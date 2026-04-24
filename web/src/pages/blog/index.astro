@@ -3,15 +3,101 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import SubstackSubscribe from '../../components/SubstackSubscribe.astro';
 import { getCollection } from 'astro:content';
 import { isPublished } from '~/utils/content';
+// Fraunces drives the beanstalk's broadsheet/zine aesthetic — oversized
+// italic on the masthead + typographic-plate cards, italic on subtitles.
+import '@fontsource-variable/fraunces';
 
-const allPosts = (await getCollection('blog', isPublished)).sort(
-  (a, b) => b.data.date.getTime() - a.data.date.getTime(),
-);
-const featuredPost = allPosts.find((p) => p.data.featured);
-const regularPosts = allPosts.filter((p) => p !== featuredPost);
+/**
+ * Per-issue tint treatment. Each post gets one of five brand-palette
+ * washes so the /blog index reads as a series of distinct editions,
+ * not a uniform card grid. Cycles by issue number so posts 6+ wrap
+ * back to the first tint, preserving the visual rhythm indefinitely.
+ *
+ * Hex values chosen to match the guides' pillar tints — keeps the
+ * site visually consistent family-wide.
+ */
+type IssueTint = {
+  name: string;
+  hex: string;
+  wash: string;
+  accentOn: string;
+  ink: string;
+};
 
-const fmt = (d: Date) =>
+const TINTS: IssueTint[] = [
+  {
+    name: 'orange',
+    hex: '#f15d22',
+    wash: 'linear-gradient(140deg, #fff6ef 0%, #ffe9d6 100%)',
+    accentOn: 'rgb(241 93 34 / 18%)',
+    ink: '#a83a11',
+  },
+  {
+    name: 'terracotta',
+    hex: '#c76a21',
+    wash: 'linear-gradient(140deg, #fff5e8 0%, #f5e1c2 100%)',
+    accentOn: 'rgb(199 106 33 / 22%)',
+    ink: '#7d420f',
+  },
+  {
+    name: 'sky',
+    hex: '#3a82b3',
+    wash: 'linear-gradient(140deg, #f1f8fd 0%, #dceaf6 100%)',
+    accentOn: 'rgb(58 130 179 / 22%)',
+    ink: '#1f4d6d',
+  },
+  {
+    name: 'kraft',
+    hex: '#b58a2a',
+    wash: 'linear-gradient(140deg, #fbf6e8 0%, #f3e4bc 100%)',
+    accentOn: 'rgb(181 138 42 / 22%)',
+    ink: '#6c4f15',
+  },
+  {
+    name: 'slate',
+    hex: '#2c3e50',
+    wash: 'linear-gradient(140deg, #f2f4f7 0%, #dde3ec 100%)',
+    accentOn: 'rgb(44 62 80 / 20%)',
+    ink: '#1a2533',
+  },
+];
+
+const allPosts = await getCollection('blog', isPublished);
+
+// Assign issue numbers by chronological order (oldest = Issue 01). Done
+// ascending so issue numbers stay stable as new posts land at the top.
+const byDateAsc = [...allPosts].sort((a, b) => a.data.date.getTime() - b.data.date.getTime());
+const issueMap = new Map<string, number>();
+byDateAsc.forEach((p, i) => issueMap.set(p.data.slug, i + 1));
+
+const byDateDesc = [...allPosts].sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+
+// "This week's issue" is always the most recent post. `featured: true` in
+// frontmatter can still pin a different post if editorial logic ever
+// calls for it.
+const explicitFeatured = allPosts.find((p) => p.data.featured);
+const featuredPost = explicitFeatured ?? byDateDesc[0];
+const backIssues = byDateDesc.filter((p) => p !== featuredPost);
+
+function tintFor(issueNumber: number): IssueTint {
+  return TINTS[(issueNumber - 1) % TINTS.length]!;
+}
+
+/** First character of the title, for typographic-plate fallbacks. */
+function firstLetter(title: string): string {
+  // Strip punctuation/leading quote marks to land on a real letter.
+  const m = title.match(/[A-Za-z]/);
+  return (m?.[0] ?? title[0] ?? '•').toLowerCase();
+}
+
+const fmtLong = (d: Date) =>
   d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+const fmtIssueStamp = (d: Date) =>
+  d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+
+const totalIssues = allPosts.length;
+const latestDate = byDateDesc[0]?.data.date;
 ---
 
 <BaseLayout
@@ -19,370 +105,693 @@ const fmt = (d: Date) =>
   description="the latest beanie news and updates — posted every friday, or roughly whenever I feel like it."
   canonicalPath="/blog"
 >
-  <div class="blog-page">
-    <!-- Hero header -->
-    <div class="blog-hero">
-      <div class="blog-hero-pattern"></div>
-      <div class="blog-hero-content">
-        <img
-          src="/brand/beanies_family_hugging_transparent_512x512.png"
-          alt="the beanies family"
-          class="blog-hero-mascot"
-        />
-        <h1 class="blog-hero-title">welcome to the beanie beanstalk!</h1>
-        <p class="blog-hero-tagline">
-          the latest beanie news and updates — posted every friday, or roughly whenever I feel like it
-        </p>
+  <main class="beanstalk">
+    <!-- ══════════════ MASTHEAD ══════════════ -->
+    <header class="masthead">
+      <div class="masthead-wash" aria-hidden="true"></div>
+      <img
+        src="/brand/beanies_family_hugging_transparent_512x512.png"
+        alt=""
+        class="masthead-mascot"
+        aria-hidden="true"
+        width="180"
+        height="180"
+      />
+      <div class="masthead-rule-top" aria-hidden="true">
+        <span>THE BEANSTALK</span>
+        <span class="masthead-rule-divider">·</span>
+        <span>EST. 2026</span>
+        <span class="masthead-rule-divider">·</span>
+        <span>A BEANIES FAMILY PUBLICATION</span>
       </div>
+      <h1 class="masthead-title">
+        <span class="masthead-title-over">the</span>
+        <span class="masthead-title-under">beanstalk.</span>
+      </h1>
+      <p class="masthead-pitch">
+        a weekly dispatch from the bean patch <span class="masthead-pitch-em">— friday mornings</span>,
+        greg writing, not a newsletter.
+      </p>
+      <p class="masthead-issue">
+        <span class="masthead-issue-chip">VOL. 01</span>
+        <span class="masthead-issue-dot">·</span>
+        <span class="masthead-issue-chip">{totalIssues} ISSUES</span>
+        {latestDate && (
+          <>
+            <span class="masthead-issue-dot">·</span>
+            <span class="masthead-issue-stamp">LATEST {fmtIssueStamp(latestDate)}</span>
+          </>
+        )}
+      </p>
+    </header>
+
+    <div class="masthead-divider" aria-hidden="true">
+      <span class="masthead-divider-glyph">🫘</span>
     </div>
 
-    <!-- Content -->
-    <div class="blog-content">
-      {featuredPost && (
+    <!-- ══════════════ FEATURED: THIS WEEK'S ISSUE ══════════════ -->
+    {featuredPost && (() => {
+      const issueNo = issueMap.get(featuredPost.data.slug) ?? 1;
+      const tint = tintFor(issueNo);
+      const hasImage = !!featuredPost.data.coverImage;
+      const plateLetter = firstLetter(featuredPost.data.title);
+      return (
         <a
+          class={`issue issue-featured ${hasImage ? 'issue-has-image' : 'issue-plate-variant'}`}
           href={`/blog/${featuredPost.data.slug}`}
-          class="featured-card"
+          style={`--tint: ${tint.hex}; --tint-ink: ${tint.ink}; --wash: ${tint.wash}; --accent-on: ${tint.accentOn};`}
+          aria-label={`Read: ${featuredPost.data.title}`}
         >
-          <div class="featured-card-bg"></div>
-          <div class="featured-card-inner">
-            <div class="featured-card-left">
-              <img
-                src="/brand/beanies_father_son_icon_192x192.png"
-                alt=""
-                class="featured-card-illustration"
-              />
-            </div>
-            <div class="featured-card-right">
-              <div class="featured-card-badge">
-                <span class="featured-card-badge-dot"></span>
-                featured
+          <div class="issue-media" aria-hidden="true">
+            {hasImage ? (
+              <div class="issue-media-frame">
+                <img src={featuredPost.data.coverImage} alt="" loading="eager" />
+                <span class="issue-media-tape issue-media-tape-tl"></span>
+                <span class="issue-media-tape issue-media-tape-br"></span>
               </div>
-              <h2 class="featured-card-title">{featuredPost.data.title}</h2>
-              <p class="featured-card-excerpt">{featuredPost.data.excerpt}</p>
-              <div class="featured-card-meta">
-                <span>{featuredPost.data.author}</span>
-                <span class="featured-card-meta-dot">·</span>
-                <span>{fmt(featuredPost.data.date)}</span>
+            ) : (
+              <div class="issue-plate">
+                <span class="issue-plate-letter">{plateLetter}</span>
+                {featuredPost.data.coverEmoji && (
+                  <span class="issue-plate-stamp">{featuredPost.data.coverEmoji}</span>
+                )}
+                <span class="issue-plate-grid" aria-hidden="true"></span>
               </div>
-            </div>
-            <div class="featured-card-arrow">
-              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            )}
+          </div>
+          <div class="issue-body">
+            <p class="issue-kicker">
+              <span class="issue-kicker-dot" aria-hidden="true"></span>
+              <span class="issue-kicker-label">THIS WEEK'S ISSUE</span>
+              <span class="issue-kicker-divider">·</span>
+              <span class="issue-kicker-issue">ISSUE {String(issueNo).padStart(2, '0')}</span>
+            </p>
+            <h2 class="issue-title issue-title-featured">{featuredPost.data.title}</h2>
+            {featuredPost.data.subtitle && (
+              <p class="issue-sub">{featuredPost.data.subtitle}</p>
+            )}
+            <p class="issue-byline">
+              <span class="issue-byline-author">{featuredPost.data.author}</span>
+              <span class="issue-byline-dot">·</span>
+              <span class="issue-byline-date">{fmtLong(featuredPost.data.date)}</span>
+              {featuredPost.data.category && (
+                <>
+                  <span class="issue-byline-dot">·</span>
+                  <span class="issue-byline-cat">{featuredPost.data.category}</span>
+                </>
+              )}
+            </p>
+            <span class="issue-cta">
+              read the issue
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                 <polyline points="9 18 15 12 9 6"></polyline>
               </svg>
-            </div>
+            </span>
           </div>
         </a>
-      )}
+      );
+    })()}
 
-      {regularPosts.length > 0 && (
-        <div class="posts-grid">
-          {regularPosts.map((post) => (
-            <a href={`/blog/${post.data.slug}`} class="post-card">
-              <div class="post-card-emoji">{post.data.coverEmoji}</div>
-              <h3 class="post-card-title">{post.data.title}</h3>
-              <p class="post-card-excerpt">{post.data.excerpt}</p>
-              <div class="post-card-meta">
-                <span>{post.data.author}</span>
-                <span class="post-card-meta-dot">·</span>
-                <span>{fmt(post.data.date)}</span>
-              </div>
-            </a>
-          ))}
+    <!-- ══════════════ BACK ISSUES ══════════════ -->
+    {backIssues.length > 0 && (
+      <>
+        <div class="section-rule" aria-hidden="true">
+          <span>BACK ISSUES</span>
         </div>
-      )}
+        <section class="issues-grid" aria-label="Back issues">
+          {backIssues.map((post) => {
+            const issueNo = issueMap.get(post.data.slug) ?? 1;
+            const tint = tintFor(issueNo);
+            const hasImage = !!post.data.coverImage;
+            const plateLetter = firstLetter(post.data.title);
+            return (
+              <a
+                class={`issue ${hasImage ? 'issue-has-image' : 'issue-plate-variant'}`}
+                href={`/blog/${post.data.slug}`}
+                style={`--tint: ${tint.hex}; --tint-ink: ${tint.ink}; --wash: ${tint.wash}; --accent-on: ${tint.accentOn};`}
+                aria-label={`Read: ${post.data.title}`}
+              >
+                <div class="issue-media" aria-hidden="true">
+                  {hasImage ? (
+                    <div class="issue-media-frame">
+                      <img src={post.data.coverImage} alt="" loading="lazy" />
+                      <span class="issue-media-tape issue-media-tape-tl"></span>
+                    </div>
+                  ) : (
+                    <div class="issue-plate">
+                      <span class="issue-plate-letter">{plateLetter}</span>
+                      {post.data.coverEmoji && (
+                        <span class="issue-plate-stamp">{post.data.coverEmoji}</span>
+                      )}
+                      <span class="issue-plate-grid" aria-hidden="true"></span>
+                    </div>
+                  )}
+                </div>
+                <div class="issue-body">
+                  <p class="issue-kicker">
+                    <span class="issue-kicker-dot" aria-hidden="true"></span>
+                    <span class="issue-kicker-issue">ISSUE {String(issueNo).padStart(2, '0')}</span>
+                    {post.data.category && (
+                      <>
+                        <span class="issue-kicker-divider">·</span>
+                        <span class="issue-kicker-cat">{post.data.category}</span>
+                      </>
+                    )}
+                  </p>
+                  <h3 class="issue-title">{post.data.title}</h3>
+                  {post.data.subtitle && (
+                    <p class="issue-sub">{post.data.subtitle}</p>
+                  )}
+                  <p class="issue-byline">
+                    <span class="issue-byline-author">{post.data.author}</span>
+                    <span class="issue-byline-dot">·</span>
+                    <span class="issue-byline-date">{fmtLong(post.data.date)}</span>
+                  </p>
+                </div>
+              </a>
+            );
+          })}
+        </section>
+      </>
+    )}
 
-      <div class="subscribe-section">
-        <SubstackSubscribe />
-      </div>
+    <div class="subscribe-section">
+      <SubstackSubscribe />
     </div>
-  </div>
+  </main>
 </BaseLayout>
 
 <style>
-.blog-page {
-  --deep-slate: #2c3e50;
-  --heritage-orange: #f15d22;
-  --terracotta: #e67e22;
-  --cloud-white: #f8f9fa;
-  background: var(--cloud-white);
-  min-height: 100vh;
-  /* Defensive against any inline content pushing the page horizontally. */
-  overflow-x: hidden;
-}
+  .beanstalk {
+    --deep-slate: #2c3e50;
+    --heritage-orange: #f15d22;
+    --terracotta: #e67e22;
+    --kraft: #f3ecd8;
+    --cloud-white: #f8f9fa;
+    --ink: #1f2d3d;
+    --muted: rgb(44 62 80 / 60%);
+    --hairline: rgb(44 62 80 / 8%);
+    --font-display: 'Outfit Variable', Outfit, system-ui, sans-serif;
+    --font-serif: 'Fraunces Variable', Fraunces, 'Source Serif 4', Georgia, serif;
 
-.blog-hero {
-  overflow: hidden;
-  /* Top padding (100px) clears the fixed pill nav (top:16px + ~50px height
-     + buffer). Previously 60px, which left the hero mascot partly covered. */
-  padding: 100px 24px 48px;
-  position: relative;
-  text-align: center;
-}
+    background: var(--cloud-white);
+    background-image:
+      radial-gradient(circle at 8% 12%, rgb(241 93 34 / 4%) 0%, transparent 40%),
+      radial-gradient(circle at 92% 88%, rgb(174 214 241 / 6%) 0%, transparent 45%);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
 
-.blog-hero-pattern {
-  background-image:
-    radial-gradient(circle at 25% 25%, var(--heritage-orange) 1px, transparent 1px),
-    radial-gradient(circle at 75% 75%, var(--terracotta) 1px, transparent 1px);
-  background-size: 32px 32px;
-  inset: 0;
-  opacity: 0.03;
-  position: absolute;
-}
+  /* ══════════════ MASTHEAD ══════════════ */
+  .masthead {
+    box-sizing: border-box;
+    margin: 0 auto;
+    max-width: 980px;
+    padding: 120px 32px 48px;
+    position: relative;
+    text-align: center;
+  }
+  .masthead-wash {
+    background:
+      radial-gradient(circle at 22% 35%, rgb(241 93 34 / 10%) 0%, transparent 42%),
+      radial-gradient(circle at 78% 70%, rgb(230 126 34 / 7%) 0%, transparent 45%);
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+  }
+  .masthead-mascot {
+    bottom: 0;
+    filter: drop-shadow(0 12px 28px rgb(44 62 80 / 12%));
+    height: 160px;
+    opacity: 0.9;
+    pointer-events: none;
+    position: absolute;
+    right: -20px;
+    transform: rotate(8deg);
+    width: 160px;
+    z-index: 0;
+  }
+  .masthead-rule-top {
+    align-items: center;
+    color: var(--heritage-orange);
+    display: inline-flex;
+    font-family: var(--font-display);
+    font-size: 0.68rem;
+    font-weight: 700;
+    gap: 10px;
+    justify-content: center;
+    letter-spacing: 0.26em;
+    margin-bottom: 28px;
+    padding: 8px 18px;
+    position: relative;
+    text-transform: uppercase;
+  }
+  .masthead-rule-top::before,
+  .masthead-rule-top::after {
+    background: linear-gradient(to right, transparent, color-mix(in srgb, var(--heritage-orange) 35%, transparent), transparent);
+    content: '';
+    display: block;
+    flex: 1;
+    height: 1px;
+    margin: 0 10px;
+    max-width: 80px;
+  }
+  .masthead-rule-divider { opacity: 0.55; }
+  .masthead-title {
+    color: var(--deep-slate);
+    font-family: var(--font-serif);
+    font-feature-settings: 'ss01';
+    line-height: 0.9;
+    margin: 0 0 22px;
+    position: relative;
+    z-index: 1;
+  }
+  .masthead-title-over {
+    display: block;
+    font-size: clamp(1.8rem, 3.6vw, 2.6rem);
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.005em;
+    opacity: 0.75;
+  }
+  .masthead-title-under {
+    color: var(--deep-slate);
+    display: block;
+    font-family: var(--font-serif);
+    font-size: clamp(4rem, 11vw, 8rem);
+    font-style: italic;
+    font-weight: 500;
+    letter-spacing: -0.035em;
+    margin-top: 2px;
+  }
+  .masthead-pitch {
+    color: rgb(44 62 80 / 78%);
+    font-family: var(--font-serif);
+    font-size: clamp(1.05rem, 1.6vw, 1.2rem);
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1.55;
+    margin: 0 auto 26px;
+    max-width: 620px;
+    position: relative;
+    z-index: 1;
+  }
+  .masthead-pitch-em {
+    color: var(--heritage-orange);
+    font-style: italic;
+    font-weight: 500;
+  }
+  .masthead-issue {
+    align-items: center;
+    color: var(--muted);
+    display: inline-flex;
+    flex-wrap: wrap;
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 700;
+    gap: 10px;
+    justify-content: center;
+    letter-spacing: 0.22em;
+    margin: 0;
+    position: relative;
+    text-transform: uppercase;
+    z-index: 1;
+  }
+  .masthead-issue-chip {
+    background: rgb(44 62 80 / 4%);
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    color: var(--deep-slate);
+    padding: 6px 12px;
+  }
+  .masthead-issue-stamp {
+    color: var(--heritage-orange);
+    font-weight: 700;
+  }
+  .masthead-issue-dot { opacity: 0.45; }
 
-.blog-hero-content { position: relative; z-index: 1; }
+  .masthead-divider {
+    align-items: center;
+    color: var(--heritage-orange);
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+    margin: 0 auto 48px;
+    max-width: 540px;
+    padding: 0 32px;
+  }
+  .masthead-divider::before,
+  .masthead-divider::after {
+    background: linear-gradient(to right, transparent, rgb(241 93 34 / 30%), transparent);
+    content: '';
+    flex: 1;
+    height: 1px;
+  }
+  .masthead-divider-glyph {
+    font-size: 0.9rem;
+    letter-spacing: 0.3em;
+    opacity: 0.6;
+  }
 
-.blog-hero-mascot {
-  animation: hero-bounce 600ms ease-out;
-  filter: drop-shadow(0 12px 32px rgb(44 62 80 / 10%));
-  height: 160px;
-  margin: 0 auto 20px;
-  width: 160px;
-}
+  /* ══════════════ ISSUE CARDS (featured + back issues) ══════════════ */
+  .issue {
+    background: var(--wash);
+    border: 1px solid color-mix(in srgb, var(--tint) 14%, var(--hairline));
+    border-radius: 24px;
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    isolation: isolate;
+    overflow: hidden;
+    position: relative;
+    text-decoration: none;
+    transition:
+      border-color 220ms ease,
+      box-shadow 220ms ease,
+      transform 220ms ease;
+  }
+  .issue::after {
+    background: linear-gradient(160deg, transparent 30%, rgb(255 255 255 / 32%) 65%, transparent 100%);
+    content: '';
+    inset: 0;
+    mix-blend-mode: overlay;
+    opacity: 0.55;
+    pointer-events: none;
+    position: absolute;
+    z-index: 0;
+  }
+  .issue:hover {
+    border-color: color-mix(in srgb, var(--tint) 48%, transparent);
+    box-shadow: 0 24px 48px -20px color-mix(in srgb, var(--tint) 40%, transparent);
+    transform: translateY(-3px);
+  }
+  .issue > * { position: relative; z-index: 1; }
 
-.blog-hero-title {
-  color: var(--deep-slate);
-  font-family: 'Outfit Variable', Outfit, sans-serif;
-  font-size: 2.25rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-}
+  /* ── Featured (hero) card: horizontal on wide, stacked on narrow ── */
+  .issue-featured {
+    display: grid;
+    gap: 0;
+    grid-template-columns: 1.05fr 1fr;
+    margin: 0 auto 56px;
+    max-width: 980px;
+  }
+  .issue-featured .issue-media { aspect-ratio: auto; height: 100%; min-height: 340px; }
+  .issue-featured .issue-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    justify-content: center;
+    padding: 44px 40px;
+  }
 
-.blog-hero-tagline {
-  color: var(--deep-slate);
-  font-family: 'Outfit Variable', Outfit, sans-serif;
-  font-size: 0.875rem;
-  margin-top: 8px;
-  opacity: 0.4;
-}
+  /* ── Media frame (when coverImage present) ── */
+  .issue-media {
+    aspect-ratio: 16 / 10;
+    background: color-mix(in srgb, var(--tint) 8%, white);
+    border-right: 1px solid color-mix(in srgb, var(--tint) 12%, transparent);
+    overflow: hidden;
+    position: relative;
+  }
+  .issue-media-frame {
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0%) 0%, rgb(255 255 255 / 0.12) 100%),
+      #fbf7ee;
+    box-shadow:
+      inset 0 0 0 8px rgb(255 255 255 / 70%),
+      inset 0 0 0 9px color-mix(in srgb, var(--tint) 18%, transparent);
+    height: 100%;
+    padding: 14px;
+    position: relative;
+    width: 100%;
+  }
+  .issue-media-frame img {
+    border-radius: 6px;
+    display: block;
+    filter: saturate(1.02) contrast(1.02);
+    height: 100%;
+    object-fit: cover;
+    transition: transform 500ms ease, filter 500ms ease;
+    width: 100%;
+  }
+  .issue:hover .issue-media-frame img {
+    filter: saturate(1.08) contrast(1.04);
+    transform: scale(1.02);
+  }
+  /* Scrapbook tape corners */
+  .issue-media-tape {
+    background: rgb(255 255 255 / 55%);
+    border: 1px solid rgb(255 255 255 / 35%);
+    box-shadow: 0 2px 4px rgb(44 62 80 / 12%);
+    height: 14px;
+    position: absolute;
+    width: 44px;
+    z-index: 2;
+  }
+  .issue-media-tape-tl {
+    left: 8px;
+    top: 6px;
+    transform: rotate(-18deg);
+  }
+  .issue-media-tape-br {
+    bottom: 6px;
+    right: 8px;
+    transform: rotate(-18deg);
+  }
 
-@keyframes hero-bounce {
-  0% { opacity: 0; transform: translateY(-20px); }
-  60% { opacity: 1; transform: translateY(4px); }
-  100% { transform: translateY(0); }
-}
+  /* ── Typographic plate (when no coverImage) ── */
+  .issue-plate {
+    align-items: center;
+    color: var(--tint-ink);
+    display: flex;
+    height: 100%;
+    justify-content: center;
+    min-height: 240px;
+    position: relative;
+  }
+  .issue-plate-letter {
+    font-family: var(--font-serif);
+    font-feature-settings: 'ss01';
+    font-size: clamp(9rem, 22vw, 16rem);
+    font-style: italic;
+    font-weight: 500;
+    letter-spacing: -0.06em;
+    line-height: 0.82;
+    margin-bottom: -0.08em;
+    opacity: 0.82;
+    position: relative;
+    z-index: 1;
+  }
+  .issue-plate-stamp {
+    align-items: center;
+    background: white;
+    border: 1px solid color-mix(in srgb, var(--tint) 26%, transparent);
+    border-radius: 50%;
+    box-shadow: 0 6px 16px -4px color-mix(in srgb, var(--tint) 30%, transparent);
+    display: inline-flex;
+    font-size: 1.25rem;
+    height: 42px;
+    justify-content: center;
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    transform: rotate(6deg);
+    width: 42px;
+    z-index: 2;
+  }
+  /* Subtle paper grid — echoes the guide textures. */
+  .issue-plate-grid {
+    background-image:
+      linear-gradient(to right, color-mix(in srgb, var(--tint) 10%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--tint) 10%, transparent) 1px, transparent 1px);
+    background-size: 28px 28px;
+    inset: 0;
+    mask-image: radial-gradient(circle at center, black 20%, transparent 85%);
+    opacity: 0.5;
+    position: absolute;
+    z-index: 0;
+  }
 
-.blog-content {
-  margin: 0 auto;
-  max-width: 800px;
-  padding: 0 24px 48px;
-}
+  /* ── Body ── */
+  .issue-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 26px 28px 28px;
+  }
+  .issue-kicker {
+    align-items: center;
+    color: var(--tint-ink);
+    display: inline-flex;
+    flex-wrap: wrap;
+    font-family: var(--font-display);
+    font-size: 0.68rem;
+    font-weight: 700;
+    gap: 8px;
+    letter-spacing: 0.2em;
+    margin: 0;
+    text-transform: uppercase;
+  }
+  .issue-kicker-dot {
+    background: var(--tint);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint) 16%, transparent);
+    display: inline-block;
+    height: 7px;
+    width: 7px;
+  }
+  .issue-kicker-divider { opacity: 0.5; }
+  .issue-kicker-cat {
+    color: rgb(44 62 80 / 60%);
+    text-transform: uppercase;
+  }
+  .issue-title {
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: clamp(1.3rem, 2vw, 1.55rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.18;
+    margin: 0;
+    transition: color 180ms;
+  }
+  .issue:hover .issue-title { color: var(--tint-ink); }
+  .issue-title-featured {
+    font-size: clamp(1.7rem, 3vw, 2.2rem);
+    letter-spacing: -0.022em;
+  }
+  .issue-sub {
+    color: rgb(44 62 80 / 72%);
+    font-family: var(--font-serif);
+    font-feature-settings: 'ss01';
+    font-size: 1rem;
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1.45;
+    margin: 0;
+  }
+  .issue-featured .issue-sub {
+    font-size: clamp(1.05rem, 1.4vw, 1.2rem);
+    max-width: 44ch;
+  }
+  .issue-byline {
+    align-items: center;
+    color: rgb(44 62 80 / 58%);
+    display: inline-flex;
+    flex-wrap: wrap;
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 500;
+    gap: 8px;
+    letter-spacing: 0.02em;
+    margin: 4px 0 0;
+  }
+  .issue-byline-author { color: var(--deep-slate); font-weight: 600; }
+  .issue-byline-dot { opacity: 0.5; }
+  .issue-byline-cat { text-transform: uppercase; letter-spacing: 0.14em; }
+  .issue-cta {
+    align-items: center;
+    color: var(--tint-ink);
+    display: inline-flex;
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 700;
+    gap: 6px;
+    letter-spacing: 0.04em;
+    margin-top: 8px;
+    text-transform: uppercase;
+    transition: gap 200ms ease;
+  }
+  .issue:hover .issue-cta { gap: 12px; }
+  .issue-cta svg { transition: transform 200ms ease; }
+  .issue:hover .issue-cta svg { transform: translateX(3px); }
 
-.featured-card {
-  border: none;
-  border-radius: 24px;
-  cursor: pointer;
-  display: block;
-  margin-bottom: 40px;
-  overflow: hidden;
-  position: relative;
-  text-align: left;
-  text-decoration: none;
-  transition: transform 200ms ease, box-shadow 200ms ease;
-  width: 100%;
-}
+  /* ══════════════ BACK ISSUES GRID ══════════════ */
+  .section-rule {
+    align-items: center;
+    color: var(--heritage-orange);
+    display: flex;
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    gap: 14px;
+    justify-content: center;
+    letter-spacing: 0.26em;
+    margin: 0 auto 28px;
+    max-width: 980px;
+    padding: 0 32px;
+    text-transform: uppercase;
+  }
+  .section-rule::before,
+  .section-rule::after {
+    background: linear-gradient(to right, transparent, rgb(241 93 34 / 28%), transparent);
+    content: '';
+    flex: 1;
+    height: 1px;
+    max-width: 180px;
+  }
 
-.featured-card:hover {
-  box-shadow: 0 16px 48px rgb(241 93 34 / 15%);
-  transform: translateY(-2px);
-}
+  .issues-grid {
+    box-sizing: border-box;
+    display: grid;
+    gap: 24px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0 auto;
+    max-width: 980px;
+    padding: 0 32px;
+  }
 
-.featured-card-bg {
-  background: linear-gradient(135deg, var(--heritage-orange) 0%, var(--terracotta) 40%, #d4721e 100%);
-  inset: 0;
-  position: absolute;
-}
+  /* ══════════════ SUBSCRIBE ══════════════ */
+  .subscribe-section {
+    margin: 72px auto 0;
+    max-width: 980px;
+    padding: 0 32px 72px;
+  }
 
-.featured-card-bg::after {
-  background-image:
-    radial-gradient(circle at 20% 80%, white 1.5px, transparent 1.5px),
-    radial-gradient(circle at 80% 20%, white 1px, transparent 1px);
-  background-size: 28px 28px, 20px 20px;
-  content: '';
-  inset: 0;
-  opacity: 0.06;
-  position: absolute;
-}
+  /* ══════════════ RESPONSIVE ══════════════ */
+  @media (max-width: 900px) {
+    .masthead { padding: 100px 24px 40px; }
+    .masthead-mascot {
+      height: 120px;
+      right: -10px;
+      width: 120px;
+    }
+    .issue-featured {
+      grid-template-columns: 1fr;
+      margin-bottom: 44px;
+    }
+    .issue-featured .issue-media { aspect-ratio: 16 / 10; min-height: 0; }
+    .issue-featured .issue-body { padding: 28px 24px; }
+    .issues-grid { gap: 20px; grid-template-columns: 1fr; padding: 0 24px; }
+    .section-rule { padding: 0 24px; }
+    .subscribe-section { margin-top: 56px; padding: 0 24px 56px; }
+  }
 
-.featured-card-inner {
-  align-items: center;
-  display: flex;
-  gap: 20px;
-  padding: 28px 24px;
-  position: relative;
-}
+  @media (max-width: 520px) {
+    .masthead { padding: 92px 20px 32px; }
+    .masthead-mascot {
+      height: 92px;
+      opacity: 0.75;
+      right: 0;
+      width: 92px;
+    }
+    .masthead-rule-top { font-size: 0.6rem; letter-spacing: 0.22em; }
+    .masthead-rule-top::before,
+    .masthead-rule-top::after { max-width: 40px; }
+    .masthead-title-over { font-size: clamp(1.4rem, 5vw, 2rem); }
+    .masthead-title-under { font-size: clamp(3.2rem, 15vw, 5.2rem); }
+    .masthead-pitch { font-size: 1rem; }
+    .issue-body { padding: 22px 20px 24px; }
+    .issue-title-featured { font-size: 1.45rem; }
+    .issue-plate-letter { font-size: clamp(7rem, 38vw, 11rem); }
+    .issue-media-frame { padding: 10px; }
+  }
 
-.featured-card-left { flex-shrink: 0; }
-
-.featured-card-illustration {
-  backdrop-filter: blur(8px);
-  background: rgb(255 255 255 / 15%);
-  border-radius: 20px;
-  height: 80px;
-  padding: 8px;
-  width: 80px;
-}
-
-.featured-card-right { flex: 1; min-width: 0; }
-
-.featured-card-badge {
-  align-items: center;
-  color: rgb(255 255 255 / 80%);
-  display: inline-flex;
-  font-family: 'Outfit Variable', Outfit, sans-serif;
-  font-size: 0.625rem;
-  font-weight: 700;
-  gap: 6px;
-  letter-spacing: 0.1em;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-}
-
-.featured-card-badge-dot {
-  animation: pulse-dot 2s ease-in-out infinite;
-  background: white;
-  border-radius: 50%;
-  height: 6px;
-  width: 6px;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-
-.featured-card-title {
-  color: white;
-  font-family: 'Outfit Variable', Outfit, sans-serif;
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.featured-card:hover .featured-card-title {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.featured-card-excerpt {
-  -webkit-box-orient: vertical;
-  color: rgb(255 255 255 / 60%);
-  display: -webkit-box;
-  font-size: 0.8125rem;
-  -webkit-line-clamp: 2;
-  line-height: 1.6;
-  margin-top: 8px;
-  overflow: hidden;
-}
-
-.featured-card-meta {
-  align-items: center;
-  color: rgb(255 255 255 / 40%);
-  display: flex;
-  font-family: 'Outfit Variable', Outfit, sans-serif;
-  font-size: 0.75rem;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.featured-card-meta-dot { opacity: 0.3; }
-
-.featured-card-arrow {
-  align-items: center;
-  background: rgb(255 255 255 / 10%);
-  border-radius: 50%;
-  color: rgb(255 255 255 / 60%);
-  display: flex;
-  flex-shrink: 0;
-  height: 40px;
-  justify-content: center;
-  transition: background 200ms, color 200ms;
-  width: 40px;
-}
-
-.featured-card:hover .featured-card-arrow {
-  background: white;
-  color: var(--heritage-orange);
-}
-
-.posts-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(2, 1fr);
-  margin-bottom: 40px;
-}
-
-@media (max-width: 480px) {
-  .posts-grid { grid-template-columns: 1fr; }
-}
-
-.post-card {
-  background: white;
-  border: 1.5px solid rgb(44 62 80 / 8%);
-  border-radius: 20px;
-  cursor: pointer;
-  display: block;
-  padding: 28px 20px;
-  text-align: left;
-  text-decoration: none;
-  transition: transform 200ms ease, border-color 200ms, box-shadow 200ms;
-  width: 100%;
-}
-
-.post-card:hover {
-  border-color: var(--heritage-orange);
-  box-shadow: 0 8px 24px rgb(241 93 34 / 8%);
-  transform: translateY(-2px);
-}
-
-.post-card-emoji { font-size: 2rem; margin-bottom: 12px; }
-
-.post-card-title {
-  color: var(--deep-slate);
-  font-family: 'Outfit Variable', Outfit, sans-serif;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  line-height: 1.4;
-  margin-bottom: 8px;
-}
-
-.post-card:hover .post-card-title { color: var(--heritage-orange); }
-
-.post-card-excerpt {
-  -webkit-box-orient: vertical;
-  color: var(--deep-slate);
-  display: -webkit-box;
-  font-size: 0.8125rem;
-  -webkit-line-clamp: 3;
-  line-height: 1.6;
-  opacity: 0.5;
-  overflow: hidden;
-}
-
-.post-card-meta {
-  align-items: center;
-  color: var(--deep-slate);
-  display: flex;
-  font-family: 'Outfit Variable', Outfit, sans-serif;
-  font-size: 0.6875rem;
-  gap: 6px;
-  margin-top: 12px;
-  opacity: 0.3;
-}
-
-.post-card-meta-dot { opacity: 0.5; }
-
-.subscribe-section { margin-top: 40px; }
-
-@media (max-width: 520px) {
-  /* Mobile nav is single-row now (hamburger below 820px), so this only
-     needs to clear the 48-56px pill + 16px top offset. */
-  .blog-hero { padding-top: 88px; }
-  .blog-hero-mascot { height: 120px; width: 120px; }
-  .blog-hero-title { font-size: 1.75rem; }
-  .featured-card-inner { flex-direction: column; text-align: center; }
-  .featured-card-arrow { display: none; }
-}
+  /* Reduce motion — drop the hover transforms + scale. */
+  @media (prefers-reduced-motion: reduce) {
+    .issue:hover { transform: none; }
+    .issue:hover .issue-media-frame img { transform: none; }
+    .issue:hover .issue-cta { gap: 6px; }
+    .issue:hover .issue-cta svg { transform: none; }
+  }
 </style>
-</content>
-</invoke>

@@ -16,6 +16,7 @@ const blog = defineCollection({
     coverEmoji: z.string().optional(),
     coverImage: z.string().optional(),
     excerpt: z.string(),
+    subtitle: z.string().optional(),
     featured: z.boolean().default(false),
     author: z.string().default('greg'),
     /** Optional. Set when a post has been substantively edited after publish.
