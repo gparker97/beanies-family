@@ -28,6 +28,7 @@ import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import type { FamilyActivity, DutyCompletion } from '@/types/models';
@@ -825,21 +826,23 @@ async function confirmReschedule() {
             {{ t('planner.rescheduleHint') }}
           </p>
 
-          <div class="grid grid-cols-2 gap-3" :class="{ 'grid-cols-3': !viewIsAllDay }">
+          <div v-if="viewIsAllDay" class="grid grid-cols-2 gap-3">
             <FormFieldGroup :label="t('planner.rescheduleTo')">
-              <BaseInput v-model="rescheduleDate" type="date" />
+              <BeanieDatePicker v-model="rescheduleDate" />
             </FormFieldGroup>
-            <template v-if="viewIsAllDay">
-              <FormFieldGroup :label="t('planner.field.endDate')">
-                <BaseInput
-                  :model-value="rescheduleEndDate"
-                  type="date"
-                  :min="rescheduleDate"
-                  @update:model-value="handleRescheduleEndDate($event as string)"
-                />
-              </FormFieldGroup>
-            </template>
-            <template v-else>
+            <FormFieldGroup :label="t('planner.field.endDate')">
+              <BeanieDatePicker
+                :model-value="rescheduleEndDate"
+                :min="rescheduleDate"
+                @update:model-value="handleRescheduleEndDate"
+              />
+            </FormFieldGroup>
+          </div>
+          <div v-else class="space-y-3">
+            <FormFieldGroup :label="t('planner.rescheduleTo')">
+              <BeanieDatePicker v-model="rescheduleDate" />
+            </FormFieldGroup>
+            <div class="grid grid-cols-2 gap-3">
               <FormFieldGroup :label="t('modal.startTime')">
                 <TimePresetPicker
                   :model-value="rescheduleStartTime"
@@ -852,7 +855,7 @@ async function confirmReschedule() {
                   @update:model-value="handleRescheduleEndTime"
                 />
               </FormFieldGroup>
-            </template>
+            </div>
           </div>
 
           <div class="flex gap-2">

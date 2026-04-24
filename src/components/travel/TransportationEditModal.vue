@@ -3,6 +3,8 @@ import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
+import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -247,14 +249,14 @@ async function handleSave() {
             :required="validation.isRequired('departureDate')"
             :error="validation.showError('departureDate')"
           >
-            <BaseInput v-model="departureDate" type="date" />
+            <BeanieDatePicker v-model="departureDate" />
           </FormFieldGroup>
           <FormFieldGroup
             :label="t('vacation.field.departureTime')"
             :required="validation.isRequired('departureTime')"
             :error="validation.showError('departureTime')"
           >
-            <BaseInput v-model="departureTime" type="time" />
+            <BeanieTimeInput v-model="departureTime" />
           </FormFieldGroup>
         </div>
       </template>
@@ -281,10 +283,10 @@ async function handleSave() {
             :required="validation.isRequired('pickupDate')"
             :error="validation.showError('pickupDate')"
           >
-            <BaseInput v-model="pickupDate" type="date" />
+            <BeanieDatePicker v-model="pickupDate" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.pickupTime')">
-            <BaseInput v-model="pickupTime" type="time" />
+            <BeanieTimeInput v-model="pickupTime" />
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
@@ -293,10 +295,10 @@ async function handleSave() {
             :required="validation.isRequired('returnDate')"
             :error="validation.showError('returnDate')"
           >
-            <BaseInput v-model="returnDate" type="date" />
+            <BeanieDatePicker v-model="returnDate" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.returnTime')">
-            <BaseInput v-model="returnTime" type="time" />
+            <BeanieTimeInput v-model="returnTime" />
           </FormFieldGroup>
         </div>
       </template>
@@ -309,22 +311,22 @@ async function handleSave() {
             :required="validation.isRequired('pickupDate')"
             :error="validation.showError('pickupDate')"
           >
-            <BaseInput v-model="pickupDate" type="date" />
+            <BeanieDatePicker v-model="pickupDate" />
           </FormFieldGroup>
           <FormFieldGroup
             :label="t('vacation.field.pickupTime')"
             :required="validation.isRequired('pickupTime')"
             :error="validation.showError('pickupTime')"
           >
-            <BaseInput v-model="pickupTime" type="time" />
+            <BeanieTimeInput v-model="pickupTime" />
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup :label="t('vacation.field.returnDate')">
-            <BaseInput v-model="returnDate" type="date" />
+            <BeanieDatePicker v-model="returnDate" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.returnTime')">
-            <BaseInput v-model="returnTime" type="time" />
+            <BeanieTimeInput v-model="returnTime" />
           </FormFieldGroup>
         </div>
       </template>

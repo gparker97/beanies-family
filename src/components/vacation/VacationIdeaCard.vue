@@ -5,6 +5,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import { formatDateShort } from '@/utils/date';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 
 const props = withDefaults(
@@ -229,11 +230,10 @@ function patch(fields: Partial<VacationIdea>) {
 
       <!-- Which day? -->
       <FormFieldGroup :label="t('vacation.ideas.whichDay')" :optional="true">
-        <BaseInput
-          type="date"
+        <BeanieDatePicker
           :model-value="idea.suggestedDate ?? ''"
           :disabled="readOnly"
-          @update:model-value="patch({ suggestedDate: String($event) })"
+          @update:model-value="patch({ suggestedDate: $event })"
         />
       </FormFieldGroup>
 

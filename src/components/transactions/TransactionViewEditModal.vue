@@ -24,7 +24,7 @@ import AmountInput from '@/components/ui/AmountInput.vue';
 import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
 import AmortizationBreakdown from '@/components/ui/AmortizationBreakdown.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import type { Transaction } from '@/types/models';
 
 type EditableField = 'description' | 'amount' | 'category' | 'date';
@@ -249,13 +249,6 @@ function handleDescriptionKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter') {
     e.preventDefault();
     saveField('description');
-  } else if (e.key === 'Escape') cancelEdit();
-}
-
-function handleDateKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    saveField('date');
   } else if (e.key === 'Escape') cancelEdit();
 }
 
@@ -534,12 +527,7 @@ async function handleDelete() {
           <template #edit>
             <div class="flex items-center gap-2">
               <div class="flex-1">
-                <BaseInput
-                  v-model="draftDate"
-                  type="date"
-                  class="rounded-[14px] ring-2 ring-orange-500/30"
-                  @keydown="handleDateKeydown"
-                />
+                <BeanieDatePicker v-model="draftDate" />
               </div>
               <button
                 class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"

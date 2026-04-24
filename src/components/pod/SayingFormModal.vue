@@ -8,6 +8,7 @@ import { computed, ref } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import { useFormModal } from '@/composables/useFormModal';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSayingsStore } from '@/stores/sayingsStore';
@@ -117,7 +118,7 @@ async function handleDelete(): Promise<void> {
 
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <FormFieldGroup :label="t('sayings.field.saidOn')" optional>
-        <BaseInput v-model="saidOn" type="date" />
+        <BeanieDatePicker v-model="saidOn" />
       </FormFieldGroup>
 
       <FormFieldGroup :label="t('sayings.field.place')" optional>
