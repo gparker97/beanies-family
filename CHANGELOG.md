@@ -12,12 +12,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **"Fresh off the press" divider on the beanstalk.** A small zine-style ornament now sits between the masthead and the latest-issue card on `/blog` — thin Heritage Orange rules fading in from each side, bracketing a Fraunces-italic label flanked by two accent dots. Replaces the previous "card butts up against the hero" layout.
+- **New family-reading illustration on the family library.** `/guides` now leads with a warm family-reading scene (dad + three beanies gathered around a book) sitting on a soft multi-stop radial halo. Gentle bob animation, redesigned from an absolute-positioned corner sticker into a proper two-column flex so nothing clips on mobile.
 - **Themed date + time pickers across the app.** New `BeanieDatePicker` and `BeanieTimeInput` components replace every native date/time field. Both use the same pill vocabulary as the existing preset-time picker: filled Heritage Orange when a value is chosen, slate when empty, Outfit font. Date picker has a calendar popover with Today/Tomorrow quick chips and respects your **Week Starts On** setting. Time picker opens a themed 3-column popover (Hour · Minute · AM/PM) with Now/Clear shortcuts — no more generic browser UI.
 - **Smaller, cleaner reschedule + activity forms.** The reschedule modal and new-activity flow no longer squeeze date + start + end time into one row when it's tight — date gets its own line and the times sit below, so nothing clips.
 - **Compact "+1 day" toggle on flight/train arrivals.** Replaces the wider checkbox + label with a small orange toggle pill, letting arrival time match departure width.
 
 ### Changed
 
+- **Beanstalk mascot on mobile is now a watermark.** The tall mascot used to stack above the title on phones and push the pitch + featured card past the fold. It now sits behind the masthead text at low opacity, keeping the brand hello visible without consuming any vertical space.
+- **Refreshed subtitles on the three existing beanstalk posts** so each card carries its own one-line hook under the title (Substack-style).
+- **Cleaner beanstalk mascot asset.** Swapped the previous background-removed PNG for a fully transparent version — no halo around the character on the hero gradient.
 - **Picker popovers teleport out of their parent** so segment cards and modals with clipped overflow no longer cut off the bottom of the calendar or time columns. They reposition on scroll/resize and flip up when they'd overflow the viewport.
 - **Quick-edit date/time fields on travel segment cards** now use the themed pickers inline, with the night-flight hint (🌙 early morning / late night) kept alongside.
 
