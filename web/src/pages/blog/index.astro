@@ -919,15 +919,19 @@ const latestDate = byDateDesc[0]?.data.date;
 
   /* ══════════════ RESPONSIVE ══════════════ */
   @media (max-width: 900px) {
+    /* On mobile the flex column stacks the tall mascot on top, which
+       pushes the title + pitch past the fold. Shrink the mascot to a
+       compact "brand hello" size so the masthead type stays above the
+       fold. Negative margin-bottom tightens the gap to the text. */
     .masthead {
       align-items: center;
       flex-direction: column;
-      gap: 8px;
-      padding: 100px 24px 40px;
+      gap: 4px;
+      padding: 84px 24px 40px;
     }
     .masthead-mascot {
-      margin-bottom: -6px;
-      width: 170px;
+      margin-bottom: -4px;
+      width: 115px;
     }
     .fresh-divider {
       gap: 14px;
@@ -948,8 +952,11 @@ const latestDate = byDateDesc[0]?.data.date;
   }
 
   @media (max-width: 520px) {
-    .masthead { padding: 92px 20px 32px; }
-    .masthead-mascot { width: 130px; }
+    .masthead { padding: 72px 20px 32px; }
+    /* Further shrink on small phones — ~86px width keeps the mascot as
+       a recognisable brand mark while freeing ~150px of vertical space
+       versus the previous 130px render. */
+    .masthead-mascot { margin-bottom: 0; width: 86px; }
     .masthead-rule-top { font-size: 0.6rem; letter-spacing: 0.22em; }
     .masthead-rule-top::before,
     .masthead-rule-top::after { max-width: 40px; }
