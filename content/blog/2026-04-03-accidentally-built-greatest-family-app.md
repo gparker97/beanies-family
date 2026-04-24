@@ -6,7 +6,7 @@ category: updates
 coverEmoji: 🚀
 coverImage: /blog/beanies-nook-screenshot.webp
 excerpt: '800 commits, 250 cups of coffee, and 89,000 gloriously vibe-coded lines later, I found myself gazing proudly at a nano banana generated image of my actual family in beanie form.'
-subtitle: '800 commits, 250 cups of coffee, one genuinely calmer family life'
+subtitle: 'or: why vibe coding by yourself at 3am can be hazardous to your health'
 featured: false
 author: greg
 ---
