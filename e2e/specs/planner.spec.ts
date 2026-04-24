@@ -3,6 +3,7 @@ import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { ui } from '../helpers/ui-strings';
 import { dismissActivityCreatedConfirm } from '../helpers/activity-modal';
+import { selectBeanieDate } from '../helpers/date-picker';
 
 /**
  * E2E tests for the Family Planner page.
@@ -50,7 +51,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /\+ add activity/i }).click();
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill(title);
     await selectAssignee(page);
-    await page.locator('input[type="date"]').first().fill(tomorrowStr);
+    await selectBeanieDate(page.locator('div[role="dialog"]'), tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
     await dismissActivityCreatedConfirm(page);
   }
@@ -86,7 +87,7 @@ test.describe('Family Planner', () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-    await page.locator('input[type="date"]').fill(tomorrowStr);
+    await selectBeanieDate(page.locator('div[role="dialog"]'), tomorrowStr);
 
     // Save
     await page.getByRole('button', { name: /^add activity$/i }).click();
@@ -106,7 +107,7 @@ test.describe('Family Planner', () => {
     // Fill in form — recurrence defaults to "Recurring"
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Piano Lesson');
     await selectAssignee(page);
-    await page.locator('input[type="date"]').first().fill('2026-03-04');
+    await selectBeanieDate(page.locator('div[role="dialog"]'), '2026-03-04');
 
     // Open start time dropdown (trigger shows "9:00 AM" by default) then select 3:00 PM
     await page.getByRole('button', { name: '9:00 AM' }).first().click();
@@ -298,7 +299,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /\+ add activity/i }).click();
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Reschedule Test');
     await selectAssignee(page);
-    await page.locator('input[type="date"]').first().fill(tomorrowStr);
+    await selectBeanieDate(page.locator('div[role="dialog"]'), tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
     // Dismiss confirmation modal
@@ -316,8 +317,7 @@ test.describe('Family Planner', () => {
     await expect(dialog.getByText(/new date/i)).toBeVisible({ timeout: 3000 });
 
     // Change the date in the reschedule form
-    const rescheduleDateInput = dialog.locator('input[type="date"]');
-    await rescheduleDateInput.fill(rescheduleStr);
+    await selectBeanieDate(dialog, rescheduleStr);
 
     // Click the Reschedule confirm button
     await dialog.getByRole('button', { name: /^reschedule$/i }).click();
