@@ -278,6 +278,7 @@ const isTomorrowDisabled = computed(() => {
     <button
       type="button"
       :disabled="disabled"
+      data-testid="beanie-date-picker-trigger"
       class="font-outfit flex w-full items-center justify-between gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
       :class="[
         modelValue
