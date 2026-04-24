@@ -8,6 +8,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-24
+
+### Added
+
+- **Themed date + time pickers across the app.** New `BeanieDatePicker` and `BeanieTimeInput` components replace every native date/time field. Both use the same pill vocabulary as the existing preset-time picker: filled Heritage Orange when a value is chosen, slate when empty, Outfit font. Date picker has a calendar popover with Today/Tomorrow quick chips and respects your **Week Starts On** setting. Time picker opens a themed 3-column popover (Hour · Minute · AM/PM) with Now/Clear shortcuts — no more generic browser UI.
+- **Smaller, cleaner reschedule + activity forms.** The reschedule modal and new-activity flow no longer squeeze date + start + end time into one row when it's tight — date gets its own line and the times sit below, so nothing clips.
+- **Compact "+1 day" toggle on flight/train arrivals.** Replaces the wider checkbox + label with a small orange toggle pill, letting arrival time match departure width.
+
+### Changed
+
+- **Picker popovers teleport out of their parent** so segment cards and modals with clipped overflow no longer cut off the bottom of the calendar or time columns. They reposition on scroll/resize and flip up when they'd overflow the viewport.
+- **Quick-edit date/time fields on travel segment cards** now use the themed pickers inline, with the night-flight hint (🌙 early morning / late night) kept alongside.
+
 ## 2026-04-23
 
 ### Added
