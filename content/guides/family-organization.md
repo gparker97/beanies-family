@@ -8,6 +8,8 @@ lastUpdated: 2026-04-22
 relatedPosts:
   - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
+  - buy-fruit
+  - best-cozi-maple-alternatives-in-2026
 tags:
   - family-organization
   - routines
@@ -156,7 +158,7 @@ Building the habit first is a more sustainable practice - here's a framework tha
 - **Make it visible -** put the app on your home screen or favorites bar, not buried in a folder. If it's out of sight, it's out of mind.
 - **Don't break the streak** - slow and steady wins the race. 2 minutes every day is better than 30 minutes once a week.
 
-Once the habit is solid, then it's time to pick your tool. Here are some good options for family planning and organization <link to cozi app options post> <!-- link pending: cozi alternatives post publishes Friday -->:
+Once the habit is solid, then it's time to pick your tool. I've written a [separate breakdown of the best cozi and maple alternatives in 2026](/blog/best-cozi-maple-alternatives-in-2026) with my honest take on each. Here are some good options to get you started:
 
 - **Google Calendar -** free, universal, but limited to calendar-only with no family features
 - **Cozi -** one of the most widely used family apps, but paywalled since 2024 and your data is stored and shared with third parties
