@@ -19,11 +19,8 @@
 >
 > **Pending / Next Session:**
 >
-> - Same Notion manual fix carrying forward from 2026-04-23: FAQ "Can I give feedback" block (`343247d9-a99f-8158-b133-e93b649c2cc9`) needs its answer updated in Notion to match the repo. MCP `update-a-block` endpoint has a schema bug — manual touch-up only.
-> - Guide detail-page section counters still use `decimal-leading-zero` ("chapter 01" inside a pillar's H2 sections). Unchanged from yesterday.
 > - E2E onboarding wizard webkit flake at 2nd logged occurrence — monitor.
 > - `seo-geo@opc-skills` plugin evaluation still pending from yesterday.
-> - Hamburger drawer direction (top vs right) still a preview choice — current is top, swap is a one-line change.
 
 **Previous update (2026-04-23 — all-day marketing-site rebuild + FAB ship + nav overhaul + content sync — ~25 commits, multiple prod deploys):** Claude (2026-04-23 afternoon/evening session covered — massive marketing-site + content + FAB shipping day, deployed in multiple waves across `https://app.beanies.family` and `https://beanies.family`).
 

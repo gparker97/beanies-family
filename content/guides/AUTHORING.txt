@@ -50,3 +50,83 @@ Body uses standard markdown with `## H2` headings. Each H2 should:
 
 The page template auto-generates a Table of Contents from H2 headings.
 H3s are skipped from the ToC (too granular) but render normally in content.
+
+## GEO scoring rubric (per-guide self-check)
+
+Family + finance is a YMYL (Your Money, Your Life) topic. AI search engines
+(ChatGPT, Perplexity, Google AI Overview, Claude via Brave) heavily weight
+citation-density and authoritative signals before they'll cite a page.
+
+Princeton GEO research (2024) quantifies which writing moves move the needle
+most. Score each guide against these before shipping. The first three carry
+most of the weight; the combination of "fluency + statistics" is the single
+highest-impact lever.
+
+  Method                         AI-citation lift
+  ─────────────────────────────────────────────────────────────────
+  Authoritative citations        +40%  (+132% for Google AI Overview)
+  Statistics addition            +37%
+  Quotation addition             +30%
+  Authoritative tone             +25%
+  Easy-to-understand phrasing    +20%
+  Domain-specific terminology    +18%
+  Vocabulary diversity           +15%
+  Fluency / readability          +15-30%
+  ─────────────────────────────────────────────────────────────────
+  Keyword stuffing               -10%  (do NOT do this)
+
+Per-guide checklist:
+  [ ] 5+ hyperlinked citations to primary sources (.gov, peer-reviewed,
+      authoritative orgs, first-party press releases)
+  [ ] 3+ specific numeric stats with their source linked inline
+  [ ] 2+ direct quotes with attribution (author, book, study)
+  [ ] Short-answer block under every H2 (2 sentences, bold)
+  [ ] Answer-first structure — the extractable chunk comes before elaboration
+  [ ] No `<meta name="keywords">` tags (Google ignored since ~2009)
+  [ ] No keyword stuffing (repeating target phrase beyond natural use)
+  [ ] Voice-authored anecdote(s) — lived experience, not generic prose
+  [ ] All external links resolve (no 404s, no redirects to homepages)
+
+Preferred citation sources:
+  Finance → CFPB, Federal Reserve, BLS, SSA, IRS, CBO, published academic
+  Family  → Pew Research, Brookings, APA, peer-reviewed studies, named books
+  Tech    → MDN, W3C, Ink & Switch, official project docs, original press
+  Industry → first-party announcements, TechCrunch / The Verge for shutdowns,
+             avoid Wikipedia as a primary source
+
+## External links — maintenance
+
+External links rot. Before shipping ANY guide update, validate every
+external URL still resolves. The `curl -I` check should return a `200`
+(direct) or a `301/302` that lands on the intended content, NOT a
+redirect to a site homepage.
+
+  curl -sI -o /dev/null -w "%{http_code} %{url_effective}\n" -L <url>
+
+If a primary source (press release, shutdown announcement, study) has
+rotted, prefer in order:
+  1. Wayback Machine snapshot (web.archive.org) of the original
+  2. A reputable secondary source from the same era (TechCrunch, The
+     Verge, Ars Technica, Reuters, AP)
+  3. Dropping the link and citing the event in-text with the date
+
+Never leave a 404 link live. Never silently swap a primary source for
+a lower-authority secondary without noting it.
+
+## Indexing verification
+
+Different AI search engines use different index backends. Run these
+quarterly (or after any major content push) to verify coverage:
+
+  Google  — https://www.google.com/search?q=site:beanies.family
+  Bing    — https://www.bing.com/search?q=site%3Abeanies.family  (Copilot + Bing)
+  Brave   — https://search.brave.com/search?q=site%3Abeanies.family  (Claude)
+  DDG     — https://duckduckgo.com/?q=site%3Abeanies.family
+
+Submission URLs if coverage is thin:
+  Google Search Console — https://search.google.com/search-console
+  Bing Webmaster Tools  — https://www.bing.com/webmasters
+  IndexNow (pushes to Bing + Yandex + others) — https://www.indexnow.org/
+  Brave uses a mix of its own crawler + third-party signals; no direct
+  submission. Good Bing coverage and strong backlinks correlate with
+  Brave coverage.

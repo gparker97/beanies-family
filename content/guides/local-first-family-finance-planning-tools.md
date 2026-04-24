@@ -13,6 +13,10 @@ tags:
   - privacy
   - family-apps
   - e2ee
+stationSubtitle: 'why the tool you use for all of this matters'
+prevTeaser: 'the money layer sits on top of the system. this is what sits under all of it.'
+isFinalPillar: true
+loopbackTeaser: "you've walked the whole curriculum. re-read chapter 1 with the system in mind - it lands differently."
 draft: false
 ---
 
@@ -32,15 +36,15 @@ Local-first is a small philosophical shift with big practical consequences - you
 
 Perhaps you've experienced an app you know and love suddenly changing its pricing model. Typically this happens after being acquired by another company, but not always. Or maybe one of your favorite apps just quietly disappeared. That is the cost of using cloud-first software, and most of us accepted it as a given for doing business on the internet.
 
-For some real-world examples, see: the [Mint shutdown](https://blog.intuit.com/news-social/mint-sunset-announcement/) ← <add link to relevant article> <!-- link added: greg confirm --> and [Sunrise calendar](https://techcrunch.com/2016/08/31/microsoft-shuts-down-sunrise-app/) ← <add link to relevant article> <!-- link added: greg confirm -->. It's a real risk - not theoretical.
+For some real-world examples, see: the [Mint shutdown](https://techcrunch.com/2023/11/02/personal-finance-monarch-intuit-mint/) and [Sunrise calendar](https://fortune.com/2016/05/11/microsoft-sunset-sunrise-calendar-app/). It's a real risk - not theoretical.
 
 There's a deeper issue, though, and it's the one that should actually worry you more - those companies do more than just hold your data - they can read it and sell it.
 
-While some companies are scrupulous and ethical about this, others are not. For one example of an unscrupulous company, see [Life360's history of selling precise location data](https://themarkup.org/privacy/2021/12/06/the-app-that-promises-to-keep-families-safe-is-selling-precise-location-data-on-tens-of-millions-of-its-users) to data brokers ← <add link to relevant article> <!-- link added: greg confirm -->.
+While some companies are scrupulous and ethical about this, others are not. For one example of an unscrupulous company, see [Life360's history of selling precise location data](https://themarkup.org/privacy/2021/12/06/the-popular-family-safety-app-life360-is-selling-precise-location-data-on-its-tens-of-millions-of-user) to data brokers.
 
 Many companies are somewhere in the middle, and the position they hold today is not necessarily the position they'll hold after an acquisition or the next funding round.
 
-When I was researching personal finance apps for my own family, I had a brief moment of clarity that I wrote about in an early blog post. Most of the apps we use happily today require us to hand over keys to important parts of our lives - and when it comes to personal finance apps, that is especially true with financial accounts.
+When I was researching personal finance apps for my own family, I had a brief moment of clarity that I wrote about in [an early blog post](/blog/welcome-to-the-beanstalk). Most of the apps we use happily today require us to hand over keys to important parts of our lives - and when it comes to personal finance apps, that is especially true with financial accounts.
 
 We trust that the company on the other end will be careful with those keys, with no recourse if they aren't.
 
@@ -65,7 +69,7 @@ There are two kinds of encryption that matter:
 
 A privacy-preserving app uses E2EE. A cloud-first app that says "your data is encrypted" may or may not actually preserve your privacy.
 
-The key thing to keep in mind is that Server-Side Encryption (SSE) is a security feature, while End-to-end Encryption (E2EE) is a privacy feature.
+The key thing to keep in mind is that Server-Side Encryption (SSE) is a _security_ feature, while End-to-end Encryption (E2EE) is a _privacy_ feature.
 
 ## end-to-end encryption, explained without the math
 
@@ -81,9 +85,9 @@ The long and short of all this is, even if a hacker breached an E2EE company tom
 
 ## the local-first manifesto: 7 ideals, in terms that anyone can understand
 
-**short answer:** in 2019, a research group called [Ink & Switch](https://www.inkandswitch.com/) ← <link to ink and switch website> <!-- link added: greg confirm --> published the seven properties they think every truly local-first app should have. In summary, those properties are: fast, multi-device, offline, lasts forever, secure, collaborative, and yours.
+**short answer:** in 2019, a research group called [Ink & Switch](https://www.inkandswitch.com/) published the seven properties they think every truly local-first app should have. In summary, those properties are: fast, multi-device, offline, lasts forever, secure, collaborative, and yours.
 
-The original Ink & Switch paper is an enlightening and interesting read if you want the full version. Below are the seven ideals, in non-technical terms:
+The original [Ink & Switch paper](https://www.inkandswitch.com/local-first/) is an enlightening and interesting read if you want the full version. Below are the seven ideals, in non-technical terms:
 
 - **No spinners** - The app should be instantly fast because your data is already on your device. No "loading..." while it talks to a server. In cases where data is encrypted, decrypting data may take time, even if it is done locally.
 - **Your work is not trapped on one device** - Your data should sync across your phone, laptop, and tablet without forcing you into one specific cloud service.
@@ -93,23 +97,23 @@ The original Ink & Switch paper is an enlightening and interesting read if you w
 - **Collaboration without conflict** - Two people editing the same thing offline shouldn't cause conflicts or a file versioning mess when they reconnect.
 - **You retain ultimate ownership** - Your data is yours - you can take it elsewhere if you want. Nobody can lock you out or hold your data hostage for any reason.
 
-That's it - seven properties, none of which most cloud apps deliver. Until very recently, most of these properties were technically very hard to deliver. Improvements in data storage, front-end technologies, conflict resolution (see CRDTs - more information below), and other important areas have enabled local-first apps to be a real and practical solution in today's marketplace.
+That's it - seven properties, none of which most cloud apps deliver. Until very recently, most of these properties were technically very hard to deliver. Improvements in data storage, front-end technologies, conflict resolution (see CRDTs - more information below), and other important areas have enabled **local-first apps** to be a real and practical solution in today's marketplace.
 
 ## CRDTs: how local-first apps stay in sync without a server telling them what to do
 
-**short answer:** a CRDT (Conflict-free Replicated Data Type) is a type of data structure that lets multiple devices edit the same data offline, and then merges their changes back together without ever resulting in a conflict. CRDT is the technology that makes local-first collaboration possible.
+**short answer:** a CRDT (Conflict-free Replicated Data Type) is a type of data structure that lets multiple devices edit the same data offline, and then merges their changes back together without ever resulting in a conflict. CRDT is the technology that makes **local-first collaboration** possible.
 
 If you've ever used Google Docs and watched two people type at the same time without overwriting each other, you're watching something similar to a CRDT in action. The difference is that Google Docs uses a central server to broker the merges.
 
-CRDTs let you do the same thing without a central server. With local-first CRDTs, each device records its changes as small operations (i.e. "user added the letter A at position 5"). When devices reconnect, they exchange operations and merge all changes in a way that will always produce the same result, using an algorithm that's mathematically proven.
+CRDTs let you do the same thing **without a central server**. With **local-first CRDTs**, each device records its changes as small operations (i.e. "user added the letter A at position 5"). When devices reconnect, they exchange operations and merge all changes in a way that will always produce the same result, using an algorithm that's mathematically proven.
 
-The true magic is in the fact that the result will always be the same. Think of it as two people editing the same shopping list. Both devices are offline, and when they finally come online and sync with each other, they don't fight - they merge.
+The true magic is in the fact that the result will **always** be the same. Think of it as two people editing the same shopping list. Both devices are offline, and when they finally come online and sync with each other, they don't fight - they merge.
 
 Without CRDTs, local-first software is theoretically possible, but practically miserable, because the users would have to manually resolve every conflict. With CRDTs, things just work.
 
 One of my early, non-negotiable requirements for beanies.family was that it would be a local-first application, with data stored on your machine and under the user's full control. We hit our first real roadblock when I started testing with my family - data consistency was awful.
 
-It wasn't until we found the [Automerge](https://automerge.org/) library, which is a native implementation of CRDTs, that things finally started to work. Without CRDTs, beanies.family would not be able to exist in its current form. I owe all the wonderful people at [Ink & Switch](https://www.inkandswitch.com/) ← <add link> <!-- link added: greg confirm --> and [automerge](https://automerge.org/) ← <add link> <!-- link added: greg confirm --> a beer.
+It wasn't until we found the [Automerge](https://automerge.org/) library, which is a native implementation of CRDTs, that things finally started to work. Without CRDTs, beanies.family would not be able to exist in its current form. I owe all the wonderful people at [Ink & Switch](https://www.inkandswitch.com/) and [automerge](https://automerge.org/) a beer.
 
 ## the old trade-off that no longer applies: privacy vs. convenience
 
@@ -125,43 +129,43 @@ Choosing convenience came with companies like WhatsApp / Meta reading your conta
 
 The trade-off felt permanent, because the technology required to make local-first software easy and accessible to non-technical users, such as efficient sync, painless E2EE, and cross-platform UI, simply didn't exist for solo developers or small teams.
 
-Luckily, the world has changed, and we're living in it.
+Luckily, **the world has changed**, and we're living in it.
 
 ## how vibe coding is removing the privacy vs convenience trade-off
 
-**short answer:** the combination of mature local-first tools ([Automerge](https://automerge.org/) <link> <!-- link added: greg confirm -->, [Yjs](https://yjs.dev/) <link> <!-- link added: greg confirm -->), browser-native crypto and storage ([Web Crypto](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API) <link> <!-- link added: greg confirm -->, [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) <link> <!-- link added: greg confirm -->, the [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API) <link> <!-- link added: greg confirm -->), cross-platform shells ([Tauri](https://tauri.app/) <link> <!-- link added: greg confirm -->, [Capacitor](https://capacitorjs.com/) <link> <!-- link added: greg confirm -->), and AI-assisted coding has made the new world possible. Small teams (or even individuals) can now build polished, privacy-preserving apps that used to take teams of experienced developers and architects literally years to build.
+**short answer:** the combination of mature local-first tools ([Automerge](https://automerge.org/), [Yjs](https://yjs.dev/)), browser-native crypto and storage ([Web Crypto](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API), [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API), the [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API)), cross-platform shells ([Tauri](https://tauri.app/), [Capacitor](https://capacitorjs.com/)), and AI-assisted coding has made the new world possible. Small teams (or even individuals) can now build polished, privacy-preserving apps that used to take teams of experienced developers and architects literally years to build.
 
 The truth about local-first software for the last decade is that it was technically possible, but financially unviable. Building a sync engine that handled offline conflicts, multi-device merging, and end-to-end encryption took a small army of senior engineers. Big companies could afford that army, but weren't willing to forfeit data ownership. Small companies and indie developers couldn't afford the building cost, so cloud-first apps remained the default.
 
-Three things are converging right now to change that:
+**Three things** are converging right now to change that:
 
 - **Open-source CRDT libraries are mature enough to use in production** - Automerge, Yjs, and others are battle-tested. Rather than building a CRDT from scratch, you're using a library that is battle-tested, proven, and actively maintained.
 - **Browsers have caught up** - The [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API) gives you proper end-to-end encryption. [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) gives you a reliable on-device database. The [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API) gives you ownership and access to your local files (at least in most browsers). PWAs let you install web apps like native apps. The limitations of the past decade have largely been overcome.
 - **AI-assisted coding has compressed the timeline** - What used to be years of development for a small team can be compressed to several months with safe, managed, and carefully guided oversight and usage of AI-assisted coding.
 
-This is roughly the story of how beanies.family came into existence. If you want the longer version, follow me on substack and I'll be posting a lot more about this new world - trust me.
+This is roughly the story of how beanies.family came into existence. If you want the longer version, [follow me on substack](https://gpbeanies.substack.com/) and I'll be posting a lot more about this new world - trust me.
 
 The privacy vs. convenience trade-off was a tooling problem, not a values problem. That tooling problem has now been solved, and I doubt beanies.family will be the first app to take advantage of this new world!
 
 ## how to spot a local-first app in the wild
 
-**short answer:** the trademarks of local-first apps are obvious if you know what to look for. Local-first apps work offline, they let you export your data in a real format, they tell you exactly where your data is stored, and that your data is owned by you.
+**short answer:** the trademarks of **local-first** apps are obvious if you know what to look for. Local-first apps work offline, they let you export your data in a real format, they tell you exactly where your data is stored, and that your data is owned by you.
 
 Here's a quick checklist when you're evaluating an app, and want to know whether it's actually local-first:
 
 - **Does it work offline?** Open the app, switch your phone to airplane mode, and see if it still functions. If everything stops working, it's probably not local-first.
-- **Can you export your data?** Look for an export option that lets you download a file in a format you can read - something like JSON, CSV, Markdown, or simply text (even if the file extension is not .txt, it may still be a recognizable format). If the only export is a PDF or a contact us form, it's probably not local-first.
+- **Can you export your data?** Look for an export option that lets you download a file in a format you can read - something like JSON, CSV, Markdown, or simply text (even if the file extension is not .txt, it may still be a recognizable format). If the only export is a PDF or a **contact us** form, it's probably not local-first.
 - **Is account creation optional?** Many local-first apps let you start using the app without signing up. The cloud account is a convenience to help with data synchronization, not a requirement.
 - **Where is your data stored?** A real local-first app will be specific. The documentation should say something like: "Your data lives in an encrypted SQLite file in this folder on your device." Cloud apps rarely provide specific answers to where your data is stored.
 - **Is the file format documented?** If your data is exported to a common file format, like the ones listed above under "Can you export your data?", you know you can get your data out, even years from now. If it's a proprietary format that you don't recognize and cannot read directly from your computer in notepad, you're betting on the company's continued existence.
 
-Apps that pass this checklist today include [Obsidian](https://obsidian.md/), [Logseq](https://logseq.com/), [Standard Notes](https://standardnotes.com/), [Cryptee](https://crypt.ee/), [beanies.family](https://beanies.family/), and a growing list of others.
+Apps that pass this checklist today include [Obsidian](https://obsidian.md/), [Logseq](https://logseq.com/), [Standard Notes](https://standardnotes.com/), [Cryptee](https://crypt.ee/), beanies.family, and a growing list of others.
 
 ## what local-first tools look like for families and finance planners (and tools that do both)
 
 **short answer:** for families, local-first means your precious, shared family and financial data - things like calendars, schedules, finances, bank accounts, and kids' info - lives on your family's devices, and not on a stranger's server. The data is synchronized between phones via end-to-end encrypted cloud storage that you control. Nobody outside the family can read it - that's a mathematical certainty.
 
-Family data is some of the most sensitive data we own. It includes our kids' schedules, our finances, our health information, relationships, and more. Yet many of us (including past me) happily stored it in apps run by major corporations with strong incentives to monetize data and attention. Case in point is the [Cozi parent company](https://www.prnewswire.com/news-releases/cozi-family-organizer-acquired-by-time-inc-300228234.html) <link here> <!-- link added: greg confirm -->, [Life360's history of selling location data](https://themarkup.org/privacy/2021/12/06/the-app-that-promises-to-keep-families-safe-is-selling-precise-location-data-on-tens-of-millions-of-its-users) <link here> <!-- link added: greg confirm -->, and the long list of family-app shutdowns that took user data with them - [Sunrise](https://techcrunch.com/2016/08/31/microsoft-shuts-down-sunrise-app/) and [Mint](https://blog.intuit.com/news-social/mint-sunset-announcement/) are two well-known examples <link to an example>. <!-- link added: greg confirm -->
+Family data is some of the most sensitive data we own. It includes our kids' schedules, our finances, our health information, relationships, and more. Yet many of us (including past me) happily stored it in apps run by major corporations with strong incentives to monetize data and attention. Case in point is the [Cozi parent company acquisition](https://techcrunch.com/2014/06/03/time-buys-seattle-based-family-organizer-service-cozi/), [Life360's history of selling location data](https://themarkup.org/privacy/2021/12/06/the-popular-family-safety-app-life360-is-selling-precise-location-data-on-its-tens-of-millions-of-user), and the long list of family-app shutdowns that took user data with them - [Sunrise](https://fortune.com/2016/05/11/microsoft-sunset-sunrise-calendar-app/) and [Mint](https://techcrunch.com/2023/11/02/personal-finance-monarch-intuit-mint/) are two well-known examples.
 
 Local-first for families means a different architecture and experience:
 
@@ -170,11 +174,11 @@ Local-first for families means a different architecture and experience:
 - Your family data file syncs through a cloud storage account you already own, such as Google Drive, iCloud, or Dropbox, but is encrypted before it leaves your device. The cloud only sees scrambled text.
 - If a family member adds soccer practice for your youngest while their phone is offline, that change merges cleanly when they reconnect, without conflicts.
 
-This is the model on which [I built beanies.family](https://beanies.family/blog/accidentally-built-greatest-family-app). Partly because it was the model I wanted for my own family, but also because, once it was clear what the new tooling that we discussed above could do - it felt almost negligent not to.
+This is the model on which [I built beanies.family](/blog/accidentally-built-greatest-family-app). Partly because it was the model I wanted for my own family, but also because, once it was clear what the new tooling that we discussed above could do - it felt almost negligent not to.
 
 **Families are an obvious win for local-first software.** The data is sensitive, the use cases are inherently multi-device, and the cost of getting it wrong is high. Nobody should be staring over your shoulder at your family's precious personal and financial data except you. And your beanies.
 
-Thanks for reading. If you want the personal story of how I ended up here, start with [why I built beanies.family](https://beanies.family/blog/welcome-to-the-beanstalk).
+Thanks for reading. If you want the personal story of how I ended up here, start with [why I built beanies.family](/blog/welcome-to-the-beanstalk).
 
 ## further reading
 
