@@ -35,8 +35,6 @@ I'm not a child psychologist or some kind of family planning expert - I'm just a
 
 The American Psychological Association's [Stress in America reports](https://www.apa.org/pubs/reports/stress-in-america) consistently show parents reporting higher stress than non-parents, with family responsibilities among the top-named drivers. If parenting seems like it's harder than it should be, that's because it is.
 
-[Pew Research's 2023 "Parenting in America Today"](https://www.pewresearch.org/social-trends/2023/01/24/parenting-in-america-today) reports **30% of mothers** saying parenting is harder than they expected, with only **20% of fathers** sharing the same sentiment. That gap is the mental load showing up in the data.
-
 In **Brigid Schulte**'s book [_Overwhelmed_](https://brigidschulte.com/overwhelmed), she talks about how feeling overwhelmed is _not_ a personal failure - it's structural. We all have unrealistic work expectations, we deal with (sometimes outdated) family roles, and we often live in a culture that undervalues rest and leisure.
 
 A key concept of her book is **time confetti** - the reason you never feel caught up. Always feeling _busy_ but never feeling _done_, not being able to get real rest, and walking around with a constant feeling of anxiety or stress. Does any of this sound familiar?
@@ -65,7 +63,9 @@ According to **Eve Rodsky** in her book [_Fair Play_](https://www.fairplaylife.c
 - Tracking logistics (when are their appointments, did you pick up the kids, etc)
 - Managing emotional dynamics (Did you write a thank-you note to your grandmother for your birthday gift?)
 
-I highly recommend her book, which lays out a clear and easy-to-follow system for helping share the load between parents and _make invisible labor more visible_, so it does not go unnoticed by the other partner.
+[Pew Research's 2023 "Parenting in America Today"](https://www.pewresearch.org/social-trends/2023/01/24/parenting-in-america-today/) reports **30% of mothers** saying parenting is harder than they expected, with only **20% of fathers** sharing the same sentiment. That gap is the mental load showing up in the data.
+
+I highly recommend Eve Rodsky's book, which lays out a clear and easy-to-follow system for helping share the load between parents and _make invisible labor more visible_, so it does not go unnoticed by the other partner.
 
 In my case, with 3 little ones all going to school, participating in various activities, playing with friends, and doing homework, even the slightest hiccup in your schedule can feel like the end of the world. I have WhatsApp, Google Calendar, a different app for each of my kids' schools, emails or chats from their various sports coaches, and lots more. When mental load reaches capacity, it can feel like you have lost control of your schedule, and even your sanity.
 
