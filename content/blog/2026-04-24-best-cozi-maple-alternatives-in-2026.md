@@ -32,8 +32,6 @@ That being said, here is way more information than I ever cared to know about fa
 
 You may like some of these more than beanies, and that's ok. Remember, this was written by AI, so this is the first time I'm seeing it, too.
 
-## Here's the order of my list and it says:
-
 ### Cozi
 
 - **Price:** $39/yr or limited free

@@ -10,9 +10,7 @@ const allPosts = (await getCollection('blog', isPublished)).sort(
 const featuredPost = allPosts.find((p) => p.data.featured);
 const regularPosts = allPosts.filter((p) => p !== featuredPost);
 
-const comingSoonCards = [
-  { emoji: '🔍', title: 'best cozi & maple alternatives in 2026', subtitle: 'coming soon' },
-];
+const comingSoonCards: Array<{ emoji: string; title: string; subtitle: string }> = [];
 
 const fmt = (d: Date) =>
   d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -95,15 +93,17 @@ const fmt = (d: Date) =>
         </div>
       )}
 
-      <div class="coming-grid">
-        {comingSoonCards.map((card, i) => (
-          <div class={`coming-card coming-card-${i % 3}`}>
-            <div class="coming-card-emoji">{card.emoji}</div>
-            <h3 class="coming-card-title">{card.title}</h3>
-            <p class="coming-card-sub">{card.subtitle}</p>
-          </div>
-        ))}
-      </div>
+      {comingSoonCards.length > 0 && (
+        <div class="coming-grid">
+          {comingSoonCards.map((card, i) => (
+            <div class={`coming-card coming-card-${i % 3}`}>
+              <div class="coming-card-emoji">{card.emoji}</div>
+              <h3 class="coming-card-title">{card.title}</h3>
+              <p class="coming-card-sub">{card.subtitle}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div class="subscribe-section">
         <SubstackSubscribe />

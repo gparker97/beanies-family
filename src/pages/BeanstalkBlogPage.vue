@@ -10,10 +10,7 @@ import { MARKETING_URL } from '@/utils/marketing';
 const router = useRouter();
 const { featuredPost, regularPosts } = useBlog();
 
-const comingSoonCards = [
-  { emoji: '✅', title: 'introducing todos', subtitle: 'coming soon' },
-  { emoji: '🔍', title: 'best cozi & maple alternatives in 2026', subtitle: 'coming soon' },
-];
+const comingSoonCards = [{ emoji: '✅', title: 'introducing todos', subtitle: 'coming soon' }];
 
 function openPost(slug: string) {
   router.push(`/blog/${slug}`);
