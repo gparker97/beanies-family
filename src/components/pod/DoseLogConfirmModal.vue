@@ -18,6 +18,8 @@
  */
 import { computed, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
+import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
 import MedicationLogRow from '@/components/pod/MedicationLogRow.vue';
 import { useDoseConfirm } from '@/composables/useDoseConfirm';
 import { useMedicationsStore } from '@/stores/medicationsStore';
@@ -130,19 +132,15 @@ function onSave(): void {
           {{ t('medicationLog.whenHeader') }}
         </h3>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
-          <input
+          <BeanieDatePicker
             v-model="dateValue"
-            type="date"
             :max="todayISO"
-            class="font-outfit rounded-xl border border-[var(--tint-slate-10)] bg-white px-3 py-2 text-sm font-medium text-[#2C3E50] focus:border-[#AED6F1] focus:ring-2 focus:ring-[#AED6F1] focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-gray-100"
-            :aria-label="t('medicationLog.dateFieldLabel')"
+            :placeholder="t('medicationLog.dateFieldLabel')"
           />
-          <input
+          <BeanieTimeInput
             v-model="timeValue"
-            type="time"
             :max="timeMax"
-            class="font-outfit rounded-xl border border-[var(--tint-slate-10)] bg-white px-3 py-2 text-sm font-medium text-[#2C3E50] focus:border-[#AED6F1] focus:ring-2 focus:ring-[#AED6F1] focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-gray-100"
-            :aria-label="t('medicationLog.timeFieldLabel')"
+            :placeholder="t('medicationLog.timeFieldLabel')"
           />
           <button
             type="button"

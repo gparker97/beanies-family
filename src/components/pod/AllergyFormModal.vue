@@ -14,6 +14,7 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import { useFormModal } from '@/composables/useFormModal';
 import { useTranslation } from '@/composables/useTranslation';
 import { useAllergiesStore } from '@/stores/allergiesStore';
@@ -187,7 +188,7 @@ async function handleDelete(): Promise<void> {
       </FormFieldGroup>
 
       <FormFieldGroup :label="t('allergies.field.reviewedOn')" optional>
-        <BaseInput v-model="reviewedOn" type="date" />
+        <BeanieDatePicker v-model="reviewedOn" />
       </FormFieldGroup>
     </div>
   </BeanieFormModal>

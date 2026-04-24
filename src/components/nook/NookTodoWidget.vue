@@ -7,6 +7,7 @@ import { toAssigneePayload } from '@/utils/assignees';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import TodoItemRow from '@/components/todo/TodoItemRow.vue';
 import AssigneePickerButton from '@/components/ui/AssigneePickerButton.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import NookSectionCard from './NookSectionCard.vue';
 
 const { t } = useTranslation();
@@ -17,7 +18,6 @@ const familyStore = useFamilyStore();
 const newTaskTitle = ref('');
 const newTaskDate = ref('');
 const newTaskAssignees = ref<string[]>([]);
-const dateInputFocused = ref(false);
 
 // ── Display ─────────────────────────────────────────────────────────────────
 const MAX_VISIBLE = 8;
@@ -128,30 +128,8 @@ async function toggleComplete(todoId: string) {
           </button>
         </div>
         <!-- Date picker (desktop) -->
-        <div
-          class="hidden shrink-0 items-center gap-1.5 rounded-2xl px-3 transition-colors sm:flex"
-          :class="newTaskDate ? 'bg-[var(--tint-orange-8)]' : ''"
-          :style="!newTaskDate ? 'background: var(--tint-slate-5)' : undefined"
-        >
-          <span class="text-base">📅</span>
-          <div class="relative">
-            <input
-              v-model="newTaskDate"
-              type="date"
-              class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
-              :style="{
-                color: newTaskDate || dateInputFocused ? 'var(--color-primary)' : 'transparent',
-              }"
-              @focus="dateInputFocused = true"
-              @blur="dateInputFocused = false"
-            />
-            <span
-              v-if="!newTaskDate && !dateInputFocused"
-              class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-3 text-sm font-semibold text-[var(--color-text)]"
-            >
-              {{ t('todo.selectDueDate') }}
-            </span>
-          </div>
+        <div class="hidden shrink-0 sm:block">
+          <BeanieDatePicker v-model="newTaskDate" :placeholder="t('todo.selectDueDate')" />
         </div>
         <!-- Assignee (desktop) -->
         <div class="hidden sm:flex">
@@ -160,31 +138,7 @@ async function toggleComplete(todoId: string) {
       </div>
       <!-- Row 2: Date + Assignee on same line (mobile only) -->
       <div class="grid grid-cols-2 gap-2 sm:hidden">
-        <div
-          class="flex items-center gap-1.5 rounded-2xl px-3 transition-colors"
-          :class="newTaskDate ? 'bg-[var(--tint-orange-8)]' : ''"
-          :style="!newTaskDate ? 'background: var(--tint-slate-5)' : undefined"
-        >
-          <span class="text-sm">📅</span>
-          <div class="relative min-w-0 flex-1">
-            <input
-              v-model="newTaskDate"
-              type="date"
-              class="beanies-input font-outfit w-full min-w-0 cursor-pointer border-none bg-transparent py-2 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
-              :style="{
-                color: newTaskDate || dateInputFocused ? 'var(--color-primary)' : 'transparent',
-              }"
-              @focus="dateInputFocused = true"
-              @blur="dateInputFocused = false"
-            />
-            <span
-              v-if="!newTaskDate && !dateInputFocused"
-              class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-2 text-xs font-semibold text-[var(--color-text)]"
-            >
-              {{ t('todo.selectDueDate') }}
-            </span>
-          </div>
-        </div>
+        <BeanieDatePicker v-model="newTaskDate" :placeholder="t('todo.selectDueDate')" />
         <div class="flex items-center gap-1.5">
           <span class="font-outfit text-xs font-semibold text-[var(--color-text)] opacity-35">
             {{ t('todo.who') }}

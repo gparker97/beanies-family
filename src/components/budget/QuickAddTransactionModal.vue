@@ -5,6 +5,7 @@ import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -125,7 +126,7 @@ function handleSave() {
     <!-- Date + Account row -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <FormFieldGroup :label="t('budget.quickAdd.date')" required>
-        <BaseInput v-model="date" type="date" />
+        <BeanieDatePicker v-model="date" />
       </FormFieldGroup>
 
       <FormFieldGroup :label="t('budget.quickAdd.account')" required>

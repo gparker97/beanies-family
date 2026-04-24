@@ -8,6 +8,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import RecurringPaymentPrompt from '@/components/ui/RecurringPaymentPrompt.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import { BaseCombobox } from '@/components/ui';
 import AccountCategoryPicker from '@/components/accounts/AccountCategoryPicker.vue';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -278,7 +279,7 @@ function handleDelete() {
           <BaseInput v-model="loanTermMonths" type="number" min="1" placeholder="360" />
         </FormFieldGroup>
         <FormFieldGroup :label="t('loanAccount.startDate')">
-          <BaseInput v-model="loanStartDate" type="date" />
+          <BeanieDatePicker v-model="loanStartDate" />
         </FormFieldGroup>
       </div>
       <RecurringPaymentPrompt

@@ -13,6 +13,7 @@ import { prefillAccommodationDates } from '@/utils/vacation';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 
 const props = withDefaults(
@@ -229,19 +230,16 @@ function showsConfirmationNumber(type: VacationAccommodationType): boolean {
 
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup :label="t('vacation.field.checkIn')">
-            <BaseInput
-              type="date"
+            <BeanieDatePicker
               :model-value="item.checkInDate ?? ''"
-              class="vacation-teal-input"
-              @update:model-value="updateItem(index, 'checkInDate', String($event))"
+              @update:model-value="updateItem(index, 'checkInDate', $event)"
             />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.checkOut')">
-            <BaseInput
-              type="date"
+            <BeanieDatePicker
               :model-value="item.checkOutDate ?? ''"
-              class="vacation-teal-input"
-              @update:model-value="updateItem(index, 'checkOutDate', String($event))"
+              :min="item.checkInDate ?? ''"
+              @update:model-value="updateItem(index, 'checkOutDate', $event)"
             />
           </FormFieldGroup>
         </div>

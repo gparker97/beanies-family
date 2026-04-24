@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -211,7 +212,7 @@ function handleSave() {
       <!-- Date + Location -->
       <div class="grid grid-cols-2 gap-3">
         <FormFieldGroup :label="t('vacation.ideas.whichDay')">
-          <BaseInput v-model="suggestedDate" type="date" />
+          <BeanieDatePicker v-model="suggestedDate" />
         </FormFieldGroup>
         <FormFieldGroup :label="t('vacation.field.location')">
           <BaseInput v-model="location" placeholder="e.g. Downtown, Beach..." />

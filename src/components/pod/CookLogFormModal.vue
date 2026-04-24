@@ -12,6 +12,7 @@ import { computed, nextTick, ref } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -203,7 +204,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
 
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <FormFieldGroup :label="t('cookLog.field.cookedOn')" required>
-        <BaseInput v-model="cookedOn" type="date" />
+        <BeanieDatePicker v-model="cookedOn" />
       </FormFieldGroup>
       <FormFieldGroup :label="t('cookLog.field.cookedBy')" optional>
         <BaseSelect v-model="cookedBy" :options="cookOptions" />

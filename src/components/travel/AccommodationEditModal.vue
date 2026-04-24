@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -215,14 +216,14 @@ async function handleSave() {
           :required="validation.isRequired('checkInDate')"
           :error="validation.showError('checkInDate')"
         >
-          <BaseInput v-model="checkInDate" type="date" />
+          <BeanieDatePicker v-model="checkInDate" />
         </FormFieldGroup>
         <FormFieldGroup
           :label="t('vacation.field.checkOut')"
           :required="validation.isRequired('checkOutDate')"
           :error="validation.showError('checkOutDate')"
         >
-          <BaseInput v-model="checkOutDate" type="date" />
+          <BeanieDatePicker v-model="checkOutDate" />
         </FormFieldGroup>
       </div>
 

@@ -9,6 +9,7 @@ import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import RecurringPaymentPrompt from '@/components/ui/RecurringPaymentPrompt.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import { BaseCombobox } from '@/components/ui';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -294,7 +295,7 @@ function handleDelete() {
 
     <!-- 6. Purchase date -->
     <FormFieldGroup :label="t('assets.purchaseDate')" optional>
-      <BaseInput v-model="purchaseDate" type="date" />
+      <BeanieDatePicker v-model="purchaseDate" />
     </FormFieldGroup>
 
     <!-- 7. Notes -->
@@ -420,7 +421,7 @@ function handleDelete() {
       </div>
 
       <FormFieldGroup :label="t('assets.loanStartDate')">
-        <BaseInput v-model="loanStartDate" type="date" />
+        <BeanieDatePicker v-model="loanStartDate" />
       </FormFieldGroup>
 
       <RecurringPaymentPrompt

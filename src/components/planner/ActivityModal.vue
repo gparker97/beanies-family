@@ -11,6 +11,7 @@ import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ActivityCategoryPicker from '@/components/ui/ActivityCategoryPicker.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import RecurringPaymentPrompt from '@/components/ui/RecurringPaymentPrompt.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
@@ -573,10 +574,10 @@ function handleSave() {
       <template v-if="recurrenceMode === 'recurring'">
         <div class="grid grid-cols-2 gap-4">
           <FormFieldGroup :label="t('planner.field.date')" required :error="errorDate">
-            <BaseInput v-model="date" type="date" required />
+            <BeanieDatePicker v-model="date" required />
           </FormFieldGroup>
           <FormFieldGroup :label="t('planner.field.endDate')" optional>
-            <BaseInput v-model="recurrenceEndDate" type="date" :min="date" />
+            <BeanieDatePicker v-model="recurrenceEndDate" :min="date" />
           </FormFieldGroup>
         </div>
         <div v-if="!isAllDay" class="grid grid-cols-2 gap-4">
@@ -592,22 +593,24 @@ function handleSave() {
       <template v-else>
         <div v-if="isAllDay" class="grid grid-cols-2 gap-4">
           <FormFieldGroup :label="t('planner.field.dateOnly')" required :error="errorDate">
-            <BaseInput v-model="date" type="date" required />
+            <BeanieDatePicker v-model="date" required />
           </FormFieldGroup>
           <FormFieldGroup :label="t('planner.field.endDate')" optional>
-            <BaseInput v-model="endDate" type="date" :min="date" />
+            <BeanieDatePicker v-model="endDate" :min="date" />
           </FormFieldGroup>
         </div>
-        <div v-else class="grid grid-cols-3 gap-3">
+        <div v-else class="space-y-3">
           <FormFieldGroup :label="t('planner.field.dateOnly')" required :error="errorDate">
-            <BaseInput v-model="date" type="date" required />
+            <BeanieDatePicker v-model="date" required />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('modal.startTime')">
-            <TimePresetPicker v-model="startTime" />
-          </FormFieldGroup>
-          <FormFieldGroup :label="t('modal.endTime')">
-            <TimePresetPicker v-model="endTime" />
-          </FormFieldGroup>
+          <div class="grid grid-cols-2 gap-3">
+            <FormFieldGroup :label="t('modal.startTime')">
+              <TimePresetPicker v-model="startTime" />
+            </FormFieldGroup>
+            <FormFieldGroup :label="t('modal.endTime')">
+              <TimePresetPicker v-model="endTime" />
+            </FormFieldGroup>
+          </div>
         </div>
       </template>
 
