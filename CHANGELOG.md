@@ -30,6 +30,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Cleaner beanstalk mascot asset.** Swapped the previous background-removed PNG for a fully transparent version — no halo around the character on the hero gradient.
 - **Picker popovers teleport out of their parent** so segment cards and modals with clipped overflow no longer cut off the bottom of the calendar or time columns. They reposition on scroll/resize and flip up when they'd overflow the viewport.
 - **Quick-edit date/time fields on travel segment cards** now use the themed pickers inline, with the night-flight hint (🌙 early morning / late night) kept alongside.
+- **Family library hero copy.** `/guides` now reads "a guide to family organization · in order" (was "a reading curriculum · in order") and opens with "how do we go from feeling overwhelmed to feeling in control?" instead of the declarative version. The reading-time stat is cleaner ("X min reading time" rather than "~X min total · a lifetime to practice"), and the footer credits claude-bot for research help.
 
 ## 2026-04-23
 
