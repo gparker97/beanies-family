@@ -919,20 +919,32 @@ const latestDate = byDateDesc[0]?.data.date;
 
   /* ══════════════ RESPONSIVE ══════════════ */
   @media (max-width: 900px) {
-    /* On mobile the flex column stacks the tall mascot on top, which
-       pushes the title + pitch past the fold. Shrink the mascot to a
-       compact "brand hello" size so the masthead type stays above the
-       fold. Negative margin-bottom tightens the gap to the text. */
+    /* On mobile we pull the mascot OUT of the flex flow and make it a
+       watermark behind the masthead text — low opacity, centered, no
+       drop shadow. This keeps the brand hello visible while letting
+       the title + pitch own the fold. Text sits above it at z-index 2;
+       the gradient wash stays on the bottom layer. */
     .masthead {
       align-items: center;
       flex-direction: column;
-      gap: 4px;
-      padding: 84px 24px 40px;
+      gap: 0;
+      padding: 72px 24px 44px;
     }
     .masthead-mascot {
-      margin-bottom: -4px;
-      width: 115px;
+      bottom: 28px;
+      filter: none;
+      height: auto;
+      left: 50%;
+      margin: 0;
+      opacity: 0.18;
+      position: absolute;
+      top: auto;
+      transform: translateX(-50%);
+      width: 240px;
+      z-index: 0;
     }
+    /* Base .masthead-text already sits at z-index: 1, above the
+       watermark (z-index: 0) and the wash (auto). No override needed. */
     .fresh-divider {
       gap: 14px;
       margin: 32px auto 32px;
@@ -952,11 +964,14 @@ const latestDate = byDateDesc[0]?.data.date;
   }
 
   @media (max-width: 520px) {
-    .masthead { padding: 72px 20px 32px; }
-    /* Further shrink on small phones — ~86px width keeps the mascot as
-       a recognisable brand mark while freeing ~150px of vertical space
-       versus the previous 130px render. */
-    .masthead-mascot { margin-bottom: 0; width: 86px; }
+    .masthead { padding: 68px 20px 36px; }
+    /* Slightly tighter watermark on small phones + a touch more fade
+       so it doesn't compete with the tighter type. */
+    .masthead-mascot {
+      bottom: 20px;
+      opacity: 0.16;
+      width: 200px;
+    }
     .masthead-rule-top { font-size: 0.6rem; letter-spacing: 0.22em; }
     .masthead-rule-top::before,
     .masthead-rule-top::after { max-width: 40px; }
