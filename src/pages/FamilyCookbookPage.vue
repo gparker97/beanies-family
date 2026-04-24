@@ -26,7 +26,7 @@ const router = useRouter();
 const { t } = useTranslation();
 const recipesStore = useRecipesStore();
 const photoStore = usePhotoStore();
-const { canManagePod } = usePermissions();
+const { canEditActivities } = usePermissions();
 
 const modalOpen = ref(false);
 const editing = ref<Recipe | null>(null);
@@ -145,7 +145,7 @@ function closeModal(): void {
         </div>
 
         <button
-          v-if="canManagePod"
+          v-if="canEditActivities"
           type="button"
           class="font-outfit from-primary-500 to-terracotta-400 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)] sm:ml-auto sm:w-auto"
           @click="openAdd"
@@ -203,7 +203,7 @@ function closeModal(): void {
       </article>
 
       <AddTile
-        v-if="canManagePod"
+        v-if="canEditActivities"
         :label="t('cookbook.addRecipe')"
         min-height="16rem"
         @click="openAdd"
@@ -216,7 +216,7 @@ function closeModal(): void {
       <EmptyState
         emoji="🍝"
         :message="t('cookbook.empty')"
-        :action-label="canManagePod ? t('cookbook.emptyCTA') : ''"
+        :action-label="canEditActivities ? t('cookbook.emptyCTA') : ''"
         @action="openAdd"
       />
     </div>

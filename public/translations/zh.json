@@ -4547,14 +4547,14 @@
       "lastUpdated": "2026-03-03"
     },
     "modal.canEditActivities": {
-      "translation": "可以编辑活动",
-      "hash": "hjitzn",
-      "lastUpdated": "2026-03-03"
+      "translation": "可以编辑家庭内容",
+      "hash": "j1rjfn",
+      "lastUpdated": "2026-04-24"
     },
     "modal.canManagePod": {
-      "translation": "可以管理pod",
-      "hash": "122kxy",
-      "lastUpdated": "2026-03-03"
+      "translation": "可以管理家庭成员",
+      "hash": "ziieig",
+      "lastUpdated": "2026-04-24"
     },
     "family.email": {
       "translation": "电子邮箱",

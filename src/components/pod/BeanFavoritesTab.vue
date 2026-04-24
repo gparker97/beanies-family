@@ -11,6 +11,7 @@ import FavoriteFormModal from '@/components/pod/FavoriteFormModal.vue';
 import { useRouter } from 'vue-router';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useTranslation } from '@/composables/useTranslation';
+import { usePermissions } from '@/composables/usePermissions';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import type { FavoriteCategory, FavoriteItem, UUID } from '@/types/models';
@@ -20,6 +21,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useTranslation();
+const { canEditActivities } = usePermissions();
 const router = useRouter();
 const favoritesStore = useFavoritesStore();
 const recipesStore = useRecipesStore();
@@ -40,7 +42,7 @@ function openRecipe(id: string, e: Event): void {
 const modalOpen = ref(false);
 const editing = ref<FavoriteItem | null>(null);
 useQuickAddIntent((action) => {
-  if (action === 'add-favorite') {
+  if (action === 'add-favorite' && canEditActivities.value) {
     editing.value = null;
     modalOpen.value = true;
   }
@@ -105,7 +107,7 @@ function closeModal(): void {
           {{ t('favorites.fromCookbook') }}
         </span>
       </button>
-      <AddTile :label="t('favorites.addTile')" @click="openAdd" />
+      <AddTile v-if="canEditActivities" :label="t('favorites.addTile')" @click="openAdd" />
     </div>
     <div
       v-else
@@ -114,7 +116,7 @@ function closeModal(): void {
       <EmptyState
         emoji="💝"
         :message="t('favorites.empty')"
-        :action-label="t('favorites.emptyCTA')"
+        :action-label="canEditActivities ? t('favorites.emptyCTA') : ''"
         @action="openAdd"
       />
     </div>

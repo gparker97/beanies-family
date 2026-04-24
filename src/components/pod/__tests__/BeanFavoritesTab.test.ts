@@ -24,6 +24,15 @@ vi.mock('@/composables/useQuickAddIntent', () => ({
   useQuickAddIntent: () => undefined,
 }));
 
+vi.mock('@/composables/usePermissions', () => ({
+  usePermissions: () => ({
+    isOwner: { value: true },
+    canManagePod: { value: true },
+    canViewFinances: { value: true },
+    canEditActivities: { value: true },
+  }),
+}));
+
 const MEMBER_ID = 'bean-neil';
 
 function makeFav(overrides: Partial<FavoriteItem> = {}): FavoriteItem {
