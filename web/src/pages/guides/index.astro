@@ -152,41 +152,52 @@ const itemListSchema = {
   jsonLd={[collectionSchema, itemListSchema]}
 >
   <main class="library">
-    <!-- ============== HERO ============== -->
+    <!-- ============== HERO ==============
+         Two-column hero (text + reading-scene illustration). The image
+         is a proper flex column, not an absolutely-positioned sticker,
+         so it never gets clipped at the edge of the viewport. A soft
+         heritage-orange radial halo sits behind it to echo the page
+         wash without competing with the composed family-reading scene.
+         Mobile flips to stacked layout (image above text) so the
+         illustration leads the eye into the content. -->
     <header class="library-hero">
       <div class="library-hero-wash" aria-hidden="true"></div>
-      <img
-        src="/brand/beanies-family-reading.webp"
-        alt=""
-        class="library-hero-mascot"
-        width="260"
-        height="260"
-        aria-hidden="true"
-      />
-      <div class="library-hero-content">
-        <p class="library-kicker">
-          <span class="library-kicker-dot" aria-hidden="true"></span>
-          a reading curriculum · in order
-        </p>
-        <h1 class="library-title">
-          <span class="library-title-over">the family</span>
-          <span class="library-title-under">library</span>
-        </h1>
-        <p class="library-pitch">
-          how to go from feeling overwhelmed to feeling in control. four chapters
-          to help you take control of your family and financial life.
-          <em>designed to be read in order.</em>
-        </p>
-        <div class="library-stats">
-          <span class="library-stat">
-            <strong>{pillars.length}</strong> chapters
-          </span>
-          <span class="library-stat-dot" aria-hidden="true">·</span>
-          <span class="library-stat">
-            <strong>~{totalReadingMinutes}</strong> min total
-          </span>
-          <span class="library-stat-dot" aria-hidden="true">·</span>
-          <span class="library-stat library-stat-italic">a lifetime to practice</span>
+      <div class="library-hero-inner">
+        <div class="library-hero-content">
+          <p class="library-kicker">
+            <span class="library-kicker-dot" aria-hidden="true"></span>
+            a reading curriculum · in order
+          </p>
+          <h1 class="library-title">
+            <span class="library-title-over">the family</span>
+            <span class="library-title-under">library</span>
+          </h1>
+          <p class="library-pitch">
+            how to go from feeling overwhelmed to feeling in control. four chapters
+            to help you take control of your family and financial life.
+            <em>designed to be read in order.</em>
+          </p>
+          <div class="library-stats">
+            <span class="library-stat">
+              <strong>{pillars.length}</strong> chapters
+            </span>
+            <span class="library-stat-dot" aria-hidden="true">·</span>
+            <span class="library-stat">
+              <strong>~{totalReadingMinutes}</strong> min total
+            </span>
+            <span class="library-stat-dot" aria-hidden="true">·</span>
+            <span class="library-stat library-stat-italic">a lifetime to practice</span>
+          </div>
+        </div>
+        <div class="library-hero-art" aria-hidden="true">
+          <div class="library-hero-halo" aria-hidden="true"></div>
+          <img
+            src="/brand/beanies-family-reading.webp"
+            alt=""
+            class="library-hero-mascot"
+            width="340"
+            height="340"
+          />
         </div>
       </div>
     </header>
@@ -387,7 +398,7 @@ const itemListSchema = {
     box-sizing: border-box;
     margin: 0 auto;
     max-width: 1120px;
-    padding: 120px 32px 60px;
+    padding: 100px 32px 60px;
     position: relative;
   }
   .library-hero-wash {
@@ -398,25 +409,68 @@ const itemListSchema = {
     pointer-events: none;
     position: absolute;
   }
-  /* Family-reading mascot — sits at the right edge of the hero as a
-     scene (dad + kids around a book), not a rotated sticker. Kept
-     upright with a tiny 2deg tilt so it reads as intentional without
-     feeling like a crooked decal. Drop shadow grounds it against the
-     pale wash beneath. */
-  .library-hero-mascot {
-    bottom: -18px;
-    filter: drop-shadow(0 20px 36px rgb(44 62 80 / 18%));
-    pointer-events: none;
-    position: absolute;
-    right: -10px;
-    transform: rotate(2deg);
-    width: 260px;
-    z-index: 0;
-  }
-  .library-hero-content {
-    max-width: 640px;
+  /* Two-column inner grid: text on the left, illustration on the right.
+     Items center-aligned so the reading scene floats at roughly the
+     midline of the text block. */
+  .library-hero-inner {
+    align-items: center;
+    display: flex;
+    flex-direction: row;
+    gap: 56px;
     position: relative;
     z-index: 1;
+  }
+  .library-hero-content {
+    flex: 1 1 auto;
+    max-width: 640px;
+    min-width: 0;
+  }
+  /* Illustration column — fixed intrinsic size so it holds its shape
+     even if the text block grows. Halo glow uses multi-stop radial
+     to pick up heritage orange + a warm terracotta ring. */
+  .library-hero-art {
+    align-items: center;
+    display: flex;
+    flex-shrink: 0;
+    justify-content: center;
+    position: relative;
+  }
+  .library-hero-halo {
+    background:
+      radial-gradient(
+        circle,
+        rgb(241 93 34 / 18%) 0%,
+        rgb(230 126 34 / 10%) 35%,
+        rgb(174 214 241 / 8%) 58%,
+        transparent 72%
+      );
+    border-radius: 50%;
+    height: 420px;
+    left: 50%;
+    pointer-events: none;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 420px;
+    z-index: 0;
+  }
+  .library-hero-mascot {
+    animation: library-mascot-bob 6.5s ease-in-out infinite;
+    display: block;
+    filter: drop-shadow(0 20px 40px rgb(44 62 80 / 18%));
+    height: auto;
+    max-width: 100%;
+    pointer-events: none;
+    position: relative;
+    width: 340px;
+    z-index: 1;
+  }
+  @keyframes library-mascot-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .library-hero-mascot { animation: none; }
   }
   .library-kicker {
     align-items: center;
@@ -979,14 +1033,16 @@ const itemListSchema = {
 
   /* ===== RESPONSIVE ===== */
   @media (max-width: 900px) {
-    .library-hero { padding: 100px 24px 40px; }
-    .library-hero-mascot {
-      bottom: auto;
-      opacity: 0.55;
-      right: -30px;
-      top: 72px;
-      width: 180px;
+    .library-hero { padding: 88px 24px 48px; }
+    /* Stack: illustration above text on narrow screens so the scene
+       leads the eye (same pattern as the help page hero). */
+    .library-hero-inner {
+      flex-direction: column-reverse;
+      gap: 32px;
     }
+    .library-hero-content { max-width: none; text-align: left; }
+    .library-hero-halo { height: 320px; width: 320px; }
+    .library-hero-mascot { width: 260px; }
     .library-pillars {
       gap: 20px;
       grid-template-columns: 1fr;
@@ -1057,12 +1113,9 @@ const itemListSchema = {
   }
 
   @media (max-width: 520px) {
-    .library-hero { padding: 92px 20px 32px; }
-    .library-hero-mascot {
-      opacity: 0.35;
-      top: 56px;
-      width: 140px;
-    }
+    .library-hero { padding: 80px 20px 36px; }
+    .library-hero-halo { height: 260px; width: 260px; }
+    .library-hero-mascot { width: 220px; }
     .library-title-under { font-size: clamp(3rem, 14vw, 5rem); }
     .library-pitch { font-size: 1rem; }
     .pillar { padding: 28px 24px 26px; }
