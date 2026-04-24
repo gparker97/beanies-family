@@ -5,6 +5,7 @@ date: 2026-04-24
 category: review
 coverEmoji: 🫘
 excerpt: 'a human + AI co-written tour of cozi, maple, ynab, greenlight, timetree, and other family and finance planning apps worth comparing in 2026.'
+subtitle: 'this post was written by AI. sort of.'
 featured: false
 author: greg
 draft: true

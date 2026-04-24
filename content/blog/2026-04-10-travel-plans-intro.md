@@ -4,7 +4,9 @@ slug: travel-plans-intro
 date: 2026-04-10
 category: travel
 coverEmoji: ✈️
+coverImage: /blog/travel-plans-screenshot.webp
 excerpt: "It's a Monday morning. You're at your desk, sipping coffee from your favorite mug. Out of nowhere, the floor begins to shake. A black hole envelops the floor..."
+subtitle: 'caught in the scheduling your vacation vortex'
 featured: false
 author: greg
 ---

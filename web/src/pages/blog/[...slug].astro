@@ -8,6 +8,8 @@ import RelatedArticles from '../../components/RelatedArticles.astro';
 import SubstackSubscribe from '../../components/SubstackSubscribe.astro';
 import { AUTHOR } from '@beanies/brand/schema';
 import { SITE_URL } from '@beanies/brand/nav';
+// Fraunces: humanist serif used for the post subtitle only. Variable font = single file.
+import '@fontsource-variable/fraunces';
 
 export async function getStaticPaths() {
   const posts = await getCollection('blog', isPublished);
@@ -104,6 +106,9 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
           </div>
         </div>
         <h1 class="post-header-title">{post.data.title}</h1>
+        {post.data.subtitle && (
+          <p class="post-header-subtitle">{post.data.subtitle}</p>
+        )}
         <div class="post-header-meta">
           <Byline
             author={post.data.author}
@@ -339,6 +344,19 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   line-height: 1.2;
 }
 
+.post-header-subtitle {
+  color: rgb(44 62 80 / 68%);
+  font-family: 'Fraunces Variable', Fraunces, 'Source Serif 4', Georgia, serif;
+  font-feature-settings: 'ss01';
+  font-size: clamp(1.1rem, 1.8vw, 1.375rem);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  line-height: 1.4;
+  margin: 14px 0 0;
+  max-width: 56ch;
+}
+
 .post-header-meta {
   margin-top: 12px;
 }
@@ -452,6 +470,7 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   /* Mobile: slightly tighter top padding but still clears the pill nav. */
   .post-content { padding-top: 76px; }
   .post-header-title { font-size: 1.375rem; }
+  .post-header-subtitle { font-size: 1rem; }
 }
 </style>
 </content>
