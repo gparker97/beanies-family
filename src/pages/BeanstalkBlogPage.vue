@@ -97,18 +97,55 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
     <!-- ══════════════ MASTHEAD ══════════════ -->
     <header class="masthead">
       <div class="masthead-wash" aria-hidden="true" />
-      <img
-        src="/brand/beanies-beanstalk-banner.webp"
-        alt=""
+      <!-- Inline SVG backdrop — warm orange horizon composition,
+           scales fluidly with the viewport, opacity baked into
+           gradients so there's no stacking-context fight. -->
+      <svg
         class="masthead-backdrop"
+        viewBox="0 0 1200 280"
+        preserveAspectRatio="xMidYMax slice"
         aria-hidden="true"
-      />
-      <img
-        src="/brand/beanies-beanstalk-mascot.webp"
-        alt=""
-        class="masthead-mascot"
-        aria-hidden="true"
-      />
+      >
+        <defs>
+          <radialGradient id="beanstalk-warmGlow" cx="50%" cy="100%" r="65%">
+            <stop offset="0%" stop-color="#f15d22" stop-opacity="0.16" />
+            <stop offset="42%" stop-color="#e67e22" stop-opacity="0.07" />
+            <stop offset="100%" stop-color="#f15d22" stop-opacity="0" />
+          </radialGradient>
+          <linearGradient id="beanstalk-vineStroke" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stop-color="#c76a21" stop-opacity="0.5" />
+            <stop offset="100%" stop-color="#e67e22" stop-opacity="0.26" />
+          </linearGradient>
+          <linearGradient id="beanstalk-leafFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#f15d22" stop-opacity="0.22" />
+            <stop offset="100%" stop-color="#e67e22" stop-opacity="0.1" />
+          </linearGradient>
+        </defs>
+        <rect width="1200" height="280" fill="url(#beanstalk-warmGlow)" />
+        <g stroke="url(#beanstalk-vineStroke)" fill="none" stroke-width="3" stroke-linecap="round">
+          <path d="M 150 280 C 130 240 180 210 160 170 C 140 130 190 110 170 70" />
+          <path d="M 380 280 C 400 230 350 200 400 160 C 450 120 380 80 420 40" />
+          <path d="M 720 280 C 700 220 760 190 740 140 C 720 100 780 80 760 50" />
+          <path
+            d="M 1020 280 C 1050 230 1000 200 1040 160 C 1080 120 1030 90 1070 60 C 1090 40 1060 20 1080 10"
+          />
+        </g>
+        <g fill="url(#beanstalk-leafFill)" stroke="none">
+          <ellipse cx="165" cy="195" rx="14" ry="5" transform="rotate(-30 165 195)" />
+          <ellipse cx="175" cy="130" rx="14" ry="5" transform="rotate(40 175 130)" />
+          <ellipse cx="385" cy="180" rx="14" ry="5" transform="rotate(20 385 180)" />
+          <ellipse cx="415" cy="100" rx="14" ry="5" transform="rotate(-30 415 100)" />
+          <ellipse cx="745" cy="170" rx="14" ry="5" transform="rotate(25 745 170)" />
+          <ellipse cx="755" cy="95" rx="14" ry="5" transform="rotate(-35 755 95)" />
+          <ellipse cx="1035" cy="180" rx="14" ry="5" transform="rotate(20 1035 180)" />
+          <ellipse cx="1050" cy="100" rx="14" ry="5" transform="rotate(-20 1050 100)" />
+        </g>
+        <g fill="#f15d22" fill-opacity="0.07">
+          <ellipse cx="1100" cy="52" rx="38" ry="14" />
+          <ellipse cx="1078" cy="42" rx="20" ry="10" />
+          <ellipse cx="1122" cy="46" rx="17" ry="9" />
+        </g>
+      </svg>
       <div class="masthead-rule-top" aria-hidden="true">
         <span>THE BEANSTALK</span>
         <span class="masthead-rule-divider">·</span>
@@ -153,6 +190,12 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
         </template>
       </p>
     </header>
+
+    <!-- Mascot separator — the beanie character stands between the
+         masthead and the latest issue as a planted, visible transition. -->
+    <div class="issue-transition" aria-hidden="true">
+      <img src="/brand/beanies-beanstalk-mascot.webp" alt="" class="issue-transition-mascot" />
+    </div>
 
     <!-- ══════════════ FEATURED ══════════════ -->
     <div v-if="featuredPost" class="beanstalk-content">
@@ -338,20 +381,6 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   position: absolute;
 }
 
-/* Mascot kept as background decoration, not a foreground character. */
-.masthead-mascot {
-  bottom: -24px;
-  height: auto;
-  opacity: 0.22;
-  pointer-events: none;
-  position: absolute;
-  right: -20px;
-  transform: rotate(6deg);
-  transform-origin: bottom center;
-  width: 210px;
-  z-index: 0;
-}
-
 .masthead-rule-top {
   align-items: center;
   color: var(--heritage-orange);
@@ -491,21 +520,54 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   opacity: 0.45;
 }
 
-/* Beanstalk banner moved INSIDE the masthead as a decorative backdrop,
-   bottom-aligned, full-width-ish, very low opacity. No longer a
-   standalone block between masthead and first card — closes the gap
-   so the latest issue lands above the fold. */
+/* Inline-SVG backdrop — scales fluidly, opacity baked into gradients. */
 .masthead-backdrop {
-  bottom: -40px;
-  height: auto;
-  left: 50%;
-  max-width: none;
-  opacity: 0.13;
+  bottom: 0;
+  display: block;
+  height: 62%;
+  left: 0;
   pointer-events: none;
   position: absolute;
-  transform: translateX(-50%);
-  width: 960px;
+  right: 0;
+  width: 100%;
   z-index: 0;
+}
+
+/* Mascot separator between masthead and latest issue. */
+.issue-transition {
+  display: flex;
+  justify-content: center;
+  margin: -18px auto 22px;
+  padding: 0 32px;
+  pointer-events: none;
+  position: relative;
+  z-index: 2;
+}
+
+.issue-transition-mascot {
+  animation: issue-transition-bob 5s ease-in-out infinite;
+  display: block;
+  filter: drop-shadow(0 10px 18px rgb(44 62 80 / 16%));
+  height: auto;
+  width: 140px;
+}
+
+@keyframes issue-transition-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+
+  50% {
+    transform: translateY(-4px) rotate(1.5deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .issue-transition-mascot {
+    animation: none;
+    transform: none;
+  }
 }
 
 .beanstalk-content {
@@ -901,15 +963,16 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
     padding: 100px 24px 40px;
   }
 
-  .masthead-mascot {
-    bottom: -12px;
-    right: -10px;
-    width: 160px;
+  .masthead-backdrop {
+    height: 58%;
   }
 
-  .masthead-backdrop {
-    bottom: -30px;
-    width: 740px;
+  .issue-transition {
+    margin: -12px auto 20px;
+  }
+
+  .issue-transition-mascot {
+    width: 120px;
   }
 
   .beanstalk-content {
@@ -945,18 +1008,16 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
     padding: 92px 20px 32px;
   }
 
-  .masthead-mascot {
-    bottom: auto;
-    opacity: 0.18;
-    right: -12px;
-    top: 70px;
-    width: 120px;
+  .masthead-backdrop {
+    height: 52%;
   }
 
-  .masthead-backdrop {
-    bottom: -20px;
-    opacity: 0.1;
-    width: 520px;
+  .issue-transition {
+    margin: -8px auto 16px;
+  }
+
+  .issue-transition-mascot {
+    width: 100px;
   }
 
   .masthead-rule-top {
