@@ -10,8 +10,6 @@ import { MARKETING_URL } from '@/utils/marketing';
 const router = useRouter();
 const { featuredPost, regularPosts } = useBlog();
 
-const comingSoonCards = [{ emoji: '✅', title: 'introducing todos', subtitle: 'coming soon' }];
-
 function openPost(slug: string) {
   router.push(`/blog/${slug}`);
 }
@@ -108,20 +106,6 @@ const navLinks = [
             <span>{{ formatDate(post.date) }}</span>
           </div>
         </button>
-      </div>
-
-      <!-- Coming soon grid -->
-      <div class="coming-grid">
-        <div
-          v-for="(card, i) in comingSoonCards"
-          :key="i"
-          class="coming-card"
-          :class="`coming-card-${i % 3}`"
-        >
-          <div class="coming-card-emoji">{{ card.emoji }}</div>
-          <h3 class="coming-card-title">{{ card.title }}</h3>
-          <p class="coming-card-sub">{{ card.subtitle }}</p>
-        </div>
       </div>
 
       <!-- Subscribe -->
@@ -456,66 +440,6 @@ const navLinks = [
 /* ── Subscribe ── */
 .subscribe-section {
   margin-top: 40px;
-}
-
-/* ── Coming soon grid ── */
-.coming-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(2, 1fr);
-}
-
-@media (width <= 480px) {
-  .coming-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.coming-card {
-  border: 1.5px dashed rgb(44 62 80 / 8%);
-  border-radius: 20px;
-  padding: 28px 20px;
-  text-align: center;
-  transition: border-color 200ms;
-}
-
-.coming-card:hover {
-  border-color: rgb(44 62 80 / 15%);
-}
-
-.coming-card-0 {
-  background: linear-gradient(135deg, rgb(241 93 34 / 4%), rgb(230 126 34 / 2%));
-}
-
-.coming-card-1 {
-  background: linear-gradient(135deg, rgb(174 214 241 / 8%), rgb(174 214 241 / 3%));
-}
-
-.coming-card-2 {
-  background: linear-gradient(135deg, rgb(39 174 96 / 5%), rgb(39 174 96 / 2%));
-}
-
-.coming-card-emoji {
-  font-size: 2rem;
-  margin-bottom: 12px;
-}
-
-.coming-card-title {
-  color: var(--deep-slate);
-  font-family: Outfit, sans-serif;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.coming-card-sub {
-  color: var(--heritage-orange);
-  font-family: Outfit, sans-serif;
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  opacity: 0.6;
-  text-transform: lowercase;
 }
 
 /* ── Mobile ── */
