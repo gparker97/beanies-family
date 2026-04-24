@@ -4,7 +4,7 @@ slug: best-cozi-maple-alternatives-in-2026
 date: 2026-04-24
 category: review
 coverEmoji: 🫘
-excerpt: 'this post was mostly written by AI. a tour of cozi, maple, ynab, greenlight, timetree, and other family and finance planning apps worth comparing in 2026.'
+excerpt: 'a human + AI co-written tour of cozi, maple, ynab, greenlight, timetree, and other family and finance planning apps worth comparing in 2026.'
 featured: false
 author: greg
 draft: true
