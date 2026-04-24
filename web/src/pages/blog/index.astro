@@ -552,7 +552,13 @@ const latestDate = byDateDesc[0]?.data.date;
     display: flex;
     gap: 20px;
     justify-content: center;
-    margin: 4px auto 36px;
+    /* Symmetric vertical rhythm — the masthead's 48px bottom padding
+       sits INSIDE its gradient wash, so the wash's visible bottom edge
+       butts against the masthead's bounding box. To center this divider
+       optically between the masthead and the featured card, we need
+       roughly equal whitespace above and below. 40px on each side
+       balances the gap the eye reads. */
+    margin: 40px auto 40px;
     max-width: 760px;
     padding: 0 32px;
   }
@@ -925,7 +931,7 @@ const latestDate = byDateDesc[0]?.data.date;
     }
     .fresh-divider {
       gap: 14px;
-      margin: 0 auto 28px;
+      margin: 32px auto 32px;
       padding: 0 24px;
     }
     .fresh-divider-rule { max-width: 64px; }
