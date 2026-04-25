@@ -150,7 +150,9 @@ I'm excited to get started, and I hope that you are too! Perhaps I'll post a sto
 
 **short answer:** Pick one place where all your family info lives - one app, one calendar, one system. everyone agrees where it is and checks it first. The tool matters less than the agreement.
 
-Now - here's the important part. When you have data scatter, nobody knows where to find anything. For me, this is the first step towards confusion and frustration. If I can't find some information that I knew I had somewhere, it throws everything off, and I can't do anything else until it's found. Let's address that issue once and for all.
+Stop - collaborate and listen. When you have data scatter, nobody knows where to find things. Sorry kids, I promise there will be no more bad Vanilla Ice impressions from dad.
+
+Data scatter is the first step towards confusion and frustration. If I can't find some information that I knew I had somewhere, it throws everything off, and I can't do anything else until it's found. Let's address that issue once and for all.
 
 Pick **one place** where your family info lives. Everyone knows where it is, and everyone checks it first. No matter where the information comes from, it goes into that one place. Everybody in your family is in agreement on where that one, magical, golden source of data lies for your family.
 
