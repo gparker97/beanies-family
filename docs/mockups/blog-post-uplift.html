@@ -1,0 +1,1311 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family · blog post uplift · v1</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500;1,9..144,600&family=Caveat:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ========== brand tokens (mirrors site-wide) ========== */
+      :root {
+        --orange: #f15d22;
+        --terracotta: #e67e22;
+        --silk: #aed6f1;
+        --slate: #2c3e50;
+        --slate-1a: #1a252f;
+        --cream: #fdfaf6;
+        --paper: #ffffff;
+        --page-bg: #f5f1ea;
+        --ink: #2c3e50;
+        --ink-muted: #6b7d8f;
+
+        --hairline: rgba(44, 62, 80, 0.08);
+        --hairline-strong: rgba(44, 62, 80, 0.16);
+
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-silk-20: rgba(174, 214, 241, 0.28);
+
+        --shadow-soft: 0 4px 24px rgba(44, 62, 80, 0.08);
+        --shadow-pop: 0 12px 30px rgba(44, 62, 80, 0.12);
+
+        --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+        --ease-spring: cubic-bezier(0.34, 1.6, 0.5, 1);
+
+        --font-display: 'Outfit', system-ui, sans-serif;
+        --font-serif: 'Fraunces', 'Source Serif 4', Georgia, serif;
+        --font-body: 'Outfit', system-ui, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        font-family: var(--font-display);
+        background:
+          radial-gradient(1200px 800px at 20% -10%, var(--tint-silk-20), transparent 60%),
+          radial-gradient(1000px 700px at 100% 110%, var(--tint-orange-8), transparent 65%),
+          var(--page-bg);
+        color: var(--ink);
+        min-height: 100vh;
+        padding: 48px 24px 96px;
+      }
+
+      /* ========== page header ========== */
+      .page-header {
+        max-width: 1280px;
+        margin: 0 auto 40px;
+      }
+      .page-eyebrow {
+        font-family: var(--font-display);
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-size: 11px;
+        color: var(--orange);
+        margin: 0 0 8px;
+      }
+      .page-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: clamp(28px, 4vw, 44px);
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+      .page-title em {
+        font-family: var(--font-serif);
+        font-style: italic;
+        font-weight: 500;
+        color: var(--orange);
+      }
+      .page-sub {
+        font-size: 15px;
+        line-height: 1.55;
+        color: var(--ink-muted);
+        margin: 12px 0 0;
+        max-width: 740px;
+      }
+
+      /* ========== section heading ========== */
+      .section {
+        max-width: 1280px;
+        margin: 0 auto 64px;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        gap: 18px;
+        margin-bottom: 8px;
+      }
+      .section-num {
+        font-family: var(--font-serif);
+        font-style: italic;
+        font-weight: 500;
+        font-size: 32px;
+        color: var(--orange);
+        line-height: 1;
+      }
+      .section-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 26px;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .section-sub {
+        font-family: var(--font-serif);
+        font-style: italic;
+        font-size: 14px;
+        color: var(--ink-muted);
+        margin: 0 0 28px 50px;
+        max-width: 720px;
+      }
+
+      /* ========== frame grid ========== */
+      .frames-2up {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+        gap: 32px;
+        max-width: 1280px;
+        margin: 0 auto;
+        align-items: start;
+      }
+      .frames-3up {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: 24px;
+        max-width: 1280px;
+        margin: 0 auto;
+        align-items: start;
+      }
+
+      .frame-block {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .frame-tag {
+        align-self: flex-start;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px 6px 6px;
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 999px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        box-shadow: var(--shadow-soft);
+      }
+      .frame-tag .num {
+        background: var(--ink);
+        color: var(--paper);
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+      }
+      .frame-tag.proposed .num { background: var(--orange); color: white; }
+      .frame-tag.swatch {
+        gap: 10px;
+        padding: 6px 14px 6px 14px;
+      }
+      .frame-tag .swatch-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        box-shadow: 0 0 0 2px rgba(255,255,255,0.6), 0 2px 4px rgba(44, 62, 80, 0.18);
+      }
+
+      .frame-cap {
+        max-width: 460px;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--ink-muted);
+      }
+      .frame-cap strong { color: var(--ink); font-family: var(--font-display); font-weight: 600; }
+      .frame-cap em { font-family: var(--font-serif); font-style: italic; }
+
+      /* ========== faux browser frame ========== */
+      .frame {
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: var(--shadow-pop);
+        display: flex;
+        flex-direction: column;
+      }
+      .chrome {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: var(--cream);
+        border-bottom: 1px solid var(--hairline);
+      }
+      .chrome-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex: 0 0 auto;
+      }
+      .chrome-dot.r { background: #ff5f57; }
+      .chrome-dot.y { background: #febc2e; }
+      .chrome-dot.g { background: #28c840; }
+      .chrome-url {
+        margin-left: 8px;
+        font-family: ui-monospace, 'SF Mono', monospace;
+        font-size: 10.5px;
+        color: var(--ink-muted);
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 999px;
+        padding: 4px 12px;
+        flex: 1;
+        text-align: center;
+      }
+
+      /* ========== POST: CURRENT (mirrors live `.post-content`) ========== */
+      .post-current {
+        background: #f8f9fa;
+        padding: 32px 28px 36px;
+      }
+      .post-current .breadcrumbs {
+        font-family: var(--font-display);
+        font-size: 11px;
+        color: rgba(44, 62, 80, 0.45);
+        margin-bottom: 18px;
+        letter-spacing: 0.02em;
+      }
+      .post-current .breadcrumbs a {
+        color: rgba(44, 62, 80, 0.45);
+        text-decoration: none;
+      }
+      .post-current .breadcrumbs .sep { opacity: 0.4; margin: 0 6px; }
+      .post-current .header-top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .post-current .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, rgba(241, 93, 34, 0.08), rgba(174, 214, 241, 0.08));
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+      }
+      .post-current .cat-chip {
+        background: rgba(44, 62, 80, 0.04);
+        border-radius: 20px;
+        color: rgba(44, 62, 80, 0.45);
+        font-family: var(--font-display);
+        font-size: 10px;
+        font-weight: 600;
+        padding: 3px 10px;
+      }
+      .post-current .title {
+        color: var(--slate);
+        font-family: var(--font-display);
+        font-size: 1.45rem;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        line-height: 1.2;
+        margin: 0 0 12px;
+      }
+      .post-current .subtitle {
+        color: rgba(44, 62, 80, 0.68);
+        font-family: var(--font-serif);
+        font-style: italic;
+        font-weight: 400;
+        font-size: 1rem;
+        line-height: 1.4;
+        margin: 0 0 12px;
+      }
+      .post-current .byline {
+        color: rgba(44, 62, 80, 0.5);
+        font-family: var(--font-display);
+        font-size: 11px;
+        font-weight: 500;
+      }
+      .post-current .divider {
+        background: linear-gradient(90deg, transparent, rgba(44, 62, 80, 0.08), transparent);
+        height: 1px;
+        margin: 24px 0;
+      }
+      .post-current .prose p {
+        color: rgba(44, 62, 80, 0.7);
+        font-family: var(--font-display);
+        font-size: 14px;
+        line-height: 1.78;
+        margin: 0 0 14px;
+      }
+      .post-current .prose strong { color: var(--slate); font-weight: 600; }
+      .post-current .prose a { color: var(--orange); text-decoration: underline; text-underline-offset: 2px; }
+      .post-current .prose h2 {
+        color: var(--slate);
+        font-family: var(--font-display);
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin: 1.4rem 0 0.6rem;
+      }
+      .post-current .prose blockquote {
+        border-left: 3px solid var(--orange);
+        color: rgba(44, 62, 80, 0.55);
+        font-family: var(--font-display);
+        font-style: italic;
+        margin: 1rem 0;
+        padding-left: 14px;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      /* ========== POST: PROPOSED v1 ========== */
+      /* tint scoping — drives wash, kicker, links, h2 dots, blockquote rule */
+      .post-uplift {
+        --tint-hex: #f15d22;
+        --tint-ink: #a83a11;
+        --tint-accent: rgba(241, 93, 34, 0.18);
+        --tint-wash: linear-gradient(140deg, #fff6ef 0%, #ffe9d6 100%);
+        background: #f8f9fa;
+        position: relative;
+      }
+      .post-uplift[data-tint='terracotta'] {
+        --tint-hex: #c76a21;
+        --tint-ink: #7d420f;
+        --tint-accent: rgba(199, 106, 33, 0.22);
+        --tint-wash: linear-gradient(140deg, #fff5e8 0%, #f5e1c2 100%);
+      }
+      .post-uplift[data-tint='sky'] {
+        --tint-hex: #3a82b3;
+        --tint-ink: #1f4d6d;
+        --tint-accent: rgba(58, 130, 179, 0.22);
+        --tint-wash: linear-gradient(140deg, #f1f8fd 0%, #dceaf6 100%);
+      }
+      .post-uplift[data-tint='kraft'] {
+        --tint-hex: #b58a2a;
+        --tint-ink: #6c4f15;
+        --tint-accent: rgba(181, 138, 42, 0.22);
+        --tint-wash: linear-gradient(140deg, #fbf6e8 0%, #f3e4bc 100%);
+      }
+      .post-uplift[data-tint='slate'] {
+        --tint-hex: #2c3e50;
+        --tint-ink: #1a2533;
+        --tint-accent: rgba(44, 62, 80, 0.20);
+        --tint-wash: linear-gradient(140deg, #f2f4f7 0%, #dde3ec 100%);
+      }
+
+      /* hero wash strip — sits behind kicker + title + subtitle, then fades */
+      .post-uplift .hero-wash {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 320px;
+        background: var(--tint-wash);
+        pointer-events: none;
+        z-index: 0;
+      }
+      .post-uplift .hero-wash::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 50%, #f8f9fa 100%);
+      }
+      /* paper-grain noise overlay (subtle) */
+      .post-uplift .hero-wash::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image:
+          radial-gradient(circle at 18% 42%, rgba(44, 62, 80, 0.05) 0.7px, transparent 1px),
+          radial-gradient(circle at 62% 28%, rgba(44, 62, 80, 0.04) 0.7px, transparent 1px),
+          radial-gradient(circle at 88% 66%, rgba(44, 62, 80, 0.05) 0.7px, transparent 1px);
+        background-size: 110px 110px, 92px 92px, 148px 148px;
+        opacity: 0.55;
+        mix-blend-mode: multiply;
+      }
+
+      .post-uplift .uplift-shell {
+        position: relative;
+        z-index: 1;
+        padding: 32px 28px 36px;
+      }
+
+      .post-uplift .breadcrumbs {
+        font-family: var(--font-display);
+        font-size: 11px;
+        color: rgba(44, 62, 80, 0.55);
+        margin-bottom: 22px;
+        letter-spacing: 0.02em;
+      }
+      .post-uplift .breadcrumbs a {
+        color: rgba(44, 62, 80, 0.55);
+        text-decoration: none;
+      }
+      .post-uplift .breadcrumbs .sep { opacity: 0.4; margin: 0 6px; }
+
+      /* kicker — Outfit uppercase tracked, with a tint dot. echoes the
+         masthead's `masthead-issue-stamp` vocabulary so the post reads as
+         continuing from the index. */
+      .post-uplift .kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-family: var(--font-display);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--tint-ink);
+        background: var(--paper);
+        border: 1px solid var(--tint-accent);
+        border-radius: 999px;
+        padding: 6px 14px;
+        box-shadow: 0 2px 8px rgba(44, 62, 80, 0.05);
+        margin-bottom: 18px;
+      }
+      .post-uplift .kicker-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--tint-hex);
+        box-shadow: 0 0 0 3px var(--tint-accent);
+        flex: 0 0 auto;
+      }
+      .post-uplift .kicker-sep {
+        opacity: 0.4;
+        font-weight: 400;
+      }
+      .post-uplift .kicker-stamp { color: var(--tint-hex); font-weight: 700; }
+
+      .post-uplift .title {
+        color: var(--slate);
+        font-family: var(--font-display);
+        font-size: clamp(1.6rem, 3.8vw, 2.4rem);
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        line-height: 1.08;
+        margin: 0 0 14px;
+        max-width: 28ch;
+        text-wrap: balance;
+      }
+
+      .post-uplift .subtitle {
+        color: rgba(44, 62, 80, 0.7);
+        font-family: var(--font-serif);
+        font-style: italic;
+        font-weight: 400;
+        font-size: 1.1rem;
+        line-height: 1.45;
+        margin: 0 0 18px;
+        max-width: 48ch;
+      }
+
+      .post-uplift .byline-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-family: var(--font-display);
+        font-size: 11.5px;
+      }
+      .post-uplift .byline-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--tint-accent), rgba(255, 255, 255, 0.5));
+        border: 1px solid var(--tint-accent);
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+      }
+      .post-uplift .byline-name {
+        color: var(--slate);
+        font-weight: 600;
+      }
+      .post-uplift .byline-meta {
+        color: rgba(44, 62, 80, 0.5);
+      }
+      .post-uplift .cat-chip {
+        background: var(--paper);
+        color: var(--tint-ink);
+        font-family: var(--font-display);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--tint-accent);
+      }
+
+      /* fresh-divider echo (smaller, tint-colored) */
+      .post-uplift .post-divider {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin: 28px 0 22px;
+        color: var(--tint-hex);
+      }
+      .post-uplift .post-divider-rule {
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(
+          to right,
+          transparent,
+          color-mix(in srgb, var(--tint-hex) 36%, transparent),
+          transparent
+        );
+      }
+      .post-uplift .post-divider-ornament {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .post-uplift .post-divider-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--tint-hex);
+        box-shadow: 0 0 0 3px var(--tint-accent);
+      }
+      .post-uplift .post-divider-text {
+        font-family: var(--font-serif);
+        font-style: italic;
+        font-size: 13px;
+        color: var(--tint-ink);
+      }
+
+      /* prose */
+      .post-uplift .prose {
+        font-family: var(--font-display);
+      }
+      .post-uplift .prose p {
+        color: rgba(44, 62, 80, 0.78);
+        font-size: 15.5px;
+        line-height: 1.78;
+        margin: 0 0 14px;
+      }
+      .post-uplift .prose strong { color: var(--slate); font-weight: 600; }
+      .post-uplift .prose a {
+        color: var(--tint-hex);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        text-decoration-thickness: 1px;
+      }
+      .post-uplift .prose a:hover { color: var(--tint-ink); }
+
+      /* ONE drop cap on the very first paragraph — Fraunces italic */
+      .post-uplift .prose > p:first-of-type::first-letter {
+        font-family: var(--font-serif);
+        font-style: italic;
+        font-weight: 500;
+        font-size: 3.5em;
+        line-height: 0.85;
+        float: left;
+        margin: 0.08em 0.1em 0 -0.04em;
+        color: var(--tint-ink);
+      }
+
+      .post-uplift .prose h2 {
+        color: var(--slate);
+        font-family: var(--font-display);
+        font-size: 1.18rem;
+        font-weight: 700;
+        margin: 1.6rem 0 0.6rem;
+        letter-spacing: -0.005em;
+        position: relative;
+        padding-left: 18px;
+      }
+      .post-uplift .prose h2::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.65em;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--tint-hex);
+        box-shadow: 0 0 0 3px var(--tint-accent);
+      }
+
+      .post-uplift .prose blockquote {
+        border-left: 3px solid var(--tint-hex);
+        color: rgba(44, 62, 80, 0.7);
+        font-family: var(--font-serif);
+        font-style: italic;
+        font-weight: 400;
+        font-size: 1.02rem;
+        margin: 1.2rem 0;
+        padding: 0.4rem 0 0.4rem 16px;
+        line-height: 1.55;
+        background: linear-gradient(90deg, var(--tint-accent), transparent 60%);
+        border-radius: 0 8px 8px 0;
+      }
+
+      .post-uplift .prose img,
+      .post-uplift .prose .figure {
+        display: block;
+        margin: 1.5rem auto;
+        max-width: 100%;
+        border: 1px solid var(--tint-accent);
+        border-radius: 14px;
+        background: var(--paper);
+        padding: 8px;
+        box-shadow: 0 8px 24px rgba(44, 62, 80, 0.06);
+      }
+      .post-uplift .prose .figure {
+        aspect-ratio: 16 / 10;
+        background:
+          repeating-linear-gradient(
+            -45deg,
+            color-mix(in srgb, var(--tint-hex) 8%, transparent),
+            color-mix(in srgb, var(--tint-hex) 8%, transparent) 12px,
+            color-mix(in srgb, var(--tint-hex) 14%, transparent) 12px,
+            color-mix(in srgb, var(--tint-hex) 14%, transparent) 24px
+          );
+      }
+      .post-uplift .prose .figcaption {
+        text-align: center;
+        font-family: var(--font-serif);
+        font-style: italic;
+        font-size: 12.5px;
+        color: rgba(44, 62, 80, 0.5);
+        margin: -0.4rem 0 1.2rem;
+      }
+
+      /* prev/next + further reading mocks (kept light) */
+      .post-uplift .post-nav {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 28px;
+      }
+      .post-uplift .post-nav-btn {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 14px;
+        padding: 12px 14px;
+        text-decoration: none;
+        font-family: var(--font-display);
+        transition: border-color 200ms;
+      }
+      .post-uplift .post-nav-btn:hover {
+        border-color: var(--tint-accent);
+      }
+      .post-uplift .post-nav-btn.is-right {
+        justify-content: flex-end;
+        text-align: right;
+      }
+      .post-uplift .post-nav-label {
+        font-size: 9.5px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--tint-ink);
+      }
+      .post-uplift .post-nav-title {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--slate);
+        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 18ch;
+      }
+      .post-uplift .post-nav-arrow {
+        color: rgba(44, 62, 80, 0.3);
+        flex: 0 0 auto;
+      }
+
+      /* ========== annotations ========== */
+      .annotations {
+        max-width: 1180px;
+        margin: 64px auto 0;
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 28px;
+        padding: 32px 36px;
+        box-shadow: var(--shadow-soft);
+      }
+      .annotations h2 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 22px;
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+      .annotations h2 em {
+        font-family: var(--font-serif);
+        font-style: italic;
+        font-weight: 500;
+        color: var(--orange);
+      }
+      .annotations .a-sub {
+        font-family: var(--font-serif);
+        font-style: italic;
+        font-size: 13px;
+        color: var(--ink-muted);
+        margin: 0 0 22px;
+      }
+      .a-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+      }
+      @media (max-width: 880px) {
+        .a-grid { grid-template-columns: 1fr; }
+      }
+      .a-col h3 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--orange);
+        margin: 0 0 10px;
+      }
+      .a-col ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--ink-muted);
+      }
+      .a-col li {
+        padding: 5px 0 5px 18px;
+        position: relative;
+      }
+      .a-col li::before {
+        content: '·';
+        position: absolute;
+        left: 0;
+        top: 4px;
+        color: var(--orange);
+        font-weight: 700;
+      }
+      .a-col li strong {
+        color: var(--ink);
+        font-family: var(--font-display);
+        font-weight: 600;
+      }
+
+      .divider {
+        max-width: 880px;
+        margin: 0 auto 56px;
+        border: 0;
+        border-top: 1px dashed var(--hairline-strong);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page-header">
+      <p class="page-eyebrow">mockup · /blog/&lt;slug&gt; uplift · v1</p>
+      <h1 class="page-title">a tint per <em>edition</em></h1>
+      <p class="page-sub">
+        Today's blog post detail page is a colorless column on cloud-white.
+        v1 carries the index's per-issue tint into the post header (orange
+        / terracotta / sky / kraft / slate) and punches up the typography,
+        without lifting the family library's e-zine vocabulary. Same
+        publication, same reading rhythm, every edition slightly different.
+      </p>
+    </header>
+
+    <!-- ============================================================
+         SECTION i — head-to-head (current vs proposed, same post)
+         ============================================================ -->
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">i.</span>
+        <h2 class="section-title">current vs proposed · same post</h2>
+      </div>
+      <p class="section-sub">
+        Issue 04 is "buy fruit" — the post's tint cycles to <em>kraft</em>
+        on the index. Left: today's live styling. Right: v1, with the
+        kraft tint inheriting into the kicker, ornament, h2 dot,
+        blockquote, and link colors.
+      </p>
+
+      <div class="frames-2up">
+        <!-- LEFT: current -->
+        <div class="frame-block">
+          <span class="frame-tag"><span class="num">A</span> current · live</span>
+          <div class="frame">
+            <div class="chrome">
+              <span class="chrome-dot r"></span>
+              <span class="chrome-dot y"></span>
+              <span class="chrome-dot g"></span>
+              <span class="chrome-url">beanies.family/blog/buy-fruit</span>
+            </div>
+            <div class="post-current">
+              <div class="breadcrumbs">
+                home <span class="sep">›</span> beanstalk
+                <span class="sep">›</span> buy fruit
+              </div>
+              <div class="header-top">
+                <div class="avatar">🫘</div>
+                <span class="cat-chip">📖 stories</span>
+              </div>
+              <h1 class="title">buy fruit</h1>
+              <p class="subtitle">it's the little things that make up life</p>
+              <div class="byline">greg · April 17, 2026</div>
+              <div class="divider"></div>
+              <div class="prose">
+                <p>
+                  Hey my Beanie Buddies,
+                </p>
+                <p>
+                  Some people ask me if these are written by AI, or do I
+                  write them myself. My answer is yes, of course, by which
+                  I mean no, I <strong>don't</strong> use AI. Meaning yes,
+                  I <strong>do</strong> write them myself. Unless I
+                  specifically tell you I used AI, in which case, no, I
+                  didn't write it myself, but still probably changed most
+                  of it. So, to answer your question, maybe?
+                </p>
+                <h2>so let me introduce you to my little friend: todos</h2>
+                <p>
+                  A todo on
+                  <a href="#">beanies.family</a> is not just something
+                  you'd like to do at some point. A todo is anything you
+                  have to do <strong>today</strong>, or on a
+                  <strong>certain date</strong>, or
+                  <strong>something you'd like somebody else in your
+                  family to do</strong>.
+                </p>
+                <blockquote>
+                  My mouth hung open as I stared incredulously upon a todo
+                  item from my wife, assigned to me, which said, simply:
+                  "buy fruit".
+                </blockquote>
+              </div>
+            </div>
+          </div>
+          <p class="frame-cap">
+            <strong>What's there.</strong> Tiny avatar, tiny chip, 1.45rem
+            title, Fraunces italic subtitle (good), sans-serif body, an
+            orange link + orange blockquote rule that don't relate to the
+            kraft cover this post wears on the index.
+          </p>
+        </div>
+
+        <!-- RIGHT: proposed -->
+        <div class="frame-block">
+          <span class="frame-tag proposed"
+            ><span class="num">B</span> proposed · v1 (kraft tint)</span
+          >
+          <div class="frame">
+            <div class="chrome">
+              <span class="chrome-dot r"></span>
+              <span class="chrome-dot y"></span>
+              <span class="chrome-dot g"></span>
+              <span class="chrome-url">beanies.family/blog/buy-fruit</span>
+            </div>
+            <div class="post-uplift" data-tint="kraft">
+              <div class="hero-wash"></div>
+              <div class="uplift-shell">
+                <div class="breadcrumbs">
+                  home <span class="sep">›</span> beanstalk
+                  <span class="sep">›</span> buy fruit
+                </div>
+                <div class="kicker">
+                  <span class="kicker-dot"></span>
+                  <span class="kicker-stamp">issue 04</span>
+                  <span class="kicker-sep">·</span>
+                  <span>17 apr 2026</span>
+                  <span class="kicker-sep">·</span>
+                  <span>4 min read</span>
+                </div>
+                <h1 class="title">buy fruit</h1>
+                <p class="subtitle">
+                  it's the little things that make up life
+                </p>
+                <div class="byline-row">
+                  <span class="byline-avatar">🫘</span>
+                  <span class="byline-name">greg</span>
+                  <span class="byline-meta">· april 17, 2026</span>
+                  <span class="cat-chip">📖 stories</span>
+                </div>
+
+                <div class="post-divider">
+                  <span class="post-divider-rule"></span>
+                  <span class="post-divider-ornament">
+                    <span class="post-divider-dot"></span>
+                    <span class="post-divider-text">the post</span>
+                    <span class="post-divider-dot"></span>
+                  </span>
+                  <span class="post-divider-rule"></span>
+                </div>
+
+                <div class="prose">
+                  <p>
+                    Hey my Beanie Buddies. Some people ask me if these are
+                    written by AI, or do I write them myself. My answer is
+                    yes, of course, by which I mean no, I
+                    <strong>don't</strong> use AI. Meaning yes, I
+                    <strong>do</strong> write them myself.
+                  </p>
+                  <p>
+                    Unless I specifically tell you I used AI, in which
+                    case, no, I didn't write it myself, but still probably
+                    changed most of it. So, to answer your question,
+                    maybe?
+                  </p>
+                  <h2>so let me introduce you to my little friend: todos</h2>
+                  <p>
+                    A todo on
+                    <a href="#">beanies.family</a> is not just something
+                    you'd like to do at some point. A todo is anything you
+                    have to do <strong>today</strong>, or on a
+                    <strong>certain date</strong>, or
+                    <strong>something you'd like somebody else in your
+                    family to do</strong>.
+                  </p>
+                  <blockquote>
+                    My mouth hung open as I stared incredulously upon a
+                    todo item from my wife, assigned to me, which said,
+                    simply: "buy fruit".
+                  </blockquote>
+                  <div class="figure"></div>
+                  <p class="figcaption">
+                    Dramatic recreation of a true, real-life event. This
+                    actually happened.
+                  </p>
+                </div>
+
+                <div class="post-nav">
+                  <a class="post-nav-btn" href="#">
+                    <span class="post-nav-arrow">‹</span>
+                    <div>
+                      <div class="post-nav-label">previous</div>
+                      <div class="post-nav-title">
+                        does family trip planning stress…
+                      </div>
+                    </div>
+                  </a>
+                  <a class="post-nav-btn is-right" href="#">
+                    <div>
+                      <div class="post-nav-label">next</div>
+                      <div class="post-nav-title">
+                        best cozi & maple alternatives…
+                      </div>
+                    </div>
+                    <span class="post-nav-arrow">›</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="frame-cap">
+            <strong>What's new.</strong> Kraft wash strip behind the hero,
+            Fraunces-italic kicker pill ("issue 04 · 17 apr · 4 min"),
+            larger title (≤2.4rem), tint-tied chip + h2 dot + blockquote
+            +  links + ornament. Body prose stays sans-serif at a real
+            reading size (15.5px / 1.78). Single drop cap on the first
+            paragraph. <em>One ornament — not five.</em>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- ============================================================
+         SECTION ii — tint variation across editions
+         ============================================================ -->
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">ii.</span>
+        <h2 class="section-title">how three other editions look</h2>
+      </div>
+      <p class="section-sub">
+        Same template, three different tints from the index's rotation.
+        The wash strip + kicker color + h2 dot + blockquote rule + chip
+        + link color all drift; the typography and rhythm stay constant.
+        Same publication, recognizable from edition to edition.
+      </p>
+
+      <div class="frames-3up">
+        <!-- terracotta — issue 02 -->
+        <div class="frame-block">
+          <span class="frame-tag swatch">
+            <span
+              class="swatch-dot"
+              style="background: #c76a21"
+            ></span>
+            terracotta · issue 02
+          </span>
+          <div class="frame">
+            <div class="chrome">
+              <span class="chrome-dot r"></span>
+              <span class="chrome-dot y"></span>
+              <span class="chrome-dot g"></span>
+              <span class="chrome-url"
+                >beanies.family/blog/accidentally-built…</span
+              >
+            </div>
+            <div class="post-uplift" data-tint="terracotta">
+              <div class="hero-wash"></div>
+              <div class="uplift-shell">
+                <div class="kicker">
+                  <span class="kicker-dot"></span>
+                  <span class="kicker-stamp">issue 02</span>
+                  <span class="kicker-sep">·</span>
+                  <span>03 apr 2026</span>
+                  <span class="kicker-sep">·</span>
+                  <span>updates</span>
+                </div>
+                <h1 class="title">
+                  I might have accidentally built the world's greatest
+                  family planning app
+                </h1>
+                <p class="subtitle">
+                  or: why vibe coding by yourself at 3am can be hazardous
+                  to your health
+                </p>
+                <div class="byline-row">
+                  <span class="byline-avatar">🚀</span>
+                  <span class="byline-name">greg</span>
+                  <span class="byline-meta">· apr 3</span>
+                </div>
+                <div class="post-divider">
+                  <span class="post-divider-rule"></span>
+                  <span class="post-divider-ornament">
+                    <span class="post-divider-dot"></span>
+                    <span class="post-divider-text">the post</span>
+                    <span class="post-divider-dot"></span>
+                  </span>
+                  <span class="post-divider-rule"></span>
+                </div>
+                <div class="prose">
+                  <p>
+                    Hi everybody! (Hi Dr. Nick!) 800 commits, 250 cups of
+                    coffee, and 89,000 gloriously vibe-coded lines later,
+                    I found myself gazing proudly at a generated image of
+                    my actual family in beanie form.
+                  </p>
+                  <h2>and here we are</h2>
+                  <p>
+                    What started as a janky spreadsheet has become a
+                    living, breathing thing. <a href="#">beanies.family</a>
+                    grew teeth this month.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- sky — issue 03 -->
+        <div class="frame-block">
+          <span class="frame-tag swatch">
+            <span class="swatch-dot" style="background: #3a82b3"></span>
+            sky · issue 03
+          </span>
+          <div class="frame">
+            <div class="chrome">
+              <span class="chrome-dot r"></span>
+              <span class="chrome-dot y"></span>
+              <span class="chrome-dot g"></span>
+              <span class="chrome-url"
+                >beanies.family/blog/travel-plans-intro</span
+              >
+            </div>
+            <div class="post-uplift" data-tint="sky">
+              <div class="hero-wash"></div>
+              <div class="uplift-shell">
+                <div class="kicker">
+                  <span class="kicker-dot"></span>
+                  <span class="kicker-stamp">issue 03</span>
+                  <span class="kicker-sep">·</span>
+                  <span>10 apr 2026</span>
+                  <span class="kicker-sep">·</span>
+                  <span>travel</span>
+                </div>
+                <h1 class="title">
+                  does family trip planning stress you out? me too
+                </h1>
+                <p class="subtitle">
+                  caught in the scheduling your vacation vortex
+                </p>
+                <div class="byline-row">
+                  <span class="byline-avatar">✈️</span>
+                  <span class="byline-name">greg</span>
+                  <span class="byline-meta">· apr 10</span>
+                </div>
+                <div class="post-divider">
+                  <span class="post-divider-rule"></span>
+                  <span class="post-divider-ornament">
+                    <span class="post-divider-dot"></span>
+                    <span class="post-divider-text">the post</span>
+                    <span class="post-divider-dot"></span>
+                  </span>
+                  <span class="post-divider-rule"></span>
+                </div>
+                <div class="prose">
+                  <p>
+                    Hey my beans! It's a Monday morning. You're at your
+                    desk, sipping coffee from your favorite mug. Out of
+                    nowhere, the floor begins to shake. A black hole
+                    envelops the floor.
+                  </p>
+                  <h2>so what now?</h2>
+                  <p>
+                    The travel feature on
+                    <a href="#">beanies.family</a> is built for the chaos
+                    of planning a real-life family trip.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- slate — issue 05 -->
+        <div class="frame-block">
+          <span class="frame-tag swatch">
+            <span class="swatch-dot" style="background: #2c3e50"></span>
+            slate · issue 05
+          </span>
+          <div class="frame">
+            <div class="chrome">
+              <span class="chrome-dot r"></span>
+              <span class="chrome-dot y"></span>
+              <span class="chrome-dot g"></span>
+              <span class="chrome-url"
+                >beanies.family/blog/best-cozi-maple…</span
+              >
+            </div>
+            <div class="post-uplift" data-tint="slate">
+              <div class="hero-wash"></div>
+              <div class="uplift-shell">
+                <div class="kicker">
+                  <span class="kicker-dot"></span>
+                  <span class="kicker-stamp">issue 05</span>
+                  <span class="kicker-sep">·</span>
+                  <span>24 apr 2026</span>
+                  <span class="kicker-sep">·</span>
+                  <span>review</span>
+                </div>
+                <h1 class="title">
+                  best cozi &amp; maple alternatives in 2026
+                </h1>
+                <p class="subtitle">this post was written by AI. sort of.</p>
+                <div class="byline-row">
+                  <span class="byline-avatar">🫘</span>
+                  <span class="byline-name">greg</span>
+                  <span class="byline-meta">· apr 24</span>
+                </div>
+                <div class="post-divider">
+                  <span class="post-divider-rule"></span>
+                  <span class="post-divider-ornament">
+                    <span class="post-divider-dot"></span>
+                    <span class="post-divider-text">the post</span>
+                    <span class="post-divider-dot"></span>
+                  </span>
+                  <span class="post-divider-rule"></span>
+                </div>
+                <div class="prose">
+                  <p>
+                    A human + AI co-written tour of cozi, maple, ynab,
+                    greenlight, timetree, and other family and finance
+                    planning apps worth comparing in 2026.
+                  </p>
+                  <h2>how the family planner field looks today</h2>
+                  <p>
+                    Six apps, six philosophies, one obvious gap. Read on
+                    for the full <a href="#">comparison</a>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         Annotations
+         ============================================================ -->
+    <section class="annotations">
+      <h2>spec &amp; <em>open calls</em></h2>
+      <p class="a-sub">
+        what's lifting from where, what's preserved, what's NOT done.
+      </p>
+      <div class="a-grid">
+        <div class="a-col">
+          <h3>What's new in v1</h3>
+          <ul>
+            <li>
+              <strong>Per-issue tint inherited from /blog index.</strong>
+              Compute issue number the same way the index does (chronological
+              ascending position) and pass the tint into
+              <code>[...slug].astro</code> as a CSS variable scope.
+              5-tint cycle: orange → terracotta → sky → kraft → slate.
+            </li>
+            <li>
+              <strong>Hero wash strip.</strong> 320px tint gradient behind
+              the kicker + title + subtitle, fading to cloud-white before
+              the body prose starts. Includes a faint paper-grain noise
+              overlay (same recipe as the masthead's
+              <code>masthead-wash::after</code>).
+            </li>
+            <li>
+              <strong>Kicker pill.</strong> "<em>issue 04 · 17 apr · 4 min
+              read</em>" — Outfit uppercase tracked, with a tint dot.
+              Mirrors the masthead's
+              <code>masthead-issue-stamp</code> vocabulary.
+            </li>
+            <li>
+              <strong>Bigger title.</strong> Up from 1.75rem → clamp(1.6,
+              3.8vw, 2.4rem). Tighter letter-spacing.
+            </li>
+            <li>
+              <strong>Fresh-divider echo.</strong> Tint-colored
+              orange-dot ornament between hero and prose. Same family as
+              the index's "fresh off the press" divider, sized down.
+            </li>
+            <li>
+              <strong>Tint-aware prose details.</strong> Links, h2
+              prefix-dot, blockquote rule + wash, image frame border,
+              prev/next hover border — all use the post's tint.
+            </li>
+            <li>
+              <strong>Single drop cap.</strong> Fraunces italic, on the
+              very first paragraph only. One editorial flourish; doesn't
+              repeat per section.
+            </li>
+            <li>
+              <strong>Fraunces blockquote.</strong> The only piece of
+              serif body copy on the page. Reads as
+              <em>quoted from the page</em>.
+            </li>
+          </ul>
+        </div>
+        <div class="a-col">
+          <h3>What's preserved</h3>
+          <ul>
+            <li>
+              <strong>Sans-serif body prose.</strong> Outfit at 15.5px,
+              line-height 1.78. Journal voice, not magazine voice.
+              Serif body would push this into the guides' territory.
+            </li>
+            <li>
+              <strong>Fraunces italic subtitle.</strong> Already doing
+              real work; no change needed.
+            </li>
+            <li>
+              <strong>Lightbox</strong>, breadcrumbs, prev/next nav,
+              further-reading, Substack subscribe — all kept as-is.
+              Visual styling adapts to the tint; structure unchanged.
+            </li>
+          </ul>
+        </div>
+        <div class="a-col">
+          <h3>What's NOT in v1 (and why)</h3>
+          <ul>
+            <li>
+              <strong>Reading progress bar.</strong> That's the guide
+              page's signature. Lifting it would flatten the
+              blog/guide distinction.
+            </li>
+            <li>
+              <strong>Numbered or decorated h2s.</strong> Guide vocabulary.
+              Blog h2 gets only a small tint dot.
+            </li>
+            <li>
+              <strong>Drop caps on every section.</strong> Too decorative;
+              one drop cap on the first paragraph is the whole budget.
+            </li>
+            <li>
+              <strong>Mascots / illustrations on the detail page.</strong>
+              The index handles mascot heavy-lifting. Detail pages stay
+              text-first.
+            </li>
+            <li>
+              <strong>Per-tint cover plate.</strong> If a post has no
+              <code>coverImage</code>, the body just starts. We don't
+              render a blank tint plate. (The index handles cover-less
+              posts with the wobble emoji; the detail doesn't need to.)
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>
