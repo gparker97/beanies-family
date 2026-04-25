@@ -4,9 +4,11 @@ import { useRouter } from 'vue-router';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
+import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
 import { showToast } from '@/composables/useToast';
 import { reEncryptEnvelope, downloadAsFile } from '@/services/sync/fileSync';
 import { getFamilyKey, getEnvelope } from '@/services/sync/syncService';
+import { useSyncStore } from '@/stores/syncStore';
 
 const props = defineProps<{
   show: boolean;
@@ -15,8 +17,11 @@ const props = defineProps<{
 
 const { t } = useTranslation();
 const router = useRouter();
+const syncStore = useSyncStore();
 const { isReconnecting, reconnect } = useGoogleReconnect();
+const { isPicking, pick } = usePickBeanpodFile();
 const isDownloading = ref(false);
+const reselectError = ref<string | null>(null);
 
 const emit = defineEmits<{
   reconnected: [];
@@ -25,6 +30,18 @@ const emit = defineEmits<{
 async function handleReconnect() {
   const success = await reconnect();
   if (success) emit('reconnected');
+}
+
+async function handleReselectFile() {
+  reselectError.value = null;
+  const picked = await pick();
+  if (!picked) return; // user cancelled, redirected, or pick failed (error in composable)
+  const result = await syncStore.recoverFromMissingFile(picked.fileId, picked.fileName);
+  if (result.success) {
+    emit('reconnected');
+  } else {
+    reselectError.value = result.error ?? t('googleDrive.fileNotFoundReselectFailed');
+  }
 }
 
 async function handleDownloadBackup() {
@@ -78,11 +95,21 @@ function goToSettings() {
     <template #actions>
       <template v-if="props.fileNotFound">
         <button
-          class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50"
+          :disabled="isPicking"
+          class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
+          @click="handleReselectFile"
+        >
+          {{ isPicking ? '...' : t('googleDrive.fileNotFoundReselect') }}
+        </button>
+        <button
+          class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30"
           @click="goToSettings"
         >
           {{ t('googleDrive.goToSettings') }}
         </button>
+        <p v-if="reselectError" class="basis-full text-xs text-white/80">
+          {{ reselectError }}
+        </p>
       </template>
       <template v-else>
         <button

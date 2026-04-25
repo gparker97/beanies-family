@@ -3475,6 +3475,14 @@ const STRING_DEFS = {
     beanie: 'your beanpod might have been moved or deleted. head to settings to sort it out',
   },
   'googleDrive.goToSettings': { en: 'Go to Settings', beanie: 'go to settings' },
+  'googleDrive.fileNotFoundReselect': {
+    en: 'Pick file from Drive',
+    beanie: 'pick from drive',
+  },
+  'googleDrive.fileNotFoundReselectFailed': {
+    en: "Couldn't load the picked file.",
+    beanie: "couldn't load that file",
+  },
   'googleDrive.reconnectFailed': {
     en: 'Could not reconnect. Try again.',
     beanie: "couldn't reconnect. try again",
