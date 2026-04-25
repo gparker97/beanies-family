@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-25
+
+### Added
+
+- **Mobile nav redesign mockups (design-only, not yet shipped).** Two interactive HTML mockups exploring a calmer 4-category bottom nav (Nook / Planning / Money / Pod) that uses a "bean-jar stack" pattern — tap a category and a vertical column of beans rises from the tab. v1 (`docs/mockups/mobile-nav-bean-jar.html`) compares three layouts; v2 (`docs/mockups/mobile-nav-bean-jar-v2.html`) commits to the system rule "cluster bloom = ADD, pure bean stack = NAVIGATE", with a Heritage Orange `+` seal differentiating the FAB's bloom from the nav's stack, plus a scaling stress test (3 / 6 / 10 items) and a `＋N more` overflow strategy. Implementation deferred to a future session.
+
+---
+
 ## 2026-04-24
 
 ### Fixed
