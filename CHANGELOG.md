@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-25
 
+### Fixed
+
+- **Onboarding: invitee on iPhone Safari no longer hits "popups are blocked" right after scanning the QR.** The join page used to fire Google OAuth automatically on mount, which iOS Safari blocks because there's no user gesture in the call stack. The page now uses a silent token check first, defers interactive auth to the existing "Pick from Drive" CTA so the tap is a real user gesture, and routes iOS / iPadOS through full-page redirect auth instead of a popup. After the redirect comes back with a fileId, the file auto-loads — no extra Picker step.
+- **Onboarding: "that folder doesn't have a pod inside" false negative when joining a shared family.** Picking a folder under the `drive.file` OAuth scope does not grant API list-access to files owned by another user, so the post-pick lookup always returned zero results even when the `.beanpod` was visibly inside. The join flow now picks the `.beanpod` file directly via the Picker, which works correctly for files shared by another user. Photos were already independent of this path (public-link + CDN).
+
 ### Changed
 
 - **Chapter 1 + 2 content sync from Notion.** Greg's Notion edits to the "overwhelmed with family planning" and "family organization" pillars are now mirrored to the repo. Chapter 1 gains a new "red flags" section about when overwhelm has tipped into something more serious, the section order has been reorganized so the calm-down + share-the-load conversation comes before the practical tooling sections, the partner-on-board section now precedes the tools-help-vs-hurt section, and the source-of-truth section opens with a Vanilla Ice riff ("Stop - collaborate and listen"). Chapter 2 adds a research callout on family routines + rituals (citing the AAP's overview), tightens the "family OS" short-answer, and adds a paragraph on the youngest beanie joining the chore system. Both bump `lastUpdated` to today and shipped to prod on commit `8ebcdfb`.
