@@ -220,7 +220,7 @@ We've discussed a lot here, so let's summarize:
 
 If you take away nothing else from this guide, just remember the above things. If you're anything like us, this will be your first steps towards a calmer, less stressful household. And we can all use that in our lives!
 
-Best of luck, and looking forward to talking more on [beanies.family](https://beanies.family). If you want to discuss or read more, join [the beanstalk on substack](https://gpbeanies.substack.com) and receive a newsletter every Friday (or, roughly, whenever I feel like it)!
+Best of luck, and looking forward to talking more on [beanies.family](https://beanies.family). If you want to discuss or read more, join [the beanstalk on substack](https://everybeancounts.substack.com) and receive a newsletter every Friday (or, roughly, whenever I feel like it)!
 
 ## further reading
 

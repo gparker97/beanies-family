@@ -188,6 +188,7 @@ const showLayout = computed(() => {
     'JoinFamily',
     'BeanstalkBlog',
     'BeanstalkPost',
+    'PlausibleExclude',
   ];
   return !noLayoutPages.includes(route.name as string);
 });

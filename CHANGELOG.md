@@ -10,8 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-25
 
+### Changed
+
+- **Substack rename — `gpbeanies.substack.com` → `everybeancounts.substack.com`.** Updated every live reference: the auto-subscribe POST endpoint on signup (`CreatePodView`), the embed iframe on `/blog` (`SubstackSubscribe`), the bio link on `/about/greg`, the glossary entry for "the beanstalk", and the three pillar guides on `/guides`. The new URL matches the brand tagline and is easier to say aloud.
+- **Plausible analytics split into two sites.** The Vue PWA at `app.beanies.family` now reports to its own dedicated Plausible site (script `pa-jvjpzIr6FM9tDKaS1gZaK`); the Astro marketing site at `beanies.family` keeps its existing site (`pa-3pxexgz2YF03NyMDucQKN`). Marketing and product traffic are now cleanly separated so DAU, signup conversion, and feature usage can be analyzed without filter gymnastics.
+
 ### Added
 
+- **`/plausible-exclude` route on the Vue app.** Mirrors the existing marketing-site exclusion page — visit it once per device/browser to set `localStorage.plausible_ignore = true` and stop the tracker on `app.beanies.family`. Unauthenticated, no layout, brand-styled standalone page.
 - **Mobile nav redesign mockups (design-only, not yet shipped).** Two interactive HTML mockups exploring a calmer 4-category bottom nav (Nook / Planning / Money / Pod) that uses a "bean-jar stack" pattern — tap a category and a vertical column of beans rises from the tab. v1 (`docs/mockups/mobile-nav-bean-jar.html`) compares three layouts; v2 (`docs/mockups/mobile-nav-bean-jar-v2.html`) commits to the system rule "cluster bloom = ADD, pure bean stack = NAVIGATE", with a Heritage Orange `+` seal differentiating the FAB's bloom from the nav's stack, plus a scaling stress test (3 / 6 / 10 items) and a `＋N more` overflow strategy. Implementation deferred to a future session.
 
 ---

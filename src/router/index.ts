@@ -207,6 +207,16 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/pages/NoAccessPage.vue'),
     meta: { titleKey: 'noAccess.title' },
   },
+  {
+    // Self-service Plausible analytics exclusion. Sets
+    // localStorage.plausible_ignore = 'true' on this device so the tracker
+    // stops sending events from this browser. Visit once per device/browser.
+    // Mirrors web/src/pages/plausible-exclude.astro on the marketing site.
+    path: '/plausible-exclude',
+    name: 'PlausibleExclude',
+    component: () => import('@/pages/PlausibleExcludePage.vue'),
+    meta: { requiresAuth: false, hideQuickAdd: true },
+  },
   externalRedirect('/help/:pathMatch(.*)*', 'HelpRedirect'),
   externalRedirect('/privacy', 'PrivacyRedirect'),
   externalRedirect('/terms', 'TermsRedirect'),
