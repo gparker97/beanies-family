@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-26
 
+### Added
+
+- **"Pick file from Drive" recovery action on the file-not-found banner.** When the red "your data file was not found" banner appears (Drive returns 404 when the app tries to read the configured `.beanpod` fileId — typically because the user revoked and re-granted the OAuth grant in their Google account, which wipes the per-file `drive.file` scope association), the banner now offers an in-place "Pick file from Drive" action alongside the existing "Go to Settings" link. Picking the file via Google Picker re-grants `drive.file` scope, the app verifies the picked file decrypts with the in-memory family key and matches the active session's familyId, then swaps the provider to the new fileId and resumes sync — no need to sign out and sign back in to recover.
+
 ### Fixed
 
 - **"Reconnect to Google Drive" button no longer silently does nothing in the installed PWA.** Standalone PWAs (Chrome on Android, Edge, etc.) and iOS Safari can't bridge the OAuth popup's `postMessage` back to the app window — the popup either fails to open or opens in a different browser context, so the existing popup-based reconnect flow hung forever with no feedback. The reconnect flow now detects standalone PWA mode and routes through full-page redirect auth instead, matching the join-flow behavior. After the redirect returns to the app, the OAuth code is consumed at app boot in `App.vue` and the next Drive operation picks up the fresh token automatically. If reconnect fails for any other reason (network, OAuth-scope-denied, etc.), the Settings page now surfaces the actual error instead of swallowing it.

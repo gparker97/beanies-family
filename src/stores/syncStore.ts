@@ -1514,6 +1514,79 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
+  /**
+   * Recover from a "file not found" state by re-binding the active session
+   * to a freshly-picked .beanpod fileId. The expected scenario: the user
+   * revoked and re-granted the app's OAuth grant in their Google account,
+   * which wiped the per-file drive.file scope association. The file is
+   * still in their Drive, but the running app's token can no longer read
+   * it by ID. Picking the file via Google Picker re-grants drive.file
+   * scope, and this method verifies the picked file decrypts with the
+   * already-loaded family key and swaps the provider in-place.
+   *
+   * Requires an active session — `familyKey` and `envelope` must be in
+   * memory. Returns `{ success: true }` on success; otherwise an error
+   * string suitable for showing to the user. Never throws.
+   */
+  async function recoverFromMissingFile(
+    fileId: string,
+    fileName_param: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (!familyKey.value || !envelope.value) {
+        return {
+          success: false,
+          error: 'No active session — sign out and sign in fresh to load this file.',
+        };
+      }
+
+      const provider = GoogleDriveProvider.fromExisting(fileId, fileName_param);
+      const text = await provider.read();
+      if (!text) {
+        return { success: false, error: 'Picked file is empty.' };
+      }
+
+      const env = parseBeanpodV4(text);
+      if (env.familyId !== envelope.value.familyId) {
+        return {
+          success: false,
+          error:
+            'That file belongs to a different family. Pick your own .beanpod, or sign out and sign in fresh to switch families.',
+        };
+      }
+
+      // Verify the in-memory family key still decrypts the file.
+      await decryptBeanpodPayload(env, familyKey.value);
+
+      // Swap the provider so subsequent saves/polls use the new fileId.
+      syncService.setProvider(provider);
+      syncService.setFamilyKey(familyKey.value, env);
+      envelope.value = env;
+      fileName.value = fileName_param;
+      driveFileId.value = fileId;
+
+      // Clear the file-not-found banner state and resume normal sync.
+      driveFileNotFound.value = false;
+      showSaveFailureBanner.value = false;
+      error.value = null;
+      syncService.resetSaveFailures();
+      saveFailureLevel.value = 'none';
+      lastSaveError.value = null;
+      startFilePolling();
+
+      console.warn(
+        '[syncStore] recoverFromMissingFile succeeded — swapped to',
+        fileId,
+        fileName_param
+      );
+      return { success: true };
+    } catch (e) {
+      const message = (e as Error).message || 'Recovery failed';
+      console.warn('[syncStore] recoverFromMissingFile failed:', message);
+      return { success: false, error: message };
+    }
+  }
+
   async function listGoogleDriveFiles(options?: {
     forceNewAccount?: boolean;
   }): Promise<Array<{ fileId: string; name: string; modifiedTime: string }>> {
@@ -1695,6 +1768,7 @@ export const useSyncStore = defineStore('sync', () => {
     loadFromDroppedFile,
     loadFromGoogleDrive,
     listGoogleDriveFiles,
+    recoverFromMissingFile,
     decryptPendingFile,
     loadFromPersistenceCache,
     clearPendingEncryptedFile,
