@@ -1,6 +1,13 @@
 ---
 import { getCollection, render } from 'astro:content';
 import { isPublished } from '~/utils/content';
+import {
+  buildIssueMap,
+  fmtIssueStamp,
+  padIssue,
+  readingMinutes,
+  tintFor,
+} from '~/utils/blog';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Byline from '../../components/Byline.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
@@ -8,11 +15,14 @@ import RelatedArticles from '../../components/RelatedArticles.astro';
 import SubstackSubscribe from '../../components/SubstackSubscribe.astro';
 import { AUTHOR } from '@beanies/brand/schema';
 import { SITE_URL } from '@beanies/brand/nav';
-// Fraunces: humanist serif used for the post subtitle only. Variable font = single file.
+// Fraunces drives the post's italic editorial accents — italic kicker
+// stamp, italic subtitle, the italic lead paragraph + drop cap, italic
+// blockquote, italic image captions, italic fresh-divider label.
 import '@fontsource-variable/fraunces';
 
 export async function getStaticPaths() {
   const posts = await getCollection('blog', isPublished);
+  const issueMap = buildIssueMap(posts);
   const sorted = [...posts].sort((a, b) => a.data.date.getTime() - b.data.date.getTime());
   return posts.map((post) => {
     const i = sorted.findIndex((p) => p.data.slug === post.data.slug);
@@ -32,14 +42,18 @@ export async function getStaticPaths() {
       href: `/blog/${p.data.slug}`,
       excerpt: p.data.excerpt,
     }));
+
+    const issueNumber = issueMap.get(post.data.slug) ?? 1;
+    const minutesToRead = readingMinutes(post.body ?? '');
+
     return {
       params: { slug: post.data.slug },
-      props: { post, prevPost, nextPost, related },
+      props: { post, prevPost, nextPost, related, issueNumber, minutesToRead },
     };
   });
 }
 
-const { post, prevPost, nextPost, related } = Astro.props;
+const { post, prevPost, nextPost, related, issueNumber, minutesToRead } = Astro.props;
 const { Content } = await render(post);
 
 const canonicalPath = `/blog/${post.data.slug}`;
@@ -52,8 +66,21 @@ const CATEGORIES: Record<string, { emoji: string; label: string }> = {
   security: { emoji: '🔒', label: 'security' },
   stories: { emoji: '📖', label: 'stories' },
   travel: { emoji: '✈️', label: 'travel' },
+  review: { emoji: '🔍', label: 'review' },
+  'use-case': { emoji: '🪴', label: 'use case' },
 };
 const categoryInfo = CATEGORIES[post.data.category];
+
+// Per-issue tint inherited from the /blog index. Drives the hero wash,
+// kicker pill, h2 dot, blockquote rule, links, and prev/next hover
+// border. Same 5-tint rotation as the index, keyed on issue number.
+const tint = tintFor(issueNumber);
+const tintStyle = [
+  `--tint-hex: ${tint.hex}`,
+  `--tint-ink: ${tint.ink}`,
+  `--tint-accent: ${tint.accentOn}`,
+  `--tint-wash: ${tint.wash}`,
+].join('; ');
 
 const modifiedDate = post.data.updatedDate ?? post.data.date;
 
@@ -82,7 +109,9 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   author={post.data.author}
   jsonLd={jsonLd}
 >
-  <div class="post-page">
+  <div class={`post-page tint-${tint.name}`} style={tintStyle}>
+    <div class="post-hero-wash" aria-hidden="true"></div>
+
     <div class="post-content">
       <div class="post-breadcrumbs">
         <Breadcrumbs
@@ -95,30 +124,44 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
       </div>
 
       <header class="post-header">
-        <div class="post-header-top">
-          <img src="/brand/beanies_father_son_icon_192x192.png" alt="" class="post-header-avatar" />
-          <div>
-            {categoryInfo && (
-              <span class="post-header-cat">
-                {categoryInfo.emoji} {categoryInfo.label}
-              </span>
-            )}
-          </div>
+        <div class="post-kicker">
+          <span class="post-kicker-dot" aria-hidden="true"></span>
+          <span class="post-kicker-stamp">issue {padIssue(issueNumber)}</span>
+          <span class="post-kicker-sep" aria-hidden="true">·</span>
+          <time datetime={post.data.date.toISOString()}>{fmtIssueStamp(post.data.date)}</time>
+          <span class="post-kicker-sep" aria-hidden="true">·</span>
+          <span>{minutesToRead} min read</span>
         </div>
-        <h1 class="post-header-title">{post.data.title}</h1>
+
+        <h1 class="post-title">{post.data.title}</h1>
+
         {post.data.subtitle && (
-          <p class="post-header-subtitle">{post.data.subtitle}</p>
+          <p class="post-subtitle">{post.data.subtitle}</p>
         )}
-        <div class="post-header-meta">
+
+        <div class="post-byline-row">
           <Byline
             author={post.data.author}
             date={post.data.date}
             updatedDate={post.data.updatedDate}
           />
+          {categoryInfo && (
+            <span class="post-cat-chip">
+              {categoryInfo.emoji} {categoryInfo.label}
+            </span>
+          )}
         </div>
       </header>
 
-      <div class="post-divider"></div>
+      <div class="post-fresh-divider" aria-hidden="true">
+        <span class="post-fresh-divider-rule"></span>
+        <span class="post-fresh-divider-ornament">
+          <span class="post-fresh-divider-dot"></span>
+          <span class="post-fresh-divider-text">the post</span>
+          <span class="post-fresh-divider-dot"></span>
+        </span>
+        <span class="post-fresh-divider-rule"></span>
+      </div>
 
       <article class="blog-prose" id="blog-article">
         <Content />
@@ -200,58 +243,161 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 </script>
 
 <style is:global>
-.blog-prose h2 {
-  color: #2c3e50;
-  font-family: 'Outfit Variable', Outfit, sans-serif;
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin: 2rem 0 0.75rem;
-}
-.blog-prose h3 {
-  color: #2c3e50;
-  font-family: 'Outfit Variable', Outfit, sans-serif;
-  font-size: 1.05rem;
-  font-weight: 600;
-  margin: 1.5rem 0 0.5rem;
-}
+/* The post-page wrapper sets --tint-hex / --tint-ink / --tint-accent /
+   --tint-wash via inline style. Prose styles below pick those up so each
+   issue gets its own h2 dot color, link color, and blockquote rule. */
+
 .blog-prose {
   /* Break long URLs / unbreakable words so they can't push the container
      wider than the viewport on mobile. */
   overflow-wrap: anywhere;
   word-break: break-word;
+  font-family: 'Outfit Variable', Outfit, system-ui, sans-serif;
 }
+
 .blog-prose p {
-  color: rgb(44 62 80 / 70%);
-  font-size: 0.9375rem;
-  line-height: 1.8;
+  color: rgb(44 62 80 / 78%);
+  font-size: 1rem;
+  line-height: 1.78;
   margin-bottom: 1rem;
 }
+
+/* Lead paragraph treatment — the first paragraph itself is Fraunces italic
+   at a slightly larger reading size, acting as a bridge between the
+   Fraunces-italic subtitle above and the sans body below. The drop cap
+   then sits inside its native italic-serif typeface, which is what makes
+   it stop looking like a stray flourish in a sans column. From paragraph
+   two onward, body returns to sans (the rule above wins by default). */
+.blog-prose > p:first-of-type {
+  color: rgb(44 62 80 / 84%);
+  font-family: 'Fraunces Variable', Fraunces, 'Source Serif 4', Georgia, serif;
+  font-feature-settings: 'ss01';
+  font-size: 1.15rem;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  line-height: 1.55;
+  margin-bottom: 1.2rem;
+}
+
+/* Raised initial on the lead paragraph — small inline accent, not a
+   floating capital. Keeps the Fraunces italic family so it reads as one
+   gesture with the lead, but stays calm even when the first line is just
+   "hey everybody". Tilt + swash variant give it a playful, hand-stamped
+   feel rather than a leather-bound editorial one. The whole "first
+   letter flourish" budget is spent here. */
+.blog-prose > p:first-of-type::first-letter {
+  color: var(--tint-ink, #a83a11);
+  display: inline-block;
+  font-family: 'Fraunces Variable', Fraunces, 'Source Serif 4', Georgia, serif;
+  /* ss01 = stylistic set 1 (Fraunces' default rounder lowercase set);
+     swsh = swash, used where Fraunces ships a swash capital for the
+     glyph (no harm if absent — it just falls back to the regular cap). */
+  font-feature-settings: 'ss01', 'swsh' 1;
+  font-size: 1.55em;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  margin-right: 0.04em;
+  transform: rotate(-3deg) translateY(0.04em);
+  /* baseline alignment — without this the larger letter tugs the line
+     box upward and unevenly spaces the rest of the lead. */
+  vertical-align: baseline;
+}
+
+/* Inline emphasis inside the lead — keep semantics, tone down so the
+   bold doesn't shout against the italic context. */
+.blog-prose > p:first-of-type strong {
+  color: rgb(44 62 80 / 95%);
+  font-weight: 600;
+}
+
+/* Mobile: italic at 1.15rem is a touch tight on a phone — ease back to
+   body-adjacent size while keeping the serif voice. Initial scales
+   proportionally. */
+@media (max-width: 520px) {
+  .blog-prose > p:first-of-type {
+    font-size: 1.05rem;
+    line-height: 1.5;
+  }
+  .blog-prose > p:first-of-type::first-letter {
+    font-size: 1.45em;
+  }
+}
+
 .blog-prose strong { color: #2c3e50; font-weight: 600; }
 .blog-prose em { font-style: italic; }
+
 .blog-prose a {
-  color: #f15d22;
+  color: var(--tint-hex, #f15d22);
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color 200ms;
 }
-.blog-prose a:hover { color: #e67e22; }
+.blog-prose a:hover { color: var(--tint-ink, #a83a11); }
+
+.blog-prose h2 {
+  color: #2c3e50;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  margin: 2.2rem 0 0.75rem;
+  padding-left: 20px;
+  position: relative;
+}
+.blog-prose h2::before {
+  background: var(--tint-hex, #f15d22);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px var(--tint-accent, rgb(241 93 34 / 18%));
+  content: '';
+  height: 9px;
+  left: 0;
+  position: absolute;
+  top: 0.62em;
+  width: 9px;
+}
+
+.blog-prose h3 {
+  color: #2c3e50;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 1.08rem;
+  font-weight: 600;
+  margin: 1.6rem 0 0.5rem;
+}
+
 .blog-prose ul, .blog-prose ol { margin-bottom: 1rem; padding-left: 1.5rem; }
 .blog-prose li {
-  color: rgb(44 62 80 / 70%);
-  font-size: 0.9375rem;
-  line-height: 1.8;
+  color: rgb(44 62 80 / 78%);
+  font-size: 1rem;
+  line-height: 1.78;
   margin-bottom: 0.35rem;
 }
 .blog-prose ul li { list-style-type: disc; }
 .blog-prose ol li { list-style-type: decimal; }
+.blog-prose ul li::marker { color: var(--tint-hex, #f15d22); }
+.blog-prose ol li::marker { color: var(--tint-ink, #a83a11); font-weight: 600; }
+
+/* Blockquote — the only piece of serif body copy on the page. Reads as
+   "quoted from the page". Tint-colored rule + a soft tint wash. */
 .blog-prose blockquote {
-  border-left: 3px solid #f15d22;
-  color: rgb(44 62 80 / 55%);
+  background: linear-gradient(90deg, var(--tint-accent, rgb(241 93 34 / 18%)), transparent 65%);
+  border-left: 3px solid var(--tint-hex, #f15d22);
+  border-radius: 0 10px 10px 0;
+  color: rgb(44 62 80 / 78%);
+  font-family: 'Fraunces Variable', Fraunces, 'Source Serif 4', Georgia, serif;
+  font-feature-settings: 'ss01';
+  font-size: 1.08rem;
   font-style: italic;
+  line-height: 1.55;
   margin: 1.5rem 0;
-  padding-left: 1rem;
+  padding: 0.6rem 1rem 0.6rem 1.2rem;
 }
+.blog-prose blockquote p { margin: 0; color: inherit; font-family: inherit; font-size: inherit; line-height: inherit; }
+
 .blog-prose code {
-  background: rgb(44 62 80 / 4%);
+  background: rgb(44 62 80 / 5%);
   border-radius: 6px;
   font-size: 0.85em;
   padding: 0.15em 0.4em;
@@ -263,19 +409,25 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   margin: 2rem 0;
 }
 .blog-prose img {
-  border: 1px solid rgb(44 62 80 / 8%);
-  border-radius: 16px;
+  background: white;
+  border: 1px solid var(--tint-accent, rgb(241 93 34 / 18%));
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgb(44 62 80 / 6%);
   cursor: zoom-in;
   display: block;
   margin: 1.5rem auto;
   max-width: 100%;
+  padding: 8px;
   width: 100%;
 }
 .blog-prose img + em {
-  color: rgb(44 62 80 / 40%);
+  color: rgb(44 62 80 / 50%);
   display: block;
-  font-size: 0.8125rem;
-  margin-top: -0.75rem;
+  font-family: 'Fraunces Variable', Fraunces, 'Source Serif 4', Georgia, serif;
+  font-feature-settings: 'ss01';
+  font-size: 0.85rem;
+  font-style: italic;
+  margin-top: -0.6rem;
   text-align: center;
 }
 </style>
@@ -283,15 +435,46 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 <style>
 .post-page {
   --deep-slate: #2c3e50;
-  --heritage-orange: #f15d22;
-  --terracotta: #e67e22;
   --cloud-white: #f8f9fa;
+  --hairline: rgb(44 62 80 / 8%);
   background: var(--cloud-white);
   min-height: 100vh;
   /* Defensive: prevents any overly-wide inline content (long URLs, fixed-width
      elements, unexpectedly wide markdown output) from pushing the page
      horizontally beyond the viewport on mobile. */
   overflow-x: hidden;
+  position: relative;
+}
+
+/* ── Hero wash strip ──
+   A tinted gradient sits behind the kicker / title / subtitle and fades
+   to cloud-white before the body prose starts. Adds a faint paper-grain
+   noise overlay (matches the masthead's wash recipe). */
+.post-hero-wash {
+  background: var(--tint-wash, linear-gradient(140deg, #fff6ef 0%, #ffe9d6 100%));
+  height: 460px;
+  inset: 0 0 auto 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+.post-hero-wash::after {
+  background: linear-gradient(180deg, transparent 55%, var(--cloud-white) 100%);
+  content: '';
+  inset: 0;
+  position: absolute;
+}
+.post-hero-wash::before {
+  background-image:
+    radial-gradient(circle at 18% 42%, rgb(44 62 80 / 5%) 0.7px, transparent 1px),
+    radial-gradient(circle at 62% 28%, rgb(44 62 80 / 4%) 0.7px, transparent 1px),
+    radial-gradient(circle at 88% 66%, rgb(44 62 80 / 5%) 0.7px, transparent 1px);
+  background-size: 110px 110px, 92px 92px, 148px 148px;
+  content: '';
+  inset: 0;
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+  position: absolute;
 }
 
 .post-content {
@@ -299,66 +482,149 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   margin: 0 auto;
   max-width: 640px;
   /* Top padding (88px) clears the fixed pill nav (top:16px + ~50px height
-     + buffer). Previously 40px, which caused the "all posts" back link to
-     be partially covered on mobile. */
+     + buffer). */
   padding: 88px 24px 48px;
+  position: relative;
+  z-index: 1;
 }
 
 .post-breadcrumbs {
-  margin-bottom: 24px;
+  margin-bottom: 22px;
 }
 
-.post-header { margin-bottom: 32px; }
+.post-header { margin-bottom: 24px; }
 
-.post-header-top {
+/* ── Kicker pill ──
+   Echoes the masthead's `.masthead-issue-stamp` vocabulary — Outfit
+   uppercase tracked, with a tint dot. "issue 04 · 17 APR 2026 · 4 min
+   read". */
+.post-kicker {
   align-items: center;
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.post-header-avatar {
-  background: linear-gradient(135deg, rgb(241 93 34 / 8%), rgb(174 214 241 / 8%));
-  border-radius: 14px;
-  height: 48px;
-  padding: 4px;
-  width: 48px;
-}
-
-.post-header-cat {
-  background: rgb(44 62 80 / 4%);
-  border-radius: 20px;
-  color: rgb(44 62 80 / 45%);
+  background: white;
+  border: 1px solid var(--tint-accent, rgb(241 93 34 / 18%));
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgb(44 62 80 / 5%);
+  color: var(--tint-ink, #a83a11);
+  display: inline-flex;
   font-family: 'Outfit Variable', Outfit, sans-serif;
   font-size: 0.6875rem;
-  font-weight: 600;
-  padding: 3px 10px;
+  font-weight: 700;
+  gap: 10px;
+  letter-spacing: 0.22em;
+  margin-bottom: 18px;
+  padding: 6px 14px;
+  text-transform: uppercase;
+}
+.post-kicker-dot {
+  background: var(--tint-hex, #f15d22);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--tint-accent, rgb(241 93 34 / 18%));
+  flex: 0 0 auto;
+  height: 8px;
+  width: 8px;
+}
+.post-kicker-stamp {
+  color: var(--tint-hex, #f15d22);
+  font-weight: 700;
+}
+.post-kicker-sep {
+  font-weight: 400;
+  opacity: 0.4;
 }
 
-.post-header-title {
+.post-title {
   color: var(--deep-slate);
   font-family: 'Outfit Variable', Outfit, sans-serif;
-  font-size: 1.75rem;
+  font-size: clamp(1.75rem, 4.5vw, 2.6rem);
   font-weight: 800;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+  margin: 0 0 14px;
+  max-width: 28ch;
+  text-wrap: balance;
 }
 
-.post-header-subtitle {
-  color: rgb(44 62 80 / 68%);
+.post-subtitle {
+  color: rgb(44 62 80 / 72%);
   font-family: 'Fraunces Variable', Fraunces, 'Source Serif 4', Georgia, serif;
   font-feature-settings: 'ss01';
-  font-size: clamp(1.1rem, 1.8vw, 1.375rem);
+  font-size: clamp(1.1rem, 2vw, 1.375rem);
   font-style: italic;
   font-weight: 400;
   letter-spacing: -0.005em;
   line-height: 1.4;
-  margin: 14px 0 0;
-  max-width: 56ch;
+  margin: 0 0 18px;
+  max-width: 52ch;
+  text-wrap: pretty;
 }
 
-.post-header-meta {
-  margin-top: 12px;
+.post-byline-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+}
+.post-byline-row :global(p) { margin: 0; }
+
+.post-cat-chip {
+  background: white;
+  border: 1px solid var(--tint-accent, rgb(241 93 34 / 18%));
+  border-radius: 999px;
+  color: var(--tint-ink, #a83a11);
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 4px 10px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── Fresh-divider echo ──
+   Smaller version of the index's "fresh off the press" ornament. Tint
+   dots flanking a Fraunces-italic label, with thin tapered rules each
+   side. Sits between the hero block and the prose. */
+.post-fresh-divider {
+  align-items: center;
+  color: var(--tint-hex, #f15d22);
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  margin: 30px 0 24px;
+}
+.post-fresh-divider-rule {
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in srgb, var(--tint-hex, #f15d22) 36%, transparent),
+    transparent
+  );
+  flex: 1;
+  height: 1px;
+  max-width: 140px;
+}
+.post-fresh-divider-ornament {
+  align-items: center;
+  display: inline-flex;
+  gap: 10px;
+}
+.post-fresh-divider-dot {
+  background: var(--tint-hex, #f15d22);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--tint-accent, rgb(241 93 34 / 18%));
+  flex: 0 0 auto;
+  height: 5px;
+  width: 5px;
+}
+.post-fresh-divider-text {
+  color: var(--tint-ink, #a83a11);
+  font-family: 'Fraunces Variable', Fraunces, 'Source Serif 4', Georgia, serif;
+  font-feature-settings: 'ss01';
+  font-size: 0.875rem;
+  font-style: italic;
+  font-weight: 400;
+  white-space: nowrap;
 }
 
 .post-divider {
@@ -379,12 +645,12 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   cursor: pointer;
   display: flex;
   flex: 1;
+  gap: 10px;
   /* Flex items default to min-width: auto (= min-content). Combined with the
      nowrap title inside, that forces each button to be at least the title's
      full non-wrapped width — pushing the flex row past the container on
      mobile. Override so the ellipsis in .post-nav-title can actually kick in. */
   min-width: 0;
-  gap: 10px;
   padding: 16px;
   text-align: left;
   text-decoration: none;
@@ -393,19 +659,17 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 
 /* The inner content div (holding label + title) also needs min-width: 0 so
    the nowrap title doesn't prop it wider than the flex allowance. */
-.post-nav-btn > div {
-  min-width: 0;
-}
+.post-nav-btn > div { min-width: 0; }
 .post-nav-btn:hover {
-  border-color: rgb(241 93 34 / 15%);
-  box-shadow: 0 4px 16px rgb(241 93 34 / 6%);
+  border-color: var(--tint-accent, rgb(241 93 34 / 18%));
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--tint-hex, #f15d22) 18%, transparent);
 }
 .post-nav-btn-right { justify-content: flex-end; text-align: right; }
 .post-nav-btn svg { color: rgb(44 62 80 / 25%); flex-shrink: 0; }
-.post-nav-btn:hover svg { color: var(--heritage-orange); }
+.post-nav-btn:hover svg { color: var(--tint-hex, #f15d22); }
 
 .post-nav-label {
-  color: rgb(44 62 80 / 35%);
+  color: var(--tint-ink, #a83a11);
   font-family: 'Outfit Variable', Outfit, sans-serif;
   font-size: 0.625rem;
   font-weight: 700;
@@ -419,15 +683,12 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   font-size: 0.8125rem;
   font-weight: 600;
   margin-top: 2px;
-  /* Fill parent instead of a fixed 200px cap — parent's own min-width: 0
-     lets this shrink freely while overflow: hidden + ellipsis clip the
-     overflowing text visually. */
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.post-nav-btn:hover .post-nav-title { color: var(--heritage-orange); }
+.post-nav-btn:hover .post-nav-title { color: var(--tint-hex, #f15d22); }
 
 .lightbox-overlay {
   align-items: center;
@@ -469,9 +730,19 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 @media (max-width: 520px) {
   /* Mobile: slightly tighter top padding but still clears the pill nav. */
   .post-content { padding-top: 76px; }
-  .post-header-title { font-size: 1.375rem; }
-  .post-header-subtitle { font-size: 1rem; }
+  .post-hero-wash { height: 380px; }
+  .post-title { font-size: clamp(1.5rem, 6.5vw, 1.85rem); }
+  .post-subtitle { font-size: 1rem; }
+  .post-kicker {
+    font-size: 0.625rem;
+    gap: 8px;
+    letter-spacing: 0.18em;
+    padding: 5px 12px;
+  }
+  .post-byline-row { gap: 10px; }
+  .post-fresh-divider-rule { max-width: 80px; }
 }
+
 </style>
 </content>
 </invoke>
