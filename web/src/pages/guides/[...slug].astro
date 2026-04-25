@@ -272,36 +272,16 @@ const articleSchema = {
           </aside>
         )}
 
-        {
-          related.length > 0 && (
-            <aside class="guide-related">
-              <p class="guide-related-eyebrow">further reading</p>
-              <h2 class="guide-related-title">from the beanstalk</h2>
-              <p class="guide-related-sub">personal stories + product updates that expand on ideas in this guide.</p>
-              <ul class="guide-related-list">
-                {related.map((post) => (
-                  <li>
-                    <a href={post.href}>
-                      <span class="guide-related-arrow" aria-hidden="true">→</span>
-                      <span>
-                        <span class="guide-related-post-title">{post.title}</span>
-                        <span class="guide-related-post-excerpt">{post.excerpt}</span>
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </aside>
-          )
-        }
-
         {/* Prev/next chapter nav — a two-card walk-through rhythm. Each
             card shows the chapter label + title as the header and the
             forward/backward teaser (pulled from adjacent pillar's
             frontmatter via `nextGuide.data.nextTeaser` for forward and
             `guide.data.prevTeaser` for backward) as the earn-the-click
             body copy. On the final pillar, the "next" slot drops since
-            the payoff card above already replaces it. */}
+            the payoff card above already replaces it. Sits ABOVE the
+            related-posts aside so the canonical curriculum walk is the
+            first thing a reader sees at the end of a chapter; the
+            beanstalk spokes are a deeper-dive option after that. */}
         <nav class="guide-nav" aria-label="guide navigation" data-final={guide.data.isFinalPillar ? 'true' : undefined}>
           <a class="guide-nav-btn" href={prevGuide ? `/guides/${prevGuide.data.slug}` : '/guides'}>
             <svg class="guide-nav-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" aria-hidden="true">
@@ -342,6 +322,29 @@ const articleSchema = {
             </a>
           )}
         </nav>
+
+        {
+          related.length > 0 && (
+            <aside class="guide-related">
+              <p class="guide-related-eyebrow">further reading</p>
+              <h2 class="guide-related-title">from the beanstalk</h2>
+              <p class="guide-related-sub">personal stories + product updates that expand on ideas in this guide.</p>
+              <ul class="guide-related-list">
+                {related.map((post) => (
+                  <li>
+                    <a href={post.href}>
+                      <span class="guide-related-arrow" aria-hidden="true">→</span>
+                      <span>
+                        <span class="guide-related-post-title">{post.title}</span>
+                        <span class="guide-related-post-excerpt">{post.excerpt}</span>
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          )
+        }
       </div>
 
       {
