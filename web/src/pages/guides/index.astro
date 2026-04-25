@@ -111,7 +111,7 @@ const canonicalPath = '/guides';
 const collectionSchema = {
   '@type': 'CollectionPage',
   '@id': `${SITE_URL}${canonicalPath}#library`,
-  name: 'the family library',
+  name: 'the beanies family library',
   description:
     'four pillar guides on the building blocks of a calmer family life: overwhelm, organization, finance, and privacy-first tooling.',
   url: `${SITE_URL}${canonicalPath}`,
@@ -133,7 +133,7 @@ const collectionSchema = {
 const itemListSchema = {
   '@type': 'ItemList',
   '@id': `${SITE_URL}${canonicalPath}#itemlist`,
-  name: 'the family library — reading order',
+  name: 'the beanies family library — reading order',
   numberOfItems: pillars.length,
   itemListOrder: 'ItemListOrderAscending',
   itemListElement: pillars.map((p, i) => ({
@@ -146,7 +146,7 @@ const itemListSchema = {
 ---
 
 <BaseLayout
-  title="the family library — beanies.family"
+  title="the beanies family library — beanies.family"
   description="four evergreen pillar guides on family life, in a deliberate reading order: overwhelm, organization, finance basics, and local-first tooling. honest, lived experience — not listicles."
   canonicalPath={canonicalPath}
   jsonLd={[collectionSchema, itemListSchema]}
@@ -169,7 +169,7 @@ const itemListSchema = {
             a guide to family organization · in order
           </p>
           <h1 class="library-title">
-            <span class="library-title-over">the family</span>
+            <span class="library-title-over">the beanies family</span>
             <span class="library-title-under">library</span>
           </h1>
           <p class="library-pitch">

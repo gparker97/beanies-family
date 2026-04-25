@@ -273,7 +273,3 @@ Family finance is hard, and the systems that work aren't necessarily the most so
 If you want to learn more, or just want to read more of my dumb writing, [join the beanstalk on substack](https://everybeancounts.substack.com) for a weekly-ish letter from me.
 
 And if you want to try a family-aware tool I built precisely because none of the existing ones worked for me, that's [beanies.family](https://beanies.family).
-
-## further reading
-
-<!-- The guide template renders relatedPosts from frontmatter into a "further reading" section automatically. -->
