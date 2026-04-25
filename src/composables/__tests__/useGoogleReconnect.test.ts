@@ -4,6 +4,10 @@ import { useGoogleReconnect } from '../useGoogleReconnect';
 vi.mock('@/services/google/googleAuth', () => ({
   requestAccessToken: vi.fn(async () => 'mock-token'),
   hasRefreshToken: vi.fn(() => false),
+  shouldUseRedirectAuth: vi.fn(() => false),
+  startRedirectAuth: vi.fn(async () => {
+    /* noop in tests — would navigate the page in real browser */
+  }),
 }));
 
 describe('useGoogleReconnect', () => {
@@ -30,7 +34,7 @@ describe('useGoogleReconnect', () => {
     const result = await reconnect();
 
     expect(result).toBe(false);
-    expect(reconnectError.value).toBe(true);
+    expect(reconnectError.value).toBe('Auth failed');
   });
 
   it('isReconnecting is true during reconnect', async () => {
@@ -61,5 +65,20 @@ describe('useGoogleReconnect', () => {
     await reconnect();
 
     expect(requestAccessToken).toHaveBeenCalledWith({ forceConsent: false });
+  });
+
+  it('routes through startRedirectAuth on standalone PWAs', async () => {
+    const { shouldUseRedirectAuth, startRedirectAuth, requestAccessToken } =
+      await import('@/services/google/googleAuth');
+    (shouldUseRedirectAuth as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+
+    const { reconnect } = useGoogleReconnect();
+    const result = await reconnect();
+
+    expect(startRedirectAuth).toHaveBeenCalled();
+    expect(requestAccessToken).not.toHaveBeenCalled();
+    // Returns true even though page would navigate in a real browser —
+    // ensures callers don't treat the in-flight redirect as a failure.
+    expect(result).toBe(true);
   });
 });
