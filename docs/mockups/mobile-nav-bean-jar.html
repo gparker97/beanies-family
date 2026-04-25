@@ -1,0 +1,1641 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family · mobile nav · bean-jar variants</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ---------- brand tokens ---------- */
+      :root {
+        --orange: #f15d22;
+        --orange-soft: #e0551f;
+        --terracotta: #e67e22;
+        --silk: #aed6f1;
+        --slate: #2c3e50;
+        --slate-1a: #1a252f;
+        --slate-24: #243342;
+        --slate-34: #34495e;
+        --cream: #fdfaf6;
+        --paper: #ffffff;
+        --page-bg: #f5f1ea;
+        --ink: #2c3e50;
+        --ink-muted: #6b7d8f;
+
+        --hairline: rgba(44, 62, 80, 0.08);
+        --hairline-strong: rgba(44, 62, 80, 0.16);
+
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-orange-22: rgba(241, 93, 34, 0.22);
+        --tint-silk-20: rgba(174, 214, 241, 0.28);
+        --tint-terracotta-10: rgba(230, 126, 34, 0.12);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+        --tint-slate-10: rgba(44, 62, 80, 0.10);
+
+        --shadow-soft: 0 4px 24px rgba(44, 62, 80, 0.08);
+        --shadow-pop: 0 10px 30px rgba(44, 62, 80, 0.14);
+        --shadow-bean: 0 6px 14px rgba(44, 62, 80, 0.12);
+
+        --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+        --ease-spring: cubic-bezier(0.34, 1.6, 0.5, 1);
+      }
+      [data-theme='dark'] {
+        --paper: #243342;
+        --page-bg: #1a252f;
+        --cream: #2c3e50;
+        --ink: #ecf0f1;
+        --ink-muted: rgba(236, 240, 241, 0.65);
+        --hairline: rgba(236, 240, 241, 0.08);
+        --hairline-strong: rgba(236, 240, 241, 0.18);
+        --tint-slate-5: rgba(236, 240, 241, 0.05);
+        --tint-slate-10: rgba(236, 240, 241, 0.10);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background:
+          radial-gradient(
+            1200px 800px at 20% -10%,
+            var(--tint-silk-20),
+            transparent 60%
+          ),
+          radial-gradient(
+            1000px 700px at 100% 110%,
+            var(--tint-orange-8),
+            transparent 65%
+          ),
+          var(--page-bg);
+        color: var(--ink);
+        min-height: 100vh;
+        padding: 48px 24px 96px;
+        transition: background 0.4s ease;
+      }
+
+      /* ---------- page header ---------- */
+      .page-header {
+        max-width: 1180px;
+        margin: 0 auto 40px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 20px;
+        align-items: end;
+      }
+      .page-eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-size: 11px;
+        color: var(--orange);
+        margin: 0 0 8px;
+      }
+      .page-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: clamp(28px, 4vw, 44px);
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+      .page-title em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        color: var(--orange);
+      }
+      .page-sub {
+        font-size: 15px;
+        line-height: 1.5;
+        color: var(--ink-muted);
+        margin: 12px 0 0;
+        max-width: 640px;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+      }
+      .ctrl-btn {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 12px;
+        background: var(--paper);
+        color: var(--ink);
+        border: 1px solid var(--hairline-strong);
+        border-radius: 999px;
+        padding: 9px 14px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+      }
+      .ctrl-btn:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
+      .ctrl-btn.active {
+        background: var(--ink);
+        color: var(--paper);
+        border-color: var(--ink);
+      }
+
+      /* ---------- variant grid ---------- */
+      .grid {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 32px;
+      }
+      @media (max-width: 980px) {
+        .grid {
+          grid-template-columns: 1fr;
+          max-width: 380px;
+        }
+      }
+
+      .variant {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+      }
+      .variant-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 14px 6px 6px;
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 999px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        box-shadow: var(--shadow-soft);
+      }
+      .variant-tag .vt-num {
+        background: var(--ink);
+        color: var(--paper);
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .variant-tag.recommended {
+        background: var(--ink);
+        color: var(--paper);
+        border-color: var(--ink);
+      }
+      .variant-tag.recommended .vt-num {
+        background: var(--orange);
+        color: white;
+      }
+      .variant-tag.recommended::after {
+        content: '★ recommended';
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        font-size: 11px;
+        color: var(--orange);
+        background: var(--paper);
+        border-radius: 999px;
+        padding: 3px 9px 3px 8px;
+        margin-left: 4px;
+      }
+
+      .variant-caption {
+        max-width: 320px;
+        text-align: center;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--ink-muted);
+      }
+      .variant-caption strong {
+        color: var(--ink);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+      }
+
+      /* ---------- phone frame ---------- */
+      .phone {
+        width: 360px;
+        height: 740px;
+        background: var(--paper);
+        border-radius: 44px;
+        position: relative;
+        overflow: hidden;
+        box-shadow:
+          0 0 0 8px var(--slate-1a),
+          0 0 0 10px rgba(255, 255, 255, 0.06),
+          0 30px 60px rgba(44, 62, 80, 0.18);
+        display: flex;
+        flex-direction: column;
+      }
+      .notch {
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 110px;
+        height: 28px;
+        background: var(--slate-1a);
+        border-radius: 999px;
+        z-index: 60;
+      }
+
+      /* ---------- mock page content ---------- */
+      .app-bg {
+        flex: 1;
+        background:
+          radial-gradient(
+            500px 300px at 20% 0%,
+            var(--tint-orange-8),
+            transparent 60%
+          ),
+          radial-gradient(
+            400px 300px at 100% 30%,
+            var(--tint-silk-20),
+            transparent 60%
+          ),
+          linear-gradient(180deg, var(--cream), var(--paper));
+        padding: 60px 18px 110px;
+        overflow: hidden;
+        position: relative;
+      }
+      [data-theme='dark'] .app-bg {
+        background:
+          radial-gradient(
+            500px 300px at 20% 0%,
+            rgba(241, 93, 34, 0.10),
+            transparent 60%
+          ),
+          radial-gradient(
+            400px 300px at 100% 30%,
+            rgba(174, 214, 241, 0.06),
+            transparent 60%
+          ),
+          linear-gradient(180deg, var(--page-bg), var(--paper));
+      }
+      .app-eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-size: 10px;
+        color: var(--orange);
+        margin: 0 0 4px;
+      }
+      .app-h1 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 24px;
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+      .app-h1 em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        color: var(--orange);
+      }
+      .app-sub {
+        font-size: 12px;
+        color: var(--ink-muted);
+        margin: 0 0 16px;
+      }
+      .skeleton-card {
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 18px;
+        padding: 14px;
+        margin-bottom: 10px;
+        box-shadow: var(--shadow-soft);
+      }
+      .sk-row {
+        height: 8px;
+        background: var(--tint-slate-5);
+        border-radius: 4px;
+        margin: 6px 0;
+      }
+      .sk-row.short {
+        width: 50%;
+      }
+      .sk-row.med {
+        width: 78%;
+      }
+      .sk-row.title {
+        height: 11px;
+        background: var(--tint-slate-10);
+        margin-bottom: 10px;
+      }
+
+      /* ---------- backdrop scrim (shared) ---------- */
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(44, 62, 80, 0.18);
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s var(--ease-out);
+        z-index: 25;
+      }
+      .phone.open .scrim {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      [data-theme='dark'] .scrim {
+        background: rgba(0, 0, 0, 0.45);
+      }
+
+      /* ============================================================
+         BOTTOM NAV — shared shell
+         ============================================================ */
+      .nav {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--paper);
+        border-top: 1px solid var(--hairline);
+        padding: 10px 8px 18px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        z-index: 40;
+        box-shadow: 0 -4px 20px rgba(44, 62, 80, 0.04);
+      }
+      .nav-tab {
+        all: unset;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 8px 4px;
+        cursor: pointer;
+        border-radius: 18px;
+        position: relative;
+        transition: background 0.2s ease;
+      }
+      .nav-tab:hover {
+        background: var(--tint-slate-5);
+      }
+      .nav-tab.active {
+        background: var(--tint-orange-8);
+      }
+      .nav-tab.is-current {
+        background: transparent;
+      }
+      .nav-tab.is-current::before {
+        content: '';
+        position: absolute;
+        top: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 28px;
+        height: 3px;
+        border-radius: 999px;
+        background: var(--orange);
+      }
+      .nav-emoji {
+        font-size: 22px;
+        line-height: 1;
+        transition: transform 0.3s var(--ease-spring);
+      }
+      .nav-tab.active .nav-emoji {
+        transform: translateY(-2px) scale(1.1);
+      }
+      .nav-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 11px;
+        color: var(--ink-muted);
+        letter-spacing: 0.01em;
+      }
+      .nav-tab.active .nav-label,
+      .nav-tab.is-current .nav-label {
+        color: var(--orange);
+      }
+      .nav-tab .has-more {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--ink-muted);
+        opacity: 0.4;
+        transition: all 0.3s var(--ease-spring);
+      }
+      .nav-tab.active .has-more {
+        background: var(--orange);
+        opacity: 1;
+        transform: scale(1.4);
+      }
+
+      /* ============================================================
+         VARIANT A — classic bean-jar stack
+         vertical column rising from the tapped tab. Bean + label pill.
+         ============================================================ */
+      .stack-a {
+        position: absolute;
+        bottom: 92px;
+        z-index: 35;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column-reverse;
+        align-items: center;
+        gap: 8px;
+        transition: left 0s;
+      }
+      .stack-a .jar-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-direction: row-reverse;
+        opacity: 0;
+        transform: translateY(20px) scale(0.6);
+        pointer-events: none;
+        transition:
+          opacity 0.25s var(--ease-out),
+          transform 0.5s var(--ease-spring);
+      }
+      .phone.open[data-variant='a'] .stack-a .jar-item {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+      }
+      .phone.open[data-variant='a'] .stack-a .jar-item:nth-child(1) {
+        transition-delay: 0.04s;
+      }
+      .phone.open[data-variant='a'] .stack-a .jar-item:nth-child(2) {
+        transition-delay: 0.10s;
+      }
+      .phone.open[data-variant='a'] .stack-a .jar-item:nth-child(3) {
+        transition-delay: 0.16s;
+      }
+      .phone.open[data-variant='a'] .stack-a .jar-item:nth-child(4) {
+        transition-delay: 0.22s;
+      }
+      .phone.open[data-variant='a'] .stack-a .jar-item:nth-child(5) {
+        transition-delay: 0.28s;
+      }
+      .phone.open[data-variant='a'] .stack-a .jar-item:nth-child(6) {
+        transition-delay: 0.34s;
+      }
+
+      .jar-bean {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: var(--paper);
+        box-shadow: var(--shadow-bean), inset 0 0 0 1px var(--hairline);
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        position: relative;
+        cursor: pointer;
+      }
+      .jar-bean::before {
+        content: '';
+        position: absolute;
+        inset: 6px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 30% 30%,
+          rgba(255, 255, 255, 0.85),
+          transparent 55%
+        );
+        pointer-events: none;
+      }
+      [data-theme='dark'] .jar-bean::before {
+        background: radial-gradient(
+          circle at 30% 30%,
+          rgba(255, 255, 255, 0.18),
+          transparent 55%
+        );
+      }
+      .jar-bean.is-active {
+        box-shadow:
+          0 0 0 2px var(--orange),
+          var(--shadow-bean);
+      }
+      .jar-label {
+        background: var(--paper);
+        color: var(--ink);
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 8px 12px;
+        border-radius: 12px;
+        white-space: nowrap;
+        box-shadow: var(--shadow-soft);
+        border: 1px solid var(--hairline);
+      }
+
+      /* ============================================================
+         VARIANT B — cluster bloom
+         beans bloom outward in a soft cluster, asymmetric +
+         organic. Big rounded card backdrop framing the cluster.
+         ============================================================ */
+      .bloom {
+        position: absolute;
+        bottom: 92px;
+        left: 14px;
+        right: 14px;
+        z-index: 35;
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 24px;
+        box-shadow: var(--shadow-pop);
+        padding: 18px 16px 16px;
+        opacity: 0;
+        transform: translateY(20px) scale(0.96);
+        transform-origin: bottom center;
+        pointer-events: none;
+        transition:
+          opacity 0.3s var(--ease-out),
+          transform 0.45s var(--ease-spring);
+      }
+      .phone.open[data-variant='b'] .bloom {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+      }
+      .bloom-arrow {
+        position: absolute;
+        bottom: -7px;
+        width: 14px;
+        height: 14px;
+        background: var(--paper);
+        border-right: 1px solid var(--hairline);
+        border-bottom: 1px solid var(--hairline);
+        transform: rotate(45deg);
+        transition: left 0.25s var(--ease-out);
+      }
+      .bloom-eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-size: 9px;
+        color: var(--ink-muted);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .bloom-eyebrow .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--orange);
+      }
+      .bloom-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 18px;
+        margin: 0 0 2px;
+        letter-spacing: -0.01em;
+      }
+      .bloom-title em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        color: var(--orange);
+      }
+      .bloom-sub {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 11px;
+        color: var(--ink-muted);
+        margin: 0 0 12px;
+      }
+      .bloom-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .bloom-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 4px;
+        background: var(--cream);
+        border: 1px solid var(--hairline);
+        border-radius: 16px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        opacity: 0;
+        transform: scale(0.6);
+      }
+      .bloom-item:hover {
+        border-color: var(--orange);
+        background: var(--tint-orange-8);
+      }
+      .phone.open[data-variant='b'] .bloom-item {
+        opacity: 1;
+        transform: scale(1);
+        transition:
+          opacity 0.2s var(--ease-out),
+          transform 0.4s var(--ease-spring),
+          border-color 0.2s ease,
+          background 0.2s ease;
+      }
+      .phone.open[data-variant='b'] .bloom-item:nth-child(1) {
+        transition-delay:
+          0.05s, 0.05s,
+          0s, 0s;
+      }
+      .phone.open[data-variant='b'] .bloom-item:nth-child(2) {
+        transition-delay:
+          0.09s, 0.09s,
+          0s, 0s;
+      }
+      .phone.open[data-variant='b'] .bloom-item:nth-child(3) {
+        transition-delay:
+          0.13s, 0.13s,
+          0s, 0s;
+      }
+      .phone.open[data-variant='b'] .bloom-item:nth-child(4) {
+        transition-delay:
+          0.17s, 0.17s,
+          0s, 0s;
+      }
+      .phone.open[data-variant='b'] .bloom-item:nth-child(5) {
+        transition-delay:
+          0.21s, 0.21s,
+          0s, 0s;
+      }
+      .phone.open[data-variant='b'] .bloom-item:nth-child(6) {
+        transition-delay:
+          0.25s, 0.25s,
+          0s, 0s;
+      }
+      .bloom-item .bi-bean {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: var(--paper);
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        box-shadow: var(--shadow-bean);
+      }
+      .bloom-item .bi-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 11px;
+        color: var(--ink);
+        text-align: center;
+        line-height: 1.2;
+      }
+
+      /* ============================================================
+         VARIANT C — kraft-card stack
+         richer cards with bean + label + one-line hint, stacked
+         vertically rising from the tab. Better for discovery.
+         ============================================================ */
+      .stack-c {
+        position: absolute;
+        bottom: 92px;
+        left: 14px;
+        right: 14px;
+        z-index: 35;
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 6px;
+        pointer-events: none;
+      }
+      .stack-c .kraft-card {
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 16px;
+        padding: 11px 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: var(--shadow-soft);
+        opacity: 0;
+        transform: translateY(28px) scale(0.92);
+        pointer-events: none;
+        cursor: pointer;
+        transition:
+          opacity 0.25s var(--ease-out),
+          transform 0.5s var(--ease-spring),
+          border-color 0.2s ease,
+          background 0.2s ease;
+      }
+      .stack-c .kraft-card:hover {
+        border-color: var(--orange);
+        background: var(--tint-orange-8);
+      }
+      .phone.open[data-variant='c'] .stack-c .kraft-card {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+      }
+      .phone.open[data-variant='c'] .stack-c .kraft-card:nth-child(1) {
+        transition-delay: 0.04s;
+      }
+      .phone.open[data-variant='c'] .stack-c .kraft-card:nth-child(2) {
+        transition-delay: 0.10s;
+      }
+      .phone.open[data-variant='c'] .stack-c .kraft-card:nth-child(3) {
+        transition-delay: 0.16s;
+      }
+      .phone.open[data-variant='c'] .stack-c .kraft-card:nth-child(4) {
+        transition-delay: 0.22s;
+      }
+      .phone.open[data-variant='c'] .stack-c .kraft-card:nth-child(5) {
+        transition-delay: 0.28s;
+      }
+      .phone.open[data-variant='c'] .stack-c .kraft-card:nth-child(6) {
+        transition-delay: 0.34s;
+      }
+      .kraft-card .kc-bean {
+        flex: 0 0 auto;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--cream);
+        border: 1px solid var(--hairline);
+        display: grid;
+        place-items: center;
+        font-size: 17px;
+      }
+      .kraft-card .kc-text {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .kraft-card .kc-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--ink);
+        line-height: 1.2;
+      }
+      .kraft-card .kc-hint {
+        font-size: 11px;
+        color: var(--ink-muted);
+        line-height: 1.2;
+      }
+      .kraft-card .kc-chev {
+        flex: 0 0 auto;
+        font-size: 14px;
+        color: var(--ink-muted);
+        opacity: 0.5;
+      }
+      .stack-c .stack-eyebrow {
+        align-self: center;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-size: 9px;
+        color: var(--ink-muted);
+        background: var(--paper);
+        padding: 5px 11px;
+        border-radius: 999px;
+        border: 1px solid var(--hairline);
+        box-shadow: var(--shadow-soft);
+        opacity: 0;
+        transform: translateY(8px);
+        transition:
+          opacity 0.3s var(--ease-out),
+          transform 0.4s var(--ease-spring);
+        transition-delay: 0.42s;
+      }
+      .phone.open[data-variant='c'] .stack-c .stack-eyebrow {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* ---------- annotations panel ---------- */
+      .annotations {
+        max-width: 1180px;
+        margin: 64px auto 0;
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 28px;
+        padding: 32px 36px;
+        box-shadow: var(--shadow-soft);
+      }
+      .annotations h2 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 22px;
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+      .annotations h2 em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        color: var(--orange);
+      }
+      .annotations .a-sub {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 13px;
+        color: var(--ink-muted);
+        margin: 0 0 20px;
+      }
+      .a-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+      }
+      @media (max-width: 880px) {
+        .a-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .a-col h3 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--orange);
+        margin: 0 0 10px;
+      }
+      .a-col ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--ink-muted);
+      }
+      .a-col li {
+        padding: 5px 0 5px 18px;
+        position: relative;
+      }
+      .a-col li::before {
+        content: '·';
+        position: absolute;
+        left: 0;
+        top: 4px;
+        color: var(--orange);
+        font-weight: 700;
+      }
+      .a-col li strong {
+        color: var(--ink);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+      }
+
+      /* ---------- demo helper ---------- */
+      .demo-toolbar {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 6px;
+      }
+      .demo-toolbar button {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 11px;
+        background: transparent;
+        border: 1px solid var(--hairline-strong);
+        color: var(--ink-muted);
+        padding: 5px 10px;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .demo-toolbar button.active {
+        background: var(--orange);
+        color: white;
+        border-color: var(--orange);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <p class="page-eyebrow">mockup · mobile navigation · v1</p>
+        <h1 class="page-title">
+          a calmer mobile nav, <em>built from beans</em>
+        </h1>
+        <p class="page-sub">
+          Four anchors instead of six. Nook is a single tap home. Planning,
+          Money, and Pod each open a stack of beans rising up from the tab —
+          same playful spring as the quick-add FAB, now repurposed for
+          navigation. Tap the same tab again to dismiss; tap a bean to navigate.
+        </p>
+      </div>
+      <div class="controls">
+        <button class="ctrl-btn" id="theme-toggle" type="button">
+          ☀️ light
+        </button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- =================================================================
+           VARIANT A — Classic bean-jar stack
+           ================================================================= -->
+      <div class="variant">
+        <span class="variant-tag"
+          ><span class="vt-num">A</span> Classic stack</span
+        >
+        <div class="phone" data-variant="a" data-tab="planning">
+          <div class="notch"></div>
+          <div class="app-bg">
+            <p class="app-eyebrow">your nook</p>
+            <h2 class="app-h1">good morning, <em>greg</em></h2>
+            <p class="app-sub">three beans on the move today.</p>
+            <div class="skeleton-card">
+              <div class="sk-row title med"></div>
+              <div class="sk-row"></div>
+              <div class="sk-row short"></div>
+            </div>
+            <div class="skeleton-card">
+              <div class="sk-row title short"></div>
+              <div class="sk-row"></div>
+              <div class="sk-row med"></div>
+            </div>
+            <div class="skeleton-card">
+              <div class="sk-row title med"></div>
+              <div class="sk-row"></div>
+              <div class="sk-row short"></div>
+            </div>
+          </div>
+
+          <div class="scrim" data-close></div>
+
+          <!-- bean stack (planning by default) -->
+          <div class="stack-a" data-stack="planning">
+            <div class="jar-item">
+              <div class="jar-bean">📅</div>
+              <div class="jar-label">Activities</div>
+            </div>
+            <div class="jar-item">
+              <div class="jar-bean">✅</div>
+              <div class="jar-label">To-do</div>
+            </div>
+            <div class="jar-item">
+              <div class="jar-bean">✈️</div>
+              <div class="jar-label">Travel</div>
+            </div>
+          </div>
+
+          <div class="stack-a" data-stack="money" hidden>
+            <div class="jar-item">
+              <div class="jar-bean">🏠</div>
+              <div class="jar-label">Overview</div>
+            </div>
+            <div class="jar-item">
+              <div class="jar-bean">💰</div>
+              <div class="jar-label">Accounts</div>
+            </div>
+            <div class="jar-item">
+              <div class="jar-bean">💵</div>
+              <div class="jar-label">Budgets</div>
+            </div>
+            <div class="jar-item">
+              <div class="jar-bean">💳</div>
+              <div class="jar-label">Transactions</div>
+            </div>
+            <div class="jar-item">
+              <div class="jar-bean">🎯</div>
+              <div class="jar-label">Goals</div>
+            </div>
+            <div class="jar-item">
+              <div class="jar-bean">🏢</div>
+              <div class="jar-label">Assets</div>
+            </div>
+          </div>
+
+          <div class="stack-a" data-stack="pod" hidden>
+            <div class="jar-item">
+              <div class="jar-bean">🧑‍🤝‍🧑</div>
+              <div class="jar-label">Meet the beans</div>
+            </div>
+            <div class="jar-item">
+              <div class="jar-bean">📖</div>
+              <div class="jar-label">Scrapbook</div>
+            </div>
+            <div class="jar-item">
+              <div class="jar-bean">🍜</div>
+              <div class="jar-label">Cookbook</div>
+            </div>
+            <div class="jar-item">
+              <div class="jar-bean">🩺</div>
+              <div class="jar-label">Care &amp; safety</div>
+            </div>
+            <div class="jar-item">
+              <div class="jar-bean">🆘</div>
+              <div class="jar-label">Emergency</div>
+            </div>
+          </div>
+
+          <nav class="nav">
+            <button class="nav-tab is-current" data-tab="nook">
+              <span class="nav-emoji">🏡</span>
+              <span class="nav-label">Nook</span>
+            </button>
+            <button class="nav-tab" data-tab="planning">
+              <span class="has-more"></span>
+              <span class="nav-emoji">🌳</span>
+              <span class="nav-label">Planning</span>
+            </button>
+            <button class="nav-tab" data-tab="money">
+              <span class="has-more"></span>
+              <span class="nav-emoji">🐷</span>
+              <span class="nav-label">Money</span>
+            </button>
+            <button class="nav-tab" data-tab="pod">
+              <span class="has-more"></span>
+              <span class="nav-emoji">🌱</span>
+              <span class="nav-label">Pod</span>
+            </button>
+          </nav>
+        </div>
+        <div class="variant-caption">
+          <strong>Pure bean stack.</strong> Beans launch straight up from the
+          tab, labels float in beside them. Lightest footprint — no backdrop
+          card. Best for muscle memory once you know the items.
+        </div>
+        <div class="demo-toolbar">
+          <button data-demo="planning" class="active">Planning</button>
+          <button data-demo="money">Money</button>
+          <button data-demo="pod">Pod</button>
+        </div>
+      </div>
+
+      <!-- =================================================================
+           VARIANT B — Cluster bloom
+           ================================================================= -->
+      <div class="variant">
+        <span class="variant-tag recommended"
+          ><span class="vt-num">B</span> Cluster bloom</span
+        >
+        <div class="phone" data-variant="b" data-tab="money">
+          <div class="notch"></div>
+          <div class="app-bg">
+            <p class="app-eyebrow">piggy bank</p>
+            <h2 class="app-h1">$12,408 <em>this month</em></h2>
+            <p class="app-sub">3 of 6 budgets on track.</p>
+            <div class="skeleton-card">
+              <div class="sk-row title med"></div>
+              <div class="sk-row"></div>
+              <div class="sk-row short"></div>
+            </div>
+            <div class="skeleton-card">
+              <div class="sk-row title short"></div>
+              <div class="sk-row"></div>
+              <div class="sk-row med"></div>
+            </div>
+            <div class="skeleton-card">
+              <div class="sk-row title med"></div>
+              <div class="sk-row"></div>
+              <div class="sk-row short"></div>
+            </div>
+          </div>
+
+          <div class="scrim" data-close></div>
+
+          <!-- bloom (money by default) -->
+          <div class="bloom" data-stack="money">
+            <div class="bloom-arrow"></div>
+            <div class="bloom-eyebrow">
+              <span class="dot"></span>piggy bank · 6 destinations
+            </div>
+            <h3 class="bloom-title">your <em>money</em></h3>
+            <p class="bloom-sub">where every bean is counted.</p>
+            <div class="bloom-grid">
+              <div class="bloom-item">
+                <div class="bi-bean">🏠</div>
+                <div class="bi-label">Overview</div>
+              </div>
+              <div class="bloom-item">
+                <div class="bi-bean">💰</div>
+                <div class="bi-label">Accounts</div>
+              </div>
+              <div class="bloom-item">
+                <div class="bi-bean">💵</div>
+                <div class="bi-label">Budgets</div>
+              </div>
+              <div class="bloom-item">
+                <div class="bi-bean">💳</div>
+                <div class="bi-label">Trans-<br />actions</div>
+              </div>
+              <div class="bloom-item">
+                <div class="bi-bean">🎯</div>
+                <div class="bi-label">Goals</div>
+              </div>
+              <div class="bloom-item">
+                <div class="bi-bean">🏢</div>
+                <div class="bi-label">Assets</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bloom" data-stack="planning" hidden>
+            <div class="bloom-arrow"></div>
+            <div class="bloom-eyebrow">
+              <span class="dot"></span>treehouse · 3 destinations
+            </div>
+            <h3 class="bloom-title">your <em>planning</em></h3>
+            <p class="bloom-sub">what's on for the family this week.</p>
+            <div class="bloom-grid">
+              <div class="bloom-item">
+                <div class="bi-bean">📅</div>
+                <div class="bi-label">Activities</div>
+              </div>
+              <div class="bloom-item">
+                <div class="bi-bean">✅</div>
+                <div class="bi-label">To-do</div>
+              </div>
+              <div class="bloom-item">
+                <div class="bi-bean">✈️</div>
+                <div class="bi-label">Travel</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bloom" data-stack="pod" hidden>
+            <div class="bloom-arrow"></div>
+            <div class="bloom-eyebrow">
+              <span class="dot"></span>the pod · 5 destinations
+            </div>
+            <h3 class="bloom-title">your <em>pod</em></h3>
+            <p class="bloom-sub">the beans, their world, their care.</p>
+            <div class="bloom-grid">
+              <div class="bloom-item">
+                <div class="bi-bean">🧑‍🤝‍🧑</div>
+                <div class="bi-label">Meet</div>
+              </div>
+              <div class="bloom-item">
+                <div class="bi-bean">📖</div>
+                <div class="bi-label">Scrap-<br />book</div>
+              </div>
+              <div class="bloom-item">
+                <div class="bi-bean">🍜</div>
+                <div class="bi-label">Cookbook</div>
+              </div>
+              <div class="bloom-item">
+                <div class="bi-bean">🩺</div>
+                <div class="bi-label">Care</div>
+              </div>
+              <div class="bloom-item">
+                <div class="bi-bean">🆘</div>
+                <div class="bi-label">Emergency</div>
+              </div>
+            </div>
+          </div>
+
+          <nav class="nav">
+            <button class="nav-tab" data-tab="nook">
+              <span class="nav-emoji">🏡</span>
+              <span class="nav-label">Nook</span>
+            </button>
+            <button class="nav-tab" data-tab="planning">
+              <span class="has-more"></span>
+              <span class="nav-emoji">🌳</span>
+              <span class="nav-label">Planning</span>
+            </button>
+            <button class="nav-tab active" data-tab="money">
+              <span class="has-more"></span>
+              <span class="nav-emoji">🐷</span>
+              <span class="nav-label">Money</span>
+            </button>
+            <button class="nav-tab" data-tab="pod">
+              <span class="has-more"></span>
+              <span class="nav-emoji">🌱</span>
+              <span class="nav-label">Pod</span>
+            </button>
+          </nav>
+        </div>
+        <div class="variant-caption">
+          <strong>Cluster bloom.</strong> Tab opens a soft cream card with a
+          title, count, and a 3-column grid of beans. Most discoverable —
+          newcomers immediately see what lives where, and the eyebrow text
+          reinforces the brand voice.
+        </div>
+        <div class="demo-toolbar">
+          <button data-demo="planning">Planning</button>
+          <button data-demo="money" class="active">Money</button>
+          <button data-demo="pod">Pod</button>
+        </div>
+      </div>
+
+      <!-- =================================================================
+           VARIANT C — Kraft-card stack
+           ================================================================= -->
+      <div class="variant">
+        <span class="variant-tag"
+          ><span class="vt-num">C</span> Card stack</span
+        >
+        <div class="phone" data-variant="c" data-tab="pod">
+          <div class="notch"></div>
+          <div class="app-bg">
+            <p class="app-eyebrow">the pod</p>
+            <h2 class="app-h1">the <em>parker</em> beans</h2>
+            <p class="app-sub">5 beans, 3 little ones, 1 dog.</p>
+            <div class="skeleton-card">
+              <div class="sk-row title med"></div>
+              <div class="sk-row"></div>
+              <div class="sk-row short"></div>
+            </div>
+            <div class="skeleton-card">
+              <div class="sk-row title short"></div>
+              <div class="sk-row"></div>
+              <div class="sk-row med"></div>
+            </div>
+            <div class="skeleton-card">
+              <div class="sk-row title med"></div>
+              <div class="sk-row"></div>
+              <div class="sk-row short"></div>
+            </div>
+          </div>
+
+          <div class="scrim" data-close></div>
+
+          <!-- card stack (pod by default) -->
+          <div class="stack-c" data-stack="pod">
+            <div class="kraft-card">
+              <div class="kc-bean">🧑‍🤝‍🧑</div>
+              <div class="kc-text">
+                <div class="kc-label">Meet the beans</div>
+                <div class="kc-hint">your family roster</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="kraft-card">
+              <div class="kc-bean">📖</div>
+              <div class="kc-text">
+                <div class="kc-label">Scrapbook</div>
+                <div class="kc-hint">favorites, sayings, notes</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="kraft-card">
+              <div class="kc-bean">🍜</div>
+              <div class="kc-text">
+                <div class="kc-label">Cookbook</div>
+                <div class="kc-hint">family recipes</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="kraft-card">
+              <div class="kc-bean">🩺</div>
+              <div class="kc-text">
+                <div class="kc-label">Care &amp; safety</div>
+                <div class="kc-hint">meds, allergies, doses</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="kraft-card">
+              <div class="kc-bean">🆘</div>
+              <div class="kc-text">
+                <div class="kc-label">Emergency</div>
+                <div class="kc-hint">contacts &amp; info</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="stack-eyebrow">the pod · 5 destinations</div>
+          </div>
+
+          <div class="stack-c" data-stack="planning" hidden>
+            <div class="kraft-card">
+              <div class="kc-bean">📅</div>
+              <div class="kc-text">
+                <div class="kc-label">Activities</div>
+                <div class="kc-hint">family calendar</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="kraft-card">
+              <div class="kc-bean">✅</div>
+              <div class="kc-text">
+                <div class="kc-label">To-do</div>
+                <div class="kc-hint">shared tasks</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="kraft-card">
+              <div class="kc-bean">✈️</div>
+              <div class="kc-text">
+                <div class="kc-label">Travel</div>
+                <div class="kc-hint">trips &amp; ideas</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="stack-eyebrow">treehouse · 3 destinations</div>
+          </div>
+
+          <div class="stack-c" data-stack="money" hidden>
+            <div class="kraft-card">
+              <div class="kc-bean">🏠</div>
+              <div class="kc-text">
+                <div class="kc-label">Overview</div>
+                <div class="kc-hint">net worth at a glance</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="kraft-card">
+              <div class="kc-bean">💰</div>
+              <div class="kc-text">
+                <div class="kc-label">Accounts</div>
+                <div class="kc-hint">all balances</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="kraft-card">
+              <div class="kc-bean">💵</div>
+              <div class="kc-text">
+                <div class="kc-label">Budgets</div>
+                <div class="kc-hint">this month's targets</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="kraft-card">
+              <div class="kc-bean">💳</div>
+              <div class="kc-text">
+                <div class="kc-label">Transactions</div>
+                <div class="kc-hint">income &amp; spending</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="kraft-card">
+              <div class="kc-bean">🎯</div>
+              <div class="kc-text">
+                <div class="kc-label">Goals</div>
+                <div class="kc-hint">savings &amp; payoff</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="kraft-card">
+              <div class="kc-bean">🏢</div>
+              <div class="kc-text">
+                <div class="kc-label">Assets</div>
+                <div class="kc-hint">homes, cars, more</div>
+              </div>
+              <div class="kc-chev">›</div>
+            </div>
+            <div class="stack-eyebrow">piggy bank · 6 destinations</div>
+          </div>
+
+          <nav class="nav">
+            <button class="nav-tab" data-tab="nook">
+              <span class="nav-emoji">🏡</span>
+              <span class="nav-label">Nook</span>
+            </button>
+            <button class="nav-tab" data-tab="planning">
+              <span class="has-more"></span>
+              <span class="nav-emoji">🌳</span>
+              <span class="nav-label">Planning</span>
+            </button>
+            <button class="nav-tab" data-tab="money">
+              <span class="has-more"></span>
+              <span class="nav-emoji">🐷</span>
+              <span class="nav-label">Money</span>
+            </button>
+            <button class="nav-tab active" data-tab="pod">
+              <span class="has-more"></span>
+              <span class="nav-emoji">🌱</span>
+              <span class="nav-label">Pod</span>
+            </button>
+          </nav>
+        </div>
+        <div class="variant-caption">
+          <strong>Kraft-card stack.</strong> Each item is a full-width card with
+          a one-line hint. Slowest to scan but the most informative — best for
+          users still building a mental map of where things live.
+        </div>
+        <div class="demo-toolbar">
+          <button data-demo="planning">Planning</button>
+          <button data-demo="money">Money</button>
+          <button data-demo="pod" class="active">Pod</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================
+         Annotations
+         ================================================================= -->
+    <section class="annotations">
+      <h2>design notes &amp; <em>open questions</em></h2>
+      <p class="a-sub">
+        the bits worth deciding before turning this into Vue.
+      </p>
+      <div class="a-grid">
+        <div class="a-col">
+          <h3>Behaviour</h3>
+          <ul>
+            <li>
+              <strong>Nook is single-tap.</strong> Always navigates straight to
+              `/nook`. The other three open a stack.
+            </li>
+            <li>
+              <strong>Tap-tab-to-toggle.</strong> Same tab tapped a second time
+              dismisses the stack. So does scrim tap, back gesture, Escape.
+            </li>
+            <li>
+              <strong>Tap-bean-to-go.</strong> Each bean inside the stack
+              navigates and closes the stack. Active route is ringed in
+              Heritage Orange so users see where they're returning to.
+            </li>
+            <li>
+              <strong>One stack at a time.</strong> Tapping a different category
+              swaps the stack instantly with a re-stagger (no full close +
+              open).
+            </li>
+            <li>
+              <strong>Closed when scrolling.</strong> Vertical scroll on the
+              page dismisses an open stack — keeps the chrome calm and avoids
+              accidental hold-overs.
+            </li>
+          </ul>
+        </div>
+        <div class="a-col">
+          <h3>Spec mapping</h3>
+          <ul>
+            <li>
+              <strong>Nook</strong> → `/nook` (homepage, today's view).
+            </li>
+            <li>
+              <strong>Planning 🌳</strong> → activities, to-do, travel.
+              Three items.
+            </li>
+            <li>
+              <strong>Money 🐷</strong> → overview, accounts, budgets,
+              transactions, goals, assets. Six items. Hidden when
+              `canViewFinances` is off.
+            </li>
+            <li>
+              <strong>Pod 🌱</strong> → meet the beans, scrapbook, cookbook,
+              care &amp; safety, emergency. Five items. Settings &amp; help
+              live in the existing top-right avatar menu, not in the bar.
+            </li>
+            <li>
+              <strong>FAB stays.</strong> Quick-add `+` keeps its corner;
+              opening the FAB closes any open nav stack and vice versa.
+            </li>
+          </ul>
+        </div>
+        <div class="a-col">
+          <h3>Open questions</h3>
+          <ul>
+            <li>
+              <strong>Visual cue for "has more".</strong> Mockup uses a tiny
+              dot in the tab corner that grows + tints orange when the stack
+              is open. Alternatives: a hairline underline, a chevron, or
+              nothing (rely on the spring motion to teach).
+            </li>
+            <li>
+              <strong>What if `canViewFinances` is off?</strong> Bar collapses
+              to 3 tabs (Nook / Planning / Pod). Grid stretches; spacing still
+              works.
+            </li>
+            <li>
+              <strong>Active-route highlight.</strong> Tab shows the orange
+              top-bar when the user is on any route inside its category — so a
+              user on `/transactions` sees Money lit even when the stack is
+              closed.
+            </li>
+            <li>
+              <strong>Reduced motion.</strong> All variants gracefully
+              fall back to a fade-in (no spring stagger) when
+              `prefers-reduced-motion: reduce` is set.
+            </li>
+            <li>
+              <strong>Naming.</strong> "Planning" is the working label for the
+              treehouse minus pod. Could also be "Plan" (shorter), "Calendar"
+              (narrower), or keep the tree emoji and label "Treehouse"
+              (brand-true). Greg to call.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      // ---------- theme ----------
+      const themeBtn = document.getElementById('theme-toggle');
+      themeBtn.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', next);
+        themeBtn.textContent = next === 'light' ? '☀️ light' : '🌙 dark';
+      });
+
+      // ---------- per-phone interactions ----------
+      document.querySelectorAll('.phone').forEach((phone) => {
+        const tabs = phone.querySelectorAll('.nav-tab');
+        const stacks = phone.querySelectorAll('[data-stack]');
+        const scrim = phone.querySelector('[data-close]');
+
+        function showStack(name) {
+          stacks.forEach((s) => {
+            s.hidden = s.dataset.stack !== name;
+          });
+          // re-position the bloom arrow under the active tab
+          const bloom = phone.querySelector(`.bloom[data-stack='${name}']`);
+          if (bloom) {
+            const tab = phone.querySelector(`.nav-tab[data-tab='${name}']`);
+            if (tab) {
+              const tabRect = tab.getBoundingClientRect();
+              const bloomRect = bloom.getBoundingClientRect();
+              const arrow = bloom.querySelector('.bloom-arrow');
+              if (arrow) {
+                const left =
+                  tabRect.left - bloomRect.left + tabRect.width / 2 - 7;
+                arrow.style.left = `${left}px`;
+              }
+            }
+          }
+          // re-position the stack-a horizontally over the active tab
+          const stackA = phone.querySelector(`.stack-a[data-stack='${name}']`);
+          if (stackA) {
+            const tab = phone.querySelector(`.nav-tab[data-tab='${name}']`);
+            if (tab) {
+              const phoneRect = phone.getBoundingClientRect();
+              const tabRect = tab.getBoundingClientRect();
+              const center = tabRect.left - phoneRect.left + tabRect.width / 2;
+              stackA.style.left = `${center}px`;
+              stackA.style.right = 'auto';
+              stackA.style.transform = 'translateX(-50%)';
+            }
+          }
+        }
+
+        function open(name) {
+          tabs.forEach((t) =>
+            t.classList.toggle('active', t.dataset.tab === name)
+          );
+          phone.dataset.tab = name;
+          showStack(name);
+          // wait one frame so the stack visibility update applies before opening
+          requestAnimationFrame(() => phone.classList.add('open'));
+        }
+        function close() {
+          phone.classList.remove('open');
+          tabs.forEach((t) => t.classList.remove('active'));
+        }
+
+        tabs.forEach((tab) => {
+          tab.addEventListener('click', () => {
+            const name = tab.dataset.tab;
+            if (name === 'nook') {
+              close();
+              tabs.forEach((t) =>
+                t.classList.toggle('is-current', t.dataset.tab === 'nook')
+              );
+              return;
+            }
+            if (phone.classList.contains('open') && phone.dataset.tab === name) {
+              close();
+            } else {
+              tabs.forEach((t) => t.classList.remove('is-current'));
+              open(name);
+            }
+          });
+        });
+        scrim.addEventListener('click', close);
+
+        // demo-toolbar buttons (under each phone) — preview each category
+        const variantWrap = phone.parentElement;
+        const demoBtns = variantWrap.querySelectorAll('.demo-toolbar button');
+        demoBtns.forEach((btn) => {
+          btn.addEventListener('click', () => {
+            demoBtns.forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            open(btn.dataset.demo);
+          });
+        });
+
+        // initial open state per phone (one is pre-opened so the variant is
+        // visible at first scroll)
+        const initial = phone.dataset.tab;
+        if (initial && initial !== 'nook') {
+          requestAnimationFrame(() => open(initial));
+        }
+      });
+    </script>
+  </body>
+</html>

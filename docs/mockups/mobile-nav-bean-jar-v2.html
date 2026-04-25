@@ -1,0 +1,1800 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family · mobile nav v2 · pure bean stack</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500;1,9..144,600&family=Caveat:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ---------- brand tokens ---------- */
+      :root {
+        --orange: #f15d22;
+        --orange-soft: #e0551f;
+        --terracotta: #e67e22;
+        --silk: #aed6f1;
+        --slate: #2c3e50;
+        --slate-1a: #1a252f;
+        --slate-24: #243342;
+        --slate-34: #34495e;
+        --cream: #fdfaf6;
+        --paper: #ffffff;
+        --page-bg: #f5f1ea;
+        --ink: #2c3e50;
+        --ink-muted: #6b7d8f;
+
+        --hairline: rgba(44, 62, 80, 0.08);
+        --hairline-strong: rgba(44, 62, 80, 0.16);
+
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-orange-22: rgba(241, 93, 34, 0.22);
+        --tint-silk-20: rgba(174, 214, 241, 0.28);
+        --tint-terracotta-10: rgba(230, 126, 34, 0.12);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+        --tint-slate-10: rgba(44, 62, 80, 0.10);
+
+        --shadow-soft: 0 4px 24px rgba(44, 62, 80, 0.08);
+        --shadow-pop: 0 10px 30px rgba(44, 62, 80, 0.14);
+        --shadow-bean: 0 6px 14px rgba(44, 62, 80, 0.12);
+
+        --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+        --ease-spring: cubic-bezier(0.34, 1.6, 0.5, 1);
+      }
+      [data-theme='dark'] {
+        --paper: #243342;
+        --page-bg: #1a252f;
+        --cream: #2c3e50;
+        --ink: #ecf0f1;
+        --ink-muted: rgba(236, 240, 241, 0.65);
+        --hairline: rgba(236, 240, 241, 0.08);
+        --hairline-strong: rgba(236, 240, 241, 0.18);
+        --tint-slate-5: rgba(236, 240, 241, 0.05);
+        --tint-slate-10: rgba(236, 240, 241, 0.10);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background:
+          radial-gradient(
+            1200px 800px at 20% -10%,
+            var(--tint-silk-20),
+            transparent 60%
+          ),
+          radial-gradient(
+            1000px 700px at 100% 110%,
+            var(--tint-orange-8),
+            transparent 65%
+          ),
+          var(--page-bg);
+        color: var(--ink);
+        min-height: 100vh;
+        padding: 48px 24px 96px;
+        transition: background 0.4s ease;
+      }
+
+      /* ---------- page header ---------- */
+      .page-header {
+        max-width: 1280px;
+        margin: 0 auto 48px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 20px;
+        align-items: end;
+      }
+      .page-eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-size: 11px;
+        color: var(--orange);
+        margin: 0 0 8px;
+      }
+      .page-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: clamp(28px, 4vw, 44px);
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+      .page-title em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        color: var(--orange);
+      }
+      .page-sub {
+        font-size: 15px;
+        line-height: 1.55;
+        color: var(--ink-muted);
+        margin: 12px 0 0;
+        max-width: 720px;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+      }
+      .ctrl-btn {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 12px;
+        background: var(--paper);
+        color: var(--ink);
+        border: 1px solid var(--hairline-strong);
+        border-radius: 999px;
+        padding: 9px 14px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+      }
+      .ctrl-btn:hover {
+        border-color: var(--orange);
+        color: var(--orange);
+      }
+
+      /* ---------- section heading ---------- */
+      .section {
+        max-width: 1280px;
+        margin: 0 auto 64px;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        gap: 18px;
+        margin-bottom: 8px;
+      }
+      .section-num {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        font-size: 32px;
+        color: var(--orange);
+        line-height: 1;
+      }
+      .section-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 26px;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .section-sub {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 14px;
+        color: var(--ink-muted);
+        margin: 0 0 28px 50px;
+        max-width: 640px;
+      }
+
+      /* ---------- side-by-side rule ---------- */
+      .rule {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 32px;
+        align-items: center;
+        margin: 0 auto 36px;
+        max-width: 880px;
+      }
+      .rule .pill {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 16px 24px;
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 22px;
+        box-shadow: var(--shadow-soft);
+      }
+      .rule .pill-eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-size: 10px;
+        color: var(--ink-muted);
+      }
+      .rule .pill-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 18px;
+        letter-spacing: -0.01em;
+      }
+      .rule .pill-title em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        color: var(--orange);
+      }
+      .rule .pill-tagline {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 12px;
+        color: var(--ink-muted);
+      }
+      .rule .vs {
+        font-family: 'Caveat', cursive;
+        font-weight: 600;
+        font-size: 28px;
+        color: var(--orange);
+        opacity: 0.85;
+      }
+
+      /* ---------- phone grid ---------- */
+      .phones {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+        gap: 36px 28px;
+        justify-items: center;
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+
+      .phone-block {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+        max-width: 360px;
+      }
+
+      .phone-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px 6px 6px;
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 999px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 12px;
+        box-shadow: var(--shadow-soft);
+      }
+      .phone-tag .num {
+        background: var(--ink);
+        color: var(--paper);
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+      }
+      .phone-tag.green .num {
+        background: #16a34a;
+        color: white;
+      }
+      .phone-tag.orange .num {
+        background: var(--orange);
+        color: white;
+      }
+
+      .phone-cap {
+        max-width: 320px;
+        text-align: center;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--ink-muted);
+      }
+      .phone-cap strong {
+        color: var(--ink);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+      }
+
+      .phone {
+        width: 360px;
+        height: 740px;
+        background: var(--paper);
+        border-radius: 44px;
+        position: relative;
+        overflow: hidden;
+        box-shadow:
+          0 0 0 8px var(--slate-1a),
+          0 0 0 10px rgba(255, 255, 255, 0.06),
+          0 30px 60px rgba(44, 62, 80, 0.18);
+        display: flex;
+        flex-direction: column;
+      }
+      .notch {
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 110px;
+        height: 28px;
+        background: var(--slate-1a);
+        border-radius: 999px;
+        z-index: 60;
+      }
+
+      /* ---------- mock page content ---------- */
+      .app-bg {
+        flex: 1;
+        background:
+          radial-gradient(
+            500px 300px at 20% 0%,
+            var(--tint-orange-8),
+            transparent 60%
+          ),
+          radial-gradient(
+            400px 300px at 100% 30%,
+            var(--tint-silk-20),
+            transparent 60%
+          ),
+          linear-gradient(180deg, var(--cream), var(--paper));
+        padding: 60px 18px 110px;
+        overflow: hidden;
+        position: relative;
+      }
+      [data-theme='dark'] .app-bg {
+        background:
+          radial-gradient(
+            500px 300px at 20% 0%,
+            rgba(241, 93, 34, 0.10),
+            transparent 60%
+          ),
+          radial-gradient(
+            400px 300px at 100% 30%,
+            rgba(174, 214, 241, 0.06),
+            transparent 60%
+          ),
+          linear-gradient(180deg, var(--page-bg), var(--paper));
+      }
+      .app-eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-size: 10px;
+        color: var(--orange);
+        margin: 0 0 4px;
+      }
+      .app-h1 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 24px;
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+      .app-h1 em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        color: var(--orange);
+      }
+      .app-sub {
+        font-size: 12px;
+        color: var(--ink-muted);
+        margin: 0 0 16px;
+      }
+      .skeleton-card {
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 18px;
+        padding: 14px;
+        margin-bottom: 10px;
+        box-shadow: var(--shadow-soft);
+      }
+      .sk-row {
+        height: 8px;
+        background: var(--tint-slate-5);
+        border-radius: 4px;
+        margin: 6px 0;
+      }
+      .sk-row.short {
+        width: 50%;
+      }
+      .sk-row.med {
+        width: 78%;
+      }
+      .sk-row.title {
+        height: 11px;
+        background: var(--tint-slate-10);
+        margin-bottom: 10px;
+      }
+
+      /* ---------- backdrop scrim ---------- */
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(44, 62, 80, 0.18);
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s var(--ease-out);
+        z-index: 25;
+      }
+      .phone.open .scrim {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      [data-theme='dark'] .scrim {
+        background: rgba(0, 0, 0, 0.45);
+      }
+
+      /* ============================================================
+         BOTTOM NAV — shared shell
+         ============================================================ */
+      .nav {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--paper);
+        border-top: 1px solid var(--hairline);
+        padding: 10px 8px 18px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        z-index: 40;
+        box-shadow: 0 -4px 20px rgba(44, 62, 80, 0.04);
+      }
+      .nav-tab {
+        all: unset;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 8px 4px;
+        cursor: pointer;
+        border-radius: 18px;
+        position: relative;
+        transition: background 0.2s ease;
+      }
+      .nav-tab:hover {
+        background: var(--tint-slate-5);
+      }
+      .nav-tab.active {
+        background: var(--tint-orange-8);
+      }
+      .nav-tab.is-current::before {
+        content: '';
+        position: absolute;
+        top: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 28px;
+        height: 3px;
+        border-radius: 999px;
+        background: var(--orange);
+      }
+      .nav-emoji {
+        font-size: 22px;
+        line-height: 1;
+        transition: transform 0.3s var(--ease-spring);
+      }
+      .nav-tab.active .nav-emoji {
+        transform: translateY(-2px) scale(1.1);
+      }
+      .nav-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 11px;
+        color: var(--ink-muted);
+      }
+      .nav-tab.active .nav-label,
+      .nav-tab.is-current .nav-label {
+        color: var(--orange);
+      }
+      .nav-tab .has-more {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--ink-muted);
+        opacity: 0.4;
+        transition: all 0.3s var(--ease-spring);
+      }
+      .nav-tab.active .has-more {
+        background: var(--orange);
+        opacity: 1;
+        transform: scale(1.4);
+      }
+
+      /* ============================================================
+         FAB (cluster-bloom — for the LEFT pill of the system rule)
+         ============================================================ */
+      .fab {
+        all: unset;
+        position: absolute;
+        bottom: 92px;
+        right: 18px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--orange);
+        color: white;
+        display: grid;
+        place-items: center;
+        box-shadow:
+          0 0 0 4px rgba(241, 93, 34, 0.16),
+          0 8px 22px rgba(44, 62, 80, 0.18);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 28px;
+        cursor: pointer;
+        z-index: 50;
+        transition: transform 0.3s var(--ease-spring);
+      }
+      .phone.fab-open .fab {
+        transform: rotate(45deg);
+      }
+
+      .bloom {
+        position: absolute;
+        bottom: 162px;
+        left: 14px;
+        right: 14px;
+        z-index: 35;
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 24px;
+        box-shadow: var(--shadow-pop);
+        padding: 18px 16px 16px;
+        opacity: 0;
+        transform: translateY(20px) scale(0.96);
+        transform-origin: bottom right;
+        pointer-events: none;
+        transition:
+          opacity 0.3s var(--ease-out),
+          transform 0.45s var(--ease-spring);
+      }
+      .phone.fab-open .bloom {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+      }
+      .bloom-eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-size: 9px;
+        color: var(--ink-muted);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .bloom-eyebrow .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--orange);
+      }
+      .bloom-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 18px;
+        margin: 0 0 2px;
+        letter-spacing: -0.01em;
+      }
+      .bloom-title em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        color: var(--orange);
+      }
+      .bloom-sub {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 11px;
+        color: var(--ink-muted);
+        margin: 0 0 12px;
+      }
+      .bloom-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .bloom-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 4px;
+        background: var(--cream);
+        border: 1px solid var(--hairline);
+        border-radius: 16px;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.2s ease;
+        opacity: 0;
+        transform: scale(0.6);
+      }
+      .bloom-item:hover {
+        border-color: var(--orange);
+        background: var(--tint-orange-8);
+      }
+      .phone.fab-open .bloom-item {
+        opacity: 1;
+        transform: scale(1);
+        transition:
+          opacity 0.2s var(--ease-out),
+          transform 0.4s var(--ease-spring),
+          border-color 0.2s ease,
+          background 0.2s ease;
+      }
+      .phone.fab-open .bloom-item:nth-child(1) {
+        transition-delay: 0.05s, 0.05s, 0s, 0s;
+      }
+      .phone.fab-open .bloom-item:nth-child(2) {
+        transition-delay: 0.09s, 0.09s, 0s, 0s;
+      }
+      .phone.fab-open .bloom-item:nth-child(3) {
+        transition-delay: 0.13s, 0.13s, 0s, 0s;
+      }
+      .phone.fab-open .bloom-item:nth-child(4) {
+        transition-delay: 0.17s, 0.17s, 0s, 0s;
+      }
+      .phone.fab-open .bloom-item:nth-child(5) {
+        transition-delay: 0.21s, 0.21s, 0s, 0s;
+      }
+      .phone.fab-open .bloom-item:nth-child(6) {
+        transition-delay: 0.25s, 0.25s, 0s, 0s;
+      }
+      .bi-bean {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: var(--paper);
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        box-shadow: var(--shadow-bean);
+        position: relative;
+      }
+      /* the differentiator: a tiny + plus mark on every bloom-bean
+         so it's clear this layout means ADD */
+      .bi-bean::after {
+        content: '+';
+        position: absolute;
+        right: -3px;
+        bottom: -3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--orange);
+        color: white;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 12px;
+        line-height: 16px;
+        text-align: center;
+        box-shadow: 0 2px 5px rgba(44, 62, 80, 0.18);
+      }
+      .bi-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 11px;
+        color: var(--ink);
+        text-align: center;
+        line-height: 1.2;
+      }
+
+      /* ============================================================
+         PURE BEAN STACK (NAV — for the RIGHT pill of the system rule
+         and the navigation deep-dive section)
+         ============================================================ */
+      .stack {
+        position: absolute;
+        bottom: 92px;
+        z-index: 35;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column-reverse;
+        align-items: center;
+        gap: 9px;
+        transform: translateX(-50%);
+      }
+      .stack .jar-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-direction: row-reverse;
+        opacity: 0;
+        transform: translateY(24px) scale(0.55);
+        pointer-events: none;
+        transition:
+          opacity 0.25s var(--ease-out),
+          transform 0.5s var(--ease-spring);
+      }
+      .phone.nav-open .stack .jar-item {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+      }
+      .phone.nav-open .stack .jar-item:nth-child(1) {
+        transition-delay: 0.04s;
+      }
+      .phone.nav-open .stack .jar-item:nth-child(2) {
+        transition-delay: 0.10s;
+      }
+      .phone.nav-open .stack .jar-item:nth-child(3) {
+        transition-delay: 0.16s;
+      }
+      .phone.nav-open .stack .jar-item:nth-child(4) {
+        transition-delay: 0.22s;
+      }
+      .phone.nav-open .stack .jar-item:nth-child(5) {
+        transition-delay: 0.28s;
+      }
+      .phone.nav-open .stack .jar-item:nth-child(6) {
+        transition-delay: 0.34s;
+      }
+      .phone.nav-open .stack .jar-item:nth-child(7) {
+        transition-delay: 0.40s;
+      }
+      .phone.nav-open .stack .jar-item:nth-child(8) {
+        transition-delay: 0.46s;
+      }
+      .phone.nav-open .stack .jar-item:nth-child(9) {
+        transition-delay: 0.52s;
+      }
+      .phone.nav-open .stack .jar-item:nth-child(10) {
+        transition-delay: 0.58s;
+      }
+      .jar-bean {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: var(--paper);
+        box-shadow: var(--shadow-bean), inset 0 0 0 1px var(--hairline);
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        position: relative;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .jar-bean:hover {
+        transform: scale(1.06);
+      }
+      .jar-bean::before {
+        content: '';
+        position: absolute;
+        inset: 6px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 30% 30%,
+          rgba(255, 255, 255, 0.85),
+          transparent 55%
+        );
+        pointer-events: none;
+      }
+      [data-theme='dark'] .jar-bean::before {
+        background: radial-gradient(
+          circle at 30% 30%,
+          rgba(255, 255, 255, 0.18),
+          transparent 55%
+        );
+      }
+      .jar-bean.is-current {
+        box-shadow:
+          0 0 0 2px var(--orange),
+          var(--shadow-bean);
+        background: var(--tint-orange-8);
+      }
+      .jar-bean.is-more {
+        background: var(--tint-orange-15);
+        font-size: 16px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        color: var(--orange);
+      }
+      .jar-label {
+        background: var(--paper);
+        color: var(--ink);
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 7px 12px;
+        border-radius: 11px;
+        white-space: nowrap;
+        box-shadow: var(--shadow-soft);
+        border: 1px solid var(--hairline);
+      }
+      .jar-item.is-current .jar-label {
+        color: var(--orange);
+        border-color: var(--tint-orange-22);
+      }
+
+      /* the floating eyebrow above the stack */
+      .stack-eyebrow {
+        order: 99;
+        margin-bottom: 4px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-muted);
+        background: var(--paper);
+        padding: 5px 11px;
+        border-radius: 999px;
+        border: 1px solid var(--hairline);
+        box-shadow: var(--shadow-soft);
+        opacity: 0;
+        transform: translateY(8px);
+        transition:
+          opacity 0.3s var(--ease-out),
+          transform 0.4s var(--ease-spring);
+      }
+      .stack-eyebrow .em {
+        color: var(--ink);
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: 0;
+      }
+      .phone.nav-open .stack .stack-eyebrow {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* ---------- annotations ---------- */
+      .annotations {
+        max-width: 1180px;
+        margin: 64px auto 0;
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 28px;
+        padding: 32px 36px;
+        box-shadow: var(--shadow-soft);
+      }
+      .annotations h2 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 22px;
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+      .annotations h2 em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        color: var(--orange);
+      }
+      .annotations .a-sub {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 13px;
+        color: var(--ink-muted);
+        margin: 0 0 22px;
+      }
+      .a-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+      }
+      @media (max-width: 880px) {
+        .a-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .a-col h3 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--orange);
+        margin: 0 0 10px;
+      }
+      .a-col ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--ink-muted);
+      }
+      .a-col li {
+        padding: 5px 0 5px 18px;
+        position: relative;
+      }
+      .a-col li::before {
+        content: '·';
+        position: absolute;
+        left: 0;
+        top: 4px;
+        color: var(--orange);
+        font-weight: 700;
+      }
+      .a-col li strong {
+        color: var(--ink);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+      }
+
+      /* ---------- math sidecar (scaling section) ---------- */
+      .math {
+        max-width: 1180px;
+        margin: 0 auto 24px;
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 22px;
+        padding: 18px 24px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 18px;
+        box-shadow: var(--shadow-soft);
+      }
+      @media (max-width: 760px) {
+        .math {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      .math .stat {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .math .stat-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-muted);
+      }
+      .math .stat-value {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 500;
+        font-size: 22px;
+        color: var(--ink);
+        letter-spacing: -0.01em;
+      }
+      .math .stat-value strong {
+        font-family: 'Outfit', sans-serif;
+        font-style: normal;
+        font-weight: 700;
+        color: var(--orange);
+      }
+      .math .stat-hint {
+        font-size: 11px;
+        color: var(--ink-muted);
+        line-height: 1.4;
+      }
+
+      /* ---------- demo helper ---------- */
+      .demo-toolbar {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .demo-toolbar button {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 11px;
+        background: transparent;
+        border: 1px solid var(--hairline-strong);
+        color: var(--ink-muted);
+        padding: 5px 10px;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .demo-toolbar button.active {
+        background: var(--orange);
+        color: white;
+        border-color: var(--orange);
+      }
+
+      /* the "more" popover that appears off the more-bean */
+      .more-pop {
+        position: absolute;
+        right: 12px;
+        bottom: 250px;
+        background: var(--paper);
+        border: 1px solid var(--hairline);
+        border-radius: 18px;
+        box-shadow: var(--shadow-pop);
+        padding: 10px 6px;
+        z-index: 36;
+        min-width: 200px;
+        opacity: 0;
+        transform: translateY(8px) scale(0.96);
+        pointer-events: none;
+        transition:
+          opacity 0.25s var(--ease-out),
+          transform 0.4s var(--ease-spring);
+      }
+      .phone.more-open .more-pop {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+      }
+      .more-pop .mp-eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-size: 9px;
+        color: var(--ink-muted);
+        padding: 4px 12px 8px;
+      }
+      .more-pop .mp-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        cursor: pointer;
+        border-radius: 12px;
+        transition: background 0.15s ease;
+      }
+      .more-pop .mp-row:hover {
+        background: var(--tint-orange-8);
+      }
+      .more-pop .mp-row .mp-bean {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--cream);
+        border: 1px solid var(--hairline);
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+      }
+      .more-pop .mp-row .mp-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 12px;
+        color: var(--ink);
+      }
+
+      /* divider rule */
+      .divider {
+        max-width: 880px;
+        margin: 0 auto 56px;
+        border: 0;
+        border-top: 1px dashed var(--hairline-strong);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <p class="page-eyebrow">mockup · mobile navigation v2</p>
+        <h1 class="page-title">two patterns, <em>one app</em></h1>
+        <p class="page-sub">
+          A system rule, locked in: the cluster bloom is for adding (the FAB);
+          the pure bean stack is for navigating (the bottom bar). Each pattern
+          carries a single intent so a user never has to ask <em>"what
+          happens when I tap this?"</em>
+        </p>
+      </div>
+      <div class="controls">
+        <button class="ctrl-btn" id="theme-toggle" type="button">
+          ☀️ light
+        </button>
+      </div>
+    </header>
+
+    <!-- =================================================================
+         SECTION 1 — the system: bloom = add / stack = navigate
+         ================================================================= -->
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">i.</span>
+        <h2 class="section-title">the system rule</h2>
+      </div>
+      <p class="section-sub">
+        Same vocabulary (beans), two distinct shapes. The plus mark on each
+        bloom-bean is the one new design tax — small enough to feel like a
+        seal, loud enough that the eye reads it as <em>add</em>.
+      </p>
+
+      <div class="rule">
+        <div class="pill">
+          <span class="pill-eyebrow">cluster bloom</span>
+          <div class="pill-title">to <em>add</em></div>
+          <div class="pill-tagline">grid · ＋ on every bean</div>
+        </div>
+        <div class="vs">vs.</div>
+        <div class="pill">
+          <span class="pill-eyebrow">pure bean stack</span>
+          <div class="pill-title">to <em>navigate</em></div>
+          <div class="pill-tagline">single column · no plus</div>
+        </div>
+      </div>
+
+      <div class="phones">
+        <!-- Phone 1: cluster bloom (FAB / add) -->
+        <div class="phone-block">
+          <span class="phone-tag green"
+            ><span class="num">+</span> Cluster bloom · Add</span
+          >
+          <div class="phone" data-mode="fab">
+            <div class="notch"></div>
+            <div class="app-bg">
+              <p class="app-eyebrow">your nook</p>
+              <h2 class="app-h1">good morning, <em>greg</em></h2>
+              <p class="app-sub">three beans on the move today.</p>
+              <div class="skeleton-card">
+                <div class="sk-row title med"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row short"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="sk-row title short"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row med"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="sk-row title med"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row short"></div>
+              </div>
+            </div>
+
+            <div class="scrim" data-close></div>
+
+            <!-- bloom (everyday quick-add subset, with + mark) -->
+            <div class="bloom">
+              <div class="bloom-eyebrow">
+                <span class="dot"></span>quick add · everyday
+              </div>
+              <h3 class="bloom-title">add a <em>bean</em></h3>
+              <p class="bloom-sub">tap any to jump straight to the form.</p>
+              <div class="bloom-grid">
+                <div class="bloom-item">
+                  <div class="bi-bean">📅</div>
+                  <div class="bi-label">Activity</div>
+                </div>
+                <div class="bloom-item">
+                  <div class="bi-bean">✅</div>
+                  <div class="bi-label">To-do</div>
+                </div>
+                <div class="bloom-item">
+                  <div class="bi-bean">💳</div>
+                  <div class="bi-label">Trans-<br />action</div>
+                </div>
+                <div class="bloom-item">
+                  <div class="bi-bean">✈️</div>
+                  <div class="bi-label">Trip</div>
+                </div>
+                <div class="bloom-item">
+                  <div class="bi-bean">🍜</div>
+                  <div class="bi-label">Cook log</div>
+                </div>
+                <div class="bloom-item">
+                  <div class="bi-bean">💬</div>
+                  <div class="bi-label">Saying</div>
+                </div>
+              </div>
+            </div>
+
+            <button class="fab" data-fab>＋</button>
+
+            <nav class="nav">
+              <button class="nav-tab is-current">
+                <span class="nav-emoji">🏡</span>
+                <span class="nav-label">Nook</span>
+              </button>
+              <button class="nav-tab">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🌳</span>
+                <span class="nav-label">Planning</span>
+              </button>
+              <button class="nav-tab">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🐷</span>
+                <span class="nav-label">Money</span>
+              </button>
+              <button class="nav-tab">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🌱</span>
+                <span class="nav-label">Pod</span>
+              </button>
+            </nav>
+          </div>
+          <div class="phone-cap">
+            <strong>Cluster bloom · adding.</strong> Grid of beans, each
+            stamped with a Heritage-Orange ＋ seal. The seal is the only way
+            to tell at a glance: <em>"this layout creates things."</em>
+          </div>
+        </div>
+
+        <!-- Phone 2: pure bean stack (NAV) -->
+        <div class="phone-block">
+          <span class="phone-tag orange"
+            ><span class="num">→</span> Pure bean stack · Navigate</span
+          >
+          <div class="phone" data-mode="nav" data-active="planning">
+            <div class="notch"></div>
+            <div class="app-bg">
+              <p class="app-eyebrow">your nook</p>
+              <h2 class="app-h1">good morning, <em>greg</em></h2>
+              <p class="app-sub">three beans on the move today.</p>
+              <div class="skeleton-card">
+                <div class="sk-row title med"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row short"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="sk-row title short"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row med"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="sk-row title med"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row short"></div>
+              </div>
+            </div>
+
+            <div class="scrim" data-close></div>
+
+            <div class="stack">
+              <div class="jar-item">
+                <div class="jar-bean">📅</div>
+                <div class="jar-label">Activities</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">✅</div>
+                <div class="jar-label">To-do</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">✈️</div>
+                <div class="jar-label">Travel</div>
+              </div>
+              <div class="stack-eyebrow">
+                🌳 <span class="em">planning</span> · 3
+              </div>
+            </div>
+
+            <nav class="nav">
+              <button class="nav-tab">
+                <span class="nav-emoji">🏡</span>
+                <span class="nav-label">Nook</span>
+              </button>
+              <button class="nav-tab active">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🌳</span>
+                <span class="nav-label">Planning</span>
+              </button>
+              <button class="nav-tab">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🐷</span>
+                <span class="nav-label">Money</span>
+              </button>
+              <button class="nav-tab">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🌱</span>
+                <span class="nav-label">Pod</span>
+              </button>
+            </nav>
+          </div>
+          <div class="phone-cap">
+            <strong>Pure stack · navigating.</strong> Single column rising
+            from the active tab. No plus marks, no card. The eyebrow ribbon
+            ("🌳 planning · 3") confirms what you tapped.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- =================================================================
+         SECTION 2 — scaling stress test
+         ================================================================= -->
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">ii.</span>
+        <h2 class="section-title">scaling: how tall can the stack get?</h2>
+      </div>
+      <p class="section-sub">
+        The honest concern with a single column is that every new feature
+        makes it taller. Here's the math, then three live examples — today's
+        biggest category, a comfortable ceiling, and the scenario where we
+        need the safety net.
+      </p>
+
+      <div class="math">
+        <div class="stat">
+          <div class="stat-label">bean + label height</div>
+          <div class="stat-value">~<strong>54</strong>px</div>
+          <div class="stat-hint">46px bean + 8px gap</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">usable column</div>
+          <div class="stat-value">~<strong>620</strong>px</div>
+          <div class="stat-hint">on a 740px viewport above the nav</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">comfortable cap</div>
+          <div class="stat-value"><strong>6</strong> items</div>
+          <div class="stat-hint">stays in one-thumb reach</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">today's largest category</div>
+          <div class="stat-value">money · <strong>6</strong></div>
+          <div class="stat-hint">already at the cap. plenty of headroom.</div>
+        </div>
+      </div>
+
+      <div class="phones">
+        <!-- Phone A: small (Planning, 3 items) -->
+        <div class="phone-block">
+          <span class="phone-tag"
+            ><span class="num">3</span> Planning · today</span
+          >
+          <div class="phone" data-mode="nav" data-active="planning">
+            <div class="notch"></div>
+            <div class="app-bg">
+              <p class="app-eyebrow">treehouse</p>
+              <h2 class="app-h1">this <em>week</em></h2>
+              <p class="app-sub">family schedule + chores.</p>
+              <div class="skeleton-card">
+                <div class="sk-row title med"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row short"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="sk-row title short"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row med"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="sk-row title med"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row short"></div>
+              </div>
+            </div>
+            <div class="scrim" data-close></div>
+            <div class="stack">
+              <div class="jar-item is-current">
+                <div class="jar-bean is-current">📅</div>
+                <div class="jar-label">Activities</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">✅</div>
+                <div class="jar-label">To-do</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">✈️</div>
+                <div class="jar-label">Travel</div>
+              </div>
+              <div class="stack-eyebrow">
+                🌳 <span class="em">planning</span> · 3
+              </div>
+            </div>
+            <nav class="nav">
+              <button class="nav-tab">
+                <span class="nav-emoji">🏡</span>
+                <span class="nav-label">Nook</span>
+              </button>
+              <button class="nav-tab active">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🌳</span>
+                <span class="nav-label">Planning</span>
+              </button>
+              <button class="nav-tab">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🐷</span>
+                <span class="nav-label">Money</span>
+              </button>
+              <button class="nav-tab">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🌱</span>
+                <span class="nav-label">Pod</span>
+              </button>
+            </nav>
+          </div>
+          <div class="phone-cap">
+            <strong>Smallest case.</strong> 3 items. Stack barely climbs into
+            the lower third. Plenty of breathing room; user is currently on
+            Activities (orange ring).
+          </div>
+        </div>
+
+        <!-- Phone B: at the cap (Money, 6 items) -->
+        <div class="phone-block">
+          <span class="phone-tag orange"
+            ><span class="num">6</span> Money · at cap</span
+          >
+          <div class="phone" data-mode="nav" data-active="money">
+            <div class="notch"></div>
+            <div class="app-bg">
+              <p class="app-eyebrow">piggy bank</p>
+              <h2 class="app-h1">$12,408 <em>this month</em></h2>
+              <p class="app-sub">3 of 6 budgets on track.</p>
+              <div class="skeleton-card">
+                <div class="sk-row title med"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row short"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="sk-row title short"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row med"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="sk-row title med"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row short"></div>
+              </div>
+            </div>
+            <div class="scrim" data-close></div>
+            <div class="stack">
+              <div class="jar-item is-current">
+                <div class="jar-bean is-current">🏠</div>
+                <div class="jar-label">Overview</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">💰</div>
+                <div class="jar-label">Accounts</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">💵</div>
+                <div class="jar-label">Budgets</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">💳</div>
+                <div class="jar-label">Transactions</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">🎯</div>
+                <div class="jar-label">Goals</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">🏢</div>
+                <div class="jar-label">Assets</div>
+              </div>
+              <div class="stack-eyebrow">
+                🐷 <span class="em">money</span> · 6
+              </div>
+            </div>
+            <nav class="nav">
+              <button class="nav-tab">
+                <span class="nav-emoji">🏡</span>
+                <span class="nav-label">Nook</span>
+              </button>
+              <button class="nav-tab">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🌳</span>
+                <span class="nav-label">Planning</span>
+              </button>
+              <button class="nav-tab active">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🐷</span>
+                <span class="nav-label">Money</span>
+              </button>
+              <button class="nav-tab">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🌱</span>
+                <span class="nav-label">Pod</span>
+              </button>
+            </nav>
+          </div>
+          <div class="phone-cap">
+            <strong>Today's biggest.</strong> 6 items — exactly at the
+            comfortable cap. Top bean (Assets) sits ~420px up, well within
+            one-thumb reach on every common phone size.
+          </div>
+        </div>
+
+        <!-- Phone C: overflow (10 items, with "more →" bean) -->
+        <div class="phone-block">
+          <span class="phone-tag"
+            ><span class="num">10</span> Future · with overflow</span
+          >
+          <div class="phone" data-mode="nav" data-active="pod">
+            <div class="notch"></div>
+            <div class="app-bg">
+              <p class="app-eyebrow">the pod</p>
+              <h2 class="app-h1">the <em>parker</em> beans</h2>
+              <p class="app-sub">5 beans, 3 little ones, 1 dog.</p>
+              <div class="skeleton-card">
+                <div class="sk-row title med"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row short"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="sk-row title short"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row med"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="sk-row title med"></div>
+                <div class="sk-row"></div>
+                <div class="sk-row short"></div>
+              </div>
+            </div>
+            <div class="scrim" data-close></div>
+            <!-- 5 visible + a "more" bean opening to 5 hidden -->
+            <div class="stack">
+              <div class="jar-item is-current">
+                <div class="jar-bean is-current">🧑‍🤝‍🧑</div>
+                <div class="jar-label">Meet the beans</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">📖</div>
+                <div class="jar-label">Scrapbook</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">🍜</div>
+                <div class="jar-label">Cookbook</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">🩺</div>
+                <div class="jar-label">Care &amp; safety</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean">🆘</div>
+                <div class="jar-label">Emergency</div>
+              </div>
+              <div class="jar-item">
+                <div class="jar-bean is-more" data-more>＋4</div>
+                <div class="jar-label">More</div>
+              </div>
+              <div class="stack-eyebrow">
+                🌱 <span class="em">pod</span> · 9 of 9
+              </div>
+            </div>
+
+            <!-- the popover that emerges from the more-bean -->
+            <div class="more-pop">
+              <div class="mp-eyebrow">also in the pod</div>
+              <div class="mp-row">
+                <div class="mp-bean">🎉</div>
+                <div class="mp-label">Milestones</div>
+              </div>
+              <div class="mp-row">
+                <div class="mp-bean">📸</div>
+                <div class="mp-label">Photos</div>
+              </div>
+              <div class="mp-row">
+                <div class="mp-bean">🎂</div>
+                <div class="mp-label">Birthdays</div>
+              </div>
+              <div class="mp-row">
+                <div class="mp-bean">📓</div>
+                <div class="mp-label">Journal</div>
+              </div>
+            </div>
+
+            <nav class="nav">
+              <button class="nav-tab">
+                <span class="nav-emoji">🏡</span>
+                <span class="nav-label">Nook</span>
+              </button>
+              <button class="nav-tab">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🌳</span>
+                <span class="nav-label">Planning</span>
+              </button>
+              <button class="nav-tab">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🐷</span>
+                <span class="nav-label">Money</span>
+              </button>
+              <button class="nav-tab active">
+                <span class="has-more"></span>
+                <span class="nav-emoji">🌱</span>
+                <span class="nav-label">Pod</span>
+              </button>
+            </nav>
+          </div>
+          <div class="phone-cap">
+            <strong>Future-proof.</strong> When a category exceeds 5 items,
+            the 5th bean keeps the most-used routes; the 6th becomes a
+            tinted <em>＋N more</em> bean. Tap it (try clicking "＋4" above)
+            to reveal the rest in a small popover. Stack height never grows
+            past the cap.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         Annotations
+         ================================================================= -->
+    <section class="annotations">
+      <h2>final spec &amp; <em>open calls</em></h2>
+      <p class="a-sub">
+        what to lock in before this becomes Vue.
+      </p>
+      <div class="a-grid">
+        <div class="a-col">
+          <h3>Pattern law</h3>
+          <ul>
+            <li>
+              <strong>Cluster bloom = add.</strong> Grid layout, ＋ seal on
+              every bean, lives behind the FAB. Never used for navigation.
+            </li>
+            <li>
+              <strong>Pure bean stack = navigate.</strong> Single column, no
+              ＋ seals, lives behind the bottom nav. Never used for adding.
+            </li>
+            <li>
+              <strong>The seal does the talking.</strong> No need for "add"
+              vs. "go to" microcopy — the visual difference is consistent
+              enough.
+            </li>
+          </ul>
+        </div>
+        <div class="a-col">
+          <h3>Stack rules</h3>
+          <ul>
+            <li>
+              <strong>Cap at 6.</strong> 5 visible items + 1 ＋N-more bean if
+              the category has more.
+            </li>
+            <li>
+              <strong>Active route at the bottom.</strong> Closest to the
+              thumb, ringed in Heritage Orange. The remaining beans stack
+              upward in canonical (sidebar) order.
+            </li>
+            <li>
+              <strong>Eyebrow ribbon.</strong> Tiny pill above the stack —
+              "🌳 <em>planning</em> · 3". Confirms the tap landed in the
+              right place. Fades in last.
+            </li>
+            <li>
+              <strong>Same-tab tap closes.</strong> Scrim, Esc, scroll, back
+              gesture also close.
+            </li>
+            <li>
+              <strong>Reduced motion.</strong> Spring stagger replaced by a
+              250ms fade.
+            </li>
+          </ul>
+        </div>
+        <div class="a-col">
+          <h3>Open calls</h3>
+          <ul>
+            <li>
+              <strong>Naming.</strong> "Planning" vs "Treehouse" — Treehouse
+              is brand-true but lengthier; Planning is shorter and more
+              functional. Greg to call.
+            </li>
+            <li>
+              <strong>Money tab visibility.</strong> Hide entirely when
+              <code>canViewFinances</code> is off → bar collapses to 3 tabs;
+              grid stretches.
+            </li>
+            <li>
+              <strong>Settings &amp; help.</strong> Stay in the existing
+              top-right avatar menu. Not in the bar.
+            </li>
+            <li>
+              <strong>The "more" bean's overflow popover.</strong> Could be a
+              right-anchored mini popover (shown), or a bottom sheet. Sheet
+              wins on touch ergonomics if any future category grows past ~10
+              items; popover is lighter for the merely-9 case. Worth
+              revisiting once a category actually hits 7.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      // ---------- theme ----------
+      const themeBtn = document.getElementById('theme-toggle');
+      themeBtn.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', next);
+        themeBtn.textContent = next === 'light' ? '☀️ light' : '🌙 dark';
+      });
+
+      // ---------- per-phone behaviour ----------
+      document.querySelectorAll('.phone').forEach((phone) => {
+        const mode = phone.dataset.mode;
+        const tabs = phone.querySelectorAll('.nav-tab');
+        const fab = phone.querySelector('[data-fab]');
+        const scrim = phone.querySelector('[data-close]');
+        const moreBtn = phone.querySelector('[data-more]');
+
+        function positionStackOverActive() {
+          const stack = phone.querySelector('.stack');
+          const activeTab = phone.querySelector('.nav-tab.active');
+          if (!stack || !activeTab) return;
+          const phoneRect = phone.getBoundingClientRect();
+          const tabRect = activeTab.getBoundingClientRect();
+          const center = tabRect.left - phoneRect.left + tabRect.width / 2;
+          stack.style.left = `${center}px`;
+        }
+
+        function openNav() {
+          phone.classList.add('nav-open');
+          positionStackOverActive();
+        }
+        function closeNav() {
+          phone.classList.remove('nav-open');
+          phone.classList.remove('more-open');
+        }
+        function openFab() {
+          phone.classList.add('fab-open');
+        }
+        function closeFab() {
+          phone.classList.remove('fab-open');
+        }
+        function closeAll() {
+          closeNav();
+          closeFab();
+        }
+
+        tabs.forEach((tab) => {
+          tab.addEventListener('click', () => {
+            if (mode !== 'nav') return;
+            // toggle: clicking active tab closes
+            if (tab.classList.contains('active')) {
+              if (phone.classList.contains('nav-open')) {
+                closeNav();
+              } else {
+                openNav();
+              }
+            }
+          });
+        });
+
+        if (fab) {
+          fab.addEventListener('click', () => {
+            if (phone.classList.contains('fab-open')) closeFab();
+            else openFab();
+          });
+        }
+
+        if (scrim) scrim.addEventListener('click', closeAll);
+
+        if (moreBtn) {
+          moreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            phone.classList.toggle('more-open');
+          });
+        }
+
+        // initial open state
+        if (mode === 'nav') {
+          requestAnimationFrame(openNav);
+        } else if (mode === 'fab') {
+          requestAnimationFrame(openFab);
+        }
+      });
+
+      // re-position stacks on resize
+      window.addEventListener('resize', () => {
+        document.querySelectorAll('.phone').forEach((phone) => {
+          const stack = phone.querySelector('.stack');
+          const activeTab = phone.querySelector('.nav-tab.active');
+          if (stack && activeTab) {
+            const phoneRect = phone.getBoundingClientRect();
+            const tabRect = activeTab.getBoundingClientRect();
+            const center = tabRect.left - phoneRect.left + tabRect.width / 2;
+            stack.style.left = `${center}px`;
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
