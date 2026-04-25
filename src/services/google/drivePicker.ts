@@ -137,10 +137,13 @@ export async function pickBeanpodFolder(
  * Open the Google Picker to select a .beanpod file.
  * Returns the selected file's ID and name, or null if the user cancelled.
  *
- * @deprecated Prefer `pickBeanpodFolder` — picking the file only grants
- * `drive.file` scope to the `.beanpod`, so photos in the same folder
- * remain unreachable from the app's API. Kept for existing callers
- * that haven't been migrated yet.
+ * This is the preferred join entry point. Folder-picking under `drive.file`
+ * scope does NOT grant API list-access to files inside a folder shared by
+ * another user — the API returns 0 results even though the folder is
+ * visible in the Drive UI. File-picking grants direct `drive.file` access
+ * to the chosen file, which works for files shared by another user.
+ * Photos are reachable independently via public-link permissions + the
+ * Google CDN, so the join flow does not need folder scope.
  */
 export async function pickBeanpodFile(
   accessToken: string

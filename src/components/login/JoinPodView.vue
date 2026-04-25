@@ -11,12 +11,13 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFileDrop } from '@/composables/useFileDrop';
 import { isTemporaryEmail } from '@/utils/email';
-import { pickBeanpodFolder } from '@/services/google/drivePicker';
-import { findBeanpodInFolder, NoBeanpodInFolderError } from '@/services/google/driveService';
+import { pickBeanpodFile } from '@/services/google/drivePicker';
 import {
   requestAccessToken,
   startRedirectAuth,
   completeRedirectAuth,
+  shouldUseRedirectAuth,
+  tryGetSilentToken,
 } from '@/services/google/googleAuth';
 import { lookupFamily, isRegistryConfigured } from '@/services/registry/registryService';
 import { useAuthStore } from '@/stores/authStore';
@@ -129,8 +130,12 @@ onMounted(async () => {
       console.error('[JoinPodView] Redirect auth failed:', e);
       return null;
     });
-    if (redirectToken && p === 'google_drive') {
-      // We have a token from redirect auth — go straight to Picker
+    // After redirect auth: the token is now cached in googleAuth state, so
+    // performLookup → attemptFileLoad will find it via tryGetSilentToken
+    // and proceed straight to loading by fileId. If we don't have a fileId
+    // (or that load fails), the user will see the Picker CTA.
+    if (redirectToken && p === 'google_drive' && !fileIdParam) {
+      // No fileId in URL — open the Picker directly with the fresh token
       await handlePickFromDriveWithToken(redirectToken);
       return;
     }
@@ -187,6 +192,19 @@ async function attemptFileLoad() {
     const fileName = expectedFileName.value || 'family.beanpod';
 
     if (!fileId) {
+      needsManualFileLoad.value = true;
+      return;
+    }
+
+    // Silent-token check first: never trigger a popup or redirect from page
+    // mount. Mobile browsers (iOS Safari especially) block popups outside a
+    // user gesture, and a surprise full-page redirect to Google looks like
+    // phishing. If we don't have a cached/refreshable token, surface the
+    // "Pick from Drive" CTA so the user kicks off auth with an explicit tap.
+    const silentToken = await tryGetSilentToken();
+    if (!silentToken) {
+      console.warn('[JoinPodView] No silent token — deferring auth to user gesture');
+      cloudLoadFailed.value = true;
       needsManualFileLoad.value = true;
       return;
     }
@@ -248,33 +266,17 @@ async function handlePickFromDriveWithToken(token: string) {
   formError.value = null;
   needsManualFileLoad.value = true; // ensure the Picker UI is visible
   try {
-    const picked = await pickBeanpodFolder(token);
+    // Pick the .beanpod file directly. Folder-picking under drive.file
+    // scope does NOT grant API list-access to files owned by another
+    // user, so a shared folder always reads as empty even when the
+    // .beanpod is visibly inside it. File-pick grants drive.file
+    // access to the chosen file, which works for shared files.
+    const picked = await pickBeanpodFile(token);
     if (!picked) return; // User cancelled — valid no-op, not an error
 
-    console.warn('[JoinPodView] Picker selected folder:', picked.folderId, picked.folderName);
+    console.warn('[JoinPodView] Picker selected file:', picked.fileId, picked.fileName);
 
-    // Pick grants drive.file scope to the folder + every descendant —
-    // including every photo — in one shot. Now walk the folder to find
-    // the .beanpod so we can continue the join with the same file-ID
-    // semantics as the legacy file-pick path.
-    let beanpod: { fileId: string; name: string };
-    try {
-      beanpod = await findBeanpodInFolder(token, picked.folderId);
-    } catch (findErr) {
-      if (findErr instanceof NoBeanpodInFolderError) {
-        console.warn(
-          '[JoinPodView] picked folder has no .beanpod',
-          picked.folderId,
-          picked.folderName
-        );
-        formError.value = t('join.pickerPrompt.noBeanpodInFolder');
-        showManualFallback.value = true;
-        return;
-      }
-      throw findErr;
-    }
-
-    targetDriveFileId.value = beanpod.fileId;
+    targetDriveFileId.value = picked.fileId;
     cloudLoadFailed.value = false;
     needsManualFileLoad.value = false;
     await attemptFileLoad();
@@ -292,20 +294,43 @@ async function handlePickFromDrive() {
   isPickerLoading.value = true;
   formError.value = null;
   try {
+    // iOS Safari blocks popups even from inside a click handler once any
+    // async work runs first. Skip the popup entirely on platforms where
+    // it's known to fail and go straight to full-page redirect auth.
+    if (shouldUseRedirectAuth()) {
+      console.warn('[JoinPodView] Using redirect auth for this platform');
+      const returnPath = `${window.location.pathname}${window.location.search}`;
+      await startRedirectAuth(returnPath);
+      return; // page navigates away
+    }
+
     const token = await requestAccessToken();
+
+    // If we have a fileId from the QR / registry, prefer auto-load over
+    // forcing the user through the Picker. Falls back to Picker if the
+    // load fails.
+    const knownFileId = targetDriveFileId.value || registryEntry.value?.fileId;
+    if (knownFileId) {
+      isPickerLoading.value = false;
+      cloudLoadFailed.value = false;
+      await attemptFileLoad();
+      if (fileLoaded.value || !cloudLoadFailed.value) return;
+      // attemptFileLoad failed — fall through to Picker
+      isPickerLoading.value = true;
+    }
+
     await handlePickFromDriveWithToken(token);
   } catch (e) {
     console.error('[JoinPodView] Picker auth failed:', e);
     const detail = e instanceof Error ? e.message : String(e);
 
-    // If popup was blocked, fall back to redirect-based OAuth
+    // Belt-and-braces: if a popup somehow still slipped through and got
+    // blocked, fall back to redirect auth.
     if (detail.includes('Popup blocked') || detail.includes('popup')) {
       console.warn('[JoinPodView] Popup blocked — falling back to redirect auth');
       try {
-        // Build return URL preserving all current query params
         const returnPath = `${window.location.pathname}${window.location.search}`;
         await startRedirectAuth(returnPath);
-        // Page will redirect — don't update state
         return;
       } catch (redirectErr) {
         console.error('[JoinPodView] Redirect auth failed:', redirectErr);
