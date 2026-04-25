@@ -231,10 +231,33 @@ async function attemptFileLoad() {
           needsManualFileLoad.value = true;
         }
       } else {
-        // Cloud load failed — fall back to manual file load
-        // syncStore.error has the actual reason (set in loadFromGoogleDrive's catch)
         const storeError = syncStore.error as string | null;
         console.warn('[JoinPodView] loadFromGoogleDrive failed:', storeError);
+        // Common case after the iOS redirect-auth fix: the joiner has a
+        // valid drive.file-scoped token but their token doesn't yet have
+        // API-level access to the inviter's `.beanpod` by ID. Under
+        // `drive.file`, an email-based file share doesn't manifest as
+        // file-by-id readability until the joiner explicitly opens the
+        // file via Picker, and folder-only shares never grant file access.
+        // The Picker IS the recovery path — opening it grants the missing
+        // access. Auto-open it with the cached token instead of showing
+        // an error.
+        const looksLikeMissingAccess =
+          storeError?.includes('File not found') ||
+          storeError?.includes('not found') ||
+          storeError?.includes('404') ||
+          storeError?.includes('403');
+        if (looksLikeMissingAccess) {
+          console.warn('[JoinPodView] file inaccessible by ID — opening Picker with cached token');
+          // Set fallback state first: if the user cancels the Picker, we
+          // want the "Pick from Drive" CTA visible so they can retry,
+          // not a blank screen.
+          cloudLoadFailed.value = true;
+          needsManualFileLoad.value = true;
+          isLoadingFile.value = false;
+          await handlePickFromDriveWithToken(silentToken);
+          return;
+        }
         formError.value = storeError
           ? `Could not load the file: ${storeError}`
           : 'Could not load the file from Google Drive. Please try again.';
@@ -294,17 +317,22 @@ async function handlePickFromDrive() {
   isPickerLoading.value = true;
   formError.value = null;
   try {
-    // iOS Safari blocks popups even from inside a click handler once any
-    // async work runs first. Skip the popup entirely on platforms where
-    // it's known to fail and go straight to full-page redirect auth.
-    if (shouldUseRedirectAuth()) {
-      console.warn('[JoinPodView] Using redirect auth for this platform');
-      const returnPath = `${window.location.pathname}${window.location.search}`;
-      await startRedirectAuth(returnPath);
-      return; // page navigates away
+    // Use a cached/silently-refreshable token if we have one — avoids a
+    // redirect cycle on iOS after the user has already round-tripped
+    // through Google once this session.
+    let token = await tryGetSilentToken();
+    if (!token) {
+      // iOS Safari blocks popups even from inside a click handler once any
+      // async work runs first. Skip the popup entirely on platforms where
+      // it's known to fail and go straight to full-page redirect auth.
+      if (shouldUseRedirectAuth()) {
+        console.warn('[JoinPodView] Using redirect auth for this platform');
+        const returnPath = `${window.location.pathname}${window.location.search}`;
+        await startRedirectAuth(returnPath);
+        return; // page navigates away
+      }
+      token = await requestAccessToken();
     }
-
-    const token = await requestAccessToken();
 
     // If we have a fileId from the QR / registry, prefer auto-load over
     // forcing the user through the Picker. Falls back to Picker if the
