@@ -480,6 +480,24 @@ onMounted(async () => {
       `auth: needsAuth=${authStore.needsAuth}, user=${authStore.currentUser?.email ?? 'none'}`
     );
 
+    // Step 2b: Consume any pending OAuth redirect-auth code. If the user
+    // just returned from a Google sign-in redirect (Settings → Reconnect,
+    // Join Pod, etc.), this exchanges the code for an access token and
+    // caches it in memory, so the in-flight Drive operation that triggered
+    // the redirect can resume on the next attempt. No-op if there's no
+    // pending redirect. Wrapped in catch so a failed exchange never
+    // blocks app boot.
+    try {
+      const { completeRedirectAuth } = await import('@/services/google/googleAuth');
+      const redirectToken = await completeRedirectAuth();
+      if (redirectToken) {
+        initBreadcrumbs.push('auth: consumed pending redirect-auth token');
+      }
+    } catch (e) {
+      console.warn('[App] completeRedirectAuth failed during init:', (e as Error).message);
+      initBreadcrumbs.push(`auth: redirect-auth completion failed: ${(e as Error).message}`);
+    }
+
     // If not authenticated, redirect to the welcome/login gate (unless already on an auth page).
     // The marketing homepage lives at beanies.family; app.beanies.family is always the app surface,
     // so unauthenticated users land on /welcome and can sign in or create a pod from there.

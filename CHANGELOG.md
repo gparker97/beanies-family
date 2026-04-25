@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-26
+
+### Fixed
+
+- **"Reconnect to Google Drive" button no longer silently does nothing in the installed PWA.** Standalone PWAs (Chrome on Android, Edge, etc.) and iOS Safari can't bridge the OAuth popup's `postMessage` back to the app window — the popup either fails to open or opens in a different browser context, so the existing popup-based reconnect flow hung forever with no feedback. The reconnect flow now detects standalone PWA mode and routes through full-page redirect auth instead, matching the join-flow behavior. After the redirect returns to the app, the OAuth code is consumed at app boot in `App.vue` and the next Drive operation picks up the fresh token automatically. If reconnect fails for any other reason (network, OAuth-scope-denied, etc.), the Settings page now surfaces the actual error instead of swallowing it.
+
 ## 2026-04-25
 
 ### Fixed

@@ -49,7 +49,7 @@ const translationStore = useTranslationStore();
 const { t } = useTranslation();
 const { canInstall, isInstalled, installApp } = usePWA();
 const { canManagePod } = usePermissions();
-const { isReconnecting, reconnect } = useGoogleReconnect();
+const { isReconnecting, reconnectError, reconnect } = useGoogleReconnect();
 
 // ── Modal state ──────────────────────────────────────────────────────────────
 const showAppearance = ref(false);
@@ -1031,6 +1031,9 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
                   {{ t('settings.forceSave') }}
                 </BaseButton>
               </div>
+              <p v-if="reconnectError" class="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                {{ t('googleDrive.reconnectFailed') }}: {{ reconnectError }}
+              </p>
             </div>
 
             <!-- Cache persist warning -->
