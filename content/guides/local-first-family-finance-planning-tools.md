@@ -162,7 +162,7 @@ The truth about local-first software for the last decade is that it was technica
 - **Browsers have caught up** - The [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API) gives you proper end-to-end encryption. [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) gives you a reliable on-device database. The [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API) gives you ownership and access to your local files (at least in most browsers). PWAs let you install web apps like native apps. The limitations of the past decade have largely been overcome.
 - **AI-assisted coding has compressed the timeline** - What used to be years of development for a small team can be compressed to several months with safe, managed, and carefully guided oversight and usage of AI-assisted coding.
 
-This is roughly the story of how beanies.family came into existence. If you want the longer version, [follow me on substack](https://gpbeanies.substack.com/) and I'll be posting a lot more about this new world - trust me.
+This is roughly the story of how beanies.family came into existence. If you want the longer version, [follow me on substack](https://everybeancounts.substack.com/) and I'll be posting a lot more about this new world - trust me.
 
 The privacy vs. convenience trade-off was a tooling problem, not a values problem. That tooling problem has now been solved, and I doubt beanies.family will be the first app to take advantage of this new world!
 

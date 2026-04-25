@@ -141,7 +141,7 @@ async function handleStep1Next() {
       try {
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = 'https://gpbeanies.substack.com/api/v1/free';
+        form.action = 'https://everybeancounts.substack.com/api/v1/free';
         form.target = 'substack-subscribe-frame';
         form.style.display = 'none';
 

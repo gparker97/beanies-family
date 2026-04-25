@@ -270,7 +270,7 @@ We've covered a lot here. If you take nothing else away:
 
 Family finance is hard, and the systems that work aren't necessarily the most sophisticated ones - they are the ones that both partners actually use. Build for that, and you will come out ahead.
 
-If you want to learn more, or just want to read more of my dumb writing, [join the beanstalk on substack](https://gpbeanies.substack.com) for a weekly-ish letter from me.
+If you want to learn more, or just want to read more of my dumb writing, [join the beanstalk on substack](https://everybeancounts.substack.com) for a weekly-ish letter from me.
 
 And if you want to try a family-aware tool I built precisely because none of the existing ones worked for me, that's [beanies.family](https://beanies.family).
 
