@@ -15,7 +15,7 @@ import { useFamilyContextStore } from './familyContextStore';
 import { useFamilyStore } from './familyStore';
 import { useSettingsStore } from './settingsStore';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
-import { flushPendingSave } from '@/services/sync/syncService';
+import { flushPendingSave, cancelPendingSave } from '@/services/sync/syncService';
 import { initDoc } from '@/services/automerge/docService';
 
 export interface AuthUser {
@@ -486,10 +486,19 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * Sign out: reset auth state and optionally delete IndexedDB cache.
    * File handle is preserved so next login auto-reconnects to the data file.
+   *
+   * Resilience: every awaited step is wrapped so that a hung Drive sync,
+   * network failure, or IndexedDB error cannot block the sign-out itself.
+   * If anything throws or times out, we still clear local auth state and
+   * let the caller navigate. A user who can't sign out is much worse than
+   * a missed final save.
    */
   async function signOut(): Promise<void> {
-    // Flush any pending debounced save so recent changes persist to file
-    await flushPendingSave();
+    // Flush any pending debounced save so recent changes persist to file.
+    // Bounded timeout — Drive can hang indefinitely if its API key is
+    // rejected, the file was deleted, or the network is offline. Don't
+    // let that block sign-out.
+    await flushPendingSaveWithTimeout(3000);
 
     const familyId = currentUser.value?.familyId;
 
@@ -508,6 +517,30 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated.value = false;
     newsletterOptIn.value = null;
     clearSession();
+  }
+
+  /**
+   * Wrap flushPendingSave so a hung Drive call cannot block sign-out.
+   * Resolves on timeout or error — a missed final save is acceptable;
+   * a user trapped on the page is not.
+   */
+  async function flushPendingSaveWithTimeout(timeoutMs: number): Promise<void> {
+    try {
+      await Promise.race([
+        flushPendingSave(),
+        new Promise<void>((resolve) => {
+          setTimeout(() => {
+            console.warn('[authStore] flushPendingSave timed out — proceeding with sign-out');
+            resolve();
+          }, timeoutMs);
+        }),
+      ]);
+    } catch (e) {
+      console.warn('[authStore] flushPendingSave failed — proceeding with sign-out', e);
+    }
+    // Cancel any debounced save still pending so it doesn't fire after
+    // sign-out clears auth state. Idempotent if no timer is set.
+    cancelPendingSave();
   }
 
   /**
@@ -532,8 +565,9 @@ export const useAuthStore = defineStore('auth', () => {
    * regardless of trusted device status. Also resets the trust flag.
    */
   async function signOutAndClearData(): Promise<void> {
-    // Flush any pending debounced save so recent changes persist to file
-    await flushPendingSave();
+    // Flush any pending debounced save so recent changes persist to file.
+    // Bounded — see signOut() for rationale.
+    await flushPendingSaveWithTimeout(3000);
 
     const familyId = currentUser.value?.familyId;
 
