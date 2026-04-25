@@ -166,6 +166,20 @@ Obviously I'm biased, as I built [beanies.family](https://beanies.family). Try s
 
 The important thing is to settle on a tool, app, or method that you all know and trust.
 
+## how do I get my partner on board?
+
+**short answer:** Start with their pain points, not yours. showing is better than selling. Demonstrate how the tool solves a specific frustration they already have.
+
+For me, when a friend comes up to me and says, "You HAVE to try this app" usually all I want to do is run away as quickly as possible. I don't like when things are framed in a way that makes me feel like I am somehow "less than" for not using a certain app, tool, or product.
+
+From my experience, you have to start with their pain points - not yours. Get in the mindset of the person you are trying to convince, rather than simply telling them about something that worked for you. The things that matter to you may not matter as much to your partner.
+
+If your partner is experiencing pain with a specific thing - show them how that will become less annoying for them personally. **Showing** is better than **selling**. Shared tools fail when one person is the one who pushed it on everybody else against their will.
+
+When I first discussed using [beanies.family](https://beanies.family) with my wife, it was a challenge. There are already so many apps to keep track of things, and this was just one more. But I already knew that Google Calendar wasn't working for us - the "shared calendar" concept didn't always trigger notifications reliably, or at the right times.
+
+One of the specific pain points my wife had was remembering when it was her turn to pick up our son from soccer practice, and when it was mine. Messages would get lost in the fray. So when she discovered the pick-up / drop-off assignment duty capability in beanies.family, we were off to the races. Todos were icing on the cake - she now assigns todos for me (such as "[buy fruit](/blog/buy-fruit)") on a regular basis. I may actually regret making this thing so easy to use!
+
 ## knowing when tools help vs when they hurt
 
 **short answer:** A tool helps when it collapses 2+ existing surfaces into one. It hurts when it's just another app to check. If it doesn't reduce your mental load, get rid of it.
@@ -180,20 +194,6 @@ Ask yourself these questions before deciding on a family tool:
 - Ultimately, does using this tool make me happy, or annoyed?
 
 Follow this framework for deciding on your family tool, and you will land on something that not just works for you and your family, but genuinely saves your time and reduces your mental load.
-
-## how do I get my partner on board?
-
-**short answer:** Start with their pain points, not yours. showing is better than selling. Demonstrate how the tool solves a specific frustration they already have.
-
-For me, when a friend comes up to me and says, "You HAVE to try this app" usually all I want to do is run away as quickly as possible. I don't like when things are framed in a way that makes me feel like I am somehow "less than" for not using a certain app, tool, or product.
-
-From my experience, you have to start with their pain points - not yours. Get in the mindset of the person you are trying to convince, rather than simply telling them about something that worked for you. The things that matter to you may not matter as much to your partner.
-
-If your partner is experiencing pain with a specific thing - show them how that will become less annoying for them personally. **Showing** is better than **selling**. Shared tools fail when one person is the one who pushed it on everybody else against their will.
-
-When I first discussed using [beanies.family](https://beanies.family) with my wife, it was a challenge. There are already so many apps to keep track of things, and this was just one more. But I already knew that Google Calendar wasn't working for us - the "shared calendar" concept didn't always trigger notifications reliably, or at the right times.
-
-One of the specific pain points my wife had was remembering when it was her turn to pick up our son from soccer practice, and when it was mine. Messages would get lost in the fray. So when she discovered the pick-up / drop-off assignment duty capability in beanies.family, we were off to the races. Todos were icing on the cake - she now assigns todos for me (such as "[buy fruit](/blog/buy-fruit)") on a regular basis. I may actually regret making this thing so easy to use!
 
 ## red flags that your "overwhelming feeling" has become something more serious
 
