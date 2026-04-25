@@ -55,6 +55,38 @@ export function isGoogleAuthConfigured(): boolean {
   return !!getClientId();
 }
 
+/**
+ * Whether the current browser should skip popup-based OAuth and use full-page
+ * redirect auth instead. iOS Safari (including iPadOS Safari, all in-app
+ * WebViews on iOS, and any other WebKit on iOS) blocks `window.open` outside
+ * the synchronous call stack of a user gesture — and even within a gesture,
+ * the gesture lifetime is too short to survive PKCE setup. Redirect auth has
+ * none of those constraints, so we use it on every iOS browser.
+ *
+ * Safe to call at module/SSR time: returns false if `navigator` is missing.
+ */
+export function shouldUseRedirectAuth(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  // All iOS browsers are WebKit and inherit Safari's popup behaviour.
+  if (/iPhone|iPad|iPod/.test(ua)) return true;
+  // iPadOS 13+ reports as Mac; detect via touch points.
+  const maxTouchPoints = (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints ?? 0;
+  if (/Macintosh/.test(ua) && maxTouchPoints > 1) return true;
+  return false;
+}
+
+/**
+ * Try to obtain a valid access token without any interactive UI (no popup,
+ * no redirect). Returns the token if cached or recoverable via silent
+ * refresh, or null if interactive auth is required. Safe to call from
+ * non-gesture contexts (page mount, background tasks).
+ */
+export async function tryGetSilentToken(): Promise<string | null> {
+  if (isTokenValid()) return accessToken;
+  return attemptSilentRefresh();
+}
+
 function getClientId(): string {
   return import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 }
