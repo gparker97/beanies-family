@@ -3,72 +3,16 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import SubstackSubscribe from '../../components/SubstackSubscribe.astro';
 import { getCollection } from 'astro:content';
 import { isPublished } from '~/utils/content';
+import { buildIssueMap, fmtIssueStamp, tintFor } from '~/utils/blog';
 // Fraunces drives the beanstalk's broadsheet/zine aesthetic — oversized
 // italic on the masthead + typographic-plate cards, italic on subtitles.
 import '@fontsource-variable/fraunces';
-
-/**
- * Per-issue tint treatment. Each post gets one of five brand-palette
- * washes so the /blog index reads as a series of distinct editions,
- * not a uniform card grid. Cycles by issue number so posts 6+ wrap
- * back to the first tint, preserving the visual rhythm indefinitely.
- *
- * Hex values chosen to match the guides' pillar tints — keeps the
- * site visually consistent family-wide.
- */
-type IssueTint = {
-  name: string;
-  hex: string;
-  wash: string;
-  accentOn: string;
-  ink: string;
-};
-
-const TINTS: IssueTint[] = [
-  {
-    name: 'orange',
-    hex: '#f15d22',
-    wash: 'linear-gradient(140deg, #fff6ef 0%, #ffe9d6 100%)',
-    accentOn: 'rgb(241 93 34 / 18%)',
-    ink: '#a83a11',
-  },
-  {
-    name: 'terracotta',
-    hex: '#c76a21',
-    wash: 'linear-gradient(140deg, #fff5e8 0%, #f5e1c2 100%)',
-    accentOn: 'rgb(199 106 33 / 22%)',
-    ink: '#7d420f',
-  },
-  {
-    name: 'sky',
-    hex: '#3a82b3',
-    wash: 'linear-gradient(140deg, #f1f8fd 0%, #dceaf6 100%)',
-    accentOn: 'rgb(58 130 179 / 22%)',
-    ink: '#1f4d6d',
-  },
-  {
-    name: 'kraft',
-    hex: '#b58a2a',
-    wash: 'linear-gradient(140deg, #fbf6e8 0%, #f3e4bc 100%)',
-    accentOn: 'rgb(181 138 42 / 22%)',
-    ink: '#6c4f15',
-  },
-  {
-    name: 'slate',
-    hex: '#2c3e50',
-    wash: 'linear-gradient(140deg, #f2f4f7 0%, #dde3ec 100%)',
-    accentOn: 'rgb(44 62 80 / 20%)',
-    ink: '#1a2533',
-  },
-];
 
 const allPosts = await getCollection('blog', isPublished);
 
 // Assign issue numbers by chronological order (oldest = Issue 01). Done
 // ascending so issue numbers stay stable as new posts land at the top.
-const byDateAsc = [...allPosts].sort((a, b) => a.data.date.getTime() - b.data.date.getTime());
-const issueMap = new Map<string, number>();
-byDateAsc.forEach((p, i) => issueMap.set(p.data.slug, i + 1));
+const issueMap = buildIssueMap(allPosts);
 
 const byDateDesc = [...allPosts].sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
 
@@ -79,15 +23,8 @@ const explicitFeatured = allPosts.find((p) => p.data.featured);
 const featuredPost = explicitFeatured ?? byDateDesc[0];
 const backIssues = byDateDesc.filter((p) => p !== featuredPost);
 
-function tintFor(issueNumber: number): IssueTint {
-  return TINTS[(issueNumber - 1) % TINTS.length]!;
-}
-
 const fmtLong = (d: Date) =>
   d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-const fmtIssueStamp = (d: Date) =>
-  d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
 
 const totalIssues = allPosts.length;
 const latestDate = byDateDesc[0]?.data.date;
