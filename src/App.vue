@@ -480,6 +480,15 @@ onMounted(async () => {
       `auth: needsAuth=${authStore.needsAuth}, user=${authStore.currentUser?.email ?? 'none'}`
     );
 
+    // Register the Google account assertion subscriber. Validates every
+    // newly-acquired access token against the current member's bound
+    // Google account; backfills the binding on first sign-in; silently
+    // self-corrects on mismatch. One-time registration for the app's
+    // lifetime — `registerGoogleAccountAssertion` is idempotent.
+    const { registerGoogleAccountAssertion } =
+      await import('@/services/auth/googleAccountAssertion');
+    registerGoogleAccountAssertion();
+
     // Step 2b: Consume any pending OAuth redirect-auth code. If the user
     // just returned from a Google sign-in redirect (Settings → Reconnect,
     // Join Pod, etc.), this exchanges the code for an access token and

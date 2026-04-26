@@ -5,38 +5,84 @@
  * All functions require a valid access token from googleAuth.ts.
  */
 
+import { getGoogleAccountEmail, fetchGoogleUserEmail } from './googleAuth';
+
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
 const APP_FOLDER_NAME = 'beanies.family';
 const FOLDER_CACHE_KEY = 'beanies_drive_folder_id';
 
-// Session cache for app folder ID
-let cachedFolderId: string | null = null;
+/**
+ * Folder cache, tagged with the Google account email it was discovered
+ * for. Folder IDs are scoped per Drive account — caching one account's
+ * folder ID and reusing it under another account's token leads to
+ * Picker / Drive API queries hitting the wrong Drive. The accountEmail
+ * tag makes the cache self-validating: on every read, we verify the
+ * cached email matches the active account.
+ */
+type CachedFolder = { folderId: string; accountEmail: string };
+let cachedFolder: CachedFolder | null = null;
 
-// Restore folder ID from localStorage on module load
+// Restore folder cache from localStorage on module load. Schema-validated
+// so legacy string-only entries (from a previous app version) are
+// silently discarded and re-discovered on next use.
 try {
   const stored = localStorage.getItem(FOLDER_CACHE_KEY);
-  if (stored) cachedFolderId = stored;
+  if (stored) {
+    const parsed = JSON.parse(stored) as Partial<CachedFolder>;
+    if (parsed && typeof parsed.folderId === 'string' && typeof parsed.accountEmail === 'string') {
+      cachedFolder = { folderId: parsed.folderId, accountEmail: parsed.accountEmail };
+    } else {
+      // Legacy or malformed entry — drop it.
+      localStorage.removeItem(FOLDER_CACHE_KEY);
+    }
+  }
 } catch {
-  // Ignore — localStorage may not be available
+  // Either localStorage is unavailable or the stored value isn't valid
+  // JSON (e.g. a legacy bare-string entry). Treat as cold cache; the
+  // next successful discovery will rewrite the entry in the new format.
+  try {
+    localStorage.removeItem(FOLDER_CACHE_KEY);
+  } catch {
+    // localStorage unavailable
+  }
+}
+
+/**
+ * Resolve the active Google account email. Cheap if already cached;
+ * falls back to a userinfo fetch on first call. Returns null if both
+ * the cache and the fetch fail (rare — e.g. revoked token).
+ */
+async function resolveActiveAccountEmail(token: string): Promise<string | null> {
+  return getGoogleAccountEmail() ?? (await fetchGoogleUserEmail(token));
 }
 
 /**
  * Get or create the beanies.family app folder on Google Drive.
- * Caches the folder ID in memory and localStorage.
+ * Caches the folder ID in memory and localStorage, tagged with the
+ * Google account email it belongs to.
  *
  * Resilience measures:
  * - Retries folder search once (1s delay) before creating a new folder
  * - Detects duplicate folders and picks the one with files
- * - Persists folder ID to localStorage to avoid re-discovery on refresh
+ * - Persists folder ID + email to localStorage to avoid re-discovery on refresh
+ * - Re-discovers when the cached email doesn't match the active account,
+ *   protecting against folder leaks across Google accounts
  */
 export async function getOrCreateAppFolder(token: string): Promise<string> {
-  if (cachedFolderId) return cachedFolderId;
+  // Cache hit only when the email tag matches the active account.
+  // If we can't resolve the active email (e.g. userinfo fails), treat
+  // the cache as cold — safer to re-discover than to return a folder
+  // that may belong to a different Drive.
+  const activeEmail = await resolveActiveAccountEmail(token);
+  if (cachedFolder && activeEmail && cachedFolder.accountEmail === activeEmail) {
+    return cachedFolder.folderId;
+  }
 
   const folders = await searchAppFolders(token);
 
   if (folders.length === 1) {
-    return cacheFolderId(folders[0]!.id);
+    return cacheFolderId(folders[0]!.id, activeEmail);
   }
 
   if (folders.length > 1) {
@@ -45,7 +91,7 @@ export async function getOrCreateAppFolder(token: string): Promise<string> {
       `[driveService] ${folders.length} "${APP_FOLDER_NAME}" folders found — resolving duplicates`
     );
     const bestId = await pickFolderWithFiles(token, folders);
-    return cacheFolderId(bestId);
+    return cacheFolderId(bestId, activeEmail);
   }
 
   // No folder found — retry once after 1s (API eventual consistency)
@@ -59,7 +105,7 @@ export async function getOrCreateAppFolder(token: string): Promise<string> {
       retryFolders.length > 1
         ? await pickFolderWithFiles(token, retryFolders)
         : retryFolders[0]!.id;
-    return cacheFolderId(bestId);
+    return cacheFolderId(bestId, activeEmail);
   }
 
   // Still not found — create a new folder
@@ -74,7 +120,7 @@ export async function getOrCreateAppFolder(token: string): Promise<string> {
   });
 
   const createData = await createRes.json();
-  return cacheFolderId(createData.id);
+  return cacheFolderId(createData.id, activeEmail);
 }
 
 /**
@@ -243,11 +289,13 @@ export async function searchBeanpodFilesGlobal(
 
   if (rawFiles.length > 0) {
     console.warn(`[driveService] Drive-wide search found ${rawFiles.length} .beanpod file(s)`);
-    // Update folder cache to the first file's parent folder
+    // Update folder cache to the first file's parent folder, tagged with
+    // the active account email so the cache stays per-account.
     const firstParent = rawFiles[0].parents?.[0];
-    if (firstParent && firstParent !== cachedFolderId) {
+    if (firstParent && firstParent !== cachedFolder?.folderId) {
       console.warn(`[driveService] Updating folder cache to ${firstParent}`);
-      cacheFolderId(firstParent);
+      const activeEmail = await resolveActiveAccountEmail(token);
+      cacheFolderId(firstParent, activeEmail);
     }
   }
 
@@ -305,14 +353,14 @@ export async function setPublicLinkPermission(token: string, fileId: string): Pr
  * Get the cached app folder ID (null if not yet resolved).
  */
 export function getAppFolderId(): string | null {
-  return cachedFolderId;
+  return cachedFolder?.folderId ?? null;
 }
 
 /**
- * Clear the cached folder ID (used on disconnect).
+ * Clear the cached folder (used on disconnect).
  */
 export function clearFolderCache(): void {
-  cachedFolderId = null;
+  cachedFolder = null;
   try {
     localStorage.removeItem(FOLDER_CACHE_KEY);
   } catch {
@@ -322,11 +370,22 @@ export function clearFolderCache(): void {
 
 // --- Internal helpers ---
 
-/** Cache folder ID in memory and localStorage. */
-function cacheFolderId(id: string): string {
-  cachedFolderId = id;
+/**
+ * Cache folder ID in memory and localStorage, tagged with the account
+ * email it belongs to. Skips persistence if the email is unknown — a
+ * folder ID without an account tag would defeat the cross-account
+ * leak protection. The folder is still returned to the caller; we just
+ * don't persist it.
+ */
+function cacheFolderId(id: string, accountEmail: string | null): string {
+  if (!accountEmail) {
+    // No email available — return the freshly-discovered folder but don't
+    // cache it. Next call will re-discover, which is fine.
+    return id;
+  }
+  cachedFolder = { folderId: id, accountEmail };
   try {
-    localStorage.setItem(FOLDER_CACHE_KEY, id);
+    localStorage.setItem(FOLDER_CACHE_KEY, JSON.stringify(cachedFolder));
   } catch {
     // Ignore — localStorage may not be available
   }

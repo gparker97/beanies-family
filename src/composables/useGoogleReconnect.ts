@@ -16,8 +16,12 @@ export function useGoogleReconnect() {
    * navigation happened. **Returns never** when the page is about to
    * navigate away (redirect-auth path) — callers should handle that as
    * "in flight" rather than waiting on the promise.
+   *
+   * @param loginHint Optional email to pre-fill Google's account chooser.
+   *   Pass the user's expected Google account so they're nudged toward
+   *   the correct one when multiple accounts are signed in.
    */
-  async function reconnect(): Promise<boolean> {
+  async function reconnect(loginHint?: string): Promise<boolean> {
     isReconnecting.value = true;
     reconnectError.value = null;
     try {
@@ -28,12 +32,12 @@ export function useGoogleReconnect() {
       // pending OAuth code via completeRedirectAuth().
       if (shouldUseRedirectAuth()) {
         const returnPath = `${window.location.pathname}${window.location.search}`;
-        await startRedirectAuth(returnPath);
+        await startRedirectAuth(returnPath, loginHint);
         // Page is navigating away. The promise will not resolve in any
         // useful way. Return true so callers don't think they failed.
         return true;
       }
-      await requestAccessToken({ forceConsent: !hasRefreshToken() });
+      await requestAccessToken({ forceConsent: !hasRefreshToken(), loginHint });
       return true;
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);

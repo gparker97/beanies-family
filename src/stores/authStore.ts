@@ -17,6 +17,8 @@ import { useSettingsStore } from './settingsStore';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { flushPendingSave, cancelPendingSave } from '@/services/sync/syncService';
 import { initDoc } from '@/services/automerge/docService';
+import { clearGoogleSessionState } from '@/services/google/googleAuth';
+import { clearFolderCache } from '@/services/google/driveService';
 
 export interface AuthUser {
   memberId: string;
@@ -500,6 +502,13 @@ export const useAuthStore = defineStore('auth', () => {
     // let that block sign-out.
     await flushPendingSaveWithTimeout(3000);
 
+    // Wipe Google session state (in-memory tokens, refresh tokens in
+    // IndexedDB+localStorage, folder cache). Without this, signing in
+    // with a different Google account on the next session can silently
+    // re-use the previous account's refresh token via a silent token
+    // refresh, leaving the app stuck on the wrong Drive.
+    await clearGoogleSessionStateWithTimeout(3000);
+
     const familyId = currentUser.value?.familyId;
 
     // Delete the per-family IndexedDB cache unless this is a trusted device
@@ -544,6 +553,30 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Wrap Google session cleanup so a stuck IndexedDB delete or hung
+   * fetch cannot block sign-out. Resolves on timeout or error — leaving
+   * a stale token cached is far better than trapping the user on the
+   * page mid-sign-out.
+   */
+  async function clearGoogleSessionStateWithTimeout(timeoutMs: number): Promise<void> {
+    try {
+      await Promise.race([
+        Promise.all([clearGoogleSessionState(), Promise.resolve(clearFolderCache())]),
+        new Promise<void>((resolve) => {
+          setTimeout(() => {
+            console.warn(
+              '[authStore] clearGoogleSessionState timed out — proceeding with sign-out'
+            );
+            resolve();
+          }, timeoutMs);
+        }),
+      ]);
+    } catch (e) {
+      console.warn('[authStore] clearGoogleSessionState failed — proceeding with sign-out', e);
+    }
+  }
+
+  /**
    * E2E test helper: restore auth from sessionStorage (dev mode only).
    * When the e2e_auto_auth flag is set, auto-authenticate so the app
    * skips the login page and loads family data from IndexedDB cache.
@@ -568,6 +601,9 @@ export const useAuthStore = defineStore('auth', () => {
     // Flush any pending debounced save so recent changes persist to file.
     // Bounded — see signOut() for rationale.
     await flushPendingSaveWithTimeout(3000);
+
+    // Wipe Google session state — same rationale as signOut().
+    await clearGoogleSessionStateWithTimeout(3000);
 
     const familyId = currentUser.value?.familyId;
 

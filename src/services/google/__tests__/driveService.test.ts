@@ -1,4 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Folder cache is bound to the active Google account email — mock the
+// googleAuth functions driveService consults so tests can simulate
+// known/unknown accounts and account switches.
+const mockGetGoogleAccountEmail = vi.fn(() => 'a@example.com' as string | null);
+const mockFetchGoogleUserEmail = vi.fn(async (_token: string) => 'a@example.com' as string | null);
+
+vi.mock('../googleAuth', () => ({
+  getGoogleAccountEmail: () => mockGetGoogleAccountEmail(),
+  fetchGoogleUserEmail: (token: string) => mockFetchGoogleUserEmail(token),
+}));
+
 import {
   getOrCreateAppFolder,
   createFile,
@@ -33,6 +45,9 @@ describe('driveService', () => {
   beforeEach(() => {
     clearFolderCache();
     vi.restoreAllMocks();
+    // Reset email mocks to the default account between tests.
+    mockGetGoogleAccountEmail.mockReturnValue('a@example.com');
+    mockFetchGoogleUserEmail.mockResolvedValue('a@example.com');
   });
 
   describe('getOrCreateAppFolder', () => {
@@ -147,6 +162,80 @@ describe('driveService', () => {
       await getOrCreateAppFolder(mockToken);
       await getOrCreateAppFolder(mockToken);
       expect(fetch).toHaveBeenCalledOnce(); // Only one API call
+    });
+
+    it('cache is honored only when the active account email matches', async () => {
+      globalThis.fetch = mockFetch({
+        files: [{ id: 'folder-A', name: 'beanies.family' }],
+      });
+
+      // First call as account A — caches folder-A under email A
+      mockGetGoogleAccountEmail.mockReturnValue('a@example.com');
+      const id1 = await getOrCreateAppFolder(mockToken);
+      expect(id1).toBe('folder-A');
+      expect(fetch).toHaveBeenCalledOnce();
+
+      // Second call as account A — cache hit, no new fetch
+      const id2 = await getOrCreateAppFolder(mockToken);
+      expect(id2).toBe('folder-A');
+      expect(fetch).toHaveBeenCalledOnce();
+
+      // Third call as account B — cache miss, re-discovers under B's Drive
+      mockGetGoogleAccountEmail.mockReturnValue('b@example.com');
+      globalThis.fetch = mockFetch({
+        files: [{ id: 'folder-B', name: 'beanies.family' }],
+      });
+      const id3 = await getOrCreateAppFolder(mockToken);
+      expect(id3).toBe('folder-B');
+      expect(fetch).toHaveBeenCalledOnce(); // (counter reset by the new mockFetch above)
+    });
+
+    it('does not return a cached folder ID when active account email cannot be resolved', async () => {
+      // Seed cache with a known folder under account A
+      globalThis.fetch = mockFetch({
+        files: [{ id: 'folder-A', name: 'beanies.family' }],
+      });
+      mockGetGoogleAccountEmail.mockReturnValue('a@example.com');
+      await getOrCreateAppFolder(mockToken);
+
+      // Now simulate userinfo failure (no email available) — should
+      // re-discover instead of returning the cached A folder.
+      mockGetGoogleAccountEmail.mockReturnValue(null);
+      mockFetchGoogleUserEmail.mockResolvedValue(null);
+      globalThis.fetch = mockFetch({
+        files: [{ id: 'folder-rediscovered', name: 'beanies.family' }],
+      });
+      const id = await getOrCreateAppFolder(mockToken);
+      expect(id).toBe('folder-rediscovered');
+    });
+
+    it('persists the cache as JSON with the account email tag', async () => {
+      globalThis.fetch = mockFetch({
+        files: [{ id: 'folder-persist', name: 'beanies.family' }],
+      });
+      await getOrCreateAppFolder(mockToken);
+      const stored = localStorage.getItem('beanies_drive_folder_id');
+      expect(stored).toBeTruthy();
+      const parsed = JSON.parse(stored!);
+      expect(parsed).toEqual({ folderId: 'folder-persist', accountEmail: 'a@example.com' });
+    });
+
+    it('clearFolderCache wipes both module memory and localStorage', async () => {
+      globalThis.fetch = mockFetch({
+        files: [{ id: 'folder-clear', name: 'beanies.family' }],
+      });
+      await getOrCreateAppFolder(mockToken);
+      expect(localStorage.getItem('beanies_drive_folder_id')).toBeTruthy();
+
+      clearFolderCache();
+      expect(localStorage.getItem('beanies_drive_folder_id')).toBeNull();
+
+      // Next call must re-discover (no cached folder in memory either).
+      globalThis.fetch = mockFetch({
+        files: [{ id: 'folder-after-clear', name: 'beanies.family' }],
+      });
+      const id = await getOrCreateAppFolder(mockToken);
+      expect(id).toBe('folder-after-clear');
     });
   });
 
