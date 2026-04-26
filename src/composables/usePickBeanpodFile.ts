@@ -5,7 +5,7 @@ import {
   startRedirectAuth,
   tryGetSilentToken,
 } from '@/services/google/googleAuth';
-import { pickBeanpodFile } from '@/services/google/drivePicker';
+import { pickBeanpodFile, type PickBeanpodFileResult } from '@/services/google/drivePicker';
 
 /**
  * Composable for re-picking a `.beanpod` file from Google Drive — used by
@@ -24,10 +24,19 @@ export function usePickBeanpodFile() {
   const pickError = ref<string | null>(null);
 
   /**
-   * Open the Google Picker for the user to select a `.beanpod`. Returns
-   * the picked file metadata, `null` if the user cancelled, or `null`
-   * after triggering a full-page redirect (the page will navigate away).
-   * Never throws — failures populate `pickError` and resolve to `null`.
+   * Open the Google Picker for the user to select a `.beanpod`.
+   * Always returns a structured result — never throws. See
+   * `PickBeanpodFileResult` for the discriminated outcomes.
+   *
+   * For the auth phase preceding the Picker call: a thrown error is
+   * caught and surfaced as `{ kind: 'failed', reason: 'script' }` so
+   * callers have one shape to handle. (Reason `script` covers
+   * "couldn't even reach the Picker"; the join flow's error registry
+   * maps it to `PICKER_SCRIPT_LOAD_FAILED`.) When the auth flow kicks
+   * off a full-page redirect (PWA / iOS Safari standalone), the page
+   * navigates away; the returned promise resolves to `'cancelled'`
+   * since no Picker actually opened — the next session completes
+   * redirect auth and the user re-triggers.
    *
    * @param opts.forceConsent When true, always shows Google's account
    *   chooser even if a valid token is cached. Default `true` because
@@ -43,7 +52,7 @@ export function usePickBeanpodFile() {
   async function pick(opts?: {
     forceConsent?: boolean;
     loginHint?: string;
-  }): Promise<{ fileId: string; fileName: string } | null> {
+  }): Promise<PickBeanpodFileResult> {
     const forceConsent = opts?.forceConsent ?? true;
     const loginHint = opts?.loginHint;
     isPicking.value = true;
@@ -60,19 +69,19 @@ export function usePickBeanpodFile() {
         if (shouldUseRedirectAuth()) {
           const returnPath = `${window.location.pathname}${window.location.search}`;
           await startRedirectAuth(returnPath, loginHint);
-          // Page navigates; this resolves to null. The next session
-          // completes redirect auth and the user can re-trigger.
-          return null;
+          // Page navigates; the next session completes redirect auth and
+          // the user re-triggers. Treat as a cancellation from the
+          // current call's perspective.
+          return { kind: 'cancelled' };
         }
         token = await requestAccessToken({ forceConsent, loginHint });
       }
-      const picked = await pickBeanpodFile(token);
-      return picked;
+      return await pickBeanpodFile(token);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       console.warn('[usePickBeanpodFile] pick failed:', message);
       pickError.value = message || 'Picker failed';
-      return null;
+      return { kind: 'failed', reason: 'script' };
     } finally {
       isPicking.value = false;
     }

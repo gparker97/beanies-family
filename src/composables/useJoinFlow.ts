@@ -352,25 +352,34 @@ export function useJoinFlow() {
 
   /**
    * Open the Picker, read the picked file. Returns `true` only when the
-   * file was picked AND loaded into `syncStore.pendingEncryptedFile` (or
-   * decrypted). Returns `false` for any non-progressing outcome:
-   * user cancelled, redirect-auth navigation kicked off, OR a file-read
-   * error was recorded. Caller decides whether to advance or bail.
+   * file was picked AND loaded into `syncStore.pendingEncryptedFile`.
+   * Returns `false` for any non-progressing outcome — caller decides
+   * whether to advance or bail.
    *
-   * NOTE: the underlying `pickBeanpodFile` returns `{fileId,fileName} | null`
-   * today. Phase 4 widens this to a discriminated union so iframe-failure
-   * and timeout symptoms map to specific error codes; for now, all `null`
-   * returns are treated as cancellations.
+   * Maps the `PickBeanpodFileResult` discriminated union to the right
+   * `JoinErrorCode`: `failed/script` → PICKER_SCRIPT_LOAD_FAILED,
+   * `failed/iframe` → PICKER_FAILED, `failed/timeout` → PICKER_TIMEOUT.
+   * `cancelled` is silent (no error; step regresses to `awaiting-auth`).
    */
   async function doPickAndLoad(forceConsent = false): Promise<boolean> {
     const picked = await pickBeanpod({
       forceConsent,
       loginHint: inviteEmailHint.value ?? undefined,
     });
-    // Null = user cancelled OR a redirect-auth navigation kicked off.
-    // In both cases the user will return to this view; no error to set.
-    if (!picked) {
+
+    if (picked.kind === 'cancelled') {
       currentStep.value = 'awaiting-auth';
+      return false;
+    }
+
+    if (picked.kind === 'failed') {
+      const code: JoinErrorCode =
+        picked.reason === 'script'
+          ? 'PICKER_SCRIPT_LOAD_FAILED'
+          : picked.reason === 'timeout'
+            ? 'PICKER_TIMEOUT'
+            : 'PICKER_FAILED';
+      currentError.value = { code, context: { reason: picked.reason } };
       return false;
     }
 

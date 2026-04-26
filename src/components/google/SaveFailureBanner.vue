@@ -41,13 +41,13 @@ async function handleReconnect() {
 
 async function handleReselectFile() {
   reselectError.value = null;
-  const picked = await pick();
-  if (!picked) return; // user cancelled, redirected, or pick failed (error in composable)
-  const result = await syncStore.recoverFromMissingFile(picked.fileId, picked.fileName);
-  if (result.success) {
+  const result = await pick();
+  if (result.kind !== 'picked') return; // cancelled, redirected, or pick failed
+  const recovery = await syncStore.recoverFromMissingFile(result.fileId, result.fileName);
+  if (recovery.success) {
     emit('reconnected');
   } else {
-    reselectError.value = result.error ?? t('googleDrive.fileNotFoundReselectFailed');
+    reselectError.value = recovery.error ?? t('googleDrive.fileNotFoundReselectFailed');
   }
 }
 

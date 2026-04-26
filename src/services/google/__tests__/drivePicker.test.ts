@@ -40,7 +40,7 @@ function mockPickerNamespace(onBuild?: (callback: (data: unknown) => void) => vo
         return mockDocsView;
       }),
       ViewId: { DOCS: 'all' },
-      Action: { PICKED: 'picked', CANCEL: 'cancel' },
+      Action: { PICKED: 'picked', CANCEL: 'cancel', LOADED: 'loaded' },
       DocsViewMode: { LIST: 'list', GRID: 'grid' },
     },
   };
@@ -105,7 +105,7 @@ describe('drivePicker', () => {
           return mockDocsView;
         }),
         ViewId: { DOCS: 'all' },
-        Action: { PICKED: 'picked', CANCEL: 'cancel' },
+        Action: { PICKED: 'picked', CANCEL: 'cancel', LOADED: 'loaded' },
         DocsViewMode: { LIST: 'list', GRID: 'grid' },
       },
     };
@@ -133,7 +133,7 @@ describe('drivePicker', () => {
     expect(mockBuilder.addView).toHaveBeenCalledTimes(2);
   });
 
-  it('returns file on selection', async () => {
+  it("returns { kind: 'picked' } on selection", async () => {
     mockPickerNamespace((callback) => {
       callback({
         action: 'picked',
@@ -142,26 +142,86 @@ describe('drivePicker', () => {
     });
 
     const result = await drivePicker.pickBeanpodFile('test-token');
-    expect(result).toEqual({ fileId: 'file-123', fileName: 'family.beanpod' });
+    expect(result).toEqual({ kind: 'picked', fileId: 'file-123', fileName: 'family.beanpod' });
   });
 
-  it('returns null on cancel', async () => {
+  it("LOADED-then-CANCEL → { kind: 'cancelled' } (real user cancel)", async () => {
     mockPickerNamespace((callback) => {
+      callback({ action: 'loaded' });
       callback({ action: 'cancel' });
     });
 
     const result = await drivePicker.pickBeanpodFile('test-token');
-    expect(result).toBeNull();
+    expect(result).toEqual({ kind: 'cancelled' });
   });
 
-  it('throws without API key', async () => {
+  it("CANCEL without prior LOADED → { kind: 'failed', reason: 'iframe' } (iOS WebKit symptom)", async () => {
+    mockPickerNamespace((callback) => {
+      // No LOADED ever fires — Picker iframe couldn't bootstrap.
+      callback({ action: 'cancel' });
+    });
+
+    const result = await drivePicker.pickBeanpodFile('test-token');
+    expect(result).toEqual({ kind: 'failed', reason: 'iframe' });
+  });
+
+  it("missing API key → { kind: 'failed', reason: 'script' }", async () => {
     vi.stubEnv('VITE_GOOGLE_API_KEY', '');
-    // Re-import to get fresh module
     vi.resetModules();
     drivePicker = await import('../drivePicker');
 
-    await expect(drivePicker.pickBeanpodFile('test-token')).rejects.toThrow(
-      'VITE_GOOGLE_API_KEY is not configured'
-    );
+    const result = await drivePicker.pickBeanpodFile('test-token');
+    expect(result).toEqual({ kind: 'failed', reason: 'script' });
+  });
+
+  it("Picker open throws → { kind: 'failed', reason: 'script' }", async () => {
+    // Set up google.picker so PickerBuilder constructor throws.
+    (globalThis as Record<string, unknown>).google = {
+      picker: {
+        PickerBuilder: vi.fn(function () {
+          throw new Error('builder boom');
+        }),
+        DocsView: vi.fn(() => ({
+          setQuery: vi.fn().mockReturnThis(),
+          setMimeTypes: vi.fn().mockReturnThis(),
+          setOwnedByMe: vi.fn().mockReturnThis(),
+          setMode: vi.fn().mockReturnThis(),
+        })),
+        ViewId: { DOCS: 'all' },
+        Action: { PICKED: 'picked', CANCEL: 'cancel', LOADED: 'loaded' },
+        DocsViewMode: { LIST: 'list', GRID: 'grid' },
+      },
+    };
+
+    const result = await drivePicker.pickBeanpodFile('test-token');
+    expect(result).toEqual({ kind: 'failed', reason: 'script' });
+  });
+
+  it("no callback within 30s → { kind: 'failed', reason: 'timeout' }", async () => {
+    vi.useFakeTimers();
+    mockPickerNamespace(() => {
+      // never invoke callback
+    });
+
+    const promise = drivePicker.pickBeanpodFile('test-token');
+    // Advance past 30 s. The library load (gapi.load) is sync (cb is invoked
+    // synchronously in the mock above), so the timeout starts almost
+    // immediately. We need to flush microtasks AND advance timers.
+    await vi.advanceTimersByTimeAsync(30_001);
+    const result = await promise;
+    expect(result).toEqual({ kind: 'failed', reason: 'timeout' });
+    vi.useRealTimers();
+  });
+
+  it('passes login_hint via setOAuthToken (no separate plumbing needed)', async () => {
+    // login_hint plumbing happens at the OAuth layer, before pickBeanpodFile.
+    // pickBeanpodFile itself just receives the token. Verify the token
+    // propagates to setOAuthToken.
+    const { mockBuilder } = mockPickerNamespace((callback) => {
+      callback({ action: 'loaded' });
+      callback({ action: 'cancel' });
+    });
+    await drivePicker.pickBeanpodFile('hint-token');
+    expect(mockBuilder.setOAuthToken).toHaveBeenCalledWith('hint-token');
   });
 });

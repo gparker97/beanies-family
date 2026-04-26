@@ -89,9 +89,14 @@ vi.mock('@/services/google/googleAuth', () => ({
   shouldUseRedirectAuth: () => mockGoogleAuth.redirectAuth,
 }));
 
-type PickResult = { fileId: string; fileName: string } | null;
+type PickResult =
+  | { kind: 'picked'; fileId: string; fileName: string }
+  | { kind: 'cancelled' }
+  | { kind: 'failed'; reason: 'script' | 'iframe' | 'timeout' };
 type PickOpts = { forceConsent?: boolean; loginHint?: string } | undefined;
-const mockPick = vi.fn<(opts?: PickOpts) => Promise<PickResult>>(async () => null);
+const mockPick = vi.fn<(opts?: PickOpts) => Promise<PickResult>>(async () => ({
+  kind: 'cancelled',
+}));
 vi.mock('@/composables/usePickBeanpodFile', () => ({
   usePickBeanpodFile: () => ({
     isPicking: { value: false },
@@ -292,7 +297,11 @@ describe('useJoinFlow', () => {
           inviteeEmail: 'wife@example.com',
         }).replace('http://localhost:3000', '')
       );
-      mockPick.mockResolvedValueOnce({ fileId: 'picked-1', fileName: 'family.beanpod' });
+      mockPick.mockResolvedValueOnce({
+        kind: 'picked',
+        fileId: 'picked-1',
+        fileName: 'family.beanpod',
+      });
       mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({
         success: false,
         needsPassword: true,
@@ -324,7 +333,7 @@ describe('useJoinFlow', () => {
           ''
         )
       );
-      mockPick.mockResolvedValueOnce(null);
+      mockPick.mockResolvedValueOnce({ kind: 'cancelled' });
 
       const { useJoinFlow } = await import('../useJoinFlow');
       const flow = useJoinFlow();
@@ -333,6 +342,43 @@ describe('useJoinFlow', () => {
 
       expect(flow.currentError.value).toBeNull();
       expect(flow.currentStep.value).toBe('awaiting-auth');
+    });
+  });
+
+  describe('Picker discriminated-union → JoinErrorCode mapping', () => {
+    async function setupAndTap(pickResult: {
+      kind: 'failed';
+      reason: 'script' | 'iframe' | 'timeout';
+    }) {
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      setUrl(
+        buildInviteLink({ familyId: 'fam', provider: 'google_drive' }).replace(
+          'http://localhost:3000',
+          ''
+        )
+      );
+      mockPick.mockResolvedValueOnce(pickResult);
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+      await flow.handleAuthTap();
+      return flow;
+    }
+
+    it("'script' reason → PICKER_SCRIPT_LOAD_FAILED", async () => {
+      const flow = await setupAndTap({ kind: 'failed', reason: 'script' });
+      expect(flow.currentError.value?.code).toBe('PICKER_SCRIPT_LOAD_FAILED');
+    });
+
+    it("'iframe' reason → PICKER_FAILED", async () => {
+      const flow = await setupAndTap({ kind: 'failed', reason: 'iframe' });
+      expect(flow.currentError.value?.code).toBe('PICKER_FAILED');
+    });
+
+    it("'timeout' reason → PICKER_TIMEOUT", async () => {
+      const flow = await setupAndTap({ kind: 'failed', reason: 'timeout' });
+      expect(flow.currentError.value?.code).toBe('PICKER_TIMEOUT');
     });
   });
 
@@ -652,14 +698,14 @@ describe('useJoinFlow', () => {
       await flow.init();
 
       // First tap: Picker fails to load file.
-      mockPick.mockResolvedValueOnce({ fileId: 'picked-1', fileName: 'f.beanpod' });
+      mockPick.mockResolvedValueOnce({ kind: 'picked', fileId: 'picked-1', fileName: 'f.beanpod' });
       mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({ success: false }));
       mockSyncStore.error = 'boom';
       await flow.handleAuthTap();
       expect(flow.currentError.value?.code).toBe('FILE_READ_FAILED');
 
       // Retry: Picker now picks something else and load succeeds.
-      mockPick.mockResolvedValueOnce({ fileId: 'picked-2', fileName: 'f.beanpod' });
+      mockPick.mockResolvedValueOnce({ kind: 'picked', fileId: 'picked-2', fileName: 'f.beanpod' });
       mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({
         success: false,
         needsPassword: true,
@@ -689,7 +735,7 @@ describe('useJoinFlow', () => {
       const flow = useJoinFlow();
       await flow.init();
 
-      mockPick.mockResolvedValueOnce({ fileId: 'p', fileName: 'f.beanpod' });
+      mockPick.mockResolvedValueOnce({ kind: 'picked', fileId: 'p', fileName: 'f.beanpod' });
       mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({
         success: false,
         needsPassword: true,
