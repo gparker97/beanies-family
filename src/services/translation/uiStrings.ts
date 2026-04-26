@@ -2848,6 +2848,35 @@ const STRING_DEFS = {
     beanie: 'ask for a new invite',
   },
 
+  // Diagnostic-info copy modal — shown from a small link below the error
+  // block. The body is a JSON blob the user can paste back to support.
+  'join.diagnostic.link': {
+    en: 'Copy diagnostic info',
+    beanie: 'copy diagnostic info',
+  },
+  'join.diagnostic.title': {
+    en: 'Diagnostic info',
+    beanie: 'diagnostic info',
+  },
+  'join.diagnostic.subtitle': {
+    en: 'Paste this when asking for help — it tells us what your device saw.',
+    beanie: 'paste this when asking for help — it tells us what your device saw.',
+  },
+  'join.diagnostic.copy': { en: 'Copy', beanie: 'copy' },
+  'join.diagnostic.copied': { en: 'Copied!', beanie: 'copied!' },
+
+  // Share-invite-modal title override when opened as the "Continue on
+  // another device" recovery path on the join screen.
+  'join.shareFallback.title': {
+    en: 'Continue on another device',
+    beanie: 'continue on another device',
+  },
+  'join.shareFallback.subtitle': {
+    en: "Send the link to yourself and open it on a computer or Android phone — that's the most reliable way to finish first-load.",
+    beanie:
+      "send the link to yourself and open it on a computer or android phone — that's the most reliable way to finish first-load.",
+  },
+
   // Google Picker join flow
   'join.pickerPrompt.description': {
     en: 'Select the shared .beanpod file from your Google Drive',
