@@ -343,12 +343,191 @@ describe('googleAuth (PKCE)', () => {
     });
   });
 
+  describe('clearGoogleSessionState', () => {
+    it('wipes in-memory token state (accessToken, refreshToken, email, currentFamilyId)', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'test@example.com' }),
+      });
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      await googleAuth.initializeAuth('family-A');
+      await googleAuth.attemptSilentRefresh();
+
+      expect(googleAuth.isTokenValid()).toBe(true);
+      expect(googleAuth.hasRefreshToken()).toBe(true);
+      googleAuth.setGoogleAccountEmail('a@example.com');
+      expect(googleAuth.getGoogleAccountEmail()).toBe('a@example.com');
+
+      await googleAuth.clearGoogleSessionState();
+
+      expect(googleAuth.isTokenValid()).toBe(false);
+      expect(googleAuth.getAccessToken()).toBeNull();
+      expect(googleAuth.hasRefreshToken()).toBe(false);
+      expect(googleAuth.getGoogleAccountEmail()).toBeNull();
+
+      vi.unstubAllEnvs();
+    });
+
+    it('clears refresh tokens for both current family AND the __pending__ key', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+
+      const { getGoogleRefreshToken, clearGoogleRefreshToken } =
+        await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      await googleAuth.initializeAuth('family-B');
+
+      await googleAuth.clearGoogleSessionState();
+
+      expect(clearGoogleRefreshToken).toHaveBeenCalledWith('family-B');
+      expect(clearGoogleRefreshToken).toHaveBeenCalledWith('__pending__');
+
+      vi.unstubAllEnvs();
+    });
+
+    it('fires best-effort revoke fetch but does not throw on network error', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ email: 'a@example.com' }) }) // userinfo
+        .mockRejectedValue(new Error('network down')); // revoke
+      globalThis.fetch = fetchMock;
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      await googleAuth.initializeAuth('family-C');
+      await googleAuth.attemptSilentRefresh();
+
+      // Should not throw
+      await expect(googleAuth.clearGoogleSessionState()).resolves.toBeUndefined();
+
+      vi.unstubAllEnvs();
+    });
+
+    it('is idempotent — safe to call when no session is active', async () => {
+      // No prior auth — module is fresh
+      await expect(googleAuth.clearGoogleSessionState()).resolves.toBeUndefined();
+      // Calling again should also work
+      await expect(googleAuth.clearGoogleSessionState()).resolves.toBeUndefined();
+    });
+
+    it('still clears local state even if refresh-token IDB clear rejects', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'a@example.com' }),
+      });
+
+      const { getGoogleRefreshToken, clearGoogleRefreshToken } =
+        await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      // Both clear calls reject (current family + __pending__) — Promise.allSettled
+      // should still resolve successfully.
+      (clearGoogleRefreshToken as ReturnType<typeof vi.fn>)
+        .mockRejectedValueOnce(new Error('idb unavailable'))
+        .mockRejectedValueOnce(new Error('idb unavailable'));
+      await googleAuth.initializeAuth('family-D');
+      await googleAuth.attemptSilentRefresh();
+
+      await googleAuth.clearGoogleSessionState();
+
+      // Local state cleared regardless of IDB failure
+      expect(googleAuth.isTokenValid()).toBe(false);
+      expect(googleAuth.hasRefreshToken()).toBe(false);
+
+      vi.unstubAllEnvs();
+    });
+  });
+
   describe('onTokenExpired', () => {
     it('returns an unsubscribe function', () => {
       const callback = vi.fn();
       const unsub = googleAuth.onTokenExpired(callback);
       expect(typeof unsub).toBe('function');
       unsub();
+    });
+  });
+
+  describe('onTokenAcquired', () => {
+    it('returns an unsubscribe function', () => {
+      const callback = vi.fn();
+      const unsub = googleAuth.onTokenAcquired(callback);
+      expect(typeof unsub).toBe('function');
+      unsub();
+    });
+
+    it('fires after a successful silent refresh with the resolved email', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'silent@example.com' }),
+      });
+
+      const subscriber = vi.fn();
+      googleAuth.onTokenAcquired(subscriber);
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      await googleAuth.initializeAuth('family-X');
+
+      await googleAuth.attemptSilentRefresh();
+      // notifyTokenAcquired is fire-and-forget — wait for the microtask + fetch
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(subscriber).toHaveBeenCalledWith('silent@example.com', 'mock-refreshed-token');
+
+      vi.unstubAllEnvs();
+    });
+
+    it('continues firing remaining callbacks if one throws', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'a@example.com' }),
+      });
+
+      const bad = vi.fn(() => {
+        throw new Error('subscriber boom');
+      });
+      const good = vi.fn();
+      googleAuth.onTokenAcquired(bad);
+      googleAuth.onTokenAcquired(good);
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      await googleAuth.initializeAuth('family-Y');
+      await googleAuth.attemptSilentRefresh();
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(bad).toHaveBeenCalled();
+      expect(good).toHaveBeenCalled();
+
+      vi.unstubAllEnvs();
+    });
+
+    it('unsubscribed callbacks are not invoked', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'a@example.com' }),
+      });
+
+      const subscriber = vi.fn();
+      const unsub = googleAuth.onTokenAcquired(subscriber);
+      unsub();
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      await googleAuth.initializeAuth('family-Z');
+      await googleAuth.attemptSilentRefresh();
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(subscriber).not.toHaveBeenCalled();
+
+      vi.unstubAllEnvs();
     });
   });
 

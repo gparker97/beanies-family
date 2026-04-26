@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
 import PasskeySettings from '@/components/settings/PasskeySettings.vue';
@@ -12,7 +12,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { alert as showAlert } from '@/composables/useConfirm';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
@@ -42,6 +42,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
@@ -57,6 +58,39 @@ const showCurrency = ref(false);
 const showSecurity = ref(false);
 const showFamilyData = ref(false);
 const showDataManagement = ref(false);
+
+// ── Deep-link: open a specific card from a route query (e.g. ?open=family-data)
+//    Generalizable — additional cards can opt in by extending the map below.
+const cardOpenMap: Record<string, () => void> = {
+  'family-data': () => {
+    showFamilyData.value = true;
+  },
+  appearance: () => {
+    showAppearance.value = true;
+  },
+  currency: () => {
+    showCurrency.value = true;
+  },
+  security: () => {
+    showSecurity.value = true;
+  },
+  'data-management': () => {
+    showDataManagement.value = true;
+  },
+};
+
+function applyOpenQuery() {
+  const open = route.query.open;
+  if (typeof open !== 'string') return;
+  const handler = cardOpenMap[open];
+  if (!handler) return;
+  handler();
+  // Strip the query so a refresh / back-nav doesn't re-open the modal.
+  router.replace({ path: route.path, query: {} });
+}
+
+onMounted(applyOpenQuery);
+watch(() => route.query.open, applyOpenQuery);
 
 // ── Family Data state ────────────────────────────────────────────────────────
 const showClearConfirm = ref(false);
@@ -167,9 +201,53 @@ async function updateTheme(value: string | number) {
 
 // ── Family Data handlers ─────────────────────────────────────────────────────
 
+const isSwitchingAccount = ref(false);
+
 async function handleSettingsReconnect() {
-  const success = await reconnect();
+  // Pre-fill Google's chooser with the expected account when known so
+  // multi-account users land on the right one by default.
+  const success = await reconnect(syncStore.providerAccountEmail ?? undefined);
   if (success) await syncStore.handleGoogleReconnected();
+}
+
+/**
+ * Switch the Google account this member is bound to. Forces a consent
+ * screen so the user can pick a different account; the resulting email
+ * is treated as the new ground truth and written to the member's
+ * googleAccountEmail (via the assertion subscriber).
+ */
+async function handleSwitchGoogleAccount() {
+  isSwitchingAccount.value = true;
+  try {
+    const { armAccountSwitch } = await import('@/services/auth/googleAccountAssertion');
+    const {
+      requestAccessToken,
+      shouldUseRedirectAuth,
+      startRedirectAuth,
+      clearGoogleSessionState,
+    } = await import('@/services/google/googleAuth');
+
+    armAccountSwitch();
+    // Wipe in-memory tokens first so silent refresh can't bypass the
+    // chooser. Without this, the existing valid token short-circuits
+    // the consent flow and the user never sees Google's account picker.
+    await clearGoogleSessionState();
+
+    if (shouldUseRedirectAuth()) {
+      await startRedirectAuth(`${window.location.pathname}${window.location.search}`);
+      return; // page navigates away
+    }
+    await requestAccessToken({ forceConsent: true });
+    await syncStore.handleGoogleReconnected();
+  } catch (e) {
+    console.warn('[SettingsPage] switch-account failed:', e);
+    await showAlert({
+      title: 'settings.familyData.switchAccount',
+      message: 'settings.familyData.switchAccountFailed',
+    });
+  } finally {
+    isSwitchingAccount.value = false;
+  }
 }
 
 async function handleForceSave() {
@@ -957,6 +1035,29 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
                   />
                 </svg>
               </a>
+            </div>
+
+            <!-- Signed-in Google account + switch -->
+            <div
+              v-if="syncStore.isGoogleDriveConnected && syncStore.providerAccountEmail"
+              class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+            >
+              <div class="min-w-0 flex-1">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ t('settings.familyData.signedInAs') }}
+                </p>
+                <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {{ syncStore.providerAccountEmail }}
+                </p>
+              </div>
+              <BaseButton
+                variant="secondary"
+                size="sm"
+                :loading="isSwitchingAccount"
+                @click="handleSwitchGoogleAccount"
+              >
+                {{ t('settings.familyData.switchAccount') }}
+              </BaseButton>
             </div>
 
             <!-- Last Saved -->

@@ -2266,6 +2266,26 @@ const STRING_DEFS = {
     beanie:
       "use this on shared or public devices - signs out and removes all local data from this device. don't worry - your data is safe with you and we'll find it again when you come back.",
   },
+  'auth.accountMismatchTitle': {
+    en: 'Wrong Google account',
+    beanie: 'wrong google account',
+  },
+  'auth.accountMismatchBody': {
+    en: 'Please sign in with {email} to access your data.',
+    beanie: 'please sign in with {email} to access your data',
+  },
+  'settings.familyData.signedInAs': {
+    en: 'Signed in with',
+    beanie: 'signed in with',
+  },
+  'settings.familyData.switchAccount': {
+    en: 'Switch Google account',
+    beanie: 'switch google account',
+  },
+  'settings.familyData.switchAccountFailed': {
+    en: "Couldn't switch accounts. Try again.",
+    beanie: "couldn't switch accounts. try again",
+  },
   'auth.fillAllFields': { en: 'Please fill in all fields', beanie: 'please fill in all fields' },
   'auth.passwordsDoNotMatch': { en: 'Passwords do not match', beanie: 'passwords do not match' },
   'auth.passwordMinLength': {
@@ -3471,8 +3491,13 @@ const STRING_DEFS = {
     beanie: "we can't find your beanpod",
   },
   'googleDrive.fileNotFoundBody': {
-    en: 'The pod file on Google Drive may have been deleted or moved. Go to Settings to reconnect or choose a different file.',
-    beanie: 'your beanpod might have been moved or deleted. head to settings to sort it out',
+    en: "We couldn't find your data file in {email}'s Drive. It may have been deleted, moved, or you may be signed in with a different account.",
+    beanie:
+      "we couldn't find your beanpod in {email}'s drive. it may have been moved, deleted, or you may be signed in with a different account",
+  },
+  'googleDrive.thisAccount': {
+    en: 'this account',
+    beanie: 'this account',
   },
   'googleDrive.goToSettings': { en: 'Go to Settings', beanie: 'go to settings' },
   'googleDrive.fileNotFoundReselect': {

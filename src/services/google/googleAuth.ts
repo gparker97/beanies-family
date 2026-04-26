@@ -48,6 +48,15 @@ type ExpiryCallback = () => void;
 const expiryCallbacks: ExpiryCallback[] = [];
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Token-acquisition callbacks. Fires after every successful access-token
+// acquisition (popup, silent refresh, redirect). Subscribers receive the
+// resolved Google account email (best-effort fetch) and the token string.
+// Used by the account-assertion subsystem to validate that the acquired
+// token belongs to the expected Google account; could also be used by
+// future telemetry/UI hooks.
+type AcquiredCallback = (email: string | null, token: string) => void;
+const acquiredCallbacks: AcquiredCallback[] = [];
+
 /**
  * Check if Google Drive integration is configured (client ID set in env)
  */
@@ -164,8 +173,14 @@ export async function loadGIS(): Promise<void> {
  * mismatches when the same popup window is reused by a second call.
  *
  * @param options.forceConsent - Force the account chooser / consent screen.
+ * @param options.loginHint - Email to pre-fill Google's account chooser
+ *   with (e.g. the user's expected Google account). Helps users with
+ *   multiple Google accounts pick the right one and reduces account drift.
  */
-export async function requestAccessToken(options?: { forceConsent?: boolean }): Promise<string> {
+export async function requestAccessToken(options?: {
+  forceConsent?: boolean;
+  loginHint?: string;
+}): Promise<string> {
   // Fast paths that don't need deduplication
   const clientId = getClientId();
   if (!clientId) {
@@ -228,13 +243,13 @@ export async function requestAccessToken(options?: { forceConsent?: boolean }): 
 async function performPopupAuth(
   clientId: string,
   popup: Window,
-  options?: { forceConsent?: boolean }
+  options?: { forceConsent?: boolean; loginHint?: string }
 ): Promise<string> {
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
   const prompt = options?.forceConsent ? 'consent' : 'select_account';
-  const authUrl = buildAuthUrl(clientId, codeChallenge, prompt);
+  const authUrl = buildAuthUrl(clientId, codeChallenge, prompt, options?.loginHint);
   const code = await waitForAuthCode(popup, authUrl);
 
   const tokens = await exchangeCodeForTokens({
@@ -268,8 +283,9 @@ async function performPopupAuth(
   // Schedule auto-refresh
   scheduleAutoRefresh(tokens.expires_in);
 
-  // Fire-and-forget: fetch account email
-  fetchGoogleUserEmail(tokens.access_token).catch(() => {});
+  // Notify subscribers (assertion + telemetry hooks). Fire-and-forget:
+  // never block token return on subscriber work.
+  notifyTokenAcquired(tokens.access_token).catch(() => {});
 
   console.warn(`[googleAuth] Token acquired via PKCE, expires in ${tokens.expires_in}s`);
   return tokens.access_token;
@@ -342,8 +358,8 @@ async function performSilentRefresh(): Promise<string | null> {
     // Schedule next auto-refresh
     scheduleAutoRefresh(tokens.expires_in);
 
-    // Fetch email if not cached
-    fetchGoogleUserEmail(tokens.access_token).catch(() => {});
+    // Notify subscribers (assertion + telemetry hooks). Fire-and-forget.
+    notifyTokenAcquired(tokens.access_token).catch(() => {});
 
     console.warn('[googleAuth] Silent refresh succeeded');
     return tokens.access_token;
@@ -395,6 +411,11 @@ export async function getValidToken(): Promise<string> {
 
 /**
  * Revoke the current tokens and clear all state.
+ *
+ * Prefer `clearGoogleSessionState()` for new call sites — it is more
+ * thorough (also wipes the pending-family refresh token, which can leak
+ * across sign-out cycles when a user signs in with a different account
+ * before the previous family was fully adopted).
  */
 export async function revokeToken(): Promise<void> {
   // Revoke access token via Google's endpoint
@@ -415,6 +436,48 @@ export async function revokeToken(): Promise<void> {
 }
 
 /**
+ * Wipe every layer of Google account session state. Safe to call when
+ * no session is active (idempotent). Used by both `signOut` paths and
+ * `googleDriveProvider.disconnect()` so the same cleanup runs whether
+ * the user explicitly signs out or the storage provider is replaced.
+ *
+ * Local state is cleared synchronously and unconditionally. The network
+ * revoke is best-effort and fire-and-forget — a failed revoke does not
+ * leave state behind locally, and Google will expire the token on its
+ * own anyway. The load-bearing step is removing the refresh token from
+ * our storage so subsequent silent-refresh attempts cannot pick it up.
+ *
+ * Why both keys are cleared: the `__pending__` family slot is used
+ * during login-page OAuth before a family is adopted. If a user signs
+ * in with account B (joins/creates a different family) and signs out
+ * mid-flow, account B's refresh token can survive under `__pending__`
+ * and silently log them in as B on the next session. Always clear it.
+ */
+export async function clearGoogleSessionState(): Promise<void> {
+  const tokenSnapshot = accessToken;
+  const familyIdSnapshot = currentFamilyId;
+
+  // 1. Clear in-memory state immediately (synchronous, fast).
+  clearTokenState();
+  currentFamilyId = null;
+
+  // 2. Best-effort fire-and-forget network revoke. Never await.
+  if (tokenSnapshot) {
+    fetch(`${GOOGLE_REVOKE_URL}?token=${tokenSnapshot}`, { method: 'POST' }).catch(() => {
+      // Network errors are expected (offline, slow, etc.) — best-effort.
+    });
+  }
+
+  // 3. Clear persisted refresh tokens for both the active family AND the
+  //    pending-family slot. Promise.allSettled so one failure doesn't
+  //    leave the other layer dirty.
+  await Promise.allSettled([
+    familyIdSnapshot ? clearGoogleRefreshToken(familyIdSnapshot) : Promise.resolve(),
+    clearGoogleRefreshToken(PENDING_FAMILY_KEY),
+  ]);
+}
+
+/**
  * Register a callback to be notified when the token is about to expire
  * and automatic refresh has failed.
  * Returns an unsubscribe function.
@@ -425,6 +488,44 @@ export function onTokenExpired(callback: ExpiryCallback): () => void {
     const index = expiryCallbacks.indexOf(callback);
     if (index > -1) expiryCallbacks.splice(index, 1);
   };
+}
+
+/**
+ * Register a callback to be notified after every successful access-token
+ * acquisition (popup, silent refresh, redirect). Receives the resolved
+ * Google account email (best-effort) and the token string.
+ *
+ * Used by the account-assertion subsystem to verify the acquired token
+ * belongs to the expected member's Google account. Subscribers should
+ * be idempotent — the same acquisition may fire callbacks more than
+ * once if it's part of a forced re-consent loop.
+ *
+ * Returns an unsubscribe function.
+ */
+export function onTokenAcquired(callback: AcquiredCallback): () => void {
+  acquiredCallbacks.push(callback);
+  return () => {
+    const index = acquiredCallbacks.indexOf(callback);
+    if (index > -1) acquiredCallbacks.splice(index, 1);
+  };
+}
+
+/**
+ * Internal: notify all token-acquisition subscribers. Fires once per
+ * successful acquisition. Email is fetched best-effort; null is passed
+ * if userinfo cannot be resolved. Subscriber errors are logged but
+ * never rethrown — one bad subscriber must not break others.
+ */
+async function notifyTokenAcquired(token: string): Promise<void> {
+  if (acquiredCallbacks.length === 0) return;
+  const email = await fetchGoogleUserEmail(token);
+  for (const cb of acquiredCallbacks) {
+    try {
+      cb(email, token);
+    } catch (e) {
+      console.warn('[googleAuth] tokenAcquired callback error:', e);
+    }
+  }
 }
 
 // --- Internal helpers ---
@@ -448,7 +549,12 @@ function clearTokenState(): void {
   }
 }
 
-function buildAuthUrl(clientId: string, codeChallenge: string, prompt: string): string {
+function buildAuthUrl(
+  clientId: string,
+  codeChallenge: string,
+  prompt: string,
+  loginHint?: string
+): string {
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: getRedirectUri(),
@@ -459,6 +565,7 @@ function buildAuthUrl(clientId: string, codeChallenge: string, prompt: string): 
     access_type: 'offline',
     prompt,
   });
+  if (loginHint) params.set('login_hint', loginHint);
   return `${GOOGLE_AUTH_URL}?${params.toString()}`;
 }
 
@@ -604,8 +711,10 @@ interface RedirectAuthState {
  * Start a redirect-based OAuth flow (for mobile where popups are blocked).
  * Saves PKCE state to sessionStorage and redirects the full page to Google.
  * After auth, OAuthCallbackPage redirects back to `returnPath`.
+ *
+ * @param loginHint Optional email to pre-fill Google's chooser with.
  */
-export async function startRedirectAuth(returnPath: string): Promise<void> {
+export async function startRedirectAuth(returnPath: string, loginHint?: string): Promise<void> {
   const clientId = getClientId();
   if (!clientId) throw new Error('Google Client ID not configured');
 
@@ -618,7 +727,7 @@ export async function startRedirectAuth(returnPath: string): Promise<void> {
     JSON.stringify({ codeVerifier, returnPath } satisfies RedirectAuthState)
   );
 
-  const authUrl = buildAuthUrl(clientId, codeChallenge, 'select_account');
+  const authUrl = buildAuthUrl(clientId, codeChallenge, 'select_account', loginHint);
   window.location.href = authUrl;
 }
 
@@ -664,7 +773,7 @@ export async function completeRedirectAuth(): Promise<string | null> {
   }
 
   scheduleAutoRefresh(tokens.expires_in);
-  fetchGoogleUserEmail(tokens.access_token).catch(() => {});
+  notifyTokenAcquired(tokens.access_token).catch(() => {});
 
   console.warn(`[googleAuth] Token acquired via redirect PKCE, expires in ${tokens.expires_in}s`);
   return tokens.access_token;

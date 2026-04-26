@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -27,8 +27,15 @@ const emit = defineEmits<{
   reconnected: [];
 }>();
 
+const fileNotFoundBody = computed(() => {
+  const email = syncStore.providerAccountEmail || t('googleDrive.thisAccount');
+  return t('googleDrive.fileNotFoundBody').replace('{email}', email);
+});
+
 async function handleReconnect() {
-  const success = await reconnect();
+  // Pre-fill Google's account chooser with the expected email when known,
+  // so the user can spot account drift before confirming.
+  const success = await reconnect(syncStore.providerAccountEmail ?? undefined);
   if (success) emit('reconnected');
 }
 
@@ -76,7 +83,9 @@ async function handleDownloadBackup() {
 }
 
 function goToSettings() {
-  router.push('/settings');
+  // Land directly inside the Family Data modal so the user can see their
+  // current Google account + reconnect/switch options without hunting.
+  router.push({ path: '/settings', query: { open: 'family-data' } });
 }
 </script>
 
@@ -88,9 +97,7 @@ function goToSettings() {
       }}
     </template>
     <template #message>
-      {{
-        props.fileNotFound ? t('googleDrive.fileNotFoundBody') : t('googleDrive.saveFailureBody')
-      }}
+      {{ props.fileNotFound ? fileNotFoundBody : t('googleDrive.saveFailureBody') }}
     </template>
     <template #actions>
       <template v-if="props.fileNotFound">

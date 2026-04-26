@@ -8,7 +8,7 @@ vi.mock('@/services/google/googleAuth', () => ({
   requestAccessToken: vi.fn(async () => 'refreshed-token'),
   attemptSilentRefresh: vi.fn(async () => null),
   hasRefreshToken: vi.fn(() => false),
-  revokeToken: vi.fn(async () => {}),
+  clearGoogleSessionState: vi.fn(async () => {}),
   fetchGoogleUserEmail: vi.fn(async () => 'test@example.com'),
   getGoogleAccountEmail: vi.fn(() => null),
   setGoogleAccountEmail: vi.fn(),
@@ -119,10 +119,10 @@ describe('GoogleDriveProvider', () => {
   });
 
   describe('disconnect', () => {
-    it('revokes token and clears cache', async () => {
-      const { revokeToken } = await import('@/services/google/googleAuth');
+    it('clears Google session state and folder cache', async () => {
+      const { clearGoogleSessionState } = await import('@/services/google/googleAuth');
       await provider.disconnect();
-      expect(revokeToken).toHaveBeenCalled();
+      expect(clearGoogleSessionState).toHaveBeenCalled();
       expect(mockClearFolderCache).toHaveBeenCalled();
     });
   });
