@@ -479,9 +479,9 @@ export function useJoinFlow() {
         const ok = await tryInviteTokenDecrypt();
         if (!ok && !currentError.value) {
           // No invite token, or token didn't match: caller should show
-          // password modal. Step stays as 'loading' until view shows
-          // modal; once user decrypts via password, view calls
-          // `handleSubmitDecryptPassword` which advances.
+          // the password modal. Step stays as 'loading' until the view
+          // shows the modal; once the user decrypts via password, the
+          // view calls the password-submit handler (below) which advances.
           currentStep.value = 'loading'; // unchanged but explicit
           return;
         }
