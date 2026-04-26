@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /* global FileSystemFileHandle */
 import { ref, computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
@@ -11,30 +10,15 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFileDrop } from '@/composables/useFileDrop';
 import { isTemporaryEmail } from '@/utils/email';
-import { pickBeanpodFile } from '@/services/google/drivePicker';
-import {
-  requestAccessToken,
-  startRedirectAuth,
-  completeRedirectAuth,
-  shouldUseRedirectAuth,
-  tryGetSilentToken,
-} from '@/services/google/googleAuth';
-import { lookupFamily, isRegistryConfigured } from '@/services/registry/registryService';
-import { useAuthStore } from '@/stores/authStore';
-import { useFamilyStore } from '@/stores/familyStore';
-import { useFamilyContextStore } from '@/stores/familyContextStore';
+import { useJoinFlow, JOIN_ERRORS, type RecoveryAction } from '@/composables/useJoinFlow';
 import { useSyncStore } from '@/stores/syncStore';
-import type { FamilyMember, RegistryEntry } from '@/types/models';
+import type { FamilyMember } from '@/types/models';
 
 const { t } = useTranslation();
-const route = useRoute();
-const authStore = useAuthStore();
-const familyStore = useFamilyStore();
-const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
+const flow = useJoinFlow();
 
 type LoginView = 'create';
-type JoinStep = 'verify' | 'pick-member' | 'set-password';
 
 const emit = defineEmits<{
   back: [];
@@ -42,379 +26,120 @@ const emit = defineEmits<{
   navigate: [view: LoginView];
 }>();
 
-// --- Wizard state ---
-const currentStep = ref<JoinStep>('verify');
-
-// Step 1: Verify & Load
-const targetFamilyId = ref('');
-const targetProvider = ref('local');
-const targetFileRef = ref('');
-const targetDriveFileId = ref('');
-const inviteToken = ref('');
-// Optional Google `login_hint` decoded from the URL (`hint=` param,
-// base64-encoded). Pre-fills Google's account chooser so multi-account
-// users land on the right account by default.
-const inviteEmailHint = ref<string | null>(null);
-const registryEntry = ref<RegistryEntry | null>(null);
-const isLookingUp = ref(false);
-const lookupDone = ref(false);
-const formError = ref<string | null>(null);
-
-// File loading (inline within verify step)
-const fileLoaded = ref(false);
-const needsManualFileLoad = ref(false);
-const cloudLoadFailed = ref(false);
-const isLoadingFile = ref(false);
-const isPickerLoading = ref(false);
-const showDecryptModal = ref(false);
-const decryptPassword = ref('');
-
-// Step 2: Pick member
-const selectedMember = ref<FamilyMember | null>(null);
-
-// Step 3: Set password
+// ── View-local form state ────────────────────────────────────────────────────
 const password = ref('');
 const confirmPassword = ref('');
-const isJoining = ref(false);
+const decryptPassword = ref('');
+const showDecryptModal = ref(false);
+const isLoadingLocalFile = ref(false);
+const localFormError = ref<string | null>(null);
 
-// --- Computed ---
-const expectedFileName = computed(() => {
-  if (registryEntry.value?.displayPath) return registryEntry.value.displayPath;
-  if (targetFileRef.value) {
-    try {
-      return atob(targetFileRef.value);
-    } catch {
-      return null;
-    }
-  }
-  return null;
+// ── Derived from the composable ──────────────────────────────────────────────
+
+/** True while the composable is doing background work the user should wait on. */
+const isBusy = computed(() =>
+  ['lookup', 'authenticating', 'loading', 'joining'].includes(flow.currentStep.value)
+);
+
+const busyLabel = computed(() => {
+  if (flow.currentStep.value === 'lookup') return t('join.lookingUp');
+  if (flow.currentStep.value === 'authenticating') return t('join.loadingFromCloud');
+  if (flow.currentStep.value === 'loading') return t('join.loadingFromCloud');
+  if (flow.currentStep.value === 'joining') return t('join.completing');
+  return '';
 });
 
-// Pets have requiresPassword:false so they'd already be excluded, but
-// filter explicitly in case that invariant is ever relaxed.
-const unclaimedMembers = computed(() =>
-  familyStore.members.filter((m) => m.requiresPassword && !m.isPet)
-);
+/** Registry-driven view of the current error (or null). */
+const currentErrorView = computed(() => {
+  const err = flow.currentError.value;
+  if (!err) return null;
+  const meta = JOIN_ERRORS[err.code];
+  let message = t(meta.messageKey);
+  // Interpolate context (used by FILE_READ_FAILED, FILE_FAMILY_MISMATCH, etc.)
+  if (err.context) {
+    for (const [key, value] of Object.entries(err.context)) {
+      message = message.replace(`{${key}}`, String(value ?? ''));
+    }
+  }
+  return {
+    code: err.code,
+    severity: meta.severity,
+    message,
+    recoveries: meta.recoveries,
+  };
+});
+
+const recoveryHandlers: Record<RecoveryAction, () => void | Promise<void>> = {
+  retry: () => flow.handleRetry(),
+  signInDifferentAccount: () => flow.handleSignInDifferent(),
+  tryAnotherDevice: () => flow.handleTryAnotherDevice(),
+  pickDifferentBean: () => {
+    flow.clearError();
+    // Navigation back to the member-pick step is handled by the composable
+    // when the file is already loaded; otherwise this is a no-op (the
+    // error registry only lists this recovery for codes that fire after
+    // the member grid is reachable).
+  },
+  askForNewInvite: () => {
+    // Dead-end recovery — the user must contact the inviter for a new
+    // link. The button is rendered for visibility / messaging; clicking
+    // is a no-op beyond clearing the error so the user can re-read it.
+    flow.clearError();
+  },
+};
 
 function getMemberRole(member: FamilyMember): string {
   if (member.ageGroup === 'child') return t('loginV6.littleBean');
   return t('loginV6.parentBean');
 }
 
-// --- Step 1: Verify & Load ---
-onMounted(async () => {
-  // Parse query params — invite links use t= and f=, magic links use fam= and code=
-  const fam =
-    (route.query.fam as string) || (route.query.code as string) || (route.query.f as string) || '';
-  const p = (route.query.p as string) || 'local';
-  const fileRef = (route.query.ref as string) || '';
-  const fileIdParam = (route.query.fileId as string) || '';
-  const token = (route.query.t as string) || '';
-  console.warn(
-    '[JoinPodView] URL params:',
-    JSON.stringify({
-      fam: fam.slice(0, 8) + '...',
-      p,
-      fileId: fileIdParam ? fileIdParam.slice(0, 8) + '...' : '(none)',
-      tokenLength: token.length,
-      tokenPreview: token ? token.slice(0, 6) + '...' + token.slice(-4) : '(none)',
-    })
-  );
+// ── Local-provider drop-zone (only relevant when provider !== 'google_drive') ─
+//
+// The composable owns the cloud flow; for `local` invites the user must
+// drop or pick a `.beanpod` file from disk. We delegate to the existing
+// syncStore methods (loadFromNewFile / loadFromDroppedFile) which handle
+// V3 + V4 file shapes.
 
-  if (token) inviteToken.value = token;
-
-  const hintEncoded = (route.query.hint as string) || '';
-  if (hintEncoded) {
-    try {
-      inviteEmailHint.value = decodeURIComponent(escape(atob(hintEncoded)));
-    } catch {
-      // Malformed hint — silently ignore. The hint is purely a UX nudge;
-      // a missing/garbled hint just means the chooser shows all accounts.
-    }
-  }
-
-  if (fam) {
-    targetFamilyId.value = fam;
-    targetProvider.value = p;
-    targetFileRef.value = fileRef;
-    targetDriveFileId.value = fileIdParam;
-
-    // Check if we're returning from a redirect-based OAuth flow (mobile)
-    const redirectToken = await completeRedirectAuth().catch((e) => {
-      console.error('[JoinPodView] Redirect auth failed:', e);
-      return null;
-    });
-    // After redirect auth: the token is now cached in googleAuth state, so
-    // performLookup → attemptFileLoad will find it via tryGetSilentToken
-    // and proceed straight to loading by fileId. If we don't have a fileId
-    // (or that load fails), the user will see the Picker CTA.
-    if (redirectToken && p === 'google_drive' && !fileIdParam) {
-      // No fileId in URL — open the Picker directly with the fresh token
-      await handlePickFromDriveWithToken(redirectToken);
-      return;
-    }
-
-    await performLookup(fam);
-  }
-});
-
-async function performLookup(familyId: string) {
-  isLookingUp.value = true;
-  formError.value = null;
-  lookupDone.value = false;
-
-  try {
-    if (!isRegistryConfigured()) {
-      // Registry not configured — try cloud load if we have provider info from URL
-      registryEntry.value = null;
-      lookupDone.value = true;
-      await attemptFileLoad();
-      return;
-    }
-
-    const entry = await lookupFamily(familyId);
-    registryEntry.value = entry;
-    lookupDone.value = true;
-
-    if (entry) {
-      // Family found — attempt to load file based on provider
-      targetFamilyId.value = familyId;
-      targetProvider.value = entry.provider || 'local';
-      await attemptFileLoad();
-    } else {
-      // Registry didn't find it — still try cloud load if URL had provider info
-      await attemptFileLoad();
-    }
-  } catch {
-    // Network error — try cloud load if we have provider info, else manual fallback
-    lookupDone.value = true;
-    await attemptFileLoad();
-  } finally {
-    isLookingUp.value = false;
-  }
-}
-
-async function attemptFileLoad() {
-  // For local provider, we can't load the file automatically
-  if (targetProvider.value === 'local') {
-    needsManualFileLoad.value = true;
-    return;
-  }
-
-  if (targetProvider.value === 'google_drive') {
-    const fileId = targetDriveFileId.value || registryEntry.value?.fileId;
-    const fileName = expectedFileName.value || 'family.beanpod';
-
-    if (!fileId) {
-      needsManualFileLoad.value = true;
-      return;
-    }
-
-    // Silent-token check first: never trigger a popup or redirect from page
-    // mount. Mobile browsers (iOS Safari especially) block popups outside a
-    // user gesture, and a surprise full-page redirect to Google looks like
-    // phishing. If we don't have a cached/refreshable token, surface the
-    // "Pick from Drive" CTA so the user kicks off auth with an explicit tap.
-    const silentToken = await tryGetSilentToken();
-    if (!silentToken) {
-      console.warn('[JoinPodView] No silent token — deferring auth to user gesture');
-      cloudLoadFailed.value = true;
-      needsManualFileLoad.value = true;
-      return;
-    }
-
-    isLoadingFile.value = true;
-    try {
-      console.warn('[JoinPodView] attemptFileLoad: loading', fileId);
-      const result = await syncStore.loadFromGoogleDrive(fileId, fileName);
-      console.warn('[JoinPodView] loadFromGoogleDrive result:', JSON.stringify(result));
-      if (result.success) {
-        await onFileLoaded();
-      } else if (result.needsPassword) {
-        console.warn('[JoinPodView] File needs password, invite token:', !!inviteToken.value);
-        if (await tryInviteTokenDecrypt()) {
-          await onFileLoaded();
-        } else if (!inviteToken.value) {
-          showDecryptModal.value = true;
-        } else {
-          // Invite token failed — show error with manual fallback
-          if (!formError.value) {
-            formError.value = 'Invite token could not decrypt the file. Ask for a new invite link.';
-          }
-          cloudLoadFailed.value = true;
-          needsManualFileLoad.value = true;
-        }
-      } else {
-        const storeError = syncStore.error as string | null;
-        console.warn('[JoinPodView] loadFromGoogleDrive failed:', storeError);
-        // Common case after the iOS redirect-auth fix: the joiner has a
-        // valid drive.file-scoped token but their token doesn't yet have
-        // API-level access to the inviter's `.beanpod` by ID. Under
-        // `drive.file`, an email-based file share doesn't manifest as
-        // file-by-id readability until the joiner explicitly opens the
-        // file via Picker, and folder-only shares never grant file access.
-        // The Picker IS the recovery path — opening it grants the missing
-        // access. Auto-open it with the cached token instead of showing
-        // an error.
-        const looksLikeMissingAccess =
-          storeError?.includes('File not found') ||
-          storeError?.includes('not found') ||
-          storeError?.includes('404') ||
-          storeError?.includes('403');
-        if (looksLikeMissingAccess) {
-          console.warn('[JoinPodView] file inaccessible by ID — opening Picker with cached token');
-          // Set fallback state first: if the user cancels the Picker, we
-          // want the "Pick from Drive" CTA visible so they can retry,
-          // not a blank screen.
-          cloudLoadFailed.value = true;
-          needsManualFileLoad.value = true;
-          isLoadingFile.value = false;
-          await handlePickFromDriveWithToken(silentToken);
-          return;
-        }
-        formError.value = storeError
-          ? `Could not load the file: ${storeError}`
-          : 'Could not load the file from Google Drive. Please try again.';
-        cloudLoadFailed.value = true;
-        needsManualFileLoad.value = true;
-      }
-    } catch (e) {
-      console.error('[JoinPodView] attemptFileLoad failed:', e);
-      const detail = e instanceof Error ? e.message : String(e);
-      formError.value = `Failed to load file: ${detail}`;
-      cloudLoadFailed.value = true;
-      needsManualFileLoad.value = true;
-    } finally {
-      isLoadingFile.value = false;
-    }
-    return;
-  }
-
-  // Unknown provider — fall back to manual
-  needsManualFileLoad.value = true;
-}
-
-// --- Google Picker fallback ---
-const showManualFallback = ref(false);
-
-/** Open Picker with an already-acquired OAuth token. */
-async function handlePickFromDriveWithToken(token: string) {
-  isPickerLoading.value = true;
-  formError.value = null;
-  needsManualFileLoad.value = true; // ensure the Picker UI is visible
-  try {
-    // Pick the .beanpod file directly. Folder-picking under drive.file
-    // scope does NOT grant API list-access to files owned by another
-    // user, so a shared folder always reads as empty even when the
-    // .beanpod is visibly inside it. File-pick grants drive.file
-    // access to the chosen file, which works for shared files.
-    const picked = await pickBeanpodFile(token);
-    if (picked.kind !== 'picked') {
-      // 'cancelled' / 'failed' — leave the user on the Picker CTA so they
-      // can retry. Phase 5 (composable refactor) routes failed kinds to
-      // specific JoinErrorCodes; the legacy view path stays silent.
-      return;
-    }
-
-    console.warn('[JoinPodView] Picker selected file:', picked.fileId, picked.fileName);
-
-    targetDriveFileId.value = picked.fileId;
-    cloudLoadFailed.value = false;
-    needsManualFileLoad.value = false;
-    await attemptFileLoad();
-  } catch (e) {
-    console.error('[JoinPodView] Picker failed:', e);
-    const detail = e instanceof Error ? e.message : String(e);
-    formError.value = `${t('join.pickerPrompt.error')} (${detail})`;
-    showManualFallback.value = true;
-  } finally {
-    isPickerLoading.value = false;
-  }
-}
-
-async function handlePickFromDrive() {
-  isPickerLoading.value = true;
-  formError.value = null;
-  try {
-    // Use a cached/silently-refreshable token if we have one — avoids a
-    // redirect cycle on iOS after the user has already round-tripped
-    // through Google once this session.
-    let token = await tryGetSilentToken();
-    if (!token) {
-      // iOS Safari blocks popups even from inside a click handler once any
-      // async work runs first. Skip the popup entirely on platforms where
-      // it's known to fail and go straight to full-page redirect auth.
-      if (shouldUseRedirectAuth()) {
-        console.warn('[JoinPodView] Using redirect auth for this platform');
-        const returnPath = `${window.location.pathname}${window.location.search}`;
-        await startRedirectAuth(returnPath, inviteEmailHint.value ?? undefined);
-        return; // page navigates away
-      }
-      token = await requestAccessToken({ loginHint: inviteEmailHint.value ?? undefined });
-    }
-
-    // If we have a fileId from the QR / registry, prefer auto-load over
-    // forcing the user through the Picker. Falls back to Picker if the
-    // load fails.
-    const knownFileId = targetDriveFileId.value || registryEntry.value?.fileId;
-    if (knownFileId) {
-      isPickerLoading.value = false;
-      cloudLoadFailed.value = false;
-      await attemptFileLoad();
-      if (fileLoaded.value || !cloudLoadFailed.value) return;
-      // attemptFileLoad failed — fall through to Picker
-      isPickerLoading.value = true;
-    }
-
-    await handlePickFromDriveWithToken(token);
-  } catch (e) {
-    console.error('[JoinPodView] Picker auth failed:', e);
-    const detail = e instanceof Error ? e.message : String(e);
-
-    // Belt-and-braces: if a popup somehow still slipped through and got
-    // blocked, fall back to redirect auth.
-    if (detail.includes('Popup blocked') || detail.includes('popup')) {
-      console.warn('[JoinPodView] Popup blocked — falling back to redirect auth');
-      try {
-        const returnPath = `${window.location.pathname}${window.location.search}`;
-        await startRedirectAuth(returnPath, inviteEmailHint.value ?? undefined);
-        return;
-      } catch (redirectErr) {
-        console.error('[JoinPodView] Redirect auth failed:', redirectErr);
-      }
-    }
-
-    formError.value = `${t('join.pickerPrompt.error')} (${detail})`;
-    showManualFallback.value = true;
-  } finally {
-    isPickerLoading.value = false;
-  }
-}
-
-// --- File picker / drop zone ---
-async function handleLoadFile() {
-  formError.value = null;
-  isLoadingFile.value = true;
-
+async function handleLoadLocalFile(): Promise<void> {
+  localFormError.value = null;
+  isLoadingLocalFile.value = true;
   try {
     const result = await syncStore.loadFromNewFile();
-    if (result.success) {
-      await onFileLoaded();
-    } else if (result.needsPassword) {
-      if (await tryInviteTokenDecrypt()) {
-        await onFileLoaded();
-      } else if (!inviteToken.value) {
-        showDecryptModal.value = true;
-      }
-    } else if (syncStore.error) {
-      formError.value = syncStore.error;
-    } else {
-      formError.value = t('auth.fileLoadFailed');
-    }
+    handleLocalLoadResult(result);
   } catch {
-    formError.value = syncStore.error || t('auth.fileLoadFailed');
+    localFormError.value = syncStore.error || t('auth.fileLoadFailed');
   } finally {
-    isLoadingFile.value = false;
+    isLoadingLocalFile.value = false;
+  }
+}
+
+async function handleDroppedFile(file: File, fileHandle?: FileSystemFileHandle): Promise<void> {
+  localFormError.value = null;
+  isLoadingLocalFile.value = true;
+  try {
+    const result = await syncStore.loadFromDroppedFile(file, fileHandle);
+    handleLocalLoadResult(result);
+  } catch {
+    localFormError.value = syncStore.error || t('auth.fileLoadFailed');
+  } finally {
+    isLoadingLocalFile.value = false;
+  }
+}
+
+function handleLocalLoadResult(result: { success: boolean; needsPassword?: boolean }): void {
+  if (result.success) {
+    // No invite token → ask the user for the file password.
+    showDecryptModal.value = true;
+    return;
+  }
+  if (result.needsPassword) {
+    showDecryptModal.value = true;
+    return;
+  }
+  if (syncStore.error) {
+    localFormError.value = syncStore.error;
+  } else {
+    localFormError.value = t('auth.fileLoadFailed');
   }
 }
 
@@ -422,221 +147,66 @@ const { isDragging, bindings: dropZoneBindings } = useFileDrop({
   accept: ['.beanpod', '.json'],
   multiple: false,
   onReject: () => {
-    formError.value = t('auth.fileLoadFailed');
+    localFormError.value = t('auth.fileLoadFailed');
   },
   onDrop: async ([dropped]) => {
     if (!dropped) return;
-    formError.value = null;
     await handleDroppedFile(dropped.file, dropped.handle);
   },
 });
 
-async function handleDroppedFile(file: File, fileHandle?: FileSystemFileHandle) {
-  isLoadingFile.value = true;
-  try {
-    const result = await syncStore.loadFromDroppedFile(file, fileHandle);
-    if (result.success) {
-      await onFileLoaded();
-    } else if (result.needsPassword) {
-      if (await tryInviteTokenDecrypt()) {
-        await onFileLoaded();
-      } else if (!inviteToken.value) {
-        showDecryptModal.value = true;
-      }
-    } else if (syncStore.error) {
-      formError.value = syncStore.error;
-    } else {
-      formError.value = t('auth.fileLoadFailed');
-    }
-  } catch {
-    formError.value = syncStore.error || t('auth.fileLoadFailed');
-  } finally {
-    isLoadingFile.value = false;
+// ── Decrypt modal ────────────────────────────────────────────────────────────
+
+async function handleDecrypt(): Promise<void> {
+  if (!decryptPassword.value) return;
+  const ok = await flow.handleSubmitDecryptPassword(decryptPassword.value);
+  if (ok) {
+    showDecryptModal.value = false;
+    decryptPassword.value = '';
   }
 }
 
-async function handleDecrypt() {
-  if (!decryptPassword.value) {
-    formError.value = t('password.required');
-    return;
-  }
+// ── Password creation (final join step) ──────────────────────────────────────
 
-  isLoadingFile.value = true;
-  formError.value = null;
-
-  try {
-    const result = await syncStore.decryptPendingFile(decryptPassword.value);
-    if (result.success) {
-      showDecryptModal.value = false;
-      decryptPassword.value = '';
-      await onFileLoaded();
-    } else {
-      formError.value = result.error ?? t('password.decryptionError');
-    }
-  } catch {
-    formError.value = t('password.decryptionError');
-  } finally {
-    isLoadingFile.value = false;
-  }
+async function handleCreatePassword(): Promise<void> {
+  if (!password.value || password.value.length < 8) return;
+  if (password.value !== confirmPassword.value) return;
+  const ok = await flow.handleSubmitPassword(password.value);
+  if (ok) emit('signed-in', '/nook');
 }
 
-/**
- * Try to decrypt the pending V4 file using the invite token.
- * Returns true if decryption succeeded, false if it should fall back to the password modal.
- */
-async function tryInviteTokenDecrypt(): Promise<boolean> {
-  if (!inviteToken.value) return false;
+const passwordError = computed(() => {
+  if (!password.value) return null;
+  if (password.value.length < 8) return t('auth.passwordMinLength');
+  if (password.value !== confirmPassword.value && confirmPassword.value)
+    return t('auth.passwordsDoNotMatch');
+  return null;
+});
 
-  const pending = syncStore.pendingEncryptedFile;
-  if (!pending?.envelope?.inviteKeys) {
-    console.warn('[JoinPodView] No inviteKeys in envelope');
-    return false;
-  }
+// ── Navigation ───────────────────────────────────────────────────────────────
 
-  isLoadingFile.value = true;
-  try {
-    const { hashInviteToken, redeemInviteToken, isInviteExpired } =
-      await import('@/services/crypto/inviteService');
-
-    const tokenHash = await hashInviteToken(inviteToken.value);
-    const knownHashes = Object.keys(pending.envelope.inviteKeys);
-    console.warn(
-      '[JoinPodView] invite decrypt:',
-      JSON.stringify({
-        tokenLength: inviteToken.value.length,
-        tokenHash: tokenHash.slice(0, 8) + '...',
-        knownHashCount: knownHashes.length,
-        knownHashPrefixes: knownHashes.map((h) => h.slice(0, 8) + '...'),
-        match: knownHashes.includes(tokenHash),
-      })
-    );
-
-    const pkg = pending.envelope.inviteKeys[tokenHash];
-
-    if (!pkg) {
-      formError.value = t('join.inviteTokenInvalid');
-      return false;
-    }
-
-    if (isInviteExpired(pkg.expiresAt)) {
-      console.warn('[JoinPodView] Invite expired:', pkg.expiresAt);
-      formError.value = t('join.inviteTokenExpired');
-      return false;
-    }
-
-    const fk = await redeemInviteToken(pkg.wrapped, pkg.salt, inviteToken.value);
-    const result = await syncStore.decryptPendingFileWithKey(fk);
-
-    if (result.success) return true;
-
-    console.warn('[JoinPodView] decryptPendingFileWithKey failed:', result.error);
-    formError.value = result.error ?? t('join.inviteTokenInvalid');
-    return false;
-  } catch (e) {
-    console.warn('[JoinPodView] invite decrypt exception:', e);
-    formError.value = t('join.inviteTokenInvalid');
-    return false;
-  } finally {
-    isLoadingFile.value = false;
-  }
-}
-
-async function onFileLoaded() {
-  // Validate familyId matches if we have a target.
-  // Use the V4 envelope's familyId (always available after decrypt) with fallback
-  // to the context store (which may be null in a fresh browser).
-  const loadedFamilyId = syncStore.envelope?.familyId ?? familyContextStore.activeFamilyId;
-  if (targetFamilyId.value && loadedFamilyId && loadedFamilyId !== targetFamilyId.value) {
-    formError.value = t('join.fileMismatch');
-    fileLoaded.value = false;
-    return;
-  }
-
-  fileLoaded.value = true;
-  needsManualFileLoad.value = false;
-
-  // Check for unclaimed members
-  if (unclaimedMembers.value.length === 0) {
-    formError.value = t('join.noUnclaimedMembers');
-    return;
-  }
-
-  // Advance to pick-member step
-  formError.value = null;
-  currentStep.value = 'pick-member';
-}
-
-// --- Step 2: Pick member ---
-function selectMember(member: FamilyMember) {
-  selectedMember.value = member;
-  formError.value = null;
-  password.value = '';
-  confirmPassword.value = '';
-  currentStep.value = 'set-password';
-}
-
-// --- Step 3: Set password ---
-async function handleCreatePassword() {
-  formError.value = null;
-
-  if (!password.value) {
-    formError.value = t('auth.enterPassword');
-    return;
-  }
-
-  if (password.value.length < 8) {
-    formError.value = t('auth.passwordMinLength');
-    return;
-  }
-
-  if (password.value !== confirmPassword.value) {
-    formError.value = t('auth.passwordsDoNotMatch');
-    return;
-  }
-
-  if (!selectedMember.value) return;
-
-  isJoining.value = true;
-
-  try {
-    const result = await authStore.joinFamily({
-      memberId: selectedMember.value.id,
-      password: password.value,
-      familyId: familyContextStore.activeFamilyId ?? targetFamilyId.value,
-    });
-
-    if (result.success) {
-      // Wrap the family key with the member's password so they can decrypt
-      // from any browser/device (e.g. Safari PWA after joining via Chrome)
-      await syncStore.wrapFamilyKeyForMember(selectedMember.value.id, password.value);
-      // Persist password hash + wrappedKey to file before handing off
-      await syncStore.syncNow(true);
-      emit('signed-in', '/nook');
-    } else {
-      formError.value = result.error ?? t('auth.signInFailed');
-    }
-  } catch {
-    formError.value = t('auth.signInFailed');
-  } finally {
-    isJoining.value = false;
-  }
-}
-
-// --- Navigation ---
-function handleBack() {
-  if (currentStep.value === 'set-password') {
-    currentStep.value = 'pick-member';
-    selectedMember.value = null;
+function handleBack(): void {
+  if (flow.currentStep.value === 'set-password') {
+    flow.currentStep.value = 'pick-member';
+    flow.selectedMember.value = null;
     password.value = '';
     confirmPassword.value = '';
-    formError.value = null;
-  } else if (currentStep.value === 'pick-member') {
-    currentStep.value = 'verify';
-    formError.value = null;
+    flow.clearError();
+  } else if (flow.currentStep.value === 'pick-member') {
+    flow.currentStep.value = 'awaiting-auth';
+    flow.clearError();
   } else {
     emit('back');
   }
 }
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+onMounted(() => {
+  flow.init().catch((e) => {
+    console.warn('[JoinPodView] flow.init crashed', e);
+  });
+});
 </script>
 
 <template>
@@ -653,9 +223,52 @@ function handleBack() {
     </button>
 
     <!-- ============================================ -->
+    <!-- ERROR BLOCK (rendered above any step content) -->
+    <!-- ============================================ -->
+    <div
+      v-if="currentErrorView"
+      class="mb-4 rounded-2xl p-4"
+      :class="
+        currentErrorView.severity === 'critical'
+          ? 'bg-red-50 dark:bg-red-900/20'
+          : 'bg-amber-50 dark:bg-amber-900/20'
+      "
+      role="alert"
+    >
+      <p
+        class="mb-3 text-sm"
+        :class="
+          currentErrorView.severity === 'critical'
+            ? 'text-red-800 dark:text-red-300'
+            : 'text-amber-800 dark:text-amber-300'
+        "
+      >
+        {{ currentErrorView.message }}
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <BaseButton
+          v-for="action in currentErrorView.recoveries"
+          :key="action"
+          size="sm"
+          :variant="action === currentErrorView.recoveries[0] ? 'primary' : 'secondary'"
+          @click="recoveryHandlers[action]()"
+        >
+          {{ t(`join.recovery.${action}`) }}
+        </BaseButton>
+      </div>
+    </div>
+
+    <!-- ============================================ -->
     <!-- STEP 1: Verify & Load                        -->
     <!-- ============================================ -->
-    <template v-if="currentStep === 'verify'">
+    <template
+      v-if="
+        flow.currentStep.value === 'lookup' ||
+        flow.currentStep.value === 'awaiting-auth' ||
+        flow.currentStep.value === 'authenticating' ||
+        flow.currentStep.value === 'loading'
+      "
+    >
       <!-- Header with beanie family image -->
       <div class="mb-6 text-center">
         <img
@@ -671,26 +284,19 @@ function handleBack() {
         </p>
       </div>
 
-      <!-- Error -->
-      <div
-        v-if="formError"
-        class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
-      >
-        {{ formError }}
-      </div>
-
-      <!-- Looking up / cloud loading spinner -->
-      <div v-if="isLookingUp || (isLoadingFile && !needsManualFileLoad)" class="py-12 text-center">
+      <!-- Busy spinner -->
+      <div v-if="isBusy && !currentErrorView" class="py-12 text-center">
         <BeanieSpinner size="md" class="mx-auto mb-3" />
-        <p class="text-sm text-gray-500 dark:text-gray-400">
-          {{ isLoadingFile ? t('join.loadingFromCloud') : t('join.lookingUp') }}
-        </p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ busyLabel }}</p>
       </div>
 
-      <!-- Family found + needs manual file load -->
-      <template v-else-if="lookupDone && needsManualFileLoad">
-        <!-- Family info card -->
-        <div v-if="registryEntry" class="mb-5 rounded-2xl bg-green-50 p-4 dark:bg-green-900/20">
+      <!-- Awaiting user gesture: show family-found card + Picker CTA / drop zone -->
+      <template v-else-if="flow.currentStep.value === 'awaiting-auth'">
+        <!-- Family found card -->
+        <div
+          v-if="flow.registryEntry.value?.familyName"
+          class="mb-5 rounded-2xl bg-green-50 p-4 dark:bg-green-900/20"
+        >
           <div class="flex items-center gap-3">
             <div
               class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-green-100 dark:bg-green-800/30"
@@ -713,136 +319,111 @@ function handleBack() {
               <p class="text-sm font-semibold text-green-800 dark:text-green-300">
                 {{ t('join.familyFound') }}
               </p>
-              <p
-                v-if="registryEntry.familyName"
-                class="font-outfit text-lg font-bold text-green-900 dark:text-green-200"
-              >
-                {{ registryEntry.familyName }}
+              <p class="font-outfit text-lg font-bold text-green-900 dark:text-green-200">
+                {{ flow.registryEntry.value.familyName }}
               </p>
             </div>
           </div>
         </div>
 
-        <!-- Google Picker — primary path for any Drive-backed invite. Renders
-             whenever the provider is google_drive, regardless of whether the
-             URL had a fileId. With no fileId we never tried auto-load (the
-             user picks the file via Picker); with a fileId we tried and
-             failed (the Picker IS the recovery path under drive.file scope). -->
-        <template v-if="targetProvider === 'google_drive'">
+        <!-- Google Drive Picker CTA — primary path for any drive-backed invite -->
+        <template v-if="flow.targetProvider.value === 'google_drive'">
           <div class="space-y-3 text-center">
             <p class="text-sm text-slate-600 dark:text-slate-400">
               {{ t('join.pickerPrompt.description') }}
             </p>
-            <BaseButton :loading="isPickerLoading" class="w-full" @click="handlePickFromDrive">
+            <BaseButton class="w-full" @click="flow.handleAuthTap">
               {{ t('join.pickerPrompt.button') }}
             </BaseButton>
           </div>
+        </template>
 
-          <!-- Manual file fallback (collapsed by default, expands on click or Picker error) -->
-          <div class="mt-4">
-            <button
-              v-if="!showManualFallback"
-              type="button"
-              class="text-primary-500 hover:text-terracotta-400 mx-auto block text-xs font-medium"
-              @click="showManualFallback = true"
-            >
-              {{ t('join.pickerPrompt.orManual') }}
-            </button>
+        <!-- Local-provider drop zone -->
+        <template v-else-if="flow.targetFamilyId.value">
+          <div class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
+            <p class="mb-3 text-sm font-semibold text-white">{{ t('join.needsFile') }}</p>
+            <p class="mb-4 text-sm text-white/70">{{ t('join.needsFileDesc') }}</p>
+            <div v-if="flow.expectedFileName.value" class="mb-4 rounded-xl bg-white/10 px-3 py-2">
+              <p class="text-xs text-white/50">{{ t('join.expectedFile') }}</p>
+              <p class="font-mono text-sm font-medium text-white">
+                {{ flow.expectedFileName.value }}
+              </p>
+            </div>
             <div
-              v-if="showManualFallback"
-              class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700"
+              v-if="localFormError"
+              class="mb-4 rounded-lg bg-red-50/20 p-2 text-xs text-red-200"
             >
-              <p class="mb-3 text-sm font-semibold text-white">
-                {{ t('join.cloudLoadFailed') }}
-              </p>
-              <p class="mb-4 text-sm text-white/70">
-                {{ t('join.needsFileDesc') }}
-              </p>
-              <div v-if="expectedFileName" class="mb-4 rounded-xl bg-white/10 px-3 py-2">
-                <p class="text-xs text-white/50">{{ t('join.expectedFile') }}</p>
-                <p class="font-mono text-sm font-medium text-white">{{ expectedFileName }}</p>
+              {{ localFormError }}
+            </div>
+            <div
+              role="button"
+              tabindex="0"
+              class="w-full cursor-pointer rounded-2xl border-2 border-dashed px-5 py-6 text-center transition-all"
+              :class="
+                isDragging
+                  ? 'border-primary-500 bg-primary-500/10'
+                  : 'hover:border-primary-500/50 border-white/20 hover:bg-white/5'
+              "
+              v-bind="dropZoneBindings"
+              @click="handleLoadLocalFile"
+              @keydown.enter="handleLoadLocalFile"
+            >
+              <div v-if="isLoadingLocalFile" class="py-2">
+                <BeanieSpinner size="sm" class="mx-auto mb-2" />
+                <p class="text-xs text-white/60">{{ t('auth.loadingFile') }}</p>
               </div>
-              <div
-                role="button"
-                tabindex="0"
-                class="w-full cursor-pointer rounded-2xl border-2 border-dashed px-5 py-6 text-center transition-all"
-                :class="
-                  isDragging
-                    ? 'border-primary-500 bg-primary-500/10'
-                    : 'hover:border-primary-500/50 border-white/20 hover:bg-white/5'
-                "
-                v-bind="dropZoneBindings"
-                @click="handleLoadFile"
-                @keydown.enter="handleLoadFile"
-              >
-                <div v-if="isLoadingFile" class="py-2">
-                  <BeanieSpinner size="sm" class="mx-auto mb-2" />
-                  <p class="text-xs text-white/60">{{ t('auth.loadingFile') }}</p>
-                </div>
-                <template v-else>
-                  <svg
-                    class="mx-auto mb-2 h-8 w-8 text-white/40"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-                  <p class="text-sm font-medium text-white/80">
-                    {{ t('join.dropZoneText') }}
-                  </p>
-                  <p class="text-primary-500 mt-1 text-xs">
-                    {{ t('join.loadFileButton') }}
-                  </p>
-                </template>
-              </div>
+              <template v-else>
+                <svg
+                  class="mx-auto mb-2 h-8 w-8 text-white/40"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  />
+                </svg>
+                <p class="text-sm font-medium text-white/80">{{ t('join.dropZoneText') }}</p>
+                <p class="text-primary-500 mt-1 text-xs">{{ t('join.loadFileButton') }}</p>
+              </template>
             </div>
           </div>
         </template>
 
-        <!-- File guidance card (non-Drive providers or no cloud failure) -->
-        <div v-else class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
-          <p class="mb-3 text-sm font-semibold text-white">
-            {{ cloudLoadFailed ? t('join.cloudLoadFailed') : t('join.needsFile') }}
-          </p>
-          <p class="mb-4 text-sm text-white/70">
-            {{ t('join.needsFileDesc') }}
-          </p>
-
-          <!-- Expected file name -->
-          <div v-if="expectedFileName" class="mb-4 rounded-xl bg-white/10 px-3 py-2">
-            <p class="text-xs text-white/50">{{ t('join.expectedFile') }}</p>
-            <p class="font-mono text-sm font-medium text-white">{{ expectedFileName }}</p>
-          </div>
-
-          <!-- File picker drop zone -->
-          <div
-            role="button"
-            tabindex="0"
-            class="w-full cursor-pointer rounded-2xl border-2 border-dashed px-5 py-6 text-center transition-all"
-            :class="
-              isDragging
-                ? 'border-primary-500 bg-primary-500/10'
-                : 'hover:border-primary-500/50 border-white/20 hover:bg-white/5'
-            "
-            v-bind="dropZoneBindings"
-            @click="handleLoadFile"
-            @keydown.enter="handleLoadFile"
-          >
-            <div v-if="isLoadingFile" class="py-2">
+        <!-- No URL params — instructions for getting a magic link -->
+        <template v-else>
+          <div class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
+            <p class="mb-3 text-sm font-semibold text-white">{{ t('join.howToJoinTitle') }}</p>
+            <div class="space-y-2.5">
               <div
-                class="border-t-primary-500 mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-2 border-white/30"
-              ></div>
-              <p class="text-xs text-white/60">{{ t('auth.loadingFile') }}</p>
+                v-for="step in [
+                  { n: 1, label: t('join.howToJoinStep1') },
+                  { n: 2, label: t('join.howToJoinStep2') },
+                  { n: 3, label: t('join.howToJoinStep3') },
+                ]"
+                :key="step.n"
+                class="flex items-start gap-3"
+              >
+                <div
+                  class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
+                >
+                  {{ step.n }}
+                </div>
+                <p class="text-sm text-white/80">{{ step.label }}</p>
+              </div>
             </div>
-            <template v-else>
+          </div>
+          <div
+            class="mt-4 flex items-start gap-3 rounded-2xl bg-gray-50 p-[14px_18px] dark:bg-slate-700/50"
+          >
+            <div
+              class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-[#6EE7B7]/[0.12]"
+            >
               <svg
-                class="mx-auto mb-2 h-8 w-8 text-white/40"
+                class="h-4 w-4 text-[#6EE7B7]"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -851,123 +432,18 @@ function handleBack() {
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
                 />
               </svg>
-              <p class="text-sm font-medium text-white/80">
-                {{ t('join.dropZoneText') }}
-              </p>
-              <p class="text-primary-500 mt-1 text-xs">
-                {{ t('join.loadFileButton') }}
-              </p>
-            </template>
+            </div>
+            <p class="text-xs font-semibold opacity-50">{{ t('join.linkExpiryNote') }}</p>
           </div>
-        </div>
+        </template>
       </template>
 
-      <!-- Family not found (registry returned null but was reachable) -->
-      <template v-else-if="lookupDone && !registryEntry && targetFamilyId">
-        <div class="mb-5 rounded-2xl bg-amber-50 p-4 dark:bg-amber-900/20">
-          <div class="flex items-start gap-3">
-            <svg
-              class="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.27 16.5c-.77.833.192 2.5 1.732 2.5z"
-              />
-            </svg>
-            <div>
-              <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                {{ t('join.familyNotFound') }}
-              </p>
-              <p class="mt-1 text-xs text-amber-700/70 dark:text-amber-400/70">
-                {{ t('join.registryOffline') }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Still allow manual file load as fallback -->
-        <div class="space-y-3">
-          <BaseButton class="w-full" @click="needsManualFileLoad = true">
-            {{ t('join.loadFileButton') }}
-          </BaseButton>
-        </div>
-      </template>
-
-      <!-- No link params — show instructions to get a magic link -->
-      <template v-else-if="!isLookingUp && !lookupDone">
-        <!-- How to join card -->
-        <div class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
-          <p class="mb-3 text-sm font-semibold text-white">
-            {{ t('join.howToJoinTitle') }}
-          </p>
-          <div class="space-y-2.5">
-            <div class="flex items-start gap-3">
-              <div
-                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
-              >
-                1
-              </div>
-              <p class="text-sm text-white/80">{{ t('join.howToJoinStep1') }}</p>
-            </div>
-            <div class="flex items-start gap-3">
-              <div
-                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
-              >
-                2
-              </div>
-              <p class="text-sm text-white/80">{{ t('join.howToJoinStep2') }}</p>
-            </div>
-            <div class="flex items-start gap-3">
-              <div
-                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
-              >
-                3
-              </div>
-              <p class="text-sm text-white/80">{{ t('join.howToJoinStep3') }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Expiry note -->
-        <div
-          class="mt-4 flex items-start gap-3 rounded-2xl bg-gray-50 p-[14px_18px] dark:bg-slate-700/50"
-        >
-          <div
-            class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-[#6EE7B7]/[0.12]"
-          >
-            <svg
-              class="h-4 w-4 text-[#6EE7B7]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
-          </div>
-          <p class="text-xs font-semibold opacity-50">
-            {{ t('join.linkExpiryNote') }}
-          </p>
-        </div>
-      </template>
-
-      <!-- Footer link -->
+      <!-- Footer link (always visible at the bottom of step 1) -->
       <div class="mt-6 text-center">
-        <span class="text-sm text-gray-500 dark:text-gray-400">
-          {{ t('loginV6.wantYourOwn') }}
-        </span>
+        <span class="text-sm text-gray-500 dark:text-gray-400">{{ t('loginV6.wantYourOwn') }}</span>
         {{ ' ' }}
         <button
           type="button"
@@ -982,12 +458,10 @@ function handleBack() {
     <!-- ============================================ -->
     <!-- STEP 2: Pick Your Bean                       -->
     <!-- ============================================ -->
-    <template v-else-if="currentStep === 'pick-member'">
-      <!-- Header -->
+    <template v-else-if="flow.currentStep.value === 'pick-member'">
       <div class="mb-6 text-center">
-        <!-- Pod name chip -->
         <div
-          v-if="registryEntry?.familyName || familyContextStore.activeFamilyName"
+          v-if="flow.registryEntry.value?.familyName"
           class="mx-auto mb-3 inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-400"
         >
           <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -998,9 +472,8 @@ function handleBack() {
               d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
             />
           </svg>
-          {{ registryEntry?.familyName || familyContextStore.activeFamilyName }}
+          {{ flow.registryEntry.value.familyName }}
         </div>
-
         <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
           {{ t('join.pickMemberTitle') }}
         </h2>
@@ -1009,21 +482,15 @@ function handleBack() {
         </p>
       </div>
 
-      <!-- Error -->
       <div
-        v-if="formError"
-        class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
+        v-if="flow.unclaimedMembers.value.length > 0"
+        class="flex flex-wrap justify-center gap-6"
       >
-        {{ formError }}
-      </div>
-
-      <!-- Avatar grid -->
-      <div v-if="unclaimedMembers.length > 0" class="flex flex-wrap justify-center gap-6">
         <button
-          v-for="member in unclaimedMembers"
+          v-for="member in flow.unclaimedMembers.value"
           :key="member.id"
           class="group flex w-[88px] flex-col items-center gap-2 transition-transform hover:-translate-y-0.5"
-          @click="selectMember(member)"
+          @click="flow.handleSelectMember(member)"
         >
           <div class="relative">
             <BeanieAvatar
@@ -1031,7 +498,6 @@ function handleBack() {
               :color="member.color"
               size="xl"
             />
-            <!-- Unclaimed indicator -->
             <div
               class="bg-primary-500 absolute right-0 bottom-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white dark:border-slate-800"
             >
@@ -1044,26 +510,21 @@ function handleBack() {
             >
               {{ member.name }}
             </p>
-            <p class="text-xs text-gray-400 opacity-60">
-              {{ getMemberRole(member) }}
-            </p>
+            <p class="text-xs text-gray-400 opacity-60">{{ getMemberRole(member) }}</p>
           </div>
         </button>
       </div>
-
-      <!-- No unclaimed members -->
       <div v-else class="py-8 text-center">
-        <p class="text-sm text-gray-600 dark:text-gray-400">
-          {{ t('join.noUnclaimedMembers') }}
-        </p>
+        <p class="text-sm text-gray-600 dark:text-gray-400">{{ t('join.noUnclaimedMembers') }}</p>
       </div>
     </template>
 
     <!-- ============================================ -->
     <!-- STEP 3: Create Password                      -->
     <!-- ============================================ -->
-    <template v-else-if="currentStep === 'set-password'">
-      <!-- Header -->
+    <template
+      v-else-if="flow.currentStep.value === 'set-password' || flow.currentStep.value === 'joining'"
+    >
       <div class="mb-6 text-center">
         <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
           {{ t('join.setPasswordTitle') }}
@@ -1073,36 +534,31 @@ function handleBack() {
         </p>
       </div>
 
-      <!-- Error -->
-      <div
-        v-if="formError"
-        class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
-      >
-        {{ formError }}
-      </div>
-
       <form @submit.prevent="handleCreatePassword">
         <!-- Selected member card -->
         <div class="mb-4 flex items-center gap-3 rounded-2xl bg-gray-50 p-4 dark:bg-slate-700/50">
           <BeanieAvatar
-            v-if="selectedMember"
-            :variant="getMemberAvatarVariant(selectedMember)"
-            :color="selectedMember.color"
+            v-if="flow.selectedMember.value"
+            :variant="getMemberAvatarVariant(flow.selectedMember.value)"
+            :color="flow.selectedMember.value.color"
             size="lg"
           />
           <div class="flex-1">
             <p class="font-outfit font-semibold text-gray-900 dark:text-gray-100">
-              {{ selectedMember?.name }}
+              {{ flow.selectedMember.value?.name }}
             </p>
             <p
-              v-if="selectedMember?.email && !isTemporaryEmail(selectedMember.email)"
+              v-if="
+                flow.selectedMember.value?.email &&
+                !isTemporaryEmail(flow.selectedMember.value.email)
+              "
               class="text-xs text-gray-500 dark:text-gray-400"
             >
-              {{ selectedMember.email }}
+              {{ flow.selectedMember.value.email }}
             </p>
           </div>
           <button
-            v-if="unclaimedMembers.length > 1"
+            v-if="flow.unclaimedMembers.value.length > 1"
             type="button"
             class="text-primary-500 hover:text-terracotta-400 text-sm font-medium"
             @click="handleBack"
@@ -1111,14 +567,12 @@ function handleBack() {
           </button>
         </div>
 
-        <!-- Password fields -->
         <BaseInput
           v-model="password"
           :label="t('auth.createPassword')"
           type="password"
           :placeholder="t('auth.createPasswordPlaceholder')"
           required
-          @input="formError = null"
         />
         <div class="mt-3">
           <BaseInput
@@ -1127,35 +581,38 @@ function handleBack() {
             type="password"
             :placeholder="t('auth.confirmPasswordPlaceholder')"
             required
-            @input="formError = null"
           />
         </div>
 
-        <BaseButton type="submit" class="mt-4 w-full" :loading="isJoining">
-          {{ isJoining ? t('join.completing') : t('auth.createAndSignIn') }}
+        <p v-if="passwordError" class="mt-2 text-xs text-red-600 dark:text-red-400">
+          {{ passwordError }}
+        </p>
+
+        <BaseButton
+          type="submit"
+          class="mt-4 w-full"
+          :loading="flow.currentStep.value === 'joining'"
+          :disabled="!!passwordError || !password || !confirmPassword"
+        >
+          {{
+            flow.currentStep.value === 'joining' ? t('join.completing') : t('auth.createAndSignIn')
+          }}
         </BaseButton>
       </form>
     </template>
 
-    <!-- Decrypt Modal -->
+    <!-- ============================================ -->
+    <!-- Decrypt Modal (no invite token / local file) -->
+    <!-- ============================================ -->
     <BaseModal :open="showDecryptModal" @close="showDecryptModal = false">
       <div class="text-center">
         <h3 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
           {{ t('loginV6.unlockTitle') }}
         </h3>
-        <p class="mt-1 text-xs opacity-40">
-          {{ t('loginV6.unlockSubtitle') }}
-        </p>
+        <p class="mt-1 text-xs opacity-40">{{ t('loginV6.unlockSubtitle') }}</p>
       </div>
 
       <form class="mt-6" @submit.prevent="handleDecrypt">
-        <div
-          v-if="formError"
-          class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
-        >
-          {{ formError }}
-        </div>
-
         <BaseInput
           v-model="decryptPassword"
           :label="t('password.password')"
@@ -1167,7 +624,6 @@ function handleBack() {
         <BaseButton
           type="submit"
           class="from-primary-500 to-terracotta-400 mt-4 w-full bg-gradient-to-r"
-          :loading="isLoadingFile"
         >
           {{ t('loginV6.unlockButton') }}
         </BaseButton>
