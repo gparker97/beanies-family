@@ -215,23 +215,24 @@ async function handleSettingsReconnect() {
  * screen so the user can pick a different account; the resulting email
  * is treated as the new ground truth and written to the member's
  * googleAccountEmail (via the assertion subscriber).
+ *
+ * Cancellation contract: if the user dismisses Google's chooser, we
+ * disarm the pending-switch flag (so the next legitimate token
+ * acquisition isn't silently overwritten) and stay on the previous
+ * account. The IDB refresh token is preserved on entry — `forceConsent`
+ * already wipes the in-memory tokens, which is enough to force the
+ * chooser, while keeping the IDB token means file polling can silently
+ * recover from any cancel without spamming the chooser on every tick.
  */
 async function handleSwitchGoogleAccount() {
   isSwitchingAccount.value = true;
+  const { armAccountSwitch, disarmAccountSwitch } =
+    await import('@/services/auth/googleAccountAssertion');
   try {
-    const { armAccountSwitch } = await import('@/services/auth/googleAccountAssertion');
-    const {
-      requestAccessToken,
-      shouldUseRedirectAuth,
-      startRedirectAuth,
-      clearGoogleSessionState,
-    } = await import('@/services/google/googleAuth');
+    const { requestAccessToken, shouldUseRedirectAuth, startRedirectAuth } =
+      await import('@/services/google/googleAuth');
 
     armAccountSwitch();
-    // Wipe in-memory tokens first so silent refresh can't bypass the
-    // chooser. Without this, the existing valid token short-circuits
-    // the consent flow and the user never sees Google's account picker.
-    await clearGoogleSessionState();
 
     if (shouldUseRedirectAuth()) {
       await startRedirectAuth(`${window.location.pathname}${window.location.search}`);
@@ -240,6 +241,15 @@ async function handleSwitchGoogleAccount() {
     await requestAccessToken({ forceConsent: true });
     await syncStore.handleGoogleReconnected();
   } catch (e) {
+    // Cancellation is a deliberate user action — disarm the switch flag
+    // so the next token acquisition isn't poisoned, then quietly return
+    // without an error alert.
+    disarmAccountSwitch();
+    const message = e instanceof Error ? e.message : String(e);
+    if (/cancel|dismiss|popup_closed|user_cancel/i.test(message)) {
+      console.warn('[SettingsPage] switch-account cancelled by user');
+      return;
+    }
     console.warn('[SettingsPage] switch-account failed:', e);
     await showAlert({
       title: 'settings.familyData.switchAccount',

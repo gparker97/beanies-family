@@ -50,11 +50,13 @@ let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Token-acquisition callbacks. Fires after every successful access-token
 // acquisition (popup, silent refresh, redirect). Subscribers receive the
-// resolved Google account email (best-effort fetch) and the token string.
-// Used by the account-assertion subsystem to validate that the acquired
-// token belongs to the expected Google account; could also be used by
-// future telemetry/UI hooks.
-type AcquiredCallback = (email: string | null, token: string) => void;
+// resolved Google account email (best-effort fetch), the token string,
+// and an `interactive` flag indicating whether the acquisition came from
+// a user-driven flow (popup / redirect) vs. a background silent refresh.
+// The interactive flag lets the account-assertion subsystem distinguish
+// a deliberate "switch account" acquisition from an incidental silent
+// refresh that happened to fire during the switch flow.
+type AcquiredCallback = (email: string | null, token: string, interactive: boolean) => void;
 const acquiredCallbacks: AcquiredCallback[] = [];
 
 /**
@@ -284,8 +286,9 @@ async function performPopupAuth(
   scheduleAutoRefresh(tokens.expires_in);
 
   // Notify subscribers (assertion + telemetry hooks). Fire-and-forget:
-  // never block token return on subscriber work.
-  notifyTokenAcquired(tokens.access_token).catch(() => {});
+  // never block token return on subscriber work. interactive=true — the
+  // user explicitly went through the chooser/consent flow.
+  notifyTokenAcquired(tokens.access_token, true).catch(() => {});
 
   console.warn(`[googleAuth] Token acquired via PKCE, expires in ${tokens.expires_in}s`);
   return tokens.access_token;
@@ -359,7 +362,8 @@ async function performSilentRefresh(): Promise<string | null> {
     scheduleAutoRefresh(tokens.expires_in);
 
     // Notify subscribers (assertion + telemetry hooks). Fire-and-forget.
-    notifyTokenAcquired(tokens.access_token).catch(() => {});
+    // interactive=false — background refresh, no user gesture involved.
+    notifyTokenAcquired(tokens.access_token, false).catch(() => {});
 
     console.warn('[googleAuth] Silent refresh succeeded');
     return tokens.access_token;
@@ -513,15 +517,17 @@ export function onTokenAcquired(callback: AcquiredCallback): () => void {
 /**
  * Internal: notify all token-acquisition subscribers. Fires once per
  * successful acquisition. Email is fetched best-effort; null is passed
- * if userinfo cannot be resolved. Subscriber errors are logged but
- * never rethrown — one bad subscriber must not break others.
+ * if userinfo cannot be resolved. The `interactive` flag distinguishes
+ * user-driven acquisitions (popup, redirect) from background ones
+ * (silent refresh). Subscriber errors are logged but never rethrown —
+ * one bad subscriber must not break others.
  */
-async function notifyTokenAcquired(token: string): Promise<void> {
+async function notifyTokenAcquired(token: string, interactive: boolean): Promise<void> {
   if (acquiredCallbacks.length === 0) return;
   const email = await fetchGoogleUserEmail(token);
   for (const cb of acquiredCallbacks) {
     try {
-      cb(email, token);
+      cb(email, token, interactive);
     } catch (e) {
       console.warn('[googleAuth] tokenAcquired callback error:', e);
     }
@@ -773,7 +779,9 @@ export async function completeRedirectAuth(): Promise<string | null> {
   }
 
   scheduleAutoRefresh(tokens.expires_in);
-  notifyTokenAcquired(tokens.access_token).catch(() => {});
+  // interactive=true — user just returned from a full-page redirect to
+  // Google's consent/chooser screen.
+  notifyTokenAcquired(tokens.access_token, true).catch(() => {});
 
   console.warn(`[googleAuth] Token acquired via redirect PKCE, expires in ${tokens.expires_in}s`);
   return tokens.access_token;

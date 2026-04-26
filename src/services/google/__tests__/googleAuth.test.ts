@@ -459,6 +459,28 @@ describe('googleAuth (PKCE)', () => {
       unsub();
     });
 
+    it('passes interactive=false from a silent refresh', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'silent@example.com' }),
+      });
+
+      const subscriber = vi.fn();
+      googleAuth.onTokenAcquired(subscriber);
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      await googleAuth.initializeAuth('family-int-silent');
+
+      await googleAuth.attemptSilentRefresh();
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(subscriber).toHaveBeenCalledWith('silent@example.com', 'mock-refreshed-token', false);
+
+      vi.unstubAllEnvs();
+    });
+
     it('fires after a successful silent refresh with the resolved email', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
       globalThis.fetch = vi.fn().mockResolvedValue({
@@ -477,7 +499,7 @@ describe('googleAuth (PKCE)', () => {
       // notifyTokenAcquired is fire-and-forget — wait for the microtask + fetch
       await new Promise((r) => setTimeout(r, 10));
 
-      expect(subscriber).toHaveBeenCalledWith('silent@example.com', 'mock-refreshed-token');
+      expect(subscriber).toHaveBeenCalledWith('silent@example.com', 'mock-refreshed-token', false);
 
       vi.unstubAllEnvs();
     });

@@ -44,18 +44,56 @@ let unsubscribe: (() => void) | null = null;
 let correcting = false;
 
 // One-shot flag set by the "switch Google account" flow. When set, the
-// next token acquisition's email is written to the member record as the
-// new googleAccountEmail (no assertion).
+// next *interactive* token acquisition's email is written to the member
+// record as the new googleAccountEmail (no assertion).
+//
+// Also mirrored to sessionStorage so the flag survives a full-page
+// redirect-auth round-trip on PWA / iOS Safari (the in-memory flag is
+// lost when the page navigates to Google's consent screen and back).
 let pendingAccountSwitch = false;
+const PENDING_SWITCH_STORAGE_KEY = 'beanies_pending_account_switch';
+
+function readPendingSwitchFromStorage(): boolean {
+  try {
+    return sessionStorage.getItem(PENDING_SWITCH_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writePendingSwitchToStorage(value: boolean): void {
+  try {
+    if (value) sessionStorage.setItem(PENDING_SWITCH_STORAGE_KEY, '1');
+    else sessionStorage.removeItem(PENDING_SWITCH_STORAGE_KEY);
+  } catch {
+    // Best-effort; sessionStorage may be unavailable in some contexts.
+  }
+}
+
+function isPendingAccountSwitch(): boolean {
+  return pendingAccountSwitch || readPendingSwitchFromStorage();
+}
 
 /**
- * Arm the next token acquisition to be treated as a deliberate account
- * switch — the new email becomes the member's googleAccountEmail.
- * Called by the Settings UI's "Switch Google account" button before
- * triggering a forced re-consent.
+ * Arm the next interactive token acquisition to be treated as a
+ * deliberate account switch — the new email becomes the member's
+ * googleAccountEmail. Called by the Settings UI's "Switch Google
+ * account" button before triggering a forced re-consent.
  */
 export function armAccountSwitch(): void {
   pendingAccountSwitch = true;
+  writePendingSwitchToStorage(true);
+}
+
+/**
+ * Clear the pending-switch flag without consuming it. Called on switch
+ * cancellation (popup dismissed, redirect bailed out via back button)
+ * so the flag doesn't poison the next legitimate token acquisition by
+ * silently overwriting the bound googleAccountEmail.
+ */
+export function disarmAccountSwitch(): void {
+  pendingAccountSwitch = false;
+  writePendingSwitchToStorage(false);
 }
 
 /**
@@ -67,7 +105,7 @@ export function registerGoogleAccountAssertion(): void {
   if (registered) return;
   registered = true;
 
-  unsubscribe = onTokenAcquired(async (email) => {
+  unsubscribe = onTokenAcquired(async (email, _token, interactive) => {
     // Userinfo failed — cannot assert anything. Fail-open.
     if (!email) return;
 
@@ -79,9 +117,13 @@ export function registerGoogleAccountAssertion(): void {
     const member = fam.members.find((m) => m.id === memberId);
     if (!member) return; // race: user signed out mid-acquisition
 
-    // Deliberate switch — write the new email and clear the flag.
-    if (pendingAccountSwitch) {
-      pendingAccountSwitch = false;
+    // Deliberate switch — only consume the flag on an *interactive*
+    // acquisition. A background silent refresh that happens to fire
+    // during the switch flow must not consume the arming, otherwise
+    // the user's actual chooser-pick a moment later would be treated
+    // as a mismatch and trigger a re-consent loop.
+    if (interactive && isPendingAccountSwitch()) {
+      disarmAccountSwitch();
       correcting = false;
       await fam.updateMember(memberId, { googleAccountEmail: email });
       return;
@@ -145,4 +187,5 @@ export function _resetGoogleAccountAssertionForTests(): void {
   registered = false;
   correcting = false;
   pendingAccountSwitch = false;
+  writePendingSwitchToStorage(false);
 }

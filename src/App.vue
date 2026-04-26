@@ -501,6 +501,15 @@ onMounted(async () => {
       const redirectToken = await completeRedirectAuth();
       if (redirectToken) {
         initBreadcrumbs.push('auth: consumed pending redirect-auth token');
+      } else {
+        // No pending redirect to consume — clear any lingering pending-
+        // account-switch flag from sessionStorage. If the user started a
+        // switch on PWA / iOS, then hit the back button instead of
+        // completing the chooser, the flag would otherwise contaminate
+        // the next legitimate token acquisition. Successful redirects
+        // already consume the flag inside the assertion subscriber.
+        const { disarmAccountSwitch } = await import('@/services/auth/googleAccountAssertion');
+        disarmAccountSwitch();
       }
     } catch (e) {
       console.warn('[App] completeRedirectAuth failed during init:', (e as Error).message);
