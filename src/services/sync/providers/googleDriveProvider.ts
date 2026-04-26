@@ -14,7 +14,7 @@ import {
 import {
   getValidToken,
   isTokenValid,
-  revokeToken,
+  clearGoogleSessionState,
   requestAccessToken,
   attemptSilentRefresh,
   hasRefreshToken,
@@ -212,7 +212,7 @@ export class GoogleDriveProvider implements StorageProvider {
    * Revoke OAuth token and clear caches.
    */
   async disconnect(): Promise<void> {
-    revokeToken();
+    await clearGoogleSessionState();
     clearFolderCache();
   }
 

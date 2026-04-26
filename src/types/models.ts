@@ -82,7 +82,31 @@ export interface DateOfBirth {
 export interface FamilyMember {
   id: UUID;
   name: string;
+  /**
+   * User-editable contact email. May be any address the user wants
+   * displayed for this member; not required to match any specific
+   * external account. Distinct from `googleAccountEmail`, which is
+   * the OAuth-bound identity used for Google Drive sync.
+   */
   email: string;
+  /**
+   * The Google account email this member is bound to for Drive sync.
+   *
+   * Set automatically the first time the member's own OAuth completes
+   * successfully. Read-only via normal forms — to change, use the
+   * explicit "switch Google account" flow in Settings, which forces a
+   * fresh consent screen and updates this field only after the new
+   * consent succeeds.
+   *
+   * NEVER overwritten silently. May be undefined for members created
+   * before this field was introduced; backfilled lazily on each
+   * member's own next successful token acquisition. Until then,
+   * account assertion is skipped (fail-open) for that member.
+   *
+   * Distinct from `email` — see ADR / 2026-04-26 plan for the
+   * two-email design rationale.
+   */
+  googleAccountEmail?: string;
   avatar?: string;
   /**
    * Optional user-uploaded avatar photo — takes precedence over `avatar`
