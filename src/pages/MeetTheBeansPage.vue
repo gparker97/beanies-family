@@ -154,6 +154,11 @@ const cachedInviteToken = ref<string | null>(null);
 // Member whose share modal is currently open (drives the per-member email
 // hint and the share-modal personalization copy).
 const pendingShareMember = ref<FamilyMember | null>(null);
+// Most recent successfully-shared invitee email. Used as `login_hint` in
+// the rendered invite URL so multi-account joiners land on the correct
+// Google account. Required (when provider is google_drive) before the
+// invite link is generated — see `handleShareWithEmail`.
+const lastSharedEmail = ref<string | null>(null);
 const shareEmail = ref('');
 const isSharing = ref(false);
 const shareResult = ref<'success' | 'error' | null>(null);
@@ -203,34 +208,71 @@ async function openInviteModal() {
   inviteLinkError.value = null;
   showInviteModal.value = true;
 
-  // Generic invite modal — always renders a hint-less URL so the QR /
-  // copied link doesn't carry a stale per-member email. If the token
-  // is still valid, reuse it (no new envelope slot consumed).
-  const { isInviteExpired, buildInviteLink } = await import('@/services/crypto/inviteService');
-  const hasCachedToken =
-    cachedInviteToken.value &&
-    cachedInviteExpiry.value &&
-    !isInviteExpired(cachedInviteExpiry.value);
-
-  if (hasCachedToken && inviteQrUrl.value) {
-    // Same token + already-rendered QR — re-render the URL with no hint.
-    inviteLink.value = buildInviteLink({
-      ...currentInviteParams(),
-      token: cachedInviteToken.value!,
-    });
+  // For Google Drive providers we now gate invite-link generation on the
+  // user sharing with a specific invitee's email first (see
+  // `handleShareWithEmail`). The shared email gets baked into the link as
+  // a `login_hint`, AND the file is already in the recipient's Drive when
+  // they tap the link — so the joiner often skips the Picker dance
+  // entirely. Show the placeholder state until the user shares.
+  if (syncStore.storageProviderType === 'google_drive') {
+    if (!lastSharedEmail.value) {
+      inviteLink.value = '';
+      inviteQrUrl.value = '';
+      return;
+    }
+    // Already have a shared email from this session — re-render the link
+    // (e.g. modal was reopened, token may have expired and need refresh).
+    await regenerateInviteLinkForEmail(lastSharedEmail.value);
     return;
   }
 
+  // Local providers (no Drive) — fall back to the legacy hint-less link.
   inviteQrUrl.value = '';
   isGeneratingInvite.value = true;
   try {
     inviteLink.value = await generateInviteLink();
     inviteQrUrl.value = await generateInviteQR(inviteLink.value);
   } catch (e) {
+    const { buildInviteLink } = await import('@/services/crypto/inviteService');
     cachedInviteExpiry.value = null;
     cachedInviteToken.value = null;
     inviteLinkError.value = (e as Error).message;
     inviteLink.value = buildInviteLink(currentInviteParams());
+  } finally {
+    isGeneratingInvite.value = false;
+  }
+}
+
+/**
+ * Generate (or re-render) the invite link for a specific invitee email,
+ * embedding it as `login_hint`. Reuses the cached token slot when valid
+ * to avoid burning a new envelope entry per recipient.
+ */
+async function regenerateInviteLinkForEmail(email: string): Promise<void> {
+  const { isInviteExpired, buildInviteLink } = await import('@/services/crypto/inviteService');
+  const hasCachedToken =
+    cachedInviteToken.value &&
+    cachedInviteExpiry.value &&
+    !isInviteExpired(cachedInviteExpiry.value);
+
+  isGeneratingInvite.value = true;
+  inviteLinkError.value = null;
+  try {
+    if (hasCachedToken) {
+      inviteLink.value = buildInviteLink({
+        ...currentInviteParams(),
+        token: cachedInviteToken.value!,
+        inviteeEmail: email,
+      });
+    } else {
+      inviteLink.value = await generateInviteLink(email);
+    }
+    inviteQrUrl.value = await generateInviteQR(inviteLink.value);
+  } catch (e) {
+    cachedInviteExpiry.value = null;
+    cachedInviteToken.value = null;
+    inviteLinkError.value = (e as Error).message;
+    inviteLink.value = buildInviteLink({ ...currentInviteParams(), inviteeEmail: email });
   } finally {
     isGeneratingInvite.value = false;
   }
@@ -270,23 +312,34 @@ async function openShareModal(member: FamilyMember) {
 
 async function handleShareWithEmail() {
   if (!isValidEmail(shareEmail.value)) return;
+  const email = shareEmail.value.trim().toLowerCase();
   isSharing.value = true;
   shareResult.value = null;
   try {
     const token = await getValidToken();
-    // Share the .beanpod file itself (existing behavior).
-    await shareFileWithEmail(token, syncStore.driveFileId!, shareEmail.value, 'writer');
-    // Also share the parent folder so photos uploaded to it by any member
-    // are accessible to everyone. `shareFileWithEmail` works identically
-    // for folders (it hits the generic permissions endpoint).
+    // Share the .beanpod file itself (existing behavior). Drive's
+    // permissions endpoint is idempotent — re-sharing with an email
+    // that already has access succeeds silently, so users can re-share
+    // freely. Also share the parent folder so photos uploaded to it
+    // by any member are accessible to everyone.
+    await shareFileWithEmail(token, syncStore.driveFileId!, email, 'writer');
     const folderId = await resolveCanonicalFolderId(token);
     if (folderId) {
-      await shareFileWithEmail(token, folderId, shareEmail.value, 'writer').catch((e) => {
-        // Folder share failures aren't fatal for a first-time invite — the
-        // .beanpod share already succeeded. Log so we notice in dev.
+      await shareFileWithEmail(token, folderId, email, 'writer').catch((e) => {
+        // Folder share failures aren't fatal for a first-time invite —
+        // the .beanpod share already succeeded. Log so we notice in dev.
         console.warn('[meetTheBeans] Folder share failed (non-fatal)', e);
       });
     }
+    // Record + (re-)generate the link so the QR / copy URL embeds this
+    // email as `login_hint`. The user can now share the link with this
+    // recipient via WhatsApp/SMS/email and Google's chooser will pre-
+    // populate to the right account on their device. Re-running the
+    // share flow with a different email just regenerates the link with
+    // the new hint — no token is burned per recipient.
+    lastSharedEmail.value = email;
+    await regenerateInviteLinkForEmail(email);
+
     shareResult.value = 'success';
     shareEmail.value = '';
     setTimeout(() => {
@@ -913,6 +966,24 @@ function cancelEditFamilyName() {
                 {{ t('invite.shareEmail.error') }}
               </p>
 
+              <!-- Persistent badge showing the email this session's link is
+                   currently scoped to. Useful when the user has dismissed
+                   the transient '✓ Shared' message but is still working in
+                   the modal — it's the single source of truth for who the
+                   link will pre-populate Google's chooser with. -->
+              <p
+                v-if="lastSharedEmail"
+                class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400"
+              >
+                <span>🔗</span>
+                <span>
+                  {{ t('invite.shareEmail.linkScopedTo') }}
+                  <span class="font-mono text-slate-700 dark:text-slate-300">{{
+                    lastSharedEmail
+                  }}</span>
+                </span>
+              </p>
+
               <!-- Encrypted file reassurance -->
               <div class="flex items-start gap-2 rounded-xl bg-white/60 p-2.5 dark:bg-slate-800/40">
                 <span class="flex-shrink-0 text-xs">🔒</span>
@@ -965,7 +1036,29 @@ function cancelEditFamilyName() {
             </h3>
           </div>
           <div class="ml-8">
-            <InviteLinkCard :link="inviteLink" :qr-url="inviteQrUrl" :loading="isGeneratingInvite">
+            <!-- Drive providers: gate the link on the user having shared
+                 with at least one invitee email in Step 1. The shared
+                 email is embedded as `login_hint` in the link AND grants
+                 the recipient direct Drive access — both make first-load
+                 dramatically smoother, especially on iPhone where the
+                 chooser otherwise asks the joiner to type their email
+                 from scratch. -->
+            <div
+              v-if="syncStore.storageProviderType === 'google_drive' && !lastSharedEmail"
+              class="flex items-start gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 p-4 dark:border-slate-600 dark:bg-slate-700/20"
+            >
+              <span class="text-lg">⬆️</span>
+              <p class="text-sm text-slate-600 dark:text-slate-400">
+                {{ t('invite.step2.shareFirst') }}
+              </p>
+            </div>
+
+            <InviteLinkCard
+              v-else
+              :link="inviteLink"
+              :qr-url="inviteQrUrl"
+              :loading="isGeneratingInvite"
+            >
               <template #actions>
                 <button
                   v-if="inviteLink && !isGeneratingInvite"
