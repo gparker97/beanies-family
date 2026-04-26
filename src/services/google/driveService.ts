@@ -232,6 +232,44 @@ export async function getFileMetadata(
 }
 
 /**
+ * Resolve the `.beanpod`'s parent folder ID — the canonical app folder for
+ * this family. Cached module-locally for the session so repeat callers don't
+ * refetch. Returns null if the file has no parent (root-level) or the lookup
+ * fails (network / permission). Callers treat folder-level operations as
+ * best-effort; failure is non-fatal.
+ *
+ * Used by:
+ *   - Invite flow: share parent folder with new beanies (so photos uploaded
+ *     by any member are accessible to everyone).
+ *   - Folder-share migration: ensure existing beanies have folder access too.
+ */
+let cachedAppFolderId: string | null = null;
+export async function resolveCanonicalFolderId(
+  token: string,
+  fileId: string
+): Promise<string | null> {
+  if (cachedAppFolderId) return cachedAppFolderId;
+  try {
+    const meta = await getFileMetadata(token, fileId, 'parents');
+    const parents = meta.parents as string[] | undefined;
+    cachedAppFolderId = parents?.[0] ?? null;
+    return cachedAppFolderId;
+  } catch (e) {
+    console.warn('[driveService] Could not resolve canonical folder', e);
+    return null;
+  }
+}
+
+/**
+ * Reset the canonical-folder cache. Call when the active family changes
+ * (e.g. on sign-out, on switch-family). Otherwise the cache survives the
+ * session, which is the desired behaviour for the active family.
+ */
+export function clearCanonicalFolderCache(): void {
+  cachedAppFolderId = null;
+}
+
+/**
  * List a file's permissions (who it's shared with).
  * Used by the app-folder migration sweep to detect which family members
  * don't yet have folder access.

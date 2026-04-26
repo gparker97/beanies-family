@@ -1,26 +1,24 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { BaseButton, BaseInput, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
-import InviteLinkCard from '@/components/ui/InviteLinkCard.vue';
 import BeanCard from '@/components/family/BeanCard.vue';
 import FamilyMemberModal from '@/components/family/FamilyMemberModal.vue';
-import ShareInviteModal from '@/components/family/ShareInviteModal.vue';
+import InviteWizardModal from '@/components/family/InviteWizardModal.vue';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
-import { isValidEmail, isTemporaryEmail } from '@/utils/email';
+import { isUnshareableEmail } from '@/utils/email';
 import { toDateInputValue } from '@/utils/date';
-import { generateInviteQR } from '@/utils/qrCode';
 import {
-  shareFileWithEmail,
-  getFileMetadata,
   listFilePermissions,
+  resolveCanonicalFolderId,
+  shareFileWithEmail,
 } from '@/services/google/driveService';
 import { getValidToken } from '@/services/google/googleAuth';
 import { usePermissions } from '@/composables/usePermissions';
+import { useInviteFlow } from '@/composables/useInviteFlow';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -142,259 +140,39 @@ const editingMember = ref<FamilyMember | null>(null);
 const isEditingFamilyName = ref(false);
 const editFamilyName = ref('');
 const showInviteModal = ref(false);
-const isGeneratingInvite = ref(false);
-const inviteLinkError = ref<string | null>(null);
-const inviteLink = ref('');
-const inviteQrUrl = ref('');
-const cachedInviteExpiry = ref<string | null>(null);
-// Cache the underlying token separately from the rendered URL so we can
-// re-render with a different `inviteeEmail` hint per member without
-// burning a fresh token / consuming a new invite slot in the envelope.
-const cachedInviteToken = ref<string | null>(null);
-// Member whose share modal is currently open (drives the per-member email
-// hint and the share-modal personalization copy).
+
+// Single owner of invite-link state — see useInviteFlow for cache reuse,
+// Drive sharing, link generation, QR rendering, and error handling.
+const inviteFlow = useInviteFlow();
+
+// Bean whose share button was tapped — drives the wizard's `prefill` prop.
+// Null when the wizard was opened from the generic "Invite Beanie" button.
 const pendingShareMember = ref<FamilyMember | null>(null);
-// Most recent successfully-shared invitee email. Used as `login_hint` in
-// the rendered invite URL so multi-account joiners land on the correct
-// Google account. Required (when provider is google_drive) before the
-// invite link is generated — see `handleShareWithEmail`.
-const lastSharedEmail = ref<string | null>(null);
-const shareEmail = ref('');
-const isSharing = ref(false);
-const shareResult = ref<'success' | 'error' | null>(null);
 
-/** Snapshot of the canonical invite-URL params at call time. */
-function currentInviteParams(): import('@/services/crypto/inviteService').InviteLinkParams {
-  const provider = syncStore.storageProviderType;
-  return {
-    familyId: familyContextStore.activeFamilyId ?? '',
-    provider: provider === 'google_drive' || provider === 'local' ? provider : undefined,
-    fileName: syncStore.fileName ?? undefined,
-    fileId: syncStore.driveFileId ?? undefined,
-  };
-}
+const wizardPrefill = computed(() =>
+  pendingShareMember.value
+    ? {
+        email: pendingShareMember.value.email || '',
+        memberName: pendingShareMember.value.name,
+      }
+    : undefined
+);
 
-/**
- * Generate a crypto invite link with a token-wrapped family key.
- * Optionally embeds an `inviteeEmail` so Google's account chooser can
- * be pre-populated via `login_hint` on the joiner side.
- */
-async function generateInviteLink(inviteeEmail?: string): Promise<string> {
-  const fk = syncStore.familyKey;
-  const { buildInviteLink, generateInviteToken, createInvitePackage, hashInviteToken } =
-    await import('@/services/crypto/inviteService');
-
-  if (!fk) {
-    // No family key — fall back to a token-less URL (V3 or unconfigured).
-    cachedInviteExpiry.value = null;
-    return buildInviteLink({ ...currentInviteParams(), inviteeEmail });
-  }
-
-  const token = generateInviteToken();
-  const pkg = await createInvitePackage(fk, token);
-  const tokenHash = await hashInviteToken(token);
-
-  // Store the invite package in the V4 envelope
-  await syncStore.addInvitePackage(tokenHash, pkg);
-
-  // Cache the expiry so we can reuse the underlying token until it expires
-  cachedInviteExpiry.value = pkg.expiresAt;
-  cachedInviteToken.value = token;
-
-  return buildInviteLink({ ...currentInviteParams(), token, inviteeEmail });
-}
-
-async function openInviteModal() {
-  inviteLinkError.value = null;
+function openInviteModal() {
+  pendingShareMember.value = null;
+  inviteFlow.reset();
   showInviteModal.value = true;
-
-  // For Google Drive providers we now gate invite-link generation on the
-  // user sharing with a specific invitee's email first (see
-  // `handleShareWithEmail`). The shared email gets baked into the link as
-  // a `login_hint`, AND the file is already in the recipient's Drive when
-  // they tap the link — so the joiner often skips the Picker dance
-  // entirely. Show the placeholder state until the user shares.
-  if (syncStore.storageProviderType === 'google_drive') {
-    if (!lastSharedEmail.value) {
-      inviteLink.value = '';
-      inviteQrUrl.value = '';
-      return;
-    }
-    // Already have a shared email from this session — re-render the link
-    // (e.g. modal was reopened, token may have expired and need refresh).
-    await regenerateInviteLinkForEmail(lastSharedEmail.value);
-    return;
-  }
-
-  // Local providers (no Drive) — fall back to the legacy hint-less link.
-  inviteQrUrl.value = '';
-  isGeneratingInvite.value = true;
-  try {
-    inviteLink.value = await generateInviteLink();
-    inviteQrUrl.value = await generateInviteQR(inviteLink.value);
-  } catch (e) {
-    const { buildInviteLink } = await import('@/services/crypto/inviteService');
-    cachedInviteExpiry.value = null;
-    cachedInviteToken.value = null;
-    inviteLinkError.value = (e as Error).message;
-    inviteLink.value = buildInviteLink(currentInviteParams());
-  } finally {
-    isGeneratingInvite.value = false;
-  }
 }
 
-/**
- * Generate (or re-render) the invite link for a specific invitee email,
- * embedding it as `login_hint`. Reuses the cached token slot when valid
- * to avoid burning a new envelope entry per recipient.
- */
-async function regenerateInviteLinkForEmail(email: string): Promise<void> {
-  const { isInviteExpired, buildInviteLink } = await import('@/services/crypto/inviteService');
-  const hasCachedToken =
-    cachedInviteToken.value &&
-    cachedInviteExpiry.value &&
-    !isInviteExpired(cachedInviteExpiry.value);
-
-  isGeneratingInvite.value = true;
-  inviteLinkError.value = null;
-  try {
-    if (hasCachedToken) {
-      inviteLink.value = buildInviteLink({
-        ...currentInviteParams(),
-        token: cachedInviteToken.value!,
-        inviteeEmail: email,
-      });
-    } else {
-      inviteLink.value = await generateInviteLink(email);
-    }
-    inviteQrUrl.value = await generateInviteQR(inviteLink.value);
-  } catch (e) {
-    cachedInviteExpiry.value = null;
-    cachedInviteToken.value = null;
-    inviteLinkError.value = (e as Error).message;
-    inviteLink.value = buildInviteLink({ ...currentInviteParams(), inviteeEmail: email });
-  } finally {
-    isGeneratingInvite.value = false;
-  }
-}
-
-// Share invite modal (per-member share button on card)
-const showShareModal = ref(false);
-
-async function openShareModal(member: FamilyMember) {
+function openShareModal(member: FamilyMember) {
   pendingShareMember.value = member;
-
-  // Reuse the cached token if it's still valid; only the URL rendering
-  // changes per member (login_hint). Falls through to a fresh
-  // generateInviteLink (and a new token slot) if the cache expired.
-  const { isInviteExpired, buildInviteLink } = await import('@/services/crypto/inviteService');
-  const hasCachedToken =
-    cachedInviteToken.value &&
-    cachedInviteExpiry.value &&
-    !isInviteExpired(cachedInviteExpiry.value);
-
-  try {
-    if (hasCachedToken) {
-      inviteLink.value = buildInviteLink({
-        ...currentInviteParams(),
-        token: cachedInviteToken.value!,
-        inviteeEmail: member.email || undefined,
-      });
-    } else {
-      inviteLink.value = await generateInviteLink(member.email || undefined);
-    }
-  } catch {
-    openInviteModal();
-    return;
-  }
-  showShareModal.value = true;
+  inviteFlow.reset();
+  showInviteModal.value = true;
 }
 
-async function handleShareWithEmail() {
-  if (!isValidEmail(shareEmail.value)) return;
-  const email = shareEmail.value.trim().toLowerCase();
-  isSharing.value = true;
-  shareResult.value = null;
-  try {
-    const token = await getValidToken();
-    // Share the .beanpod file itself (existing behavior). Drive's
-    // permissions endpoint is idempotent — re-sharing with an email
-    // that already has access succeeds silently, so users can re-share
-    // freely. Also share the parent folder so photos uploaded to it
-    // by any member are accessible to everyone.
-    await shareFileWithEmail(token, syncStore.driveFileId!, email, 'writer');
-    const folderId = await resolveCanonicalFolderId(token);
-    if (folderId) {
-      await shareFileWithEmail(token, folderId, email, 'writer').catch((e) => {
-        // Folder share failures aren't fatal for a first-time invite —
-        // the .beanpod share already succeeded. Log so we notice in dev.
-        console.warn('[meetTheBeans] Folder share failed (non-fatal)', e);
-      });
-    }
-    // Record + (re-)generate the link so the QR / copy URL embeds this
-    // email as `login_hint`. The user can now share the link with this
-    // recipient via WhatsApp/SMS/email and Google's chooser will pre-
-    // populate to the right account on their device. Re-running the
-    // share flow with a different email just regenerates the link with
-    // the new hint — no token is burned per recipient.
-    lastSharedEmail.value = email;
-    await regenerateInviteLinkForEmail(email);
-
-    shareResult.value = 'success';
-    shareEmail.value = '';
-    setTimeout(() => {
-      shareResult.value = null;
-    }, 3000);
-  } catch {
-    shareResult.value = 'error';
-  } finally {
-    isSharing.value = false;
-  }
-}
-
-/**
- * Lazy lookup of the canonical app-folder ID by reading `.beanpod`'s
- * parent. Cached module-locally for the session so repeat shares don't
- * refetch. Returns null if we can't determine the folder — callers treat
- * folder share as best-effort.
- */
-let cachedAppFolderId: string | null = null;
-async function resolveCanonicalFolderId(token: string): Promise<string | null> {
-  if (cachedAppFolderId) return cachedAppFolderId;
-  if (!syncStore.driveFileId) return null;
-  try {
-    const meta = await getFileMetadata(token, syncStore.driveFileId, 'parents');
-    const parents = meta.parents as string[] | undefined;
-    cachedAppFolderId = parents?.[0] ?? null;
-    return cachedAppFolderId;
-  } catch (e) {
-    console.warn('[meetTheBeans] Could not resolve canonical folder', e);
-    return null;
-  }
-}
-
-/**
- * Skip share attempts for emails that can never succeed:
- *   - Temporary placeholders (`@setup.local`, `@temp.beanies.family`)
- *     that the app itself generates for members without real emails.
- *   - Non-routable TLDs (`.local`, `.test`, `.invalid`, `.example`)
- *     reserved by RFC 2606 for internal/dev use.
- * Drive responds 403 "not a Google account" for all of these — each
- * attempt is a pointless round-trip and a noisy console error. The
- * migration still runs the share call for real-looking emails; Drive
- * remains the source of truth for whether the target account exists.
- */
-function isUnshareableEmail(email: string): boolean {
-  if (isTemporaryEmail(email)) return true;
-  const domain = email.split('@')[1]?.toLowerCase() ?? '';
-  return (
-    domain.endsWith('.local') ||
-    domain.endsWith('.test') ||
-    domain.endsWith('.invalid') ||
-    domain.endsWith('.example') ||
-    domain === 'example.com' ||
-    domain === 'example.org'
-  );
+function handleWizardClose() {
+  showInviteModal.value = false;
+  pendingShareMember.value = null;
 }
 
 /**
@@ -418,7 +196,7 @@ async function runFolderShareMigration(): Promise<void> {
 
   try {
     const token = await getValidToken();
-    const folderId = await resolveCanonicalFolderId(token);
+    const folderId = await resolveCanonicalFolderId(token, driveFileId);
     if (!folderId) return;
     const existingPerms = await listFilePermissions(token, folderId);
     const alreadyShared = new Set(
@@ -905,210 +683,17 @@ function cancelEditFamilyName() {
       @delete="handleMemberDelete"
     />
 
-    <!-- Invite Family Member Modal -->
-    <BaseModal
+    <!-- Invite Family Member Wizard — both the generic "Invite Beanie" CTA
+         and the per-bean share button funnel through here. The wizard
+         renders Step 1 (confirm email) → Step 2 (send invite link). -->
+    <InviteWizardModal
       :open="showInviteModal"
-      :title="t('login.inviteTitle')"
-      size="lg"
-      @close="showInviteModal = false"
-    >
-      <div class="space-y-5">
-        <p class="text-sm text-gray-600 dark:text-gray-400">
-          {{ t('login.inviteDesc') }}
-        </p>
-
-        <!-- Step 1: Prepare the family data pod file -->
-        <div class="space-y-3">
-          <div class="flex items-center gap-2.5">
-            <div
-              class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#F15D22] to-[#E67E22] text-xs font-bold text-white"
-            >
-              1
-            </div>
-            <h3 class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-200">
-              {{ t('invite.step1.title') }}
-            </h3>
-          </div>
-
-          <div class="ml-8">
-            <p class="mb-3 text-xs text-slate-500 dark:text-slate-400">
-              {{ t('invite.step1.desc') }}
-            </p>
-
-            <!-- Google Drive: auto-share file access -->
-            <div
-              v-if="syncStore.storageProviderType === 'google_drive'"
-              class="space-y-3 rounded-2xl bg-gradient-to-br from-[var(--tint-silk-10)] to-[var(--tint-silk-20)] p-4 dark:from-slate-700/40 dark:to-slate-700/20"
-            >
-              <div class="flex gap-2">
-                <BaseInput
-                  v-model="shareEmail"
-                  type="email"
-                  :placeholder="t('invite.shareEmail.placeholder')"
-                  class="flex-1"
-                />
-                <BaseButton
-                  :loading="isSharing"
-                  :disabled="!isValidEmail(shareEmail)"
-                  @click="handleShareWithEmail"
-                >
-                  {{ t('invite.shareEmail.button') }}
-                </BaseButton>
-              </div>
-              <p
-                v-if="shareResult === 'success'"
-                class="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"
-              >
-                <span>✓</span>
-                {{ t('invite.shareEmail.success') }}
-              </p>
-              <p v-if="shareResult === 'error'" class="text-xs text-[#F15D22]">
-                {{ t('invite.shareEmail.error') }}
-              </p>
-
-              <!-- Persistent badge showing the email this session's link is
-                   currently scoped to. Useful when the user has dismissed
-                   the transient '✓ Shared' message but is still working in
-                   the modal — it's the single source of truth for who the
-                   link will pre-populate Google's chooser with. -->
-              <p
-                v-if="lastSharedEmail"
-                class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400"
-              >
-                <span>🔗</span>
-                <span>
-                  {{ t('invite.shareEmail.linkScopedTo') }}
-                  <span class="font-mono text-slate-700 dark:text-slate-300">{{
-                    lastSharedEmail
-                  }}</span>
-                </span>
-              </p>
-
-              <!-- Encrypted file reassurance -->
-              <div class="flex items-start gap-2 rounded-xl bg-white/60 p-2.5 dark:bg-slate-800/40">
-                <span class="flex-shrink-0 text-xs">🔒</span>
-                <p class="text-xs text-slate-400 dark:text-slate-500">
-                  {{ t('invite.step1.encrypted') }}
-                </p>
-              </div>
-
-              <!-- Child sharing tip -->
-              <div class="flex items-start gap-2 rounded-xl bg-white/60 p-2.5 dark:bg-slate-800/40">
-                <span class="flex-shrink-0 text-xs">👶</span>
-                <p class="text-xs text-slate-400 dark:text-slate-500">
-                  {{ t('invite.step1.childTip') }}
-                </p>
-              </div>
-            </div>
-
-            <!-- Local storage: manual file sharing reminder -->
-            <div
-              v-else
-              class="flex items-start gap-3 rounded-2xl bg-gradient-to-br from-[var(--tint-orange-8)] to-[var(--tint-silk-10)] p-4 dark:from-slate-700/40 dark:to-slate-700/20"
-            >
-              <div
-                class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-[var(--tint-orange-15)]"
-              >
-                <span class="text-sm">📁</span>
-              </div>
-              <div class="space-y-1">
-                <p class="text-sm text-slate-700 dark:text-slate-300">
-                  {{ t('join.shareFileNote') }}
-                </p>
-                <p class="text-xs text-slate-400 dark:text-slate-500">
-                  {{ t('invite.step1.encrypted') }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Step 2: Send the magic link -->
-        <div class="space-y-3">
-          <div class="flex items-center gap-2.5">
-            <div
-              class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#AED6F1] to-[#87CEEB] text-xs font-bold text-[#2C3E50]"
-            >
-              2
-            </div>
-            <h3 class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-200">
-              {{ t('invite.step2.title') }}
-            </h3>
-          </div>
-          <div class="ml-8">
-            <!-- Drive providers: gate the link on the user having shared
-                 with at least one invitee email in Step 1. The shared
-                 email is embedded as `login_hint` in the link AND grants
-                 the recipient direct Drive access — both make first-load
-                 dramatically smoother, especially on iPhone where the
-                 chooser otherwise asks the joiner to type their email
-                 from scratch. -->
-            <div
-              v-if="syncStore.storageProviderType === 'google_drive' && !lastSharedEmail"
-              class="flex items-start gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 p-4 dark:border-slate-600 dark:bg-slate-700/20"
-            >
-              <span class="text-lg">⬆️</span>
-              <p class="text-sm text-slate-600 dark:text-slate-400">
-                {{ t('invite.step2.shareFirst') }}
-              </p>
-            </div>
-
-            <InviteLinkCard
-              v-else
-              :link="inviteLink"
-              :qr-url="inviteQrUrl"
-              :loading="isGeneratingInvite"
-            >
-              <template #actions>
-                <button
-                  v-if="inviteLink && !isGeneratingInvite"
-                  class="font-outfit flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--color-sky-silk-300)]/50 bg-gradient-to-r from-[var(--color-sky-silk-300)]/30 via-[var(--color-sky-silk-300)]/15 to-[var(--color-sky-silk-300)]/30 px-5 py-3 text-sm font-semibold text-[var(--color-secondary-500)] shadow-sm transition-all hover:from-[var(--color-sky-silk-300)]/40 hover:via-[var(--color-sky-silk-300)]/25 hover:to-[var(--color-sky-silk-300)]/40 hover:shadow-md dark:border-[var(--color-sky-silk-300)]/20 dark:from-[var(--color-sky-silk-300)]/20 dark:via-[var(--color-sky-silk-300)]/10 dark:to-[var(--color-sky-silk-300)]/20 dark:text-gray-200"
-                  @click="showShareModal = true"
-                >
-                  <span class="text-base">💌</span>
-                  {{ t('share.title') }}
-                </button>
-              </template>
-            </InviteLinkCard>
-          </div>
-        </div>
-
-        <!-- What happens next — info card -->
-        <div
-          class="flex items-start gap-3 rounded-2xl bg-gradient-to-br from-[var(--tint-silk-10)] to-white p-4 dark:from-slate-700/30 dark:to-slate-800/50"
-        >
-          <div
-            class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-[var(--tint-silk-20)]"
-          >
-            <span class="text-sm">💡</span>
-          </div>
-          <div class="space-y-1">
-            <p class="text-xs font-medium text-slate-600 dark:text-slate-300">
-              {{ t('invite.whatNext.title') }}
-            </p>
-            <p class="text-xs text-slate-400 dark:text-slate-500">
-              {{ t('invite.whatNext.desc') }}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="flex justify-end">
-          <BaseButton variant="secondary" @click="showInviteModal = false">
-            {{ t('action.close') }}
-          </BaseButton>
-        </div>
-      </template>
-    </BaseModal>
-
-    <!-- Share Invite Link Modal — invitee is the bean whose card was tapped. -->
-    <ShareInviteModal
-      :open="showShareModal"
-      :link="inviteLink"
+      :provider="syncStore.storageProviderType"
+      :inviter-name="familyStore.currentMember?.name ?? t('family.title')"
       :family-name="familyContextStore.activeFamilyName || t('family.title')"
-      :member-name="pendingShareMember?.name || t('family.title')"
-      @close="showShareModal = false"
+      :prefill="wizardPrefill"
+      :invite-flow="inviteFlow"
+      @close="handleWizardClose"
     />
   </div>
 </template>

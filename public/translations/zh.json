@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-26",
-    "translationCount": 2499
+    "translationCount": 2531
   },
   "translations": {
     "app.name": {
@@ -5606,16 +5606,6 @@
       "hash": "7epkd1",
       "lastUpdated": "2026-03-06"
     },
-    "invite.shareEmail.button": {
-      "translation": "共享",
-      "hash": "1bjem7",
-      "lastUpdated": "2026-03-06"
-    },
-    "invite.shareEmail.success": {
-      "translation": "文件已共享！他们将收到来自Google的电子邮件。",
-      "hash": "u9k03h",
-      "lastUpdated": "2026-03-06"
-    },
     "invite.shareEmail.error": {
       "translation": "无法共享文件。您可以通过Google云端硬盘手动分享。",
       "hash": "dxoqyl",
@@ -7685,41 +7675,6 @@
       "translation": "您的活动已创建！",
       "hash": "3982wz",
       "lastUpdated": "2026-03-18"
-    },
-    "invite.step1.title": {
-      "translation": "准备家庭数据文件",
-      "hash": "6facci",
-      "lastUpdated": "2026-03-19"
-    },
-    "invite.step1.desc": {
-      "translation": "您的家庭成员需要访问家庭数据文件才能加入。如果他们还没有访问权限，请立即与他们分享。",
-      "hash": "8nnedq",
-      "lastUpdated": "2026-03-19"
-    },
-    "invite.step1.encrypted": {
-      "translation": "别担心，文件已加密。只有拥有邀请链接的家庭成员才能解锁。",
-      "hash": "o5y0u2",
-      "lastUpdated": "2026-03-19"
-    },
-    "invite.step1.childTip": {
-      "translation": "邀请孩子？您可以在他们的设备上使用自己的帐户登录云提供商，以便他们可以访问该文件。他们仍然只有您授权的权限，无需担心。",
-      "hash": "l1z9y7",
-      "lastUpdated": "2026-03-19"
-    },
-    "invite.step2.title": {
-      "translation": "发送魔术链接",
-      "hash": "410yb0",
-      "lastUpdated": "2026-03-19"
-    },
-    "invite.whatNext.title": {
-      "translation": "接下來會發生什麼？",
-      "hash": "9brjs1",
-      "lastUpdated": "2026-03-19"
-    },
-    "invite.whatNext.desc": {
-      "translation": "他们打开链接，选择密码，然后加入Pod。登录后，他们可以随时使用自己的账号登录。",
-      "hash": "593697",
-      "lastUpdated": "2026-03-19"
     },
     "vacation.planningATrip": {
       "translation": "让它成为一个家庭度假！",
@@ -12499,6 +12454,211 @@
     "googleDrive.fileNotFoundReselectFailed": {
       "translation": "无法加载所选文件。",
       "hash": "qnh4h7",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.diagnostic.link": {
+      "translation": "复制诊断信息",
+      "hash": "j12qd8",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.diagnostic.title": {
+      "translation": "诊断信息",
+      "hash": "5xyn4p",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.diagnostic.subtitle": {
+      "translation": "在寻求帮助时粘贴此内容—它会告诉我们您的设备看到了什么。",
+      "hash": "70qpsv",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.diagnostic.copy": {
+      "translation": "复制",
+      "hash": "19579",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.diagnostic.copied": {
+      "translation": "已复制！",
+      "hash": "rqllj7",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.shareFallback.title": {
+      "translation": "在另一台设备上继续",
+      "hash": "bxnxp7",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.shareFallback.subtitle": {
+      "translation": "将链接发送给自己，然后在电脑或安卓手机上打开，这是完成首次加载的最可靠方法。",
+      "hash": "u0nq67",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.label": {
+      "translation": "確認電子郵件",
+      "hash": "7jh05g",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step2.label": {
+      "translation": "发送邀请",
+      "hash": "4gvvs1",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.title": {
+      "translation": "邀请便帽",
+      "hash": "thcw9q",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.titlePrefilled": {
+      "translation": "正在与{name}分享？",
+      "hash": "scu5u6",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.subhead": {
+      "translation": "使用他们登录Google的电子邮件—这是他们打开家庭Pod的方式。",
+      "hash": "wdgusa",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.confirmLabel.empty": {
+      "translation": "这是他们的家庭pod的Google帐户电子邮件",
+      "hash": "6t94qb",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.confirmLabel.withEmail": {
+      "translation": "{email}是他们家庭pod的Google帐户电子邮件",
+      "hash": "mjx33f",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.cta.empty": {
+      "translation": "输入要共享的电子邮件",
+      "hash": "1e0smh",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.cta.unconfirmed": {
+      "translation": "确认以继续",
+      "hash": "owsea4",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.cta.share": {
+      "translation": "通过电子邮件分享",
+      "hash": "tpm0ot",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.cta.confirm": {
+      "translation": "确认电子邮件",
+      "hash": "5zuqzg",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.faq.toggle": {
+      "translation": "有疑问或担忧？",
+      "hash": "q6awsq",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.faq.q1": {
+      "translation": "这个安全吗？",
+      "hash": "r9mcd6",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.faq.a1": {
+      "translation": "是的。家庭数据文件使用只有您和您的beanies拥有的密钥进行加密。Google无法读取里面的内容，他们只是为您存储锁定的文件。",
+      "hash": "fc3yox",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.faq.q2": {
+      "translation": "那小帽子呢？",
+      "hash": "w4c36k",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.faq.a2": {
+      "translation": "如果他们还没有自己的Google账号，请通过您自己的电子邮件分享。您可以使用该账号在他们的设备上登录，他们将看到Family Pod。",
+      "hash": "po5uqs",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.faq.q3": {
+      "translation": "如果他们不使用Google怎么办？",
+      "hash": "mu4las",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.faq.a3": {
+      "translation": "他们需要一个免费的Google帐户才能访问家庭Pod （它位于Google云端硬盘中）。在accounts.google.com上完成设置大约需要一分钟。",
+      "hash": "4cduom",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step2.title": {
+      "translation": "魔术链接就绪",
+      "hash": "zcwo6o",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step2.caption": {
+      "translation": "为{email}进行设置，他们将自动登录正确的Google帐户。",
+      "hash": "h006qr",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step2.qr.title": {
+      "translation": "在同一个房间？",
+      "hash": "h053qk",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step2.qr.accent": {
+      "translation": "扫一扫加入",
+      "hash": "jxgx42",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step2.qr.help": {
+      "translation": "将豆豆的摄像头对准这个—它们将在几秒钟内进入豆荚。",
+      "hash": "cwub9e",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step2.qr.unavailable": {
+      "translation": "二维码不可用，请通过链接分享。",
+      "hash": "jy6zkf",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step2.orSendLink": {
+      "translation": "或发送链接",
+      "hash": "5qnbro",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step2.useDifferent": {
+      "translation": "使用其他电子邮件",
+      "hash": "cbetml",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.local.reminder": {
+      "translation": "您将单独发送.beanpod。",
+      "hash": "rkpe38",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.error.invalidEmail": {
+      "translation": "输入有效的电子邮件地址。",
+      "hash": "tu4dlj",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.error.driveShareFailed": {
+      "translation": "无法与Google云端硬盘共享。请重试或使用其他电子邮箱。",
+      "hash": "l5xswx",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.error.invalidGoogleEmail": {
+      "translation": "Google无法与该电子邮件共享—请仔细检查它是Gmail或Workspace地址。",
+      "hash": "3r1tgd",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.error.linkGenerationFailed": {
+      "translation": "无法创建邀请链接。请重试。",
+      "hash": "7sc0ur",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.error.tryAgain": {
+      "translation": "再試一次",
+      "hash": "9ysxvf",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.error.couldntCopy": {
+      "translation": "无法复制—请尝试长按链接。",
+      "hash": "9iebcv",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.error.channelOpenFailed": {
+      "translation": "无法打开{channel}。请尝试复制链接或其他选项。",
+      "hash": "tbuoyy",
       "lastUpdated": "2026-04-26"
     }
   }
