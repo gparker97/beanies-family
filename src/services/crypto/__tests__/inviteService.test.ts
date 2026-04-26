@@ -6,6 +6,7 @@ import {
   redeemInviteToken,
   hashInviteToken,
   buildInviteLink,
+  parseInviteLink,
   isInviteExpired,
 } from '../inviteService';
 import { generateFamilyKey, exportFamilyKey } from '../familyKeyService';
@@ -101,18 +102,106 @@ describe('inviteService', () => {
     });
   });
 
-  // ── Link building ──────────────────────────────────────────────
+  // ── Link building / parsing ────────────────────────────────────
 
   describe('buildInviteLink', () => {
     it('includes token and familyId as query params', () => {
-      const link = buildInviteLink('my-token', 'family-123');
+      const link = buildInviteLink({ token: 'my-token', familyId: 'family-123' });
       expect(link).toContain('t=my-token');
-      expect(link).toContain('f=family-123');
+      expect(link).toContain('fam=family-123');
     });
 
-    it('uses hash-based routing', () => {
-      const link = buildInviteLink('tok', 'fam');
-      expect(link).toContain('#/join');
+    it('produces a non-hash-routed URL matching the production share format', () => {
+      const link = buildInviteLink({ familyId: 'fam' });
+      expect(link).toContain('/join?');
+      expect(link).not.toContain('/#/');
+    });
+
+    it('omits absent optional params entirely', () => {
+      const link = buildInviteLink({ familyId: 'fam' });
+      expect(link).not.toContain('t=');
+      expect(link).not.toContain('p=');
+      expect(link).not.toContain('ref=');
+      expect(link).not.toContain('fileId=');
+      expect(link).not.toContain('hint=');
+    });
+
+    it('base64-encodes the invitee email into the hint param', () => {
+      const link = buildInviteLink({ familyId: 'fam', inviteeEmail: 'wife@example.com' });
+      const expected = btoa('wife@example.com'); // plain base64
+      expect(link).toContain(`hint=${encodeURIComponent(expected)}`);
+    });
+
+    it('base64-encodes the file name into the ref param', () => {
+      const link = buildInviteLink({ familyId: 'fam', fileName: 'family.beanpod' });
+      const expected = btoa('family.beanpod');
+      expect(link).toContain(`ref=${encodeURIComponent(expected)}`);
+    });
+  });
+
+  describe('parseInviteLink', () => {
+    it('round-trips every field through buildInviteLink → parseInviteLink', () => {
+      const original = {
+        token: 'tok-abc',
+        familyId: 'family-123',
+        provider: 'google_drive' as const,
+        fileName: 'family.beanpod',
+        fileId: '1AbCdEfGhIjK',
+        inviteeEmail: 'wife@example.com',
+      };
+      const link = buildInviteLink(original);
+      const parsed = parseInviteLink(link);
+      expect(parsed).toEqual(original);
+    });
+
+    it('round-trips the minimum (familyId only)', () => {
+      const link = buildInviteLink({ familyId: 'fam' });
+      expect(parseInviteLink(link)).toEqual({ familyId: 'fam' });
+    });
+
+    it('returns null when the URL has no familyId', () => {
+      expect(parseInviteLink('https://app.beanies.family/join?t=abc')).toBeNull();
+    });
+
+    it('returns null on malformed input', () => {
+      expect(parseInviteLink('not a url')).toBeNull();
+    });
+
+    it('accepts legacy `f=` parameter (older invite format)', () => {
+      const parsed = parseInviteLink('https://app.beanies.family/#/join?t=tok&f=family-legacy');
+      expect(parsed).toEqual({ token: 'tok', familyId: 'family-legacy' });
+    });
+
+    it('accepts hash-routed URLs (older format)', () => {
+      const parsed = parseInviteLink(
+        'https://app.beanies.family/#/join?t=tok&fam=family-hash&p=google_drive'
+      );
+      expect(parsed?.familyId).toBe('family-hash');
+      expect(parsed?.provider).toBe('google_drive');
+    });
+
+    it('returns inviteeEmail as undefined for legacy URLs without hint', () => {
+      const parsed = parseInviteLink('https://app.beanies.family/join?fam=fam');
+      expect(parsed?.inviteeEmail).toBeUndefined();
+    });
+
+    it('silently drops a malformed hint without throwing', () => {
+      const parsed = parseInviteLink(
+        'https://app.beanies.family/join?fam=fam&hint=!!!not-base64!!!'
+      );
+      expect(parsed).toEqual({ familyId: 'fam' });
+    });
+
+    it('silently drops a malformed ref without throwing', () => {
+      const parsed = parseInviteLink(
+        'https://app.beanies.family/join?fam=fam&ref=!!!not-base64!!!'
+      );
+      expect(parsed).toEqual({ familyId: 'fam' });
+    });
+
+    it('rejects an invalid provider value (treats as undefined)', () => {
+      const parsed = parseInviteLink('https://app.beanies.family/join?fam=fam&p=other');
+      expect(parsed?.provider).toBeUndefined();
     });
   });
 

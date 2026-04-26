@@ -147,33 +147,43 @@ const inviteLinkError = ref<string | null>(null);
 const inviteLink = ref('');
 const inviteQrUrl = ref('');
 const cachedInviteExpiry = ref<string | null>(null);
+// Cache the underlying token separately from the rendered URL so we can
+// re-render with a different `inviteeEmail` hint per member without
+// burning a fresh token / consuming a new invite slot in the envelope.
+const cachedInviteToken = ref<string | null>(null);
+// Member whose share modal is currently open (drives the per-member email
+// hint and the share-modal personalization copy).
+const pendingShareMember = ref<FamilyMember | null>(null);
 const shareEmail = ref('');
 const isSharing = ref(false);
 const shareResult = ref<'success' | 'error' | null>(null);
 
-/** Build the base join URL (without token) for display/fallback. */
-function buildBaseJoinUrl(): string {
-  const fam = familyContextStore.activeFamilyId ?? '';
-  const p = syncStore.storageProviderType ?? 'local';
-  const fileRef = syncStore.fileName ? btoa(syncStore.fileName) : '';
-  let url = `${window.location.origin}/join?fam=${fam}&p=${p}&ref=${fileRef}`;
-  if (p === 'google_drive' && syncStore.driveFileId) {
-    url += `&fileId=${encodeURIComponent(syncStore.driveFileId)}`;
-  }
-  return url;
+/** Snapshot of the canonical invite-URL params at call time. */
+function currentInviteParams(): import('@/services/crypto/inviteService').InviteLinkParams {
+  const provider = syncStore.storageProviderType;
+  return {
+    familyId: familyContextStore.activeFamilyId ?? '',
+    provider: provider === 'google_drive' || provider === 'local' ? provider : undefined,
+    fileName: syncStore.fileName ?? undefined,
+    fileId: syncStore.driveFileId ?? undefined,
+  };
 }
 
-/** Generate a crypto invite link with a token-wrapped family key. */
-async function generateInviteLink(): Promise<string> {
+/**
+ * Generate a crypto invite link with a token-wrapped family key.
+ * Optionally embeds an `inviteeEmail` so Google's account chooser can
+ * be pre-populated via `login_hint` on the joiner side.
+ */
+async function generateInviteLink(inviteeEmail?: string): Promise<string> {
   const fk = syncStore.familyKey;
-  if (!fk) {
-    // No family key — fall back to base URL (V3 or unconfigured)
-    cachedInviteExpiry.value = null;
-    return buildBaseJoinUrl();
-  }
-
-  const { generateInviteToken, createInvitePackage, hashInviteToken } =
+  const { buildInviteLink, generateInviteToken, createInvitePackage, hashInviteToken } =
     await import('@/services/crypto/inviteService');
+
+  if (!fk) {
+    // No family key — fall back to a token-less URL (V3 or unconfigured).
+    cachedInviteExpiry.value = null;
+    return buildInviteLink({ ...currentInviteParams(), inviteeEmail });
+  }
 
   const token = generateInviteToken();
   const pkg = await createInvitePackage(fk, token);
@@ -182,30 +192,35 @@ async function generateInviteLink(): Promise<string> {
   // Store the invite package in the V4 envelope
   await syncStore.addInvitePackage(tokenHash, pkg);
 
-  // Cache the expiry so we can reuse this link until it expires
+  // Cache the expiry so we can reuse the underlying token until it expires
   cachedInviteExpiry.value = pkg.expiresAt;
+  cachedInviteToken.value = token;
 
-  // Build full URL with token + provider info
-  const base = buildBaseJoinUrl();
-  return `${base}&t=${encodeURIComponent(token)}`;
+  return buildInviteLink({ ...currentInviteParams(), token, inviteeEmail });
 }
 
 async function openInviteModal() {
   inviteLinkError.value = null;
   showInviteModal.value = true;
 
-  // Reuse cached invite link if it hasn't expired
-  const { isInviteExpired } = await import('@/services/crypto/inviteService');
-  if (
-    inviteLink.value &&
-    inviteQrUrl.value &&
+  // Generic invite modal — always renders a hint-less URL so the QR /
+  // copied link doesn't carry a stale per-member email. If the token
+  // is still valid, reuse it (no new envelope slot consumed).
+  const { isInviteExpired, buildInviteLink } = await import('@/services/crypto/inviteService');
+  const hasCachedToken =
+    cachedInviteToken.value &&
     cachedInviteExpiry.value &&
-    !isInviteExpired(cachedInviteExpiry.value)
-  ) {
+    !isInviteExpired(cachedInviteExpiry.value);
+
+  if (hasCachedToken && inviteQrUrl.value) {
+    // Same token + already-rendered QR — re-render the URL with no hint.
+    inviteLink.value = buildInviteLink({
+      ...currentInviteParams(),
+      token: cachedInviteToken.value!,
+    });
     return;
   }
 
-  // Generate a fresh invite link with crypto token + QR code
   inviteQrUrl.value = '';
   isGeneratingInvite.value = true;
   try {
@@ -213,8 +228,9 @@ async function openInviteModal() {
     inviteQrUrl.value = await generateInviteQR(inviteLink.value);
   } catch (e) {
     cachedInviteExpiry.value = null;
+    cachedInviteToken.value = null;
     inviteLinkError.value = (e as Error).message;
-    inviteLink.value = buildBaseJoinUrl();
+    inviteLink.value = buildInviteLink(currentInviteParams());
   } finally {
     isGeneratingInvite.value = false;
   }
@@ -223,19 +239,31 @@ async function openInviteModal() {
 // Share invite modal (per-member share button on card)
 const showShareModal = ref(false);
 
-async function openShareModal() {
-  // Generate invite link if we don't have a valid cached one
-  const { isInviteExpired } = await import('@/services/crypto/inviteService');
-  const hasCachedLink =
-    inviteLink.value && cachedInviteExpiry.value && !isInviteExpired(cachedInviteExpiry.value);
+async function openShareModal(member: FamilyMember) {
+  pendingShareMember.value = member;
 
-  if (!hasCachedLink) {
-    try {
-      inviteLink.value = await generateInviteLink();
-    } catch {
-      openInviteModal();
-      return;
+  // Reuse the cached token if it's still valid; only the URL rendering
+  // changes per member (login_hint). Falls through to a fresh
+  // generateInviteLink (and a new token slot) if the cache expired.
+  const { isInviteExpired, buildInviteLink } = await import('@/services/crypto/inviteService');
+  const hasCachedToken =
+    cachedInviteToken.value &&
+    cachedInviteExpiry.value &&
+    !isInviteExpired(cachedInviteExpiry.value);
+
+  try {
+    if (hasCachedToken) {
+      inviteLink.value = buildInviteLink({
+        ...currentInviteParams(),
+        token: cachedInviteToken.value!,
+        inviteeEmail: member.email || undefined,
+      });
+    } else {
+      inviteLink.value = await generateInviteLink(member.email || undefined);
     }
+  } catch {
+    openInviteModal();
+    return;
   }
   showShareModal.value = true;
 }
@@ -560,7 +588,7 @@ function cancelEditFamilyName() {
             :class="syncHighlightClass(member.id)"
             @edit="openEditModal(member)"
             @delete="deleteMember(member.id)"
-            @share-invite="openShareModal"
+            @share-invite="openShareModal(member)"
             @role-change="handleRoleChange(member.id, $event)"
           />
         </div>
@@ -981,12 +1009,12 @@ function cancelEditFamilyName() {
       </template>
     </BaseModal>
 
-    <!-- Share Invite Link Modal -->
+    <!-- Share Invite Link Modal — invitee is the bean whose card was tapped. -->
     <ShareInviteModal
       :open="showShareModal"
       :link="inviteLink"
       :family-name="familyContextStore.activeFamilyName || t('family.title')"
-      :member-name="familyStore.currentMember?.name || t('family.title')"
+      :member-name="pendingShareMember?.name || t('family.title')"
       @close="showShareModal = false"
     />
   </div>
