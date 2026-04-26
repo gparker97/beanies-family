@@ -134,29 +134,77 @@ export async function pickBeanpodFolder(
 }
 
 /**
- * Open the Google Picker to select a .beanpod file.
- * Returns the selected file's ID and name, or null if the user cancelled.
+ * Discriminated outcome of a `pickBeanpodFile` call.
  *
- * This is the preferred join entry point. Folder-picking under `drive.file`
- * scope does NOT grant API list-access to files inside a folder shared by
- * another user — the API returns 0 results even though the folder is
- * visible in the Drive UI. File-picking grants direct `drive.file` access
- * to the chosen file, which works for files shared by another user.
- * Photos are reachable independently via public-link permissions + the
- * Google CDN, so the join flow does not need folder scope.
+ * - `picked`     — user chose a file successfully.
+ * - `cancelled`  — user opened the Picker normally (LOADED fired) and
+ *                  closed it without picking.
+ * - `failed`     — Picker could not be invoked or rendered. `reason`:
+ *     - `'script'`  → Google API JS could not be loaded (script error,
+ *                     missing API key, library load error).
+ *     - `'iframe'`  → Picker iframe errored before LOADED fired. This
+ *                     covers iOS WebKit's "API developer key invalid" /
+ *                     cookie-consent symptoms where the iframe can't
+ *                     bootstrap its auth context across the storage-
+ *                     partitioning boundary.
+ *     - `'timeout'` → No callback fired within 30s of `setVisible(true)`.
  */
-export async function pickBeanpodFile(
-  accessToken: string
-): Promise<{ fileId: string; fileName: string } | null> {
+export type PickBeanpodFileResult =
+  | { kind: 'picked'; fileId: string; fileName: string }
+  | { kind: 'cancelled' }
+  | { kind: 'failed'; reason: 'script' | 'iframe' | 'timeout' };
+
+const PICKER_TIMEOUT_MS = 30_000;
+
+/**
+ * Open the Google Picker to select a .beanpod file. Always resolves
+ * (never throws) so callers can route to the structured registry of
+ * join errors without wrapping in try/catch. See `PickBeanpodFileResult`.
+ *
+ * This is the preferred join entry point. Folder-picking under
+ * `drive.file` scope does NOT grant API list-access to files inside a
+ * folder shared by another user — the API returns 0 results even though
+ * the folder is visible in the Drive UI. File-picking grants direct
+ * `drive.file` access to the chosen file, which works for files shared
+ * by another user. Photos are reachable independently via public-link
+ * permissions + the Google CDN, so the join flow does not need folder
+ * scope.
+ */
+export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodFileResult> {
   const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
   if (!apiKey) {
-    throw new Error('VITE_GOOGLE_API_KEY is not configured');
+    console.error('[drivePicker] VITE_GOOGLE_API_KEY is not configured');
+    return { kind: 'failed', reason: 'script' };
   }
 
-  await loadPickerScript();
-  await loadPickerLibrary();
+  try {
+    await loadPickerScript();
+    await loadPickerLibrary();
+  } catch (e) {
+    console.error('[drivePicker] script/library load failed', e);
+    return { kind: 'failed', reason: 'script' };
+  }
 
-  return new Promise((resolve, reject) => {
+  return new Promise<PickBeanpodFileResult>((resolve) => {
+    // Tracks whether the Picker iframe successfully bootstrapped. Used
+    // to distinguish a real cancel (LOADED-then-CANCEL) from an iframe
+    // failure (CANCEL with no preceding LOADED) — the iOS WebKit
+    // symptom path.
+    let hasLoaded = false;
+    let settled = false;
+
+    const settle = (result: PickBeanpodFileResult): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutHandle);
+      resolve(result);
+    };
+
+    const timeoutHandle = setTimeout(() => {
+      console.warn('[drivePicker] timed out waiting for Picker callback');
+      settle({ kind: 'failed', reason: 'timeout' });
+    }, PICKER_TIMEOUT_MS);
+
     try {
       // "My Drive" view filtered to .beanpod files
       const myDriveView = new google.picker.DocsView(google.picker.ViewId.DOCS);
@@ -188,18 +236,34 @@ export async function pickBeanpodFile(
       const picker = builder
         .setCallback((data: google.picker.PickerResponse) => {
           console.warn('[drivePicker] Picker callback:', data.action, data.docs?.[0]?.id);
-          if (data.action === google.picker.Action.PICKED && data.docs?.[0]) {
-            resolve({ fileId: data.docs[0].id, fileName: data.docs[0].name });
-          } else if (data.action === google.picker.Action.CANCEL) {
-            resolve(null);
+          // LOADED isn't in @types/google.picker's Action enum but the
+          // Picker emits it at runtime when the iframe finishes
+          // bootstrapping. Compare as string to avoid the typedef gap.
+          if ((data.action as string) === 'loaded') {
+            hasLoaded = true;
+            return;
           }
-          // Other actions (e.g. LOADED) are ignored — Picker is still open
+          if (data.action === google.picker.Action.PICKED && data.docs?.[0]) {
+            settle({
+              kind: 'picked',
+              fileId: data.docs[0].id,
+              fileName: data.docs[0].name,
+            });
+            return;
+          }
+          if (data.action === google.picker.Action.CANCEL) {
+            // CANCEL without a preceding LOADED → iframe-bootstrap failure
+            // (the iOS WebKit symptom). LOADED-then-CANCEL → real cancel.
+            settle(hasLoaded ? { kind: 'cancelled' } : { kind: 'failed', reason: 'iframe' });
+            return;
+          }
         })
         .build();
 
       picker.setVisible(true);
     } catch (e) {
-      reject(e);
+      console.error('[drivePicker] picker open failed', e);
+      settle({ kind: 'failed', reason: 'script' });
     }
   });
 }
