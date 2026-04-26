@@ -10,6 +10,14 @@ const props = defineProps<{
   link: string;
   familyName: string;
   memberName: string;
+  /**
+   * Optional title override — used when this modal is reused outside
+   * the per-bean share context (e.g. the join-flow "Continue on
+   * another device" recovery). Falls back to `share.title`.
+   */
+  title?: string;
+  /** Optional subtitle override. Falls back to `share.subtitle`. */
+  subtitle?: string;
 }>();
 
 const emit = defineEmits<{
@@ -138,10 +146,10 @@ function handleChannel(channel: (typeof channels.value)[0]) {
           <!-- Title & subtitle -->
           <div class="min-w-0 pr-6">
             <h2 class="font-outfit text-secondary-500 text-lg font-bold dark:text-gray-100">
-              {{ t('share.title') }}
+              {{ props.title ?? t('share.title') }}
             </h2>
             <p class="text-xs text-gray-500 dark:text-gray-400">
-              {{ t('share.subtitle') }}
+              {{ props.subtitle ?? t('share.subtitle') }}
             </p>
           </div>
         </div>

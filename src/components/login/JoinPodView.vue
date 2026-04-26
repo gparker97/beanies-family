@@ -6,17 +6,22 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import ShareInviteModal from '@/components/family/ShareInviteModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFileDrop } from '@/composables/useFileDrop';
+import { useClipboard } from '@/composables/useClipboard';
 import { isTemporaryEmail } from '@/utils/email';
 import { useJoinFlow, JOIN_ERRORS, type RecoveryAction } from '@/composables/useJoinFlow';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
 import type { FamilyMember } from '@/types/models';
 
 const { t } = useTranslation();
 const syncStore = useSyncStore();
+const familyContextStore = useFamilyContextStore();
 const flow = useJoinFlow();
+const { copied: diagCopied, copy: diagCopy } = useClipboard();
 
 type LoginView = 'create';
 
@@ -33,6 +38,19 @@ const decryptPassword = ref('');
 const showDecryptModal = ref(false);
 const isLoadingLocalFile = ref(false);
 const localFormError = ref<string | null>(null);
+
+// ── Diagnostic-info modal ───────────────────────────────────────────────────
+const showDiagnosticModal = ref(false);
+const diagnosticReport = ref('');
+
+function openDiagnostic(): void {
+  diagnosticReport.value = flow.buildDiagnosticReport();
+  showDiagnosticModal.value = true;
+}
+
+async function copyDiagnostic(): Promise<void> {
+  await diagCopy(diagnosticReport.value);
+}
 
 // ── Derived from the composable ──────────────────────────────────────────────
 
@@ -256,6 +274,18 @@ onMounted(() => {
           {{ t(`join.recovery.${action}`) }}
         </BaseButton>
       </div>
+      <button
+        type="button"
+        class="mt-3 text-xs underline opacity-60 hover:opacity-100"
+        :class="
+          currentErrorView.severity === 'critical'
+            ? 'text-red-700 dark:text-red-400'
+            : 'text-amber-700 dark:text-amber-400'
+        "
+        @click="openDiagnostic"
+      >
+        {{ t('join.diagnostic.link') }}
+      </button>
     </div>
 
     <!-- ============================================ -->
@@ -629,5 +659,47 @@ onMounted(() => {
         </BaseButton>
       </form>
     </BaseModal>
+
+    <!-- ============================================ -->
+    <!-- Diagnostic-info Modal                        -->
+    <!-- ============================================ -->
+    <BaseModal :open="showDiagnosticModal" @close="showDiagnosticModal = false">
+      <div class="text-center">
+        <h3 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+          {{ t('join.diagnostic.title') }}
+        </h3>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {{ t('join.diagnostic.subtitle') }}
+        </p>
+      </div>
+
+      <pre
+        class="mt-4 max-h-64 overflow-auto rounded-lg bg-gray-100 p-3 text-xs text-gray-700 dark:bg-slate-900 dark:text-gray-300"
+        >{{ diagnosticReport }}</pre
+      >
+
+      <div class="mt-4 flex justify-end">
+        <BaseButton size="sm" @click="copyDiagnostic">
+          {{ diagCopied ? t('join.diagnostic.copied') : t('join.diagnostic.copy') }}
+        </BaseButton>
+      </div>
+    </BaseModal>
+
+    <!-- ============================================ -->
+    <!-- "Continue on another device" share modal     -->
+    <!-- ============================================ -->
+    <ShareInviteModal
+      :open="flow.showShareFallback.value"
+      :link="flow.currentInviteUrl.value"
+      :family-name="
+        flow.registryEntry.value?.familyName ||
+        familyContextStore.activeFamilyName ||
+        t('family.title')
+      "
+      :member-name="flow.selectedMember.value?.name || t('family.title')"
+      :title="t('join.shareFallback.title')"
+      :subtitle="t('join.shareFallback.subtitle')"
+      @close="flow.showShareFallback.value = false"
+    />
   </div>
 </template>
