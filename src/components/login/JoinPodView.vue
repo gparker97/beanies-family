@@ -309,7 +309,12 @@ async function handlePickFromDriveWithToken(token: string) {
     // .beanpod is visibly inside it. File-pick grants drive.file
     // access to the chosen file, which works for shared files.
     const picked = await pickBeanpodFile(token);
-    if (!picked) return; // User cancelled — valid no-op, not an error
+    if (picked.kind !== 'picked') {
+      // 'cancelled' / 'failed' — leave the user on the Picker CTA so they
+      // can retry. Phase 5 (composable refactor) routes failed kinds to
+      // specific JoinErrorCodes; the legacy view path stays silent.
+      return;
+    }
 
     console.warn('[JoinPodView] Picker selected file:', picked.fileId, picked.fileName);
 
