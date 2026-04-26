@@ -4,7 +4,7 @@ slug: best-cozi-maple-alternatives-in-2026
 date: 2026-04-24
 category: review
 coverEmoji: 🫘
-coverImage: /blog/beanies-quick-add-screenshot.webp
+coverImage: /blog/beanies-cozi-comparison-infographic.webp
 excerpt: 'a human + AI co-written tour of cozi, maple, ynab, greenlight, timetree, and other family and finance planning apps worth comparing in 2026.'
 subtitle: 'this post was written by AI. sort of.'
 featured: false
@@ -104,4 +104,5 @@ Peace out, my beans.
 
 greg
 
-![the beanies.family nook with the quick-add menu open — one of the places where a single shared family system starts to feel calmer than a pile of apps](/blog/beanies-quick-add-screenshot.webp)
+![and just for fun, here is an AI-generated beanies.family infographic to enjoy. thanks for reading!](/blog/beanies-cozi-comparison-infographic.webp)
+_and just for fun, here is an AI-generated beanies.family infographic to enjoy. thanks for reading!_
