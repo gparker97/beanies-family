@@ -134,12 +134,16 @@ export const JOIN_ERRORS = {
   },
   INVITE_TOKEN_EXPIRED: {
     messageKey: 'join.error.tokenExpired',
-    recoveries: ['askForNewInvite'],
+    recoveries: ['retry', 'askForNewInvite'],
     severity: 'critical',
   },
   INVITE_TOKEN_INVALID: {
+    // Most common cause is a stale Drive read — the inviter just generated
+    // the link, but the iPhone read a CDN-cached version of the .beanpod
+    // from before the new inviteKey was persisted. `retry` re-runs the
+    // load, which typically picks up the freshest version.
     messageKey: 'join.error.tokenInvalid',
-    recoveries: ['askForNewInvite'],
+    recoveries: ['retry', 'askForNewInvite'],
     severity: 'critical',
   },
   NO_UNCLAIMED_MEMBERS: {
@@ -231,12 +235,50 @@ export function useJoinFlow() {
     }
   }
 
+  /**
+   * Last 4 chars of a token / id, for diagnostic correlation without
+   * leaking the full secret value.
+   */
+  function tail(s: string | null | undefined, n = 4): string | null {
+    if (!s) return null;
+    return s.length <= n ? s : `…${s.slice(-n)}`;
+  }
+
   function buildDiagnosticReport(): string {
+    // Capture inviteKey hash prefixes from the loaded (or pending) envelope
+    // so debugging can correlate the URL token's hash against what's
+    // actually in the file. Hashes are non-secret (storage keys derived
+    // via SHA-256), but we truncate anyway for log readability.
+    const envelopeWithKeys = syncStore.envelope ?? syncStore.pendingEncryptedFile?.envelope ?? null;
+    const inviteKeyHashes = envelopeWithKeys?.inviteKeys
+      ? Object.keys(envelopeWithKeys.inviteKeys).map((h) => `${h.slice(0, 8)}…`)
+      : [];
+
     return JSON.stringify(
       {
         device: getDeviceInfo(),
         step: currentStep.value,
         error: currentError.value,
+        url: {
+          familyId: targetFamilyId.value || null,
+          provider: targetProvider.value,
+          fileIdTail: tail(targetFileId.value),
+          fileName: targetFileName.value || null,
+          inviteTokenTail: tail(inviteToken.value),
+          inviteEmailHint: inviteEmailHint.value,
+        },
+        registry: {
+          familyName: registryEntry.value?.familyName ?? null,
+          provider: registryEntry.value?.provider ?? null,
+        },
+        envelope: {
+          familyIdMatchesUrl:
+            envelopeWithKeys?.familyId && targetFamilyId.value
+              ? envelopeWithKeys.familyId === targetFamilyId.value
+              : null,
+          inviteKeyCount: inviteKeyHashes.length,
+          inviteKeyHashes,
+        },
         redirectAuth: shouldUseRedirectAuth(),
         googleEmail: getGoogleAccountEmail(),
         timestamp: new Date().toISOString(),
@@ -509,6 +551,13 @@ export function useJoinFlow() {
     const picked = await doPickAndLoad();
     if (!picked) return; // cancel, redirect, or file-read-error — no advance
 
+    // File loaded; reflect that in the step before any decrypt-stage
+    // failures fire. Without this update, INVITE_TOKEN_INVALID would
+    // appear in the diagnostic blob with step='authenticating', which
+    // is misleading — the auth + file read succeeded, only the
+    // invite-key match failed.
+    currentStep.value = 'loading';
+
     if (syncStore.pendingEncryptedFile && inviteToken.value) {
       const ok = await tryInviteTokenDecrypt();
       if (!ok) return; // either error set or password modal needed
@@ -537,6 +586,7 @@ export function useJoinFlow() {
     currentStep.value = 'authenticating';
     const picked = await doPickAndLoad(/* forceConsent */ true);
     if (!picked) return;
+    currentStep.value = 'loading';
     if (syncStore.pendingEncryptedFile && inviteToken.value) {
       const ok = await tryInviteTokenDecrypt();
       if (!ok) return;
