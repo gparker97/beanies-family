@@ -3,13 +3,14 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
 // Capture the registered onTokenAcquired callback so tests can drive it.
-let registeredCallback: ((email: string | null, token: string) => void) | null = null;
+type AcquiredCb = (email: string | null, token: string, interactive: boolean) => void;
+let registeredCallback: AcquiredCb | null = null;
 
 const mockClearGoogleSessionState = vi.fn(async () => {});
 const mockRequestAccessToken = vi.fn(async (_opts?: unknown) => 'new-token');
 
 vi.mock('@/services/google/googleAuth', () => ({
-  onTokenAcquired: (cb: (email: string | null, token: string) => void) => {
+  onTokenAcquired: (cb: AcquiredCb) => {
     registeredCallback = cb;
     return () => {
       registeredCallback = null;
@@ -72,9 +73,9 @@ describe('googleAccountAssertion', () => {
     assertionModule._resetGoogleAccountAssertionForTests();
   });
 
-  function fireToken(email: string | null) {
+  function fireToken(email: string | null, interactive = true) {
     if (!registeredCallback) throw new Error('subscriber not registered');
-    return registeredCallback(email, 'tok-' + (email ?? 'null'));
+    return registeredCallback(email, 'tok-' + (email ?? 'null'), interactive);
   }
 
   it('registers an onTokenAcquired subscriber', () => {
@@ -221,5 +222,84 @@ describe('googleAccountAssertion', () => {
 
     expect(mockUpdateMember).not.toHaveBeenCalled();
     expect(mockClearGoogleSessionState).not.toHaveBeenCalled();
+  });
+
+  it('disarmAccountSwitch clears the flag — next acquisition asserts normally', async () => {
+    familyMembers.push({ id: 'member-A', googleAccountEmail: 'a@example.com' });
+    assertionModule.registerGoogleAccountAssertion();
+
+    assertionModule.armAccountSwitch();
+    assertionModule.disarmAccountSwitch();
+
+    // A different email now — should be treated as a mismatch (assert,
+    // not a switch) because the flag was disarmed before consumption.
+    await fireToken('b@example.com');
+
+    expect(mockUpdateMember).not.toHaveBeenCalled();
+    expect(mockClearGoogleSessionState).toHaveBeenCalled();
+    expect(mockRequestAccessToken).toHaveBeenCalled();
+  });
+
+  it('background silent refresh does NOT consume the pending account-switch flag', async () => {
+    familyMembers.push({ id: 'member-A', googleAccountEmail: 'a@example.com' });
+    assertionModule.registerGoogleAccountAssertion();
+
+    // User clicks "switch account" → flag armed
+    assertionModule.armAccountSwitch();
+
+    // While the chooser is up, the file-polling timer ticks and a
+    // background silent refresh fires for the *currently bound* account.
+    await fireToken('a@example.com', /* interactive */ false);
+
+    // Silent refresh must NOT consume the flag — it isn't an interactive
+    // "user picked an account" signal.
+    expect(mockUpdateMember).not.toHaveBeenCalled();
+
+    // Now the user actually picks a new account at the chooser.
+    await fireToken('c@example.com', /* interactive */ true);
+
+    // Flag is still armed → consumed by the interactive acquisition,
+    // member email is rewritten to the new one.
+    expect(mockUpdateMember).toHaveBeenCalledWith('member-A', {
+      googleAccountEmail: 'c@example.com',
+    });
+    // No mismatch correction triggered.
+    expect(mockClearGoogleSessionState).not.toHaveBeenCalled();
+    expect(mockRequestAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('armAccountSwitch persists across full-page redirects via sessionStorage', async () => {
+    familyMembers.push({ id: 'member-A', googleAccountEmail: 'a@example.com' });
+    assertionModule.registerGoogleAccountAssertion();
+
+    assertionModule.armAccountSwitch();
+    expect(sessionStorage.getItem('beanies_pending_account_switch')).toBe('1');
+
+    // Simulate the page navigating away and back: re-import the module
+    // to reset in-memory state (mirrors the new JS heap on page load).
+    vi.resetModules();
+    assertionModule = await import('../googleAccountAssertion');
+    assertionModule._resetGoogleAccountAssertionForTests();
+    // _resetForTests clears sessionStorage too — re-set it to simulate
+    // the surviving redirect-flow flag.
+    sessionStorage.setItem('beanies_pending_account_switch', '1');
+    assertionModule.registerGoogleAccountAssertion();
+
+    // First acquisition after redirect-completion is interactive.
+    await fireToken('c@example.com', true);
+
+    // Member email rewritten — flag was honored from sessionStorage.
+    expect(mockUpdateMember).toHaveBeenCalledWith('member-A', {
+      googleAccountEmail: 'c@example.com',
+    });
+    // sessionStorage flag consumed.
+    expect(sessionStorage.getItem('beanies_pending_account_switch')).toBeNull();
+  });
+
+  it('disarmAccountSwitch clears the sessionStorage mirror', () => {
+    assertionModule.armAccountSwitch();
+    expect(sessionStorage.getItem('beanies_pending_account_switch')).toBe('1');
+    assertionModule.disarmAccountSwitch();
+    expect(sessionStorage.getItem('beanies_pending_account_switch')).toBeNull();
   });
 });
