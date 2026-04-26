@@ -2947,6 +2947,16 @@ const STRING_DEFS = {
     en: "Couldn't share the file. You can share it manually from Google Drive.",
     beanie: "couldn't share the pod. try sharing from google drive",
   },
+  'invite.shareEmail.linkScopedTo': {
+    en: 'Your invite link is set to pre-fill for',
+    beanie: 'your magic link is set to pre-fill for',
+  },
+
+  'invite.step2.shareFirst': {
+    en: 'Share with someone above first — your invite link will be ready to send as soon as the file is shared with their email.',
+    beanie:
+      'share with a bean above first — your magic link will be ready as soon as the pod is shared with their email.',
+  },
 
   // Share invite modal
   'share.title': { en: 'Share Invite Link', beanie: 'share the magic link' },
