@@ -68,36 +68,35 @@ export function isGoogleAuthConfigured(): boolean {
 
 /**
  * Whether the current browser should skip popup-based OAuth and use full-page
- * redirect auth instead. Two cases trigger this:
+ * redirect auth instead. Only one case triggers this:
  *
- * 1. **iOS Safari** (including iPadOS Safari, all WebKit on iOS) blocks
- *    `window.open` outside the synchronous call stack of a user gesture, and
- *    even within a gesture the gesture lifetime is too short to survive PKCE
- *    setup. Redirect auth has none of those constraints.
+ * **Installed PWA in standalone display-mode** (Chrome on Android, Edge,
+ * iOS Safari "Add to Home Screen", etc.). Popups opened from a standalone
+ * PWA either fail to open or open in a different browser context —
+ * `postMessage` from the OAuth callback can't reach back to the PWA
+ * window, so the popup auth flow hangs silently. Redirect auth keeps
+ * everything in the PWA's own window.
  *
- * 2. **Installed PWA in standalone display-mode** (Chrome on Android, Edge,
- *    etc.). Popups opened from a standalone PWA either fail to open or open
- *    in a different browser context — `postMessage` from the OAuth callback
- *    can't reach back to the PWA window, so the popup auth flow hangs
- *    silently. Redirect auth keeps everything in the PWA's own window.
+ * **Why not iOS regular Safari?** A previous version of this function
+ * routed all iOS UAs through redirect because the original `/join` page
+ * auto-fired OAuth on mount, with no user gesture in the call stack —
+ * iOS Safari's popup blocker rejected it. The fix to that was to defer
+ * auth to a user-gesture button tap (already shipped). With a real
+ * gesture in place, iOS regular Safari allows popups synchronously, and
+ * popups don't introduce the ITP top-level navigation that was breaking
+ * the Google Picker iframe's auth context after redirect-auth (the
+ * cookie-consent → "API developer key invalid" chain). So iOS regular
+ * Safari is back on the popup path; only standalone PWAs need redirect.
  *
- * Safe to call at module/SSR time: returns false if `navigator` or
- * `matchMedia` is missing.
+ * Safe to call at module/SSR time: returns false if `navigator`,
+ * `window`, or `matchMedia` is missing.
  */
 export function shouldUseRedirectAuth(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent || '';
-  // All iOS browsers are WebKit and inherit Safari's popup behaviour.
-  if (/iPhone|iPad|iPod/.test(ua)) return true;
-  // iPadOS 13+ reports as Mac; detect via touch points.
-  const maxTouchPoints = (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints ?? 0;
-  if (/Macintosh/.test(ua) && maxTouchPoints > 1) return true;
+  if (typeof window === 'undefined') return false;
   // Installed PWA in standalone mode — popup→postMessage bridge is broken.
-  if (typeof window !== 'undefined') {
-    if (window.matchMedia?.('(display-mode: standalone)').matches) return true;
-    // iOS Safari "Add to Home Screen" PWAs use this older flag.
-    if ((window.navigator as Navigator & { standalone?: boolean }).standalone === true) return true;
-  }
+  if (window.matchMedia?.('(display-mode: standalone)').matches) return true;
+  // iOS Safari "Add to Home Screen" PWAs use this older flag.
+  if ((window.navigator as Navigator & { standalone?: boolean }).standalone === true) return true;
   return false;
 }
 

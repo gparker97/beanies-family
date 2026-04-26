@@ -60,6 +60,84 @@ describe('googleAuth (PKCE)', () => {
     });
   });
 
+  describe('shouldUseRedirectAuth', () => {
+    // Helpers to stub navigator + window for each platform/standalone permutation.
+    // The function reads navigator.standalone (legacy iOS), matchMedia('display-mode: standalone'),
+    // and (in the JSDoc-removed UA branch) navigator.userAgent. We stub all of them so a stray
+    // jsdom default doesn't sneak in.
+    function stubEnv(opts: {
+      ua?: string;
+      maxTouchPoints?: number;
+      standaloneMq?: boolean;
+      iosStandalone?: boolean;
+    }) {
+      const { ua = '', maxTouchPoints = 0, standaloneMq = false, iosStandalone = false } = opts;
+      Object.defineProperty(window.navigator, 'userAgent', { value: ua, configurable: true });
+      Object.defineProperty(window.navigator, 'maxTouchPoints', {
+        value: maxTouchPoints,
+        configurable: true,
+      });
+      Object.defineProperty(window.navigator, 'standalone', {
+        value: iosStandalone,
+        configurable: true,
+      });
+      const matchMediaMock = vi.fn().mockImplementation((q: string) => ({
+        matches: q === '(display-mode: standalone)' ? standaloneMq : false,
+        media: q,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }));
+      Object.defineProperty(window, 'matchMedia', {
+        value: matchMediaMock,
+        configurable: true,
+      });
+    }
+
+    it('returns false for iOS regular Safari (non-standalone)', () => {
+      stubEnv({
+        ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+        maxTouchPoints: 5,
+      });
+      expect(googleAuth.shouldUseRedirectAuth()).toBe(false);
+    });
+
+    it('returns true for iOS standalone PWA (legacy navigator.standalone flag)', () => {
+      stubEnv({
+        ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+        maxTouchPoints: 5,
+        iosStandalone: true,
+      });
+      expect(googleAuth.shouldUseRedirectAuth()).toBe(true);
+    });
+
+    it('returns true for Android Chrome standalone PWA (display-mode media query)', () => {
+      stubEnv({
+        ua: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
+        standaloneMq: true,
+      });
+      expect(googleAuth.shouldUseRedirectAuth()).toBe(true);
+    });
+
+    it('returns false for desktop Chrome (no standalone signal)', () => {
+      stubEnv({
+        ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+      });
+      expect(googleAuth.shouldUseRedirectAuth()).toBe(false);
+    });
+
+    it('returns false for iPad regular Safari (non-standalone)', () => {
+      stubEnv({
+        ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+        maxTouchPoints: 5, // iPadOS 13+ reports as Mac with touch points
+      });
+      expect(googleAuth.shouldUseRedirectAuth()).toBe(false);
+    });
+  });
+
   describe('isTokenValid', () => {
     it('returns false when no token is set', () => {
       expect(googleAuth.isTokenValid()).toBe(false);
