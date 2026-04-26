@@ -3,7 +3,7 @@ import type { Route } from '@playwright/test';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 test.describe('Magic Link Invite System', () => {
-  test('Invite flow: add member, auto-open modal, verify invite link params', async ({ page }) => {
+  test('Invite wizard: add member, walk through Step 1 → Step 2, verify QR', async ({ page }) => {
     await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
@@ -14,42 +14,60 @@ test.describe('Magic Link Invite System', () => {
     await page.goto('/pod');
     await page.waitForURL(/\/pod(\/|$)/);
 
-    // --- Part 1: Auto-open invite modal after adding a member ---
+    // --- Part 1: Add member, wizard auto-opens at Step 1 ---
 
-    // Click "Add Bean" (formerly "+ Add a Beanie"; regex covers both forms
-    // in case older translations load during the test).
     const addButton = page.getByRole('button', { name: /add (bean|a beanie)/i });
     await addButton.click();
 
-    // Fill out form — find name input in the dialog
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     const nameInput = dialog.getByPlaceholder(/name/i);
     await nameInput.fill('Test Beanie');
 
-    // Save
     const saveButton = dialog.getByRole('button', { name: /save|add/i });
     await saveButton.click();
 
-    // Verify invite modal opens automatically with QR code
-    const inviteQr = page.locator('[data-testid="invite-qr"]');
-    await expect(inviteQr).toBeVisible({ timeout: 5000 });
-    const inviteModal = page
-      .locator('[data-testid="invite-qr"]')
-      .locator('xpath=ancestor::div[@role="dialog"]');
-    await expect(inviteModal).toBeVisible({ timeout: 5000 });
+    // Wizard opens with Step 1 visible (email field + confirmation checkbox).
+    // Scope by step-content testid since BaseModal doesn't forward attrs.
+    const step1 = page.locator('[data-testid="invite-wizard-step-1"]');
+    await expect(step1).toBeVisible({ timeout: 5000 });
 
-    // Verify share button is present
-    await expect(inviteModal.getByRole('button', { name: /share/i })).toBeVisible();
+    // --- Part 2: Walk Step 1 — fill email, confirm, submit ---
 
-    // --- Part 2: Verify invite link params ---
+    const emailInput = page.locator('[data-testid="invite-email-input"]');
+    await emailInput.fill('test.invitee@example.com');
 
-    // Verify QR code is displayed
-    const qrSrc = await inviteQr.getAttribute('src');
+    const submitButton = page.locator('[data-testid="invite-wizard-submit"]');
+    // Submit is disabled until the confirmation checkbox is ticked.
+    await expect(submitButton).toBeDisabled();
+
+    // The checkbox is sr-only (visually replaced by a custom box); use force to
+    // skip the visibility check since the wrapping <label> is the visible target.
+    const confirmCheckbox = page.locator('[data-testid="invite-wizard-confirm-checkbox"]');
+    await confirmCheckbox.check({ force: true });
+    await expect(submitButton).toBeEnabled();
+
+    await submitButton.click();
+
+    // --- Part 3: Step 2 renders QR + channels + back button ---
+
+    const step2 = page.locator('[data-testid="invite-wizard-step-2"]');
+    await expect(step2).toBeVisible({ timeout: 5000 });
+
+    const qr = page.locator('[data-testid="invite-wizard-qr"]');
+    await expect(qr).toBeVisible({ timeout: 5000 });
+    const qrSrc = await qr.getAttribute('src');
     expect(qrSrc).toContain('data:image/png');
 
-    // Verify file sharing info card is visible
-    await expect(inviteModal.getByText(/share the .beanpod file/i)).toBeVisible();
+    // Channel grid + copy-link row from ShareChannelGrid.
+    await expect(page.locator('[data-testid="invite-channel-whatsapp"]')).toBeVisible();
+    await expect(page.locator('[data-testid="invite-copy-link"]')).toBeVisible();
+
+    // Back link returns to Step 1 with email retained but checkbox unticked.
+    await page.locator('[data-testid="invite-wizard-back"]').click();
+    await expect(step1).toBeVisible();
+    await expect(emailInput).toHaveValue('test.invitee@example.com');
+    await expect(confirmCheckbox).not.toBeChecked();
   });
 
   test('Join flow: graceful degradation when registry unavailable', async ({ page }) => {
