@@ -2769,6 +2769,85 @@ const STRING_DEFS = {
     beanie: 'invite links expire after 24 hours for security',
   },
 
+  // Join flow — error registry. One entry per JoinErrorCode in
+  // src/composables/useJoinFlow.ts. Adding a new code without a matching
+  // i18n key fails the build via `t(messageKey)` strict typing.
+  // FILE_READ_FAILED interpolates {hintEmail} and {actualEmail} at render
+  // time when both are present in the error context; FILE_FAMILY_MISMATCH
+  // interpolates {expected} and {actual}.
+  'join.error.oauthRedirect': {
+    en: "Couldn't finish signing in to Google. Please try again.",
+    beanie: "couldn't finish signing in to google. please try again.",
+  },
+  'join.error.scopeDenied': {
+    en: 'beanies.family needs permission to access the shared file. Please try again and allow Drive access.',
+    beanie:
+      'beanies needs permission to access the shared file. please try again and allow drive access.',
+  },
+  'join.error.popupBlocked': {
+    en: 'Your browser blocked the sign-in popup. Allow popups for app.beanies.family or try again on a different device.',
+    beanie:
+      'your browser blocked the sign-in popup. allow popups for app.beanies.family or try again on a different device.',
+  },
+  'join.error.pickerScript': {
+    en: "Couldn't load the Google file picker. Check your internet connection and try again.",
+    beanie: "couldn't load the google file picker. check your internet and try again.",
+  },
+  'join.error.pickerFailed': {
+    en: "The Google file picker couldn't open. This is a known iPhone limitation — try again, sign in with a different Google account, or continue on another device (computer or Android).",
+    beanie:
+      "the google file picker couldn't open. this is a known iphone hiccup — try again, sign in with a different google account, or continue on another device.",
+  },
+  'join.error.pickerTimeout': {
+    en: "The Google file picker isn't responding. Please try again.",
+    beanie: "the google file picker isn't responding. please try again.",
+  },
+  'join.error.fileRead': {
+    en: "Couldn't read the data file with {actualEmail}. The invite was sent to {hintEmail} — try signing in with that account.",
+    beanie:
+      "couldn't read the data file with {actualEmail}. the invite was sent to {hintEmail} — try signing in with that account.",
+  },
+  'join.error.fileDecrypt': {
+    en: "Couldn't unlock your family's data. Ask the inviter for a new invite link.",
+    beanie: "couldn't unlock your family's data. ask the inviter for a new invite link.",
+  },
+  'join.error.familyMismatch': {
+    en: 'This file belongs to a different family. Sign in with a different account or ask for a new invite.',
+    beanie:
+      'this file belongs to a different family. sign in with a different account or ask for a new invite.',
+  },
+  'join.error.tokenExpired': {
+    en: 'This invite has expired. Ask the inviter for a new link.',
+    beanie: 'this invite has expired. ask the inviter for a new link.',
+  },
+  'join.error.tokenInvalid': {
+    en: "This invite link isn't recognized. Ask the inviter for a new one.",
+    beanie: "this invite link isn't recognized. ask the inviter for a new one.",
+  },
+  'join.error.noUnclaimed': {
+    en: 'Every bean in this family has already been claimed. Ask a family admin to add you.',
+    beanie: 'every bean in this pod has already been claimed. ask a family admin to add you.',
+  },
+
+  // Recovery action button labels.
+  'join.recovery.retry': { en: 'Try again', beanie: 'try again' },
+  'join.recovery.signInDifferentAccount': {
+    en: 'Sign in with a different account',
+    beanie: 'sign in with a different account',
+  },
+  'join.recovery.tryAnotherDevice': {
+    en: 'Continue on another device',
+    beanie: 'continue on another device',
+  },
+  'join.recovery.pickDifferentBean': {
+    en: 'Pick a different bean',
+    beanie: 'pick a different bean',
+  },
+  'join.recovery.askForNewInvite': {
+    en: 'Ask for a new invite',
+    beanie: 'ask for a new invite',
+  },
+
   // Google Picker join flow
   'join.pickerPrompt.description': {
     en: 'Select the shared .beanpod file from your Google Drive',
