@@ -2899,63 +2899,156 @@ const STRING_DEFS = {
     beanie: "that folder doesn't have a pod inside. pick the beanies.family folder shared with you",
   },
 
-  // Invite modal — stepped flow
-  'invite.step1.title': {
-    en: 'Prepare the Family Data File',
-    beanie: 'prepare the pod',
-  },
-  'invite.step1.desc': {
-    en: "Your family member needs access to the family data file before they can join. If they don't already have access, share it with them now.",
-    beanie:
-      "your beanie needs access to the family pod before they can join. share it now if they don't have it yet.",
-  },
-  'invite.step1.encrypted': {
-    en: "Don't worry — the file is encrypted. Only family members with the invite link can unlock it.",
-    beanie: "don't worry — the pod is encrypted. only beanies with the magic link can open it.",
-  },
-  'invite.step1.childTip': {
-    en: "Inviting a child? You can sign into your cloud provider with your own account on their device so they can access the file. They'll still only have permissions you authorize — no need to worry.",
-    beanie:
-      "inviting a little bean? share with their cloud storage account, or you can sign into your account on their device so they can reach the pod. they'll only see what you allow!",
-  },
-  'invite.step2.title': {
-    en: 'Send the Magic Link',
-    beanie: 'send the magic link',
-  },
-  'invite.whatNext.title': {
-    en: 'What Happens Next?',
-    beanie: 'what happens next?',
-  },
-  'invite.whatNext.desc': {
-    en: 'They open the link, choose a password, and join the pod. Once in, they can sign in anytime with their own account.',
-    beanie: 'they open the link, pick a password, and hop into the pod. easy peasy!',
-  },
-  // Invite modal — email sharing
+  // Invite — reused from prior modal, still consumed by the new wizard
   'invite.shareEmail.placeholder': {
     en: 'family.member@gmail.com',
     beanie: 'bean@example.com',
-  },
-  'invite.shareEmail.button': {
-    en: 'Share',
-    beanie: 'share',
-  },
-  'invite.shareEmail.success': {
-    en: "File shared! They'll get an email from Google.",
-    beanie: 'pod shared! google will email them',
   },
   'invite.shareEmail.error': {
     en: "Couldn't share the file. You can share it manually from Google Drive.",
     beanie: "couldn't share the pod. try sharing from google drive",
   },
-  'invite.shareEmail.linkScopedTo': {
-    en: 'Your invite link is set to pre-fill for',
-    beanie: 'your magic link is set to pre-fill for',
-  },
 
-  'invite.step2.shareFirst': {
-    en: 'Share with someone above first — your invite link will be ready to send as soon as the file is shared with their email.',
+  // Invite Wizard — 2-step wizard for inviting beanies
+  'inviteWizard.step1.label': {
+    en: 'Confirm Email',
+    beanie: 'confirm email',
+  },
+  'inviteWizard.step2.label': {
+    en: 'Send Invite',
+    beanie: 'send invite',
+  },
+  'inviteWizard.step1.title': {
+    en: 'Invite a Beanie',
+    beanie: 'invite a beanie',
+  },
+  'inviteWizard.step1.titlePrefilled': {
+    en: 'Sharing with {name}?',
+    beanie: 'sharing with {name}?',
+  },
+  'inviteWizard.step1.subhead': {
+    en: "Use the email they sign in to Google with — it's how they'll open the family pod.",
+    beanie: "use the email they sign in to google with — it's how they'll open the family pod",
+  },
+  'inviteWizard.step1.confirmLabel.empty': {
+    en: 'This is their Google account email for the family pod',
+    beanie: 'this is their google account email for the family pod',
+  },
+  'inviteWizard.step1.confirmLabel.withEmail': {
+    en: '{email} is their Google account email for the family pod',
+    beanie: '{email} is their google account email for the family pod',
+  },
+  'inviteWizard.step1.cta.empty': {
+    en: 'Enter an Email to Share',
+    beanie: 'enter an email to share',
+  },
+  'inviteWizard.step1.cta.unconfirmed': {
+    en: 'Confirm to Continue',
+    beanie: 'confirm to continue',
+  },
+  'inviteWizard.step1.cta.share': {
+    en: 'Share with {email}',
+    beanie: 'share with {email}',
+  },
+  'inviteWizard.step1.cta.confirm': {
+    en: 'Confirm {email}',
+    beanie: 'confirm {email}',
+  },
+  'inviteWizard.step1.faq.toggle': {
+    en: 'Questions or worries?',
+    beanie: 'questions or worries?',
+  },
+  'inviteWizard.step1.faq.q1': {
+    en: 'Is this safe?',
+    beanie: 'is this safe?',
+  },
+  'inviteWizard.step1.faq.a1': {
+    en: "Yes. The family data file is encrypted with a key only you and your beanies have. Google can't read what's inside — they're just storing the locked file for you.",
     beanie:
-      'share with a bean above first — your magic link will be ready as soon as the pod is shared with their email.',
+      "yes. the family pod is encrypted with a key only you and your beanies have. google can't read what's inside — they're just storing the locked pod for you",
+  },
+  'inviteWizard.step1.faq.q2': {
+    en: 'What about the little beanies?',
+    beanie: 'what about the little beanies?',
+  },
+  'inviteWizard.step1.faq.a2': {
+    en: "If they don't have their own Google account yet, share with one of your own emails. You can sign them in on their device with that account, and they'll see the family pod.",
+    beanie:
+      "if they don't have their own google account yet, share with one of your own emails. you can sign them in on their device with that account, and they'll see the family pod",
+  },
+  'inviteWizard.step1.faq.q3': {
+    en: "What if they don't use Google?",
+    beanie: "what if they don't use google?",
+  },
+  'inviteWizard.step1.faq.a3': {
+    en: "They'll need a free Google account to access the family pod (it lives in Google Drive). Setting one up takes about a minute at accounts.google.com.",
+    beanie:
+      "they'll need a free google account to access the family pod (it lives in google drive). setting one up takes about a minute at accounts.google.com",
+  },
+  'inviteWizard.step2.title': {
+    en: 'Magic Link Ready',
+    beanie: 'magic link ready',
+  },
+  'inviteWizard.step2.caption': {
+    en: "Set up for {email} — they'll land in the right Google account automatically.",
+    beanie: "set up for {email} — they'll land in the right google account automatically",
+  },
+  'inviteWizard.step2.qr.title': {
+    en: 'In the Same Room?',
+    beanie: 'in the same room?',
+  },
+  'inviteWizard.step2.qr.accent': {
+    en: 'scan to join.',
+    beanie: 'scan to join.',
+  },
+  'inviteWizard.step2.qr.help': {
+    en: "Point a beanie's camera at this — they'll be in the pod in seconds.",
+    beanie: "point a beanie's camera at this — they'll be in the pod in seconds",
+  },
+  'inviteWizard.step2.qr.unavailable': {
+    en: 'QR code unavailable — share via link instead.',
+    beanie: 'qr code unavailable — share via link instead',
+  },
+  'inviteWizard.step2.orSendLink': {
+    en: 'Or Send a Link',
+    beanie: 'or send a link',
+  },
+  'inviteWizard.step2.useDifferent': {
+    en: 'Use a Different Email',
+    beanie: 'use a different email',
+  },
+  'inviteWizard.local.reminder': {
+    en: "You'll send the .beanpod separately.",
+    beanie: "you'll send the .beanpod separately",
+  },
+  'inviteWizard.error.invalidEmail': {
+    en: 'Enter a valid email address.',
+    beanie: 'enter a valid email address',
+  },
+  'inviteWizard.error.driveShareFailed': {
+    en: "Couldn't share with Google Drive. Try again or use a different email.",
+    beanie: "couldn't share with google drive. try again or use a different email",
+  },
+  'inviteWizard.error.invalidGoogleEmail': {
+    en: "Google couldn't share with that email — double-check it's a Gmail or Workspace address.",
+    beanie:
+      "google couldn't share with that email — double-check it's a gmail or workspace address",
+  },
+  'inviteWizard.error.linkGenerationFailed': {
+    en: "Couldn't create the invite link. Please try again.",
+    beanie: "couldn't create the invite link. please try again",
+  },
+  'inviteWizard.error.tryAgain': {
+    en: 'Try Again',
+    beanie: 'try again',
+  },
+  'inviteWizard.error.couldntCopy': {
+    en: "Couldn't copy — try long-pressing the link.",
+    beanie: "couldn't copy — try long-pressing the link",
+  },
+  'inviteWizard.error.channelOpenFailed': {
+    en: "Couldn't open {channel}. Try Copy Link or another option.",
+    beanie: "couldn't open {channel}. try copy link or another option",
   },
 
   // Share invite modal
