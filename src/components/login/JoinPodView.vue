@@ -704,8 +704,12 @@ function handleBack() {
           </div>
         </div>
 
-        <!-- Google Picker (primary option when cloud load failed for Drive) -->
-        <template v-if="cloudLoadFailed && targetProvider === 'google_drive'">
+        <!-- Google Picker — primary path for any Drive-backed invite. Renders
+             whenever the provider is google_drive, regardless of whether the
+             URL had a fileId. With no fileId we never tried auto-load (the
+             user picks the file via Picker); with a fileId we tried and
+             failed (the Picker IS the recovery path under drive.file scope). -->
+        <template v-if="targetProvider === 'google_drive'">
           <div class="space-y-3 text-center">
             <p class="text-sm text-slate-600 dark:text-slate-400">
               {{ t('join.pickerPrompt.description') }}
