@@ -103,16 +103,19 @@ test.describe('Magic Link Invite System', () => {
       `/join?fam=${fakeFamilyId}&p=google_drive&ref=dGVzdC5iZWFucG9k&fileId=${fakeFileId}`
     );
 
-    // Wait for cloud load to fail (popup closes → error → cloudLoadFailed = true)
-    // and show the picker prompt
+    // The new useJoinFlow defers cloud auto-load to a user gesture when no
+    // silent token is available (which is always the case in tests), so
+    // the user lands on `awaiting-auth` with the Picker CTA visible —
+    // ready to be tapped. The picker button is the canonical and only
+    // recovery path for Drive-backed joiners; the rev-3 plan deliberately
+    // removed the local-file fallback for cloud joiners (it would have
+    // created an orphaned standalone copy of the data).
     const pickerButton = page.getByRole('button', { name: /select file from drive/i });
     await expect(pickerButton).toBeVisible({ timeout: 15000 });
 
-    // Should show the "or manual" fallback link
-    await expect(page.getByText(/or load a file from your device/i)).toBeVisible();
-
-    // Click the manual fallback link to expand the drop zone
-    await page.getByText(/or load a file from your device/i).click();
-    await expect(page.getByText(/drop.*beanpod|load.*beanpod/i).first()).toBeVisible();
+    // The local-file drop zone is NOT shown for google_drive invites —
+    // there's no "load from device" link or drop zone. Negative assert
+    // so a future regression that re-introduces the fallback is caught.
+    await expect(page.getByText(/or load a file from your device/i)).not.toBeVisible();
   });
 });
