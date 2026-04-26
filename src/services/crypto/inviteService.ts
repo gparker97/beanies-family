@@ -108,9 +108,115 @@ export async function hashInviteToken(token: string): Promise<string> {
 
 // ── Link building ───────────────────────────────────────────────────
 
-/** Build a full invite URL for the app. */
-export function buildInviteLink(token: string, familyId: string): string {
-  return `${globalThis.location?.origin ?? 'https://beanies.family'}/#/join?t=${encodeURIComponent(token)}&f=${encodeURIComponent(familyId)}`;
+/**
+ * Canonical shape of a beanies.family invite/join URL. Single source of
+ * truth — both `buildInviteLink` (inviter side) and `parseInviteLink`
+ * (joiner side) consume this. Adding a new optional field is the only
+ * way to extend the URL contract.
+ */
+export interface InviteLinkParams {
+  /** Invite token (omit for a base join URL with no key-wrapping). */
+  token?: string;
+  /** Family ID — required. */
+  familyId: string;
+  /** Storage provider ('local' or 'google_drive'). */
+  provider?: 'google_drive' | 'local';
+  /** File name (will be base64-encoded into the `ref` param). */
+  fileName?: string;
+  /** Google Drive file ID. */
+  fileId?: string;
+  /**
+   * Invitee's email — used as a Google `login_hint` on the joiner's
+   * OAuth flow so multi-account users land in the correct inbox.
+   * Plain-text in the URL (mild PII per yesterday's threat model:
+   * the invite token is the bigger concern if the link leaks).
+   */
+  inviteeEmail?: string;
+}
+
+/**
+ * Build a full beanies.family join URL. Param naming matches the
+ * existing wire format that `JoinPodView.onMounted` parses today
+ * (`fam=`, `p=`, `ref=`, `fileId=`, `t=`, plus new `hint=`). Returns
+ * a non-hash-routed URL (matches the production share-modal output).
+ */
+export function buildInviteLink(params: InviteLinkParams): string {
+  const origin = globalThis.location?.origin ?? 'https://beanies.family';
+  const search = new URLSearchParams();
+  search.set('fam', params.familyId);
+  if (params.provider) search.set('p', params.provider);
+  if (params.fileName) search.set('ref', encodeBase64(params.fileName));
+  if (params.fileId) search.set('fileId', params.fileId);
+  if (params.token) search.set('t', params.token);
+  if (params.inviteeEmail) search.set('hint', encodeBase64(params.inviteeEmail));
+  return `${origin}/join?${search.toString()}`;
+}
+
+/**
+ * Parse a beanies.family join URL into its components. Returns null if
+ * the URL is malformed or missing a familyId. Accepts hash-routed URLs
+ * (`/#/join?...`) and plain-path URLs (`/join?...`) for backward
+ * compatibility, and accepts both `f=` and `fam=` for the family
+ * parameter.
+ */
+export function parseInviteLink(url: string): InviteLinkParams | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+
+  // Honor either plain `?…` query or hash-route `#/path?…` query.
+  let qs = parsed.search;
+  if (!qs && parsed.hash) {
+    const hash = parsed.hash.startsWith('#') ? parsed.hash.slice(1) : parsed.hash;
+    const qIdx = hash.indexOf('?');
+    qs = qIdx >= 0 ? hash.slice(qIdx) : '';
+  }
+  const sp = new URLSearchParams(qs);
+
+  const familyId = sp.get('fam') || sp.get('f') || sp.get('code');
+  if (!familyId) return null;
+
+  const result: InviteLinkParams = { familyId };
+
+  const token = sp.get('t');
+  if (token) result.token = token;
+
+  const provider = sp.get('p');
+  if (provider === 'google_drive' || provider === 'local') result.provider = provider;
+
+  const fileNameEncoded = sp.get('ref');
+  if (fileNameEncoded) {
+    const decoded = decodeBase64(fileNameEncoded);
+    if (decoded) result.fileName = decoded;
+  }
+
+  const fileId = sp.get('fileId');
+  if (fileId) result.fileId = fileId;
+
+  const hintEncoded = sp.get('hint');
+  if (hintEncoded) {
+    const decoded = decodeBase64(hintEncoded);
+    if (decoded) result.inviteeEmail = decoded;
+  }
+
+  return result;
+}
+
+/** Plain base64 — matches the existing `ref=btoa(fileName)` wire format. */
+function encodeBase64(input: string): string {
+  return btoa(unescape(encodeURIComponent(input)));
+}
+
+/** Plain base64 decode. Returns null on malformed input rather than throwing. */
+function decodeBase64(input: string): string | null {
+  try {
+    return decodeURIComponent(escape(atob(input)));
+  } catch {
+    return null;
+  }
 }
 
 // ── Expiry check ────────────────────────────────────────────────────
