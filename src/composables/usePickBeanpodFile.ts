@@ -3,6 +3,7 @@ import {
   requestAccessToken,
   shouldUseRedirectAuth,
   startRedirectAuth,
+  tryGetSilentToken,
 } from '@/services/google/googleAuth';
 import { pickBeanpodFile } from '@/services/google/drivePicker';
 
@@ -28,28 +29,43 @@ export function usePickBeanpodFile() {
    * after triggering a full-page redirect (the page will navigate away).
    * Never throws — failures populate `pickError` and resolve to `null`.
    *
-   * **Always forces the consent / account-chooser screen.** This composable
-   * is invoked from recovery surfaces where account drift is the most
-   * likely cause of the failure (e.g. wrong-Drive on the file-not-found
-   * banner). Forcing consent surfaces Google's account chooser so the
-   * user explicitly confirms which account to use — eliminating the
-   * "I picked A but landed in B" failure mode at the cost of one extra
-   * tap on the account chooser.
+   * @param opts.forceConsent When true, always shows Google's account
+   *   chooser even if a valid token is cached. Default `true` because
+   *   most callers (recovery surfaces — `SaveFailureBanner`'s "Pick file
+   *   from Drive" action) need explicit account confirmation to avoid
+   *   silent account drift. The join flow passes `false` so first-time
+   *   joiners with a valid silent token aren't asked to re-pick their
+   *   account unnecessarily.
+   * @param opts.loginHint Optional Google email to pre-populate the
+   *   account chooser via `login_hint`. Use when the expected account
+   *   is known (e.g. invitee's email from the invite URL hint).
    */
-  async function pick(): Promise<{ fileId: string; fileName: string } | null> {
+  async function pick(opts?: {
+    forceConsent?: boolean;
+    loginHint?: string;
+  }): Promise<{ fileId: string; fileName: string } | null> {
+    const forceConsent = opts?.forceConsent ?? true;
+    const loginHint = opts?.loginHint;
     isPicking.value = true;
     pickError.value = null;
     try {
-      // Skip silent-token fast path: recovery flows must show the chooser
-      // so the user can pick the correct account.
-      if (shouldUseRedirectAuth()) {
-        const returnPath = `${window.location.pathname}${window.location.search}`;
-        await startRedirectAuth(returnPath);
-        // Page navigates; this resolves to null. The next session will
-        // complete redirect auth and the user can re-trigger the pick.
-        return null;
+      // Recovery flows skip the silent-token fast path so the user
+      // explicitly confirms the account. First-time join flows can
+      // accept a silent token (forceConsent=false).
+      let token: string | null = null;
+      if (!forceConsent) {
+        token = await tryGetSilentToken();
       }
-      const token = await requestAccessToken({ forceConsent: true });
+      if (!token) {
+        if (shouldUseRedirectAuth()) {
+          const returnPath = `${window.location.pathname}${window.location.search}`;
+          await startRedirectAuth(returnPath, loginHint);
+          // Page navigates; this resolves to null. The next session
+          // completes redirect auth and the user can re-trigger.
+          return null;
+        }
+        token = await requestAccessToken({ forceConsent, loginHint });
+      }
       const picked = await pickBeanpodFile(token);
       return picked;
     } catch (e) {
