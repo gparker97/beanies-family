@@ -51,6 +51,10 @@ const targetProvider = ref('local');
 const targetFileRef = ref('');
 const targetDriveFileId = ref('');
 const inviteToken = ref('');
+// Optional Google `login_hint` decoded from the URL (`hint=` param,
+// base64-encoded). Pre-fills Google's account chooser so multi-account
+// users land on the right account by default.
+const inviteEmailHint = ref<string | null>(null);
 const registryEntry = ref<RegistryEntry | null>(null);
 const isLookingUp = ref(false);
 const lookupDone = ref(false);
@@ -118,6 +122,16 @@ onMounted(async () => {
   );
 
   if (token) inviteToken.value = token;
+
+  const hintEncoded = (route.query.hint as string) || '';
+  if (hintEncoded) {
+    try {
+      inviteEmailHint.value = decodeURIComponent(escape(atob(hintEncoded)));
+    } catch {
+      // Malformed hint — silently ignore. The hint is purely a UX nudge;
+      // a missing/garbled hint just means the chooser shows all accounts.
+    }
+  }
 
   if (fam) {
     targetFamilyId.value = fam;
@@ -328,10 +342,10 @@ async function handlePickFromDrive() {
       if (shouldUseRedirectAuth()) {
         console.warn('[JoinPodView] Using redirect auth for this platform');
         const returnPath = `${window.location.pathname}${window.location.search}`;
-        await startRedirectAuth(returnPath);
+        await startRedirectAuth(returnPath, inviteEmailHint.value ?? undefined);
         return; // page navigates away
       }
-      token = await requestAccessToken();
+      token = await requestAccessToken({ loginHint: inviteEmailHint.value ?? undefined });
     }
 
     // If we have a fileId from the QR / registry, prefer auto-load over
@@ -358,7 +372,7 @@ async function handlePickFromDrive() {
       console.warn('[JoinPodView] Popup blocked — falling back to redirect auth');
       try {
         const returnPath = `${window.location.pathname}${window.location.search}`;
-        await startRedirectAuth(returnPath);
+        await startRedirectAuth(returnPath, inviteEmailHint.value ?? undefined);
         return;
       } catch (redirectErr) {
         console.error('[JoinPodView] Redirect auth failed:', redirectErr);

@@ -22,6 +22,7 @@ import PwaReinstallModal from '@/components/common/PwaReinstallModal.vue';
 import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
+import { formatDeviceInfo } from '@/utils/diagnostics';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
 import ContentSkeleton from '@/components/ui/ContentSkeleton.vue';
 import BackgroundSyncBar from '@/components/common/BackgroundSyncBar.vue';
@@ -670,15 +671,8 @@ onMounted(async () => {
   }
 });
 
-function getDeviceDiagnostics(): string {
-  return [
-    `UA: ${navigator.userAgent}`,
-    `WASM: ${typeof WebAssembly !== 'undefined'}`,
-    `Crypto: ${typeof crypto?.subtle !== 'undefined'}`,
-    `IDB: ${typeof indexedDB !== 'undefined'}`,
-    `SW: ${'serviceWorker' in navigator}`,
-  ].join('\n');
-}
+// Re-export for the template binding. Logic lives in `src/utils/diagnostics.ts`.
+const getDeviceDiagnostics = formatDeviceInfo;
 
 function handleReload() {
   window.location.reload();
