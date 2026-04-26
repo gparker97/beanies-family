@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-24",
-    "translationCount": 2474
+    "lastUpdated": "2026-04-26",
+    "translationCount": 2499
   },
   "translations": {
     "app.name": {
@@ -4612,9 +4612,9 @@
       "lastUpdated": "2026-03-03"
     },
     "googleDrive.fileNotFoundBody": {
-      "translation": "Google云端硬盘上的pod文件可能已被删除或移动。转到“设置”以重新连接或选择其他文件。",
-      "hash": "s0t6vu",
-      "lastUpdated": "2026-03-01"
+      "translation": "我们在{email}的云端硬盘中找不到您的数据文件。它可能已被删除、移动，或者您可能使用其他帐户登录。",
+      "hash": "bh21yp",
+      "lastUpdated": "2026-04-26"
     },
     "googleDrive.goToSettings": {
       "translation": "打开设置",
@@ -12375,6 +12375,131 @@
       "translation": "清楚",
       "hash": "12tbn1",
       "lastUpdated": "2026-04-24"
+    },
+    "auth.accountMismatchTitle": {
+      "translation": "错误的Google帐户",
+      "hash": "hlre7b",
+      "lastUpdated": "2026-04-26"
+    },
+    "auth.accountMismatchBody": {
+      "translation": "请使用{email}登录以访问您的数据。",
+      "hash": "a3ss76",
+      "lastUpdated": "2026-04-26"
+    },
+    "settings.familyData.signedInAs": {
+      "translation": "已登录",
+      "hash": "apxjib",
+      "lastUpdated": "2026-04-26"
+    },
+    "settings.familyData.switchAccount": {
+      "translation": "切换Google帐户",
+      "hash": "d6f61a",
+      "lastUpdated": "2026-04-26"
+    },
+    "settings.familyData.switchAccountFailed": {
+      "translation": "无法切换帐户。请重试。",
+      "hash": "8zjsc1",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.error.oauthRedirect": {
+      "translation": "无法完成登录Google。请重试。",
+      "hash": "p3ns1a",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.error.scopeDenied": {
+      "translation": "beanies.family需要访问共享文件的权限。请重试并允许访问云端硬盘。",
+      "hash": "dhazz1",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.error.popupBlocked": {
+      "translation": "您的浏览器阻止了登录弹出窗口。允许app.beanies.family弹出窗口，或在其他设备上重试。",
+      "hash": "jy2iv",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.error.pickerScript": {
+      "translation": "无法加载Google文件选取器。请检查您的互联网连接，然后重试。",
+      "hash": "207y1g",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.error.pickerFailed": {
+      "translation": "无法打开Google文件选取器。这是已知的iPhone限制—请重试，使用其他Google帐户登录，或在其他设备（计算机或Android ）上继续。",
+      "hash": "escz9u",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.error.pickerTimeout": {
+      "translation": "Google文件选取器没有响应。请重试。",
+      "hash": "d4tryj",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.error.fileRead": {
+      "translation": "无法使用{actualEmail}读取数据文件。邀请已发送到{hintEmail} —请尝试使用该帐户登录。",
+      "hash": "lbz56h",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.error.fileDecrypt": {
+      "translation": "无法解锁您家人的数据。向邀请人索取新的邀请链接。",
+      "hash": "4y5n79",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.error.familyMismatch": {
+      "translation": "此文件属于不同的家庭。使用其他账号登录或申请新的邀请。",
+      "hash": "lre8ct",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.error.tokenExpired": {
+      "translation": "此邀请已过期。向邀请人索取新链接。",
+      "hash": "xtftmz",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.error.tokenInvalid": {
+      "translation": "无法识别此邀请链接。向邀请人索取新邀请。",
+      "hash": "3gk9hv",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.error.noUnclaimed": {
+      "translation": "这个家族中的每一颗豆子都已经被认领了。请家庭管理员添加您。",
+      "hash": "ho1eqr",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.recovery.retry": {
+      "translation": "再试一次",
+      "hash": "agecuz",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.recovery.signInDifferentAccount": {
+      "translation": "使用其他账号登录",
+      "hash": "ikcegr",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.recovery.tryAnotherDevice": {
+      "translation": "在另一台设备上继续",
+      "hash": "bxnxp7",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.recovery.pickDifferentBean": {
+      "translation": "选择不同的豆类",
+      "hash": "gjrtij",
+      "lastUpdated": "2026-04-26"
+    },
+    "join.recovery.askForNewInvite": {
+      "translation": "请求新的邀请",
+      "hash": "kp1e9y",
+      "lastUpdated": "2026-04-26"
+    },
+    "googleDrive.thisAccount": {
+      "translation": "使用此账号",
+      "hash": "yh0otn",
+      "lastUpdated": "2026-04-26"
+    },
+    "googleDrive.fileNotFoundReselect": {
+      "translation": "从驱动器中选择文件",
+      "hash": "x6m3wn",
+      "lastUpdated": "2026-04-26"
+    },
+    "googleDrive.fileNotFoundReselectFailed": {
+      "translation": "无法加载所选文件。",
+      "hash": "qnh4h7",
+      "lastUpdated": "2026-04-26"
     }
   }
 }
