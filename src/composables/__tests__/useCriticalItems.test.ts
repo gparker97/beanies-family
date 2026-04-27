@@ -3,8 +3,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useCriticalItems } from '@/composables/useCriticalItems';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import type { FamilyActivity, FamilyMember, TodoItem } from '@/types/models';
+import type {
+  FamilyActivity,
+  FamilyMember,
+  Medication,
+  MedicationLogEntry,
+  TodoItem,
+} from '@/types/models';
 
 // Mock the repositories so stores can initialise
 vi.mock('@/services/automerge/repositories/activityRepository', () => ({
@@ -23,6 +30,20 @@ vi.mock('@/services/automerge/repositories/todoRepository', () => ({
   createTodo: vi.fn(),
   updateTodo: vi.fn(),
   deleteTodo: vi.fn(),
+}));
+
+vi.mock('@/services/automerge/repositories/medicationRepository', () => ({
+  getAllMedications: vi.fn().mockResolvedValue([]),
+  createMedication: vi.fn(),
+  updateMedication: vi.fn(),
+  deleteMedication: vi.fn(),
+  deleteMedicationCascade: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/services/automerge/repositories/medicationLogRepository', () => ({
+  getAllMedicationLogs: vi.fn().mockResolvedValue([]),
+  createMedicationLog: vi.fn(),
+  deleteMedicationLog: vi.fn(),
 }));
 
 vi.mock('@/composables/useToday', async () => {
@@ -85,18 +106,58 @@ function makeTodo(overrides?: Partial<TodoItem>): TodoItem {
   };
 }
 
+function makeMedication(overrides?: Partial<Medication>): Medication {
+  return {
+    id: 'med-1',
+    memberId: 'child-1',
+    name: 'Antibiotics',
+    dose: '5ml',
+    frequency: 'twice daily',
+    dosesPerDay: 2,
+    ongoing: true,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function makeMedLog(overrides?: Partial<MedicationLogEntry>): MedicationLogEntry {
+  // Use local ISO-ish strings (no trailing Z) so the test is timezone-
+  // robust — `dosesToday` extracts the LOCAL date from administeredOn,
+  // and a UTC `Z` timestamp can roll into the next/prev local day in
+  // east/west timezones.
+  return {
+    id: `medlog-${Math.random().toString(36).slice(2, 8)}`,
+    medicationId: 'med-1',
+    administeredOn: TODAY + 'T10:00:00.000',
+    administeredBy: 'parent-1',
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
 describe('useCriticalItems', () => {
   let familyStore: ReturnType<typeof useFamilyStore>;
   let activityStore: ReturnType<typeof useActivityStore>;
   let todoStore: ReturnType<typeof useTodoStore>;
+  let medicationsStore: ReturnType<typeof useMedicationsStore>;
 
   beforeEach(() => {
+    // Fake the system clock BEFORE Pinia setup — stores call useToday() at
+    // setup time and capture the resulting `today` ref. If the clock is
+    // faked after setup, those captured refs hold the real date and the
+    // medication-dose tests can't reach the TODAY date their logs use.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(TODAY + 'T08:00:00'));
+
     setActivePinia(createPinia());
     vi.clearAllMocks();
 
     familyStore = useFamilyStore();
     activityStore = useActivityStore();
     todoStore = useTodoStore();
+    medicationsStore = useMedicationsStore();
 
     // Set up family members
     familyStore.members.push(
@@ -104,10 +165,6 @@ describe('useCriticalItems', () => {
       makeMember({ id: 'parent-2', name: 'Mom' }),
       makeMember({ id: 'child-1', name: 'Emma' })
     );
-
-    // Mock the current date to TODAY
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(TODAY + 'T08:00:00'));
   });
 
   afterEach(() => {
@@ -593,5 +650,98 @@ describe('useCriticalItems', () => {
     expect(criticalItems.value).toHaveLength(1);
     expect(criticalItems.value[0]!.completable).toBe(true);
     expect(criticalItems.value[0]!.completed).toBe(false);
+  });
+
+  // ── Medication dose reminders ─────────────────────────────────────
+
+  it('shows a medication reminder when no doses logged today (plural)', () => {
+    familyStore.setCurrentMember('parent-1');
+    medicationsStore.medications.push(makeMedication({ dosesPerDay: 2 }));
+
+    const { criticalItems } = useCriticalItems();
+    const meds = criticalItems.value.filter((i) => i.type === 'medication');
+    expect(meds).toHaveLength(1);
+    expect(meds[0]!.message).toContain('Antibiotics');
+    expect(meds[0]!.message).toContain('Emma');
+    expect(meds[0]!.message).toContain('2 more today');
+    expect(meds[0]!.icon).toBe('💊');
+    expect(meds[0]!.id).toBe('med-1');
+  });
+
+  it('shows a medication reminder with singular copy when 1 dose remains', () => {
+    familyStore.setCurrentMember('parent-1');
+    medicationsStore.medications.push(makeMedication({ dosesPerDay: 2 }));
+    medicationsStore.medicationLogs.push(makeMedLog());
+
+    const { criticalItems } = useCriticalItems();
+    const meds = criticalItems.value.filter((i) => i.type === 'medication');
+    expect(meds).toHaveLength(1);
+    expect(meds[0]!.message).toContain('1 more today');
+  });
+
+  it('clears the medication reminder once all doses are logged', () => {
+    familyStore.setCurrentMember('parent-1');
+    medicationsStore.medications.push(makeMedication({ dosesPerDay: 2 }));
+    medicationsStore.medicationLogs.push(
+      makeMedLog({ id: 'log-1', administeredOn: TODAY + 'T08:00:00.000' }),
+      makeMedLog({ id: 'log-2', administeredOn: TODAY + 'T20:00:00.000' })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    const meds = criticalItems.value.filter((i) => i.type === 'medication');
+    expect(meds).toHaveLength(0);
+  });
+
+  it('clears the medication reminder when over-dosed (defensive)', () => {
+    familyStore.setCurrentMember('parent-1');
+    medicationsStore.medications.push(makeMedication({ dosesPerDay: 2 }));
+    medicationsStore.medicationLogs.push(
+      makeMedLog({ id: 'log-1', administeredOn: TODAY + 'T08:00:00.000' }),
+      makeMedLog({ id: 'log-2', administeredOn: TODAY + 'T14:00:00.000' }),
+      makeMedLog({ id: 'log-3', administeredOn: TODAY + 'T20:00:00.000' })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    const meds = criticalItems.value.filter((i) => i.type === 'medication');
+    expect(meds).toHaveLength(0);
+  });
+
+  it('skips legacy medications without dosesPerDay (no reminder)', () => {
+    familyStore.setCurrentMember('parent-1');
+    // Legacy med — dosesPerDay is undefined; make sure to override the
+    // default dosesPerDay: 2 from makeMedication.
+    medicationsStore.medications.push({
+      ...makeMedication(),
+      dosesPerDay: undefined,
+    });
+
+    const { criticalItems } = useCriticalItems();
+    const meds = criticalItems.value.filter((i) => i.type === 'medication');
+    expect(meds).toHaveLength(0);
+  });
+
+  it('skips medications explicitly marked "as needed" (dosesPerDay null)', () => {
+    familyStore.setCurrentMember('parent-1');
+    medicationsStore.medications.push(makeMedication({ dosesPerDay: null }));
+
+    const { criticalItems } = useCriticalItems();
+    const meds = criticalItems.value.filter((i) => i.type === 'medication');
+    expect(meds).toHaveLength(0);
+  });
+
+  it('skips inactive medications even when dosesPerDay is set', () => {
+    familyStore.setCurrentMember('parent-1');
+    // endDate < today → inactive
+    medicationsStore.medications.push(
+      makeMedication({
+        dosesPerDay: 2,
+        ongoing: false,
+        endDate: '2026-03-01',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    const meds = criticalItems.value.filter((i) => i.type === 'medication');
+    expect(meds).toHaveLength(0);
   });
 });

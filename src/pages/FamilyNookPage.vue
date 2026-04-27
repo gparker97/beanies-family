@@ -15,6 +15,8 @@ import ActivityViewEditModal from '@/components/planner/ActivityViewEditModal.vu
 import ActivityModal from '@/components/planner/ActivityModal.vue';
 import TransactionViewEditModal from '@/components/transactions/TransactionViewEditModal.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
+import MedicationViewModal from '@/components/pod/MedicationViewModal.vue';
+import MedicationFormModal from '@/components/pod/MedicationFormModal.vue';
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard.vue';
 import BeanTipCard from '@/components/nook/BeanTipCard.vue';
 import { usePermissions } from '@/composables/usePermissions';
@@ -24,6 +26,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useVacationStore } from '@/stores/vacationStore';
+import { useMedicationsStore } from '@/stores/medicationsStore';
 import { confirm } from '@/composables/useConfirm';
 import { useSounds } from '@/composables/useSounds';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
@@ -45,6 +48,7 @@ const todoStore = useTodoStore();
 const activityStore = useActivityStore();
 const transactionsStore = useTransactionsStore();
 const vacationStore = useVacationStore();
+const medicationsStore = useMedicationsStore();
 const { playWhoosh } = useSounds();
 
 // ── Todo modal (for ScheduleCards / RecentActivityCard clicks) ───────────────
@@ -52,6 +56,22 @@ const selectedTodoId = ref<string | null>(null);
 const selectedTodo = computed(() =>
   selectedTodoId.value ? (todoStore.todos.find((t) => t.id === selectedTodoId.value) ?? null) : null
 );
+
+// ── Medication detail modal — opened from critical-item taps. Resolves
+// reactively from the store so a deleted med renders empty rather than
+// a stale snapshot. Same pattern as BeanMedicationsTab.
+const viewingMedicationId = ref<string | null>(null);
+const viewingMedication = computed(() =>
+  viewingMedicationId.value
+    ? (medicationsStore.medications.find((m) => m.id === viewingMedicationId.value) ?? null)
+    : null
+);
+
+// ── Medication edit drawer — opened from the View modal's Edit button.
+// Mounted on the Nook page (not the pod page) so users editing a med
+// from the critical-items briefing stay in context — no surprise
+// navigation. Matches the View → Edit pivot pattern in BeanMedicationsTab.
+const editingMedication = ref<import('@/types/models').Medication | null>(null);
 
 // ── Activity modal ───────────────────────────────────────────────────────────
 const showActivityEditModal = ref(false);
@@ -194,6 +214,7 @@ async function handleTransactionDelete(id: string) {
     <FamilyStatusToast
       @open-todo="selectedTodoId = $event"
       @open-activity="(id: string, date: string) => openActivity(id, date)"
+      @open-medication="viewingMedicationId = $event"
       @complete-duty="handleDutyComplete"
       @complete-todo="handleTodoComplete"
       @show-full-schedule="scrollToSchedule"
@@ -266,6 +287,29 @@ async function handleTransactionDelete(id: string) {
       :transaction="viewingTransaction"
       @close="viewingTransaction = null"
       @open-edit="handleTransactionOpenEdit"
+    />
+
+    <!-- Medication detail modal — opened from critical-item taps. Edit
+         pivots in-place to MedicationFormModal so users stay on the
+         Nook page (no surprise navigation). Matches the View → Edit
+         pivot pattern used in BeanMedicationsTab. -->
+    <MedicationViewModal
+      :open="viewingMedication !== null"
+      :medication="viewingMedication"
+      @close="viewingMedicationId = null"
+      @edit="
+        (m) => {
+          viewingMedicationId = null;
+          editingMedication = m;
+        }
+      "
+    />
+
+    <MedicationFormModal
+      :open="editingMedication !== null"
+      :member-id="editingMedication?.memberId ?? ''"
+      :medication="editingMedication"
+      @close="editingMedication = null"
     />
 
     <TransactionModal

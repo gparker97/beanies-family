@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-27",
-    "translationCount": 2550
+    "translationCount": 2566
   },
   "translations": {
     "app.name": {
@@ -12754,6 +12754,86 @@
     "error.supportNotified": {
       "translation": "客服已收到通知。",
       "hash": "98kg7b",
+      "lastUpdated": "2026-04-27"
+    },
+    "medications.field.dosesPerDay": {
+      "translation": "每天多久一次？",
+      "hash": "pog56g",
+      "lastUpdated": "2026-04-27"
+    },
+    "medications.dosesOption.once": {
+      "translation": "忘记1次",
+      "hash": "1grz5",
+      "lastUpdated": "2026-04-27"
+    },
+    "medications.dosesOption.twice": {
+      "translation": "响两声",
+      "hash": "1ccxl4",
+      "lastUpdated": "2026-04-27"
+    },
+    "medications.dosesOption.three": {
+      "translation": "3",
+      "hash": "1dw",
+      "lastUpdated": "2026-04-27"
+    },
+    "medications.dosesOption.four": {
+      "translation": "4",
+      "hash": "1er",
+      "lastUpdated": "2026-04-27"
+    },
+    "medications.dosesOption.other": {
+      "translation": "其他/根据需要",
+      "hash": "1m16da",
+      "lastUpdated": "2026-04-27"
+    },
+    "medications.frequencyAuto.onceDaily": {
+      "translation": "每天一次",
+      "hash": "6j84li",
+      "lastUpdated": "2026-04-27"
+    },
+    "medications.frequencyAuto.twiceDaily": {
+      "translation": "每天两次",
+      "hash": "821yxt",
+      "lastUpdated": "2026-04-27"
+    },
+    "medications.frequencyAuto.threeDaily": {
+      "translation": "每日三次",
+      "hash": "hyrk2a",
+      "lastUpdated": "2026-04-27"
+    },
+    "medications.frequencyAuto.fourDaily": {
+      "translation": "每天4次",
+      "hash": "d42wur",
+      "lastUpdated": "2026-04-27"
+    },
+    "medications.willDisplayAs": {
+      "translation": "显示文章",
+      "hash": "fcbvpg",
+      "lastUpdated": "2026-04-27"
+    },
+    "medications.frequencyDescribe": {
+      "translation": "描述时间表",
+      "hash": "qlrc79",
+      "lastUpdated": "2026-04-27"
+    },
+    "nook.criticalMedReminder": {
+      "translation": "别忘了： {member}的{medication} （今天还有{remaining}个）",
+      "hash": "9c6nj8",
+      "lastUpdated": "2026-04-27"
+    },
+    "nook.criticalMedReminderOne": {
+      "translation": "别忘了： {member}的{medication} （今天还有1个）",
+      "hash": "efxo19",
+      "lastUpdated": "2026-04-27"
+    },
+    "family.unknownMemberInline": {
+      "translation": "添加家属",
+      "hash": "c0csdl",
+      "lastUpdated": "2026-04-27"
+    },
+    "time.done": {
+      "translation": "完成",
+      "hash": "19s4i",
       "lastUpdated": "2026-04-27"
     }
   }

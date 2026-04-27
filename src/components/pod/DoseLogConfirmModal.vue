@@ -10,9 +10,13 @@
  *  - Compact read-only list of today's logged doses for the medication
  *    (reusing `MedicationLogRow` with `readOnly` so we don't duplicate
  *    avatar/name/time rendering). Empty state is explicit.
- *  - Editable date + time, defaulting to now. Future values blocked
- *    via input max-attribute AND a gating computed on the Save button
- *    (defense in depth — native validation is best-effort).
+ *  - Editable date + time, defaulting to now. The pickers themselves
+ *    DO NOT constrain to "today or earlier" — the time picker is a
+ *    multi-step (hour/minute/AM-PM) interaction where `disable hours
+ *    after the current time` produces confusing artifacts (e.g. trying
+ *    to pick 7am when AM/PM is on PM disables 7-11 in the hour column).
+ *    Instead, future values are surfaced as inline form validation
+ *    (see `isFuture` + the alert below the pickers) and gate Save.
  *  - Save emits the chosen timestamp as ISO 8601; cancel resolves the
  *    caller's promise with `undefined`.
  */
@@ -43,11 +47,7 @@ function resetToNow(): void {
   timeValue.value = toTimeInputValue(now);
 }
 
-// Bounds. Date max = today local. Time has a ceiling only when the
-// selected date IS today — earlier dates have no time restriction.
 const { today: todayISO } = useToday();
-const nowTime = computed(() => toTimeInputValue(new Date()));
-const timeMax = computed(() => (dateValue.value === todayISO.value ? nowTime.value : undefined));
 
 const combinedDate = computed(() => {
   if (!dateValue.value || !timeValue.value) return null;
@@ -133,16 +133,8 @@ function onSave(): void {
           {{ t('medicationLog.whenHeader') }}
         </h3>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
-          <BeanieDatePicker
-            v-model="dateValue"
-            :max="todayISO"
-            :placeholder="t('medicationLog.dateFieldLabel')"
-          />
-          <BeanieTimeInput
-            v-model="timeValue"
-            :max="timeMax"
-            :placeholder="t('medicationLog.timeFieldLabel')"
-          />
+          <BeanieDatePicker v-model="dateValue" :placeholder="t('medicationLog.dateFieldLabel')" />
+          <BeanieTimeInput v-model="timeValue" :placeholder="t('medicationLog.timeFieldLabel')" />
           <button
             type="button"
             class="font-outfit rounded-xl bg-[var(--tint-orange-8)] px-3 py-2 text-xs font-bold tracking-wider text-[#F15D22] uppercase transition-colors hover:bg-[var(--tint-orange-15)] focus:bg-[var(--tint-orange-15)] focus:outline-none"
