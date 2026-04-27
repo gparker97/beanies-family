@@ -17,6 +17,24 @@ vi.mock('@/services/automerge/repositories/medicationLogRepository', () => ({
   deleteMedicationLog: vi.fn(),
 }));
 
+// Mock useToday so its `today` ref reflects whatever time is set via
+// `vi.setSystemTime` at the moment useToday() is invoked. The store calls
+// useToday() once during setup; tests set the system time BEFORE calling
+// useMedicationsStore() so the captured today matches the test's "now".
+vi.mock('@/composables/useToday', async () => {
+  const { ref, computed } = await import('vue');
+  const { toDateInputValue, getStartOfDay } = await import('@/utils/date');
+  return {
+    useToday: () => ({
+      today: ref(toDateInputValue(new Date())),
+      startOfToday: computed(() => getStartOfDay(new Date())),
+      isVisible: ref(true),
+      lastVisibleAt: ref(0),
+      lastHiddenAt: ref(0),
+    }),
+  };
+});
+
 import { useMedicationsStore } from '../medicationsStore';
 import * as medicationRepo from '@/services/automerge/repositories/medicationRepository';
 import * as medicationLogRepo from '@/services/automerge/repositories/medicationLogRepository';

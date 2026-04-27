@@ -22,6 +22,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { usePermissions } from '@/composables/usePermissions';
 import { useGiveDose } from '@/composables/useGiveDose';
 import { isMedicationActive, useMedicationsStore } from '@/stores/medicationsStore';
+import { useToday } from '@/composables/useToday';
 import type { Medication, UUID } from '@/types/models';
 
 const props = defineProps<{
@@ -34,10 +35,13 @@ const medicationsStore = useMedicationsStore();
 const { giveDose } = useGiveDose();
 
 const memberMedications = computed(() => medicationsStore.byMember(props.memberId).value);
+const { today } = useToday();
 
 // Active meds: primary grid. Sorted alphabetically for stable ordering.
 const activeMedications = computed(() =>
-  memberMedications.value.filter(isMedicationActive).sort((a, b) => a.name.localeCompare(b.name))
+  memberMedications.value
+    .filter((m) => isMedicationActive(m, today.value))
+    .sort((a, b) => a.name.localeCompare(b.name))
 );
 
 // Ended meds: collapsible history section. Sorted by endDate desc
@@ -45,7 +49,7 @@ const activeMedications = computed(() =>
 // undated ended meds fall through to an alphabetical tiebreak.
 const endedMedications = computed(() =>
   memberMedications.value
-    .filter((m) => !isMedicationActive(m))
+    .filter((m) => !isMedicationActive(m, today.value))
     .sort((a, b) => {
       const aEnd = a.endDate ?? '';
       const bEnd = b.endDate ?? '';

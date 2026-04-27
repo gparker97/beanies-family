@@ -25,6 +25,7 @@ import { useDoseConfirm } from '@/composables/useDoseConfirm';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { toDateInputValue, toTimeInputValue } from '@/utils/date';
+import { useToday } from '@/composables/useToday';
 import type { MedicationLogEntry } from '@/types/models';
 
 const { state, handleConfirm, handleCancel } = useDoseConfirm();
@@ -44,7 +45,7 @@ function resetToNow(): void {
 
 // Bounds. Date max = today local. Time has a ceiling only when the
 // selected date IS today — earlier dates have no time restriction.
-const todayISO = computed(() => toDateInputValue(new Date()));
+const { today: todayISO } = useToday();
 const nowTime = computed(() => toTimeInputValue(new Date()));
 const timeMax = computed(() => (dateValue.value === todayISO.value ? nowTime.value : undefined));
 

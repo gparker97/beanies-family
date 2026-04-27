@@ -1,5 +1,6 @@
 import { computed, type Ref } from 'vue';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useToday } from '@/composables/useToday';
 import {
   addDays,
   toDateInputValue,
@@ -17,10 +18,11 @@ export interface DayInfo {
 }
 
 export function useDayNavigation(referenceDate: Ref<Date>) {
+  const { today } = useToday();
   const currentDay = computed<DayInfo>(() => {
     const d = referenceDate.value;
     const dateStr = toDateInputValue(d);
-    return { date: d, dateStr, isToday: dateStr === toDateInputValue(new Date()) };
+    return { date: d, dateStr, isToday: dateStr === today.value };
   });
 
   const dayLabel = computed(() => formatDayLong(currentDay.value.dateStr));
@@ -48,6 +50,7 @@ export interface WeekDay {
 
 export function useWeekNavigation(referenceDate: Ref<Date>) {
   const settingsStore = useSettingsStore();
+  const { today } = useToday();
 
   function getWeekStart(date: Date): Date {
     const dayOfWeek = date.getDay();
@@ -57,7 +60,7 @@ export function useWeekNavigation(referenceDate: Ref<Date>) {
 
   const weekDays = computed<WeekDay[]>(() => {
     const start = getWeekStart(referenceDate.value);
-    const todayStr = toDateInputValue(new Date());
+    const todayStr = today.value;
     return Array.from({ length: 7 }, (_, i) => {
       const d = addDays(start, i);
       const dateStr = toDateInputValue(d);

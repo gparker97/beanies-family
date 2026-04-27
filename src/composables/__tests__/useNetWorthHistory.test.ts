@@ -42,6 +42,20 @@ vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: () => settingsState,
 }));
 
+vi.mock('@/composables/useToday', async () => {
+  const { ref, computed } = await import('vue');
+  const { toDateInputValue, getStartOfDay } = await import('@/utils/date');
+  return {
+    useToday: () => ({
+      today: ref(toDateInputValue(new Date())),
+      startOfToday: computed(() => getStartOfDay(new Date())),
+      isVisible: ref(true),
+      lastVisibleAt: ref(0),
+      lastHiddenAt: ref(0),
+    }),
+  };
+});
+
 import { useNetWorthHistory } from '../useNetWorthHistory';
 
 function account(overrides: Partial<Account> = {}): Account {

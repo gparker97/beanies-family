@@ -8,6 +8,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { useToday } from '@/composables/useToday';
 
 // ── localStorage helpers ─────────────────────────────────────────────────────
 
@@ -53,13 +54,10 @@ const state = ref<TipState>({ dismissedTips: [], tipsEnabled: true, lastTipShown
 const isDismissing = ref(false);
 let currentMemberId = '';
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 // ── Composable ───────────────────────────────────────────────────────────────
 
 export function useBeanTips() {
+  const { today } = useToday();
   const familyStore = useFamilyStore();
   const settingsStore = useSettingsStore();
   const transactionsStore = useTransactionsStore();
@@ -97,7 +95,7 @@ export function useBeanTips() {
     if (!currentMemberId) return null;
 
     // Already shown a tip today
-    if (state.value.lastTipShownDate === todayISO()) {
+    if (state.value.lastTipShownDate === today.value) {
       // Return the tip that was shown today (the one just dismissed)
       // so the card can finish its dismiss animation
       return null;
@@ -123,7 +121,7 @@ export function useBeanTips() {
       state.value = {
         ...state.value,
         dismissedTips: [...state.value.dismissedTips, tipId],
-        lastTipShownDate: todayISO(),
+        lastTipShownDate: today.value,
       };
       saveState(currentMemberId, state.value);
       isDismissing.value = false;

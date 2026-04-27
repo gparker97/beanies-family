@@ -4,7 +4,8 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
-import { toDateInputValue, formatTime12, formatDateShort } from '@/utils/date';
+import { formatTime12, formatDateShort } from '@/utils/date';
+import { useToday } from '@/composables/useToday';
 import { normalizeAssignees } from '@/utils/assignees';
 import { isTodoOverdue } from '@/utils/todo';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
@@ -36,8 +37,7 @@ export function useCriticalItems() {
   const activityStore = useActivityStore();
   const { getMemberName } = useMemberInfo();
   const { t } = useTranslation();
-
-  const todayStr = computed(() => toDateInputValue(new Date()));
+  const { today: todayStr } = useToday();
 
   const criticalItems = computed<CriticalItem[]>(() => {
     const memberId = familyStore.currentMemberId;

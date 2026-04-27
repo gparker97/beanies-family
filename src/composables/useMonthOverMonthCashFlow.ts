@@ -12,6 +12,7 @@ import { computed } from 'vue';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useToday } from '@/composables/useToday';
 import { convertAmount } from '@/utils/currency';
 import {
   addMonths,
@@ -25,12 +26,13 @@ export function useMonthOverMonthCashFlow() {
   const transactionsStore = useTransactionsStore();
   const recurringStore = useRecurringStore();
   const settingsStore = useSettingsStore();
+  const { startOfToday } = useToday();
 
   /** Sum of one-time income transactions (no recurring) within the previous calendar month, in base currency. */
   const lastMonthOneTimeIncome = computed(() => {
     const baseCurrency = settingsStore.baseCurrency;
     const rates = settingsStore.exchangeRates;
-    const lastMonth = addMonths(new Date(), -1);
+    const lastMonth = addMonths(startOfToday.value, -1);
     const start = toISODateString(getStartOfMonth(lastMonth));
     const end = toISODateString(getEndOfMonth(lastMonth));
 
@@ -43,7 +45,7 @@ export function useMonthOverMonthCashFlow() {
   const lastMonthOneTimeExpenses = computed(() => {
     const baseCurrency = settingsStore.baseCurrency;
     const rates = settingsStore.exchangeRates;
-    const lastMonth = addMonths(new Date(), -1);
+    const lastMonth = addMonths(startOfToday.value, -1);
     const start = toISODateString(getStartOfMonth(lastMonth));
     const end = toISODateString(getEndOfMonth(lastMonth));
 

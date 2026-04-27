@@ -7,6 +7,20 @@ vi.mock('@/composables/useToast', () => ({
   showToast: vi.fn(),
   useToast: () => ({ toasts: { value: [] }, showToast: vi.fn(), dismissToast: vi.fn() }),
 }));
+
+vi.mock('@/composables/useToday', async () => {
+  const { ref, computed } = await import('vue');
+  const { toDateInputValue, getStartOfDay } = await import('@/utils/date');
+  return {
+    useToday: () => ({
+      today: ref(toDateInputValue(new Date())),
+      startOfToday: computed(() => getStartOfDay(new Date())),
+      isVisible: ref(true),
+      lastVisibleAt: ref(0),
+      lastHiddenAt: ref(0),
+    }),
+  };
+});
 import type {
   FamilyVacation,
   FamilyActivity,
