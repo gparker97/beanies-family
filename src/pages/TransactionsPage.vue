@@ -124,7 +124,7 @@ function handleTransactionQueryParam() {
       accountFilter.value = accountId;
     } else {
       console.warn('[TransactionsPage] unknown account filter id:', accountId);
-      showToast('error', t('txn.filter.accountNotFound'));
+      showToast('error', t('txn.filter.accountNotFound'), undefined, { silent: true });
     }
   }
   const goalId = route.query.goal as string | undefined;
@@ -134,7 +134,7 @@ function handleTransactionQueryParam() {
       goalFilter.value = goalId;
     } else {
       console.warn('[TransactionsPage] unknown goal filter id:', goalId);
-      showToast('error', t('txn.filter.goalNotFound'));
+      showToast('error', t('txn.filter.goalNotFound'), undefined, { silent: true });
     }
   }
   if (viewId || riId || direction || accountId || goalId) {

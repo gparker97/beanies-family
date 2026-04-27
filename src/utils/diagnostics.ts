@@ -40,3 +40,17 @@ export function formatDeviceInfo(info: DeviceInfo = getDeviceInfo()): string {
     `SW: ${info.serviceWorker}`,
   ].join('\n');
 }
+
+/**
+ * Last `n` chars of a token / id (default 4), for diagnostic correlation
+ * without leaking the full secret value. Returns null for null/undefined/
+ * empty input. Strings shorter than `n` are returned as-is.
+ *
+ * Used by the Slack error reporter for `*_tail` context fields, by
+ * `useJoinFlow.buildDiagnosticReport` for invite tokens / file IDs, and
+ * anywhere we want a stable correlatable suffix without the full value.
+ */
+export function tail(s: string | null | undefined, n = 4): string | null {
+  if (!s) return null;
+  return s.length <= n ? s : `…${s.slice(-n)}`;
+}

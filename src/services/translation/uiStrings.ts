@@ -1770,6 +1770,10 @@ const STRING_DEFS = {
     beanie:
       'some beans may be out of date. try refreshing the app. if it keeps happening, sign out and sign back in.',
   },
+  'error.supportNotified': {
+    en: 'Support has been notified.',
+    beanie: 'support has been notified.',
+  },
 
   // Not Found (404)
   'notFound.title': { en: 'Not Found', beanie: 'not found' },

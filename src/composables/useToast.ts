@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { reportError } from '@/utils/errorReporter';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -17,6 +18,32 @@ export interface ToastActionOptions {
    * an Undo flow). Error toasts ignore this — they stay sticky.
    */
   durationMs?: number;
+  /**
+   * Skip the automatic error reporter for this toast. Use ONLY for
+   * validation / user-recoverable errors (e.g. clipboard permission
+   * denied, stale URL filter). System errors that warrant support
+   * notification should NOT set this — that's the default behavior.
+   *
+   * No-op for non-error toasts (success/info/warning never report).
+   */
+  silent?: boolean;
+  /**
+   * Override the auto-detected surface name for the error report.
+   * If unset, the reporter falls back to a generic 'app' surface.
+   * Use kebab-case: 'create-activity', 'drive-sync-write', etc.
+   */
+  surface?: string;
+  /**
+   * Extra structured context for the error report. Filtered through the
+   * reporter's allowlist before send — anything not on the allowlist is
+   * dropped with a console.warn.
+   */
+  context?: Record<string, unknown>;
+  /**
+   * The Error object, if any. Lets the reporter ship the stack trace.
+   * Pass when you have one; safe to omit.
+   */
+  error?: unknown;
 }
 
 export interface Toast {
@@ -27,6 +54,9 @@ export interface Toast {
   timestamp: number;
   actionLabel?: string;
   actionFn?: () => void | Promise<void>;
+  /** True if the reporter was fired for this toast. Drives the
+   *  "Support has been notified" line in the toast component. */
+  reported: boolean;
 }
 
 let nextId = 0;
@@ -55,6 +85,29 @@ export function showToast(
   message?: string,
   options?: ToastActionOptions
 ): void {
+  // Auto-report system errors. Wrapped in try/catch — a reporter failure
+  // must NEVER prevent the toast from rendering. The user always sees
+  // their error, even if Slack is down or the reporter itself bugs out.
+  let reported = false;
+  if (type === 'error' && !options?.silent) {
+    try {
+      // The toast's `title` is the error class name (e.g. "Couldn't save");
+      // `message` is the user-facing detail, included as the reporter's
+      // `message` so support sees the full toast text in Slack. If the
+      // caller passed an Error, its stack is attached separately.
+      const reportMessage = message ? `${title} — ${message}` : title;
+      reportError({
+        surface: options?.surface ?? 'app',
+        message: reportMessage,
+        error: options?.error,
+        context: options?.context,
+      });
+      reported = true;
+    } catch (e) {
+      console.warn('[useToast] reportError threw — toast still rendering:', e);
+    }
+  }
+
   const toast: Toast = {
     id: nextId++,
     type,
@@ -63,6 +116,7 @@ export function showToast(
     timestamp: Date.now(),
     actionLabel: options?.actionLabel,
     actionFn: options?.actionFn,
+    reported,
   };
 
   toasts.value.push(toast);

@@ -7,6 +7,7 @@ import { updateRatesIfStale } from '@/services/exchangeRate/exchangeRateService'
 import { attemptSilentReconnect } from '@/utils/silentReconnect';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
+import { reportError } from '@/utils/errorReporter';
 
 /**
  * Heavy refresh on tab wake or day change.
@@ -62,20 +63,32 @@ async function run(reason: 'day-changed' | 'long-absence'): Promise<void> {
       await syncStore.reloadAllStores();
     } catch (e) {
       console.error(`[useStaleTabRefresh] reloadAllStores failed (${reason})`, e);
+      // Pass surface explicitly so the auto-report from showToast tags this
+      // correctly in Slack (otherwise Layer A defaults to 'app').
       showToast(
         'error',
         t('error.backgroundRefreshFailed'),
-        t('error.backgroundRefreshFailedHelp')
+        t('error.backgroundRefreshFailedHelp'),
+        { surface: 'stale-tab-refresh', error: e, context: { action: reason } }
       );
       return;
     }
 
     // 2. Non-critical, sequential — depends on step 1's current state.
     //    Idempotent via `alreadyExists` dedup, safe to retry next wake.
+    //    Failure is silent to the user (recurring tx will retry next wake)
+    //    but support still gets notified via reportError so we can see the
+    //    pattern if it's persistent.
     try {
       await processRecurringItems();
     } catch (e) {
       console.warn(`[useStaleTabRefresh] processRecurringItems failed (${reason})`, e);
+      reportError({
+        surface: 'stale-tab-refresh',
+        message: 'processRecurringItems failed',
+        error: e,
+        context: { action: reason },
+      });
     }
 
     // 3. Non-critical, parallel — independent subsystems.
@@ -85,14 +98,27 @@ async function run(reason: 'day-changed' | 'long-absence'): Promise<void> {
     ]);
     if (rates.status === 'rejected') {
       console.warn(`[useStaleTabRefresh] updateRatesIfStale failed (${reason})`, rates.reason);
+      reportError({
+        surface: 'stale-tab-refresh',
+        message: 'updateRatesIfStale failed',
+        error: rates.reason,
+        context: { action: reason },
+      });
     }
     if (reconnect.status === 'rejected') {
       // SaveFailureBanner + syncStore.showGoogleReconnect already cover the
-      // user-facing path — don't double-surface.
+      // user-facing path — don't double-surface to the user, but still
+      // notify support so we can correlate sessions to reconnect failures.
       console.warn(
         `[useStaleTabRefresh] attemptSilentReconnect failed (${reason})`,
         reconnect.reason
       );
+      reportError({
+        surface: 'stale-tab-refresh',
+        message: 'attemptSilentReconnect failed',
+        error: reconnect.reason,
+        context: { action: reason },
+      });
     }
 
     // 4. Non-critical — pull remote Drive changes (see ordering note above).
@@ -100,6 +126,12 @@ async function run(reason: 'day-changed' | 'long-absence'): Promise<void> {
       await syncStore.reloadIfFileChanged();
     } catch (e) {
       console.warn(`[useStaleTabRefresh] reloadIfFileChanged failed (${reason})`, e);
+      reportError({
+        surface: 'stale-tab-refresh',
+        message: 'reloadIfFileChanged failed',
+        error: e,
+        context: { action: reason },
+      });
     }
   } finally {
     syncStore.resumeFilePolling();
