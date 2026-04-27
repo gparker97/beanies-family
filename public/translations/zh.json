@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-26",
-    "translationCount": 2531
+    "translationCount": 2548
   },
   "translations": {
     "app.name": {
@@ -12547,8 +12547,8 @@
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.step1.faq.toggle": {
-      "translation": "有疑问或担忧？",
-      "hash": "q6awsq",
+      "translation": "您有疑问吗？我们为您解答",
+      "hash": "ql1gg8",
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.step1.faq.q1": {
@@ -12567,8 +12567,8 @@
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.step1.faq.a2": {
-      "translation": "如果他们还没有自己的Google账号，请通过您自己的电子邮件分享。您可以使用该账号在他们的设备上登录，他们将看到Family Pod。",
-      "hash": "po5uqs",
+      "translation": "如果他们还没有自己的Google账号，请使用您自己的电子邮箱进行分享。您可以使用该账号在他们的设备上登录，他们就会看到家庭账号。当他们准备好自己使用时，您可以通过<a href=\"https://families.google/familylink/\" target=\"_blank\" rel=\"noopener\" class=\"wizard-faq-link\">Google家庭链接</a>设置免费的家长监督Gmail。",
+      "hash": "ce5n2s",
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.step1.faq.q3": {
@@ -12577,8 +12577,8 @@
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.step1.faq.a3": {
-      "translation": "他们需要一个免费的Google帐户才能访问家庭Pod （它位于Google云端硬盘中）。在accounts.google.com上完成设置大约需要一分钟。",
-      "hash": "4cduom",
+      "translation": "他们需要一个免费的Google帐户才能访问家庭pod —它位于Google云端硬盘中。在<a href=\"https://accounts.google.com\" target=\"_blank\" rel=\"noopener\" class=\"wizard-faq-link\">accounts.google.com</a>上完成设置大约需要一分钟。对于孩子， <a href=\"https://families.google/familylink/\" target=\"_blank\" rel=\"noopener\" class=\"wizard-faq-link\">Google家庭链接</a>会创建一个免费的、由家长监督的Gmail。",
+      "hash": "tf9leu",
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.step2.title": {
@@ -12659,6 +12659,91 @@
     "inviteWizard.error.channelOpenFailed": {
       "translation": "无法打开{channel}。请尝试复制链接或其他选项。",
       "hash": "tbuoyy",
+      "lastUpdated": "2026-04-26"
+    },
+    "family.addMemberFailed": {
+      "translation": "无法添加该便帽—请重试。",
+      "hash": "9zb7i5",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.picker.title": {
+      "translation": "谁将加入吊舱？",
+      "hash": "nh1yl5",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.picker.subhead": {
+      "translation": "选择要邀请的便帽，或添加新人。",
+      "hash": "yrica4",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.picker.statusOwner": {
+      "translation": "★ pod所有者",
+      "hash": "ebnanx",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.picker.statusJoined": {
+      "translation": "已加入",
+      "hash": "pe31me",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.picker.tileNoEmail": {
+      "translation": "还没有电子邮箱",
+      "hash": "7i008r",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.picker.addBean": {
+      "translation": "添加一个新的豆豆",
+      "hash": "cq58qy",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.picker.empty": {
+      "translation": "没有正在等待的beanies —添加一个以发送您的第一个邀请。",
+      "hash": "mobxy5",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.invitee.label": {
+      "translation": "对于",
+      "hash": "1ind",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.invitee.change": {
+      "translation": "更改",
+      "hash": "miole8",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.noEmailChip": {
+      "translation": "没有默认电子邮件—输入{name}将使用登录的Google帐户电子邮件。",
+      "hash": "pp4d91",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.cta.addEmail": {
+      "translation": "首先添加电子邮箱",
+      "hash": "j8g648",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.confirmLabel.noEmail": {
+      "translation": "请在上方添加电子邮箱以继续",
+      "hash": "39n38x",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.childHint.toggle": {
+      "translation": "如果我的孩子没有电子邮件怎么办？",
+      "hash": "bem3t9",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.childHint.body1": {
+      "translation": "没关系，您可以通过自己的电子邮件分享。您可以使用该账号在他们的设备上登录，他们将看到Family Pod。当他们准备好自己使用时，您可以通过以下方式设置一个免费的、由家长监督的Gmail",
+      "hash": "iydb71",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.childHint.linkLabel": {
+      "translation": "Google家庭链接",
+      "hash": "413tap",
+      "lastUpdated": "2026-04-26"
+    },
+    "inviteWizard.step1.childHint.body2": {
+      "translation": "—然后从设置中切换。",
+      "hash": "7dlk4y",
       "lastUpdated": "2026-04-26"
     }
   }

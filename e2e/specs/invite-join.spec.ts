@@ -3,7 +3,7 @@ import type { Route } from '@playwright/test';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 test.describe('Magic Link Invite System', () => {
-  test('Invite wizard: add member, walk through Step 1 → Step 2, verify QR', async ({ page }) => {
+  test('Invite wizard: picker → add-bean → Step 1 → Step 2 with QR', async ({ page }) => {
     await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
@@ -14,10 +14,28 @@ test.describe('Magic Link Invite System', () => {
     await page.goto('/pod');
     await page.waitForURL(/\/pod(\/|$)/);
 
-    // --- Part 1: Add member, wizard auto-opens at Step 1 ---
+    // --- Part 1: Open wizard from generic CTA — picker (Step 0) opens ---
 
-    const addButton = page.getByRole('button', { name: /add (bean|a beanie)/i });
-    await addButton.click();
+    // The "Invite Beanie" button is now visible regardless of whether the
+    // pod has invitable members (the picker handles the empty case with
+    // its add-tile + caption).
+    const inviteButton = page.getByRole('button', { name: /invite/i }).first();
+    await inviteButton.click();
+
+    const step0 = page.locator('[data-testid="invite-wizard-step-0"]');
+    await expect(step0).toBeVisible({ timeout: 5000 });
+
+    // --- Part 2: Tap "+ add a new beanie" from the picker → add-modal ---
+
+    const addBeanTile = page.locator('[data-testid="invite-picker-add-bean"]');
+    await expect(addBeanTile).toBeVisible();
+    await addBeanTile.click();
+
+    // Picker closes; FamilyMemberModal opens. Wait for the picker to be
+    // gone before asserting on the add-modal — the wizard and the
+    // add-modal are both `role="dialog"`, so the strict locator would
+    // resolve ambiguously during the transition window.
+    await expect(step0).not.toBeVisible({ timeout: 5000 });
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -27,29 +45,40 @@ test.describe('Magic Link Invite System', () => {
     const saveButton = dialog.getByRole('button', { name: /save|add/i });
     await saveButton.click();
 
-    // Wizard opens with Step 1 visible (email field + confirmation checkbox).
-    // Scope by step-content testid since BaseModal doesn't forward attrs.
+    // Wizard reopens at Step 1 — the new bean was just selected for us.
     const step1 = page.locator('[data-testid="invite-wizard-step-1"]');
     await expect(step1).toBeVisible({ timeout: 5000 });
 
-    // --- Part 2: Walk Step 1 — fill email, confirm, submit ---
+    // Invitee chip shows the bean we just added.
+    const inviteeChip = page.locator('[data-testid="invite-wizard-invitee-chip"]');
+    await expect(inviteeChip).toContainText('Test Beanie');
 
+    // The new bean has a system-generated `*@temp.beanies.family` email
+    // (we didn't supply one), so the wizard treats it as no-email-on-file:
+    // email field is blank + warning chip + child-hint disclosure visible.
     const emailInput = page.locator('[data-testid="invite-email-input"]');
+    await expect(emailInput).toHaveValue('');
+    await expect(page.locator('[data-testid="invite-wizard-no-email-chip"]')).toBeVisible();
+    await expect(page.locator('[data-testid="invite-wizard-child-hint-toggle"]')).toBeVisible();
+
+    // --- Part 3: Type email, tick confirm, submit → Step 2 ---
+
     await emailInput.fill('test.invitee@example.com');
 
+    // Warning chip hides once a real value is typed.
+    await expect(page.locator('[data-testid="invite-wizard-no-email-chip"]')).not.toBeVisible();
+
     const submitButton = page.locator('[data-testid="invite-wizard-submit"]');
-    // Submit is disabled until the confirmation checkbox is ticked.
     await expect(submitButton).toBeDisabled();
 
-    // The checkbox is sr-only (visually replaced by a custom box); use force to
-    // skip the visibility check since the wrapping <label> is the visible target.
+    // Checkbox is sr-only (visually replaced by a custom box); force-check.
     const confirmCheckbox = page.locator('[data-testid="invite-wizard-confirm-checkbox"]');
     await confirmCheckbox.check({ force: true });
     await expect(submitButton).toBeEnabled();
 
     await submitButton.click();
 
-    // --- Part 3: Step 2 renders QR + channels + back button ---
+    // --- Part 4: Step 2 renders QR + channels + back button ---
 
     const step2 = page.locator('[data-testid="invite-wizard-step-2"]');
     await expect(step2).toBeVisible({ timeout: 5000 });
@@ -59,7 +88,6 @@ test.describe('Magic Link Invite System', () => {
     const qrSrc = await qr.getAttribute('src');
     expect(qrSrc).toContain('data:image/png');
 
-    // Channel grid + copy-link row from ShareChannelGrid.
     await expect(page.locator('[data-testid="invite-channel-whatsapp"]')).toBeVisible();
     await expect(page.locator('[data-testid="invite-copy-link"]')).toBeVisible();
 

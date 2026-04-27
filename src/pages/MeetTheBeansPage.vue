@@ -129,11 +129,6 @@ const upcomingThisWeek = computed(() => {
   return activityStore.upcomingActivities.filter((e) => e.date >= today && e.date <= weekFromNow);
 });
 
-/** True when there are non-owner, non-pet members who could receive an invite link. */
-const hasInvitableMembers = computed(
-  () => familyStore.members.filter((m) => m.role !== 'owner' && !m.isPet).length > 0
-);
-
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const editingMember = ref<FamilyMember | null>(null);
@@ -273,22 +268,56 @@ async function handleMemberSave(
   if ('id' in data) {
     await familyStore.updateMember(data.id, data.data);
     closeEditModal();
-  } else {
-    const memberName = data.name;
-    const isPet = data.isPet === true;
-    await familyStore.createMember(data);
-    showAddModal.value = false;
-
-    // Wait for drawer close transition before opening invite modal
-    await nextTick();
-
-    // Show success toast; skip the invite modal for pets (they can't
-    // receive invites, sign in, or have access levels).
-    showToast('success', t('family.memberAdded'), memberName);
-    if (!isPet) {
-      await openInviteModal();
-    }
+    return;
   }
+  const memberName = data.name;
+  const isPet = data.isPet === true;
+  let created;
+  try {
+    created = await familyStore.createMember(data);
+  } catch (e) {
+    console.error('[meetTheBeans] handleMemberSave failed', { error: e });
+    showToast('error', t('family.addMemberFailed'));
+    return;
+  }
+  showAddModal.value = false;
+  await nextTick();
+
+  if (!created) {
+    // familyStore already logged with [familyStore] prefix; surface a
+    // user-actionable toast and bail (don't open the invite wizard
+    // pointing at a member that doesn't exist).
+    showToast('error', t('family.addMemberFailed'));
+    return;
+  }
+
+  showToast('success', t('family.memberAdded'), memberName);
+  if (isPet) return;
+
+  // Pre-select the freshly-created bean in the wizard. The wizard sees
+  // `prefill` and starts at Step 1 (confirm-email) directly, skipping
+  // the picker — the user just told us who they want to invite.
+  pendingShareMember.value = created;
+  inviteFlow.reset();
+  showInviteModal.value = true;
+}
+
+/**
+ * Wizard's "+ add a new beanie" tile was tapped — close the wizard so
+ * FamilyMemberModal can take focus, then open the add-modal. The wizard
+ * will reopen automatically once the new member is saved (see
+ * handleMemberSave). If the user cancels the add-modal, the wizard
+ * stays closed; they can reopen via "Invite Beanie" again.
+ *
+ * The nextTick lets the wizard's exit transition start before the
+ * add-modal mounts — otherwise both dialogs are momentarily visible
+ * (looks like a stack rather than a swap).
+ */
+async function handleAddBeanFromWizard() {
+  showInviteModal.value = false;
+  pendingShareMember.value = null;
+  await nextTick();
+  openAddModal();
 }
 
 async function handleMemberDelete(id: string) {
@@ -386,7 +415,7 @@ function cancelEditFamilyName() {
         class="flex w-full flex-shrink-0 flex-wrap items-center gap-2 sm:w-auto"
       >
         <button
-          v-if="familyContextStore.activeFamilyId && hasInvitableMembers"
+          v-if="familyContextStore.activeFamilyId"
           type="button"
           class="font-outfit text-secondary-500 inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white sm:flex-initial dark:bg-slate-800/80 dark:text-gray-100 dark:hover:bg-slate-800"
           @click="openInviteModal"
@@ -694,6 +723,7 @@ function cancelEditFamilyName() {
       :prefill="wizardPrefill"
       :invite-flow="inviteFlow"
       @close="handleWizardClose"
+      @add-bean="handleAddBeanFromWizard"
     />
   </div>
 </template>
