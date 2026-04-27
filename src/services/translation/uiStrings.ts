@@ -3098,10 +3098,6 @@ const STRING_DEFS = {
     en: 'Add an Email First',
     beanie: 'add an email first',
   },
-  'inviteWizard.step1.confirmLabel.noEmail': {
-    en: 'Add an email above to continue',
-    beanie: 'add an email above to continue',
-  },
   'inviteWizard.step1.childHint.toggle': {
     en: "What if my child doesn't have an email?",
     beanie: "what if my child doesn't have an email?",
