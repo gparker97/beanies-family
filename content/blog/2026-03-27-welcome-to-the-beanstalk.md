@@ -6,7 +6,7 @@ category: updates
 coverEmoji: 🫘
 coverImage: /blog/greg-family-disney.webp
 excerpt: "The story of how a janky spreadsheet, my son's nickname, and three crazy boys naturally led to vibe coding a family planning app at 3am."
-subtitle: 'the story of this site written by an actual human'
+subtitle: 'the story of this site, written by an actual human'
 featured: false
 author: greg
 ---
