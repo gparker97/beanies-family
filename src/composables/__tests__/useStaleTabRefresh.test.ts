@@ -186,7 +186,8 @@ describe('useStaleTabRefresh', () => {
     expect(showToastMock).toHaveBeenCalledWith(
       'error',
       'error.backgroundRefreshFailed',
-      'error.backgroundRefreshFailedHelp'
+      'error.backgroundRefreshFailedHelp',
+      expect.objectContaining({ surface: 'stale-tab-refresh' })
     );
     expect(processRecurringItemsMock).not.toHaveBeenCalled();
     expect(updateRatesIfStaleMock).not.toHaveBeenCalled();

@@ -33,7 +33,8 @@ import {
   getGoogleAccountEmail,
 } from '@/services/google/googleAuth';
 import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
-import { getDeviceInfo } from '@/utils/diagnostics';
+import { getDeviceInfo, tail } from '@/utils/diagnostics';
+import { reportError } from '@/utils/errorReporter';
 import type { FamilyMember, RegistryEntry } from '@/types/models';
 
 // ─── State machine + error registry ──────────────────────────────────────────
@@ -231,17 +232,18 @@ export function useJoinFlow() {
         code,
         context: { error: message, ...contextExtra },
       };
+      // Auto-notify support — the join flow shows its own structured error
+      // UI to the user, so we don't double-surface here. Just fire the
+      // Slack message with the registry code as the surface so we can
+      // group onboarding failures by error code in #beanies-errors.
+      reportError({
+        surface: `join-flow:${code}`,
+        message: message || code,
+        error: err,
+        context: { error_code: code },
+      });
       return null;
     }
-  }
-
-  /**
-   * Last 4 chars of a token / id, for diagnostic correlation without
-   * leaking the full secret value.
-   */
-  function tail(s: string | null | undefined, n = 4): string | null {
-    if (!s) return null;
-    return s.length <= n ? s : `…${s.slice(-n)}`;
   }
 
   function buildDiagnosticReport(): string {

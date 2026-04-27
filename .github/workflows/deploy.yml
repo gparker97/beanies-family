@@ -148,6 +148,15 @@ jobs:
           VITE_INVITE_WEBHOOK_URL: ${{ secrets.INVITE_WEBHOOK_URL }}
           VITE_CONTACT_WEBHOOK_URL: ${{ secrets.CONTACT_WEBHOOK_URL }}
           VITE_SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          # Error reporter — fires automatic Slack messages to #beanies-errors
+          # whenever any error toast / Vue render error / unhandled rejection
+          # is caught. Webhook URL is a repository VARIABLE (not a secret) per
+          # the rule in tasks/lessons.md — it sits in the client bundle anyway
+          # and being a variable makes it auditable + rotatable from the UI.
+          VITE_BEANIES_ERROR_WEBHOOK_URL: ${{ vars.BEANIES_ERROR_WEBHOOK_URL }}
+          # Build SHA — every error report includes this so we can correlate
+          # bugs to specific deploys. Falls back to 'dev' for local builds.
+          VITE_BUILD_SHA: ${{ github.sha }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7

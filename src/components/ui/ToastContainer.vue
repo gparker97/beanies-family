@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useToast, type ToastType } from '@/composables/useToast';
+import { useTranslation } from '@/composables/useTranslation';
 
 const { toasts, dismissToast, invokeToastAction } = useToast();
+const { t } = useTranslation();
 
 const typeConfig: Record<ToastType, { icon: string; bgClass: string; borderClass: string }> = {
   success: {
@@ -70,6 +72,9 @@ const titleColorClass: Record<ToastType, string> = {
         </p>
         <p v-if="toast.message" class="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
           {{ toast.message }}
+        </p>
+        <p v-if="toast.reported" class="mt-1 text-xs text-gray-500 italic dark:text-gray-500">
+          {{ t('error.supportNotified') }}
         </p>
       </div>
       <button
