@@ -2016,6 +2016,10 @@ const STRING_DEFS = {
     beanie: 'copy the magic bean link for this beanie',
   },
   'family.memberAdded': { en: 'Member Added!', beanie: 'new beanie added!' },
+  'family.addMemberFailed': {
+    en: "Couldn't add that beanie — please try again.",
+    beanie: "couldn't add that beanie — please try again",
+  },
   'family.scanOrShare': {
     en: 'Scan QR code or share the link',
     beanie: 'scan the magic code or share the link',
@@ -2955,8 +2959,8 @@ const STRING_DEFS = {
     beanie: 'confirm {email}',
   },
   'inviteWizard.step1.faq.toggle': {
-    en: 'Questions or worries?',
-    beanie: 'questions or worries?',
+    en: "You've got questions? We've got answers",
+    beanie: "you've got questions? we've got answers",
   },
   'inviteWizard.step1.faq.q1': {
     en: 'Is this safe?',
@@ -2972,18 +2976,18 @@ const STRING_DEFS = {
     beanie: 'what about the little beanies?',
   },
   'inviteWizard.step1.faq.a2': {
-    en: "If they don't have their own Google account yet, share with one of your own emails. You can sign them in on their device with that account, and they'll see the family pod.",
+    en: 'If they don\'t have their own Google account yet, share with one of your own emails — you can sign them in on their device with that account, and they\'ll see the family pod. When they\'re ready for their own, you can set up a free, parent-supervised Gmail through <a href="https://families.google/familylink/" target="_blank" rel="noopener" class="wizard-faq-link">Google Family Link</a>.',
     beanie:
-      "if they don't have their own google account yet, share with one of your own emails. you can sign them in on their device with that account, and they'll see the family pod",
+      'if they don\'t have their own google account yet, share with one of your own emails — you can sign them in on their device with that account, and they\'ll see the family pod. when they\'re ready for their own, you can set up a free, parent-supervised gmail through <a href="https://families.google/familylink/" target="_blank" rel="noopener" class="wizard-faq-link">google family link</a>',
   },
   'inviteWizard.step1.faq.q3': {
     en: "What if they don't use Google?",
     beanie: "what if they don't use google?",
   },
   'inviteWizard.step1.faq.a3': {
-    en: "They'll need a free Google account to access the family pod (it lives in Google Drive). Setting one up takes about a minute at accounts.google.com.",
+    en: 'They\'ll need a free Google account to access the family pod — it lives in Google Drive. Setting one up takes about a minute at <a href="https://accounts.google.com" target="_blank" rel="noopener" class="wizard-faq-link">accounts.google.com</a>. For kids, <a href="https://families.google/familylink/" target="_blank" rel="noopener" class="wizard-faq-link">Google Family Link</a> creates a free, parent-supervised Gmail.',
     beanie:
-      "they'll need a free google account to access the family pod (it lives in google drive). setting one up takes about a minute at accounts.google.com",
+      'they\'ll need a free google account to access the family pod — it lives in google drive. setting one up takes about a minute at <a href="https://accounts.google.com" target="_blank" rel="noopener" class="wizard-faq-link">accounts.google.com</a>. for kids, <a href="https://families.google/familylink/" target="_blank" rel="noopener" class="wizard-faq-link">google family link</a> creates a free, parent-supervised gmail',
   },
   'inviteWizard.step2.title': {
     en: 'Magic Link Ready',
@@ -3049,6 +3053,71 @@ const STRING_DEFS = {
   'inviteWizard.error.channelOpenFailed': {
     en: "Couldn't open {channel}. Try Copy Link or another option.",
     beanie: "couldn't open {channel}. try copy link or another option",
+  },
+  'inviteWizard.picker.title': {
+    en: "Who's joining the pod?",
+    beanie: "who's joining the pod?",
+  },
+  'inviteWizard.picker.subhead': {
+    en: 'Pick a beanie to invite, or add someone new.',
+    beanie: 'pick a beanie to invite, or add someone new',
+  },
+  'inviteWizard.picker.statusOwner': {
+    en: '★ pod owner',
+    beanie: '★ pod owner',
+  },
+  'inviteWizard.picker.statusJoined': {
+    en: '✓ joined',
+    beanie: '✓ joined',
+  },
+  'inviteWizard.picker.tileNoEmail': {
+    en: 'no email yet',
+    beanie: 'no email yet',
+  },
+  'inviteWizard.picker.addBean': {
+    en: 'add a new beanie',
+    beanie: 'add a new beanie',
+  },
+  'inviteWizard.picker.empty': {
+    en: 'No beanies waiting yet — add one to send your first invite.',
+    beanie: 'no beanies waiting yet — add one to send your first invite',
+  },
+  'inviteWizard.invitee.label': {
+    en: 'For',
+    beanie: 'for',
+  },
+  'inviteWizard.invitee.change': {
+    en: 'change',
+    beanie: 'change',
+  },
+  'inviteWizard.step1.noEmailChip': {
+    en: 'No default email on file — enter the Google account email {name} will sign in with.',
+    beanie: 'no default email on file — enter the google account email {name} will sign in with',
+  },
+  'inviteWizard.step1.cta.addEmail': {
+    en: 'Add an Email First',
+    beanie: 'add an email first',
+  },
+  'inviteWizard.step1.confirmLabel.noEmail': {
+    en: 'Add an email above to continue',
+    beanie: 'add an email above to continue',
+  },
+  'inviteWizard.step1.childHint.toggle': {
+    en: "What if my child doesn't have an email?",
+    beanie: "what if my child doesn't have an email?",
+  },
+  'inviteWizard.step1.childHint.body1': {
+    en: "That's fine — share with one of your own emails. You can sign them in on their device with that account, and they'll see the family pod. When they're ready for their own, you can set up a free, parent-supervised Gmail through",
+    beanie:
+      "that's fine — share with one of your own emails. you can sign them in on their device with that account, and they'll see the family pod. when they're ready for their own, you can set up a free, parent-supervised gmail through",
+  },
+  'inviteWizard.step1.childHint.linkLabel': {
+    en: 'Google Family Link',
+    beanie: 'google family link',
+  },
+  'inviteWizard.step1.childHint.body2': {
+    en: '— then switch them over from settings.',
+    beanie: '— then switch them over from settings',
   },
 
   // Share invite modal

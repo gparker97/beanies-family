@@ -8,6 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-27
+
+### Changed
+
+- **Invite wizard now opens with a beanie picker.** The generic "Invite Beanie" CTA used to drop you in front of a blank email field — you had to remember and retype the address of someone already in the pod. It now opens a Step 0 picker that lists every beanie waiting to join as a tappable row; already-joined beanies and the pod owner are dimmed with a status chip explaining why; an end-of-list "+ add a new beanie" tile funnels into the existing add-member drawer, and on save the wizard reopens at the email-confirm step with the new bean pre-selected. Per-bean share button (the BeanCard share icon) is unchanged — still skips the picker. When a picked beanie has no real email yet (system placeholder like `*@temp.beanies.family`), the email field stays blank and surfaces a Sky-Silk warning chip plus a "what if my child doesn't have an email?" expandable hint pointing to Google Family Link.
+- **FAQ section refresh.** "Questions or worries?" → "You've got questions? We've got answers"; dropped Caveat for Outfit-bold (Caveat is reserved for Step 2's QR accent now). Q3 ("what if they don't use Google?") was wrong — non-Google joiners can't open the Drive-backed pod. Restored the accurate answer pointing to `accounts.google.com` with a kids note linking to Google Family Link. Q2 (kids' beanies) gets the same Family Link reference.
+
+---
+
 ## 2026-04-26
 
 ### Changed
