@@ -3,9 +3,12 @@ import { computed, ref, useTemplateRef, watch } from 'vue';
 import { BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import ShareChannelGrid from '@/components/family/ShareChannelGrid.vue';
+import InvitePickerStep from '@/components/family/InvitePickerStep.vue';
+import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useAttentionPulse } from '@/composables/useAttentionPulse';
 import { useSounds } from '@/composables/useSounds';
+import { isUnshareableEmail } from '@/utils/email';
 import type { InviteFlow } from '@/composables/useInviteFlow';
 import type { StorageProviderType } from '@/services/sync/storageProvider';
 
@@ -30,27 +33,47 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
+  /** User tapped the picker's "+ add a new beanie" tile. Parent should
+   *  close the wizard, open FamilyMemberModal, and on save reopen the
+   *  wizard with `prefill` set to the new member. */
+  'add-bean': [];
 }>();
 
 const { t } = useTranslation();
 const { pulse } = useAttentionPulse();
 const { playClink } = useSounds();
+const familyStore = useFamilyStore();
 
 // --- UI state (this component only — flow state lives in props.inviteFlow) ---
-type Step = 1 | 2;
+type Step = 0 | 1 | 2;
 const currentStep = ref<Step>(1);
+/** Member picked from Step 0. Null when entered via per-bean share (uses
+ *  `props.prefill` instead) or when the user hasn't picked yet. */
+const pickedMember = ref<Prefill | null>(null);
 const emailValue = ref('');
 const confirmed = ref(false);
 const faqOpen = ref(false);
+const childHintOpen = ref(false);
 const emailFieldRef = useTemplateRef<HTMLInputElement>('emailField');
 
 // --- Derived ---
-const isPrefilled = computed(() => Boolean(props.prefill?.email));
+/** Effective invitee on Step 1+ — prefill (per-bean share entry) takes
+ *  precedence over picker selection so the wizard stays consistent for
+ *  callers that arrive prefilled. */
+const invitee = computed<Prefill | null>(() => props.prefill ?? pickedMember.value);
+
+/** Empty when the supplied email is missing or unshareable (system
+ *  placeholder like *@temp.beanies.family). Drives the Step 1 prefill
+ *  decision and the warning-chip rendering. */
+function realEmailFor(email: string | undefined): string {
+  return email && !isUnshareableEmail(email) ? email : '';
+}
 
 const heroTitle = computed(() => {
   if (currentStep.value === 2) return t('inviteWizard.step2.title');
-  return isPrefilled.value && props.prefill
-    ? t('inviteWizard.step1.titlePrefilled').replace('{name}', props.prefill.memberName)
+  if (currentStep.value === 0) return t('inviteWizard.picker.title');
+  return invitee.value
+    ? t('inviteWizard.step1.titlePrefilled').replace('{name}', invitee.value.memberName)
     : t('inviteWizard.step1.title');
 });
 
@@ -63,7 +86,7 @@ const canSubmit = computed(
 const isDriveProvider = computed(() => props.provider === 'google_drive');
 
 const ctaLabel = computed(() => {
-  if (!hasEmail.value) return t('inviteWizard.step1.cta.empty');
+  if (!hasEmail.value) return t('inviteWizard.step1.cta.addEmail');
   if (!confirmed.value) return t('inviteWizard.step1.cta.unconfirmed');
   const key = isDriveProvider.value
     ? 'inviteWizard.step1.cta.share'
@@ -72,7 +95,7 @@ const ctaLabel = computed(() => {
 });
 
 const confirmLabel = computed(() => {
-  if (!hasEmail.value) return t('inviteWizard.step1.confirmLabel.empty');
+  if (!hasEmail.value) return t('inviteWizard.step1.confirmLabel.noEmail');
   return t('inviteWizard.step1.confirmLabel.withEmail').replace('{email}', trimmedEmail.value);
 });
 
@@ -83,33 +106,70 @@ const step2Caption = computed(() =>
   )
 );
 
+const noEmailChipMessage = computed(() => {
+  const name = invitee.value?.memberName ?? t('family.title');
+  return t('inviteWizard.step1.noEmailChip').replace('{name}', name);
+});
+
 const error = computed(() => props.inviteFlow.error.value);
-// Errors with `edit-email` recovery surface near the email field;
-// `retry` errors offer a Try-Again button next to the message.
 const showRetryButton = computed(() => error.value?.recovery === 'retry');
+/** Change-link visible only when entered via picker (not per-bean share),
+ *  so the user can swap recipient without closing the wizard. */
+const showChangeLink = computed(() => !props.prefill && pickedMember.value !== null);
 
 // --- Lifecycle ---
-// Reset wizard UI state when the modal opens. Composable state is reset by
-// the parent (it owns the composable's lifecycle).
 watch(
   () => props.open,
   async (isOpen) => {
     if (!isOpen) return;
-    currentStep.value = 1;
-    emailValue.value = props.prefill?.email ?? '';
+    pickedMember.value = null;
     confirmed.value = false;
     faqOpen.value = false;
-    // If prefilled, the user must still actively confirm — pulse the email
-    // so their eye lands on the value to verify.
-    if (isPrefilled.value) {
-      await new Promise((r) => setTimeout(r, 80));
-      pulse(emailFieldRef.value);
+    childHintOpen.value = false;
+    if (props.prefill) {
+      currentStep.value = 1;
+      emailValue.value = realEmailFor(props.prefill.email);
+      // If real-email prefilled, pulse the field so the user verifies.
+      if (emailValue.value) {
+        await new Promise((r) => setTimeout(r, 80));
+        pulse(emailFieldRef.value);
+      }
+    } else {
+      currentStep.value = 0;
+      emailValue.value = '';
     }
   },
   { immediate: true }
 );
 
 // --- Actions ---
+function handlePickerSelect(memberId: string): void {
+  const m = familyStore.members.find((x) => x.id === memberId);
+  if (!m) {
+    // Race vs. delete during open modal — log for diagnostics, then
+    // abort. Wizard stays on Step 0 so the user can re-pick.
+    console.warn('[InviteWizardModal] picker select for unknown member', { memberId });
+    return;
+  }
+  pickedMember.value = { email: m.email ?? '', memberName: m.name };
+  emailValue.value = realEmailFor(m.email);
+  confirmed.value = false;
+  childHintOpen.value = false;
+  props.inviteFlow.clearError();
+  currentStep.value = 1;
+  // Pulse the email field if prefilled, mirroring the per-bean-share
+  // entry path so the user always re-verifies the value.
+  if (emailValue.value) {
+    void Promise.resolve().then(() => {
+      setTimeout(() => pulse(emailFieldRef.value), 80);
+    });
+  }
+}
+
+function handlePickerAddBean(): void {
+  emit('add-bean');
+}
+
 async function handleSubmit() {
   if (!canSubmit.value) return;
   const ok = isDriveProvider.value
@@ -123,16 +183,23 @@ async function handleSubmit() {
 }
 
 function handleRetry() {
-  // Clear the error and let the user resubmit. CTA is already enabled.
   props.inviteFlow.clearError();
 }
 
 function goBackToStep1() {
-  // Preserve email value so the user doesn't have to retype.
-  // Force re-confirmation so they actively re-acknowledge.
   confirmed.value = false;
   props.inviteFlow.clearError();
   currentStep.value = 1;
+}
+
+function changeRecipient() {
+  // Step 1 → back to picker. Reset selection state so user actively re-picks.
+  pickedMember.value = null;
+  emailValue.value = '';
+  confirmed.value = false;
+  childHintOpen.value = false;
+  props.inviteFlow.clearError();
+  currentStep.value = 0;
 }
 
 function handleClose() {
@@ -150,13 +217,13 @@ function handleClose() {
     fullscreen-mobile
     @close="handleClose"
   >
-    <!-- Hero band: tinted wash + progress strip -->
+    <!-- Hero band — Step 0 (picker) gets a single-mascot lobby header;
+         Step 1+ get the existing 2-mascot progress strip. -->
     <template #header>
       <div
         class="relative overflow-hidden rounded-t-3xl"
         :style="{ backgroundColor: 'var(--tint-orange-8)' }"
       >
-        <!-- Close button -->
         <button
           type="button"
           class="absolute top-3 right-3 z-10 rounded-full bg-white/80 p-1.5 text-gray-500 backdrop-blur-sm transition-all hover:bg-white hover:text-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-800/80 dark:hover:bg-slate-800"
@@ -167,9 +234,24 @@ function handleClose() {
           <BeanieIcon name="close" size="md" />
         </button>
 
-        <!-- Progress strip -->
-        <div class="flex items-center justify-center gap-3 px-8 pt-7 pb-4">
-          <!-- Step 1 mascot: father icon -->
+        <!-- Step 0 lobby header -->
+        <div v-if="currentStep === 0" class="px-8 pt-7 pb-5 text-center">
+          <img
+            src="/brand/beanies_logo_transparent_logo_only_192x192.png"
+            alt=""
+            aria-hidden="true"
+            class="wizard-bean-active mx-auto mb-2 h-16 w-16 object-contain"
+          />
+          <h2 class="font-outfit text-secondary-500 text-xl font-bold dark:text-gray-100">
+            {{ t('inviteWizard.picker.title') }}
+          </h2>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('inviteWizard.picker.subhead') }}
+          </p>
+        </div>
+
+        <!-- Step 1+ progress strip -->
+        <div v-else class="flex items-center justify-center gap-3 px-8 pt-7 pb-4">
           <div class="flex flex-col items-center gap-1.5">
             <img
               src="/brand/beanies_father_icon_transparent_360x360.png"
@@ -190,7 +272,6 @@ function handleClose() {
             </span>
           </div>
 
-          <!-- Curve -->
           <div
             class="mb-6 h-[3px] w-12 overflow-hidden rounded-sm bg-gray-200/80 dark:bg-slate-600"
           >
@@ -203,7 +284,6 @@ function handleClose() {
             />
           </div>
 
-          <!-- Step 2 mascot: parent + child holding hands (logo only) -->
           <div class="flex flex-col items-center gap-1.5">
             <img
               src="/brand/beanies_logo_transparent_logo_only_192x192.png"
@@ -223,8 +303,16 @@ function handleClose() {
       </div>
     </template>
 
-    <!-- Step 1 -->
-    <div v-if="currentStep === 1" data-testid="invite-wizard-step-1" class="space-y-4">
+    <!-- Step 0 — Picker -->
+    <InvitePickerStep
+      v-if="currentStep === 0"
+      :members="familyStore.sortedHumans"
+      @select="handlePickerSelect"
+      @add-bean="handlePickerAddBean"
+    />
+
+    <!-- Step 1 — Confirm Email -->
+    <div v-else-if="currentStep === 1" data-testid="invite-wizard-step-1" class="space-y-4">
       <div>
         <h2 class="font-outfit text-secondary-500 text-2xl font-bold dark:text-gray-100">
           {{ heroTitle }}
@@ -232,6 +320,33 @@ function handleClose() {
         <p class="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
           {{ t('inviteWizard.step1.subhead') }}
         </p>
+      </div>
+
+      <!-- Invitee chip (always shown on Step 1) — name + optional change link.
+           Change link visible only when entered via picker, so the user can
+           swap without closing the wizard. -->
+      <div
+        v-if="invitee"
+        class="flex items-center gap-2 rounded-full border border-[var(--color-primary)]/20 bg-[var(--tint-orange-8)] px-3 py-1.5"
+        data-testid="invite-wizard-invitee-chip"
+      >
+        <span
+          class="font-outfit text-[10px] font-semibold tracking-[0.08em] text-gray-400 uppercase"
+        >
+          {{ t('inviteWizard.invitee.label') }}
+        </span>
+        <span class="font-outfit text-secondary-500 text-sm font-bold dark:text-gray-100">
+          {{ invitee.memberName }}
+        </span>
+        <button
+          v-if="showChangeLink"
+          type="button"
+          class="font-outfit ml-auto rounded-full border border-[var(--color-primary)]/25 bg-white px-2.5 py-0.5 text-xs font-semibold text-[var(--color-primary)] transition-colors hover:bg-[var(--tint-orange-8)] dark:bg-slate-800"
+          data-testid="invite-wizard-change"
+          @click="changeRecipient"
+        >
+          {{ t('inviteWizard.invitee.change') }}
+        </button>
       </div>
 
       <input
@@ -244,7 +359,54 @@ function handleClose() {
         class="font-inter w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3 text-base font-medium text-gray-900 transition-all outline-none placeholder:font-normal placeholder:text-gray-400 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--tint-orange-15)] dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
       />
 
-      <!-- Inline error chip -->
+      <!-- No-default-email warning chip + child-hint disclosure: only when the
+           invitee has no usable email and the user hasn't typed one yet. -->
+      <template v-if="invitee && !emailValue.trim()">
+        <div
+          class="flex items-start gap-2.5 rounded-xl border border-[#AED6F1]/50 bg-[#AED6F1]/15 px-3.5 py-3"
+          data-testid="invite-wizard-no-email-chip"
+        >
+          <BeanieIcon name="alert-circle" size="sm" class="mt-0.5 flex-shrink-0 text-[#1E5A85]" />
+          <p class="text-sm leading-relaxed text-[#1E5A85]">
+            {{ noEmailChipMessage }}
+          </p>
+        </div>
+
+        <details
+          class="child-hint group -mt-1"
+          :open="childHintOpen"
+          @toggle="childHintOpen = ($event.target as HTMLDetailsElement).open"
+        >
+          <summary
+            class="font-outfit inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-1 text-xs font-semibold text-gray-500 transition-colors hover:text-[var(--color-primary)] dark:text-gray-400"
+            data-testid="invite-wizard-child-hint-toggle"
+          >
+            <span
+              class="text-[10px] text-[var(--color-primary)] transition-transform group-open:rotate-90"
+              aria-hidden="true"
+              >▸</span
+            >
+            <span>{{ t('inviteWizard.step1.childHint.toggle') }}</span>
+          </summary>
+          <div
+            class="mt-2 rounded-r-xl border-l-2 border-[#E67E22] bg-[var(--tint-orange-8)] px-3.5 py-2.5"
+          >
+            <p class="text-xs leading-relaxed text-gray-700 dark:text-gray-300">
+              {{ t('inviteWizard.step1.childHint.body1') }}
+              <a
+                href="https://families.google/familylink/"
+                target="_blank"
+                rel="noopener"
+                class="wizard-faq-link"
+                >{{ t('inviteWizard.step1.childHint.linkLabel') }}</a
+              >
+              {{ t('inviteWizard.step1.childHint.body2') }}
+            </p>
+          </div>
+        </details>
+      </template>
+
+      <!-- Inline error chip from useInviteFlow.error -->
       <div
         v-if="error"
         class="flex items-start gap-2 rounded-xl border border-[var(--color-primary)]/30 bg-[var(--tint-orange-8)] px-3.5 py-3"
@@ -269,7 +431,7 @@ function handleClose() {
         </button>
       </div>
 
-      <!-- Confirm checkbox — gated on this for explicit user confirmation -->
+      <!-- Confirm checkbox -->
       <label
         class="flex cursor-pointer items-start gap-3 rounded-2xl border-2 border-dashed border-[var(--color-primary)]/30 px-4 py-3 transition-all"
         :class="
@@ -334,15 +496,21 @@ function handleClose() {
         </template>
       </button>
 
-      <!-- FAQ disclosure (Caveat font once per step — at this trigger) -->
+      <!-- FAQ disclosure — Outfit-bold (no Caveat); answers via v-html for
+           static HTML link content (XSS-safe — strings are static literals
+           from uiStrings.ts, never interpolated with user data). -->
       <div class="pt-2">
         <button
           type="button"
-          class="font-caveat inline-flex items-center gap-1.5 text-base text-gray-500 transition-colors hover:text-[var(--color-primary)] dark:text-gray-400"
+          class="font-outfit inline-flex items-center gap-1.5 text-sm font-bold text-gray-700 transition-colors hover:text-[var(--color-primary)] dark:text-gray-200"
           data-testid="invite-wizard-faq"
           @click="faqOpen = !faqOpen"
         >
-          <span class="transition-transform" :class="faqOpen ? 'rotate-90' : ''">›</span>
+          <span
+            class="text-[var(--color-primary)] transition-transform"
+            :class="faqOpen ? 'rotate-90' : ''"
+            >›</span
+          >
           <span>{{ t('inviteWizard.step1.faq.toggle') }}</span>
         </button>
         <div
@@ -377,9 +545,10 @@ function handleClose() {
                   >+</span
                 >
               </summary>
-              <p class="pb-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                {{ t('inviteWizard.step1.faq.a2') }}
-              </p>
+              <p
+                class="pb-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400"
+                v-html="t('inviteWizard.step1.faq.a2')"
+              />
             </details>
             <details class="group">
               <summary
@@ -391,9 +560,10 @@ function handleClose() {
                   >+</span
                 >
               </summary>
-              <p class="pb-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                {{ t('inviteWizard.step1.faq.a3') }}
-              </p>
+              <p
+                class="pb-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400"
+                v-html="t('inviteWizard.step1.faq.a3')"
+              />
             </details>
           </div>
         </div>
@@ -411,7 +581,6 @@ function handleClose() {
         </p>
       </div>
 
-      <!-- QR card — always visible centerpiece -->
       <div
         class="rounded-3xl px-5 py-5 text-center"
         :style="{ backgroundColor: 'var(--tint-orange-8)' }"
@@ -443,20 +612,17 @@ function handleClose() {
         </p>
       </div>
 
-      <!-- Channel divider + grid + copy -->
       <ShareChannelGrid
         :link="inviteFlow.inviteLink.value"
         :family-name="familyName"
-        :member-name="prefill?.memberName ?? inviterName"
+        :member-name="invitee?.memberName ?? inviterName"
         hide-expiry-note
       />
 
-      <!-- Local-provider reminder -->
       <p v-if="!isDriveProvider" class="text-center text-xs text-gray-500 dark:text-gray-400">
         {{ t('inviteWizard.local.reminder') }}
       </p>
 
-      <!-- Footer: back + expiry -->
       <div
         class="flex items-center justify-between border-t border-dashed border-gray-200 pt-3 dark:border-slate-600"
       >
@@ -473,7 +639,6 @@ function handleClose() {
       </div>
     </div>
 
-    <!-- Brand foot tagline (italic Outfit, low opacity, per CIG wordmark spec) -->
     <p
       class="font-outfit mt-3 -mb-2 text-center text-xs tracking-[0.06em] text-gray-400 italic opacity-60"
     >
@@ -511,5 +676,17 @@ function handleClose() {
   .wizard-bean-active {
     animation: none;
   }
+}
+
+.wizard-faq-link {
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.wizard-faq-link:hover {
+  color: #d14d1a;
 }
 </style>

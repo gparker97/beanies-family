@@ -1,0 +1,1282 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>invite wizard picker — beanies.family mockup</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Caveat:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --heritage-orange: #f15d22;
+        --heritage-orange-dark: #d94e16;
+        --heritage-orange-soft: #fef0e8;
+        --heritage-orange-glow: #fde6d8;
+        --terracotta: #e67e22;
+        --terracotta-soft: #fbe9d7;
+        --deep-slate: #2c3e50;
+        --slate-soft: #4a5d72;
+        --sky-silk: #aed6f1;
+        --sky-silk-soft: #eaf4fb;
+        --sky-silk-deep: #2c7fb8;
+        --cloud-white: #f8f9fa;
+        --cream: #fffaf3;
+        --cream-deep: #fdf3e7;
+        --peach-bg: #fff5ec;
+        --slate-50: #f8fafc;
+        --slate-100: #f1f5f9;
+        --slate-200: #e2e8f0;
+        --slate-300: #cbd5e1;
+        --slate-400: #94a3b8;
+        --slate-500: #64748b;
+        --slate-600: #475569;
+        --slate-700: #334155;
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --shadow-modal:
+          0 30px 80px -20px rgba(241, 93, 34, 0.18),
+          0 12px 30px -10px rgba(15, 23, 42, 0.08);
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background:
+          radial-gradient(ellipse at 15% 0%, #ffe8d4 0%, transparent 55%),
+          radial-gradient(ellipse at 85% 100%, var(--sky-silk-soft) 0%, transparent 55%),
+          radial-gradient(ellipse at 50% 50%, #fff8ef 0%, var(--cream) 100%);
+        color: var(--deep-slate);
+        min-height: 100vh;
+        padding: 48px 24px 96px;
+        -webkit-font-smoothing: antialiased;
+      }
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      header.page-header {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 32px;
+        text-align: center;
+      }
+      header.page-header h1 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 28px;
+        color: var(--deep-slate);
+        margin: 0;
+        letter-spacing: -0.012em;
+      }
+      header.page-header .meta {
+        font-size: 12.5px;
+        color: var(--slate-500);
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      header.page-header .meta a {
+        color: var(--heritage-orange);
+        text-decoration: none;
+        border-bottom: 1px dashed var(--heritage-orange);
+      }
+      .variant-toggle {
+        display: inline-flex;
+        gap: 4px;
+        background: white;
+        padding: 5px;
+        border-radius: 999px;
+        margin: 14px auto 6px;
+        box-shadow: 0 4px 14px -6px rgba(15, 23, 42, 0.1);
+        font-family: 'Outfit', sans-serif;
+      }
+      .variant-toggle button {
+        background: transparent;
+        border: 0;
+        padding: 8px 16px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--slate-500);
+        cursor: pointer;
+        transition: all 0.18s ease;
+      }
+      .variant-toggle button.active {
+        background: var(--heritage-orange);
+        color: white;
+        box-shadow: 0 6px 14px -4px rgba(241, 93, 34, 0.4);
+      }
+      .variant-toggle button:not(.active):hover {
+        background: var(--heritage-orange-soft);
+        color: var(--heritage-orange);
+      }
+      .variant-caption {
+        font-size: 13px;
+        color: var(--slate-500);
+        margin: 8px 0 0;
+        max-width: 540px;
+        margin-left: auto;
+        margin-right: auto;
+        line-height: 1.5;
+      }
+      .variant-caption strong {
+        color: var(--heritage-orange);
+        font-weight: 600;
+      }
+
+      /* stage */
+      .stage {
+        display: flex;
+        justify-content: center;
+        padding: 0 8px;
+      }
+      .modal-frame {
+        background: white;
+        border-radius: 28px;
+        width: min(440px, 100%);
+        box-shadow: var(--shadow-modal);
+        position: relative;
+        overflow: hidden;
+        animation: modal-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      @keyframes modal-in {
+        from {
+          transform: translateY(12px) scale(0.985);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0) scale(1);
+          opacity: 1;
+        }
+      }
+      .modal-close {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        z-index: 10;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(6px);
+        border: 0;
+        font-size: 14px;
+        color: var(--slate-500);
+        cursor: pointer;
+        transition: all 0.18s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-close:hover {
+        background: white;
+        color: var(--heritage-orange);
+      }
+
+      /* hero band — picker variant (single mascot, no progress strip) */
+      .hero-band-picker {
+        position: relative;
+        background: var(--tint-orange-8);
+        padding: 26px 28px 18px;
+        border-bottom: 1px solid rgba(241, 93, 34, 0.06);
+      }
+      .hero-band-picker .mascot {
+        display: block;
+        margin: 0 auto 6px;
+        width: 64px;
+        height: 64px;
+        object-fit: contain;
+        animation: bean-wiggle 2.4s ease-in-out infinite;
+        filter: drop-shadow(0 6px 14px rgba(241, 93, 34, 0.28));
+      }
+      @keyframes bean-wiggle {
+        0%, 100% { transform: rotate(0deg) translateY(0); }
+        25% { transform: rotate(-3deg) translateY(-2px); }
+        50% { transform: rotate(0deg) translateY(0); }
+        75% { transform: rotate(3deg) translateY(-1px); }
+      }
+      .hero-band-picker h2 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--deep-slate);
+        margin: 0;
+        text-align: center;
+        letter-spacing: -0.01em;
+      }
+      .hero-band-picker .subhead {
+        margin: 6px 0 0;
+        text-align: center;
+        font-size: 13px;
+        color: var(--slate-500);
+        line-height: 1.5;
+      }
+
+      /* hero band — confirm-email variant (2 mascots + progress strip — same as v1) */
+      .hero-band-confirm {
+        position: relative;
+        background: var(--tint-orange-8);
+        padding: 24px 28px 14px;
+      }
+      .progress-strip {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .progress-bean {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        transition: opacity 0.4s ease;
+      }
+      .progress-bean .bean-art {
+        width: 56px;
+        height: 56px;
+        object-fit: contain;
+        transition: filter 0.4s ease, transform 0.4s ease, opacity 0.4s ease;
+      }
+      .progress-bean.active .bean-art {
+        animation: bean-wiggle 2.4s ease-in-out infinite;
+        filter: drop-shadow(0 6px 14px rgba(241, 93, 34, 0.35));
+      }
+      .progress-bean:not(.active) .bean-art {
+        opacity: 0.65;
+        filter: drop-shadow(0 4px 10px rgba(230, 126, 34, 0.18));
+      }
+      .progress-bean .label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--slate-400);
+        transition: color 0.4s ease;
+      }
+      .progress-bean.active .label {
+        color: var(--heritage-orange);
+      }
+      .progress-curve {
+        width: 48px;
+        height: 3px;
+        background: rgba(203, 213, 225, 0.7);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-bottom: 24px;
+      }
+
+      /* body */
+      .body {
+        padding: 22px 24px 24px;
+      }
+
+      /* picker — member tiles list */
+      .member-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .member-tile {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        width: 100%;
+        background: white;
+        border: 1.5px solid var(--slate-200);
+        border-radius: 18px;
+        padding: 12px 14px 12px 12px;
+        cursor: pointer;
+        text-align: left;
+        font-family: inherit;
+        position: relative;
+        transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+        animation: tile-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      }
+      .member-tile:nth-child(1) { animation-delay: 0.04s; }
+      .member-tile:nth-child(2) { animation-delay: 0.09s; }
+      .member-tile:nth-child(3) { animation-delay: 0.14s; }
+      .member-tile:nth-child(4) { animation-delay: 0.19s; }
+      .member-tile:nth-child(5) { animation-delay: 0.24s; }
+      .member-tile:nth-child(6) { animation-delay: 0.29s; }
+      @keyframes tile-in {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .member-tile:not(:disabled):hover {
+        border-color: var(--heritage-orange);
+        background: var(--peach-bg);
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px -10px rgba(241, 93, 34, 0.25);
+      }
+      .member-tile:not(:disabled):hover .tile-arrow {
+        transform: translateX(3px);
+        opacity: 1;
+        color: var(--heritage-orange);
+      }
+      .member-tile:not(:disabled):active {
+        transform: translateY(0);
+      }
+
+      .member-tile[disabled],
+      .member-tile.is-joined {
+        opacity: 0.62;
+        cursor: not-allowed;
+        background: var(--slate-50);
+      }
+      .member-tile.is-owner {
+        opacity: 0.78;
+        cursor: not-allowed;
+        background: linear-gradient(135deg, rgba(174, 214, 241, 0.18) 0%, rgba(174, 214, 241, 0.04) 100%);
+        border-color: rgba(174, 214, 241, 0.5);
+      }
+
+      .tile-avatar {
+        flex-shrink: 0;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--cream-deep);
+        font-size: 22px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+      }
+      .tile-avatar.adult-m { background: linear-gradient(135deg, #fde6d8 0%, #fbcdb0 100%); }
+      .tile-avatar.adult-f { background: linear-gradient(135deg, #f5d8e8 0%, #ebb4d2 100%); }
+      .tile-avatar.child-m { background: linear-gradient(135deg, #d6eaf8 0%, #aed6f1 100%); }
+      .tile-avatar.child-f { background: linear-gradient(135deg, #fce4ec 0%, #f8b9cb 100%); }
+
+      .tile-meta {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .tile-name {
+        font-family: 'Outfit', sans-serif;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--deep-slate);
+        line-height: 1.2;
+      }
+      .tile-role {
+        font-family: 'Inter', sans-serif;
+        font-size: 12px;
+        color: var(--slate-500);
+        line-height: 1.3;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .tile-role .dot {
+        color: var(--slate-300);
+      }
+
+      .tile-status {
+        flex-shrink: 0;
+        font-family: 'Outfit', sans-serif;
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 5px 9px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .tile-status.joined {
+        background: var(--sky-silk-soft);
+        color: var(--sky-silk-deep);
+      }
+      .tile-status.owner {
+        background: rgba(230, 126, 34, 0.12);
+        color: var(--terracotta);
+      }
+      .tile-status.waiting {
+        background: rgba(241, 93, 34, 0.1);
+        color: var(--heritage-orange);
+      }
+
+      .tile-arrow {
+        flex-shrink: 0;
+        font-size: 20px;
+        color: var(--slate-300);
+        transition: all 0.2s ease;
+        opacity: 0.7;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 500;
+      }
+
+      /* "+ add a new beanie" tile */
+      .add-tile {
+        margin-top: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        background: transparent;
+        border: 1.5px dashed rgba(241, 93, 34, 0.4);
+        border-radius: 18px;
+        padding: 14px;
+        cursor: pointer;
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--heritage-orange);
+        transition: all 0.2s ease;
+        animation: tile-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+        animation-delay: 0.32s;
+      }
+      .add-tile:hover {
+        background: var(--heritage-orange-soft);
+        border-color: var(--heritage-orange);
+        border-style: solid;
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px -10px rgba(241, 93, 34, 0.25);
+      }
+      .add-tile .plus {
+        font-size: 18px;
+        line-height: 1;
+        font-weight: 400;
+      }
+
+      /* footer (picker) */
+      .picker-foot {
+        margin-top: 14px;
+        text-align: center;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        color: var(--slate-400);
+        letter-spacing: 0.06em;
+        font-style: italic;
+        opacity: 0.7;
+      }
+
+      /* ============= confirm-email step (Step 1) ============= */
+      .step1-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--deep-slate);
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .step1-subhead {
+        margin: 6px 0 14px;
+        font-size: 13px;
+        color: var(--slate-500);
+        line-height: 1.5;
+      }
+
+      /* who-we're-inviting chip — shows the bean we picked */
+      .invitee-chip {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px 8px 8px;
+        background: var(--tint-orange-8);
+        border: 1px solid rgba(241, 93, 34, 0.18);
+        border-radius: 999px;
+        margin: 0 0 14px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--slate-600);
+      }
+      .invitee-chip .invitee-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+      .invitee-chip .label {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 10px;
+        color: var(--slate-400);
+        font-weight: 600;
+        margin-right: 2px;
+      }
+      .invitee-chip .name {
+        color: var(--deep-slate);
+        font-weight: 700;
+      }
+      .invitee-chip .change {
+        margin-left: auto;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--heritage-orange);
+        background: white;
+        border: 1px solid rgba(241, 93, 34, 0.25);
+        border-radius: 999px;
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      .invitee-chip .change:hover {
+        background: var(--heritage-orange-soft);
+      }
+
+      .email-field {
+        width: 100%;
+        padding: 12px 14px;
+        font-family: 'Inter', sans-serif;
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--deep-slate);
+        background: white;
+        border: 2px solid var(--slate-200);
+        border-radius: 12px;
+        outline: none;
+        transition: all 0.18s ease;
+      }
+      .email-field::placeholder {
+        color: var(--slate-400);
+        font-weight: 400;
+      }
+      .email-field:focus {
+        border-color: var(--heritage-orange);
+        box-shadow: 0 0 0 4px var(--tint-orange-15);
+      }
+      .email-field.is-prefilled {
+        animation: prefill-pulse 1.6s ease-out 0.2s 1;
+      }
+      @keyframes prefill-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(241, 93, 34, 0.5); border-color: var(--heritage-orange); }
+        70% { box-shadow: 0 0 0 12px rgba(241, 93, 34, 0); border-color: var(--heritage-orange); }
+        100% { box-shadow: 0 0 0 0 rgba(241, 93, 34, 0); border-color: var(--slate-200); }
+      }
+
+      /* no-default-email warning chip — appears when prefill is missing */
+      .no-email-chip {
+        margin-top: 8px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 11px 14px;
+        background: rgba(174, 214, 241, 0.18);
+        border: 1px solid rgba(174, 214, 241, 0.5);
+        border-radius: 14px;
+        font-family: 'Inter', sans-serif;
+        font-size: 12.5px;
+        line-height: 1.5;
+        color: var(--sky-silk-deep);
+      }
+      .no-email-chip svg {
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+
+      /* inline child-hint disclosure (matches FAQ disclosure pattern) */
+      .child-hint {
+        margin-top: 8px;
+      }
+      .child-hint summary {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--slate-500);
+        cursor: pointer;
+        list-style: none;
+        padding: 4px 2px;
+        transition: color 0.18s ease;
+      }
+      .child-hint summary::-webkit-details-marker { display: none; }
+      .child-hint summary:hover { color: var(--heritage-orange); }
+      .child-hint summary .chev {
+        font-size: 10px;
+        transition: transform 0.2s ease;
+      }
+      .child-hint[open] summary .chev { transform: rotate(90deg); color: var(--heritage-orange); }
+      .child-hint .hint-body {
+        margin: 8px 0 0;
+        padding: 11px 14px;
+        background: var(--cream-deep);
+        border-left: 2px solid var(--terracotta);
+        border-radius: 0 12px 12px 0;
+        font-family: 'Inter', sans-serif;
+        font-size: 12.5px;
+        line-height: 1.55;
+        color: var(--slate-600);
+      }
+      .child-hint .hint-body strong {
+        color: var(--deep-slate);
+        font-weight: 600;
+      }
+
+      /* confirm checkbox row */
+      .confirm-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 14px;
+        margin-top: 14px;
+        border: 2px dashed rgba(241, 93, 34, 0.3);
+        border-radius: 16px;
+        cursor: pointer;
+        transition: all 0.18s ease;
+      }
+      .confirm-row:hover {
+        border-color: rgba(241, 93, 34, 0.6);
+        background: rgba(241, 93, 34, 0.04);
+      }
+      .confirm-row.is-checked {
+        border-style: solid;
+        border-color: var(--heritage-orange);
+        background: var(--tint-orange-8);
+      }
+      .confirm-row input[type="checkbox"] {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .confirm-box {
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        border: 2px solid var(--slate-300);
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 1px;
+        transition: all 0.18s ease;
+      }
+      .confirm-row.is-checked .confirm-box {
+        background: var(--heritage-orange);
+        border-color: var(--heritage-orange);
+      }
+      .confirm-box svg { opacity: 0; transition: opacity 0.18s ease; }
+      .confirm-row.is-checked .confirm-box svg { opacity: 1; }
+      .confirm-label {
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--slate-700);
+        font-weight: 500;
+      }
+      .confirm-label .email-pill {
+        display: inline-block;
+        padding: 1px 8px;
+        background: white;
+        border: 1px solid rgba(241, 93, 34, 0.3);
+        border-radius: 7px;
+        font-weight: 600;
+        color: var(--heritage-orange);
+      }
+
+      /* primary CTA */
+      .cta-primary {
+        margin-top: 14px;
+        width: 100%;
+        padding: 14px 18px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        color: white;
+        background: linear-gradient(135deg, var(--heritage-orange) 0%, var(--terracotta) 100%);
+        border: 0;
+        border-radius: 16px;
+        box-shadow: 0 8px 18px -6px rgba(241, 93, 34, 0.4);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.18s ease;
+      }
+      .cta-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 22px -6px rgba(241, 93, 34, 0.5);
+      }
+      .cta-primary:disabled {
+        background: var(--slate-200);
+        color: var(--slate-500);
+        box-shadow: none;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      /* FAQ — UPDATED: no Caveat, Outfit bold, refreshed copy */
+      .faq-toggle {
+        margin-top: 16px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: transparent;
+        border: 0;
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--deep-slate);
+        cursor: pointer;
+        padding: 4px 0;
+        transition: color 0.18s ease;
+      }
+      .faq-toggle:hover { color: var(--heritage-orange); }
+      .faq-toggle .chev {
+        font-size: 11px;
+        color: var(--heritage-orange);
+        transition: transform 0.2s ease;
+      }
+      .faq-toggle.is-open .chev { transform: rotate(90deg); }
+
+      .faq-panel {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+      }
+      .faq-panel.is-open { max-height: 600px; margin-top: 8px; }
+      .faq-panel-inner {
+        background: var(--tint-orange-8);
+        border-radius: 14px;
+        padding: 4px 14px;
+      }
+      .faq-item {
+        border-bottom: 1px solid rgba(241, 93, 34, 0.1);
+      }
+      .faq-item:last-child { border-bottom: 0; }
+      .faq-item summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 11px 0;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 500;
+        font-size: 13.5px;
+        color: var(--slate-700);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .faq-item summary::-webkit-details-marker { display: none; }
+      .faq-item .qmark {
+        color: var(--slate-300);
+        transition: transform 0.2s ease, color 0.2s ease;
+        font-size: 16px;
+      }
+      .faq-item details[open] .qmark {
+        transform: rotate(45deg);
+        color: var(--heritage-orange);
+      }
+      .faq-item p {
+        margin: 0 0 12px;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--slate-600);
+      }
+
+      /* brand foot */
+      .brand-foot {
+        margin: 14px 0 -4px;
+        text-align: center;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        color: var(--slate-400);
+        letter-spacing: 0.06em;
+        font-style: italic;
+        opacity: 0.6;
+      }
+
+      /* notes panel */
+      .notes {
+        margin-top: 36px;
+        max-width: 720px;
+        margin-left: auto;
+        margin-right: auto;
+        background: white;
+        border-radius: 18px;
+        padding: 22px 26px;
+        box-shadow: 0 12px 28px -16px rgba(15, 23, 42, 0.1);
+        border: 1px solid var(--slate-100);
+        font-size: 13.5px;
+        line-height: 1.6;
+        color: var(--slate-600);
+      }
+      .notes h3 {
+        font-family: 'Outfit', sans-serif;
+        margin: 0 0 8px;
+        font-size: 14.5px;
+        color: var(--deep-slate);
+      }
+      .notes ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .notes li {
+        margin-bottom: 4px;
+      }
+      .notes li strong {
+        color: var(--deep-slate);
+      }
+
+      /* hide all by default */
+      [data-step]:not(.is-active) { display: none; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="page-header">
+        <span class="meta">mockup · 2026-04-27 · refines <a href="invite-wizard.html">invite-wizard.html</a></span>
+        <h1>invite wizard — picker step + FAQ refresh</h1>
+        <div class="variant-toggle" role="tablist">
+          <button class="active" data-variant="picker" type="button">pick a beanie</button>
+          <button data-variant="picker-empty" type="button">empty pod</button>
+          <button data-variant="prefilled" type="button">picked joey (real email)</button>
+          <button data-variant="blank" type="button">picked liam (no email)</button>
+        </div>
+        <p class="variant-caption" id="variant-caption">
+          Tapping <strong>Invite Beanie</strong> opens the picker first. Each beanie waiting to join is selectable; already-joined beanies are dimmed.
+        </p>
+      </header>
+
+      <section class="stage">
+        <!-- ============== variant: picker ============== -->
+        <div class="modal-frame" id="modal-picker" data-variant-frame="picker">
+          <button class="modal-close" type="button" aria-label="Close">✕</button>
+
+          <div class="hero-band-picker">
+            <img
+              class="mascot"
+              src="../../public/brand/beanies_logo_transparent_logo_only_192x192.png"
+              alt=""
+              aria-hidden="true"
+            />
+            <h2>Who's joining the pod?</h2>
+            <p class="subhead">Pick a beanie to invite, or add someone new.</p>
+          </div>
+
+          <div class="body">
+            <div class="member-list">
+              <!-- owner — disabled -->
+              <button class="member-tile is-owner" disabled type="button">
+                <span class="tile-avatar adult-m">🧔</span>
+                <span class="tile-meta">
+                  <span class="tile-name">greg</span>
+                  <span class="tile-role">parent <span class="dot">·</span> age 42</span>
+                </span>
+                <span class="tile-status owner">★ pod owner</span>
+              </button>
+
+              <!-- joined — disabled -->
+              <button class="member-tile is-joined" disabled type="button">
+                <span class="tile-avatar adult-f">👩</span>
+                <span class="tile-meta">
+                  <span class="tile-name">sarah</span>
+                  <span class="tile-role">parent <span class="dot">·</span> age 39</span>
+                </span>
+                <span class="tile-status joined">✓ joined</span>
+              </button>
+
+              <!-- waiting (real email) — selectable -->
+              <button class="member-tile" type="button" data-pick="joey">
+                <span class="tile-avatar child-m">👦</span>
+                <span class="tile-meta">
+                  <span class="tile-name">joey</span>
+                  <span class="tile-role">child <span class="dot">·</span> age 10 <span class="dot">·</span> joey.beanie@gmail.com</span>
+                </span>
+                <span class="tile-arrow">→</span>
+              </button>
+
+              <!-- waiting (no email) — selectable -->
+              <button class="member-tile" type="button" data-pick="liam">
+                <span class="tile-avatar child-m">🧒</span>
+                <span class="tile-meta">
+                  <span class="tile-name">liam</span>
+                  <span class="tile-role">child <span class="dot">·</span> age 7 <span class="dot">·</span> no email yet</span>
+                </span>
+                <span class="tile-arrow">→</span>
+              </button>
+
+              <!-- waiting (real email) — selectable -->
+              <button class="member-tile" type="button" data-pick="theo">
+                <span class="tile-avatar child-m">🧒</span>
+                <span class="tile-meta">
+                  <span class="tile-name">theo</span>
+                  <span class="tile-role">child <span class="dot">·</span> age 5 <span class="dot">·</span> theo@example.com</span>
+                </span>
+                <span class="tile-arrow">→</span>
+              </button>
+            </div>
+
+            <button class="add-tile" type="button" data-action="add-bean">
+              <span class="plus">+</span>
+              <span>add a new beanie</span>
+            </button>
+
+            <p class="picker-foot">every bean counts</p>
+          </div>
+        </div>
+
+        <!-- ============== variant: picker-empty ============== -->
+        <div class="modal-frame" id="modal-picker-empty" data-variant-frame="picker-empty" style="display: none;">
+          <button class="modal-close" type="button" aria-label="Close">✕</button>
+
+          <div class="hero-band-picker">
+            <img
+              class="mascot"
+              src="../../public/brand/beanies_logo_transparent_logo_only_192x192.png"
+              alt=""
+              aria-hidden="true"
+            />
+            <h2>Who's joining the pod?</h2>
+            <p class="subhead">Pick a beanie to invite, or add someone new.</p>
+          </div>
+
+          <div class="body">
+            <div class="member-list">
+              <button class="member-tile is-owner" disabled type="button">
+                <span class="tile-avatar adult-m">🧔</span>
+                <span class="tile-meta">
+                  <span class="tile-name">greg</span>
+                  <span class="tile-role">parent</span>
+                </span>
+                <span class="tile-status owner">★ pod owner</span>
+              </button>
+            </div>
+
+            <button class="add-tile" type="button" data-action="add-bean">
+              <span class="plus">+</span>
+              <span>add a new beanie</span>
+            </button>
+
+            <p class="picker-foot" style="opacity: 0.85;">no beanies waiting yet — add one to send your first invite</p>
+          </div>
+        </div>
+
+        <!-- ============== variant: prefilled (Joey, real email) ============== -->
+        <div class="modal-frame" id="modal-prefilled" data-variant-frame="prefilled" style="display: none;">
+          <button class="modal-close" type="button" aria-label="Close">✕</button>
+
+          <div class="hero-band-confirm">
+            <div class="progress-strip">
+              <div class="progress-bean active">
+                <img
+                  class="bean-art"
+                  src="../../public/brand/beanies_father_icon_transparent_360x360.png"
+                  alt=""
+                  aria-hidden="true"
+                />
+                <span class="label">confirm email</span>
+              </div>
+              <div class="progress-curve"></div>
+              <div class="progress-bean">
+                <img
+                  class="bean-art"
+                  src="../../public/brand/beanies_logo_transparent_logo_only_192x192.png"
+                  alt=""
+                  aria-hidden="true"
+                />
+                <span class="label">send invite</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="body">
+            <h2 class="step1-title">Inviting joey</h2>
+            <p class="step1-subhead">Use the email they sign in to Google with — it's how they'll open the family pod.</p>
+
+            <div class="invitee-chip">
+              <span class="invitee-avatar" style="background: linear-gradient(135deg, #d6eaf8 0%, #aed6f1 100%);">👦</span>
+              <span class="label">for</span>
+              <span class="name">joey</span>
+              <button class="change" type="button">change</button>
+            </div>
+
+            <input
+              type="email"
+              class="email-field is-prefilled"
+              value="joey.beanie@gmail.com"
+              placeholder="family.member@gmail.com"
+              autocomplete="off"
+            />
+
+            <label class="confirm-row">
+              <input type="checkbox" />
+              <span class="confirm-box">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 6.5l2.5 2.5L10 3.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="confirm-label">
+                <span class="email-pill">joey.beanie@gmail.com</span>
+                is their Google account email for the family pod
+              </span>
+            </label>
+
+            <button class="cta-primary" disabled>
+              <span>Confirm to continue</span>
+              <span class="arrow">→</span>
+            </button>
+
+            <button class="faq-toggle" type="button">
+              <span class="chev">▸</span>
+              <span>You've got questions? We've got answers</span>
+            </button>
+            <div class="faq-panel">
+              <div class="faq-panel-inner">
+                <div class="faq-item">
+                  <details>
+                    <summary>
+                      <span>Is this safe?</span>
+                      <span class="qmark">+</span>
+                    </summary>
+                    <p>Yes. The family data file is encrypted with a key only you and your beanies have. Google can't read what's inside — they're just storing the locked file for you.</p>
+                  </details>
+                </div>
+                <div class="faq-item">
+                  <details>
+                    <summary>
+                      <span>What about the little beanies?</span>
+                      <span class="qmark">+</span>
+                    </summary>
+                    <p>If they don't have their own Google account yet, share with one of your own emails — you can sign them in on their device with that account, and they'll see the family pod. When they're ready for their own, you can set up a free, parent-supervised Gmail through <a href="https://families.google/familylink/" target="_blank" rel="noopener" style="color: var(--heritage-orange); font-weight: 600;">Google Family Link</a>.</p>
+                  </details>
+                </div>
+                <div class="faq-item">
+                  <details>
+                    <summary>
+                      <span>What if they don't use Google?</span>
+                      <span class="qmark">+</span>
+                    </summary>
+                    <p>They'll need a free Google account to access the family pod — it lives in Google Drive. Setting one up takes about a minute at <a href="https://accounts.google.com" target="_blank" rel="noopener" style="color: var(--heritage-orange); font-weight: 600;">accounts.google.com</a>. For kids, <a href="https://families.google/familylink/" target="_blank" rel="noopener" style="color: var(--heritage-orange); font-weight: 600;">Google Family Link</a> creates a free, parent-supervised Gmail.</p>
+                  </details>
+                </div>
+              </div>
+            </div>
+
+            <p class="brand-foot">every bean counts</p>
+          </div>
+        </div>
+
+        <!-- ============== variant: blank (Liam, no real email) ============== -->
+        <div class="modal-frame" id="modal-blank" data-variant-frame="blank" style="display: none;">
+          <button class="modal-close" type="button" aria-label="Close">✕</button>
+
+          <div class="hero-band-confirm">
+            <div class="progress-strip">
+              <div class="progress-bean active">
+                <img
+                  class="bean-art"
+                  src="../../public/brand/beanies_father_icon_transparent_360x360.png"
+                  alt=""
+                  aria-hidden="true"
+                />
+                <span class="label">confirm email</span>
+              </div>
+              <div class="progress-curve"></div>
+              <div class="progress-bean">
+                <img
+                  class="bean-art"
+                  src="../../public/brand/beanies_logo_transparent_logo_only_192x192.png"
+                  alt=""
+                  aria-hidden="true"
+                />
+                <span class="label">send invite</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="body">
+            <h2 class="step1-title">Inviting liam</h2>
+            <p class="step1-subhead">Use the email they sign in to Google with — it's how they'll open the family pod.</p>
+
+            <div class="invitee-chip">
+              <span class="invitee-avatar" style="background: linear-gradient(135deg, #d6eaf8 0%, #aed6f1 100%);">🧒</span>
+              <span class="label">for</span>
+              <span class="name">liam</span>
+              <button class="change" type="button">change</button>
+            </div>
+
+            <input
+              type="email"
+              class="email-field"
+              value=""
+              placeholder="family.member@gmail.com"
+              autocomplete="off"
+            />
+
+            <div class="no-email-chip">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" />
+                <path d="M8 5v3.5M8 11v.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+              <span>No default email on file — enter the Google account email <strong>liam</strong> will sign in with.</span>
+            </div>
+
+            <details class="child-hint">
+              <summary>
+                <span class="chev">▸</span>
+                <span>What if my child doesn't have an email?</span>
+              </summary>
+              <div class="hint-body">
+                <strong>That's fine — share with one of your own emails.</strong> You can sign liam in on their device with that account, and they'll see the family pod. When they're ready for their own, you can set up a free, parent-supervised Gmail through <a href="https://families.google/familylink/" target="_blank" rel="noopener" style="color: var(--heritage-orange); font-weight: 600;">Google Family Link</a> — then switch liam over from settings.
+              </div>
+            </details>
+
+            <label class="confirm-row">
+              <input type="checkbox" />
+              <span class="confirm-box">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 6.5l2.5 2.5L10 3.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="confirm-label">
+                Add an email above to continue
+              </span>
+            </label>
+
+            <button class="cta-primary" disabled>
+              <span>Add an email first</span>
+              <span class="arrow">→</span>
+            </button>
+
+            <button class="faq-toggle" type="button">
+              <span class="chev">▸</span>
+              <span>You've got questions? We've got answers</span>
+            </button>
+            <div class="faq-panel">
+              <div class="faq-panel-inner">
+                <div class="faq-item">
+                  <details>
+                    <summary>
+                      <span>Is this safe?</span>
+                      <span class="qmark">+</span>
+                    </summary>
+                    <p>Yes. The family data file is encrypted with a key only you and your beanies have. Google can't read what's inside — they're just storing the locked file for you.</p>
+                  </details>
+                </div>
+                <div class="faq-item">
+                  <details>
+                    <summary>
+                      <span>What about the little beanies?</span>
+                      <span class="qmark">+</span>
+                    </summary>
+                    <p>If they don't have their own Google account yet, share with one of your own emails — you can sign them in on their device with that account, and they'll see the family pod. When they're ready for their own, you can set up a free, parent-supervised Gmail through <a href="https://families.google/familylink/" target="_blank" rel="noopener" style="color: var(--heritage-orange); font-weight: 600;">Google Family Link</a>.</p>
+                  </details>
+                </div>
+                <div class="faq-item">
+                  <details>
+                    <summary>
+                      <span>What if they don't use Google?</span>
+                      <span class="qmark">+</span>
+                    </summary>
+                    <p>They'll need a free Google account to access the family pod — it lives in Google Drive. Setting one up takes about a minute at <a href="https://accounts.google.com" target="_blank" rel="noopener" style="color: var(--heritage-orange); font-weight: 600;">accounts.google.com</a>. For kids, <a href="https://families.google/familylink/" target="_blank" rel="noopener" style="color: var(--heritage-orange); font-weight: 600;">Google Family Link</a> creates a free, parent-supervised Gmail.</p>
+                  </details>
+                </div>
+              </div>
+            </div>
+
+            <p class="brand-foot">every bean counts</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="notes">
+        <h3>What's changing in this iteration</h3>
+        <ul>
+          <li><strong>New picker step (Step 0)</strong> — when you tap <em>Invite Beanie</em> from the Pod, the wizard now opens with a list of every beanie waiting to join. Owner + already-joined members appear dimmed with a status chip; pets are hidden entirely. Per-bean share button bypasses this step (goes straight to confirm-email like before).</li>
+          <li><strong>"+ add a new beanie" tile</strong> at the end of the list — opens the existing add-member drawer in-place. Once the new bean is saved, the wizard advances directly to the confirm-email step with their info pre-filled.</li>
+          <li><strong>Smarter email pre-fill</strong> — only fills when the bean has a real, shareable address. Temporary placeholders (<code>pending-*@setup.local</code>, <code>*@temp.beanies.family</code>) leave the field blank, surface a Sky-Silk warning chip, and add an inline expandable hint <em>"What if my child doesn't have an email?"</em>.</li>
+          <li><strong>FAQ button refresh</strong> — drops Caveat for Outfit-bold and updated copy: <em>"You've got questions? We've got answers."</em> Caveat is now reserved for Step 2's QR-code accent (the wizard's once-per-flow handwritten moment).</li>
+          <li><strong>Invitee chip</strong> on Step 1 makes it visually clear who you're inviting, with a "change" link back to the picker — no need to close the modal to swap recipient.</li>
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      const buttons = document.querySelectorAll('.variant-toggle button');
+      const frames = document.querySelectorAll('[data-variant-frame]');
+      const captions = {
+        picker:
+          "Tapping <strong>Invite Beanie</strong> opens the picker first. Each beanie waiting to join is selectable; already-joined beanies are dimmed.",
+        'picker-empty':
+          "If everyone's already joined, the picker shows just the <strong>+ add a new beanie</strong> tile — no dead-end empty state.",
+        prefilled:
+          "Picking joey (real email on file) — email pre-fills with a one-shot pulse so the eye lands on it. Confirm checkbox still required.",
+        blank:
+          "Picking liam (no email yet) — field stays blank, soft warning chip + the <strong>'what if my child doesn't have an email?'</strong> disclosure offer recovery.",
+      };
+      const captionEl = document.getElementById('variant-caption');
+
+      function setVariant(name) {
+        buttons.forEach((b) => b.classList.toggle('active', b.dataset.variant === name));
+        frames.forEach((f) => {
+          f.style.display = f.dataset.variantFrame === name ? '' : 'none';
+        });
+        if (captions[name]) captionEl.innerHTML = captions[name];
+      }
+
+      buttons.forEach((b) => {
+        b.addEventListener('click', () => setVariant(b.dataset.variant));
+      });
+
+      // Click a member tile to jump to the matching variant
+      document.querySelectorAll('[data-pick]').forEach((tile) => {
+        tile.addEventListener('click', () => {
+          const pick = tile.dataset.pick;
+          if (pick === 'joey' || pick === 'theo') setVariant('prefilled');
+          if (pick === 'liam') setVariant('blank');
+        });
+      });
+
+      // "+ add a new beanie" — flash for the demo
+      document.querySelectorAll('[data-action="add-bean"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          btn.style.background = 'var(--heritage-orange-soft)';
+          btn.style.borderStyle = 'solid';
+          setTimeout(() => {
+            btn.style.background = '';
+            btn.style.borderStyle = '';
+          }, 800);
+        });
+      });
+
+      // FAQ + child-hint toggles
+      document.querySelectorAll('.faq-toggle').forEach((toggle) => {
+        toggle.addEventListener('click', () => {
+          const panel = toggle.nextElementSibling;
+          toggle.classList.toggle('is-open');
+          panel.classList.toggle('is-open');
+        });
+      });
+
+      // confirm-row tick visual
+      document.querySelectorAll('.confirm-row input[type="checkbox"]').forEach((cb) => {
+        cb.addEventListener('change', () => {
+          cb.closest('.confirm-row').classList.toggle('is-checked', cb.checked);
+        });
+      });
+
+      // "change" link on invitee chip → back to picker
+      document.querySelectorAll('.invitee-chip .change').forEach((btn) => {
+        btn.addEventListener('click', () => setVariant('picker'));
+      });
+    </script>
+  </body>
+</html>
