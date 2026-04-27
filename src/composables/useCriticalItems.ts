@@ -2,6 +2,7 @@ import { computed } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
+import { isMedicationActive, useMedicationsStore } from '@/stores/medicationsStore';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatTime12, formatDateShort } from '@/utils/date';
@@ -14,7 +15,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export interface CriticalItem {
   id: string;
-  type: 'todo' | 'activity';
+  type: 'todo' | 'activity' | 'medication';
   message: string;
   icon: string;
   time: string; // HH:mm for sorting, '' if untimed
@@ -35,6 +36,7 @@ export function useCriticalItems() {
   const familyStore = useFamilyStore();
   const todoStore = useTodoStore();
   const activityStore = useActivityStore();
+  const medicationsStore = useMedicationsStore();
   const { getMemberName } = useMemberInfo();
   const { t } = useTranslation();
   const { today: todayStr } = useToday();
@@ -134,6 +136,42 @@ export function useCriticalItems() {
       }
     }
 
+    // ── Active medications with required-but-not-yet-logged doses today ──
+    // Audience: shown to ALL family members (the "for {member}" in the
+    // message carries the context — patient sees their own, caretakers
+    // see the patient's). Skips legacy/as-needed (no structured count).
+    // The `?? []` is defensive insurance; the store always initializes
+    // `medications` to an array, but null-safe access here means a
+    // mid-init race could never crash the whole criticalItems computed.
+    for (const med of medicationsStore.medications ?? []) {
+      // Skip inactive medications (ended, future-dated, or otherwise not
+      // currently being given).
+      if (!isMedicationActive(med, todayStr.value)) continue;
+      // Skip legacy meds (dosesPerDay undefined) and explicit "as needed"
+      // (null) — both surface as "Other" in the form and produce no
+      // reminder. Add a 4th condition? Insert above this comment block.
+      if (typeof med.dosesPerDay !== 'number') continue;
+      // Skip if today's full dose count is already logged.
+      const remaining = med.dosesPerDay - medicationsStore.dosesToday(med.id);
+      if (remaining <= 0) continue;
+
+      const memberName = getMemberName(med.memberId, t('family.unknownMemberInline'));
+      const messageKey: UIStringKey =
+        remaining === 1 ? 'nook.criticalMedReminderOne' : 'nook.criticalMedReminder';
+      items.push({
+        id: med.id,
+        type: 'medication',
+        message: buildMessage(messageKey, {
+          medication: med.name,
+          member: memberName,
+          remaining: String(remaining),
+        }),
+        icon: '💊',
+        time: '', // untimed in v1
+        completable: false, // tap-to-open-detail; no inline +dose
+      });
+    }
+
     // ── Todos assigned to current member ──────────────────────────────
     for (const todo of todoStore.openTodos) {
       if (!normalizeAssignees(todo).includes(memberId)) continue;
@@ -226,7 +264,12 @@ export function useCriticalItems() {
       const dd = todo.dueDate?.split('T')[0] ?? '';
       return dd === '' || dd <= todayStr.value;
     }).length;
-    const total = totalActivities + totalTodos;
+    const totalMeds = medicationsStore.medications.filter((med) => {
+      if (!isMedicationActive(med, todayStr.value)) return false;
+      if (typeof med.dosesPerDay !== 'number') return false;
+      return med.dosesPerDay - medicationsStore.dosesToday(med.id) > 0;
+    }).length;
+    const total = totalActivities + totalTodos + totalMeds;
     return Math.max(0, total - MAX_ITEMS);
   });
 

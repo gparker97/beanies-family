@@ -14,6 +14,7 @@ const { criticalItems, overflowCount } = useCriticalItems();
 const emit = defineEmits<{
   'open-todo': [id: string];
   'open-activity': [id: string, date: string];
+  'open-medication': [id: string];
   'complete-duty': [id: string, dutyType: string, occurrenceDate: string];
   'complete-todo': [id: string];
   'show-full-schedule': [];
@@ -92,6 +93,7 @@ const title = computed(() => {
 
 function handleItemClick(item: CriticalItem) {
   if (item.type === 'todo') emit('open-todo', item.id);
+  else if (item.type === 'medication') emit('open-medication', item.id);
   else emit('open-activity', item.id, item.occurrenceDate ?? '');
 }
 </script>

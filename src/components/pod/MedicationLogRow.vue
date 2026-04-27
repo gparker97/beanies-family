@@ -16,7 +16,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import { timeAgo } from '@/utils/date';
+import { formatLogEntryTime } from '@/utils/date';
 import type { AvatarVariant } from '@/constants/avatars';
 import type { MedicationLogEntry } from '@/types/models';
 
@@ -48,7 +48,10 @@ const color = computed(() => member.value?.color ?? '#AED6F1');
 
 const { url: avatarUrl } = useAvatarPhotoUrl(() => member.value?.avatarPhotoId);
 
-const relativeTime = computed(() => timeAgo(props.entry.administeredOn));
+// Today → relative ("3h ago"); yesterday → "Yesterday at 8:30am";
+// older → graduated absolute date+time so the day-separation between
+// doses is obvious at a glance.
+const relativeTime = computed(() => formatLogEntryTime(props.entry.administeredOn));
 </script>
 
 <template>

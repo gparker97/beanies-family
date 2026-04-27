@@ -420,9 +420,13 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <!-- Footer: Now + Clear -->
+            <!-- Footer: Now (left) + Clear (subtle middle) + Done (right primary).
+                 Time pick is multi-step (hour/minute/AM-PM each commit on tap)
+                 so the popover stays open across taps; Done is the explicit
+                 close affordance — value is already saved on each tap, Done
+                 just signals "I'm finished, dismiss." -->
             <div
-              class="flex items-center justify-between border-t border-[var(--tint-slate-10)] px-3 py-1.5 dark:border-slate-700"
+              class="flex items-center justify-between gap-2 border-t border-[var(--tint-slate-10)] px-3 py-1.5 dark:border-slate-700"
             >
               <button
                 type="button"
@@ -431,14 +435,23 @@ onBeforeUnmount(() => {
               >
                 {{ t('time.now') }}
               </button>
-              <button
-                v-if="modelValue"
-                type="button"
-                class="font-outfit text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
-                @click="clearValue"
-              >
-                {{ t('time.clear') }}
-              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="modelValue"
+                  type="button"
+                  class="font-outfit text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
+                  @click="clearValue"
+                >
+                  {{ t('time.clear') }}
+                </button>
+                <button
+                  type="button"
+                  class="font-outfit rounded-full bg-gradient-to-br from-[#F15D22] to-[#E67E22] px-3.5 py-1 text-xs font-bold text-white shadow-sm transition-all hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F15D22] focus-visible:ring-offset-2 active:scale-[0.97]"
+                  @click="closePopover"
+                >
+                  ✓ {{ t('time.done') }}
+                </button>
+              </div>
             </div>
           </div>
         </Transition>

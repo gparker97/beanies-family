@@ -846,7 +846,16 @@ export interface Medication {
   memberId: UUID;
   name: string;
   dose: string;
+  /** Display-only string ("twice daily", "every 4 hours"). Auto-generated
+   *  from `dosesPerDay` when 1-4; user-typed when `dosesPerDay` is null. */
   frequency: string;
+  /**
+   * Structured doses-per-day count for the daily reminder math in
+   * `useCriticalItems`. `1`-`4` enables a reminder; `null` means
+   * "as needed / other" — no reminder fires. Legacy records may have
+   * this `undefined`; treat undefined the same as null at consumers.
+   */
+  dosesPerDay?: number | null;
   startDate?: ISODateString;
   endDate?: ISODateString;
   ongoing?: boolean;
