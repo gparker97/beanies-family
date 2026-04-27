@@ -393,8 +393,29 @@ export function hasRefreshToken(): boolean {
 }
 
 /**
+ * Sentinel error thrown by silent-only token paths when the access token
+ * has expired and silent refresh has failed. Callers should NOT respond
+ * by opening a popup themselves — instead, surface the existing reconnect
+ * banner (`syncStore.showGoogleReconnect`) so the user can re-auth via a
+ * deliberate click. Background operations must never trigger an unsolicited
+ * Google popup.
+ */
+export class TokenExpiredError extends Error {
+  constructor(message = 'Google access token expired and silent refresh failed') {
+    super(message);
+    this.name = 'TokenExpiredError';
+  }
+}
+
+/**
  * Get a valid access token, refreshing if needed.
  * Attempts silent refresh first; falls back to interactive auth.
+ *
+ * **For user-gesture-triggered call sites only** (button clicks, form
+ * submissions). Background operations like sync, file polling, and
+ * recurring refreshes must use `getValidTokenSilent()` instead — opening
+ * an unsolicited popup mid-operation is the bug class this distinction
+ * is here to prevent.
  *
  * When falling back to interactive auth without a refresh token,
  * forces consent so Google issues a new refresh token.
@@ -410,6 +431,41 @@ export async function getValidToken(): Promise<string> {
   // Force consent when we have no refresh token — Google only issues
   // refresh tokens with prompt=consent, not prompt=select_account.
   return requestAccessToken({ forceConsent: !refreshToken });
+}
+
+/**
+ * Get a valid access token using silent refresh ONLY. Throws
+ * `TokenExpiredError` if the token has expired and silent refresh fails —
+ * never opens a Google popup.
+ *
+ * Use this from any background/non-user-gesture context (Drive sync,
+ * polling, recurring refreshes, the wake-time stale-tab refresh). The
+ * caller should catch `TokenExpiredError` and let the existing reconnect
+ * banner (`syncStore.showGoogleReconnect`) prompt the user.
+ *
+ * Why this exists: an unsolicited popup that opens because we couldn't
+ * silently refresh is the worst kind of UX — it appears without any
+ * action by the user, often gets blocked by browsers (no user gesture in
+ * the call stack), and feels like a bug even when auth is healthy.
+ */
+export async function getValidTokenSilent(): Promise<string> {
+  if (isTokenValid()) return accessToken!;
+  const silentToken = await attemptSilentRefresh();
+  if (silentToken) return silentToken;
+
+  // Notify subscribers (syncStore surfaces the reconnect banner) before
+  // throwing. Same channel `scheduleAutoRefresh` uses on its own failure,
+  // so the banner appears whether the failure surfaces via the timer or
+  // via an on-demand silent token request.
+  expiryCallbacks.forEach((cb) => {
+    try {
+      cb();
+    } catch (e) {
+      console.warn('[googleAuth] Expiry callback error:', e);
+    }
+  });
+
+  throw new TokenExpiredError();
 }
 
 /**
