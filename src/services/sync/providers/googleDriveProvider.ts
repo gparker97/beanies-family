@@ -12,15 +12,15 @@ import {
   clearFileHandleForFamily,
 } from '../fileHandleStore';
 import {
-  getValidToken,
+  getValidTokenSilent,
   isTokenValid,
   clearGoogleSessionState,
   requestAccessToken,
   attemptSilentRefresh,
-  hasRefreshToken,
   fetchGoogleUserEmail,
   getGoogleAccountEmail,
   setGoogleAccountEmail,
+  TokenExpiredError,
 } from '@/services/google/googleAuth';
 import {
   readFile,
@@ -70,27 +70,31 @@ export class GoogleDriveProvider implements StorageProvider {
    */
   async write(content: string): Promise<void> {
     try {
-      const token = await getValidToken();
+      const token = await getValidTokenSilent();
       await withRetry(() => updateFile(token, this.fileId, content));
     } catch (e) {
-      // 401 — token expired, try silent refresh first to avoid popup during auto-save
+      // 401 — server says the in-memory token is invalid. Try one silent
+      // refresh in case it raced with token expiry; on failure, queue the
+      // save and surface a TokenExpiredError so the reconnect banner
+      // appears. Never open an unsolicited popup mid-save.
       if (e instanceof DriveApiError && e.status === 401) {
         const silentToken = await attemptSilentRefresh();
         if (silentToken) {
           await withRetry(() => updateFile(silentToken, this.fileId, content));
           return;
         }
-        // Silent refresh failed — fall back to interactive auth.
-        // Force consent when we have no refresh token so Google issues one.
-        try {
-          const newToken = await requestAccessToken({ forceConsent: !hasRefreshToken() });
-          await withRetry(() => updateFile(newToken, this.fileId, content));
-          return;
-        } catch {
-          // Interactive auth failed (popup blocked, dismissed, etc.) — queue for retry
-          enqueueOfflineSave(content);
-          return;
-        }
+        enqueueOfflineSave(content);
+        throw new TokenExpiredError(
+          'Drive write failed: token rejected and silent refresh failed; save queued offline'
+        );
+      }
+
+      // Silent token path threw TokenExpiredError before any API call — queue
+      // the save so it flushes when the user reconnects, then re-throw so
+      // syncStore surfaces the reconnect banner.
+      if (e instanceof TokenExpiredError) {
+        enqueueOfflineSave(content);
+        throw e;
       }
 
       // 404 — file gone (deleted/moved), let caller handle
@@ -126,7 +130,7 @@ export class GoogleDriveProvider implements StorageProvider {
     try {
       /* eslint-disable no-console -- init diagnostics */
       console.log('[GoogleDrive.read] getting token...');
-      const token = await getValidToken();
+      const token = await getValidTokenSilent();
       console.log('[GoogleDrive.read] token obtained, reading file...');
       const result = await withRetry(() => readFile(token, this.fileId));
       console.log('[GoogleDrive.read] read complete, length=', result?.length ?? 0);
@@ -135,13 +139,16 @@ export class GoogleDriveProvider implements StorageProvider {
     } catch (e) {
       console.warn('[GoogleDrive.read] error:', (e as Error).message);
       if (e instanceof DriveApiError && e.status === 401) {
+        // Server says the token is invalid. Try one silent refresh (in case
+        // the in-memory token went stale between getValidTokenSilent's
+        // isTokenValid check and the actual API call). On failure, signal
+        // the caller to surface the reconnect banner — do NOT open an
+        // unsolicited popup.
         const silentToken = await attemptSilentRefresh();
         if (silentToken) {
           return await withRetry(() => readFile(silentToken, this.fileId));
         }
-        // Force consent when we have no refresh token so Google issues one.
-        const newToken = await requestAccessToken({ forceConsent: !hasRefreshToken() });
-        return await withRetry(() => readFile(newToken, this.fileId));
+        throw new TokenExpiredError('Drive read failed: token rejected and silent refresh failed');
       }
       throw e;
     }
@@ -154,11 +161,12 @@ export class GoogleDriveProvider implements StorageProvider {
    */
   async getLastModified(): Promise<string | null> {
     try {
-      const token = await getValidToken();
+      const token = await getValidTokenSilent();
       return await getFileModifiedTime(token, this.fileId);
     } catch (e) {
-      // 401 — auth failure, let caller handle (e.g., show reconnect prompt)
-      // 404 — file gone (deleted/moved), let caller handle (e.g., show file-not-found banner)
+      // TokenExpiredError or 401 — auth failure, let caller surface reconnect banner.
+      // 404 — file gone (deleted/moved), let caller handle (e.g., file-not-found banner).
+      if (e instanceof TokenExpiredError) throw e;
       if (e instanceof DriveApiError && (e.status === 401 || e.status === 404)) {
         throw e;
       }
