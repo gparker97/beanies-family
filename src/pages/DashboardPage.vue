@@ -11,6 +11,7 @@ import NetWorthHeroCard from '@/components/dashboard/NetWorthHeroCard.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
+import { useToday } from '@/composables/useToday';
 import { useNetWorthHistory } from '@/composables/useNetWorthHistory';
 import { useMonthOverMonthCashFlow } from '@/composables/useMonthOverMonthCashFlow';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
@@ -66,8 +67,9 @@ const savingsRate = computed(() => {
 // ── Recent + Upcoming Transactions ──────────────────────────────────────────
 const recentTransactions = computed(() => transactionsStore.filteredRecentTransactions.slice(0, 5));
 
+const { startOfToday } = useToday();
 const upcomingTransactions = computed(() => {
-  const now = new Date();
+  const now = startOfToday.value;
   const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
   return recurringStore.filteredActiveItems
@@ -110,7 +112,7 @@ function formatDate(dateString: string): string {
 }
 
 function getDaysUntil(date: Date): string {
-  const now = new Date();
+  const now = startOfToday.value;
   const diffTime = date.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 

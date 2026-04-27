@@ -24,6 +24,7 @@ import { computed } from 'vue';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { useTranslation } from '@/composables/useTranslation';
 import { isMedicationActive } from '@/stores/medicationsStore';
+import { useToday } from '@/composables/useToday';
 import type { Medication } from '@/types/models';
 
 const props = defineProps<{ medication: Medication }>();
@@ -34,8 +35,9 @@ defineEmits<{
 
 const { t } = useTranslation();
 const { url: photoUrl } = useAvatarPhotoUrl(() => props.medication.photoIds?.[0]);
+const { today } = useToday();
 
-const isActive = computed(() => isMedicationActive(props.medication));
+const isActive = computed(() => isMedicationActive(props.medication, today.value));
 
 const scheduleLabel = computed(() => {
   const m = props.medication;

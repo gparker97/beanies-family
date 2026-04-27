@@ -6,6 +6,7 @@ import * as vacationRepo from '@/services/automerge/repositories/vacationReposit
 import * as activityRepo from '@/services/automerge/repositories/activityRepository';
 import { computeVacationDates, extendTripDates, collectSegmentDates } from '@/utils/vacation';
 import { toISODateString, extractDatePart } from '@/utils/date';
+import { useToday } from '@/composables/useToday';
 import type {
   FamilyVacation,
   CreateFamilyVacationInput,
@@ -20,10 +21,11 @@ export const useVacationStore = defineStore('vacations', () => {
   const error = ref<string | null>(null);
 
   // Getters
+  const { today } = useToday();
   const upcomingVacations = computed(() => {
-    const today = extractDatePart(new Date().toISOString());
+    const todayStr = today.value;
     return vacations.value
-      .filter((v) => !v.endDate || extractDatePart(v.endDate) >= today)
+      .filter((v) => !v.endDate || extractDatePart(v.endDate) >= todayStr)
       .sort((a, b) => (a.startDate ?? '').localeCompare(b.startDate ?? ''));
   });
 

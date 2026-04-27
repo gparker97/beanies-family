@@ -2,6 +2,7 @@
 import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useToday } from '@/composables/useToday';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import {
   parseLocalDate,
@@ -75,13 +76,7 @@ const weekdayInitials = computed(() =>
   Array.from({ length: 7 }, (_, i) => WEEKDAY_INITIALS_SUN[(i + weekStart.value) % 7]!)
 );
 
-const today = computed(() => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-});
-
-const todayStr = computed(() => toDateInputValue(today.value));
+const { today: todayStr, startOfToday: today } = useToday();
 const tomorrowStr = computed(() => toDateInputValue(addDays(today.value, 1)));
 
 // ── Trigger label ─────────────────────────────────────────────────────────

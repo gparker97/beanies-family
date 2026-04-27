@@ -1,8 +1,9 @@
 import { computed, type Ref } from 'vue';
 import { useRecurringStore } from '@/stores/recurringStore';
+import { useToday } from '@/composables/useToday';
 import { getDueDatesInRange } from '@/services/recurring/recurringProcessor';
 import type { DisplayTransaction } from '@/types/models';
-import { getStartOfMonth, getEndOfMonth, getStartOfDay, toDateInputValue } from '@/utils/date';
+import { getStartOfMonth, getEndOfMonth, toDateInputValue } from '@/utils/date';
 
 /**
  * Generates ephemeral projected transactions for the current and future months
@@ -13,16 +14,16 @@ import { getStartOfMonth, getEndOfMonth, getStartOfDay, toDateInputValue } from 
 export function useProjectedTransactions(selectedMonth: Ref<Date>) {
   const recurringStore = useRecurringStore();
 
+  const { startOfToday } = useToday();
+
   const isFutureMonth = computed(() => {
     const monthStart = getStartOfMonth(selectedMonth.value);
-    const today = getStartOfDay(new Date());
-    return monthStart > today;
+    return monthStart > startOfToday.value;
   });
 
   const isCurrentOrFutureMonth = computed(() => {
     const monthEnd = getEndOfMonth(selectedMonth.value);
-    const today = getStartOfDay(new Date());
-    return monthEnd >= today;
+    return monthEnd >= startOfToday.value;
   });
 
   const projectedTransactions = computed<DisplayTransaction[]>(() => {

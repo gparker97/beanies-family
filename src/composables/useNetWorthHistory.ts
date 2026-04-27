@@ -14,6 +14,7 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useToday } from '@/composables/useToday';
 import { buildNetWorthChanges, replayNetWorthHistory } from '@/utils/netWorthHistory';
 import {
   addDays,
@@ -52,8 +53,11 @@ function formatLabel(date: Date, period: PeriodKey): string {
  * Build the descending list of chart-point dates for a given period.
  * Newest-first to match the backward-walk replay direction.
  */
-function buildChartPointsNewestFirst(period: PeriodKey, earliestTxnDate: Date | null): Date[] {
-  const now = getStartOfDay(new Date());
+function buildChartPointsNewestFirst(
+  period: PeriodKey,
+  earliestTxnDate: Date | null,
+  now: Date
+): Date[] {
   let startDate: Date;
   let stepDays: number;
 
@@ -108,6 +112,7 @@ export function useNetWorthHistory() {
   const assetsStore = useAssetsStore();
   const transactionsStore = useTransactionsStore();
   const settingsStore = useSettingsStore();
+  const { startOfToday } = useToday();
 
   const selectedPeriod = ref<PeriodKey>('1M');
 
@@ -141,7 +146,11 @@ export function useNetWorthHistory() {
           }, new Date())
         : null;
 
-      const chartPointsNewestFirst = buildChartPointsNewestFirst(period, earliestTxnDate);
+      const chartPointsNewestFirst = buildChartPointsNewestFirst(
+        period,
+        earliestTxnDate,
+        startOfToday.value
+      );
 
       const changesNewestFirst = buildNetWorthChanges({
         accounts: eligibleAccounts,
