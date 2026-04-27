@@ -56,6 +56,9 @@ import { useAuthStore } from '@/stores/authStore';
 import { setSoundEnabled } from '@/composables/useSounds';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
+import { useToday } from '@/composables/useToday';
+import { useStaleTabRefresh } from '@/composables/useStaleTabRefresh';
+import { attemptSilentReconnect } from '@/utils/silentReconnect';
 import { saveNow, hasFamilyKey, setFamilyKey } from '@/services/sync/syncService';
 import { __internals as photoStoreInternals } from '@/stores/photoStore';
 
@@ -689,34 +692,15 @@ async function handleClearDataAndSignOut() {
   window.location.reload();
 }
 
-// Attempt silent reconnect to Google Drive when tab becomes visible or network comes back.
-// Uses a guard to prevent concurrent reconnect attempts.
-let isReconnecting = false;
-async function attemptSilentReconnect() {
-  if (isReconnecting || !syncStore.isGoogleDriveConnected) return;
-  isReconnecting = true;
-  try {
-    const { attemptSilentRefresh } = await import('@/services/google/googleAuth');
-    const refreshed = await attemptSilentRefresh();
-    if (refreshed) {
-      const hadVisibleError =
-        syncStore.showGoogleReconnect || syncStore.saveFailureLevel !== 'none';
-      if (hadVisibleError) {
-        await syncStore.handleGoogleReconnected();
-        showToast('success', t('googleDrive.reconnected'));
-      }
-    }
-  } catch {
-    /* Silent — non-critical */
-  } finally {
-    isReconnecting = false;
-  }
-}
-
 // Save data when going hidden; check for external file changes when becoming visible.
 // visibilitychange → hidden is the primary save point (fires reliably on tab close,
 // app switch, etc.). beforeunload is best-effort only — browsers may terminate
 // the async save before it completes.
+//
+// The visibilitychange listener itself lives in `useToday` (single sink for the
+// app's wake-detection events). Save-on-hide watches that composable's
+// reactive `isVisible` ref. `useStaleTabRefresh` (wired below) handles the
+// heavy refresh on wake / day-change.
 
 /** Restore syncService key from store if out of sync, then save. */
 function saveWithKeyRecovery() {
@@ -727,16 +711,12 @@ function saveWithKeyRecovery() {
   saveNow().catch(console.warn);
 }
 
-function handleVisibilityChange() {
-  if (document.visibilityState === 'hidden') {
-    syncStore.pauseFilePolling();
-    saveWithKeyRecovery();
-  } else if (document.visibilityState === 'visible') {
-    syncStore.resumeFilePolling();
-    attemptSilentReconnect().catch(console.warn);
-    syncStore.reloadIfFileChanged().catch(console.warn);
-  }
-}
+const { isVisible: isTabVisible } = useToday();
+watch(isTabVisible, (visible) => {
+  if (!visible) saveWithKeyRecovery();
+});
+
+useStaleTabRefresh();
 
 function handleBeforeUnload() {
   saveWithKeyRecovery();
@@ -744,15 +724,15 @@ function handleBeforeUnload() {
 
 function handleOnline() {
   showToast('success', t('pwa.backOnline'));
-  attemptSilentReconnect().catch(console.warn);
+  attemptSilentReconnect().catch((e) =>
+    console.warn('[App] silent reconnect on online event failed', e)
+  );
 }
 
-document.addEventListener('visibilitychange', handleVisibilityChange);
 window.addEventListener('beforeunload', handleBeforeUnload);
 window.addEventListener('online', handleOnline);
 
 onUnmounted(() => {
-  document.removeEventListener('visibilitychange', handleVisibilityChange);
   window.removeEventListener('beforeunload', handleBeforeUnload);
   window.removeEventListener('online', handleOnline);
 });

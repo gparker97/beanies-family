@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-27",
-    "translationCount": 2547
+    "translationCount": 2549
   },
   "translations": {
     "app.name": {
@@ -12740,6 +12740,16 @@
       "translation": "—然后从设置中切换。",
       "hash": "7dlk4y",
       "lastUpdated": "2026-04-26"
+    },
+    "error.backgroundRefreshFailed": {
+      "translation": "无法刷新您的数据",
+      "hash": "gexvho",
+      "lastUpdated": "2026-04-27"
+    },
+    "error.backgroundRefreshFailedHelp": {
+      "translation": "某些数据可能已过期。请尝试刷新应用。如果问题仍然存在，请退出并重新登录。",
+      "hash": "hkz74m",
+      "lastUpdated": "2026-04-27"
     }
   }
 }

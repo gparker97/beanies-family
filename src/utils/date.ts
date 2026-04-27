@@ -274,6 +274,19 @@ export function toDateInputValue(date: Date): string {
 }
 
 /**
+ * Today in the user's LOCAL timezone as a YYYY-MM-DD string.
+ *
+ * For one-shot reads only (timestamps, comparisons in pure helpers,
+ * services). Reactive UI consumers should read `useToday().today` from
+ * `@/composables/useToday` instead — that ref auto-advances at midnight
+ * and on tab wake, so views, computeds, and Pinia getters that filter
+ * by "today" stay correct without manual re-renders.
+ */
+export function localToday(): string {
+  return toDateInputValue(new Date());
+}
+
+/**
  * Format a Date as `HH:mm` in LOCAL time — the value shape expected by
  * `<input type="time">`. Mirrors `toDateInputValue` for time inputs.
  */

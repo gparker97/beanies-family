@@ -24,7 +24,8 @@ import { usePermissions } from '@/composables/usePermissions';
 import { showToast } from '@/composables/useToast';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
-import { formatDateShort, formatNookDate, toDateInputValue, extractDatePart } from '@/utils/date';
+import { formatDateShort, formatNookDate, extractDatePart } from '@/utils/date';
+import { useToday } from '@/composables/useToday';
 import {
   tripTypeEmoji,
   bookingProgress,
@@ -148,7 +149,7 @@ function scrollToOutOfRange(): void {
 
 /** Which hint tooltip is currently expanded */
 
-const todayISO = computed(() => toDateInputValue(new Date()));
+const { today: todayISO } = useToday();
 
 /** True when today falls inside `[tripStart, tripEnd]` inclusive. */
 const isMidTrip = computed(() => {

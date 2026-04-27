@@ -1761,6 +1761,15 @@ const STRING_DEFS = {
     en: 'Network error. Please check your connection.',
     beanie: 'no connection — your beanies are still here though!',
   },
+  'error.backgroundRefreshFailed': {
+    en: "Couldn't refresh your data",
+    beanie: "couldn't refresh your beanies",
+  },
+  'error.backgroundRefreshFailedHelp': {
+    en: 'Some data may be out of date. Try refreshing the app. If it keeps happening, sign out and sign back in.',
+    beanie:
+      'some beans may be out of date. try refreshing the app. if it keeps happening, sign out and sign back in.',
+  },
 
   // Not Found (404)
   'notFound.title': { en: 'Not Found', beanie: 'not found' },

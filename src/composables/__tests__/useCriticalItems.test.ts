@@ -25,6 +25,20 @@ vi.mock('@/services/automerge/repositories/todoRepository', () => ({
   deleteTodo: vi.fn(),
 }));
 
+vi.mock('@/composables/useToday', async () => {
+  const { ref, computed } = await import('vue');
+  const { toDateInputValue, getStartOfDay } = await import('@/utils/date');
+  return {
+    useToday: () => ({
+      today: ref(toDateInputValue(new Date())),
+      startOfToday: computed(() => getStartOfDay(new Date())),
+      isVisible: ref(true),
+      lastVisibleAt: ref(0),
+      lastHiddenAt: ref(0),
+    }),
+  };
+});
+
 const NOW = '2026-03-10T00:00:00.000Z';
 const TODAY = '2026-03-10'; // Tuesday
 

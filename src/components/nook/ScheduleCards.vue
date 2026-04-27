@@ -4,6 +4,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { toDateInputValue, formatNookDate, formatTime12 } from '@/utils/date';
+import { useToday } from '@/composables/useToday';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import NookSectionCard from './NookSectionCard.vue';
 
@@ -27,7 +28,7 @@ interface ScheduleItem {
   icon: string;
 }
 
-const todayStr = computed(() => toDateInputValue(new Date()));
+const { today: todayStr } = useToday();
 
 const todayFormatted = computed(() => formatNookDate(todayStr.value));
 

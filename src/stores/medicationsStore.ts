@@ -4,33 +4,24 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import * as repo from '@/services/automerge/repositories/medicationRepository';
 import * as logRepo from '@/services/automerge/repositories/medicationLogRepository';
 import { toDateInputValue } from '@/utils/date';
+import { useToday } from '@/composables/useToday';
 import type { Medication, MedicationLogEntry, CreateMedicationLogEntryInput } from '@/types/models';
 
 /**
- * "Today" in the user's LOCAL timezone as a YYYY-MM-DD string.
- * Medication startDate/endDate are saved as local-date strings from
- * `<input type="date">`, so comparing against UTC would misclassify
- * medications near the timezone boundary (a med starting "today"
- * local reads as "future" in UTC east of the line, flipping the
- * active chip to Ended). Always compare local-to-local.
+ * A medication is "active" when it's either ongoing or `today` is within
+ * [startDate, endDate]. Undated medications are treated as active.
  *
- * The same helper powers `dosesToday` below — administration log
- * entries store full timestamps, so we extract the LOCAL date part
- * via `toDateInputValue(new Date(administeredOn))` before compare.
+ * Pure function — `today` (a YYYY-MM-DD local-date string) is passed in by
+ * the caller so the function stays testable in isolation and the caller
+ * controls whether the read is reactive (via `useToday().today`) or
+ * one-shot (via `localToday()` from `utils/date.ts`).
+ *
+ * Local-to-local compares are required: medication startDate/endDate are
+ * saved as local-date strings from `<input type="date">`, so comparing
+ * against UTC would misclassify medications near the timezone boundary.
  */
-function localToday(): string {
-  return toDateInputValue(new Date());
-}
-
-/**
- * A medication is "active" when it's either ongoing or today is
- * within [startDate, endDate]. Undated medications are treated as
- * active. Exported so MedicationCard / BeanMedicationsTab share one
- * implementation — previously three drift-prone copies existed.
- */
-export function isMedicationActive(m: Medication): boolean {
+export function isMedicationActive(m: Medication, today: string): boolean {
   if (m.ongoing) return true;
-  const today = localToday();
   if (m.endDate && m.endDate < today) return false;
   if (m.startDate && m.startDate > today) return false;
   return true;
@@ -50,7 +41,10 @@ export const useMedicationsStore = defineStore('medications', () => {
   }
 
   /** Active medications (see isMedicationActive for the rule). */
-  const active = computed(() => medications.value.filter(isMedicationActive));
+  const { today } = useToday();
+  const active = computed(() =>
+    medications.value.filter((m) => isMedicationActive(m, today.value))
+  );
 
   /**
    * All log entries for a medication, descending by administeredOn
@@ -70,11 +64,11 @@ export const useMedicationsStore = defineStore('medications', () => {
    * creating a new log. Returns 0 for medications with no logs.
    */
   function dosesToday(medicationId: string): number {
-    const today = localToday();
+    const todayStr = today.value;
     let count = 0;
     for (const log of medicationLogs.value) {
       if (log.medicationId !== medicationId) continue;
-      if (toDateInputValue(new Date(log.administeredOn)) === today) count++;
+      if (toDateInputValue(new Date(log.administeredOn)) === todayStr) count++;
     }
     return count;
   }

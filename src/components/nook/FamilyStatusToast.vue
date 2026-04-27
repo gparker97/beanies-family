@@ -4,7 +4,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useCriticalItems, type CriticalItem } from '@/composables/useCriticalItems';
-import { toDateInputValue } from '@/utils/date';
+import { useToday } from '@/composables/useToday';
 
 const { t } = useTranslation();
 const todoStore = useTodoStore();
@@ -27,9 +27,9 @@ function handleComplete(item: CriticalItem) {
   }
 }
 
+const { today } = useToday();
 const todayActivitiesCount = computed(() => {
-  const todayStr = toDateInputValue(new Date());
-  return activityStore.upcomingActivities.filter(({ date }) => date === todayStr).length;
+  return activityStore.upcomingActivities.filter(({ date }) => date === today.value).length;
 });
 
 const openTodosCount = computed(() => todoStore.filteredOpenTodos.length);

@@ -8,6 +8,7 @@ import { activityCategoryToExpenseCategory } from '@/constants/categories';
 import { calculateMonthlyFee } from '@/utils/finance';
 import { useSettingsStore } from './settingsStore';
 import { toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
+import { useToday } from '@/composables/useToday';
 import { normalizeAssignees } from '@/utils/assignees';
 import { ACTIVITY_COLORS, getActivityCategoryColor } from '@/constants/activityCategories';
 import type {
@@ -154,9 +155,15 @@ export const useActivityStore = defineStore('activities', () => {
   /**
    * Get upcoming activities from today, limited to `limit` items.
    * Excludes vacation-linked activities (they appear as sidebar cards instead).
+   *
+   * Reads `today` from the reactive `useToday` composable so this list
+   * auto-refreshes at midnight and on tab wake — without a reactive source
+   * the previous `new Date()` call only re-ran when other deps changed.
    */
+  const { today: todayRef } = useToday();
   const upcomingActivities = computed(() => {
-    const today = new Date();
+    const today = parseLocalDate(todayRef.value);
+    const todayStr = todayRef.value;
     const results: { activity: FamilyActivity; date: string }[] = [];
 
     // Look ahead 90 days
@@ -166,7 +173,7 @@ export const useActivityStore = defineStore('activities', () => {
         const m = today.getMonth() + i;
         const expanded = expandRecurring(a, y, m);
         for (const occ of expanded) {
-          if (occ.date >= formatDate(today)) {
+          if (occ.date >= todayStr) {
             results.push(occ);
           }
         }
