@@ -410,6 +410,24 @@ const STRING_DEFS = {
   'medications.field.name': { en: 'Name', beanie: 'name' },
   'medications.field.dose': { en: 'Dose', beanie: 'dose' },
   'medications.field.frequency': { en: 'Frequency', beanie: 'frequency' },
+  'medications.field.dosesPerDay': {
+    en: 'How often each day?',
+    beanie: 'how often each day?',
+  },
+  'medications.dosesOption.once': { en: 'Once', beanie: 'once' },
+  'medications.dosesOption.twice': { en: 'Twice', beanie: 'twice' },
+  'medications.dosesOption.three': { en: '3×', beanie: '3×' },
+  'medications.dosesOption.four': { en: '4×', beanie: '4×' },
+  'medications.dosesOption.other': { en: 'Other / as needed', beanie: 'other / as needed' },
+  'medications.frequencyAuto.onceDaily': { en: 'once daily', beanie: 'once daily' },
+  'medications.frequencyAuto.twiceDaily': { en: 'twice daily', beanie: 'twice daily' },
+  'medications.frequencyAuto.threeDaily': { en: '3 times daily', beanie: '3 times daily' },
+  'medications.frequencyAuto.fourDaily': { en: '4 times daily', beanie: '4 times daily' },
+  'medications.willDisplayAs': { en: 'Will display as:', beanie: 'will display as:' },
+  'medications.frequencyDescribe': {
+    en: 'Describe the schedule',
+    beanie: 'describe the schedule',
+  },
   'medications.field.startDate': { en: 'Start date', beanie: 'start date' },
   'medications.field.endDate': { en: 'End date', beanie: 'end date' },
   'medications.field.ongoing': { en: 'Ongoing', beanie: 'ongoing' },
@@ -1090,6 +1108,14 @@ const STRING_DEFS = {
 
   // Generic fallbacks used by transactionLabel
   'family.unknownMember': { en: 'Unknown', beanie: 'unknown' },
+  // Natural-reading inline variant — for messages where the member name
+  // is interpolated into a sentence (e.g. "Don't forget: Antibiotics for
+  // {member}"). "Unknown" reads awkwardly there; "a family member" keeps
+  // the sentence flowing while still signalling the data is missing.
+  'family.unknownMemberInline': {
+    en: 'a family member',
+    beanie: 'a family member',
+  },
   'family.unknownAccount': { en: 'Unknown account', beanie: 'unknown account' },
 
   // Account categories & subtypes (used in AccountCategoryPicker)
@@ -1818,6 +1844,7 @@ const STRING_DEFS = {
   'time.period': { en: 'AM/PM', beanie: 'am/pm' },
   'time.now': { en: 'Now', beanie: 'now' },
   'time.clear': { en: 'Clear', beanie: 'clear' },
+  'time.done': { en: 'Done', beanie: 'done' },
   'date.days': { en: 'days', beanie: 'days' },
   'date.currentMonth': { en: 'Current Month', beanie: 'current month' },
   'date.lastMonth': { en: 'Last Month', beanie: 'last month' },
@@ -3576,6 +3603,14 @@ const STRING_DEFS = {
   'nook.criticalActivity': {
     en: 'You have {activity} at {time} today!',
     beanie: 'you have {activity} at {time} today!',
+  },
+  'nook.criticalMedReminder': {
+    en: "Don't forget: {medication} for {member} ({remaining} more today)",
+    beanie: "don't forget: {medication} for {member} ({remaining} more today)",
+  },
+  'nook.criticalMedReminderOne': {
+    en: "Don't forget: {medication} for {member} (1 more today)",
+    beanie: "don't forget: {medication} for {member} (1 more today)",
   },
   'nook.criticalActivityNoTime': {
     en: "You have {activity} today — don't miss it!",

@@ -4,11 +4,12 @@
  * convention (right-side drawer via BeanieFormModal `variant="drawer"`,
  * same pattern as TodoViewEditModal, MedicationFormModal, etc.).
  *
- * The drawer's native save button IS the "Log a dose" action — tapping
- * it opens the DoseLogConfirmModal via `useGiveDose`. This keeps all
- * dose-logging flows consistent: the drawer's primary button, the
- * card's 💊 quick-action, and the confirm modal all route through the
- * same composable.
+ * Footer matches the site convention: `[✏️ Edit] [Close]`, mirroring
+ * `ActivityViewEditModal`. The drawer's native save slot is "Close",
+ * Edit lives in `#footer-start`. The primary action — "Give a dose" —
+ * is elevated to a hero CTA inside the modal body (after the title
+ * block, before the recent-doses list) so it owns the visual moment
+ * and remains thumb-reachable on long, scrolling logs.
  *
  * Edit is delegated to the existing `MedicationFormModal` via `@edit`
  * so we never re-implement form logic.
@@ -31,7 +32,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { confirm } from '@/composables/useConfirm';
 import { getMemberRoleLabel } from '@/composables/useMemberInfo';
-import { timeAgo } from '@/utils/date';
+import { formatLogEntryTime } from '@/utils/date';
 import type { AvatarVariant } from '@/constants/avatars';
 import type { Medication } from '@/types/models';
 
@@ -156,10 +157,9 @@ const scheduleMeta = computed(() => {
     size="narrow"
     :title="medication?.name ?? ''"
     icon="💊"
-    :save-label="t('medicationLog.giveDose')"
-    save-gradient="orange"
+    :save-label="t('action.close')"
     @close="emit('close')"
-    @save="handleGiveDose"
+    @save="emit('close')"
   >
     <template v-if="medication">
       <!-- Photo hero — extends edge-to-edge by escaping BeanieFormModal's
@@ -208,7 +208,9 @@ const scheduleMeta = computed(() => {
         </div>
       </div>
 
-      <!-- Identity ribbon: member + role + edit button -->
+      <!-- Identity ribbon: pure "For whom" caption — no controls. Edit
+           moved to the footer per site convention; primary action is
+           the hero "Give a dose" button below the title block. -->
       <div
         class="-mx-6 flex items-center gap-3 bg-[var(--tint-slate-5)] px-6 py-3 dark:bg-slate-800/60"
       >
@@ -230,18 +232,6 @@ const scheduleMeta = computed(() => {
             }}<span v-if="roleLabel" class="text-[#2C3E50]/50"> · {{ roleLabel }}</span>
           </p>
         </div>
-        <button
-          type="button"
-          :aria-label="t('action.edit')"
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[var(--tint-orange-8)] text-[#F15D22] transition-colors hover:bg-[var(--tint-orange-15)] focus:bg-[var(--tint-orange-15)] focus:outline-none"
-          @click="handleEdit"
-        >
-          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path
-              d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828zM2 17a1 1 0 001 1h14a1 1 0 100-2H3a1 1 0 00-1 1z"
-            />
-          </svg>
-        </button>
       </div>
 
       <!-- Title block -->
@@ -266,12 +256,12 @@ const scheduleMeta = computed(() => {
         >
           "{{ medication.notes }}"
         </p>
-        <!-- Last-dose caption — replaces the prior below-CTA line. Renders
-             above the log list as a contextual summary so the user sees
-             the critical info before the button they'll tap. -->
+        <!-- Last-dose caption — contextual summary directly above the
+             hero CTA so the user sees how recent the last dose was
+             before tapping "Give a dose". -->
         <p class="font-inter pt-1 text-xs text-[#2C3E50]/55 dark:text-gray-400">
           <template v-if="lastDose">
-            {{ t('medicationLog.lastDosePrefix') }} {{ timeAgo(lastDose) }}
+            {{ t('medicationLog.lastDosePrefix') }} {{ formatLogEntryTime(lastDose) }}
             <span v-if="dosesTodayCount >= 1">
               · {{ dosesTodayCount }} {{ t('medicationLog.dosesTodaySuffix') }}
             </span>
@@ -281,6 +271,27 @@ const scheduleMeta = computed(() => {
           </template>
         </p>
       </div>
+
+      <!-- Hero CTA — primary action of this surface, elevated from the
+           footer to a generous in-body button so it owns the visual
+           moment between context (title + last-dose) and history (log
+           list). One-shot sheen on open as a soft attention nudge,
+           gated on prefers-reduced-motion. -->
+      <button
+        type="button"
+        class="give-dose-hero group font-outfit relative w-full overflow-hidden rounded-2xl px-5 py-4 text-base font-bold text-white shadow-md transition-all hover:shadow-lg focus-visible:ring-2 focus-visible:ring-[#F15D22] focus-visible:ring-offset-2 focus-visible:outline-none active:scale-[0.98]"
+        @click="handleGiveDose"
+      >
+        <span class="relative z-10 flex items-center justify-center gap-2.5">
+          <span class="text-xl leading-none" aria-hidden="true">💊</span>
+          <span>{{ t('medicationLog.giveDose') }}</span>
+          <span
+            class="ml-0.5 transition-transform duration-200 group-hover:translate-x-0.5 group-active:translate-x-1"
+            aria-hidden="true"
+            >→</span
+          >
+        </span>
+      </button>
 
       <!-- Recent doses -->
       <div>
@@ -316,16 +327,17 @@ const scheduleMeta = computed(() => {
       </div>
     </template>
 
-    <!-- Secondary close action alongside the primary "Log a dose" button.
-         Mirrors the Cancel/Save pairing convention used across the app's
-         view-edit modals (see ActivityViewEditModal footer-start slot). -->
+    <!-- Footer-start: Edit button. Matches the site convention used by
+         ActivityViewEditModal and TodoViewEditModal — the modal's
+         native save slot is "Close", footer-start holds the secondary
+         action (here, Edit). -->
     <template #footer-start>
       <button
         type="button"
         class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-300 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
-        @click="emit('close')"
+        @click="handleEdit"
       >
-        {{ t('action.close') }}
+        ✏️ {{ t('action.edit') }}
       </button>
     </template>
   </BeanieFormModal>
@@ -339,3 +351,34 @@ const scheduleMeta = computed(() => {
     @close="photoLightboxOpen = false"
   />
 </template>
+
+<style scoped>
+/* Hero "Give a dose" CTA — Heritage Orange → Terracotta gradient with a
+ * one-time sheen sweep on open as a soft attention nudge. Scoped to
+ * this modal; the gradient + sheen are specific to the dose-log primary
+ * action and shouldn't bleed into other CTAs. */
+.give-dose-hero {
+  background: linear-gradient(135deg, #f15d22 0%, #e67e22 100%);
+}
+
+.give-dose-hero::before {
+  animation: give-dose-sheen 1.4s ease-out 0.3s 1 forwards;
+  background: linear-gradient(115deg, transparent 30%, rgb(255 255 255 / 22%) 50%, transparent 70%);
+  content: '';
+  inset: 0;
+  position: absolute;
+  transform: translateX(-100%);
+}
+
+@keyframes give-dose-sheen {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .give-dose-hero::before {
+    animation: none;
+  }
+}
+</style>

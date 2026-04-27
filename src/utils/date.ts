@@ -187,6 +187,66 @@ export function timeAgo(isoString: ISODateString): string {
   return formatDate(isoString);
 }
 
+/**
+ * Graduated timestamp format for log-entry rows (dose log, future food /
+ * sleep / mood logs). Today reads as relative time; prior days surface
+ * an absolute date + time so the day-separation between entries is
+ * obvious at a glance — `timeAgo`'s "3d ago" loses that context.
+ *
+ * Output examples (assuming today is Wed, 27 Apr 2026 at 14:00):
+ *   - 30 sec ago         → "just now"
+ *   - 30 min ago         → "30m ago"
+ *   - 6h ago (same day)  → "6h ago"
+ *   - yesterday 8:30 AM  → "Yesterday at 8:30 AM"
+ *   - 4 days ago, Sat    → "Sat at 8:30 AM"
+ *   - 21 Apr (this year) → "Mon, 21 Apr at 8:30 AM"
+ *   - 21 Apr 2025        → "Mon, 21 Apr 2025 at 8:30 AM"
+ *
+ * Day-of-week buckets (yesterday, "this week") are computed from local
+ * calendar boundaries — NOT from raw ms-difference — so a dose at
+ * 23:30 last night and one at 00:30 today never collide as "the same
+ * day" or skip "Yesterday."
+ */
+export function formatLogEntryTime(isoString: ISODateString): string {
+  const date = fromISODateString(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+
+  // Same calendar day → relative
+  const todayStart = getStartOfDay(now);
+  const dateStart = getStartOfDay(date);
+  if (todayStart.getTime() === dateStart.getTime()) {
+    if (diffSec < 60) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    return `${diffHr}h ago`;
+  }
+
+  const time = formatTime12(toTimeInputValue(date));
+
+  // Yesterday → "Yesterday at 8:30 AM"
+  const yesterdayStart = addDays(todayStart, -1);
+  if (dateStart.getTime() === yesterdayStart.getTime()) {
+    return `Yesterday at ${time}`;
+  }
+
+  // Within last 7 days (excluding today + yesterday) → "Mon at 8:30 AM"
+  const sixDaysAgoStart = addDays(todayStart, -6);
+  if (dateStart.getTime() >= sixDaysAgoStart.getTime()) {
+    return `${DAYS_SHORT[date.getDay()]} at ${time}`;
+  }
+
+  // Same year → "Mon, 21 Apr at 8:30 AM"
+  if (date.getFullYear() === now.getFullYear()) {
+    return `${DAYS_SHORT[date.getDay()]}, ${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} at ${time}`;
+  }
+
+  // Earlier years → include year
+  return `${DAYS_SHORT[date.getDay()]}, ${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()} at ${time}`;
+}
+
 const DAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const MONTHS_LONG = [
