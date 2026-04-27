@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-26",
-    "translationCount": 2548
+    "lastUpdated": "2026-04-27",
+    "translationCount": 2547
   },
   "translations": {
     "app.name": {
@@ -12719,11 +12719,6 @@
     "inviteWizard.step1.cta.addEmail": {
       "translation": "首先添加电子邮箱",
       "hash": "j8g648",
-      "lastUpdated": "2026-04-26"
-    },
-    "inviteWizard.step1.confirmLabel.noEmail": {
-      "translation": "请在上方添加电子邮箱以继续",
-      "hash": "39n38x",
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.step1.childHint.toggle": {

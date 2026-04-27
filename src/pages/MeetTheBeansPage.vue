@@ -417,11 +417,20 @@ function cancelEditFamilyName() {
         <button
           v-if="familyContextStore.activeFamilyId"
           type="button"
-          class="font-outfit text-secondary-500 inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white sm:flex-initial dark:bg-slate-800/80 dark:text-gray-100 dark:hover:bg-slate-800"
+          class="invite-beanie-cta font-outfit relative inline-flex flex-1 items-center justify-center gap-2.5 overflow-hidden rounded-full bg-gradient-to-br from-[var(--color-primary)] via-[#E67E22] to-[#F4B942] py-2 pr-5 pl-2 text-sm font-bold text-white shadow-[0_6px_16px_rgba(241,93,34,0.32)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_22px_rgba(241,93,34,0.45)] sm:flex-initial"
           @click="openInviteModal"
         >
-          <span aria-hidden="true">💌</span>
-          <span>{{ t('family.hub.inviteBean') }}</span>
+          <span
+            class="invite-beanie-mascot relative z-10 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white p-1 shadow-[0_2px_6px_rgba(15,23,42,0.1)]"
+          >
+            <img
+              src="/brand/beanies_logo_transparent_logo_only_192x192.png"
+              alt=""
+              aria-hidden="true"
+              class="h-full w-full object-contain"
+            />
+          </span>
+          <span class="relative z-10">{{ t('family.hub.inviteBean') }}</span>
         </button>
         <button
           type="button"
@@ -727,3 +736,74 @@ function cancelEditFamilyName() {
     />
   </div>
 </template>
+
+<style scoped>
+/* Invite Beanie button — gradient + mascot + periodic sheen sweep.
+   Shimmer is the visual hook that says "this is the central gesture";
+   the hugging-beanies mascot grounds the meaning. Animations gate on
+   prefers-reduced-motion so users with vestibular sensitivities aren't
+   strobed. */
+.invite-beanie-cta::before {
+  animation: invite-beanie-shimmer 5s ease-in-out infinite;
+  animation-delay: 1.2s;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    transparent 30%,
+    rgb(255 255 255 / 45%) 50%,
+    transparent 70%,
+    transparent 100%
+  );
+  content: '';
+  inset-block: 0;
+  left: -120%;
+  pointer-events: none;
+  position: absolute;
+  width: 65%;
+  z-index: 0;
+}
+
+.invite-beanie-cta:hover .invite-beanie-mascot {
+  animation: invite-beanie-wobble 0.6s ease-in-out;
+}
+
+@keyframes invite-beanie-shimmer {
+  0% {
+    left: -120%;
+  }
+
+  45% {
+    left: 200%;
+  }
+
+  100% {
+    left: 200%;
+  }
+}
+
+@keyframes invite-beanie-wobble {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  25% {
+    transform: rotate(-7deg);
+  }
+
+  75% {
+    transform: rotate(7deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .invite-beanie-cta::before {
+    animation: none;
+    opacity: 0;
+  }
+
+  .invite-beanie-cta:hover .invite-beanie-mascot {
+    animation: none;
+  }
+}
+</style>
