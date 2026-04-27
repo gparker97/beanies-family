@@ -94,11 +94,6 @@ const ctaLabel = computed(() => {
   return t(key).replace('{email}', trimmedEmail.value);
 });
 
-const confirmLabel = computed(() => {
-  if (!hasEmail.value) return t('inviteWizard.step1.confirmLabel.noEmail');
-  return t('inviteWizard.step1.confirmLabel.withEmail').replace('{email}', trimmedEmail.value);
-});
-
 const step2Caption = computed(() =>
   t('inviteWizard.step2.caption').replace(
     '{email}',
@@ -431,8 +426,11 @@ function handleClose() {
         </button>
       </div>
 
-      <!-- Confirm checkbox -->
+      <!-- Confirm checkbox — only render once an email is entered. The
+           CTA itself communicates the "add an email first" state, so a
+           dashed-border placeholder here would be redundant noise. -->
       <label
+        v-if="hasEmail"
         class="flex cursor-pointer items-start gap-3 rounded-2xl border-2 border-dashed border-[var(--color-primary)]/30 px-4 py-3 transition-all"
         :class="
           confirmed
@@ -452,15 +450,12 @@ function handleClose() {
           <BeanieIcon v-if="confirmed" name="check" size="sm" class="text-white" />
         </span>
         <span class="text-sm leading-relaxed font-medium text-gray-700 dark:text-gray-300">
-          <span v-if="hasEmail">
-            <span
-              class="rounded-md border border-[var(--color-primary)]/30 bg-white px-1.5 py-0.5 font-semibold text-[var(--color-primary)] dark:bg-slate-800"
-            >
-              {{ trimmedEmail }}
-            </span>
-            {{ ' is their Google account email for the family pod' }}
+          <span
+            class="rounded-md border border-[var(--color-primary)]/30 bg-white px-1.5 py-0.5 font-semibold text-[var(--color-primary)] dark:bg-slate-800"
+          >
+            {{ trimmedEmail }}
           </span>
-          <span v-else>{{ confirmLabel }}</span>
+          {{ ' is their Google account email for the family pod' }}
         </span>
       </label>
 
@@ -678,15 +673,19 @@ function handleClose() {
   }
 }
 
-.wizard-faq-link {
+/* :deep() — anchors come from v-html (FAQ a2/a3, child-hint Family Link),
+   so they don't carry the data-v-* scoped attribute. Without :deep() the
+   rule never reaches them and links render as browser defaults. */
+:deep(.wizard-faq-link) {
   color: var(--color-primary);
   font-weight: 600;
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
+  transition: color 0.15s ease;
 }
 
-.wizard-faq-link:hover {
+:deep(.wizard-faq-link:hover) {
   color: #d14d1a;
 }
 </style>
