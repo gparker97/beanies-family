@@ -80,7 +80,7 @@ async function handleCopy() {
   const ok = await copy(props.link);
   if (!ok) {
     console.error('[ShareChannelGrid] clipboard write failed');
-    showToast('error', t('inviteWizard.error.couldntCopy'));
+    showToast('error', t('inviteWizard.error.couldntCopy'), undefined, { silent: true });
     return;
   }
   emit('shared', 'copy');
@@ -93,7 +93,7 @@ function handleChannel(channel: (typeof channels.value)[0]) {
     copy(props.link).then((ok) => {
       if (!ok) {
         console.error('[ShareChannelGrid] WeChat copy failed');
-        showToast('error', t('inviteWizard.error.couldntCopy'));
+        showToast('error', t('inviteWizard.error.couldntCopy'), undefined, { silent: true });
         return;
       }
       wechatHint.value = true;

@@ -65,4 +65,11 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  define: {
+    // Build SHA — populated by `deploy.yml` via `VITE_BUILD_SHA: ${{ github.sha }}`.
+    // Falls back to 'dev' for local builds. Read at runtime via
+    // `import.meta.env.VITE_BUILD_SHA` (the errorReporter ships this in
+    // every Slack message so we can correlate bugs to specific deploys).
+    'import.meta.env.VITE_BUILD_SHA': JSON.stringify(process.env.VITE_BUILD_SHA || 'dev'),
+  },
 });
