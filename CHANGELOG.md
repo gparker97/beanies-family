@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **Setup wizard Step 3 add-member form — natural field order + clearer role labels.** Reordered fields from Role → Name → Birthday to **Name → Birthday → Role** (universal form-design principle: easiest/least committal field first, narrow, then categorize). Dropped the redundant "Type" prompt label above the role chips — the chips' emoji + labels are self-describing. Beanie-mode role labels also tightened: `loginV6.parentBean` "big beanie" → **"parent beanie"**; `loginV6.littleBean` "little beanie" → **"child beanie"**. The `parent / child` distinction is unambiguous (a 16-year-old isn't really "little"); affection in beanie mode is preserved by the "beanie" suffix instead of by the size adjective. en values unchanged.
+
 - **Drive pod-created success modal — celebratory + tighter.** When a brand-new pod's `.beanpod` file lands on Google Drive, the success modal now reads "**Your pod is planted! 🌱**" with a one-line subtitle "Saved safely — let's add your family next." and a single compact file-badge below. The previous orange callout instructing users to manually share the file via Drive's UI is gone — that flow is handled by the per-bean share button on the Pod page (and the upcoming onboarding-end invite prompt), not this success moment. The "Location: beanies.family folder" subline is also omitted from the modal (still surfaces in Settings → Family Data where users actually want to find it later). ~60% less visible text on what's meant to be a milestone celebration.
 
 ### Fixed
