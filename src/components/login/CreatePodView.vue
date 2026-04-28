@@ -1070,38 +1070,23 @@ function handleBack() {
           <h3 class="font-outfit text-lg font-bold text-gray-900 dark:text-gray-100">
             {{ t('googleDrive.fileCreated') }}
           </h3>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {{ t('googleDrive.fileCreatedSubtitle') }}
+          </p>
         </div>
 
-        <div class="mt-4 space-y-3">
-          <!-- File details -->
+        <div class="mt-4">
+          <!-- File details — single compact badge. Folder location, sharing
+               instructions, and other Drive-side details intentionally
+               omitted from this success moment; they're available in
+               Settings → Family Data and via the Pod page invite flow. -->
           <div class="rounded-xl bg-gray-50 p-3 dark:bg-slate-700/50">
-            <div class="flex items-center gap-2.5">
-              <CloudProviderBadge
-                provider-type="google_drive"
-                :file-name="syncStore.fileName"
-                :account-email="syncStore.providerAccountEmail"
-                size="md"
-              />
-            </div>
-            <p class="mt-1 pl-5 text-xs text-gray-500 dark:text-gray-400">
-              {{ t('googleDrive.fileLocation') }}
-            </p>
-          </div>
-
-          <!-- Sharing hint — prominent callout -->
-          <div
-            class="border-primary-500/25 bg-primary-500/[0.06] dark:border-primary-500/15 dark:bg-primary-500/[0.08] rounded-xl border p-3"
-          >
-            <div class="flex gap-2.5">
-              <img
-                src="/brand/beanies_impact_bullet_transparent_192x192.png"
-                alt=""
-                class="mt-0.5 h-5 w-5 flex-shrink-0"
-              />
-              <p class="text-secondary-500 text-sm leading-relaxed font-medium dark:text-gray-200">
-                {{ t('googleDrive.shareHint') }}
-              </p>
-            </div>
+            <CloudProviderBadge
+              provider-type="google_drive"
+              :file-name="syncStore.fileName"
+              :account-email="syncStore.providerAccountEmail"
+              size="md"
+            />
           </div>
         </div>
 

@@ -3802,17 +3802,16 @@ const STRING_DEFS = {
   'googleDrive.refresh': { en: 'Refresh', beanie: 'refresh' },
   'googleDrive.storageLabel': { en: 'Google Drive', beanie: 'google drive' },
   'googleDrive.fileCreated': {
-    en: 'Your pod has been created on Google Drive.',
-    beanie: 'your pod has been created on google drive.',
+    en: 'Your pod is planted! 🌱',
+    beanie: 'your pod is planted! 🌱',
+  },
+  'googleDrive.fileCreatedSubtitle': {
+    en: "Saved safely — let's add your family next.",
+    beanie: "saved safely — let's add your family next.",
   },
   'googleDrive.fileLocation': {
     en: 'Location: beanies.family folder',
     beanie: 'location: beanies.family folder',
-  },
-  'googleDrive.shareHint': {
-    en: 'To share with family members, open this file in Google Drive and share it with read & write access.',
-    beanie:
-      'to share with family members, open this file in google drive and share it with read & write access.',
   },
   'googleDrive.openInDrive': { en: 'Open in Google Drive', beanie: 'open in google drive' },
   'googleDrive.savedTo': { en: 'Saved to Google Drive', beanie: 'saved to google drive' },
