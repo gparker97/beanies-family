@@ -8,7 +8,7 @@ export interface ActivityPreset {
 }
 
 /**
- * Shared activity presets used in both ActivityModal and OnboardingFamily.
+ * Shared activity presets used in both ActivityModal and OnboardingActivity.
  * Each preset maps an emoji to a category and default title.
  */
 export const ACTIVITY_PRESETS: ActivityPreset[] = [

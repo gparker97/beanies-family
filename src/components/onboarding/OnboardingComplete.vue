@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+import OnboardingInvitePanel from './OnboardingInvitePanel.vue';
+import { useAccountsStore } from '@/stores/accountsStore';
+import { useRecurringStore } from '@/stores/recurringStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
 
 defineProps<{
-  accountCount: number;
-  recurringCount: number;
+  /** Slider value from Step 4. Default 20 if onboarding skipped Savings. */
   savingsPercent: number;
-  activityCount: number;
 }>();
 
 const emit = defineEmits<{
@@ -13,6 +16,14 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const accountsStore = useAccountsStore();
+const recurringStore = useRecurringStore();
+const activityStore = useActivityStore();
+
+// Counts derived from stores directly — no more prop threading from the wizard.
+const accountCount = computed(() => accountsStore.accounts.length);
+const recurringCount = computed(() => recurringStore.recurringItems.length);
+const activityCount = computed(() => activityStore.activities.length);
 </script>
 
 <template>
@@ -61,6 +72,9 @@ const { t } = useTranslation();
           <div class="ob-summary-label">{{ t('onboarding.summaryActivity') }}</div>
         </div>
       </div>
+
+      <!-- Inline invite panel (renders only when storage = Drive AND >=1 invitable member) -->
+      <OnboardingInvitePanel />
 
       <!-- CTA -->
       <button class="ob-cta ob-pulse-glow" data-testid="onboarding-finish" @click="emit('finish')">

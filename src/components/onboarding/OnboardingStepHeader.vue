@@ -1,47 +1,71 @@
 <script setup lang="ts">
 import OnboardingProgressPips from './OnboardingProgressPips.vue';
+import { useTranslation } from '@/composables/useTranslation';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 defineProps<{
+  /** Hero emoji shown above the title (e.g. "🐷"). */
   icon: string;
-  iconBg: string;
-  stepLabel: string;
-  titlePrefix: string;
-  titleHighlight: string;
+  /** i18n key for the leading part of the title — usually ends with a trailing space. */
+  titlePrefixKey: UIStringKey;
+  /** i18n key for the heritage-orange highlighted part of the title. */
+  titleHighlightKey: UIStringKey;
+  /** 1-indexed current step in the wizard (1-6). */
   currentStep: number;
+  /** Total step count (6 for onboarding-v2). */
   totalSteps: number;
 }>();
+
+const { t } = useTranslation();
 </script>
 
 <template>
-  <div class="ob-header">
-    <div class="flex items-center gap-2.5">
-      <div
-        class="flex h-10 w-10 items-center justify-center text-xl"
-        :style="{ background: iconBg, borderRadius: '14px' }"
-      >
-        {{ icon }}
-      </div>
-      <div>
-        <div class="font-heading text-xs font-semibold tracking-widest uppercase opacity-40">
-          {{ stepLabel }}
-        </div>
-        <div class="font-heading text-deep-slate mt-0.5 text-lg font-extrabold dark:text-gray-100">
-          {{ titlePrefix }}
-          <span class="text-heritage-orange">{{ titleHighlight }}</span>
-        </div>
-      </div>
+  <!--
+    Layout: pips at top center → emoji centered → title (prefix + highlight)
+    centered. Mockup-approved structure; clear "you are here" feedback at the
+    very top of every data-entry step.
+  -->
+  <div class="ob-step-header">
+    <div class="ob-step-pips-wrap">
+      <OnboardingProgressPips :current="currentStep" :total="totalSteps" />
     </div>
-    <OnboardingProgressPips :current="currentStep" :total="totalSteps" />
+    <div class="ob-step-emoji">{{ icon }}</div>
+    <h2 class="ob-step-title">
+      {{ t(titlePrefixKey) }}<span class="text-heritage-orange">{{ t(titleHighlightKey) }}</span>
+    </h2>
   </div>
 </template>
 
 <style scoped>
-.ob-header {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 24px;
+.ob-step-header {
+  margin-bottom: 20px;
   position: relative;
+  text-align: center;
   z-index: 1;
+}
+
+.ob-step-pips-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.ob-step-emoji {
+  font-size: 38px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.ob-step-title {
+  color: var(--deep-slate, #2c3e50);
+  font-family: Outfit, sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.012em;
+  margin: 0;
+}
+
+.dark .ob-step-title {
+  color: #f1f5f9;
 }
 </style>

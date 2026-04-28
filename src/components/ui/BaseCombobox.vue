@@ -42,8 +42,48 @@ const searchQuery = ref('');
 const customText = ref('');
 const isOtherMode = ref(false);
 const dropdownRef = ref<HTMLElement | null>(null);
+const triggerRef = ref<HTMLButtonElement | null>(null);
+const popoverRef = ref<HTMLElement | null>(null);
 const searchInputRef = ref<HTMLInputElement | null>(null);
 const customInputRef = ref<HTMLInputElement | null>(null);
+
+/**
+ * Fixed-position style for the teleported dropdown popover. Computed from
+ * the trigger's bounding rect — keeps the popover anchored to the trigger
+ * regardless of where it lives in the DOM.
+ *
+ * Why teleport: when the combobox sits inside a modal/container with
+ * `overflow: hidden` (rounded corners, etc.), an absolutely-positioned
+ * dropdown gets clipped at the container's edge. Teleporting to `body`
+ * + fixed positioning lets the popover float over the entire page.
+ */
+const popoverStyle = ref<Record<string, string>>({});
+
+function updatePopoverPosition() {
+  const trigger = triggerRef.value;
+  if (!trigger) return;
+  const rect = trigger.getBoundingClientRect();
+  // Default: open below the trigger. If there's not enough room (within 280px
+  // of viewport bottom), flip upward so the dropdown stays fully visible.
+  const dropdownMaxHeight = 280;
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const openUp = spaceBelow < dropdownMaxHeight && rect.top > spaceBelow;
+  popoverStyle.value = openUp
+    ? {
+        position: 'fixed',
+        left: `${rect.left}px`,
+        bottom: `${window.innerHeight - rect.top + 4}px`,
+        width: `${rect.width}px`,
+        maxHeight: `${Math.min(dropdownMaxHeight, rect.top - 16)}px`,
+      }
+    : {
+        position: 'fixed',
+        left: `${rect.left}px`,
+        top: `${rect.bottom + 4}px`,
+        width: `${rect.width}px`,
+        maxHeight: `${Math.min(dropdownMaxHeight, spaceBelow - 16)}px`,
+      };
+}
 
 // Check if the current modelValue matches any option
 const selectedOption = computed(() => props.options.find((o) => o.value === props.modelValue));
@@ -94,15 +134,28 @@ onMounted(() => {
   checkBackwardCompat();
   document.addEventListener('click', handleClickOutside);
   document.addEventListener('keydown', handleKeydown);
+  // Reposition popover when the trigger moves (window resize) or the page
+  // scrolls. Listeners are passive — no perf cost when popover is closed
+  // because `updatePopoverPosition` early-returns if the trigger isn't there.
+  window.addEventListener('resize', updatePopoverPosition);
+  window.addEventListener('scroll', updatePopoverPosition, true);
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
   document.removeEventListener('keydown', handleKeydown);
+  window.removeEventListener('resize', updatePopoverPosition);
+  window.removeEventListener('scroll', updatePopoverPosition, true);
 });
 
 function handleClickOutside(event: MouseEvent) {
-  if (dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) {
+  // Popover is teleported to body, so `dropdownRef` (the trigger's wrapper)
+  // doesn't contain it. Check both the trigger wrapper AND the popover so
+  // clicks inside either don't dismiss.
+  const target = event.target as Node;
+  const inTrigger = dropdownRef.value?.contains(target) ?? false;
+  const inPopover = popoverRef.value?.contains(target) ?? false;
+  if (!inTrigger && !inPopover) {
     closeDropdown();
   }
 }
@@ -125,7 +178,12 @@ function toggleDropdown() {
 function openDropdown() {
   isOpen.value = true;
   searchQuery.value = '';
+  // Compute position synchronously (trigger rect available now) AND on next
+  // tick (after popover renders, in case the size shifts). Both keep things
+  // robust on slower devices where layout-thrashes can desync.
+  updatePopoverPosition();
   nextTick(() => {
+    updatePopoverPosition();
     searchInputRef.value?.focus();
   });
 }
@@ -202,6 +260,7 @@ function clearSelection() {
 
     <!-- Trigger button -->
     <button
+      ref="triggerRef"
       type="button"
       data-testid="combobox-trigger"
       class="flex w-full items-center justify-between rounded-[16px] border-2 border-transparent px-4 py-3 text-left transition-all duration-200 focus:outline-none"
@@ -281,108 +340,115 @@ function clearSelection() {
       @keydown="handleCustomKeydown"
     />
 
-    <!-- Dropdown -->
-    <div
-      v-if="isOpen"
-      data-testid="combobox-dropdown"
-      class="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-[16px] border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
-    >
-      <!-- Search input -->
+    <!-- Dropdown — teleported to body so containers with overflow:hidden
+         (e.g. modals with rounded corners) don't clip it. Uses fixed
+         positioning anchored to the trigger via getBoundingClientRect.
+         See `updatePopoverPosition` for the math. -->
+    <Teleport to="body">
       <div
-        class="sticky top-0 border-b border-gray-100 bg-white p-2 dark:border-slate-700 dark:bg-slate-800"
+        v-if="isOpen"
+        ref="popoverRef"
+        data-testid="combobox-dropdown"
+        :style="popoverStyle"
+        class="z-[9999] overflow-y-auto rounded-[16px] border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
       >
-        <input
-          ref="searchInputRef"
-          v-model="searchQuery"
-          type="text"
-          data-testid="combobox-search"
-          class="focus:border-primary-500 focus:ring-primary-500 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-900 focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-gray-100"
-          :placeholder="searchPlaceholder"
-          @keydown.stop
-        />
-      </div>
-
-      <!-- Options list -->
-      <div class="py-1">
-        <button
-          v-for="option in filteredOptions"
-          :key="option.value"
-          type="button"
-          :data-testid="`combobox-option-${option.value}`"
-          class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
-          :class="
-            option.value === modelValue && !isOtherMode
-              ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
-              : 'text-gray-700 dark:text-gray-300'
-          "
-          @click="selectOption(option)"
-        >
-          <span class="flex-1 truncate">{{ option.label }}</span>
-          <span v-if="option.isCustom" class="flex items-center gap-1">
-            <span
-              class="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-slate-700 dark:text-gray-400"
-            >
-              Custom
-            </span>
-            <button
-              type="button"
-              :data-testid="`combobox-remove-${option.value}`"
-              class="rounded p-0.5 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-              title="Remove custom institution"
-              @click.stop="removeCustomOption(option)"
-            >
-              <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </span>
-          <!-- Checkmark for selected -->
-          <svg
-            v-if="option.value === modelValue && !isOtherMode"
-            class="text-primary-600 dark:text-primary-400 h-4 w-4 flex-shrink-0"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-        </button>
-
-        <!-- Empty state -->
+        <!-- Search input -->
         <div
-          v-if="filteredOptions.length === 0"
-          class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400"
+          class="sticky top-0 border-b border-gray-100 bg-white p-2 dark:border-slate-700 dark:bg-slate-800"
         >
-          No results found
+          <input
+            ref="searchInputRef"
+            v-model="searchQuery"
+            type="text"
+            data-testid="combobox-search"
+            class="focus:border-primary-500 focus:ring-primary-500 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-900 focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-gray-100"
+            :placeholder="searchPlaceholder"
+            @keydown.stop
+          />
         </div>
 
-        <!-- "Other" option -->
-        <button
-          v-if="otherValue"
-          type="button"
-          data-testid="combobox-other"
-          class="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:border-slate-700 dark:hover:bg-slate-700"
-          :class="
-            isOtherMode
-              ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
-              : 'text-gray-500 dark:text-gray-400'
-          "
-          @click="selectOther"
-        >
-          <span class="flex-1">{{ otherLabel }}</span>
-        </button>
+        <!-- Options list -->
+        <div class="py-1">
+          <button
+            v-for="option in filteredOptions"
+            :key="option.value"
+            type="button"
+            :data-testid="`combobox-option-${option.value}`"
+            class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
+            :class="
+              option.value === modelValue && !isOtherMode
+                ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
+                : 'text-gray-700 dark:text-gray-300'
+            "
+            @click="selectOption(option)"
+          >
+            <span class="flex-1 truncate">{{ option.label }}</span>
+            <span v-if="option.isCustom" class="flex items-center gap-1">
+              <span
+                class="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-slate-700 dark:text-gray-400"
+              >
+                Custom
+              </span>
+              <button
+                type="button"
+                :data-testid="`combobox-remove-${option.value}`"
+                class="rounded p-0.5 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                title="Remove custom institution"
+                @click.stop="removeCustomOption(option)"
+              >
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </span>
+            <!-- Checkmark for selected -->
+            <svg
+              v-if="option.value === modelValue && !isOtherMode"
+              class="text-primary-600 dark:text-primary-400 h-4 w-4 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </button>
+
+          <!-- Empty state -->
+          <div
+            v-if="filteredOptions.length === 0"
+            class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400"
+          >
+            No results found
+          </div>
+
+          <!-- "Other" option -->
+          <button
+            v-if="otherValue"
+            type="button"
+            data-testid="combobox-other"
+            class="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:border-slate-700 dark:hover:bg-slate-700"
+            :class="
+              isOtherMode
+                ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
+                : 'text-gray-500 dark:text-gray-400'
+            "
+            @click="selectOther"
+          >
+            <span class="flex-1">{{ otherLabel }}</span>
+          </button>
+        </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- Error/Hint -->
     <p v-if="error" class="text-sm text-red-600 dark:text-red-400">

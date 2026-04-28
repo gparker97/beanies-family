@@ -43,35 +43,8 @@ async function handleStart() {
       >.family
     </h2>
 
-    <!-- Description -->
-    <p class="ob-description">
-      {{ t('onboarding.welcomeDescription') }}
-    </p>
-
-    <!-- Three pillar cards -->
-    <div class="ob-pillars">
-      <div class="ob-pillar-card">
-        <div class="text-xl sm:text-2xl">🐷</div>
-        <div class="ob-pillar-label">
-          <span class="hidden sm:inline">{{ t('onboarding.pillarMoney') }}</span>
-          <span class="sm:hidden">{{ t('onboarding.pillarMoneyShort') }}</span>
-        </div>
-      </div>
-      <div class="ob-pillar-card">
-        <div class="text-xl sm:text-2xl">📅</div>
-        <div class="ob-pillar-label">
-          <span class="hidden sm:inline">{{ t('onboarding.pillarPlan') }}</span>
-          <span class="sm:hidden">{{ t('onboarding.pillarPlanShort') }}</span>
-        </div>
-      </div>
-      <div class="ob-pillar-card">
-        <div class="text-xl sm:text-2xl">🌳</div>
-        <div class="ob-pillar-label">
-          <span class="hidden sm:inline">{{ t('onboarding.pillarFamily') }}</span>
-          <span class="sm:hidden">{{ t('onboarding.pillarFamilyShort') }}</span>
-        </div>
-      </div>
-    </div>
+    <!-- Tagline (Caveat italic, soft slate) — replaces the deleted description paragraph -->
+    <p class="ob-tagline">{{ t('onboarding.welcomeTagline') }}</p>
 
     <!-- Currency question -->
     <div class="ob-currency-question">
@@ -106,7 +79,7 @@ async function handleStart() {
 
     <!-- Progress dots -->
     <div class="mb-8 sm:mb-10">
-      <OnboardingProgressPips :current="1" :total="3" />
+      <OnboardingProgressPips :current="1" :total="6" />
     </div>
 
     <!-- CTA -->
@@ -244,76 +217,21 @@ async function handleStart() {
   }
 }
 
-.ob-description {
-  color: var(--deep-slate, #2c3e50);
-  font-size: 0.8rem;
-  line-height: 1.6;
-  margin-bottom: 28px;
-  max-width: 400px;
-  opacity: 0.5;
-  position: relative;
-  z-index: 1;
-}
-
-.dark .ob-description {
-  color: #cbd5e1;
-}
-
-@media (width >= 640px) {
-  .ob-description {
-    font-size: 0.95rem;
-    margin-bottom: 40px;
-  }
-}
-
-.ob-pillars {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 28px;
+.ob-tagline {
+  color: var(--terracotta, #e67e22);
+  font-family: Caveat, cursive;
+  font-size: 1.25rem;
+  font-style: italic;
+  font-weight: 500;
+  margin-bottom: 24px;
   position: relative;
   z-index: 1;
 }
 
 @media (width >= 640px) {
-  .ob-pillars {
-    gap: 16px;
-    margin-bottom: 36px;
-  }
-}
-
-.ob-pillar-card {
-  background: white;
-  border-radius: 14px;
-  box-shadow: 0 2px 10px rgb(44 62 80 / 5%);
-  padding: 10px 14px;
-  text-align: center;
-}
-
-.dark .ob-pillar-card {
-  background: #243342;
-  box-shadow: 0 2px 10px rgb(0 0 0 / 20%);
-}
-
-@media (width >= 640px) {
-  .ob-pillar-card {
-    border-radius: 16px;
-    box-shadow: 0 4px 16px rgb(44 62 80 / 6%);
-    padding: 12px 20px;
-  }
-}
-
-.ob-pillar-label {
-  font-family: Outfit, sans-serif;
-  font-size: 0.55rem;
-  font-weight: 600;
-  margin-top: 3px;
-  opacity: 0.5;
-}
-
-@media (width >= 640px) {
-  .ob-pillar-label {
-    font-size: 0.65rem;
-    margin-top: 4px;
+  .ob-tagline {
+    font-size: 1.4rem;
+    margin-bottom: 32px;
   }
 }
 

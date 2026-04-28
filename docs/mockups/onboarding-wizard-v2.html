@@ -1,0 +1,1828 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>onboarding wizard v2 — beanies.family mockup</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Caveat:ital,wght@0,500;0,600;1,500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --heritage-orange: #f15d22;
+        --terracotta: #e67e22;
+        --golden: #f4b942;
+        --deep-slate: #2c3e50;
+        --slate-soft: #4a5d72;
+        --sky-silk: #aed6f1;
+        --sky-silk-soft: #eaf4fb;
+        --cloud-white: #f8f9fa;
+        --cream: #fffaf3;
+        --soft-green: #27ae60;
+        --soft-green-soft: #e8f7ee;
+        --slate-50: #f8fafc;
+        --slate-100: #f1f5f9;
+        --slate-200: #e2e8f0;
+        --slate-300: #cbd5e1;
+        --slate-400: #94a3b8;
+        --slate-500: #64748b;
+        --slate-600: #475569;
+        --slate-700: #334155;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        font-family: 'Inter', sans-serif;
+        background:
+          radial-gradient(ellipse at 15% 0%, #ffe8d4 0%, transparent 55%),
+          radial-gradient(ellipse at 85% 100%, var(--sky-silk-soft) 0%, transparent 55%),
+          radial-gradient(ellipse at 50% 50%, #fff8ef 0%, var(--cream) 100%);
+        color: var(--deep-slate);
+        min-height: 100vh;
+        padding: 48px 24px 96px;
+        -webkit-font-smoothing: antialiased;
+      }
+      .page { max-width: 1240px; margin: 0 auto; }
+
+      header.page-header {
+        text-align: center;
+        margin-bottom: 8px;
+      }
+      header.page-header h1 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 30px;
+        margin: 0;
+        letter-spacing: -0.012em;
+      }
+      header.page-header .meta {
+        font-size: 12.5px;
+        color: var(--slate-500);
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      header.page-header .meta strong { color: var(--heritage-orange); font-weight: 600; }
+      header.page-header .lede {
+        font-size: 14.5px;
+        color: var(--slate-soft);
+        max-width: 720px;
+        margin: 12px auto 0;
+        line-height: 1.6;
+      }
+      header.page-header .lede code {
+        background: #fdf3e7;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+      }
+
+      .variant-toggle {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        background: white;
+        padding: 5px;
+        border-radius: 999px;
+        border: 1px solid #fdf3e7;
+        margin: 22px auto 8px;
+        box-shadow: 0 4px 14px -6px rgba(241, 93, 34, 0.18);
+        max-width: 100%;
+      }
+      .variant-toggle button {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 500;
+        font-size: 12.5px;
+        padding: 9px 14px;
+        border: none;
+        background: transparent;
+        color: var(--slate-500);
+        border-radius: 999px;
+        cursor: pointer;
+        transition: all 0.18s ease;
+        white-space: nowrap;
+      }
+      .variant-toggle button.active {
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        color: white;
+        box-shadow: 0 4px 12px -4px rgba(241, 93, 34, 0.55);
+      }
+
+      .stage {
+        display: grid;
+        grid-template-columns: minmax(0, 480px) minmax(280px, 380px);
+        gap: 32px;
+        align-items: start;
+        justify-content: center;
+        margin-top: 28px;
+      }
+      @media (max-width: 980px) {
+        .stage { grid-template-columns: 1fr; max-width: 500px; margin: 28px auto 0; }
+      }
+
+      /* ─── Modal frame: matches existing onboarding wizard ─────── */
+      .modal-frame {
+        border-radius: 24px;
+        box-shadow: 0 20px 60px rgba(44, 62, 80, 0.25);
+        width: 100%;
+        max-width: 480px;
+        overflow: hidden;
+        position: relative;
+        min-height: 640px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Per-step gradient backgrounds (matches OnboardingWelcome / Money / Family / Complete) */
+      .frame-bg-welcome {
+        background: linear-gradient(180deg, var(--cloud-white) 0%, #edf6fc 100%);
+      }
+      .frame-bg-money {
+        background: linear-gradient(180deg, var(--cloud-white) 0%, #fff5ec 100%);
+      }
+      .frame-bg-family {
+        background: linear-gradient(180deg, var(--cloud-white) 0%, #f3eafb 100%);
+      }
+      .frame-bg-complete {
+        background: linear-gradient(180deg, var(--cloud-white) 0%, #fef0e8 100%);
+      }
+
+      /* Two ambient blobs in corners (matches existing pattern) */
+      .frame-bg::before, .frame-bg::after {
+        content: '';
+        border-radius: 50%;
+        position: absolute;
+        z-index: 0;
+        pointer-events: none;
+      }
+      .frame-bg::before {
+        background: radial-gradient(circle, rgb(174 214 241 / 25%), transparent 70%);
+        bottom: -100px;
+        left: -100px;
+        height: 360px;
+        width: 360px;
+      }
+      .frame-bg::after {
+        background: radial-gradient(circle, rgb(241 93 34 / 10%), transparent 70%);
+        right: -60px;
+        top: -60px;
+        height: 280px;
+        width: 280px;
+      }
+      .frame-bg-family::before { background: radial-gradient(circle, rgb(155 89 182 / 18%), transparent 70%); }
+      .frame-bg-complete::before { background: radial-gradient(circle, rgb(244 185 66 / 22%), transparent 70%); }
+
+      /* Floating decorative emojis (matches existing) */
+      .float-emoji {
+        opacity: 0.12;
+        position: absolute;
+        z-index: 0;
+        animation: ob-float 5s ease-in-out infinite;
+      }
+      @keyframes ob-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
+      }
+
+      .frame-body {
+        padding: 30px 28px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        z-index: 1;
+      }
+
+      .frame-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        border-top: 1px solid rgb(15 23 42 / 5%);
+        background: white;
+        position: relative;
+        z-index: 2;
+      }
+      .nav-back, .nav-skip {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--slate-400);
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 8px;
+      }
+      .nav-skip { font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
+      .nav-back:hover, .nav-skip:hover { color: var(--slate-soft); }
+      .nav-next {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        color: white;
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        border: none;
+        border-radius: 999px;
+        padding: 10px 22px;
+        cursor: pointer;
+        box-shadow: 0 4px 14px -4px rgba(241, 93, 34, 0.5);
+        transition: transform 0.15s;
+      }
+      .nav-next:hover { transform: translateY(-1px); }
+      .nav-right { display: flex; align-items: center; gap: 10px; }
+
+      /* Pulse-glow on welcome + complete primary CTA */
+      .pulse-glow {
+        animation: pulse-glow 3s ease-in-out infinite;
+      }
+      @keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 8px 32px rgba(241, 93, 34, 0.25); }
+        50% { box-shadow: 0 8px 32px rgba(241, 93, 34, 0.25), 0 0 20px 8px rgba(241, 93, 34, 0.10); }
+      }
+
+      /* ─── Welcome step ────────────────────────────────────────── */
+      .welcome-stack {
+        align-items: center;
+        text-align: center;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0;
+      }
+      .welcome-mascot {
+        width: 160px;
+        height: 160px;
+        background: radial-gradient(circle at 50% 38%, rgba(241, 93, 34, 0.18), transparent 70%);
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 100px;
+        animation: ob-float 4s ease-in-out infinite;
+        margin-bottom: 14px;
+      }
+      .welcome-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 28px;
+        margin: 0;
+        line-height: 1.05;
+        letter-spacing: -0.018em;
+      }
+      .welcome-title em {
+        font-style: normal;
+        color: var(--heritage-orange);
+        font-weight: 800;
+      }
+      .welcome-sub {
+        font-family: 'Caveat', cursive;
+        font-style: italic;
+        font-size: 24px;
+        color: var(--terracotta);
+        font-weight: 600;
+        margin: 8px 0 24px;
+      }
+      .currency-block {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 28px;
+      }
+      .currency-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--slate-soft);
+        opacity: 0.5;
+      }
+      .currency-select {
+        appearance: none;
+        background: white;
+        border: 2px solid rgba(44, 62, 80, 0.08);
+        border-radius: 16px;
+        box-shadow: 0 2px 10px rgba(44, 62, 80, 0.05);
+        color: var(--deep-slate);
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+        min-width: 220px;
+        padding: 11px 36px 11px 18px;
+        cursor: pointer;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%2394a3b8' stroke-width='2' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/></svg>");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+      }
+      .welcome-cta {
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        border: none;
+        border-radius: 60px;
+        color: white;
+        cursor: pointer;
+        font-family: 'Outfit', sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        padding: 14px 36px;
+        transition: transform 0.2s;
+      }
+      .welcome-cta:hover { transform: translateY(-2px); }
+      .welcome-meta {
+        font-family: 'Outfit', sans-serif;
+        font-style: italic;
+        font-size: 11px;
+        color: var(--slate-400);
+        margin-top: 14px;
+      }
+
+      /* ─── Step heading (steps 2-5) ─────────────────────────────── */
+      .step-emoji {
+        font-size: 38px;
+        text-align: center;
+        margin-bottom: 4px;
+      }
+      .step-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        text-align: center;
+        margin: 0 0 6px;
+        letter-spacing: -0.012em;
+      }
+      .step-title em { font-style: normal; color: var(--heritage-orange); }
+      .step-sub {
+        font-family: 'Caveat', cursive;
+        font-style: italic;
+        font-size: 18px;
+        color: var(--terracotta);
+        text-align: center;
+        margin: 0 0 18px;
+        font-weight: 500;
+      }
+
+      /* progress pips at top of body */
+      .progress-pips {
+        display: flex;
+        gap: 6px;
+        justify-content: center;
+        margin-bottom: 12px;
+      }
+      .pip {
+        width: 22px;
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(44, 62, 80, 0.12);
+        transition: all 0.3s;
+      }
+      .pip.active { background: var(--heritage-orange); width: 32px; }
+      .pip.done { background: rgba(241, 93, 34, 0.35); }
+
+      /* form fields */
+      .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+      .field-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--slate-soft);
+        opacity: 0.55;
+      }
+      .field-input, .field-select {
+        font-family: 'Inter', sans-serif;
+        font-size: 13.5px;
+        color: var(--deep-slate);
+        background: white;
+        border: 1.5px solid rgba(44, 62, 80, 0.08);
+        border-radius: 14px;
+        padding: 10px 14px;
+        outline: none;
+        box-shadow: 0 2px 10px rgba(44, 62, 80, 0.04);
+      }
+      .field-input:focus, .field-select:focus {
+        border-color: var(--heritage-orange);
+        box-shadow: 0 0 0 3px rgba(241, 93, 34, 0.12);
+      }
+      .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+      .add-pill {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 12px;
+        color: white;
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        border: none;
+        border-radius: 999px;
+        padding: 8px 18px;
+        cursor: pointer;
+        align-self: flex-end;
+        margin-top: 8px;
+        box-shadow: 0 4px 12px -4px rgba(241, 93, 34, 0.4);
+      }
+      .add-pill:hover { transform: translateY(-1px); }
+      .add-pill.full { align-self: stretch; width: 100%; text-align: center; }
+
+      /* ─── Inline cards (matches OnboardingMoney/Family ob-recurring-card / ob-activity-card) ─── */
+      .ob-card {
+        background: white;
+        border: 2px solid rgba(44, 62, 80, 0.05);
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 2px 12px rgba(44, 62, 80, 0.04);
+        margin-top: 4px;
+      }
+      .ob-card-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .ob-card-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+      .ob-card-icon.tone-sky    { background: rgba(174, 214, 241, 0.20); }
+      .ob-card-icon.tone-orange { background: rgba(241, 93, 34, 0.08); }
+      .ob-card-icon.tone-green  { background: rgba(39, 174, 96, 0.10); }
+      .ob-card-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 14.5px;
+        color: var(--deep-slate);
+        letter-spacing: -0.01em;
+      }
+      .ob-card-title-meta {
+        font-family: 'Inter', sans-serif;
+        font-size: 11px;
+        color: var(--slate-soft);
+        opacity: 0.5;
+        margin-top: 1px;
+      }
+
+      /* small uppercase detail labels inside the card (matches ob-detail-label) */
+      .ob-detail-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 9.5px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--slate-soft);
+        opacity: 0.45;
+        margin-bottom: 5px;
+      }
+
+      /* description input (recurring card) — softer chip-style fill */
+      .ob-desc-input {
+        width: 100%;
+        background: rgba(44, 62, 80, 0.04);
+        border: 1.5px solid rgba(44, 62, 80, 0.08);
+        border-radius: 12px;
+        padding: 8px 12px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 13.5px;
+        font-weight: 700;
+        color: var(--deep-slate);
+        outline: none;
+      }
+      .ob-desc-input:focus { border-color: var(--heritage-orange); }
+
+      /* mini-select inside card header (account picker for recurring) */
+      .ob-mini-select {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        background: white;
+        border: 1.5px solid rgba(44, 62, 80, 0.08);
+        border-radius: 12px;
+        padding: 7px 28px 7px 10px;
+        color: var(--deep-slate);
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%232c3e50' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+        background-position: right 8px center;
+        background-repeat: no-repeat;
+        box-shadow: 0 1px 4px rgba(44, 62, 80, 0.04);
+        min-width: 150px;
+      }
+
+      /* Section A account grid (matches ob-account-grid) */
+      .ob-account-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        align-items: end;
+      }
+      @media (max-width: 480px) {
+        .ob-account-grid { grid-template-columns: 1fr; }
+      }
+
+      /* Bank combobox-style trigger (mockup approximation of BaseCombobox) */
+      .ob-combo-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        background: white;
+        border: 1.5px solid rgba(44, 62, 80, 0.08);
+        border-radius: 14px;
+        padding: 10px 12px;
+        font-family: 'Inter', sans-serif;
+        font-size: 13.5px;
+        color: var(--deep-slate);
+        cursor: pointer;
+        box-shadow: 0 1px 4px rgba(44, 62, 80, 0.04);
+      }
+      .ob-combo-trigger.placeholder { color: rgba(44, 62, 80, 0.4); font-weight: 500; }
+      .ob-combo-caret { opacity: 0.4; font-size: 11px; }
+
+      /* Currency-amount input pair (mockup approximation of CurrencyAmountInput) */
+      .ob-currency-amount {
+        display: grid;
+        grid-template-columns: 76px 1fr;
+        gap: 6px;
+      }
+      .ob-currency-pill {
+        background: white;
+        border: 1.5px solid rgba(44, 62, 80, 0.08);
+        border-radius: 14px;
+        padding: 10px 8px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 12.5px;
+        color: var(--deep-slate);
+        text-align: center;
+        cursor: pointer;
+        box-shadow: 0 1px 4px rgba(44, 62, 80, 0.04);
+      }
+      .ob-amount-input {
+        background: white;
+        border: 1.5px solid rgba(44, 62, 80, 0.08);
+        border-radius: 14px;
+        padding: 10px 12px;
+        font-family: 'Inter', sans-serif;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--deep-slate);
+        outline: none;
+        text-align: right;
+        box-shadow: 0 1px 4px rgba(44, 62, 80, 0.04);
+      }
+
+      /* Auto-generated name preview (faded, opacity 0.35) */
+      .ob-name-preview-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 12px;
+      }
+      .ob-name-preview {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--deep-slate);
+        opacity: 0.35;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+        flex: 1;
+      }
+
+      /* Days/Member/Time row (matches ob-days-member-time-row) */
+      .ob-days-member-time-row {
+        display: grid;
+        grid-template-columns: 1fr 110px 200px;
+        gap: 10px;
+        align-items: start;
+        margin-bottom: 12px;
+      }
+      @media (max-width: 600px) {
+        .ob-days-member-time-row { grid-template-columns: 1fr; }
+      }
+      .ob-day-pills {
+        display: flex;
+        gap: 4px;
+      }
+      .ob-day-pill {
+        flex: 1;
+        min-width: 0;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--slate-soft);
+        background: rgba(44, 62, 80, 0.04);
+        border: 1.5px solid transparent;
+        border-radius: 10px;
+        padding: 7px 0;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.15s;
+      }
+      .ob-day-pill:hover { background: rgba(174, 214, 241, 0.18); }
+      .ob-day-pill.active {
+        background: rgba(241, 93, 34, 0.10);
+        border-color: var(--heritage-orange);
+        color: var(--heritage-orange);
+      }
+      .ob-time-pair {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .ob-time-input {
+        width: 100%;
+        background: white;
+        border: 1.5px solid rgba(44, 62, 80, 0.08);
+        border-radius: 12px;
+        padding: 8px 10px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--deep-slate);
+        text-align: center;
+        outline: none;
+        box-shadow: 0 1px 4px rgba(44, 62, 80, 0.04);
+        cursor: pointer;
+      }
+
+      /* Added-row (green confirmation row that appears after Add) */
+      .ob-added-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(39, 174, 96, 0.06);
+        border: 1.5px solid rgba(39, 174, 96, 0.20);
+        border-radius: 12px;
+        padding: 8px 12px;
+        margin-bottom: 6px;
+        margin-top: 12px;
+      }
+      .ob-added-icon { font-size: 16px; }
+      .ob-added-body { flex: 1; min-width: 0; }
+      .ob-added-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 12.5px;
+        color: var(--deep-slate);
+      }
+      .ob-added-meta {
+        font-family: 'Inter', sans-serif;
+        font-size: 11.5px;
+        color: var(--slate-soft);
+        opacity: 0.5;
+      }
+      .ob-added-tag {
+        background: rgba(44, 62, 80, 0.06);
+        border-radius: 6px;
+        padding: 2px 6px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 9.5px;
+        font-weight: 700;
+        color: var(--slate-soft);
+        text-transform: capitalize;
+      }
+      .ob-added-tick { color: var(--soft-green); font-weight: 800; font-size: 12px; }
+
+      /* recurring chips */
+      .chip-group { margin-bottom: 14px; }
+      .chip-group-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+      }
+      .chip-label-income { color: var(--soft-green); }
+      .chip-label-expense { color: var(--heritage-orange); }
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 11.5px;
+        color: var(--slate-soft);
+        background: white;
+        border: 1.5px solid rgba(44, 62, 80, 0.08);
+        border-radius: 999px;
+        padding: 6px 12px;
+        cursor: pointer;
+        transition: all 0.18s;
+        box-shadow: 0 2px 6px rgba(44, 62, 80, 0.04);
+      }
+      .chip-income:hover { border-color: var(--soft-green); color: var(--soft-green); }
+      .chip-expense:hover { border-color: var(--heritage-orange); color: var(--heritage-orange); }
+      .chip-custom { border-style: dashed; }
+
+      /* savings slider */
+      .savings-block {
+        background: var(--soft-green-soft);
+        border: 1.5px solid rgba(39, 174, 96, 0.18);
+        border-radius: 18px;
+        padding: 18px;
+        margin-bottom: 6px;
+      }
+      .savings-pct {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 36px;
+        color: var(--soft-green);
+        text-align: center;
+        margin: 0 0 4px;
+        letter-spacing: -0.02em;
+      }
+      .savings-of {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--slate-soft);
+        text-align: center;
+        margin: 0 0 14px;
+        opacity: 0.6;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .savings-track {
+        height: 8px;
+        background: white;
+        border-radius: 999px;
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 14px;
+        box-shadow: inset 0 1px 3px rgba(44, 62, 80, 0.08);
+      }
+      .savings-fill {
+        position: absolute;
+        inset: 0;
+        width: 22%;
+        background: linear-gradient(90deg, var(--soft-green), #4ec77e);
+        border-radius: 999px;
+      }
+      .savings-thumb {
+        position: absolute;
+        left: 22%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: white;
+        border: 3px solid var(--soft-green);
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
+      }
+      .savings-encourage {
+        font-family: 'Caveat', cursive;
+        font-size: 20px;
+        color: var(--soft-green);
+        text-align: center;
+        margin: 0;
+        font-weight: 600;
+      }
+      .savings-summary {
+        background: white;
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-family: 'Inter', sans-serif;
+        font-size: 12.5px;
+        color: var(--slate-soft);
+        text-align: center;
+        margin-top: 10px;
+      }
+      .savings-summary strong { color: var(--soft-green); font-weight: 700; }
+
+      /* ─── Complete step ────────────────────────────────────────── */
+      .complete-mascot {
+        width: 110px;
+        height: 110px;
+        margin: 0 auto 12px;
+        background: radial-gradient(circle at 50% 40%, rgba(244, 185, 66, 0.25), transparent 70%);
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 70px;
+        animation: ob-float 4s ease-in-out infinite;
+      }
+      .complete-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 24px;
+        text-align: center;
+        margin: 0 0 4px;
+        letter-spacing: -0.012em;
+      }
+      .complete-title em { font-style: normal; color: var(--heritage-orange); }
+      .complete-sub {
+        font-family: 'Caveat', cursive;
+        font-style: italic;
+        font-size: 18px;
+        color: var(--terracotta);
+        text-align: center;
+        margin: 0 0 18px;
+        font-weight: 500;
+      }
+
+      .summary-stats {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+      .stat-tile {
+        background: white;
+        border-radius: 14px;
+        padding: 12px;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(44, 62, 80, 0.05);
+        border: 1px solid rgba(44, 62, 80, 0.04);
+      }
+      .stat-num {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        margin: 0;
+        line-height: 1.05;
+      }
+      .stat-num.green { color: var(--soft-green); }
+      .stat-num.orange { color: var(--heritage-orange); }
+      .stat-num.silk { color: #2280b8; }
+      .stat-num.golden { color: #c98e1a; }
+      .stat-label {
+        font-family: 'Inter', sans-serif;
+        font-size: 11px;
+        color: var(--slate-soft);
+        margin: 4px 0 0;
+        opacity: 0.7;
+      }
+
+      /* invite section (Step 6 disclosure) */
+      .invite-card {
+        background: white;
+        border: 1.5px solid rgba(241, 93, 34, 0.2);
+        border-radius: 18px;
+        padding: 14px 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 4px 16px rgba(241, 93, 34, 0.06);
+      }
+      .invite-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .invite-head .icon {
+        font-size: 16px;
+      }
+      .invite-head .title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--deep-slate);
+      }
+      .invite-head .pill {
+        background: rgba(241, 93, 34, 0.1);
+        color: var(--heritage-orange);
+        font-family: 'Outfit', sans-serif;
+        font-size: 9.5px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-left: auto;
+      }
+      .invite-lede {
+        font-family: 'Inter', sans-serif;
+        font-size: 12px;
+        color: var(--slate-soft);
+        line-height: 1.5;
+        margin: 0 0 12px;
+      }
+      .invite-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .invite-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        background: var(--slate-50);
+        border-radius: 12px;
+        border: 1px solid rgba(44, 62, 80, 0.04);
+      }
+      .invite-row.sent {
+        background: var(--soft-green-soft);
+        border-color: rgba(39, 174, 96, 0.2);
+      }
+      .invite-row .avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        flex: 0 0 auto;
+      }
+      .invite-row .avatar.sarah { background: linear-gradient(135deg, #fde6d8, #ffd1b3); }
+      .invite-row .avatar.emma { background: linear-gradient(135deg, #d2dae2, #aed6f1); }
+      .invite-row .avatar.liam { background: linear-gradient(135deg, #d4f5e3, #a8e6c4); }
+      .invite-row .name {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--deep-slate);
+        min-width: 50px;
+      }
+      .invite-row .email-input {
+        flex: 1;
+        font-family: 'Inter', sans-serif;
+        font-size: 12px;
+        color: var(--deep-slate);
+        background: white;
+        border: 1px solid rgba(44, 62, 80, 0.08);
+        border-radius: 10px;
+        padding: 6px 10px;
+        outline: none;
+        min-width: 0;
+      }
+      .invite-row .email-input:focus {
+        border-color: var(--heritage-orange);
+      }
+      .invite-row .no-email {
+        font-family: 'Inter', sans-serif;
+        font-size: 11.5px;
+        font-style: italic;
+        color: var(--slate-400);
+        flex: 1;
+      }
+      .invite-row .send-btn {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 11px;
+        color: white;
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        border: none;
+        border-radius: 999px;
+        padding: 6px 12px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .invite-row .sent-badge {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 11px;
+        color: var(--soft-green);
+        background: white;
+        border: 1px solid rgba(39, 174, 96, 0.3);
+        border-radius: 999px;
+        padding: 5px 10px;
+        white-space: nowrap;
+      }
+      .invite-skip {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--slate-400);
+        background: none;
+        border: none;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        cursor: pointer;
+      }
+      .invite-reminder {
+        font-family: 'Caveat', cursive;
+        font-style: italic;
+        font-size: 16px;
+        color: var(--slate-soft);
+        text-align: center;
+        margin: 8px 0 0;
+        font-weight: 500;
+        opacity: 0.85;
+      }
+
+      .complete-cta {
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        border: none;
+        border-radius: 60px;
+        color: white;
+        cursor: pointer;
+        font-family: 'Outfit', sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        padding: 14px 32px;
+        box-shadow: 0 8px 32px rgba(241, 93, 34, 0.25);
+        align-self: center;
+        margin-top: 8px;
+        transition: transform 0.2s;
+      }
+      .complete-cta:hover { transform: translateY(-2px); }
+      .complete-meta {
+        font-family: 'Caveat', cursive;
+        font-style: italic;
+        font-size: 16px;
+        color: var(--terracotta);
+        text-align: center;
+        margin-top: 6px;
+        font-weight: 500;
+        opacity: 0.7;
+      }
+
+      /* ─── Changes panel (sidebar) ──────────────────────────────── */
+      .changes-panel {
+        background: white;
+        border: 1px solid #fdf3e7;
+        border-radius: 24px;
+        padding: 24px;
+        position: sticky;
+        top: 24px;
+        box-shadow: 0 8px 24px -10px rgba(15, 23, 42, 0.08);
+      }
+      .changes-panel h3 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        color: var(--deep-slate);
+        margin: 0 0 4px;
+      }
+      .changes-panel .step-tag {
+        display: inline-block;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--heritage-orange);
+        background: rgba(241, 93, 34, 0.1);
+        padding: 3px 9px;
+        border-radius: 999px;
+        letter-spacing: 0.04em;
+        margin-bottom: 12px;
+      }
+      .changes-panel ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .changes-panel li {
+        padding: 8px 0;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--slate-soft);
+        border-bottom: 1px dashed #fdf3e7;
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .changes-panel li:last-child { border-bottom: none; }
+      .changes-panel li::before {
+        content: '';
+        flex: 0 0 6px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        margin-top: 7px;
+      }
+      .changes-panel li.cut::before { background: var(--heritage-orange); }
+      .changes-panel li.add::before { background: var(--soft-green); }
+      .changes-panel li.tweak::before { background: var(--sky-silk); }
+      .changes-panel li strong { color: var(--deep-slate); font-weight: 600; }
+      .changes-panel li code {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11.5px;
+        background: var(--slate-50);
+        padding: 1px 5px;
+        border-radius: 4px;
+        color: var(--slate-700);
+      }
+      .legend {
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px dashed #fdf3e7;
+        display: flex;
+        gap: 14px;
+        font-size: 11px;
+        color: var(--slate-500);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .legend span { display: flex; align-items: center; gap: 5px; }
+      .legend span::before { content: ''; width: 8px; height: 8px; border-radius: 50%; }
+      .legend .l-cut::before { background: var(--heritage-orange); }
+      .legend .l-add::before { background: var(--soft-green); }
+      .legend .l-tweak::before { background: var(--sky-silk); }
+
+      .variant { display: none; }
+      .variant.active { display: grid; }
+
+      .footnote {
+        margin: 56px auto 0;
+        max-width: 720px;
+        text-align: center;
+        font-size: 12.5px;
+        color: var(--slate-400);
+        line-height: 1.6;
+      }
+      .footnote code {
+        font-family: 'JetBrains Mono', monospace;
+        background: var(--slate-50);
+        padding: 1px 5px;
+        border-radius: 4px;
+        color: var(--slate-700);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="page-header">
+        <div class="meta"><strong>onboarding wizard</strong> · v2 mockup · brand-faithful rebuild</div>
+        <h1>simpler structure, full visual fidelity</h1>
+        <p class="lede">
+          Same polished design language you've iterated on — the
+          <code>cloud-white→tinted</code> gradients, the floating decorative emojis, the Caveat
+          accents, the pulse-glow CTAs, the brand-colored section labels — but with the
+          <strong>3-in-1 Money step split into 3 focused screens</strong>, the Welcome decluttered
+          (paragraph + 3 pillar cards dropped), the Family step's "more things to explore" block
+          dropped, and a new optional <strong>Invite the rest?</strong> section on Complete that
+          uses per-member email rows reusing your existing <code>ShareInviteModal</code>.
+        </p>
+
+        <div class="variant-toggle">
+          <button class="active" data-variant="step1">1 · Welcome</button>
+          <button data-variant="step2">2 · Account</button>
+          <button data-variant="step3">3 · Recurring</button>
+          <button data-variant="step4">4 · Savings</button>
+          <button data-variant="step5">5 · Activity</button>
+          <button data-variant="step6">6 · Complete</button>
+        </div>
+      </header>
+
+      <!-- ═══ STEP 1 — WELCOME ═══════════════════════════════════ -->
+      <div class="variant active" data-variant="step1">
+        <div class="stage">
+          <div class="modal-frame frame-bg frame-bg-welcome">
+            <div class="float-emoji" style="top: 30px; left: 50px; font-size: 28px;">🥫</div>
+            <div class="float-emoji" style="top: 110px; right: 60px; font-size: 22px; animation-delay: 1s;">🐷</div>
+            <div class="float-emoji" style="bottom: 90px; left: 80px; font-size: 26px; animation-delay: 0.5s;">🌳</div>
+            <div class="frame-body">
+              <div class="welcome-stack">
+                <div class="welcome-mascot">🫂</div>
+                <h2 class="welcome-title">Welcome to <em>beanies</em>.family</h2>
+                <p class="welcome-sub">Let's set up your bean pod.</p>
+
+                <div class="currency-block">
+                  <div class="currency-label">Base currency</div>
+                  <select class="currency-select">
+                    <option>🇺🇸 USD · US Dollar</option>
+                  </select>
+                </div>
+
+                <button class="welcome-cta pulse-glow">Let's go 🫘</button>
+                <p class="welcome-meta">a few quick steps · about 2 minutes</p>
+              </div>
+            </div>
+          </div>
+
+          <aside class="changes-panel">
+            <span class="step-tag">Step 1 — Welcome</span>
+            <h3>What changed</h3>
+            <ul>
+              <li class="cut">
+                <strong>Removed: 33-word "your family's cozy corner..." paragraph.</strong> They've
+                already signed up — no re-pitch needed. A short Caveat-italic sub-hero ("Let's set
+                up your bean pod.") carries enough warmth.
+              </li>
+              <li class="cut">
+                <strong>Removed: 3 decorative pillar cards</strong> (🐷 Track money · 📅 Plan life ·
+                🌳 Grow together). Illustrative but not actionable; vertical clutter on the first
+                screen.
+              </li>
+              <li class="tweak">
+                <strong>Kept everything else verbatim</strong> — gradient bg, ambient blobs,
+                floating emoji decorations, hero mascot with float animation, currency picker, the
+                pulse-glow CTA, the Caveat-italic step-count subtitle. Same design vocabulary
+                you've iterated on.
+              </li>
+              <li class="tweak">
+                CTA <code>Let's Get This Pod Rolling 🥬</code> →
+                <strong>"Let's go 🫘"</strong>. Six chars, same intent, less try-hard.
+              </li>
+              <li class="tweak">
+                <code>just 3 quick steps · 2 minutes</code> →
+                <strong>"a few quick steps · about 2 minutes"</strong>. Avoids locking to a count
+                (the new flow is 5 working steps + complete).
+              </li>
+            </ul>
+            <div class="legend">
+              <span class="l-cut">cut</span><span class="l-add">added</span><span class="l-tweak">tweaked</span>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- ═══ STEP 2 — ACCOUNT ═══════════════════════════════════ -->
+      <div class="variant" data-variant="step2">
+        <div class="stage">
+          <div class="modal-frame frame-bg frame-bg-money">
+            <div class="float-emoji" style="top: 40px; left: 40px; font-size: 24px;">💰</div>
+            <div class="float-emoji" style="top: 130px; right: 50px; font-size: 20px; animation-delay: 1s;">🐷</div>
+            <div class="float-emoji" style="bottom: 100px; left: 60px; font-size: 22px; animation-delay: 0.5s;">🏦</div>
+            <div class="frame-body">
+              <div class="progress-pips">
+                <span class="pip active"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
+              </div>
+              <div class="step-emoji">🐷</div>
+              <h2 class="step-title">Add your first <em>account</em></h2>
+              <p class="step-sub">where your money lives.</p>
+
+              <!-- Bank + Balance grid first — easiest-to-answer fields up top.
+                   Bank is the most identifying / top-of-mind answer. -->
+              <div class="ob-account-grid" style="margin-bottom: 14px;">
+                <div>
+                  <div class="ob-detail-label">Bank</div>
+                  <div class="ob-combo-trigger">
+                    <span>OCBC</span>
+                    <span class="ob-combo-caret">▾</span>
+                  </div>
+                </div>
+                <div>
+                  <div class="ob-detail-label">Balance</div>
+                  <div class="ob-currency-amount">
+                    <div class="ob-currency-pill">SGD ▾</div>
+                    <input class="ob-amount-input" placeholder="0.00" value="2,450.00" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Account-type chips (FrequencyChips + accountTypeOptions) — placed below
+                   bank/balance so it reads bank → balance → type → preview/add. The chip
+                   selection feeds the auto-name preview directly underneath. -->
+              <div>
+                <div class="ob-detail-label">Type</div>
+                <div class="chip-row" style="margin-bottom: 12px;">
+                  <button class="chip chip-expense" style="border-color: var(--heritage-orange); color: var(--heritage-orange); background: rgba(241, 93, 34, 0.08);">🏦 Checking</button>
+                  <button class="chip chip-expense">💰 Savings</button>
+                  <button class="chip chip-expense">📈 Investment</button>
+                </div>
+              </div>
+
+              <!-- Auto-generated name preview (faded 35%) + Add pill — name is NOT manually entered;
+                   it's derived as `${owner}'s ${bank} ${type}` once Bank + Type are set. -->
+              <div class="ob-name-preview-row">
+                <div class="ob-name-preview">Greg's OCBC Checking</div>
+                <button class="add-pill" style="margin-top: 0; align-self: auto;">+ Add account</button>
+              </div>
+            </div>
+            <div class="frame-nav">
+              <button class="nav-back">← Back</button>
+              <div class="nav-right">
+                <button class="nav-skip">Skip for now</button>
+                <button class="nav-next">Next →</button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="changes-panel">
+            <span class="step-tag">Step 2 — Account</span>
+            <h3>What changed</h3>
+            <ul>
+              <li class="add">
+                <strong>Now its own dedicated screen.</strong> Was section A of the old "Money"
+                3-in-1 step. One focus, breathable.
+              </li>
+              <li class="tweak">
+                Section A header (letter badge + "drop in an account") → step's own emoji + title
+                + Caveat sub. Same hierarchy, less stacked text.
+              </li>
+              <li class="tweak">
+                <strong>Field order: easiest-to-answer first.</strong> Bank + Balance grid up top
+                (bank name is the most top-of-mind answer about any account), then Type chips
+                (🏦 Checking · 💰 Savings · 📈 Investment) just above the preview row so the
+                auto-name visually responds to the chip the user just tapped. The live wizard
+                puts chips on top — this flips the order to follow the same easy-first principle
+                used elsewhere in onboarding.
+              </li>
+              <li class="tweak">
+                Same components as production — the 2-col grid is still
+                <code>ob-account-grid</code>, the chip row is still <code>FrequencyChips</code>
+                with <code>accountTypeOptions</code>. Only the vertical order changed.
+              </li>
+              <li class="cut">
+                <strong>No manual "Account name" field.</strong> The live wizard never had one —
+                it auto-derives the name as <code>{owner}'s {bank} {type}</code> ("Greg's OCBC
+                Checking") and shows it faded at <code>opacity 0.35</code> as a preview before
+                Add. The earlier mockup added an unnecessary input; this restores the original
+                low-friction pattern.
+              </li>
+              <li class="tweak">
+                <strong>Component-faithful inputs preserved</strong>: bank picker is a
+                <code>BaseCombobox</code>-style trigger (white, rounded-xl, soft shadow, with
+                search + "Other" custom option in production), balance is a
+                <code>CurrencyAmountInput</code> pair (currency pill + right-aligned amount input).
+                Same dropdowns and styling as today.
+              </li>
+              <li class="tweak">
+                <strong>Visual language preserved</strong>: cloud-white → peach gradient, corner
+                ambient blobs, floating decorative emojis (💰 🐷 🏦), Outfit titles + Caveat
+                sub-heroes, white shadowed form inputs with heritage-orange focus states, gradient
+                pill add-button.
+              </li>
+              <li class="add">
+                "Skip for now" in the bottom nav — same pattern across all 4 setup-data screens.
+              </li>
+            </ul>
+            <div class="legend"><span class="l-cut">cut</span><span class="l-add">added</span><span class="l-tweak">tweaked</span></div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- ═══ STEP 3 — RECURRING ═════════════════════════════════ -->
+      <div class="variant" data-variant="step3">
+        <div class="stage">
+          <div class="modal-frame frame-bg frame-bg-money">
+            <div class="float-emoji" style="top: 36px; right: 50px; font-size: 24px;">💸</div>
+            <div class="float-emoji" style="top: 140px; left: 40px; font-size: 22px; animation-delay: 0.8s;">📅</div>
+            <div class="float-emoji" style="bottom: 100px; right: 60px; font-size: 20px; animation-delay: 0.4s;">🛒</div>
+            <div class="frame-body">
+              <div class="progress-pips">
+                <span class="pip done"></span><span class="pip active"></span><span class="pip"></span><span class="pip"></span>
+              </div>
+              <div class="step-emoji">💸</div>
+              <h2 class="step-title">Add a regular <em>transaction</em></h2>
+              <p class="step-sub">income or expense — the usual stuff.</p>
+
+              <!-- Two chip groups (matches RECURRING_INCOME_PRESETS + RECURRING_EXPENSE_PRESETS).
+                   Tapping a chip opens the inline card below (same flow as live OnboardingMoney). -->
+              <div class="chip-group">
+                <div class="chip-group-label chip-label-income">↑ Income</div>
+                <div class="chip-row">
+                  <button class="chip chip-income">💼 Salary</button>
+                  <button class="chip chip-income">📈 Freelance</button>
+                  <button class="chip chip-income">🎁 Gift / Other</button>
+                </div>
+              </div>
+              <div class="chip-group" style="margin-bottom: 16px;">
+                <div class="chip-group-label chip-label-expense">↓ Expenses</div>
+                <div class="chip-row">
+                  <button class="chip chip-expense">🏠 Rent</button>
+                  <button class="chip chip-expense">🛒 Groceries</button>
+                  <button class="chip chip-expense" style="border-color: var(--heritage-orange); color: var(--heritage-orange); background: rgba(241, 93, 34, 0.08);">⚡ Utilities</button>
+                  <button class="chip chip-expense">📱 Subscription</button>
+                  <button class="chip chip-expense">🚗 Transport</button>
+                  <button class="chip chip-expense chip-custom">+ Custom</button>
+                </div>
+              </div>
+
+              <!-- Inline card that appears when a chip is selected. Mirrors ob-recurring-card.
+                   Description input is editable and pre-filled with preset.defaultName. Account
+                   selector defaults to the most recently added account from Step 2. -->
+              <div class="ob-card">
+                <div class="ob-card-header">
+                  <div class="ob-card-icon tone-orange">⚡</div>
+                  <div style="flex: 1; min-width: 0;">
+                    <input class="ob-desc-input" value="Utilities" />
+                  </div>
+                  <select class="ob-mini-select">
+                    <option>Greg's OCBC Checking</option>
+                  </select>
+                </div>
+                <div class="row-2">
+                  <div>
+                    <div class="ob-detail-label">Amount</div>
+                    <div class="ob-currency-amount">
+                      <div class="ob-currency-pill">SGD ▾</div>
+                      <input class="ob-amount-input" value="180" />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="ob-detail-label">Frequency</div>
+                    <div class="chip-row" style="gap: 6px;">
+                      <button class="chip">🔄 Daily</button>
+                      <button class="chip" style="border-color: var(--heritage-orange); color: var(--heritage-orange); background: rgba(241, 93, 34, 0.08);">📅 Monthly</button>
+                      <button class="chip">📆 Yearly</button>
+                    </div>
+                  </div>
+                </div>
+                <button class="add-pill full">+ Add transaction</button>
+              </div>
+            </div>
+            <div class="frame-nav">
+              <button class="nav-back">← Back</button>
+              <div class="nav-right">
+                <button class="nav-skip">Skip for now</button>
+                <button class="nav-next">Next →</button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="changes-panel">
+            <span class="step-tag">Step 3 — Recurring</span>
+            <h3>What changed</h3>
+            <ul>
+              <li class="add">
+                <strong>Now its own dedicated screen.</strong> Was section B of the old "Money"
+                3-in-1 step. The income + expense chip rows get the room they deserve.
+              </li>
+              <li class="tweak">
+                <strong>Existing chip system preserved</strong>: green "↑ Income" group
+                (<code>RECURRING_INCOME_PRESETS</code>), orange "↓ Expenses" group
+                (<code>RECURRING_EXPENSE_PRESETS</code>), hover-to-color transitions, dashed
+                "+ Custom" tile.
+              </li>
+              <li class="tweak">
+                <strong>Inline expanded card on chip-select</strong>, mirroring
+                <code>ob-recurring-card</code> from the live wizard exactly:
+                <ul style="margin: 4px 0 0 16px; padding: 0;">
+                  <li><strong>Header row</strong>: tinted icon (orange for expense, green for
+                  income) + editable description input pre-filled with
+                  <code>preset.defaultName</code> + account selector defaulting to the most
+                  recently added account.</li>
+                  <li><strong>Amount + Frequency row</strong>: <code>CurrencyAmountInput</code>
+                  on the left (SGD ▾ pill + amount), <code>FrequencyChips</code> on the right
+                  (🔄 Daily · 📅 Monthly · 📆 Yearly).</li>
+                  <li><strong>Full-width "+ Add transaction" pill</strong> at the bottom; on add,
+                  the form clears and a green confirmation row appears (same as today).</li>
+                </ul>
+              </li>
+              <li class="cut">
+                <strong>No separate Add-Recurring modal.</strong> The card is inline so users
+                don't bounce in and out of a modal mid-step — same pattern as the live wizard.
+              </li>
+              <li class="add">
+                Same "Skip for now" escape hatch as Step 2.
+              </li>
+            </ul>
+            <div class="legend"><span class="l-cut">cut</span><span class="l-add">added</span><span class="l-tweak">tweaked</span></div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- ═══ STEP 4 — SAVINGS ═══════════════════════════════════ -->
+      <div class="variant" data-variant="step4">
+        <div class="stage">
+          <div class="modal-frame frame-bg frame-bg-money">
+            <div class="float-emoji" style="top: 36px; left: 50px; font-size: 22px;">🌱</div>
+            <div class="float-emoji" style="top: 130px; right: 60px; font-size: 24px; animation-delay: 0.7s;">🫘</div>
+            <div class="float-emoji" style="bottom: 110px; left: 70px; font-size: 20px; animation-delay: 0.3s;">🎯</div>
+            <div class="frame-body">
+              <div class="progress-pips">
+                <span class="pip done"></span><span class="pip done"></span><span class="pip active"></span><span class="pip"></span>
+              </div>
+              <div class="step-emoji">🌱</div>
+              <h2 class="step-title">Set a <em>savings goal</em></h2>
+              <p class="step-sub">how much of your income each month?</p>
+
+              <div class="savings-block">
+                <p class="savings-pct">22%</p>
+                <p class="savings-of">of your income</p>
+                <div class="savings-track">
+                  <div class="savings-fill"></div>
+                  <div class="savings-thumb"></div>
+                </div>
+                <p class="savings-encourage">Nice! 🌱</p>
+                <p class="savings-summary">
+                  That's <strong>$1,100 / month</strong> into your bean jar.
+                </p>
+              </div>
+            </div>
+            <div class="frame-nav">
+              <button class="nav-back">← Back</button>
+              <div class="nav-right">
+                <button class="nav-skip">Skip for now</button>
+                <button class="nav-next">Next →</button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="changes-panel">
+            <span class="step-tag">Step 4 — Savings</span>
+            <h3>What changed</h3>
+            <ul>
+              <li class="add">
+                <strong>Now its own dedicated screen.</strong> Was section C of the old "Money"
+                3-in-1 step. The slider + live "$X/month into your bean jar" preview becomes a
+                moment, not a third afterthought.
+              </li>
+              <li class="tweak">
+                <strong>Existing savings card preserved</strong>: soft-green wash + matching
+                slider + Caveat-italic encouragement ("Nice! 🌱") + the live amount summary tile.
+                Same brand voice, same visual.
+              </li>
+              <li class="tweak">
+                Default position 22% — matches existing logic. No data-shape change.
+              </li>
+            </ul>
+            <div class="legend"><span class="l-cut">cut</span><span class="l-add">added</span><span class="l-tweak">tweaked</span></div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- ═══ STEP 5 — ACTIVITY ══════════════════════════════════ -->
+      <div class="variant" data-variant="step5">
+        <div class="stage">
+          <div class="modal-frame frame-bg frame-bg-family">
+            <div class="float-emoji" style="top: 36px; right: 50px; font-size: 24px;">📅</div>
+            <div class="float-emoji" style="top: 130px; left: 50px; font-size: 22px; animation-delay: 0.8s;">⚽</div>
+            <div class="float-emoji" style="bottom: 100px; right: 60px; font-size: 20px; animation-delay: 0.4s;">🎨</div>
+            <div class="frame-body">
+              <div class="progress-pips">
+                <span class="pip done"></span><span class="pip done"></span><span class="pip done"></span><span class="pip active"></span>
+              </div>
+              <div class="step-emoji">📅</div>
+              <h2 class="step-title">Add an <em>activity</em></h2>
+              <p class="step-sub">lessons, sports, anything weekly. you can do this later from the planner.</p>
+
+              <!-- Activity-preset chips (ACTIVITY_PRESETS — 7 presets). Selecting a chip pre-fills
+                   the card below; the title comes from preset.defaultTitle and is NOT manually
+                   editable, matching the live OnboardingFamily.vue. -->
+              <div class="chip-group" style="margin-bottom: 14px;">
+                <div class="chip-row" style="justify-content: center;">
+                  <button class="chip" style="border-color: var(--heritage-orange); color: var(--heritage-orange); background: rgba(241, 93, 34, 0.08);">🎹 Piano</button>
+                  <button class="chip">🎾 Tennis</button>
+                  <button class="chip">🎨 Art</button>
+                  <button class="chip">💃 Dance</button>
+                  <button class="chip">📚 Tutoring</button>
+                  <button class="chip">🏫 After School</button>
+                  <button class="chip chip-custom">📓 Other</button>
+                </div>
+              </div>
+
+              <!-- Inline card on chip-select. Mirrors ob-activity-card.
+                   Header shows preset.icon + preset.defaultTitle (NON-editable, bold).
+                   Days + Who + Start/End time row, then Cost/month, then full-width Add. -->
+              <div class="ob-card">
+                <div class="ob-card-header">
+                  <div class="ob-card-icon tone-sky">🎹</div>
+                  <div>
+                    <div class="ob-card-title">Piano Lessons</div>
+                  </div>
+                </div>
+
+                <div class="ob-days-member-time-row">
+                  <div>
+                    <div class="ob-detail-label">Days</div>
+                    <div class="ob-day-pills">
+                      <button class="ob-day-pill">S</button>
+                      <button class="ob-day-pill">M</button>
+                      <button class="ob-day-pill active">T</button>
+                      <button class="ob-day-pill">W</button>
+                      <button class="ob-day-pill">T</button>
+                      <button class="ob-day-pill">F</button>
+                      <button class="ob-day-pill">S</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="ob-detail-label">Who</div>
+                    <select class="ob-mini-select" style="min-width: 0; width: 100%;">
+                      <option>🌱 Sophia</option>
+                      <option>🫘 Greg</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div class="ob-time-pair">
+                      <div>
+                        <div class="ob-detail-label">Start</div>
+                        <input class="ob-time-input" value="3:00 PM" />
+                      </div>
+                      <div>
+                        <div class="ob-detail-label">End</div>
+                        <input class="ob-time-input" value="4:00 PM" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="margin-top: 6px; margin-bottom: 12px;">
+                  <div class="ob-detail-label">Cost / month</div>
+                  <div class="ob-currency-amount" style="max-width: 240px;">
+                    <div class="ob-currency-pill">SGD ▾</div>
+                    <input class="ob-amount-input" placeholder="0 (optional)" />
+                  </div>
+                </div>
+
+                <button class="add-pill full">+ Add activity</button>
+              </div>
+            </div>
+            <div class="frame-nav">
+              <button class="nav-back">← Back</button>
+              <div class="nav-right">
+                <button class="nav-skip">Skip — add later</button>
+                <button class="nav-next">Next →</button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="changes-panel">
+            <span class="step-tag">Step 5 — Activity</span>
+            <h3>What changed</h3>
+            <ul>
+              <li class="cut">
+                <strong>Removed: "More things to explore" pillar block (section B).</strong> Four
+                unclickable cards (To-Do · Goals · Vacations · Pet Beans) advertising features —
+                pure visual clutter on a step that should be about adding ONE activity.
+              </li>
+              <li class="cut">
+                <strong>Removed: closing line "We built beanies to help you... so you can spend your
+                time on what's important — your little beans."</strong> Sales copy after the user
+                has already committed; doesn't earn its space here.
+              </li>
+              <li class="add">
+                <strong>Inline reassurance</strong> in the Caveat sub-hero: "you can do this later
+                from the planner." Same idea you flagged — make skipping painless.
+              </li>
+              <li class="tweak">
+                Skip-button copy <code>Skip for now</code> →
+                <strong>"Skip — add later"</strong>. Action-shaped + names where they'd find this
+                later (Planner).
+              </li>
+              <li class="tweak">
+                <strong>Activity-preset chips preserved</strong>: 🎹 Piano · 🎾 Tennis · 🎨 Art ·
+                💃 Dance · 📚 Tutoring · 🏫 After School · 📓 Other — same row as existing
+                <code>ACTIVITY_PRESETS</code>. Tapping a preset opens the inline activity card
+                below with its <code>defaultTitle</code> + icon + category pre-filled.
+              </li>
+              <li class="tweak">
+                <strong>Inline activity card mirrors <code>ob-activity-card</code> exactly</strong>:
+                <ul style="margin: 4px 0 0 16px; padding: 0;">
+                  <li><strong>Header</strong>: sky-silk-tinted icon + <code>preset.defaultTitle</code>
+                  shown as bold (NON-editable). The earlier mockup had an editable "Activity name"
+                  input — the live wizard never had one. Restored.</li>
+                  <li><strong>Days + Who + Time row</strong>: 7-day pill selector
+                  (<code>DayOfWeekSelector</code>) on the left, member dropdown in the middle (only
+                  shown when there's more than one human member), and a 2-col Start + End time pair
+                  on the right (two <code>TimePresetPicker</code>s — the earlier mockup only had a
+                  single "Time" input, which lost the duration). Restored.</li>
+                  <li><strong>Cost / month row</strong>: <code>CurrencyAmountInput</code>, capped
+                  at <code>max-w-[240px]</code> so it doesn't dominate; explicitly optional.</li>
+                  <li><strong>Full-width "+ Add activity" pill</strong> at the bottom; on add, a
+                  green confirmation row appears and the form resets.</li>
+                </ul>
+              </li>
+              <li class="tweak">
+                <strong>Visual language preserved</strong>: cloud-white → soft-purple gradient
+                (matches the existing Family-step bg), purple ambient blob in corner, floating
+                family-flavor emojis (📅 ⚽ 🎨), same form-field shape + brand focus states.
+              </li>
+            </ul>
+            <div class="legend"><span class="l-cut">cut</span><span class="l-add">added</span><span class="l-tweak">tweaked</span></div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- ═══ STEP 6 — COMPLETE ══════════════════════════════════ -->
+      <div class="variant" data-variant="step6">
+        <div class="stage">
+          <div class="modal-frame frame-bg frame-bg-complete">
+            <div class="float-emoji" style="top: 30px; left: 50px; font-size: 24px;">🎉</div>
+            <div class="float-emoji" style="top: 110px; right: 60px; font-size: 22px; animation-delay: 1s;">🫘</div>
+            <div class="float-emoji" style="bottom: 80px; left: 80px; font-size: 26px; animation-delay: 0.5s;">🌟</div>
+            <div class="frame-body">
+              <div class="complete-mascot">🎉</div>
+              <h2 class="complete-title">Your <em>bean pod</em> is ready!</h2>
+              <p class="complete-sub">all set — explore, add more, make beanies yours.</p>
+
+              <div class="summary-stats">
+                <div class="stat-tile">
+                  <p class="stat-num green">1</p>
+                  <p class="stat-label">Account</p>
+                </div>
+                <div class="stat-tile">
+                  <p class="stat-num orange">2</p>
+                  <p class="stat-label">Recurring</p>
+                </div>
+                <div class="stat-tile">
+                  <p class="stat-num silk">22%</p>
+                  <p class="stat-label">Savings</p>
+                </div>
+                <div class="stat-tile">
+                  <p class="stat-num golden">1</p>
+                  <p class="stat-label">Activity</p>
+                </div>
+              </div>
+
+              <!-- Invite section: per-member rows + send buttons -->
+              <div class="invite-card">
+                <div class="invite-head">
+                  <span class="icon">✉️</span>
+                  <span class="title">Invite the rest?</span>
+                  <span class="pill">Optional</span>
+                </div>
+                <p class="invite-lede">
+                  Each beanie gets their own link. Drop in their email and we'll generate a share
+                  link you can text or send right away.
+                </p>
+                <div class="invite-rows">
+                  <div class="invite-row">
+                    <div class="avatar sarah"></div>
+                    <span class="name">Sarah</span>
+                    <input class="email-input" type="email" placeholder="sarah@example.com" />
+                    <button class="send-btn">Send →</button>
+                  </div>
+                  <div class="invite-row">
+                    <div class="avatar emma"></div>
+                    <span class="name">Emma</span>
+                    <span class="no-email">no email — skip</span>
+                  </div>
+                  <div class="invite-row sent">
+                    <div class="avatar liam"></div>
+                    <span class="name">Liam</span>
+                    <input class="email-input" type="email" value="liam@example.com" disabled />
+                    <span class="sent-badge">✓ Sent</span>
+                  </div>
+                </div>
+                <div style="display: flex; justify-content: center;">
+                  <button class="invite-skip">Skip the rest</button>
+                </div>
+                <p class="invite-reminder">
+                  ✨ you can always invite anytime later from My Pod
+                </p>
+              </div>
+
+              <button class="complete-cta pulse-glow">Enter the Nook 🏡</button>
+              <p class="complete-meta">go take care of your beans — we'll handle the rest. 🫘</p>
+            </div>
+          </div>
+
+          <aside class="changes-panel">
+            <span class="step-tag">Step 6 — Complete</span>
+            <h3>What changed</h3>
+            <ul>
+              <li class="add">
+                <strong>NEW: per-member invite section.</strong> Each row = one family member added
+                in setup: avatar + name + email field + "Send →" button. Click Send →
+                opens the existing <code>ShareInviteModal</code> (you've already polished it —
+                WhatsApp / Telegram / SMS / Messenger / WeChat / Email / Copy + QR channel grid)
+                pre-filled with that member's email and a pre-generated invite link via
+                <code>useInviteFlow</code>. After share, row gets a "✓ Sent" badge and the email
+                input locks.
+              </li>
+              <li class="add">
+                <strong>Children with no email</strong> render an inline "no email — skip" hint —
+                no Send button, doesn't block. Per the <code>isTemporaryEmail()</code> check or a
+                blank-email member added in setup.
+              </li>
+              <li class="add">
+                <strong>"✨ you can always invite anytime later from My Pod" Caveat-italic
+                reminder</strong> — soft footer below the rows so users feel safe skipping.
+              </li>
+              <li class="add">
+                <strong>"Skip the rest" link</strong> bypasses the whole section without finishing
+                — same skip pattern as setup-data steps. The main "Enter the Nook 🏡" CTA works
+                regardless of whether 0/some/all invites were sent.
+              </li>
+              <li class="tweak">
+                <strong>Visual language preserved</strong>: cloud-white → peach gradient, golden
+                ambient blob in corner, celebratory floating emoji (🎉 🫘 🌟), 110px hero mascot
+                with float animation, summary-stat tiles, pulse-glow primary CTA, Caveat-italic
+                sign-off line "go take care of your beans..." below the CTA.
+              </li>
+              <li class="tweak">
+                <strong>Disclosure NOT needed</strong> — invite section renders inline (open) by
+                default, since it's the natural last action on this screen. The "Optional" pill
+                + "Skip the rest" link cover the bypass without hiding the rows.
+              </li>
+              <li class="cut">
+                Section only renders when <strong>storage is Drive AND ≥1 invitable member exists</strong>.
+                Local-storage pods have no shareable file; lone-owner pods have nobody to invite.
+              </li>
+            </ul>
+            <div class="legend"><span class="l-cut">cut</span><span class="l-add">added</span><span class="l-tweak">tweaked</span></div>
+          </aside>
+        </div>
+      </div>
+
+      <p class="footnote">
+        Mockup. Not yet wired. The 6-step structure means
+        <code>OnboardingWizard.vue</code>'s <code>currentStep</code> goes from 4 → 6, and the
+        existing <code>OnboardingMoney.vue</code> splits into <code>OnboardingAccount.vue</code> /
+        <code>OnboardingRecurring.vue</code> / <code>OnboardingSavings.vue</code> (or stays one
+        component with internal sub-step state — implementation call). Step 6's invite rows
+        consume the existing <code>useInviteFlow</code> + <code>ShareInviteModal</code> — no new
+        invite-flow logic required.
+      </p>
+    </div>
+
+    <script>
+      const buttons = document.querySelectorAll('.variant-toggle button');
+      const variants = document.querySelectorAll('.variant');
+      buttons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          buttons.forEach((b) => b.classList.remove('active'));
+          variants.forEach((v) => v.classList.remove('active'));
+          btn.classList.add('active');
+          const target = btn.dataset.variant;
+          document.querySelectorAll(`.variant[data-variant="${target}"]`).forEach((v) => v.classList.add('active'));
+        });
+      });
+    </script>
+  </body>
+</html>
