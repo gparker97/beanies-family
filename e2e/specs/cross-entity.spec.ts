@@ -189,11 +189,24 @@ test.describe('Onboarding Wizard', () => {
     // Should show the added account list with "Add Another" button
     await expect(page.getByText(/add another/i)).toBeVisible({ timeout: 15000 });
 
-    // --- Step 2 → Step 3: Activity presets (from onboarding test #6) ---
-    await page.getByTestId('onboarding-next').click();
-    await expect(page.getByText(/family life/i)).toBeVisible({ timeout: 15000 });
+    // Wizard is now 6 steps: Welcome → Account → Recurring → Savings →
+    // Activity → Complete. Each data-entry step (2-5) is optional, so we
+    // skip past them with `onboarding-next` and assert on the title text
+    // that uniquely identifies the next step's header.
 
-    // --- Step 3 → Completion screen (from onboarding test #8) ---
+    // --- Step 2 → Step 3: Recurring transactions ---
+    await page.getByTestId('onboarding-next').click();
+    await expect(page.getByText(/Add a regular/i).first()).toBeVisible({ timeout: 15000 });
+
+    // --- Step 3 → Step 4: Savings goal ---
+    await page.getByTestId('onboarding-next').click();
+    await expect(page.getByText(/savings goal/i).first()).toBeVisible({ timeout: 15000 });
+
+    // --- Step 4 → Step 5: Activity presets ---
+    await page.getByTestId('onboarding-next').click();
+    await expect(page.getByText(/Add an /i).first()).toBeVisible({ timeout: 15000 });
+
+    // --- Step 5 → Step 6: Completion screen ---
     await page.getByTestId('onboarding-next').click();
     await page.getByTestId('onboarding-finish').waitFor({ state: 'visible', timeout: 15000 });
 
