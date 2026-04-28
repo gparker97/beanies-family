@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-27",
-    "translationCount": 2566
+    "lastUpdated": "2026-04-28",
+    "translationCount": 2578
   },
   "translations": {
     "app.name": {
@@ -3071,20 +3071,15 @@
       "hash": "1g60t",
       "lastUpdated": "2026-03-03"
     },
-    "mobile.piggyBank": {
-      "translation": "小猪存钱罐",
-      "hash": "37zgyk",
-      "lastUpdated": "2026-03-03"
-    },
     "mobile.budget": {
       "translation": "预算",
       "hash": "x3510l",
       "lastUpdated": "2026-03-03"
     },
     "mobile.pod": {
-      "translation": "科",
-      "hash": "yohf9g",
-      "lastUpdated": "2026-03-03"
+      "translation": "吊舱",
+      "hash": "1q1x",
+      "lastUpdated": "2026-04-28"
     },
     "mobile.menu": {
       "translation": "菜单",
@@ -6761,11 +6756,6 @@
       "hash": "17pqxl",
       "lastUpdated": "2026-03-08"
     },
-    "mobile.todo": {
-      "translation": "待办事项",
-      "hash": "1c6kgt",
-      "lastUpdated": "2026-03-08"
-    },
     "family.hub.statBeans": {
       "translation": "豆类",
       "hash": "1jqegz",
@@ -8579,16 +8569,6 @@
     "action.saveAndClose": {
       "translation": "保存&关闭",
       "hash": "58ycwr",
-      "lastUpdated": "2026-03-21"
-    },
-    "mobile.activities": {
-      "translation": "活动",
-      "hash": "46kgs3",
-      "lastUpdated": "2026-03-21"
-    },
-    "mobile.travel": {
-      "translation": "旅行",
-      "hash": "tguthi",
       "lastUpdated": "2026-03-21"
     },
     "travel.title": {
@@ -12835,6 +12815,86 @@
       "translation": "完成",
       "hash": "19s4i",
       "lastUpdated": "2026-04-27"
+    },
+    "mobile.planning": {
+      "translation": "规划",
+      "hash": "vzgqyl",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobile.money": {
+      "translation": "金钱",
+      "hash": "18ddb4",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.activities": {
+      "translation": "计划，日程安排，日志",
+      "hash": "w2thwc",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.todo": {
+      "translation": "共享的家庭任务",
+      "hash": "90a5rh",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.travel": {
+      "translation": "行程和创意",
+      "hash": "8w2z74",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.overview": {
+      "translation": "最低标准",
+      "hash": "cfamjo",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.accounts": {
+      "translation": "支票，储蓄，卡片",
+      "hash": "lftvks",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.budgets": {
+      "translation": "每月跟踪",
+      "hash": "vtjuaf",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.transactions": {
+      "translation": "收入和支出",
+      "hash": "gwkt64",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.goals": {
+      "translation": "储蓄目标",
+      "hash": "wrwbxh",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.assets": {
+      "translation": "家、汽车等",
+      "hash": "8731us",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.meetBeans": {
+      "translation": "pod中的每个人",
+      "hash": "9jdfqo",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.scrapbook": {
+      "translation": "照片和回忆",
+      "hash": "q1w36g",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.cookbook": {
+      "translation": "家庭食谱",
+      "hash": "6885wp",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.safety": {
+      "translation": "药物、过敏、剂量",
+      "hash": "gg1gch",
+      "lastUpdated": "2026-04-28"
+    },
+    "mobileNav.hint.contacts": {
+      "translation": "联系人信息",
+      "hash": "irc0k5",
+      "lastUpdated": "2026-04-28"
     }
   }
 }

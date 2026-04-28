@@ -3704,14 +3704,32 @@ const STRING_DEFS = {
   'nook.spent': { en: 'Spent', beanie: 'spent' },
   'nook.received': { en: 'Received', beanie: 'received' },
 
-  // Mobile navigation
+  // Mobile navigation — v3 bottom nav uses 4 category tabs.
   'mobile.nook': { en: 'Nook', beanie: 'nook' },
-  'mobile.todo': { en: 'To-Do', beanie: 'to-do' },
-  'mobile.activities': { en: 'Activities', beanie: 'activities' },
-  'mobile.travel': { en: 'Travel', beanie: 'travel' },
-  'mobile.piggyBank': { en: 'Piggy Bank', beanie: 'piggy bank' },
+  'mobile.planning': { en: 'Planning', beanie: 'planning' },
+  'mobile.money': { en: 'Money', beanie: 'money' },
+  'mobile.pod': { en: 'Pod', beanie: 'your pod' },
   'mobile.budget': { en: 'Budget', beanie: 'budget' },
-  'mobile.pod': { en: 'Family', beanie: 'your pod' },
+  // v3 side-card hint copy. Each line is a one-line preview of what the
+  // user finds on the route, capped at ~22 chars to never wrap on a
+  // 360px phone. See docs/mockups/mobile-nav-bean-jar-v3.html.
+  'mobileNav.hint.activities': { en: 'plan, schedule, log', beanie: 'plan, schedule, log' },
+  'mobileNav.hint.todo': { en: 'shared family tasks', beanie: 'shared family tasks' },
+  'mobileNav.hint.travel': { en: 'trips & ideas', beanie: 'trips & ideas' },
+  'mobileNav.hint.overview': { en: 'your bottom line', beanie: 'your bottom line' },
+  'mobileNav.hint.accounts': {
+    en: 'checking, savings, cards',
+    beanie: 'checking, savings, cards',
+  },
+  'mobileNav.hint.budgets': { en: 'tracked monthly', beanie: 'tracked monthly' },
+  'mobileNav.hint.transactions': { en: 'income & expenses', beanie: 'income & expenses' },
+  'mobileNav.hint.goals': { en: 'savings targets', beanie: 'savings targets' },
+  'mobileNav.hint.assets': { en: 'home, cars, and more', beanie: 'home, cars, and more' },
+  'mobileNav.hint.meetBeans': { en: 'everyone in the pod', beanie: 'everyone in the pod' },
+  'mobileNav.hint.scrapbook': { en: 'photos & memories', beanie: 'photos & memories' },
+  'mobileNav.hint.cookbook': { en: 'family recipes', beanie: 'family recipes' },
+  'mobileNav.hint.safety': { en: 'meds, allergies, doses', beanie: 'meds, allergies, doses' },
+  'mobileNav.hint.contacts': { en: 'contacts & info', beanie: 'contacts & info' },
   'mobile.menu': { en: 'Menu', beanie: 'menu' },
   'mobile.closeMenu': { en: 'Close menu', beanie: 'close menu' },
   'mobile.navigation': { en: 'Navigation', beanie: 'navigation' },
