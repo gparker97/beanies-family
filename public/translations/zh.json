@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-28",
-    "translationCount": 2582
+    "translationCount": 2579
   },
   "translations": {
     "app.name": {
@@ -6246,41 +6246,6 @@
       "hash": "3vkzbt",
       "lastUpdated": "2026-03-08"
     },
-    "onboarding.welcomeDescription": {
-      "translation": "您的家庭舒适的角落，可以管理混乱的2014年财务状况、日程安排、活动以及介于两者之间的一切。减少压力，为您的小豆子留出更多时间。",
-      "hash": "h8xo2a",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.pillarMoney": {
-      "translation": "追踪收入",
-      "hash": "o2yt1n",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.pillarMoneyShort": {
-      "translation": "金钱",
-      "hash": "18ddb4",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.pillarPlan": {
-      "translation": "规划生命",
-      "hash": "42zoul",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.pillarPlanShort": {
-      "translation": "计划",
-      "hash": "19ykp6",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.pillarFamily": {
-      "translation": "共同成长",
-      "hash": "48v8ft",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.pillarFamilyShort": {
-      "translation": "科",
-      "hash": "yohf9g",
-      "lastUpdated": "2026-03-08"
-    },
     "onboarding.currencyQuestion": {
       "translation": "您家庭的基础货币是多少？",
       "hash": "98eiz2",
@@ -6292,19 +6257,9 @@
       "lastUpdated": "2026-03-08"
     },
     "onboarding.welcomeSubtitle": {
-      "translation": "只需3个快速步骤\\ u00B7大约需要2分钟",
-      "hash": "nmeql7",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.sectionAccount": {
-      "translation": "存入账号",
-      "hash": "f1mz0k",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.sectionAccountSub": {
-      "translation": "\\ u2014从您的主要问题开始",
-      "hash": "c53i22",
-      "lastUpdated": "2026-03-08"
+      "translation": "几个简单的步骤\\ u00B7大约需要2分钟",
+      "hash": "zcpkgb",
+      "lastUpdated": "2026-04-28"
     },
     "onboarding.bank": {
       "translation": "银行",
@@ -6314,16 +6269,6 @@
     "onboarding.bankPlaceholder": {
       "translation": "％s-选择银行",
       "hash": "8j9mc2",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.accountName": {
-      "translation": "账户名",
-      "hash": "jsbizi",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.accountNamePlaceholder": {
-      "translation": "例如：储蓄账户",
-      "hash": "76ofre",
       "lastUpdated": "2026-03-08"
     },
     "onboarding.balance": {
@@ -6336,34 +6281,9 @@
       "hash": "he46su",
       "lastUpdated": "2026-03-08"
     },
-    "onboarding.added": {
-      "translation": "已添加",
-      "hash": "1j60w0",
-      "lastUpdated": "2026-03-08"
-    },
     "onboarding.addAnother": {
       "translation": "添加另一个",
       "hash": "30qbrl",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.sectionRecurring": {
-      "translation": "添加常规交易",
-      "hash": "qqn3jw",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.sectionRecurringSub": {
-      "translation": "\\ u2014轻触类别以添加详细信息",
-      "hash": "68vele",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.income": {
-      "translation": "\\ u2191收入",
-      "hash": "6czm7t",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.expenses": {
-      "translation": "\\ u2193费用",
-      "hash": "z2ohyh",
       "lastUpdated": "2026-03-08"
     },
     "onboarding.sectionSavings": {
@@ -6396,44 +6316,9 @@
       "hash": "kqu06y",
       "lastUpdated": "2026-03-08"
     },
-    "onboarding.summarySavingsBar": {
-      "translation": "节省金额",
-      "hash": "ciwz1j",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.summaryFlexible": {
-      "translation": "灵活",
-      "hash": "tx9bl7",
-      "lastUpdated": "2026-03-08"
-    },
     "onboarding.addRecurring": {
       "translation": "添加常规交易",
       "hash": "exwnwl",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.customTransaction": {
-      "translation": "自定义",
-      "hash": "xkgi35",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.direction": {
-      "translation": "方向",
-      "hash": "h80bq7",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.directionExpense": {
-      "translation": "\\ u2193支出",
-      "hash": "cl637u",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.directionIncome": {
-      "translation": "\\ u2191收入",
-      "hash": "6czm7t",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.transactionName": {
-      "translation": "Transaction Name",
-      "hash": "6i0l6b",
       "lastUpdated": "2026-03-08"
     },
     "onboarding.transactionNamePlaceholder": {
@@ -6446,39 +6331,9 @@
       "hash": "whwdbs",
       "lastUpdated": "2026-03-08"
     },
-    "onboarding.dayOfMonth": {
-      "translation": "每月的某些天",
-      "hash": "dq6zut",
-      "lastUpdated": "2026-03-08"
-    },
     "onboarding.frequency": {
       "translation": "频率",
       "hash": "vzf4u4",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.account": {
-      "translation": "账户",
-      "hash": "8259n1",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.autoSelected": {
-      "translation": "已自动选择",
-      "hash": "dvloo7",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.addCategory": {
-      "translation": "添加类别",
-      "hash": "94p0bh",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.sectionActivity": {
-      "translation": "是什么让您的家人忙碌？",
-      "hash": "oas0tl",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.sectionActivitySub": {
-      "translation": "\\ u2014添加课程或活动",
-      "hash": "ldn6ug",
       "lastUpdated": "2026-03-08"
     },
     "onboarding.assignee": {
@@ -6489,11 +6344,6 @@
     "onboarding.days": {
       "translation": "天",
       "hash": "19i0n",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.time": {
-      "translation": "时间",
-      "hash": "1jvfx",
       "lastUpdated": "2026-03-08"
     },
     "onboarding.startTime": {
@@ -6514,31 +6364,6 @@
     "onboarding.addActivity": {
       "translation": "添加项目门票",
       "hash": "l4t8gi",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.addedToPlanner": {
-      "translation": "已添加到计划和预算",
-      "hash": "cu82xe",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.sectionDiscover": {
-      "translation": "更多精彩体验",
-      "hash": "ub3ygy",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.sectionDiscoverSub": {
-      "translation": "\\ u2014在Nook等候",
-      "hash": "43jfyw",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.closingTitle": {
-      "translation": "我们建造了豆豆来帮助您。",
-      "hash": "scam6i",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.closingSubtitle": {
-      "translation": "这样您就可以把时间花在重要的事情上\\ u2014您的小豆子上。",
-      "hash": "ffy8gs",
       "lastUpdated": "2026-03-08"
     },
     "onboarding.completePrefix": {
@@ -6599,16 +6424,6 @@
     "onboarding.skip": {
       "translation": "暂时跳过",
       "hash": "r83laa",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.nextFamily": {
-      "translation": "下一篇：家庭生活\\ u2192",
-      "hash": "68w8j2",
-      "lastUpdated": "2026-03-08"
-    },
-    "onboarding.allDone": {
-      "translation": "全部完成！\\ u {1F389}",
-      "hash": "3x02yo",
       "lastUpdated": "2026-03-08"
     },
     "onboarding.restartOnboarding": {
@@ -12914,6 +12729,176 @@
     "googleDrive.fileCreatedSubtitle": {
       "translation": "已安全保存，接下来请添加您的家庭成员。",
       "hash": "cvyffp",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.accountType": {
+      "translation": "类型",
+      "hash": "1k7dm",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.invite.title": {
+      "translation": "邀请其他人？",
+      "hash": "97030l",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.invite.optional": {
+      "translation": "任选",
+      "hash": "8k29s",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.invite.lede": {
+      "translation": "每个豆豆都有自己的链接。输入他们的电子邮件，我们会生成一个分享链接，您可以立即通过短信发送或发送。",
+      "hash": "xcpka0",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.invite.send": {
+      "translation": "发送\\ u2192",
+      "hash": "djcnc9",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.invite.sent": {
+      "translation": "\\ u2713已发送",
+      "hash": "6snaso",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.invite.noEmail": {
+      "translation": "no email\\ u2014 skip",
+      "hash": "yjdl1e",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.invite.reminder": {
+      "translation": "\\ u2728您以后可以随时从My Pod邀请",
+      "hash": "640eg7",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.invite.retry": {
+      "translation": "重试\\ u2192",
+      "hash": "jldbnt",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.invite.editEmail": {
+      "translation": "编辑电子邮箱\\ u2192",
+      "hash": "hodhxx",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.errors.addAccountFailed": {
+      "translation": "无法添加该账号。请重试\\ u2014客服已收到通知。",
+      "hash": "z4l21v",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.errors.addRecurringFailed": {
+      "translation": "无法添加该定期交易。请重试\\ u2014客服已收到通知。",
+      "hash": "cgbxe3",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.errors.addActivityFailed": {
+      "translation": "无法添加该活动。请重试\\ u2014客服已收到通知。",
+      "hash": "yu6zo9",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.errors.inviteFailed": {
+      "translation": "无法发送该邀请。请重试或编辑电子邮箱，然后重试。",
+      "hash": "yiub3y",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.skipAddLater": {
+      "translation": "跳过\\ u2014稍后添加",
+      "hash": "f8w5xk",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.next": {
+      "translation": "下一步\\ u2192",
+      "hash": "us1qqq",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.welcomeTagline": {
+      "translation": "让我们设置您的豆荚",
+      "hash": "bg155g",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.remove": {
+      "translation": "移除",
+      "hash": "ulvuxo",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.account.titlePrefix": {
+      "translation": "添加你的第一篇",
+      "hash": "dkz2ua",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.account.titleHighlight": {
+      "translation": "账户",
+      "hash": "jgy11v",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.accountType.checking": {
+      "translation": "正在检查",
+      "hash": "qhim7u",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.accountType.savings": {
+      "translation": "节省金额",
+      "hash": "ciwz1j",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.accountType.investment": {
+      "translation": "投资",
+      "hash": "65s0zx",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.savings.titlePrefix": {
+      "translation": "A组",
+      "hash": "u4rern",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.savings.titleHighlight": {
+      "translation": "节省目标",
+      "hash": "1ee1nq",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.savingsMode.percent": {
+      "translation": "占收入的百分比",
+      "hash": "a7h79l",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.savingsMode.fixed": {
+      "translation": "固定",
+      "hash": "dkn97c",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.recurring.titlePrefix": {
+      "translation": "新增常客",
+      "hash": "53fnxe",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.recurring.titleHighlight": {
+      "translation": "交易",
+      "hash": "zeuc4e",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.frequency.daily": {
+      "translation": "每天",
+      "hash": "1366m1",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.frequency.monthly": {
+      "translation": "每月",
+      "hash": "n1rd3n",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.frequency.yearly": {
+      "translation": "每年",
+      "hash": "ras40m",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.activity.titlePrefix": {
+      "translation": "新增",
+      "hash": "8ibtro",
+      "lastUpdated": "2026-04-28"
+    },
+    "onboarding.activity.titleHighlight": {
+      "translation": "动态",
+      "hash": "rdx4a9",
       "lastUpdated": "2026-04-28"
     }
   }

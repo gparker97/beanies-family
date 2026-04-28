@@ -4504,57 +4504,42 @@ const STRING_DEFS = {
   // Onboarding wizard
   'onboarding.welcomePrefix': { en: 'Welcome to ', beanie: 'welcome to ' },
   'onboarding.welcomeBrand': { en: 'beanies' },
-  'onboarding.welcomeDescription': {
-    en: "Your family's cozy corner for managing the chaos \u2014 finances, schedules, activities, and everything in between. Less stress, more time for your little beans.",
-    beanie:
-      "your family's cozy corner for managing the chaos \u2014 finances, schedules, activities, and everything in between. less stress, more time for your little beans.",
-  },
-  'onboarding.pillarMoney': { en: 'Track money', beanie: 'track money' },
-  'onboarding.pillarMoneyShort': { en: 'Money', beanie: 'money' },
-  'onboarding.pillarPlan': { en: 'Plan life', beanie: 'plan life' },
-  'onboarding.pillarPlanShort': { en: 'Plans', beanie: 'plans' },
-  'onboarding.pillarFamily': { en: 'Grow together', beanie: 'grow together' },
-  'onboarding.pillarFamilyShort': { en: 'Family', beanie: 'family' },
   'onboarding.currencyQuestion': {
     en: "What's your family's base currency?",
     beanie: "what's your family's base currency?",
+  },
+  'onboarding.welcomeTagline': {
+    en: "let's set up your bean pod",
+    beanie: "let's set up your bean pod",
   },
   'onboarding.welcomeCta': {
     en: "Let's Get This Pod Rolling \u{1F96B}",
     beanie: "let's get this pod rolling \u{1F96B}",
   },
   'onboarding.welcomeSubtitle': {
-    en: 'just 3 quick steps \u00B7 takes about 2 minutes',
-    beanie: 'just 3 quick steps \u00B7 takes about 2 minutes',
+    en: 'a few quick steps \u00B7 takes about 2 minutes',
+    beanie: 'a few quick steps \u00B7 takes about 2 minutes',
   },
 
-  // Money step
-  'onboarding.sectionAccount': { en: 'Drop in an account', beanie: 'drop in an account' },
-  'onboarding.sectionAccountSub': {
-    en: '\u2014 start with your main one',
-    beanie: '\u2014 start with your main one',
-  },
+  // Generic remove action (used by OnboardingAddedRow's delete button)
+  'onboarding.remove': { en: 'Remove', beanie: 'remove' },
+
+  // Account step
+  'onboarding.account.titlePrefix': { en: 'Add your first ', beanie: 'add your first ' },
+  'onboarding.account.titleHighlight': { en: 'account', beanie: 'account' },
   'onboarding.bank': { en: 'Bank', beanie: 'bank' },
   'onboarding.bankPlaceholder': { en: 'Select bank...', beanie: 'select bank...' },
-  'onboarding.accountName': { en: 'Account Name', beanie: 'account name' },
-  'onboarding.accountNamePlaceholder': {
-    en: 'e.g. Savings Account',
-    beanie: 'e.g. savings account',
-  },
   'onboarding.balance': { en: 'Balance', beanie: 'balance' },
+  'onboarding.accountType': { en: 'Type', beanie: 'type' },
+  'onboarding.accountType.checking': { en: 'Checking', beanie: 'checking' },
+  'onboarding.accountType.savings': { en: 'Savings', beanie: 'savings' },
+  'onboarding.accountType.investment': { en: 'Investment', beanie: 'investment' },
   'onboarding.addAccount': { en: 'Add Account', beanie: 'add account' },
-  'onboarding.added': { en: 'added', beanie: 'added' },
   'onboarding.addAnother': { en: '+ Add another', beanie: '+ add another' },
-  'onboarding.sectionRecurring': {
-    en: 'Add a regular transaction',
-    beanie: 'add a regular transaction',
-  },
-  'onboarding.sectionRecurringSub': {
-    en: '\u2014 tap a category to add details',
-    beanie: '\u2014 tap a category to add details',
-  },
-  'onboarding.income': { en: '\u2191 Income', beanie: '\u2191 income' },
-  'onboarding.expenses': { en: '\u2193 Expenses', beanie: '\u2193 expenses' },
+
+  // Savings step
+  'onboarding.savings.titlePrefix': { en: 'Set a ', beanie: 'set a ' },
+  'onboarding.savings.titleHighlight': { en: 'savings goal', beanie: 'savings goal' },
   'onboarding.sectionSavings': {
     en: 'Set your savings goal each month',
     beanie: 'set your savings goal each month',
@@ -4565,68 +4550,34 @@ const STRING_DEFS = {
     en: "That's {amount}/month into your bean jar. \u{1F331}",
     beanie: "that's {amount}/month into your bean jar. \u{1F331}",
   },
+  'onboarding.savingsMode.percent': { en: '% of Income', beanie: '% of income' },
+  'onboarding.savingsMode.fixed': { en: 'Fixed $', beanie: 'fixed $' },
+
+  // Recurring step
+  'onboarding.recurring.titlePrefix': { en: 'Add a regular ', beanie: 'add a regular ' },
+  'onboarding.recurring.titleHighlight': { en: 'transaction', beanie: 'transaction' },
   'onboarding.summaryIncome': { en: 'Income', beanie: 'income' },
   'onboarding.summaryFixedCosts': { en: 'Fixed costs', beanie: 'fixed costs' },
-  'onboarding.summarySavingsBar': { en: 'Savings', beanie: 'savings' },
-  'onboarding.summaryFlexible': { en: 'Flexible', beanie: 'flexible' },
-
-  // Recurring modal
   'onboarding.addRecurring': { en: 'Add Regular Transaction', beanie: 'add regular transaction' },
-  'onboarding.customTransaction': { en: 'Custom', beanie: 'custom' },
-  'onboarding.direction': { en: 'Direction', beanie: 'direction' },
-  'onboarding.directionExpense': {
-    en: '\u2193 Expense',
-    beanie: '\u2193 expense',
-  },
-  'onboarding.directionIncome': {
-    en: '\u2191 Income',
-    beanie: '\u2191 income',
-  },
-  'onboarding.transactionName': { en: 'Transaction Name', beanie: 'transaction name' },
   'onboarding.transactionNamePlaceholder': {
     en: 'e.g. Monthly Rent',
     beanie: 'e.g. monthly rent',
   },
   'onboarding.amount': { en: 'Amount', beanie: 'amount' },
-  'onboarding.dayOfMonth': { en: 'Day of Month', beanie: 'day of month' },
   'onboarding.frequency': { en: 'Frequency', beanie: 'frequency' },
-  'onboarding.account': { en: 'Account', beanie: 'account' },
-  'onboarding.autoSelected': { en: 'Auto-selected', beanie: 'auto-selected' },
-  'onboarding.addCategory': { en: 'Add {category}', beanie: 'add {category}' },
+  'onboarding.frequency.daily': { en: 'Daily', beanie: 'daily' },
+  'onboarding.frequency.monthly': { en: 'Monthly', beanie: 'monthly' },
+  'onboarding.frequency.yearly': { en: 'Yearly', beanie: 'yearly' },
 
-  // Family step
-  'onboarding.sectionActivity': {
-    en: 'What keeps your family busy?',
-    beanie: 'what keeps your family busy?',
-  },
-  'onboarding.sectionActivitySub': {
-    en: '\u2014 add a lesson or activity',
-    beanie: '\u2014 add a lesson or activity',
-  },
+  // Activity step
+  'onboarding.activity.titlePrefix': { en: 'Add an ', beanie: 'add an ' },
+  'onboarding.activity.titleHighlight': { en: 'activity', beanie: 'activity' },
   'onboarding.assignee': { en: 'Who', beanie: 'who' },
   'onboarding.days': { en: 'Days', beanie: 'days' },
-  'onboarding.time': { en: 'Time', beanie: 'time' },
   'onboarding.startTime': { en: 'Start Time', beanie: 'start time' },
   'onboarding.endTime': { en: 'End Time', beanie: 'end time' },
   'onboarding.costPerMonth': { en: 'Cost / Month', beanie: 'cost / month' },
   'onboarding.addActivity': { en: 'Add Activity', beanie: 'add activity' },
-  'onboarding.addedToPlanner': {
-    en: 'Added to planner & budget',
-    beanie: 'added to planner & budget',
-  },
-  'onboarding.sectionDiscover': { en: 'More things to explore', beanie: 'more things to explore' },
-  'onboarding.sectionDiscoverSub': {
-    en: '\u2014 waiting in your Nook',
-    beanie: '\u2014 waiting in your nook',
-  },
-  'onboarding.closingTitle': {
-    en: 'We built beanies to help you.',
-    beanie: 'we built beanies to help you.',
-  },
-  'onboarding.closingSubtitle': {
-    en: "So you can spend your time on what's important \u2014 your little beans.",
-    beanie: "so you can spend your time on what's important \u2014 your little beans.",
-  },
 
   // Completion step
   'onboarding.completePrefix': { en: 'Your ', beanie: 'your ' },
@@ -4649,11 +4600,54 @@ const STRING_DEFS = {
     beanie: "go take care of your little beans \u2014 we'll take care of the rest. \u{1F96B}",
   },
 
+  // Step 6 invite panel
+  'onboarding.invite.title': { en: 'Invite the rest?', beanie: 'invite the rest?' },
+  'onboarding.invite.optional': { en: 'Optional', beanie: 'optional' },
+  'onboarding.invite.lede': {
+    en: "Each beanie gets their own link. Drop in their email and we'll generate a share link you can text or send right away.",
+    beanie:
+      "each beanie gets their own link. drop in their email and we'll generate a share link you can text or send right away.",
+  },
+  'onboarding.invite.send': { en: 'Send \u2192', beanie: 'send \u2192' },
+  'onboarding.invite.sent': { en: '\u2713 Sent', beanie: '\u2713 sent' },
+  'onboarding.invite.noEmail': {
+    en: 'no email \u2014 skip',
+    beanie: 'no email \u2014 skip',
+  },
+  'onboarding.invite.reminder': {
+    en: '\u2728 you can always invite anytime later from My Pod',
+    beanie: '\u2728 you can always invite anytime later from my pod',
+  },
+  'onboarding.invite.retry': { en: 'Retry \u2192', beanie: 'retry \u2192' },
+  'onboarding.invite.editEmail': { en: 'Edit email \u2192', beanie: 'edit email \u2192' },
+
+  // Error toasts (auto-routed via showToast -> errorReporter -> Slack)
+  'onboarding.errors.addAccountFailed': {
+    en: "Couldn't add that account. Please try again \u2014 support's been notified.",
+    beanie: "couldn't add that account. please try again \u2014 support's been notified.",
+  },
+  'onboarding.errors.addRecurringFailed': {
+    en: "Couldn't add that recurring transaction. Please try again \u2014 support's been notified.",
+    beanie:
+      "couldn't add that recurring transaction. please try again \u2014 support's been notified.",
+  },
+  'onboarding.errors.addActivityFailed': {
+    en: "Couldn't add that activity. Please try again \u2014 support's been notified.",
+    beanie: "couldn't add that activity. please try again \u2014 support's been notified.",
+  },
+  'onboarding.errors.inviteFailed': {
+    en: "Couldn't send that invite. Try again or edit the email and retry.",
+    beanie: "couldn't send that invite. try again or edit the email and retry.",
+  },
+
   // Navigation
   'onboarding.back': { en: '\u2190 Back', beanie: '\u2190 back' },
   'onboarding.skip': { en: 'Skip for now', beanie: 'skip for now' },
-  'onboarding.nextFamily': { en: 'Next: Family Life \u2192', beanie: 'next: family life \u2192' },
-  'onboarding.allDone': { en: 'All Done! \u{1F389}', beanie: 'all done! \u{1F389}' },
+  'onboarding.skipAddLater': {
+    en: 'Skip \u2014 add later',
+    beanie: 'skip \u2014 add later',
+  },
+  'onboarding.next': { en: 'Next \u2192', beanie: 'next \u2192' },
 
   // Settings
   'onboarding.restartOnboarding': {
