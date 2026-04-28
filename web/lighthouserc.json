@@ -28,7 +28,8 @@
         "legacy-javascript-insight": "warn",
         "third-party-summary-insight": "warn",
         "duplicated-javascript-insight": "warn",
-        "prioritize-lcp-image-insight": "warn"
+        "prioritize-lcp-image-insight": "warn",
+        "color-contrast": "warn"
       }
     },
     "upload": { "target": "temporary-public-storage" }

@@ -52,8 +52,15 @@ import { APP_URL } from '@beanies/brand/nav';
         <a class="hero__story-link" href="#story" data-scroll-to="story">why I built this ↓</a>
       </div>
 
-      <!-- FLOATING DEVICE SHOWCASE -->
-      <div class="showcase">
+      <!-- FLOATING DEVICE SHOWCASE
+           Decorative mockup of the app's UI — pure illustration of what the
+           product looks like. The tiny labels inside (6-7px stat text, mock
+           account names, etc.) are visual prop, not readable content for
+           assistive tech. aria-hidden tells screen readers + Lighthouse's
+           color-contrast audit to skip — the audit was flagging the demo's
+           intentionally-low-contrast 6px label text against white as if it
+           were real body content. -->
+      <div class="showcase" aria-hidden="true">
         <div class="hero__float" style="animation-delay: 0s; left: 50px; top: 10px; z-index: 6">
           <div class="hero__float-icon">📈</div>
           <div class="hero__float-label">net worth</div>
