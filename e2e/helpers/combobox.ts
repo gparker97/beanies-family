@@ -39,16 +39,21 @@ export class ComboboxHelper {
     return this.container.getByTestId('combobox-trigger');
   }
 
-  get searchInput() {
-    return this.container.getByTestId('combobox-search');
+  // Dropdown is `<Teleport to="body">` — it is not a descendant of the
+  // trigger's wrapper. Only one dropdown can be open at a time (opening
+  // any combobox closes the others), so a page-level testid lookup is
+  // unambiguous when the dropdown is mounted.
+  get dropdown() {
+    return this.page.getByTestId('combobox-dropdown');
   }
 
+  get searchInput() {
+    return this.dropdown.getByTestId('combobox-search');
+  }
+
+  // Custom-text input renders inline inside the wrapper (NOT teleported).
   get customInput() {
     return this.container.getByTestId('combobox-custom-input');
-  }
-
-  get dropdown() {
-    return this.container.getByTestId('combobox-dropdown');
   }
 
   get clearButton() {
@@ -81,9 +86,10 @@ export class ComboboxHelper {
   /** Open the dropdown and click the option whose visible text matches `optionLabel`. */
   async selectOption(optionLabel: string) {
     await this.open();
-    // Use dispatchEvent('click') — the option is inside a position:absolute
-    // dropdown that may extend below the viewport boundary.
-    await this.jsClick(this.container.getByRole('button', { name: optionLabel }));
+    // Option buttons live inside the teleported dropdown — scope by
+    // `this.dropdown`, not `this.container`. Use dispatchEvent('click') —
+    // the dropdown can be tall enough to extend past the viewport.
+    await this.jsClick(this.dropdown.getByRole('button', { name: optionLabel }));
     await expect(this.dropdown).not.toBeVisible();
   }
 
@@ -91,14 +97,14 @@ export class ComboboxHelper {
   async searchAndSelect(query: string, optionLabel: string) {
     await this.open();
     await this.search(query);
-    await this.jsClick(this.container.getByRole('button', { name: optionLabel }));
+    await this.jsClick(this.dropdown.getByRole('button', { name: optionLabel }));
     await expect(this.dropdown).not.toBeVisible();
   }
 
   /** Click "Other", then fill and confirm a custom value. */
   async selectOther(customText: string) {
     await this.open();
-    await this.jsClick(this.container.getByTestId('combobox-other'));
+    await this.jsClick(this.dropdown.getByTestId('combobox-other'));
     await expect(this.dropdown).not.toBeVisible();
     await expect(this.customInput).toBeVisible();
     await this.customInput.fill(customText);
