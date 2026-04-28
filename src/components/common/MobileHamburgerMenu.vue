@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, watch, onMounted, onUnmounted } from 'vue';
+import { computed, toRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
+import { useFullscreenOverlay } from '@/composables/useFullscreenOverlay';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
@@ -173,30 +174,10 @@ async function selectCurrency(code: CurrencyCode) {
   await settingsStore.setDisplayCurrency(code);
 }
 
-function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && props.open) {
-    close();
-  }
-}
+useFullscreenOverlay(toRef(props, 'open'), close);
 
 // Close on route change
 watch(() => route.path, close);
-
-onMounted(() => {
-  document.addEventListener('keydown', handleKeydown);
-});
-
-onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeydown);
-});
-
-// Lock/unlock body scroll
-watch(
-  () => props.open,
-  (isOpen) => {
-    document.body.style.overflow = isOpen ? 'hidden' : '';
-  }
-);
 
 const encryptionLabel = computed(() => {
   if (!syncStore.isConfigured) return t('sidebar.noDataFile');
