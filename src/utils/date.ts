@@ -273,6 +273,16 @@ export function formatDayLong(dateStr: string): string {
 }
 
 /**
+ * Format: "Tue, 28 April" — short day name + date + long month, no year.
+ * Used for the conversational "today" caption on the Family Nook where
+ * horizontal space is at a premium (mobile) and the year is implicit.
+ */
+export function formatTodayCaption(dateStr: string): string {
+  const date = parseLocalDate(dateStr);
+  return `${DAYS_SHORT[date.getDay()]}, ${date.getDate()} ${MONTHS_LONG[date.getMonth()]}`;
+}
+
+/**
  * Format a date as "January 2026"
  */
 export function formatMonthYear(date: Date): string {
