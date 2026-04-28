@@ -619,7 +619,7 @@ import { APP_URL } from '@beanies/brand/nav';
           </a>
         </div>
 
-        <p class="reveal" style="color: var(--muted-text); font-size: 0.78rem; margin-top: 32px; opacity: 0.5; text-align: center;">
+        <p class="reveal" style="color: var(--muted-text); font-size: 0.78rem; margin-top: 32px; opacity: 0.7; text-align: center;">
           beanies.family is open source. see
           <a href="https://github.com/gparker97/beanies-family/blob/main/LICENSE" class="story__link" style="font-size: inherit">LICENSE</a>
           and
@@ -813,7 +813,11 @@ import { APP_URL } from '@beanies/brand/nav';
   --cloud-white: #f8f9fa;
   --soft-green: #27ae60;
   --body-text: #4a5568;
-  --muted-text: #8896a6;
+  /* Muted body text — dark enough to clear WCAG AA 4.5:1 on cloud-white
+     (#4d5d6c on #f8f9fa ≈ 5.6:1). The previous #8896a6 was ~2.9:1 and
+     failed Lighthouse's color-contrast audit; the new shade still reads
+     as a subdued slate next to full Deep Slate body. */
+  --muted-text: #4d5d6c;
   --sq: 24px;
   --card-shadow: 0 4px 20px rgb(44 62 80 / 5%);
   --card-hover-shadow: 0 8px 32px rgb(44 62 80 / 10%);

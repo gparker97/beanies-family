@@ -421,7 +421,9 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   width: 100%;
 }
 .blog-prose img + em {
-  color: rgb(44 62 80 / 50%);
+  /* 70% deep slate over cloud-white clears WCAG AA 4.5:1 contrast for
+     image captions; the previous 50% was ~3:1 and Lighthouse flagged it. */
+  color: rgb(44 62 80 / 70%);
   display: block;
   font-family: 'Fraunces Variable', Fraunces, 'Source Serif 4', Georgia, serif;
   font-feature-settings: 'ss01';
