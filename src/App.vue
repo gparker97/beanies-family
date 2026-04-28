@@ -623,17 +623,42 @@ onMounted(async () => {
     }
 
     // Post-init health check: verify the Automerge doc is loaded
+    let docLoaded = false;
     try {
       const { getDoc } = await import('@/services/automerge/docService');
       getDoc(); // throws if currentDoc is null
+      docLoaded = true;
       initBreadcrumbs.push('health: automerge doc OK');
     } catch {
-      // Doc not loaded — initialization completed but data is missing
+      // Doc not loaded — initialization completed but data is missing.
+      // Two reasons this can happen: (a) genuine init failure (network, file
+      // missing, etc.) — surface the recovery UI; (b) loadFamilyData
+      // intentionally redirected us to /welcome or /login because the user
+      // needs to authenticate before the doc can be decrypted — surfacing
+      // the recovery UI on top of the login page is confusing and wrong.
+      // The route check distinguishes the two cases.
       initBreadcrumbs.push('health: NO automerge doc loaded');
       const breadcrumbLog = initBreadcrumbs.join('\n');
-      initError.value = 'Initialization completed but no data was loaded';
-      initErrorDetail.value = breadcrumbLog;
-      console.error('[App] Post-init health check failed — no Automerge doc\n' + breadcrumbLog);
+      const onLoginFlowRoute = route.path === '/welcome' || route.path === '/login';
+      if (!onLoginFlowRoute) {
+        initError.value = 'Initialization completed but no data was loaded';
+        initErrorDetail.value = breadcrumbLog;
+        console.error('[App] Post-init health check failed — no Automerge doc\n' + breadcrumbLog);
+      } else {
+        console.warn(
+          '[App] Post-init health check: no doc, but redirected to login — suppressing recovery UI\n' +
+            breadcrumbLog
+        );
+      }
+    }
+
+    // Skip exchange-rate refresh entirely when the doc isn't loaded. Its
+    // callees (forceUpdateRates / updateRatesIfStale → getSettings →
+    // getDoc) would throw synchronously and the .catch(console.error) below
+    // would only surface noise. Rates are refreshed cleanly post-sign-in
+    // when the doc actually loads.
+    if (!docLoaded) {
+      return;
     }
 
     // Always fetch exchange rates on init when none are loaded (first-time users,
