@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-28",
-    "translationCount": 2578
+    "translationCount": 2579
   },
   "translations": {
     "app.name": {
@@ -12894,6 +12894,11 @@
     "mobileNav.hint.contacts": {
       "translation": "联系人信息",
       "hash": "irc0k5",
+      "lastUpdated": "2026-04-28"
+    },
+    "nook.todayCaption": {
+      "translation": "现在是{date} ·您的家人一览",
+      "hash": "gq9aij",
       "lastUpdated": "2026-04-28"
     }
   }
