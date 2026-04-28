@@ -8,6 +8,7 @@ import AppSidebarSubNav from '@/components/common/AppSidebarSubNav.vue';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
 import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useTranslation } from '@/composables/useTranslation';
+import { isRouteActive } from '@/utils/route';
 import {
   NAV_SECTIONS,
   TREEHOUSE_ITEMS,
@@ -66,8 +67,7 @@ function isActive(path: string): boolean {
  */
 function isParentActive(item: MappedNavItem): boolean {
   if (!item.children) return isActive(item.path);
-  if (route.path === item.path) return true;
-  return route.path.startsWith(`${item.path}/`);
+  return isRouteActive(route.path, item.path);
 }
 
 function navigateTo(item: MappedNavItem) {

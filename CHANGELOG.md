@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-28
+
+### Changed
+
+- **Mobile bottom nav v3 — 4-tab shell with bean-stack categories.** The mobile bottom navigation collapses from a flat 6-tab strip (Nook / To-do / Activities / Travel / Piggy Bank / Pod) to a calmer **4-tab layout** (Nook / Planning / Money / Pod). Tapping Nook navigates directly. Tapping any of the other three opens a vertical "bean stack" — a column of round bean buttons paired with side cards carrying one-line hints (e.g. Activities · _plan, schedule, log_; Accounts · _checking, savings, cards_). The bean stays anchored over the active tab; the side card auto-flips toward whichever screen-half has more space. Active route is the bottom bean (closest to thumb), ringed in Heritage Orange. Esc key, scrim tap, Android back gesture, browser back, and route changes all close the stack cleanly. Money tab hides automatically when finance permissions are off (3-tab fallback). The 5 Pod sub-routes (Meet The Beans, Scrapbook, Cookbook, Care & Safety, Emergency) are now first-class beans in the Pod stack instead of being buried in the hamburger drawer. Full ARIA: each category tab carries `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`, and active beans get `aria-current="page"`. Focus management: opening the stack focuses the active route's bean (or the bottom bean as fallback); closing returns focus to the trigger tab. `prefers-reduced-motion: reduce` honored — animations skip cleanly without leaving items invisible. Implementation pulls a meaningful DRY win: three new single-purpose composables (`useEscapeClose` 7 tests, `useBodyScrollLock` 6 tests, `useBackGestureClose` 7 tests with re-entry guard for programmatic `history.back()`) replace inline scroll-lock + Esc + back-gesture machinery; an `isRouteActive` pure helper kills a previously-duplicated `route.path === path \|\| startsWith(...)` pattern across the sidebar and the bottom nav; a new `mobileCategory` field on `NavItemDef` lets the 4 mobile categories derive cleanly from the single `NAV_ITEMS` source-of-truth (no parallel constant to maintain). Module load throws on missing hint keys — typos cannot ship. 1747 unit tests pass (up from 1675; +72 new); type-check + lint clean. Plan: `docs/plans/2026-04-28-mobile-nav-v3-bean-stack.md`. Mockup: `docs/mockups/mobile-nav-bean-jar-v3.html`. Issue: #190. Refactor of `BaseModal` and `MobileHamburgerMenu` to consume the new composables is intentionally deferred to a follow-up PR (single-purpose cleanup, isolated regression risk).
+
+---
+
 ## 2026-04-27
 
 ### Added
