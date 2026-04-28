@@ -44,10 +44,13 @@ const year = new Date().getFullYear();
   }
 
   .page-footer { background: var(--deep-slate); padding: 32px 24px; text-align: center; }
-  .page-footer__brand { color: rgb(255 255 255 / 50%); font-family: 'Outfit Variable', Outfit, sans-serif; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+  /* WCAG AA against the deep-slate footer bg: white at 50%/30% rendered
+     ~3.5:1 / ~2.4:1. Bumped to 75% / 60% to clear 4.5:1 for the brand line
+     and the body links. */
+  .page-footer__brand { color: rgb(255 255 255 / 75%); font-family: 'Outfit Variable', Outfit, sans-serif; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
   .page-footer__brand-orange { color: var(--heritage-orange); }
   .page-footer__links { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-top: 8px; }
-  .page-footer__links a { color: rgb(255 255 255 / 30%); font-size: 0.78rem; text-decoration: none; transition: color 150ms; }
+  .page-footer__links a { color: rgb(255 255 255 / 60%); font-size: 0.78rem; text-decoration: none; transition: color 150ms; }
   .page-footer__links a:hover { color: var(--heritage-orange); }
   .page-footer__fineprint {
     align-items: center;
