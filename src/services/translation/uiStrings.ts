@@ -3428,6 +3428,10 @@ const STRING_DEFS = {
     en: 'Your family at a glance',
     beanie: 'your bean pod at a glance',
   },
+  'nook.todayCaption': {
+    en: "It's {date} · Your family at a glance",
+    beanie: "it's {date} · your bean pod at a glance",
+  },
   'nook.motto0': {
     en: "Everyone's having a great week!",
     beanie: 'the beanies are thriving!',

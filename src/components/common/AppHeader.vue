@@ -455,22 +455,14 @@ async function confirmSignOutAndClearData() {
 
     <!-- ═══ DESKTOP HEADER ═══ -->
     <template v-else>
-      <!-- Left side - Page title or greeting -->
+      <!-- Left side - Page title (or greeting on Nook/Dashboard) + today's date -->
       <div class="min-w-0">
-        <template v-if="isNookOrDashboard">
-          <h1 class="font-outfit text-secondary-500 truncate text-lg font-bold dark:text-gray-100">
-            {{ greeting }}
-          </h1>
-          <p class="text-secondary-500/40 text-xs dark:text-gray-500">
-            {{ todayFormatted }}
-          </p>
-        </template>
-        <h1
-          v-else
-          class="font-outfit text-secondary-500 truncate text-lg font-bold dark:text-gray-100"
-        >
-          {{ pageTitle }}
+        <h1 class="font-outfit text-secondary-500 truncate text-lg font-bold dark:text-gray-100">
+          {{ isNookOrDashboard ? greeting : pageTitle }}
         </h1>
+        <p class="font-outfit text-primary-500 text-xs font-medium">
+          {{ todayFormatted }}
+        </p>
       </div>
 
       <!-- Right side - v4 pill/squircle controls -->
