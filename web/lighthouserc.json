@@ -23,7 +23,12 @@
         "uses-responsive-images": "warn",
         "image-delivery-insight": "warn",
         "network-dependency-tree-insight": "warn",
-        "inspector-issues": "warn"
+        "inspector-issues": "warn",
+        "forced-reflow-insight": "warn",
+        "legacy-javascript-insight": "warn",
+        "third-party-summary-insight": "warn",
+        "duplicated-javascript-insight": "warn",
+        "prioritize-lcp-image-insight": "warn"
       }
     },
     "upload": { "target": "temporary-public-storage" }
