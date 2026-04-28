@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-28
 
+### Changed
+
+- **Setup wizard tightened — fewer words, hide-and-reveal where it counts.** The first-run "Create a new pod" wizard's three steps each lost a redundant subtitle, and Step 2's 75-word security paragraph collapsed into a `▸ How this works` disclosure (3 short bullets, hidden by default). The three coming-soon storage-provider cards (Dropbox / iCloud / OneDrive) shrunk into a single `▸ More providers coming soon` disclosure with compact chips. The disabled-state CTA now reads "Pick a storage to continue" (intent-shaped) instead of a dimmed generic "Next". Step 1 title goes "Grow a brand-new pod" → **"Start your pod 🌱"**; Step 3 title "Add your family members" → **"Add your family 🫘"**; Step 3 final CTA "Finish" → **"Finish · take me to the nook 🏡"** (destination-shaped). Member tiles in Step 3 now show the captured birthday inline (`🫘 Parent bean · 14 May`). The cream-warmth experiment: a subtle white-to-cream gradient on the modal frame, scoped to this wizard for now and evaluated after live. New `formatBirthdayShort` helper in `src/utils/date.ts` (with documented empty-string fallback for missing/invalid input). 7 i18n strings updated, 5 unused keys removed, 8 new keys added (covering the new disclosure body + disabled-CTA copy); zh.json regenerated cleanly. Mockup at `docs/mockups/setup-wizard-v2.html`. Plan at `docs/plans/2026-04-28-setup-wizard-v2.md`.
+
 ### Security
 
 - **fast-xml-parser bumped to 5.7.1** (via `@aws-sdk/xml-builder` coordinated update) — fixes [GHSA-9554-fp4j-h2g6](https://github.com/advisories/GHSA-9554-fp4j-h2g6): XML comment + CDATA injection via unescaped delimiters in XMLBuilder output. Used transitively through the AWS SDK in our DynamoDB code path. CI green confirmed our usage doesn't trip the documented breaking entity-handling change in 5.7.x.

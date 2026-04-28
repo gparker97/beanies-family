@@ -55,7 +55,9 @@ test.describe('Google Drive Sync', () => {
 
     await page.getByRole('button', { name: ui('action.next') }).click();
 
-    await page.getByText(ui('loginV6.step2Title')).waitFor({ state: 'visible', timeout: 10000 });
+    await page
+      .getByText(ui('loginV6.storageSectionLabel'))
+      .waitFor({ state: 'visible', timeout: 10000 });
 
     // Google Drive should be listed as a storage option
     await expect(page.getByText(ui('googleDrive.storageLabel')).first()).toBeVisible();

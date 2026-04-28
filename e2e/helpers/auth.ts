@@ -30,7 +30,9 @@ export async function navigateToSetupStep3(page: Page): Promise<void> {
   await page.getByRole('button', { name: ui('action.next') }).click();
 
   // Step 2: Skip to step 3 via dev hook (storage picker can't be automated)
-  await page.getByText(ui('loginV6.step2Title')).waitFor({ state: 'visible', timeout: 10000 });
+  await page
+    .getByText(ui('loginV6.storageSectionLabel'))
+    .waitFor({ state: 'visible', timeout: 10000 });
   await page.evaluate(() => {
     (window as any).__e2eCreatePod?.setStep(3);
   });
@@ -82,7 +84,9 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
     // Step 2: Storage & pod password
     // Wait for step 2 to fully render (signUp is async, so step 1's Next
     // triggers an async flow that sets currentStep = 2 on completion).
-    await page.getByText(ui('loginV6.step2Title')).waitFor({ state: 'visible', timeout: 10000 });
+    await page
+      .getByText(ui('loginV6.storageSectionLabel'))
+      .waitFor({ state: 'visible', timeout: 10000 });
 
     // The Local button triggers showSaveFilePicker (native OS dialog) which
     // cannot be automated in headless browsers. Skip to step 3 using the

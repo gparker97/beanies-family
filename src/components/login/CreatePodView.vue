@@ -18,6 +18,7 @@ import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import { clearFolderCache } from '@/services/google/driveService';
 import { slackNotify } from '@/utils/slackNotify';
+import { formatBirthdayShort } from '@/utils/date';
 import type { FamilyMember, Gender, AgeGroup, DateOfBirth } from '@/types/models';
 
 const { t } = useTranslation();
@@ -369,7 +370,16 @@ function handleBack() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[540px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800">
+  <!--
+    Scoped experiment: cream gradient on the setup wizard modal frame only.
+    CIG defines Cloud White (#F8F9FA) as the primary background; the warmer
+    cream tail here is a localized warmth try, evaluated after live. If this
+    spreads to other surfaces, promote `#fffaf3` to a brand token in
+    `packages/brand/theme.css` instead of inline-copying the literal.
+  -->
+  <div
+    class="mx-auto max-w-[540px] rounded-3xl bg-gradient-to-b from-white to-[#fffaf3] p-8 shadow-xl dark:bg-slate-800 dark:from-slate-800 dark:to-slate-800"
+  >
     <!-- Back button -->
     <button
       class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
@@ -456,12 +466,9 @@ function handleBack() {
 
     <!-- Step 1: About You -->
     <div v-if="currentStep === 1">
-      <h2 class="font-outfit mb-1 text-xl font-bold text-gray-900 dark:text-gray-100">
-        {{ t('loginV6.growPodTitle') }} 🌱
+      <h2 class="font-outfit mb-6 text-xl font-bold text-gray-900 dark:text-gray-100">
+        {{ t('loginV6.growPodTitle') }}
       </h2>
-      <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
-        {{ t('loginV6.growPodSubtitle') }}
-      </p>
 
       <form @submit.prevent="handleStep1Next">
         <div class="space-y-4">
@@ -543,26 +550,14 @@ function handleBack() {
 
     <!-- Step 2: Save & Secure -->
     <div v-else-if="currentStep === 2">
-      <h2 class="font-outfit mb-1 text-center text-xl font-bold text-gray-900 dark:text-gray-100">
-        {{ t('loginV6.step2Title') }}
+      <h2 class="font-outfit mb-6 text-center text-xl font-bold text-gray-900 dark:text-gray-100">
+        {{ t('loginV6.storageSectionLabel') }}
       </h2>
-      <p class="mb-6 text-center text-sm text-gray-500 dark:text-gray-400">
-        {{ t('loginV6.step2Subtitle') }}
-      </p>
 
       <!-- Storage section — v6 styled rounded box -->
       <div
         class="border-primary-500/15 bg-primary-500/[0.02] dark:border-primary-500/10 dark:bg-primary-500/[0.03] rounded-[18px] border-2 p-4"
       >
-        <div
-          class="font-outfit text-primary-500 mb-1.5 text-xs font-bold tracking-[0.1em] uppercase"
-        >
-          {{ t('loginV6.storageSectionLabel') }}
-        </div>
-        <p class="text-secondary-500 mb-3 text-xs leading-relaxed opacity-40 dark:text-gray-300">
-          {{ t('loginV6.storageDescription') }}
-        </p>
-
         <!-- Available storage options -->
         <div class="grid grid-cols-2 gap-2">
           <!-- Google Drive -->
@@ -722,77 +717,77 @@ function handleBack() {
           </button>
         </div>
 
-        <!-- Coming soon providers -->
-        <div class="mt-2 grid grid-cols-3 gap-2">
-          <!-- Dropbox (coming soon) -->
-          <div
-            class="flex h-[72px] cursor-not-allowed flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50/60 px-2.5 opacity-40 dark:bg-slate-700/30"
+        <!-- "How this works" disclosure — replaces the 75-word security paragraph.
+             Native <details>; mirrors the existing child-hint pattern in
+             InviteWizardModal.vue (▸ rotates 90° on open). Inline by site, not
+             a shared component, since the 3 disclosure usages in the codebase
+             have distinct visual contexts. -->
+        <details class="group mt-3">
+          <summary
+            class="font-outfit text-secondary-500/70 hover:text-primary-500 inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-2 text-xs font-semibold transition-colors dark:text-gray-400"
           >
-            <svg class="mb-1 h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M12 2L6 6.5l6 4.5-6 4.5L12 20l6-4.5-6-4.5 6-4.5L12 2zm0 13l-4-3 4-3 4 3-4 3z"
-              />
-            </svg>
             <span
-              class="font-outfit text-center text-xs font-semibold whitespace-nowrap text-gray-500 dark:text-gray-500"
-              >{{ t('storage.dropbox') }}</span
+              class="text-primary-500 inline-block text-[10px] transition-transform group-open:rotate-90"
+              aria-hidden="true"
+              >▸</span
             >
-            <span class="mt-0.5 text-center text-xs text-gray-400 dark:text-gray-500">{{
-              t('storage.comingSoon')
-            }}</span>
+            <span>{{ t('loginV6.howThisWorks.toggle') }}</span>
+          </summary>
+          <div class="text-secondary-500/70 pb-2 pl-4 text-sm leading-relaxed dark:text-gray-400">
+            <p class="mb-2">
+              <strong class="text-secondary-500 dark:text-gray-200">{{
+                t('loginV6.howThisWorks.leadStrong')
+              }}</strong>
+              {{ t('loginV6.howThisWorks.lead') }}
+            </p>
+            <ul class="list-disc space-y-1 pl-4">
+              <li>{{ t('loginV6.howThisWorks.bullet1') }}</li>
+              <li>{{ t('loginV6.howThisWorks.bullet2') }}</li>
+              <li>{{ t('loginV6.howThisWorks.bullet3') }}</li>
+            </ul>
           </div>
+        </details>
 
-          <!-- iCloud (coming soon) -->
-          <div
-            class="flex h-[72px] cursor-not-allowed flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50/60 px-2.5 opacity-40 dark:bg-slate-700/30"
+        <!-- Coming-soon providers — collapsed into a disclosure with compact chips
+             instead of 3 disabled full-size cards. -->
+        <details class="group">
+          <summary
+            class="font-outfit text-secondary-500/70 hover:text-primary-500 inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-2 text-xs font-semibold transition-colors dark:text-gray-400"
           >
-            <svg class="mb-1 h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83z"
-              />
-            </svg>
             <span
-              class="font-outfit text-center text-xs font-semibold whitespace-nowrap text-gray-500 dark:text-gray-500"
-              >{{ t('storage.iCloud') }}</span
+              class="text-primary-500 inline-block text-[10px] transition-transform group-open:rotate-90"
+              aria-hidden="true"
+              >▸</span
             >
-            <span class="mt-0.5 text-center text-xs text-gray-400 dark:text-gray-500">{{
-              t('storage.comingSoon')
-            }}</span>
-          </div>
-
-          <!-- OneDrive (coming soon) -->
-          <div
-            class="flex h-[72px] cursor-not-allowed flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50/60 px-2.5 opacity-40 dark:bg-slate-700/30"
-          >
-            <svg class="mb-1 h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M10.5 18H18a4.5 4.5 0 0 0 .87-8.92A6 6 0 0 0 6.25 10.1 4 4 0 0 0 7 18h3.5z"
-              />
-            </svg>
+            <span>{{ t('loginV6.moreProvidersComingSoon') }}</span>
+          </summary>
+          <div class="flex gap-2 pb-2 pl-4">
             <span
-              class="font-outfit text-center text-xs font-semibold whitespace-nowrap text-gray-500 dark:text-gray-500"
-              >OneDrive</span
+              class="font-outfit text-secondary-500/50 flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold dark:border-slate-600 dark:bg-slate-700/30 dark:text-gray-400"
+              >📦 {{ t('storage.dropbox') }}</span
             >
-            <span class="mt-0.5 text-center text-xs text-gray-400 dark:text-gray-500">{{
-              t('storage.comingSoon')
-            }}</span>
+            <span
+              class="font-outfit text-secondary-500/50 flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold dark:border-slate-600 dark:bg-slate-700/30 dark:text-gray-400"
+              >☁️ {{ t('storage.iCloud') }}</span
+            >
+            <span
+              class="font-outfit text-secondary-500/50 flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold dark:border-slate-600 dark:bg-slate-700/30 dark:text-gray-400"
+              >🪟 OneDrive</span
+            >
           </div>
-        </div>
+        </details>
       </div>
 
       <BaseButton class="mt-6 w-full" :disabled="!storageSaved" @click="handleStep2Next">
-        {{ t('loginV6.createNext') }}
+        {{ storageSaved ? t('loginV6.createNext') : t('loginV6.pickStorageToContinue') }}
       </BaseButton>
     </div>
 
     <!-- Step 3: Add Family Members -->
     <div v-else-if="currentStep === 3">
-      <h2 class="font-outfit mb-1 text-center text-xl font-bold text-gray-900 dark:text-gray-100">
+      <h2 class="font-outfit mb-6 text-center text-xl font-bold text-gray-900 dark:text-gray-100">
         {{ t('loginV6.addBeansTitle') }}
       </h2>
-      <p class="mb-6 text-center text-sm text-gray-500 dark:text-gray-400">
-        {{ t('loginV6.addBeansSubtitle') }}
-      </p>
 
       <!-- Owner + added members list -->
       <div class="mb-4 space-y-2">
@@ -843,7 +838,9 @@ function handleBack() {
                 member.ageGroup === 'child'
                   ? '🌱 ' + t('loginV6.littleBean')
                   : '🫘 ' + t('loginV6.parentBean')
-              }}
+              }}<template v-if="formatBirthdayShort(member.dateOfBirth)">
+                · {{ formatBirthdayShort(member.dateOfBirth) }}</template
+              >
             </p>
           </div>
           <button

@@ -1,0 +1,1124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>setup wizard v2 — beanies.family mockup</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --heritage-orange: #f15d22;
+        --heritage-orange-dark: #d94e16;
+        --heritage-orange-soft: #fef0e8;
+        --heritage-orange-glow: #fde6d8;
+        --terracotta: #e67e22;
+        --terracotta-soft: #fbe9d7;
+        --deep-slate: #2c3e50;
+        --slate-soft: #4a5d72;
+        --sky-silk: #aed6f1;
+        --sky-silk-soft: #eaf4fb;
+        --cloud-white: #f8f9fa;
+        --cream: #fffaf3;
+        --cream-deep: #fdf3e7;
+        --soft-green: #27ae60;
+        --slate-50: #f8fafc;
+        --slate-100: #f1f5f9;
+        --slate-200: #e2e8f0;
+        --slate-300: #cbd5e1;
+        --slate-400: #94a3b8;
+        --slate-500: #64748b;
+        --slate-600: #475569;
+        --slate-700: #334155;
+        --shadow-modal:
+          0 30px 80px -20px rgba(241, 93, 34, 0.18),
+          0 12px 30px -10px rgba(15, 23, 42, 0.08);
+      }
+      *,
+      *::before,
+      *::after { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background:
+          radial-gradient(ellipse at 15% 0%, #ffe8d4 0%, transparent 55%),
+          radial-gradient(ellipse at 85% 100%, var(--sky-silk-soft) 0%, transparent 55%),
+          radial-gradient(ellipse at 50% 50%, #fff8ef 0%, var(--cream) 100%);
+        color: var(--deep-slate);
+        min-height: 100vh;
+        padding: 48px 24px 96px;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      .page { max-width: 1180px; margin: 0 auto; }
+
+      header.page-header {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 16px;
+        text-align: center;
+      }
+      header.page-header h1 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 30px;
+        color: var(--deep-slate);
+        margin: 0;
+        letter-spacing: -0.012em;
+      }
+      header.page-header .meta {
+        font-size: 12.5px;
+        color: var(--slate-500);
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      header.page-header .meta strong {
+        color: var(--heritage-orange);
+        font-weight: 600;
+      }
+      header.page-header .lede {
+        font-size: 14.5px;
+        color: var(--slate-soft);
+        max-width: 640px;
+        margin: 8px auto 0;
+        line-height: 1.6;
+      }
+
+      /* variant toggle */
+      .variant-toggle {
+        display: inline-flex;
+        gap: 4px;
+        background: white;
+        padding: 5px;
+        border-radius: 999px;
+        border: 1px solid var(--cream-deep);
+        margin: 22px auto 8px;
+        align-self: center;
+        box-shadow: 0 4px 14px -6px rgba(241, 93, 34, 0.18);
+      }
+      .variant-toggle button {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 500;
+        font-size: 13.5px;
+        padding: 9px 18px;
+        border: none;
+        background: transparent;
+        color: var(--slate-500);
+        border-radius: 999px;
+        cursor: pointer;
+        transition: all 0.18s ease;
+      }
+      .variant-toggle button.active {
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        color: white;
+        box-shadow: 0 4px 12px -4px rgba(241, 93, 34, 0.55);
+      }
+      .variant-toggle button:not(.active):hover { color: var(--heritage-orange); }
+
+      .variant-caption {
+        text-align: center;
+        font-size: 13px;
+        color: var(--slate-500);
+        margin: 0 auto 32px;
+        max-width: 560px;
+        line-height: 1.55;
+      }
+
+      .stage {
+        display: grid;
+        grid-template-columns: minmax(0, 460px) minmax(280px, 360px);
+        gap: 32px;
+        align-items: start;
+        justify-content: center;
+      }
+      @media (max-width: 940px) {
+        .stage { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
+      }
+
+      /* modal frame */
+      .modal-frame {
+        background: linear-gradient(180deg, white 0%, var(--cream) 100%);
+        border-radius: 30px;
+        box-shadow: var(--shadow-modal);
+        width: 100%;
+        max-width: 460px;
+        overflow: hidden;
+        position: relative;
+        border: 1px solid var(--cream-deep);
+      }
+
+      /* progress strip */
+      .progress-band {
+        padding: 28px 32px 16px;
+        background:
+          radial-gradient(ellipse 70% 80% at 50% 30%, var(--heritage-orange-soft) 0%, transparent 70%);
+      }
+      .progress-strip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .progress-pip {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        background: var(--slate-100);
+        color: var(--slate-400);
+        transition: all 0.3s;
+      }
+      .progress-pip.active {
+        background: var(--heritage-orange);
+        color: white;
+        box-shadow: 0 4px 12px -4px rgba(241, 93, 34, 0.55);
+      }
+      .progress-pip.done {
+        background: rgba(39, 174, 96, 0.15);
+        color: var(--soft-green);
+      }
+      .progress-rule {
+        flex: 1;
+        height: 3px;
+        border-radius: 999px;
+        background: var(--slate-100);
+      }
+      .progress-rule.done { background: rgba(39, 174, 96, 0.4); }
+      .progress-labels {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 10px;
+      }
+      .progress-labels span {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--slate-400);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        flex: 1;
+        text-align: center;
+      }
+      .progress-labels span:first-child { text-align: left; }
+      .progress-labels span:last-child { text-align: right; }
+      .progress-labels span.active { color: var(--heritage-orange); }
+
+      /* step body */
+      .step-body { padding: 8px 32px 28px; }
+      .step-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 22px;
+        color: var(--deep-slate);
+        margin: 0 0 18px;
+        letter-spacing: -0.012em;
+      }
+      .step-title em { font-style: normal; color: var(--heritage-orange); }
+
+      /* form rows */
+      .field { margin-bottom: 14px; }
+      .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+      .field-label {
+        display: block;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--slate-soft);
+        margin-bottom: 6px;
+      }
+      .field-input,
+      .field-select {
+        width: 100%;
+        padding: 11px 14px;
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
+        color: var(--deep-slate);
+        background: white;
+        border: 1.5px solid var(--cream-deep);
+        border-radius: 14px;
+        outline: none;
+        transition: border-color 0.18s, box-shadow 0.18s;
+      }
+      .field-input:focus,
+      .field-select:focus {
+        border-color: var(--heritage-orange);
+        box-shadow: 0 0 0 4px var(--heritage-orange-glow);
+      }
+      .field-hint {
+        font-size: 12px;
+        color: var(--slate-400);
+        margin-top: 5px;
+      }
+      .field-checkbox {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        font-size: 13px;
+        color: var(--slate-soft);
+        margin-top: 10px;
+        cursor: pointer;
+      }
+      .field-checkbox input { margin-top: 2px; }
+
+      /* primary CTA */
+      .cta-primary {
+        width: 100%;
+        padding: 13px 18px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 15px;
+        color: white;
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        border: none;
+        border-radius: 16px;
+        cursor: pointer;
+        margin-top: 8px;
+        box-shadow: 0 8px 22px -8px rgba(241, 93, 34, 0.5);
+        transition: transform 0.15s, box-shadow 0.15s;
+      }
+      .cta-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 28px -8px rgba(241, 93, 34, 0.55);
+      }
+      .cta-secondary {
+        width: 100%;
+        padding: 11px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 500;
+        font-size: 13px;
+        color: var(--slate-500);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        margin-top: 6px;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      /* storage cards (step 2) */
+      .storage-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .storage-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 18px 10px 14px;
+        background: white;
+        border: 2px solid var(--cream-deep);
+        border-radius: 18px;
+        cursor: pointer;
+        transition: all 0.18s;
+        min-height: 96px;
+      }
+      .storage-card:hover {
+        border-color: var(--heritage-orange);
+        background: var(--heritage-orange-soft);
+      }
+      .storage-card.recommended {
+        border-color: rgba(241, 93, 34, 0.35);
+        background: rgba(241, 93, 34, 0.04);
+      }
+      .storage-card .icon { width: 28px; height: 28px; margin-bottom: 8px; }
+      .storage-card .label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--deep-slate);
+      }
+      .storage-card .pill {
+        margin-top: 4px;
+        background: rgba(241, 93, 34, 0.15);
+        color: var(--heritage-orange);
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        letter-spacing: 0.04em;
+      }
+      .storage-card.local .label,
+      .storage-card.local .icon path { color: var(--slate-400); stroke: var(--slate-400); }
+      .storage-card.local { background: var(--slate-50); }
+      .storage-card.local:hover {
+        border-color: var(--slate-300);
+        background: white;
+      }
+
+      /* disclosure rows (step 2) */
+      details.disclosure {
+        margin-top: 10px;
+        border: 1px solid var(--cream-deep);
+        border-radius: 14px;
+        background: white;
+        overflow: hidden;
+      }
+      details.disclosure summary {
+        padding: 10px 14px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 12.5px;
+        color: var(--slate-soft);
+        cursor: pointer;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        user-select: none;
+      }
+      details.disclosure summary::-webkit-details-marker { display: none; }
+      details.disclosure summary::before {
+        content: '▸';
+        color: var(--heritage-orange);
+        transition: transform 0.18s;
+        display: inline-block;
+        font-size: 11px;
+      }
+      details.disclosure[open] summary::before { transform: rotate(90deg); }
+      details.disclosure summary:hover { color: var(--heritage-orange); }
+      details.disclosure .body {
+        padding: 0 14px 14px 30px;
+        font-size: 13px;
+        color: var(--slate-soft);
+        line-height: 1.55;
+      }
+      details.disclosure .body p { margin: 0 0 8px; }
+      details.disclosure .body p:last-child { margin-bottom: 0; }
+      details.disclosure .body ul { margin: 0; padding-left: 18px; }
+      details.disclosure .body li { margin-bottom: 4px; }
+      details.disclosure .body strong { color: var(--deep-slate); }
+
+      /* coming-soon mini-row */
+      .coming-soon-row {
+        display: flex;
+        gap: 8px;
+        padding: 0 4px;
+      }
+      .coming-soon-chip {
+        flex: 1;
+        text-align: center;
+        padding: 8px 6px;
+        background: var(--slate-50);
+        border: 1px dashed var(--slate-200);
+        border-radius: 10px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--slate-400);
+        letter-spacing: 0.04em;
+      }
+      .coming-soon-chip svg { vertical-align: -2px; margin-right: 4px; opacity: 0.6; }
+
+      /* member tiles (step 3) */
+      .member-tile {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: var(--slate-50);
+        border-radius: 14px;
+        margin-bottom: 8px;
+      }
+      .member-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #fde6d8, #aed6f1);
+        flex: 0 0 auto;
+      }
+      .member-name {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--deep-slate);
+        margin: 0;
+      }
+      .member-role {
+        font-size: 12px;
+        color: var(--slate-500);
+        margin: 1px 0 0;
+      }
+      .you-pill {
+        margin-left: 6px;
+        background: rgba(241, 93, 34, 0.15);
+        color: var(--heritage-orange);
+        font-family: 'Outfit', sans-serif;
+        font-size: 9.5px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 999px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .member-add-form {
+        padding: 14px;
+        background: white;
+        border: 1.5px dashed var(--cream-deep);
+        border-radius: 16px;
+        margin-top: 6px;
+      }
+      .role-toggle {
+        display: inline-flex;
+        gap: 4px;
+        background: var(--slate-50);
+        padding: 3px;
+        border-radius: 999px;
+        margin-bottom: 12px;
+      }
+      .role-toggle button {
+        padding: 6px 14px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--slate-500);
+        background: transparent;
+        border: none;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .role-toggle button.active {
+        background: var(--deep-slate);
+        color: white;
+      }
+      .dob-grid {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr 1fr;
+        gap: 8px;
+      }
+      .add-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .add-row .cta-primary { margin-top: 0; flex: 1; padding: 10px; font-size: 13px; }
+      .add-row .cta-secondary { margin-top: 0; flex: 1; padding: 10px; text-decoration: none; background: var(--slate-100); border-radius: 16px; color: var(--slate-soft); font-weight: 600; font-size: 13px; }
+
+      /* footer link */
+      .footer-link {
+        text-align: center;
+        font-size: 13px;
+        color: var(--slate-500);
+        margin-top: 18px;
+      }
+      .footer-link a { color: var(--heritage-orange); text-decoration: none; font-weight: 600; }
+
+      /* changes panel (sidebar) */
+      .changes-panel {
+        background: white;
+        border: 1px solid var(--cream-deep);
+        border-radius: 24px;
+        padding: 24px;
+        position: sticky;
+        top: 24px;
+        box-shadow: 0 8px 24px -10px rgba(15, 23, 42, 0.08);
+      }
+      .changes-panel h3 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        color: var(--deep-slate);
+        margin: 0 0 4px;
+      }
+      .changes-panel .step-tag {
+        display: inline-block;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--heritage-orange);
+        background: var(--heritage-orange-soft);
+        padding: 3px 9px;
+        border-radius: 999px;
+        letter-spacing: 0.04em;
+        margin-bottom: 12px;
+      }
+      .changes-panel ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .changes-panel li {
+        padding: 8px 0;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--slate-soft);
+        border-bottom: 1px dashed var(--cream-deep);
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .changes-panel li:last-child { border-bottom: none; }
+      .changes-panel li::before {
+        content: '';
+        flex: 0 0 6px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        margin-top: 7px;
+      }
+      .changes-panel li.cut::before { background: var(--heritage-orange); }
+      .changes-panel li.add::before { background: var(--soft-green); }
+      .changes-panel li.tweak::before { background: var(--sky-silk); }
+      .changes-panel li strong { color: var(--deep-slate); font-weight: 600; }
+      .changes-panel li code {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11.5px;
+        background: var(--slate-50);
+        padding: 1px 5px;
+        border-radius: 4px;
+        color: var(--slate-700);
+      }
+      .legend {
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px dashed var(--cream-deep);
+        display: flex;
+        gap: 14px;
+        font-size: 11px;
+        color: var(--slate-500);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .legend span { display: flex; align-items: center; gap: 5px; }
+      .legend span::before {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+      .legend .l-cut::before { background: var(--heritage-orange); }
+      .legend .l-add::before { background: var(--soft-green); }
+      .legend .l-tweak::before { background: var(--sky-silk); }
+
+      .step-stack { display: none; }
+      .step-stack.active { display: grid; grid-template-columns: minmax(0, 460px); gap: 32px; justify-content: center; }
+
+      /* show/hide variants */
+      .variant { display: none; }
+      .variant.active { display: grid; }
+
+      .footnote {
+        margin: 56px auto 0;
+        max-width: 720px;
+        text-align: center;
+        font-size: 12.5px;
+        color: var(--slate-400);
+        line-height: 1.6;
+      }
+      .footnote code {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        background: var(--slate-50);
+        padding: 1px 5px;
+        border-radius: 4px;
+        color: var(--slate-700);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="page-header">
+        <div class="meta"><strong>setup wizard</strong> · v2 mockup</div>
+        <h1>tighter, less wordy, less intimidating</h1>
+        <p class="lede">
+          Same 3 steps, same captured information — but stripped of every paragraph that
+          wasn't pulling its weight. Step 2's 75-word security paragraph becomes a
+          <code>▸ how this works</code> disclosure. Coming-soon storage providers shrink
+          from 3 disabled cards into a small chip row. Section subtitles drop or move into
+          context. Form-first design throughout.
+        </p>
+
+        <div class="variant-toggle" role="tablist">
+          <button class="active" data-variant="step1">Step 1 · You</button>
+          <button data-variant="step2">Step 2 · Storage</button>
+          <button data-variant="step3">Step 3 · Family</button>
+          <button data-variant="all">All three</button>
+        </div>
+        <p class="variant-caption">
+          Step beans + bottom CTA stay in their current positions. The cuts are all in
+          the body content — copy density, not navigation.
+        </p>
+      </header>
+
+      <!-- ─── STEP 1 ───────────────────────────────────────────── -->
+      <div class="variant active" data-variant="step1">
+        <div class="stage">
+          <div class="modal-frame">
+            <div class="progress-band">
+              <div class="progress-strip">
+                <span class="progress-pip active">1</span>
+                <span class="progress-rule"></span>
+                <span class="progress-pip">2</span>
+                <span class="progress-rule"></span>
+                <span class="progress-pip">3</span>
+              </div>
+              <div class="progress-labels">
+                <span class="active">You</span>
+                <span>Storage</span>
+                <span>Family</span>
+              </div>
+            </div>
+            <div class="step-body">
+              <h2 class="step-title">Start your pod <em>🌱</em></h2>
+
+              <div class="field">
+                <label class="field-label">Pod name</label>
+                <input class="field-input" type="text" placeholder="The Parkers" />
+              </div>
+
+              <div class="field-row">
+                <div>
+                  <label class="field-label">Your name</label>
+                  <input class="field-input" type="text" placeholder="Greg" />
+                </div>
+                <div>
+                  <label class="field-label">You're a</label>
+                  <select class="field-select">
+                    <option>🫘 Parent bean</option>
+                    <option>🌱 Little bean</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="field-label">Email</label>
+                <input class="field-input" type="email" placeholder="you@example.com" />
+              </div>
+
+              <div class="field-row">
+                <div>
+                  <label class="field-label">Password</label>
+                  <input class="field-input" type="password" placeholder="••••••••" />
+                </div>
+                <div>
+                  <label class="field-label">Confirm</label>
+                  <input class="field-input" type="password" placeholder="••••••••" />
+                </div>
+              </div>
+              <p class="field-hint">8+ characters. Used to sign into your bean profile.</p>
+
+              <label class="field-checkbox">
+                <input type="checkbox" checked />
+                <span>Send me the beanstalk newsletter <em style="color:var(--slate-400);font-style:normal;">(every other week, no spam)</em></span>
+              </label>
+
+              <button class="cta-primary">Next →</button>
+            </div>
+          </div>
+
+          <aside class="changes-panel">
+            <span class="step-tag">Step 1 — You</span>
+            <h3>What changed</h3>
+            <ul>
+              <li class="tweak">
+                Title <code>Grow a brand-new pod</code> →
+                <strong>Start your pod 🌱</strong>. Three words shorter, same intent.
+              </li>
+              <li class="cut">
+                Subtitle dropped: <em>"Name your family pod and create your sign-in
+                password."</em> The form labels say this already.
+              </li>
+              <li class="tweak">
+                Field labels switched to UI-style caps for visual rhythm: <code>Pod
+                name</code>, <code>Your name</code>, <code>You're a</code>.
+              </li>
+              <li class="tweak">
+                Password hint shortened: <em>"You'll use this password to sign into your
+                bean profile"</em> → <strong>"8+ characters. Used to sign into your bean
+                profile."</strong>
+              </li>
+              <li class="tweak">
+                Newsletter line gains a small parenthetical so the user knows what they're
+                opting into without a separate paragraph.
+              </li>
+              <li class="cut">
+                <strong>3 lines of text</strong> removed total on this step.
+              </li>
+            </ul>
+            <div class="legend">
+              <span class="l-cut">cut</span>
+              <span class="l-add">added</span>
+              <span class="l-tweak">tweaked</span>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- ─── STEP 2 ───────────────────────────────────────────── -->
+      <div class="variant" data-variant="step2">
+        <div class="stage">
+          <div class="modal-frame">
+            <div class="progress-band">
+              <div class="progress-strip">
+                <span class="progress-pip done">✓</span>
+                <span class="progress-rule done"></span>
+                <span class="progress-pip active">2</span>
+                <span class="progress-rule"></span>
+                <span class="progress-pip">3</span>
+              </div>
+              <div class="progress-labels">
+                <span>You</span>
+                <span class="active">Storage</span>
+                <span>Family</span>
+              </div>
+            </div>
+            <div class="step-body">
+              <h2 class="step-title">Where should we save it?</h2>
+
+              <div class="storage-grid">
+                <div class="storage-card recommended">
+                  <svg class="icon" viewBox="0 0 87.3 78">
+                    <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                    <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-20.4 35.3c-.8 1.4-1.2 2.95-1.2 4.5h27.5z" fill="#00ac47"/>
+                    <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.5l5.85 13.15z" fill="#ea4335"/>
+                    <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                    <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+                    <path d="m73.4 26.5-10.1-17.5c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 23.8h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+                  </svg>
+                  <span class="label">Google Drive</span>
+                  <span class="pill">Recommended</span>
+                </div>
+                <div class="storage-card local">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span class="label">Local file</span>
+                </div>
+              </div>
+
+              <details class="disclosure">
+                <summary>How this works</summary>
+                <div class="body">
+                  <p>
+                    <strong>Your data stays yours.</strong> beanies.family doesn't run any
+                    server or database — your encrypted <code>.beanpod</code> file lives
+                    in your own storage.
+                  </p>
+                  <ul>
+                    <li><strong>AES-256 encryption.</strong> Only your password unlocks it.</li>
+                    <li><strong>No tracking.</strong> No analytics on your finances.</li>
+                    <li><strong>Open source.</strong> Audit the code on GitHub anytime.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="disclosure">
+                <summary>More providers coming soon</summary>
+                <div class="body">
+                  <div class="coming-soon-row">
+                    <span class="coming-soon-chip">📦 Dropbox</span>
+                    <span class="coming-soon-chip">☁️ iCloud</span>
+                    <span class="coming-soon-chip">🪟 OneDrive</span>
+                  </div>
+                </div>
+              </details>
+
+              <button class="cta-primary" disabled style="opacity: 0.45; cursor: not-allowed; background: var(--slate-200); color: var(--slate-500); box-shadow: none;">Pick a storage to continue</button>
+            </div>
+          </div>
+
+          <aside class="changes-panel">
+            <span class="step-tag">Step 2 — Storage</span>
+            <h3>What changed</h3>
+            <ul>
+              <li class="cut">
+                <strong>Removed: 75-word security paragraph.</strong> <em>"We don't store
+                your data on any server or database — your family's finances stay entirely
+                in your hands. Choose where your encrypted .beanpod file lives, and only
+                you hold the key."</em>
+              </li>
+              <li class="cut">
+                Title <code>Save & secure your pod</code> + section label <code>Where
+                should we save your pod?</code> merged into one heading: <strong>"Where
+                should we save it?"</strong>
+              </li>
+              <li class="cut">
+                Subtitle dropped: <em>"Choose where to store your encrypted data
+                file."</em> The heading already asks the question.
+              </li>
+              <li class="add">
+                Added <code>▸ How this works</code> disclosure — security explainer in
+                3 short bullets, hidden by default. Available without burning visible
+                space.
+              </li>
+              <li class="cut">
+                Coming-soon Dropbox / iCloud / OneDrive cards (3 disabled tiles, ~216px
+                tall) collapsed into a single <code>▸ More providers coming soon</code>
+                disclosure with mini chips. Visible noise reduced ~70%.
+              </li>
+              <li class="tweak">
+                CTA stays disabled with explicit text <em>"Pick a storage to continue"</em>
+                until a card is selected, instead of a generic <code>Next</code> that
+                looks active but isn't.
+              </li>
+            </ul>
+            <div class="legend">
+              <span class="l-cut">cut</span>
+              <span class="l-add">added</span>
+              <span class="l-tweak">tweaked</span>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- ─── STEP 3 ───────────────────────────────────────────── -->
+      <div class="variant" data-variant="step3">
+        <div class="stage">
+          <div class="modal-frame">
+            <div class="progress-band">
+              <div class="progress-strip">
+                <span class="progress-pip done">✓</span>
+                <span class="progress-rule done"></span>
+                <span class="progress-pip done">✓</span>
+                <span class="progress-rule done"></span>
+                <span class="progress-pip active">3</span>
+              </div>
+              <div class="progress-labels">
+                <span>You</span>
+                <span>Storage</span>
+                <span class="active">Family</span>
+              </div>
+            </div>
+            <div class="step-body">
+              <h2 class="step-title">Add your family <em>🫘</em></h2>
+
+              <div class="member-tile">
+                <div class="member-avatar"></div>
+                <div style="flex:1;">
+                  <p class="member-name">Greg <span class="you-pill">You</span></p>
+                  <p class="member-role">🫘 Parent bean</p>
+                </div>
+              </div>
+
+              <div class="member-tile">
+                <div class="member-avatar" style="background: linear-gradient(135deg, #fde6d8, #ffd1b3);"></div>
+                <div style="flex:1;">
+                  <p class="member-name">Sarah</p>
+                  <p class="member-role">🫘 Parent bean · 14 May</p>
+                </div>
+                <button style="background:none;border:none;padding:6px;color:var(--slate-400);cursor:pointer;font-size:18px;">×</button>
+              </div>
+
+              <div class="member-add-form">
+                <div class="role-toggle">
+                  <button class="active">🫘 Parent</button>
+                  <button>🌱 Little</button>
+                </div>
+                <input class="field-input" type="text" placeholder="Name" style="margin-bottom:10px;" />
+                <div class="dob-grid">
+                  <select class="field-select"><option>Month</option></select>
+                  <select class="field-select"><option>Day</option></select>
+                  <input class="field-input" type="text" placeholder="Year" />
+                </div>
+                <div class="add-row">
+                  <button class="cta-secondary" style="text-decoration:none;">Cancel</button>
+                  <button class="cta-primary" style="background: var(--deep-slate);">Add bean</button>
+                </div>
+              </div>
+
+              <button class="cta-primary">Finish · take me to the nook 🏡</button>
+              <button class="cta-secondary">Skip — just me for now</button>
+            </div>
+          </div>
+
+          <aside class="changes-panel">
+            <span class="step-tag">Step 3 — Family</span>
+            <h3>What changed</h3>
+            <ul>
+              <li class="tweak">
+                Title <code>Add your family members</code> → <strong>Add your family
+                🫘</strong>. Same meaning, half the words.
+              </li>
+              <li class="cut">
+                Subtitle dropped: <em>"You can always add more later"</em>. Moved into
+                the secondary CTA instead: <strong>"Skip — just me for now"</strong>
+                covers the same reassurance and is action-shaped.
+              </li>
+              <li class="tweak">
+                Final CTA <code>Finish</code> →
+                <strong>"Finish · take me to the nook 🏡"</strong>. Tells the user where
+                they're going next; the destination feels like a reward, not a button
+                press.
+              </li>
+              <li class="tweak">
+                Add-member CTA <code>Add Member</code> →
+                <strong>"Add bean"</strong>. Brand-vocabulary, single syllable.
+              </li>
+              <li class="add">
+                <strong>Birthday display moved into the member-tile meta line</strong>
+                (<em>"🫘 Parent bean · 14 May"</em>) so reviewing a list of 3+ members is
+                easier without expanding each.
+              </li>
+              <li class="cut">
+                <strong>2 lines of text</strong> removed; CTA verbosity → CTA promise.
+              </li>
+            </ul>
+            <div class="legend">
+              <span class="l-cut">cut</span>
+              <span class="l-add">added</span>
+              <span class="l-tweak">tweaked</span>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- ─── ALL THREE (stacked) ──────────────────────────────── -->
+      <div class="variant" data-variant="all">
+        <div class="step-stack active" style="grid-template-columns: repeat(3, minmax(0, 360px)); gap: 24px; max-width: 100%;">
+          <!-- Step 1 (compact) -->
+          <div class="modal-frame" style="max-width: 360px;">
+            <div class="progress-band" style="padding: 22px 24px 12px;">
+              <div class="progress-strip">
+                <span class="progress-pip active">1</span>
+                <span class="progress-rule"></span>
+                <span class="progress-pip">2</span>
+                <span class="progress-rule"></span>
+                <span class="progress-pip">3</span>
+              </div>
+              <div class="progress-labels">
+                <span class="active">You</span>
+                <span>Storage</span>
+                <span>Family</span>
+              </div>
+            </div>
+            <div class="step-body" style="padding: 6px 24px 22px;">
+              <h2 class="step-title" style="font-size:18px;margin-bottom:14px;">Start your pod <em>🌱</em></h2>
+              <div class="field"><label class="field-label">Pod name</label><input class="field-input" placeholder="The Parkers" /></div>
+              <div class="field-row" style="margin-bottom:10px;">
+                <div><label class="field-label">Your name</label><input class="field-input" placeholder="Greg" /></div>
+                <div><label class="field-label">You're a</label><select class="field-select"><option>🫘 Parent</option></select></div>
+              </div>
+              <div class="field"><label class="field-label">Email</label><input class="field-input" type="email" placeholder="you@example.com" /></div>
+              <div class="field-row" style="margin-bottom:6px;">
+                <div><label class="field-label">Password</label><input class="field-input" type="password" placeholder="••••••••" /></div>
+                <div><label class="field-label">Confirm</label><input class="field-input" type="password" placeholder="••••••••" /></div>
+              </div>
+              <p class="field-hint" style="margin-bottom:8px;">8+ characters.</p>
+              <label class="field-checkbox" style="font-size:12px;"><input type="checkbox" checked /><span>Subscribe to the beanstalk newsletter</span></label>
+              <button class="cta-primary" style="font-size:13.5px;padding:11px;">Next →</button>
+            </div>
+          </div>
+
+          <!-- Step 2 (compact) -->
+          <div class="modal-frame" style="max-width: 360px;">
+            <div class="progress-band" style="padding: 22px 24px 12px;">
+              <div class="progress-strip">
+                <span class="progress-pip done">✓</span>
+                <span class="progress-rule done"></span>
+                <span class="progress-pip active">2</span>
+                <span class="progress-rule"></span>
+                <span class="progress-pip">3</span>
+              </div>
+              <div class="progress-labels">
+                <span>You</span>
+                <span class="active">Storage</span>
+                <span>Family</span>
+              </div>
+            </div>
+            <div class="step-body" style="padding: 6px 24px 22px;">
+              <h2 class="step-title" style="font-size:18px;margin-bottom:14px;">Where should we save it?</h2>
+              <div class="storage-grid">
+                <div class="storage-card recommended" style="min-height:80px;padding:12px 8px 10px;">
+                  <svg class="icon" viewBox="0 0 87.3 78" style="width:22px;height:22px;margin-bottom:5px;">
+                    <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                    <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-20.4 35.3c-.8 1.4-1.2 2.95-1.2 4.5h27.5z" fill="#00ac47"/>
+                    <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.5l5.85 13.15z" fill="#ea4335"/>
+                    <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                    <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+                    <path d="m73.4 26.5-10.1-17.5c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 23.8h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+                  </svg>
+                  <span class="label" style="font-size:11.5px;">Google Drive</span>
+                  <span class="pill" style="font-size:9px;padding:1px 6px;">Recommended</span>
+                </div>
+                <div class="storage-card local" style="min-height:80px;padding:12px 8px 10px;">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:22px;height:22px;margin-bottom:5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
+                  <span class="label" style="font-size:11.5px;">Local file</span>
+                </div>
+              </div>
+              <details class="disclosure"><summary>How this works</summary><div class="body"><p>Your encrypted <code>.beanpod</code> lives in your storage. AES-256, no servers, open source.</p></div></details>
+              <details class="disclosure"><summary>More providers coming soon</summary><div class="body"><div class="coming-soon-row"><span class="coming-soon-chip">📦 Dropbox</span><span class="coming-soon-chip">☁️ iCloud</span><span class="coming-soon-chip">🪟 OneDrive</span></div></div></details>
+              <button class="cta-primary" disabled style="opacity: 0.45; cursor: not-allowed; background: var(--slate-200); color: var(--slate-500); box-shadow: none; font-size:13.5px; padding:11px;">Pick a storage</button>
+            </div>
+          </div>
+
+          <!-- Step 3 (compact) -->
+          <div class="modal-frame" style="max-width: 360px;">
+            <div class="progress-band" style="padding: 22px 24px 12px;">
+              <div class="progress-strip">
+                <span class="progress-pip done">✓</span>
+                <span class="progress-rule done"></span>
+                <span class="progress-pip done">✓</span>
+                <span class="progress-rule done"></span>
+                <span class="progress-pip active">3</span>
+              </div>
+              <div class="progress-labels">
+                <span>You</span>
+                <span>Storage</span>
+                <span class="active">Family</span>
+              </div>
+            </div>
+            <div class="step-body" style="padding: 6px 24px 22px;">
+              <h2 class="step-title" style="font-size:18px;margin-bottom:14px;">Add your family <em>🫘</em></h2>
+              <div class="member-tile" style="padding:10px;">
+                <div class="member-avatar" style="width:30px;height:30px;"></div>
+                <div style="flex:1;"><p class="member-name" style="font-size:13px;">Greg <span class="you-pill">You</span></p><p class="member-role" style="font-size:11px;">🫘 Parent bean</p></div>
+              </div>
+              <div class="member-tile" style="padding:10px;">
+                <div class="member-avatar" style="width:30px;height:30px;background: linear-gradient(135deg, #fde6d8, #ffd1b3);"></div>
+                <div style="flex:1;"><p class="member-name" style="font-size:13px;">Sarah</p><p class="member-role" style="font-size:11px;">🫘 Parent · 14 May</p></div>
+              </div>
+              <div class="member-add-form" style="padding:10px;">
+                <div class="role-toggle" style="margin-bottom:8px;"><button class="active" style="padding:4px 10px;font-size:11px;">🫘 Parent</button><button style="padding:4px 10px;font-size:11px;">🌱 Little</button></div>
+                <input class="field-input" placeholder="Name" style="margin-bottom:8px;" />
+                <div class="dob-grid"><select class="field-select"><option>Mo</option></select><select class="field-select"><option>Day</option></select><input class="field-input" placeholder="Year" /></div>
+                <div class="add-row"><button class="cta-secondary" style="text-decoration:none;font-size:12px;padding:8px;">Cancel</button><button class="cta-primary" style="background: var(--deep-slate);font-size:12px;padding:8px;">Add bean</button></div>
+              </div>
+              <button class="cta-primary" style="font-size:13.5px;padding:11px;">Finish · take me to the nook 🏡</button>
+              <button class="cta-secondary" style="font-size:12px;">Skip — just me for now</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="footnote">
+        Mockup. Not yet wired into the Vue components — proposal only. Existing 3-step
+        structure is preserved; CTAs and form fields keep the same data contract. Once
+        the copy direction is approved, the Vue refactor is mostly i18n-string updates
+        plus the new <code>&lt;details&gt;</code> disclosure markup in
+        <code>CreatePodView.vue</code>'s Step 2.
+      </p>
+    </div>
+
+    <script>
+      const buttons = document.querySelectorAll('.variant-toggle button');
+      const variants = document.querySelectorAll('.variant');
+      buttons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          buttons.forEach((b) => b.classList.remove('active'));
+          variants.forEach((v) => v.classList.remove('active'));
+          btn.classList.add('active');
+          const target = btn.dataset.variant;
+          document.querySelectorAll(`.variant[data-variant="${target}"]`).forEach((v) => v.classList.add('active'));
+        });
+      });
+    </script>
+  </body>
+</html>

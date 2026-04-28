@@ -2642,15 +2642,14 @@ const STRING_DEFS = {
     en: 'Save a .beanpod file to your device',
     beanie: 'save a .beanpod file to your device',
   },
-  'loginV6.addBeansTitle': { en: 'Add your family members', beanie: 'add your beanies' },
-  'loginV6.addBeansSubtitle': {
-    en: 'You can always add more later',
-    beanie: 'more beans can join later!',
-  },
-  'loginV6.addMember': { en: 'Add Member', beanie: 'add beanie' },
+  'loginV6.addBeansTitle': { en: 'Add your family 🫘', beanie: 'add your family 🫘' },
+  'loginV6.addMember': { en: 'Add bean', beanie: 'add bean' },
   'loginV6.addAnotherBeanie': { en: 'Add another family member?', beanie: 'add another beanie?' },
-  'loginV6.finish': { en: 'Finish', beanie: 'finish' },
-  'loginV6.skip': { en: 'Skip for now', beanie: 'skip for now' },
+  'loginV6.finish': {
+    en: 'Finish · take me to the nook 🏡',
+    beanie: 'finish · take me to the nook 🏡',
+  },
+  'loginV6.skip': { en: 'Skip — just me for now', beanie: 'skip — just me for now' },
   'loginV6.joinButton': { en: "Join My Family's Pod", beanie: 'join your pod!' },
   'loginV6.wantYourOwn': { en: 'Want your own?', beanie: 'want your own?' },
   'loginV6.createLink': { en: 'Create a new pod', beanie: 'create a new pod' },
@@ -2683,29 +2682,48 @@ const STRING_DEFS = {
     beanie:
       'onboarded beans can sign in with their password. new beans need to create a password first.',
   },
-  'loginV6.growPodTitle': { en: 'Grow a brand-new pod', beanie: 'grow a brand-new pod' },
-  'loginV6.growPodSubtitle': {
-    en: 'Name your family pod and create your sign-in password.',
-    beanie: 'name your family pod and create your sign-in password.',
+  'loginV6.growPodTitle': {
+    en: 'Start your pod \ud83c\udf31',
+    beanie: 'start your pod \ud83c\udf31',
   },
   'loginV6.signInPasswordLabel': { en: 'Your sign-in password', beanie: 'your sign-in password' },
   'loginV6.signInPasswordHint': {
-    en: "You'll use this password to sign into your bean profile",
-    beanie: "you'll use this password to sign into your bean profile",
-  },
-  'loginV6.storageDescription': {
-    en: "We don't store your data on any server or database \u2014 your family's finances stay entirely in your hands. Choose where your encrypted .beanpod file lives, and only you hold the key.",
-    beanie:
-      "we don't store your data on any server or database \u2014 your family's finances stay entirely in your hands. choose where your encrypted .beanpod file lives, and only you hold the key.",
+    en: '8+ characters. Used to sign into your bean profile.',
+    beanie: '8+ characters. used to sign into your bean profile.',
   },
   'loginV6.storageSectionLabel': {
-    en: 'Where should we save your pod?',
-    beanie: 'where should we save your pod?',
+    en: 'Where should we save it?',
+    beanie: 'where should we save it?',
   },
-  'loginV6.step2Title': { en: 'Save & secure your pod', beanie: 'save & secure your pod' },
-  'loginV6.step2Subtitle': {
-    en: 'Choose where to store your encrypted data file.',
-    beanie: 'choose where to store your encrypted data file.',
+  'loginV6.howThisWorks.toggle': { en: 'How this works', beanie: 'how this works' },
+  'loginV6.howThisWorks.lead': {
+    en: "beanies.family doesn't run any server or database \u2014 your encrypted .beanpod file lives in your own storage.",
+    beanie:
+      "beanies.family doesn't run any server or database \u2014 your encrypted .beanpod file lives in your own storage.",
+  },
+  'loginV6.howThisWorks.bullet1': {
+    en: 'AES-256 encryption. Only your password unlocks it.',
+    beanie: 'aes-256 encryption. only your password unlocks it.',
+  },
+  'loginV6.howThisWorks.bullet2': {
+    en: 'No tracking. No analytics on your finances.',
+    beanie: 'no tracking. no analytics on your finances.',
+  },
+  'loginV6.howThisWorks.bullet3': {
+    en: 'Open source. Audit the code on GitHub anytime.',
+    beanie: 'open source. audit the code on github anytime.',
+  },
+  'loginV6.howThisWorks.leadStrong': {
+    en: 'Your data stays yours.',
+    beanie: 'your data stays yours.',
+  },
+  'loginV6.moreProvidersComingSoon': {
+    en: 'More providers coming soon',
+    beanie: 'more providers coming soon',
+  },
+  'loginV6.pickStorageToContinue': {
+    en: 'Pick a storage to continue',
+    beanie: 'pick a storage to continue',
   },
   'loginV6.addMemberFailed': {
     en: 'Failed to add member. Please try again.',
