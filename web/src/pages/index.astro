@@ -9,6 +9,7 @@ import { APP_URL } from '@beanies/brand/nav';
   description="one app to manage your family's money, activities, and all the little beans. open source and fully encrypted. no ads, no tracking, no nonsense."
   canonicalPath="/"
   jsonLd={SOFTWARE_APPLICATION}
+  lcpImage="/brand/beanies_family_hugging_transparent_512x512.webp"
 >
   <div class="landing-page">
     <!-- HERO -->
@@ -19,16 +20,23 @@ import { APP_URL } from '@beanies/brand/nav';
       <div class="hero__bean" style="font-size: 1.3rem; right: 5%; top: 60%; transform: rotate(10deg)">🫘</div>
       <div class="hero__bean" style="bottom: 35%; font-size: 1.8rem; right: 18%; transform: rotate(-20deg)">🫘</div>
 
-      <img src="/brand/beanies_small_bean_favicon_512x512.png" alt="" class="hero__deco-img" style="animation: decoFloat1 8s ease-in-out infinite; opacity: 0.06; right: 12%; top: 8%; transform: rotate(12deg); width: 40px" />
-      <img src="/brand/beanies_open_eyes_transparent_512x512.png" alt="" class="hero__deco-img" style="bottom: 15%; opacity: 0.04; right: 6%; transform: rotate(-8deg); width: 50px" />
-      <img src="/brand/beanies_impact_bullet_transparent_192x192.png" alt="" class="hero__deco-img" style="animation: decoFloat2 10s ease-in-out infinite; left: 4%; opacity: 0.05; top: 45%; transform: rotate(15deg); width: 35px" />
+      <img src="/brand/beanies_small_bean_favicon_512x512.webp" alt="" width="512" height="512" loading="lazy" decoding="async" class="hero__deco-img" style="animation: decoFloat1 8s ease-in-out infinite; opacity: 0.06; right: 12%; top: 8%; transform: rotate(12deg); width: 40px; height: auto" />
+      <img src="/brand/beanies_open_eyes_transparent_512x512.webp" alt="" width="512" height="512" loading="lazy" decoding="async" class="hero__deco-img" style="bottom: 15%; opacity: 0.04; right: 6%; transform: rotate(-8deg); width: 50px; height: auto" />
+      <img src="/brand/beanies_impact_bullet_transparent_192x192.webp" alt="" width="192" height="192" loading="lazy" decoding="async" class="hero__deco-img" style="animation: decoFloat2 10s ease-in-out infinite; left: 4%; opacity: 0.05; top: 45%; transform: rotate(15deg); width: 35px; height: auto" />
 
       <div class="hero__deco" style="background: var(--sky-silk); height: 400px; right: -150px; top: -100px; width: 400px"></div>
       <div class="hero__deco" style="background: var(--heritage-orange); bottom: 10%; filter: blur(100px); height: 300px; left: -120px; width: 300px"></div>
       <div class="hero__deco" style="background: var(--terracotta); filter: blur(80px); height: 200px; opacity: 0.04; right: 5%; top: 40%; width: 200px"></div>
 
       <div class="hero__mascot">
-        <img src="/brand/beanies_family_hugging_transparent_512x512.png" alt="the beanies family" />
+        <img
+          src="/brand/beanies_family_hugging_transparent_512x512.webp"
+          alt="the beanies family"
+          width="512"
+          height="512"
+          fetchpriority="high"
+          decoding="async"
+        />
       </div>
 
       <h1 class="hero__headline">every. bean.<br /><em>counts.</em></h1>
@@ -183,25 +191,25 @@ import { APP_URL } from '@beanies/brand/nav';
             <div class="mock-beans-row">
               <div class="mock-bean">
                 <div class="mock-bean-avatar" style="border-color: #3b82f6">
-                  <img src="/brand/beanies_father_icon_transparent_360x360.png" alt="" />
+                  <img src="/brand/beanies_father_icon_transparent_360x360.webp" alt="" width="360" height="360" loading="lazy" decoding="async" />
                 </div>
                 <div class="mock-bean-name">Greg</div>
               </div>
               <div class="mock-bean">
                 <div class="mock-bean-avatar" style="border-color: #ec4899">
-                  <img src="/brand/beanies_mother_icon_transparent_350x350.png" alt="" />
+                  <img src="/brand/beanies_mother_icon_transparent_350x350.webp" alt="" width="350" height="350" loading="lazy" decoding="async" />
                 </div>
                 <div class="mock-bean-name">Sarah</div>
               </div>
               <div class="mock-bean">
                 <div class="mock-bean-avatar" style="border-color: #f59e0b">
-                  <img src="/brand/beanies_baby_girl_icon_transparent_300x300.png" alt="" />
+                  <img src="/brand/beanies_baby_girl_icon_transparent_300x300.webp" alt="" width="300" height="300" loading="lazy" decoding="async" />
                 </div>
                 <div class="mock-bean-name">Emma</div>
               </div>
               <div class="mock-bean">
                 <div class="mock-bean-avatar" style="border-color: #10b981">
-                  <img src="/brand/beanies_baby_boy_icon_transparent_300x300.png" alt="" />
+                  <img src="/brand/beanies_baby_boy_icon_transparent_300x300.webp" alt="" width="300" height="300" loading="lazy" decoding="async" />
                 </div>
                 <div class="mock-bean-name">Liam</div>
               </div>
@@ -368,7 +376,7 @@ import { APP_URL } from '@beanies/brand/nav';
     <section id="security" class="security-section">
       <div class="ambient-orb ambient-orb--1"></div>
       <div class="ambient-orb ambient-orb--2"></div>
-      <img src="/brand/beanies_small_bean_favicon_512x512.png" alt="" class="security-section__deco-accent" />
+      <img src="/brand/beanies_small_bean_favicon_512x512.webp" alt="" width="512" height="512" loading="lazy" decoding="async" class="security-section__deco-accent" />
       <div class="container">
         <p class="section-label reveal">privacy &amp; security</p>
         <h2 class="section-title reveal">seriously, I don't want your data</h2>
@@ -427,7 +435,7 @@ import { APP_URL } from '@beanies/brand/nav';
           </div>
         </div>
 
-        <img src="/brand/beanies_covering_eyes_transparent_512x512.png" alt="" class="security-section__watermark" />
+        <img src="/brand/beanies_covering_eyes_transparent_512x512.webp" alt="" width="512" height="512" loading="lazy" decoding="async" class="security-section__watermark" />
       </div>
     </section>
 
@@ -438,9 +446,9 @@ import { APP_URL } from '@beanies/brand/nav';
     <section id="story" class="story-section">
       <div class="ambient-orb ambient-orb--1"></div>
       <div class="ambient-orb ambient-orb--2"></div>
-      <img src="/brand/beanies_celebrating_circle_transparent_300x300.png" alt="" class="story-section__deco-accent" />
+      <img src="/brand/beanies_celebrating_circle_transparent_300x300.webp" alt="" width="300" height="300" loading="lazy" decoding="async" class="story-section__deco-accent" />
       <div class="story-header reveal">
-        <img src="/brand/beanies_father_son_icon_512x512.png" alt="Beanies father and son" class="story-header__illustration" />
+        <img src="/brand/beanies_father_son_icon_512x512.webp" alt="Beanies father and son" width="512" height="512" loading="lazy" decoding="async" class="story-header__illustration" />
         <p class="section-label">the beanies story</p>
         <h2 class="section-title">okay, here's the deal</h2>
       </div>
@@ -600,7 +608,7 @@ import { APP_URL } from '@beanies/brand/nav';
         </div>
 
         <div class="story__signoff-row reveal">
-          <img src="/brand/beanies_father_son_icon_512x512.png" alt="greg and beanie" class="story__signoff-img" />
+          <img src="/brand/beanies_father_son_icon_512x512.webp" alt="greg and beanie" width="512" height="512" loading="lazy" decoding="async" class="story__signoff-img" />
           <a href="/blog/accidentally-built-greatest-family-app" class="story__next-post">
             <p class="story__next-post-text">want to read more? here's my next post!</p>
             <div class="story__next-post-arrow">
@@ -625,8 +633,8 @@ import { APP_URL } from '@beanies/brand/nav';
     <section class="final-cta">
       <div class="ambient-orb ambient-orb--1"></div>
       <div class="ambient-orb ambient-orb--2"></div>
-      <img src="/brand/beanies_celebrating_circle_transparent_300x300.png" alt="" class="final-cta__hero-img" />
-      <img src="/brand/beanies_neutral_icon_transparent_350x350.png" alt="" class="final-cta__deco-accent" />
+      <img src="/brand/beanies_celebrating_circle_transparent_300x300.webp" alt="" width="300" height="300" loading="lazy" decoding="async" class="final-cta__hero-img" />
+      <img src="/brand/beanies_neutral_icon_transparent_350x350.webp" alt="" width="350" height="350" loading="lazy" decoding="async" class="final-cta__deco-accent" />
       <div class="container">
         <h2 class="final-cta__title reveal">so... ready to count some beans? <em>🫘</em></h2>
         <p class="final-cta__sub reveal">

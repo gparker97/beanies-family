@@ -6,6 +6,7 @@ import mdx from '@astrojs/mdx';
 import tailwindcss from '@tailwindcss/vite';
 import rehypeGuideAnnotations from './src/lib/rehype-guide-annotations.mjs';
 import rehypeExternalLinks from './src/lib/rehype-external-links.mjs';
+import rehypeImageDims from './src/lib/rehype-image-dims.mjs';
 
 export default defineConfig({
   site: 'https://beanies.family',
@@ -14,7 +15,7 @@ export default defineConfig({
     format: 'file',
   },
   markdown: {
-    rehypePlugins: [rehypeGuideAnnotations, rehypeExternalLinks],
+    rehypePlugins: [rehypeGuideAnnotations, rehypeExternalLinks, rehypeImageDims],
   },
   // Canonical homepage is the apex (beanies.family). Anyone hitting /home
   // gets sent there. /welcome is an app-surface URL — kick it to the PWA so

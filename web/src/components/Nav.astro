@@ -15,7 +15,7 @@ const securityHref = isHome ? '#security' : '/#security';
 
 <nav id="fnav" class="fnav" aria-label="main navigation">
   <a href="/" class="fnav__logo" data-scroll-top={isHome ? '' : undefined}>
-    <img src="/brand/beanies_logo_transparent_logo_only_192x192.png" alt="" />beanies<span class="fnav__logo-orange">.family</span>
+    <img src="/brand/beanies_logo_transparent_logo_only_192x192.webp" alt="" width="192" height="192" decoding="async" />beanies<span class="fnav__logo-orange">.family</span>
   </a>
   <div class="fnav__right">
     <div class="fnav__links">
@@ -47,18 +47,18 @@ const securityHref = isHome ? '#security' : '/#security';
 <!-- Drawer + overlay. Rendered at document level (not inside .fnav) so
      the pill's backdrop-filter + border radius don't clip the drawer.
      Hidden by default; CSS animates in when [data-open]. -->
-<div id="fnav-overlay" class="fnav-overlay" aria-hidden="true"></div>
+<div id="fnav-overlay" class="fnav-overlay" inert></div>
 <aside
   id="fnav-drawer"
   class="fnav-drawer"
   role="dialog"
   aria-modal="true"
   aria-label="site menu"
-  aria-hidden="true"
+  inert
 >
   <div class="fnav-drawer__head">
     <a href="/" class="fnav-drawer__brand" data-close-drawer data-scroll-top={isHome ? '' : undefined}>
-      <img src="/brand/beanies_logo_transparent_logo_only_192x192.png" alt="" />beanies<span class="fnav-drawer__brand-orange">.family</span>
+      <img src="/brand/beanies_logo_transparent_logo_only_192x192.webp" alt="" width="192" height="192" decoding="async" />beanies<span class="fnav-drawer__brand-orange">.family</span>
     </a>
     <button
       type="button"
@@ -132,8 +132,12 @@ const securityHref = isHome ? '#security' : '/#security';
     if (!drawer || !overlay || !toggle) return;
     drawer.setAttribute('data-open', '');
     overlay.setAttribute('data-open', '');
-    drawer.setAttribute('aria-hidden', 'false');
-    overlay.setAttribute('aria-hidden', 'false');
+    // `inert` (instead of aria-hidden=true) removes the closed drawer's
+    // descendants from both focus and the accessibility tree without the
+    // Lighthouse `aria-hidden-focus` violation that aria-hidden produces
+    // when its container has focusable children.
+    drawer.removeAttribute('inert');
+    overlay.removeAttribute('inert');
     toggle.setAttribute('aria-expanded', 'true');
     HTML.style.overflow = 'hidden';
     // Focus the close button so keyboard users can Esc/close immediately.
@@ -144,8 +148,8 @@ const securityHref = isHome ? '#security' : '/#security';
     if (!drawer || !overlay || !toggle) return;
     drawer.removeAttribute('data-open');
     overlay.removeAttribute('data-open');
-    drawer.setAttribute('aria-hidden', 'true');
-    overlay.setAttribute('aria-hidden', 'true');
+    drawer.setAttribute('inert', '');
+    overlay.setAttribute('inert', '');
     toggle.setAttribute('aria-expanded', 'false');
     HTML.style.overflow = '';
   }
