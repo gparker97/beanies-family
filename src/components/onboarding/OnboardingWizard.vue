@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, type Component } from 'vue';
 
 // Outer overlay fade is driven by a class toggle + setTimeout unmount rather
 // than Vue's <Transition>. On WebKit/Safari, <Transition> inside <Teleport>
@@ -7,29 +7,52 @@ import { ref, onMounted, computed } from 'vue';
 // `leave-from + leave-active` and blocking all clicks (issue #153). A plain
 // class + timeout is deterministic across browsers.
 const OVERLAY_FADE_MS = 300;
+
 import OnboardingWelcome from './OnboardingWelcome.vue';
-import OnboardingMoney from './OnboardingMoney.vue';
-import OnboardingFamily from './OnboardingFamily.vue';
+import OnboardingAccount from './OnboardingAccount.vue';
+import OnboardingRecurring from './OnboardingRecurring.vue';
+import OnboardingSavings from './OnboardingSavings.vue';
+import OnboardingActivity from './OnboardingActivity.vue';
 import OnboardingComplete from './OnboardingComplete.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { useAccountsStore } from '@/stores/accountsStore';
-import { useRecurringStore } from '@/stores/recurringStore';
-import { useActivityStore } from '@/stores/activityStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { celebrate } from '@/composables/useCelebration';
 import { useTranslation } from '@/composables/useTranslation';
+import { reportError } from '@/utils/errorReporter';
+import { ErrorSurfaces } from './errorSurfaces';
 
 const settingsStore = useSettingsStore();
-const accountsStore = useAccountsStore();
-const recurringStore = useRecurringStore();
-const activityStore = useActivityStore();
 const syncStore = useSyncStore();
 const { t } = useTranslation();
+
+interface StepDef {
+  component: Component;
+  /** True for the data-entry steps (2-5); false for Welcome and Complete which own their primary CTA. */
+  hasNavBar: boolean;
+  /** Skip-button label key — only relevant when hasNavBar is true. */
+  skipKey: 'onboarding.skip' | 'onboarding.skipAddLater' | null;
+}
+
+const STEPS: readonly StepDef[] = [
+  { component: OnboardingWelcome, hasNavBar: false, skipKey: null },
+  { component: OnboardingAccount, hasNavBar: true, skipKey: 'onboarding.skip' },
+  { component: OnboardingRecurring, hasNavBar: true, skipKey: 'onboarding.skip' },
+  { component: OnboardingSavings, hasNavBar: true, skipKey: 'onboarding.skip' },
+  { component: OnboardingActivity, hasNavBar: true, skipKey: 'onboarding.skipAddLater' },
+  { component: OnboardingComplete, hasNavBar: false, skipKey: null },
+] as const;
 
 const currentStep = ref(1);
 const direction = ref<'forward' | 'backward'>('forward');
 const mounted = ref(true);
 const visible = ref(true);
+
+const currentDef = computed(() => STEPS[currentStep.value - 1] ?? STEPS[0]);
+const totalSteps = STEPS.length;
+const skipLabelKey = computed(() => currentDef.value.skipKey ?? 'onboarding.skip');
+
+// Owned here, threaded into Savings via v-model and Complete via prop. Today's
+// hardcoded `20` is the same default; the slider now actually reaches Complete.
+const savingsPercent = ref(20);
 
 function dismiss() {
   visible.value = false;
@@ -37,13 +60,6 @@ function dismiss() {
     mounted.value = false;
   }, OVERLAY_FADE_MS);
 }
-
-// Summary data for completion screen
-const savingsPercent = ref(20);
-
-const accountCount = computed(() => accountsStore.accounts.length);
-const recurringCount = computed(() => recurringStore.recurringItems.length);
-const activityCount = computed(() => activityStore.activities.length);
 
 onMounted(() => {
   // E2E auto-skip: same pattern as InviteGateOverlay and TrustDeviceModal.
@@ -61,7 +77,7 @@ onMounted(() => {
 
 function goNext() {
   direction.value = 'forward';
-  if (currentStep.value < 4) {
+  if (currentStep.value < totalSteps) {
     currentStep.value++;
   }
 }
@@ -73,21 +89,34 @@ function goBack() {
   }
 }
 
-async function handleSkip() {
+/**
+ * Fire-and-forget background sync on dismiss. NOT awaited — the user has
+ * moved on, awaiting risks racing the unmount. Failure routes to Slack
+ * via reportError without blocking dismissal. Non-blocking + non-silent.
+ */
+function syncInBackground(surface: string) {
+  if (!syncStore.isConfigured) return;
+  syncStore.syncNow(true).catch((e) =>
+    reportError({
+      surface,
+      message: 'Background sync failed on onboarding dismiss — user already proceeded.',
+      error: e,
+    })
+  );
+}
+
+function handleSkip() {
   settingsStore.setOnboardingCompleted(true);
-  if (syncStore.isConfigured) {
-    await syncStore.syncNow(true);
-  }
+  syncInBackground(ErrorSurfaces.onboardingSkipSync);
   dismiss();
 }
 
-async function handleFinish() {
+function handleFinish() {
   settingsStore.setOnboardingCompleted(true);
-  if (syncStore.isConfigured) {
-    await syncStore.syncNow(true);
-  }
+  syncInBackground(ErrorSurfaces.onboardingFinishSync);
   dismiss();
-  celebrate('setup-complete');
+  // No celebrate('setup-complete') — OnboardingComplete IS the celebration
+  // moment. Two consecutive "all set" surfaces is redundant.
 }
 
 const transitionName = computed(() =>
@@ -107,41 +136,28 @@ const transitionName = computed(() =>
         <!-- Step content -->
         <div class="ob-content">
           <Transition :name="transitionName" mode="out-in">
-            <OnboardingWelcome v-if="currentStep === 1" :key="1" @next="goNext" />
-            <OnboardingMoney v-else-if="currentStep === 2" :key="2" @next="goNext" @back="goBack" />
-            <OnboardingFamily
-              v-else-if="currentStep === 3"
-              :key="3"
+            <component
+              :is="currentDef.component"
+              :key="currentStep"
+              v-model:savings-percent="savingsPercent"
               @next="goNext"
               @back="goBack"
-            />
-            <OnboardingComplete
-              v-else
-              :key="4"
-              :account-count="accountCount"
-              :recurring-count="recurringCount"
-              :savings-percent="savingsPercent"
-              :activity-count="activityCount"
               @finish="handleFinish"
             />
           </Transition>
         </div>
 
-        <!-- Nav bar (steps 2 & 3 only) -->
-        <div v-if="currentStep === 2 || currentStep === 3" class="ob-nav">
+        <!-- Nav bar — data-entry steps only -->
+        <div v-if="currentDef.hasNavBar" class="ob-nav">
           <button class="ob-nav-back" @click="goBack">
             {{ t('onboarding.back') }}
           </button>
           <div class="flex items-center gap-3 sm:gap-4">
             <button class="ob-nav-skip" @click="handleSkip">
-              {{ t('onboarding.skip') }}
+              {{ t(skipLabelKey) }}
             </button>
-            <button
-              class="ob-nav-next"
-              data-testid="onboarding-next"
-              @click="currentStep === 3 ? ((direction = 'forward'), (currentStep = 4)) : goNext()"
-            >
-              {{ currentStep === 3 ? t('onboarding.allDone') : t('onboarding.nextFamily') }}
+            <button class="ob-nav-next" data-testid="onboarding-next" @click="goNext">
+              {{ t('onboarding.next') }}
             </button>
           </div>
         </div>
@@ -151,6 +167,10 @@ const transitionName = computed(() =>
 </template>
 
 <style scoped>
+/* Overlay: full-screen backdrop. On desktop, scrolls vertically if the
+ * modal is taller than the viewport — keeps modal-internal scroll bars
+ * from ever showing. On mobile, the modal fills the screen and the
+ * overlay matches; no scroll needed at this level. */
 .ob-overlay {
   align-items: center;
   backdrop-filter: blur(8px);
@@ -172,6 +192,8 @@ const transitionName = computed(() =>
 
 @media (width >= 640px) {
   .ob-overlay {
+    align-items: flex-start; /* anchor modal near top so growth happens downward */
+    overflow-y: auto; /* outer scroll if modal > viewport — no inner bars */
     padding: 24px;
   }
 }
@@ -196,14 +218,44 @@ const transitionName = computed(() =>
     border-radius: 24px;
     box-shadow: 0 20px 60px rgb(44 62 80 / 25%);
     height: auto;
-    max-height: 90vh;
+
+    /* Auto-sized to content. No max-height: when modal exceeds viewport,
+     * the OVERLAY scrolls (above), so modal-internal scrollbars never
+     * show. The gradient on .ob-content always covers the full content. */
+    max-height: none;
   }
 }
 
+/* Content: gradient lives here so it covers the full scrollable area on
+ * any step — fixes the "gradient turns to white when scrolling" bug
+ * (caused by min-height: 100% being shorter than scroll-extent on the form).
+ *
+ * Overflow strategy:
+ *   - Mobile: `overflow: hidden auto` — horizontal hidden (defense against
+ *     future layout bugs that could otherwise produce an x-scrollbar; the
+ *     outer .ob-container's overflow:hidden also clips, but specifying it
+ *     here too means no spec quirk where visible-paired-with-hidden silently
+ *     turns the other axis into auto). Vertical auto so content scrolls
+ *     within the modal when viewport is short.
+ *   - Desktop: `overflow: visible` (both axes explicit, no spec quirk).
+ *     The outer overlay scrolls if the modal exceeds the viewport. The
+ *     .ob-container's overflow:hidden still clips any sideways overflow.
+ *     No internal scrollbar ever shows on desktop. */
 .ob-content {
+  background: linear-gradient(180deg, var(--cloud-white, #f8f9fa) 0%, #edf6fc 100%);
   flex: 1;
   overflow: hidden auto;
   position: relative;
+}
+
+.dark .ob-content {
+  background: linear-gradient(180deg, #1a252f 0%, #1e3040 100%);
+}
+
+@media (width >= 640px) {
+  .ob-content {
+    overflow: visible;
+  }
 }
 
 .ob-nav {
