@@ -78,6 +78,29 @@ If any launch-relevant work was done (new features, user-facing changes, metrics
 - Ask the user if they want to complete any of them now before closing out.
 - For items that can't be completed, add a note to `docs/STATUS.md` under a "Pending / Next Session" section so the next developer knows.
 
+### Step 5.5: Validate the existing STATUS.md pending block before re-saving (mandatory)
+
+Pending items rot. An item carried forward from session to session may have been shipped in commits since it was added. **Before saving an updated STATUS.md, verify every existing entry in "Pending / Next Session" still applies.**
+
+For each entry already in the pending block, look for fingerprints in the repo that prove it was shipped:
+
+- **Names a feature, helper, composable, component** → grep for the symbol in `src/` and `web/src/`. If present, drop the entry.
+- **Names a file path with a described implementation** → read the file. If the implementation is there, drop the entry.
+- **Describes a deploy/ship of something nameable** → `git log --since="<entry-date>" --oneline --grep="<keyword>" -i`. If commits match, drop.
+- **References a draft flag flip** (`DRAFT = true` → `false`, `draft: true` → `false`) → grep the literal flag in the named file.
+- **References content cleanup** (arrow artifacts, `<!-- TODO -->`, `greg confirm` placeholders) → grep the directory for the pattern. Empty grep = done.
+- **Points at a GitHub issue** → `gh issue view <n> --json state` to confirm it's still open and unresolved.
+
+Run checks in parallel — most are fast greps.
+
+**Action by verdict:**
+- **Verifiably done** → remove the entry from the pending block. Add a one-line note at the top of "Pending / Next Session" saying "Validated YYYY-MM-DD: removed <N> stale blocks already shipped — <one-line summary of each>" so greg has an audit trail of what got cleaned up.
+- **Done but worth confirming** → ask greg before removing: "STATUS lists X as pending but I see Y in the codebase — confirm done?"
+- **Still pending** → leave in place, optionally trim stale context that no longer applies.
+- **Ambiguous** → leave in, flag in the wrap-up summary so greg can clarify next session.
+
+This validation runs **before** the new pending items from the current session get appended, so the saved file is accurate end-to-end.
+
 ### Step 6: Final Push & Verify
 
 1. Stage and commit all status file updates (STATUS.md, CHANGELOG.md).

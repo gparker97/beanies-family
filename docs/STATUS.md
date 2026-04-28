@@ -164,36 +164,11 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-**🔴 Auto-send onboarding diagnostics to Slack (from 2026-04-26 late evening — greg's explicit ask after deploying #185 hardening):**
+> **Validated 2026-04-28:** removed three stale blocks already shipped — auto-send onboarding diagnostics to Slack (delivered universally via `errorReporter` in commit `2950638`; `useJoinFlow.ts:237` routes every step failure to `#beanies-errors` with the registry code as the surface, so the "Send to support" button is moot), mobile nav v3 implementation (shipped to prod in `1b6b8d9`, greg verified bean-tap navigation on real devices), and guides/FAQ/glossary layout pass (FAQ + glossary `DRAFT=false` and live; pillars went through curriculum reframe + GEO citation pass + voice-reviewed copy + payoff reorder; arrow artifacts and `<!-- greg confirm -->` placeholders all cleaned up).
 
-- **Goal:** when a joiner hits an error in the new `useJoinFlow` (or any error-screen "Send to support" tap), automatically POST the diagnostic JSON blob to greg's Slack so we get visibility into onboarding failures without users having to copy-paste manually. Currently the diagnostic blob has to be copy-pasted by the user — not great for support throughput.
-- **Method (per greg, 2026-04-26):** **DO NOT use email** — there's no support email address (`support@beanies.family` is not configured and greg does not want to set one up). The only delivery channel is Slack. **Use the same pattern the marketing-site contact form already uses** at `web/src/pages/index.astro:683` and `:779` — a direct browser-to-Slack-webhook fetch with `mode: 'no-cors'` and the standard Slack payload `{ text: "..." }`. The webhook URL is read from `import.meta.env.PUBLIC_CONTACT_WEBHOOK_URL` at build time. **NO Cloudflare Worker proxy needed** — the homepage form has been working without one. Just reuse the same env var (or add a dedicated `PUBLIC_DIAG_WEBHOOK_URL` if greg wants to route to a different channel).
-- **Implementation sketch:**
-  - Add a "Send to support" button in `JoinPodView`'s diagnostic modal next to "Copy diagnostic info".
-  - Handler does `fetch(import.meta.env.PUBLIC_CONTACT_WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ text: \`_Onboarding diagnostic_\n\\\`\\\`\\\`\${diagnosticReport}\\\`\\\`\\\`\` }) })`. Note: `mode: 'no-cors'` means we get an opaque response — assume success unless the fetch itself throws. After send, show a brief "Sent ✓" state for 2s.
-  - Add a small consent line under the button — "Sends device info, the URL params (without secrets), and the error to support. No personal data."
-  - New i18n keys: `join.diagnostic.send`, `join.diagnostic.sent`, `join.diagnostic.sendFailed`, `join.diagnostic.consent`.
-  - The same button can later be added to other error surfaces (`SaveFailureBanner`, sign-out failures, etc.) by extracting the send-to-Slack helper into `src/utils/diagnostics.ts` (already exists) — `sendDiagnosticToSlack(report: string): Promise<boolean>`.
-- **Diagnostic enrichment (also greg's ask):** before adding the send button, expand the diagnostic blob further:
-  - Pull `syncStore.error`, `syncStore.lastSync`, `syncStore.driveFileNotFound`, `syncStore.saveFailureLevel` so Drive-side state is captured.
-  - Add `localStorage.getItem('beanies_grt_*')` keys' presence (NOT values) so we can see if there's a stale refresh token.
-  - Add `navigator.connection.effectiveType` if available (catches throttled-network reads).
-- **Privacy considerations:** the blob already truncates `inviteToken` and `fileId` to last 4 chars. Don't send full tokens or file contents. Email hint is fine to send (it's the recipient's email, not greg's).
-- **Files to touch:** `src/composables/useJoinFlow.ts` (expand `buildDiagnosticReport`), `src/components/login/JoinPodView.vue` (new "Send to support" button + handler + consent line), `src/utils/diagnostics.ts` (new `sendDiagnosticToSlack` helper — single source of truth for the Slack POST so other surfaces can reuse), `src/services/translation/uiStrings.ts` (~4 new keys).
-- **Out of scope:** rate limiting, retry logic, queueing offline. The marketing-form pattern doesn't have any of that and works fine for low-volume support traffic. Add later only if abuse becomes a problem.
+**🟡 PR 2 — refactor `BaseModal` + `MobileHamburgerMenu` to consume new composables (from 2026-04-28 mobile nav v3 ship):**
 
-**🟠 Mobile nav redesign — Vue implementation (from 2026-04-25 design sessions, approved direction):**
-
-- **Approved mockup:** `docs/mockups/mobile-nav-bean-jar-v3.html` — 4-category bottom nav (Nook / Planning / Money / Pod) with the "bean-jar stack" pattern (tap a category → vertical column of beans rises from the tab). Each bean carries a side card with bold label + one-line hint preview (e.g. "Activities / plan, schedule, log"). Active-tab bean stays anchored; text card auto-side-flips toward whichever side has more space. `＋N more` overflow bean carries its own hint.
-- **Earlier iterations** (kept for reference): `mobile-nav-bean-jar.html` (v1 — three layout comparison) and `mobile-nav-bean-jar-v2.html` (v2 — locked the system rule "cluster bloom = ADD, pure bean stack = NAVIGATE", added scaling stress test 3/6/10 items).
-- **Pre-implementation:** the v3 mockup includes an 18-string hint-copy guide for greg's voice review before strings land in `uiStrings.ts` (per the lowercase + voice-review feedback rules).
-- **Implementation:** Vue components + composables; replaces current bottom tab bar (#101's 5-tab layout). Touches `App.vue` mounting, sidebar accordion mapping, mobile-only render gates, and the `uiStrings.ts` additions for hints. No GitHub issue filed yet.
-
-**🟠 Guides index + FAQ/glossary pages — layout & design pass (from 2026-04-22 evening, explicit carry-forward):**
-
-- Pillar pages now have their family-zine editorial treatment. The `/guides` index page (`web/src/pages/guides/index.astro`) is still the pre-redesign layout — weakest link in the new aesthetic; needs a pass to feel continuous with the pillar pages (kicker, zine typography, card density, relationship between pillars).
-- FAQ (`web/src/pages/help/faq.astro` — 25 Qs + FAQPage JSON-LD) and glossary (`web/src/pages/help/glossary.astro` — 18 terms + DefinedTermSet JSON-LD) both fully authored but gated behind `DRAFT = true` + `isDraftHidden()` (prod shows `DraftPlaceholder`, DEV shows full content). Open design questions: do these get the same editorial treatment as the pillars, or a distinct help-center-reference treatment? Where do we surface them — cards on `/help` index, inline links from guides (e.g. glossary terms linked via `<dfn>`), promote glossary to its own top-level nav, or keep as deep-links? How does overall IA thread guides ↔ help ↔ FAQ ↔ glossary coherently? Discussion first, design second.
-- **Residual content cleanup before flipping pillars `draft: false`:** arrow artifacts `←` + `<!-- link added: greg confirm -->` annotations still in pillars 1-4 (repo AND Notion). Greg's cozi-alternatives blog post targeted Friday 2026-04-24 — once it ships, Pillar 2's placeholder `<link to cozi app options post>` gets filled in. Greg handles that reminder himself.
+- Single-purpose cleanup: swap inline scroll-lock + Esc handlers in `src/components/ui/BaseModal.vue` and `src/components/common/MobileHamburgerMenu.vue` for the new `useEscapeClose` + `useBodyScrollLock` composables (`src/composables/`). ~75 lines of inline duplication to remove across 2 files. Isolated regression risk.
 
 **🟢 Net-worth chart follow-ups (from 2026-04-22 plan, explicitly deferred):**
 

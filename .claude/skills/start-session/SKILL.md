@@ -68,6 +68,33 @@ Surface anything that's actively waiting:
    ```
 5. Any deferred runbooks (e.g. `docs/runbooks/cutover-*.md`) that mention "scheduled" or "tomorrow"
 
+### Step 3.5: Validate pending items against the codebase (mandatory)
+
+STATUS.md's "Pending / Next Session" block can rot — items shipped in subsequent sessions get carried forward by mistake. Before displaying any item to greg, **verify it isn't already done**.
+
+For each candidate item from STATUS.md, ask: would this leave a fingerprint in the repo if it were shipped? If yes, look for the fingerprint:
+
+- **Item names a feature, helper, composable, or component** (e.g. "build `sendDiagnosticToSlack`", "extract `useEscapeClose`") → grep the codebase for the symbol. If it exists, the item is done.
+  ```bash
+  grep -rn "<symbol>" src/ web/src/ 2>/dev/null | head -5
+  ```
+- **Item names a file/path** (e.g. "implement v3 nav in `MobileBottomNav.vue`") → read the file. If the implementation is there, done.
+- **Item describes a deploy, ship, or implementation** of something nameable → check commits since the item was added.
+  ```bash
+  git log --since="<item's date>" --oneline --grep="<keywords>" -i
+  ```
+- **Item references a draft flag flip** ("flip pillars `draft: false`", "remove `DRAFT = true`") → grep the file for the literal flag.
+- **Item references content cleanup** ("remove arrow artifacts `←`", "drop `<!-- TODO -->` placeholders") → grep the relevant content directory for the literal pattern.
+- **Item points at a GitHub issue** ("#185 hardening", "#190 mobile nav") → check issue state via `gh issue view <n> --json state,labels`.
+
+**Verdict for each item:**
+- **Done** — drop silently from the displayed pending list (do NOT pad the report). Mention in the closing summary that N stale items were dropped, so greg knows the validator ran.
+- **Done but worth confirming** — surface as a question, not a pending item: "STATUS lists X as pending but I see Y in the codebase — is this done?"
+- **Still pending** — keep in the list, optionally with a one-line "verified still pending: <evidence>" if the check turned up something interesting.
+- **Ambiguous** — keep, but flag for greg: "couldn't fully verify; carrying forward."
+
+Run the checks in parallel (one bash call per item, batched in a single message) — most checks are fast greps. Don't ask greg before each verification — only ask after, if the verdict is genuinely ambiguous.
+
 ### Step 4: Fetch news headlines
 
 Surface 1–2 major news stories from the last 24 hours. Use `WebSearch` with a query like `"top news today"` or `"major news headlines [today's date]"`. Pick stories that are genuinely top-of-the-news — world events, major tech/AI announcements, market moves. Skip clickbait, sports, celebrity gossip.
