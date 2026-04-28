@@ -1,4 +1,4 @@
-import type { ISODateString } from '@/types/models';
+import type { DateOfBirth, ISODateString } from '@/types/models';
 
 // ── Shared month abbreviations (dd MMM yyyy standard) ──────────────────────
 const MONTHS_SHORT = [
@@ -280,6 +280,27 @@ export function formatDayLong(dateStr: string): string {
 export function formatTodayCaption(dateStr: string): string {
   const date = parseLocalDate(dateStr);
   return `${DAYS_SHORT[date.getDay()]}, ${date.getDate()} ${MONTHS_LONG[date.getMonth()]}`;
+}
+
+/**
+ * Format: "14 May" — day + short month, no year.
+ *
+ * Used in compact list views (e.g. the setup wizard's member tiles, family
+ * roster cards) where the birthday is decoration alongside other meta, not
+ * a load-bearing value. Year is intentionally omitted for visual uniformity
+ * across members regardless of whether year was captured.
+ *
+ * Returns an empty string when `dob` is missing, undefined, or has invalid
+ * month/day values. The empty string is the documented fallback so callers
+ * can render `${role}${birthdayShort ? ` · ${birthdayShort}` : ''}` cleanly
+ * via a `<template v-if>` guard — graceful degradation, not a silent
+ * failure (the empty string IS the contract, not a hidden error).
+ */
+export function formatBirthdayShort(dob: DateOfBirth | undefined | null): string {
+  if (!dob || !dob.month || !dob.day) return '';
+  const idx = dob.month - 1;
+  if (idx < 0 || idx >= MONTHS_SHORT.length) return '';
+  return `${dob.day} ${MONTHS_SHORT[idx]}`;
 }
 
 /**

@@ -16,7 +16,7 @@ test.describe('Setup Flow', () => {
 
     // Add a family member with birthday during step 3
     // Add Member button should be disabled when name/birthday not filled
-    const addButton = page.getByRole('button', { name: /add member/i });
+    const addButton = page.getByRole('button', { name: ui('loginV6.addMember') });
     await expect(addButton).toBeDisabled();
 
     // Fill name

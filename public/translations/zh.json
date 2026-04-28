@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-28",
-    "translationCount": 2579
+    "translationCount": 2582
   },
   "translations": {
     "app.name": {
@@ -2787,29 +2787,24 @@
       "lastUpdated": "2026-03-03"
     },
     "loginV6.addBeansTitle": {
-      "translation": "添加家庭成员",
-      "hash": "lo5fij",
-      "lastUpdated": "2026-03-03"
-    },
-    "loginV6.addBeansSubtitle": {
-      "translation": "您稍后可以随时添加更多",
-      "hash": "dmy140",
-      "lastUpdated": "2026-03-03"
+      "translation": "添加家庭成员 🫘",
+      "hash": "1gtj14",
+      "lastUpdated": "2026-04-28"
     },
     "loginV6.addMember": {
-      "translation": "添加成员",
-      "hash": "nibw07",
-      "lastUpdated": "2026-03-03"
+      "translation": "添加Bean",
+      "hash": "kc934h",
+      "lastUpdated": "2026-04-28"
     },
     "loginV6.finish": {
-      "translation": "完成日期",
-      "hash": "yswf5f",
-      "lastUpdated": "2026-03-03"
+      "translation": "完成·带我去角落 🏡",
+      "hash": "dzn88p",
+      "lastUpdated": "2026-04-28"
     },
     "loginV6.skip": {
-      "translation": "暂时跳过",
-      "hash": "r83laa",
-      "lastUpdated": "2026-03-03"
+      "translation": "跳过—暂时只有我",
+      "hash": "cp2swu",
+      "lastUpdated": "2026-04-28"
     },
     "loginV6.joinButton": {
       "translation": "加入我家人的Pod",
@@ -2852,14 +2847,9 @@
       "lastUpdated": "2026-02-24"
     },
     "loginV6.growPodTitle": {
-      "translation": "种植全新的豆荚",
-      "hash": "hjrzl9",
-      "lastUpdated": "2026-03-03"
-    },
-    "loginV6.growPodSubtitle": {
-      "translation": "为家庭pod命名并创建登录密码。",
-      "hash": "qmufhz",
-      "lastUpdated": "2026-02-24"
+      "translation": "启动pod\\ ud83c\\ udf31",
+      "hash": "mquzkw",
+      "lastUpdated": "2026-04-28"
     },
     "loginV6.signInPasswordLabel": {
       "translation": "您的登录密码",
@@ -2867,29 +2857,14 @@
       "lastUpdated": "2026-03-03"
     },
     "loginV6.signInPasswordHint": {
-      "translation": "您将使用此密码登录Bean配置文件",
-      "hash": "ch0rc",
-      "lastUpdated": "2026-02-24"
-    },
-    "loginV6.storageDescription": {
-      "translation": "我们不会将您的数据存储在任何服务器或数据库上\\ u2014您家庭的财务状况完全由您掌控。选择加密的.beanpod文件所在的位置，只有您持有密钥。",
-      "hash": "9526bv",
-      "lastUpdated": "2026-02-24"
+      "translation": "8个以上的字符。用于登录到您的Bean配置文件。",
+      "hash": "shlcg",
+      "lastUpdated": "2026-04-28"
     },
     "loginV6.storageSectionLabel": {
-      "translation": "我们应该将您的Pod保存在哪里？",
-      "hash": "m246ci",
-      "lastUpdated": "2026-03-03"
-    },
-    "loginV6.step2Title": {
-      "translation": "保存和保护您的Pod",
-      "hash": "n4ov50",
-      "lastUpdated": "2026-03-03"
-    },
-    "loginV6.step2Subtitle": {
-      "translation": "选择存储加密数据文件的位置。",
-      "hash": "5vu5jx",
-      "lastUpdated": "2026-03-04"
+      "translation": "我们应该把它保存在哪里？",
+      "hash": "utf1jl",
+      "lastUpdated": "2026-04-28"
     },
     "loginV6.addMemberFailed": {
       "translation": "添加失败请重试",
@@ -12899,6 +12874,46 @@
     "nook.todayCaption": {
       "translation": "现在是{date} ·您的家人一览",
       "hash": "gq9aij",
+      "lastUpdated": "2026-04-28"
+    },
+    "loginV6.howThisWorks.toggle": {
+      "translation": "本书将阐述的内容",
+      "hash": "npa64w",
+      "lastUpdated": "2026-04-28"
+    },
+    "loginV6.howThisWorks.lead": {
+      "translation": "beanies.family不运行任何服务器或数据库\\ u2014您的加密.beanpod文件位于您自己的存储中。",
+      "hash": "j0wcxb",
+      "lastUpdated": "2026-04-28"
+    },
+    "loginV6.howThisWorks.bullet1": {
+      "translation": "AES-256加密。只有您的密码才能解锁。",
+      "hash": "vd92ee",
+      "lastUpdated": "2026-04-28"
+    },
+    "loginV6.howThisWorks.bullet2": {
+      "translation": "无需跟踪。无需对您的财务状况进行分析。",
+      "hash": "whgexk",
+      "lastUpdated": "2026-04-28"
+    },
+    "loginV6.howThisWorks.bullet3": {
+      "translation": "开源。随时在GitHub上审核代码。",
+      "hash": "ipnbqr",
+      "lastUpdated": "2026-04-28"
+    },
+    "loginV6.howThisWorks.leadStrong": {
+      "translation": "您的数据始终归您所有。",
+      "hash": "10tvml",
+      "lastUpdated": "2026-04-28"
+    },
+    "loginV6.moreProvidersComingSoon": {
+      "translation": "更多供应商即将推出",
+      "hash": "qy1tin",
+      "lastUpdated": "2026-04-28"
+    },
+    "loginV6.pickStorageToContinue": {
+      "translation": "选择存储空间以继续",
+      "hash": "wxp5m1",
       "lastUpdated": "2026-04-28"
     }
   }
