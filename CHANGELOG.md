@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-28
 
+### Changed
+
+- **Drive pod-created success modal — celebratory + tighter.** When a brand-new pod's `.beanpod` file lands on Google Drive, the success modal now reads "**Your pod is planted! 🌱**" with a one-line subtitle "Saved safely — let's add your family next." and a single compact file-badge below. The previous orange callout instructing users to manually share the file via Drive's UI is gone — that flow is handled by the per-bean share button on the Pod page (and the upcoming onboarding-end invite prompt), not this success moment. The "Location: beanies.family folder" subline is also omitted from the modal (still surfaces in Settings → Family Data where users actually want to find it later). ~60% less visible text on what's meant to be a milestone celebration.
+
 ### Fixed
 
 - **App init no longer surfaces a false "failed to start" recovery screen when the user is being redirected to login.** Pre-existing race in `App.vue`'s init flow: when `loadFamilyData()` decided "sync configured + Drive fetched ✓ + needs password ✓ + no cached key → redirect to /welcome", the post-init health check still ran, found no Automerge doc, and surfaced the orange recovery overlay on top of the login page (confusing UX). The exchange-rate refresher then fired and crashed for the same reason — caught by `.catch(console.error)`, just noise but pollution. Now: `App.vue` tracks a `docLoaded` flag through the health check; if the doc isn't loaded, suppresses the recovery UI **only when the user is on a login-flow route** (`/welcome` or `/login` — i.e. `loadFamilyData` deliberately redirected them) and skips the rate-refresh path entirely (its callees would throw). Genuine init failures (network, file missing, etc.) still surface the recovery UI as before. Each branch logs cleanly with `[App]` prefix; no silent failures.
