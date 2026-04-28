@@ -887,45 +887,15 @@ function handleBack() {
         </div>
       </div>
 
-      <!-- Add member form -->
+      <!-- Add member form. Field order is intentional: Name → Birthday → Role.
+           Easiest/least committal field first (name), narrowing fact next
+           (birthday), categorize last (role). The role chips are
+           self-describing via their emoji + word labels — no "Type" prompt
+           label is needed above. -->
       <div
         v-if="showMemberForm"
         class="space-y-3 rounded-2xl border border-gray-200 p-4 dark:border-slate-600"
       >
-        <!-- Role toggle -->
-        <div class="flex items-center gap-3">
-          <span
-            class="font-outfit text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
-            >{{ t('form.type') }}</span
-          >
-          <div class="flex gap-2">
-            <button
-              type="button"
-              class="rounded-full px-3 py-1 text-sm transition-colors"
-              :class="
-                newMemberRole === 'parent'
-                  ? 'bg-secondary-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400'
-              "
-              @click="newMemberRole = 'parent'"
-            >
-              🫘 {{ t('loginV6.parentBean') }}
-            </button>
-            <button
-              type="button"
-              class="rounded-full px-3 py-1 text-sm transition-colors"
-              :class="
-                newMemberRole === 'child'
-                  ? 'bg-secondary-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400'
-              "
-              @click="newMemberRole = 'child'"
-            >
-              🌱 {{ t('loginV6.littleBean') }}
-            </button>
-          </div>
-        </div>
-
         <BaseInput
           v-model="newMemberName"
           :label="'👤 ' + t('form.name')"
@@ -951,6 +921,34 @@ function handleBack() {
             />
             <BaseInput v-model="dobYear" type="number" placeholder="Year" />
           </div>
+        </div>
+
+        <!-- Role chips — self-describing via emoji + labels, no prompt above. -->
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="rounded-full px-3 py-1 text-sm transition-colors"
+            :class="
+              newMemberRole === 'parent'
+                ? 'bg-secondary-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400'
+            "
+            @click="newMemberRole = 'parent'"
+          >
+            🫘 {{ t('loginV6.parentBean') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-full px-3 py-1 text-sm transition-colors"
+            :class="
+              newMemberRole === 'child'
+                ? 'bg-secondary-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400'
+            "
+            @click="newMemberRole = 'child'"
+          >
+            🌱 {{ t('loginV6.littleBean') }}
+          </button>
         </div>
 
         <div class="flex gap-2">
