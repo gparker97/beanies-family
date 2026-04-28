@@ -13,9 +13,8 @@
  * own rAF-throttled resize listener — only while open. On close, all
  * listeners and locks are released; `onScopeDispose` is the safety net.
  *
- * Reuses two single-purpose overlay composables for behavior:
- *   - useEscapeClose    — Esc key closes the stack
- *   - useBodyScrollLock — body scroll locked while open
+ * Uses the shared `useFullscreenOverlay` composable for the standard
+ * viewport-blocking behaviors (Esc-key closes + body scroll lock).
  *
  * Deliberately does NOT push synthetic history entries / capture the back
  * gesture. The stack is a small menu, not a full-screen modal — same
@@ -31,8 +30,7 @@
 import { computed, nextTick, onScopeDispose, ref, toRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
-import { useEscapeClose } from '@/composables/useEscapeClose';
-import { useBodyScrollLock } from '@/composables/useBodyScrollLock';
+import { useFullscreenOverlay } from '@/composables/useFullscreenOverlay';
 import { useReducedMotion } from '@/composables/useReducedMotion';
 import { usePermissions, FINANCE_ROUTES } from '@/composables/usePermissions';
 import { isRouteActive } from '@/utils/route';
@@ -224,8 +222,7 @@ async function focusInitialBean() {
 // ---------------------------------------------------------------------------
 // Lifecycle wiring — composables + position/focus on open, cleanup on close.
 // ---------------------------------------------------------------------------
-useEscapeClose(isOpenRef, () => emit('close'));
-useBodyScrollLock(isOpenRef);
+useFullscreenOverlay(isOpenRef, () => emit('close'));
 
 watch(
   isOpenRef,

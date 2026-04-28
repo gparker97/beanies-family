@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { watch, onMounted, onUnmounted } from 'vue';
+import { toRef } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
-import { lockBodyScroll, unlockBodyScroll } from '@/utils/overlayStack';
+import { useFullscreenOverlay } from '@/composables/useFullscreenOverlay';
 
 interface Props {
   open: boolean;
@@ -34,31 +34,7 @@ function close() {
   }
 }
 
-function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && props.open) {
-    close();
-  }
-}
-
-watch(
-  () => props.open,
-  (isOpen) => {
-    if (isOpen) {
-      lockBodyScroll();
-    } else {
-      unlockBodyScroll();
-    }
-  }
-);
-
-onMounted(() => {
-  document.addEventListener('keydown', handleKeydown);
-});
-
-onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeydown);
-  if (props.open) unlockBodyScroll();
-});
+useFullscreenOverlay(toRef(props, 'open'), close);
 </script>
 
 <template>
