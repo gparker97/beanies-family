@@ -5,6 +5,7 @@ import { useRegisterSW } from 'virtual:pwa-register/vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSyncStore } from '@/stores/syncStore';
 import { hasOpenOverlays } from '@/utils/overlayStack';
+import { safeServiceWorkerUpdate } from '@/utils/safeServiceWorkerUpdate';
 
 const { t } = useTranslation();
 const router = useRouter();
@@ -23,14 +24,14 @@ const { needRefresh, updateServiceWorker } = useRegisterSW({
   onRegisteredSW(_swUrl: string, registration: ServiceWorkerRegistration | undefined) {
     swRegistration = registration;
     if (registration) {
-      setInterval(() => registration.update(), POLL_INTERVAL_MS);
+      setInterval(() => safeServiceWorkerUpdate(registration, 'periodic-poll'), POLL_INTERVAL_MS);
     }
   },
 });
 
 function handleVisibilityChange() {
   if (document.visibilityState === 'visible' && swRegistration) {
-    swRegistration.update();
+    safeServiceWorkerUpdate(swRegistration, 'visibility-change');
   }
 }
 document.addEventListener('visibilitychange', handleVisibilityChange);
