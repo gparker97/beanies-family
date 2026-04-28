@@ -6,6 +6,7 @@ import {
   formatTime12,
   formatDayLong,
   formatLogEntryTime,
+  formatBirthdayShort,
 } from '../date';
 
 describe('toDateInputValue', () => {
@@ -229,5 +230,26 @@ describe('formatLogEntryTime', () => {
   it('returns "DOW, D Mon YYYY at <time>" for entries in prior years', () => {
     expect(formatLogEntryTime(localISO(2025, 4, 21, 8, 30))).toBe('Mon, 21 Apr 2025 at 8:30am');
     expect(formatLogEntryTime(localISO(2024, 12, 25, 14, 0))).toBe('Wed, 25 Dec 2024 at 2pm');
+  });
+});
+
+describe('formatBirthdayShort', () => {
+  it('returns "D Mon" for a valid DateOfBirth (year present)', () => {
+    expect(formatBirthdayShort({ month: 5, day: 14, year: 1985 })).toBe('14 May');
+  });
+
+  it('returns "D Mon" for a valid DateOfBirth (year absent)', () => {
+    expect(formatBirthdayShort({ month: 12, day: 1 })).toBe('1 Dec');
+  });
+
+  it('returns empty string when input is undefined or null', () => {
+    expect(formatBirthdayShort(undefined)).toBe('');
+    expect(formatBirthdayShort(null)).toBe('');
+  });
+
+  it('returns empty string when month or day is missing or out of range', () => {
+    expect(formatBirthdayShort({ month: 0, day: 5 })).toBe('');
+    expect(formatBirthdayShort({ month: 13, day: 5 })).toBe('');
+    expect(formatBirthdayShort({ month: 5 } as unknown as { month: number; day: number })).toBe('');
   });
 });
