@@ -34,6 +34,7 @@ import { showToast } from '@/composables/useToast';
 import { isTemporaryEmail } from '@/utils/email';
 import { formatDateFull, toDateInputValue } from '@/utils/date';
 import { MARKETING_URL } from '@/utils/marketing';
+import { safeServiceWorkerUpdate } from '@/utils/safeServiceWorkerUpdate';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
@@ -176,7 +177,7 @@ async function handleRefreshAll() {
     // Check for app updates (SW)
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.getRegistration();
-      if (registration) registration.update();
+      if (registration) safeServiceWorkerUpdate(registration, 'refresh-all');
     }
 
     // Refresh data from Drive
