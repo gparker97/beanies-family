@@ -3737,19 +3737,14 @@
       "lastUpdated": "2026-02-26"
     },
     "googleDrive.fileCreated": {
-      "translation": "您的Pod已在Google云端硬盘上创建。",
-      "hash": "j9evrs",
-      "lastUpdated": "2026-03-03"
+      "translation": "您的豆荚已种植完毕！ 🌱",
+      "hash": "y9fya8",
+      "lastUpdated": "2026-04-28"
     },
     "googleDrive.fileLocation": {
       "translation": "位置： beanies.family文件夹",
       "hash": "d8wzaw",
       "lastUpdated": "2026-03-03"
-    },
-    "googleDrive.shareHint": {
-      "translation": "要与家人共享，请在Google云端硬盘中打开此文件，并具有读写权限。",
-      "hash": "f5zpl",
-      "lastUpdated": "2026-02-26"
     },
     "googleDrive.openInDrive": {
       "translation": "在Google云端硬盘中打开",
@@ -12914,6 +12909,11 @@
     "loginV6.pickStorageToContinue": {
       "translation": "选择存储空间以继续",
       "hash": "wxp5m1",
+      "lastUpdated": "2026-04-28"
+    },
+    "googleDrive.fileCreatedSubtitle": {
+      "translation": "已安全保存，接下来请添加您的家庭成员。",
+      "hash": "cvyffp",
       "lastUpdated": "2026-04-28"
     }
   }
