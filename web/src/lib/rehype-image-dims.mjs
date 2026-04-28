@@ -24,13 +24,20 @@ const cache = new Map();
 
 async function getDims(src) {
   if (cache.has(src)) return cache.get(src);
+  // path.join with a fixed PUBLIC_DIR prefix and a markdown-author-controlled
+  // image src; runs at build time only, never on user input. The
+  // security/detect-non-literal-fs-filename rule's threat model (untrusted
+  // runtime input) does not apply.
   const filePath = path.join(PUBLIC_DIR, src);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
   if (!existsSync(filePath)) {
     console.warn(`[rehype-image-dims] image not found at ${filePath}`);
     cache.set(src, null);
     return null;
   }
   try {
+    // Same justification as existsSync above — build-time only, fixed-prefix path.
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     const meta = await sharp(filePath).metadata();
     if (!meta.width || !meta.height) {
       console.warn(`[rehype-image-dims] no dimensions for ${src}`);
