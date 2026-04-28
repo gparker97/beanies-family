@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-28
 
+### Security
+
+- **fast-xml-parser bumped to 5.7.1** (via `@aws-sdk/xml-builder` coordinated update) — fixes [GHSA-9554-fp4j-h2g6](https://github.com/advisories/GHSA-9554-fp4j-h2g6): XML comment + CDATA injection via unescaped delimiters in XMLBuilder output. Used transitively through the AWS SDK in our DynamoDB code path. CI green confirmed our usage doesn't trip the documented breaking entity-handling change in 5.7.x.
+
+### Changed
+
+- **Dependency cleanup pass — 13 dependabot PRs triaged, 3 merged, 8 deferred, 2 closed as superseded.** Merged: development-dependencies group (10 minor/patch bumps incl. postcss XSS fix), production-dependencies group (@automerge/automerge 3.2.5 → 3.2.6, vue patch, tailwindcss patches, @tailwindcss/vite patch), fast-xml-parser security fix (above). Deferred to focused-migration work (each closed with a comment naming the cascade): astro 5 → 6, vite 7 → 8, @astrojs/mdx 4 → 5, astro-seo 0 → 1, astro-og-canvas + canvaskit-wasm pre-1.0 minor bumps, eslint 9 → 10 (peer-deps cascade confirmed locally via ERESOLVE), stylelint 16 → 17 (same shape). Closed as superseded: standalone postcss PR (covered by the dev-deps group), older astro 6.1.6 PR (newer 6.1.8 was open). Remaining 5 security alerts triaged as non-applicable or unfixable-transitive — see STATUS.md `Engineering follow-ups`.
+
 ### Fixed
 
 - **Slack `#beanies-errors` no longer fires on transient service-worker update failures.** First production error report after the auto-error-notifications shipped was a `TypeError: Failed to update a ServiceWorker` from a user on Android Chrome over 4G — three call sites (`UpdatePrompt.vue` periodic 5-min poll + visibility-change refresh, and `AppHeader.vue` refresh-all button) were calling `registration.update()` without catching the rejection. Any transient fetch failure of `sw.js` (mobile signal blip, momentary CDN error, mid-deploy cache invalidation) floated up to the global `unhandledrejection` listener and pinged Slack. There is **zero user impact** when this happens — the currently-installed SW keeps serving fine; the next update attempt succeeds. New `safeServiceWorkerUpdate(registration, source)` helper wraps `registration.update()` with a `.catch()` that logs `[serviceWorker] update from <source> failed (transient)` + the Error to console (devs retain debugging visibility) but intentionally does NOT promote to an error report. All three call sites now use the helper. Compliant with the no-silent-failures rule: failure is caught + classified + logged with prefix + Error; the "non-critical → console only with documented fallback" path applies.

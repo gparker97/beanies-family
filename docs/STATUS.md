@@ -218,9 +218,21 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 **Engineering follow-ups:**
 
-- **Lighthouse CI first real run** — fires on next PR touching `web/`. May need perf tuning if assertions fail.
+- **Lighthouse CI first real run** — fired on the prod-deps dependabot PR (#184) on 2026-04-28 and confirmed pre-existing perf/a11y debt on the marketing site: performance score 0.78 vs the 0.95 threshold, plus aria-hidden-focus, color-contrast, unsized-images, image-delivery-insight, lcp-discovery-insight, network-dependency-tree-insight, uses-responsive-images. Not a regression from any single bump — this is the genuine state of the marketing site. Fix as a focused perf pass touching web/ image dimensions, image format/sizing, critical-path discovery, and contrast ratios on guide/blog/help pages. Until then, Lighthouse CI will fail on every web-touching PR and merges need `--admin`.
 - **Vue app fonts still on Google Fonts** (`index.html`). Out of scope for #167.
-- **Dependabot `tmp` vulnerability** — transitive dep in `@lhci/cli`. Not actionable; resolves when `@lhci/cli` updates.
+- **Major-version dependency migrations** (deferred from 2026-04-28 dependabot triage; closed PRs noted in commit `<sha>`):
+  - **astro 5 → 6** (was #176): breaking — Container API, removed adapters, image service changes, Content Layer API revision. Needs focused migration with full visual QA across blog/guides/help.
+  - **vite 7 → 8** (was #181): touches both Vue app (vite-plugin-pwa, @vitejs/plugin-vue compat) and marketing site (Astro adapter compat). Plugin ecosystem typically lags 2-4 weeks behind a major.
+  - **@astrojs/mdx 4 → 5** (was #179): tied to astro 6 — bump alongside the astro migration above.
+  - **astro-seo 0 → 1** (was #175): pre-1.0 → 1.0 jumps are typically breaking. Small focused PR with `<head>` visual diff.
+  - **astro-og-canvas pre-1.0 minor** (was #178) + **canvaskit-wasm pre-1.0 minor** (was #174): bump together as a single OG-image-generation cleanup PR with output verification across blog post / guide / help article.
+  - **eslint 9 → 10** (was #177): blocked by `@microsoft/eslint-plugin-sdl`, typescript-eslint, eslint-plugin-vue, eslint-plugin-es-x peer-deps that haven't caught up. ERESOLVE confirmed locally. Wait for ecosystem.
+  - **stylelint 16 → 17** (was #180): blocked by stylelint-config-standard, stylelint-config-recommended-vue, stylelint-config-html peer-deps. ERESOLVE confirmed locally. Coordinated bump or wait for the next dependabot grouped run.
+- **Dependabot security alerts (5 remaining as of 2026-04-28, all triaged as non-applicable or already-deferred):**
+  - **uuid v3/5/6 `buf` bounds-check (#40, medium)** — we use uuid 8 + 10 transitively (via `@lhci/cli` and `vite-plugin-top-level-await`); the vulnerable v3/5/6 path is not in our tree.
+  - **astro `define:vars` XSS (#37, #38, medium, duplicate)** — `define:vars` is not used in any of our `web/src/pages/*.astro` files; will be picked up incidentally when astro is migrated to v6.
+  - **tmp symlink (#36, low)** — transitive in `@lhci/cli`; not actionable until lhci updates upstream.
+  - **yaml stack-overflow on deep nesting (#23, medium)** — transitive in build/dev tools (astro, vite, lint-staged, yaml-language-server). We never parse untrusted YAML; no exploitable path in our app or build.
 
 **External ops (outside repo, user actions):**
 
