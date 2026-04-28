@@ -28,6 +28,16 @@ interface Props {
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
   /** Mark the page as noindex (e.g. staging preview, utility pages). */
   noindex?: boolean;
+  /**
+   * Path to the page's LCP (Largest Contentful Paint) image. When set,
+   * a `<link rel="preload" as="image">` is rendered in `<head>` so the
+   * browser starts the request before discovering the `<img>` tag in the
+   * body — measurably improves LCP on image-heavy hero pages and resolves
+   * Lighthouse's `lcp-discovery-insight` audit.
+   *
+   * Pass the served path (e.g. `/brand/foo.webp`), not a `src/` import.
+   */
+  lcpImage?: string;
 }
 
 const {
@@ -42,6 +52,7 @@ const {
   tags,
   jsonLd,
   noindex = false,
+  lcpImage,
 } = Astro.props;
 
 const canonical = new URL(canonicalPath, SITE_URL).toString();
@@ -58,6 +69,7 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
          across prod (apex) and this site during Phase B / after cutover. -->
     <link rel="icon" type="image/png" href="/brand/beanies_small_bean_favicon_32x32.png" />
     <link rel="apple-touch-icon" href="/brand/beanies_father_son_icon_192x192.png" />
+    {lcpImage && <link rel="preload" as="image" href={lcpImage} fetchpriority="high" />}
     <SEO
       title={title}
       description={description}
