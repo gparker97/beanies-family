@@ -17,19 +17,29 @@ interface Prefill {
   memberName: string;
 }
 
-const props = defineProps<{
-  /** v-model:open from parent. */
-  open: boolean;
-  /** Active sync provider — drives Step 1 CTA semantics (share vs confirm). */
-  provider: StorageProviderType | null;
-  /** Inviter context used in the share message body. */
-  inviterName: string;
-  familyName: string;
-  /** When opened from a per-bean share button, prefill + bean name. */
-  prefill?: Prefill;
-  /** Single owner of invite-link state. Created in the parent page. */
-  inviteFlow: InviteFlow;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** v-model:open from parent. */
+    open: boolean;
+    /** Active sync provider — drives Step 1 CTA semantics (share vs confirm). */
+    provider: StorageProviderType | null;
+    /** Inviter context used in the share message body. */
+    inviterName: string;
+    familyName: string;
+    /** When opened from a per-bean share button, prefill + bean name. */
+    prefill?: Prefill;
+    /** Single owner of invite-link state. Created in the parent page. */
+    inviteFlow: InviteFlow;
+    /**
+     * BaseModal layer. Defaults to 'overlay' (z-[60]) — fine for the Pod page.
+     * Pass 'top' (z-[250]) when mounted from above another full-screen
+     * takeover surface like the OnboardingWizard (z-200), otherwise the
+     * wizard renders behind it and tapping Send appears to do nothing.
+     */
+    layer?: 'overlay' | 'top';
+  }>(),
+  { layer: 'overlay' }
+);
 
 const emit = defineEmits<{
   close: [];
@@ -206,7 +216,7 @@ function handleClose() {
   <BaseModal
     :open="open"
     size="md"
-    layer="overlay"
+    :layer="layer"
     custom-header
     :closable="!inviteFlow.isGenerating.value"
     fullscreen-mobile

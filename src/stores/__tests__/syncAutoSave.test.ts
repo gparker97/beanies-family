@@ -217,7 +217,6 @@ vi.mock('@/services/sync/capabilities', () => ({
     googleDrive: false,
     manualSync: true,
   }),
-  supportsGoogleDrive: () => false,
   canAutoSync: () => true,
 }));
 

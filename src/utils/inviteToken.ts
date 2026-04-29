@@ -3,14 +3,14 @@
  *
  * Valid token hashes are stored in VITE_INVITE_BEAN_HASHES (comma-separated hex).
  * Generate a hash: echo -n "my-token" | sha256sum | cut -d' ' -f1
+ *
+ * Whether the gate itself is enabled is exposed via `features.inviteGate` in
+ * `@/config/features` — callers gate UI on that, not on a separate helper here.
  */
 
-const HASHES_ENV = import.meta.env.VITE_INVITE_BEAN_HASHES ?? '';
+import { features } from '@/config/features';
 
-/** Whether the invite gate is active (non-empty hash list). */
-export function isInviteGateEnabled(): boolean {
-  return HASHES_ENV.trim().length > 0;
-}
+const HASHES_ENV = import.meta.env.VITE_INVITE_BEAN_HASHES ?? '';
 
 /** SHA-256 hash a string, returning lowercase hex. */
 async function sha256Hex(input: string): Promise<string> {
@@ -23,7 +23,7 @@ async function sha256Hex(input: string): Promise<string> {
 
 /** Validate a token against the configured hashes. */
 export async function validateInviteToken(token: string): Promise<boolean> {
-  if (!isInviteGateEnabled()) return true;
+  if (!features.inviteGate) return true;
 
   const normalized = token.trim().toLowerCase();
   if (!normalized) return false;

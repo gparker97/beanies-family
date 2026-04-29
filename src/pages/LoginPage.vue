@@ -12,7 +12,7 @@ import JoinPodView from '@/components/login/JoinPodView.vue';
 import BiometricLoginView from '@/components/login/BiometricLoginView.vue';
 import InviteGateOverlay from '@/components/login/InviteGateOverlay.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { isInviteGateEnabled } from '@/utils/inviteToken';
+import { features } from '@/config/features';
 import { useSyncStore } from '@/stores/syncStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
@@ -59,7 +59,7 @@ const forceNewGoogleAccount = ref(false);
 const loadError = ref<string | undefined>();
 const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
 const isSingleFamilyAutoSelect = ref(false);
-const inviteGateLocked = ref(isInviteGateEnabled());
+const inviteGateLocked = ref(features.inviteGate);
 
 onMounted(async () => {
   if (familyStore.members.length === 0) {
@@ -434,7 +434,11 @@ function handleSignedIn(destination: string) {
             @navigate="handleNavigate"
           />
         </div>
-        <InviteGateOverlay v-if="inviteGateLocked" @unlocked="inviteGateLocked = false" />
+        <InviteGateOverlay
+          v-if="inviteGateLocked"
+          @unlocked="inviteGateLocked = false"
+          @cancel="activeView = 'welcome'"
+        />
       </div>
 
       <JoinPodView

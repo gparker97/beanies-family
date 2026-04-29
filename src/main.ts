@@ -2,8 +2,11 @@ import { createPinia } from 'pinia';
 import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
+import { initAnalytics } from './services/analytics/plausible';
 import { reportError } from './utils/errorReporter';
 import './style.css';
+
+initAnalytics();
 
 const app = createApp(App);
 

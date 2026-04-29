@@ -170,7 +170,9 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-> **Validated 2026-04-29 (end-of-day):** no commits since 2026-04-28 afternoon's validation pass — `git log --since="2026-04-28 14:00"` confirms only the onboarding-wizard-v2 ship work landed (`fdcff94`, `d0cca18`, `a852569`). Yesterday's pending items remain accurate; appending today's research/discussion-session outputs below.
+> **Validated 2026-04-29 (afternoon):** dropped one stale block — "PR — refactor `BaseModal` + `MobileHamburgerMenu` to consume new composables" — both files already consume `useFullscreenOverlay` (commit `8a91f84`), so the work shipped under a different name; no PR needed. All other pending items below remain accurate.
+>
+> **Earlier 2026-04-29 (end-of-day):** no commits since 2026-04-28 afternoon's validation pass — `git log --since="2026-04-28 14:00"` confirms only the onboarding-wizard-v2 ship work landed (`fdcff94`, `d0cca18`, `a852569`). Yesterday's pending items remain accurate; appending today's research/discussion-session outputs below.
 >
 > **Earlier 2026-04-28 (afternoon) validation:** verified the `BaseModal` + `MobileHamburgerMenu` refactor item is still pending — `grep -l "useEscapeClose\|useBodyScrollLock"` against both files returned empty, so neither has been refactored yet. All other pending items below remain accurate. No stale items removed in this validation pass.
 >
@@ -195,10 +197,6 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 - **Manual smoke walkthrough** — do a fresh sign-up walkthrough of all 6 steps. Verify visual fidelity (gradient covers, no scrollbars, dropdown teleports correctly, mobile-width has no horizontal overflow); beanie-mode lowercase rendering across step titles + chip labels; Chinese translation rendering (post-`npm run translate`); error-path toast smoke (DevTools → Network → Offline → click Add Account; row should stay in entry state, toast should fire with `surface: 'onboarding-add-account'`); Step 6 invite-gate combinations (Local storage = no card; Drive + lone-owner = no card; Drive + ≥1 shareable member = card visible). 5-minute pass once at a browser.
 - **`BaseCombobox` Teleport regression check** — the Teleport-to-body change benefits every combobox usage, but worth a sanity pass on the Settings page combobox + the asset/account modals where the combobox also sits inside an `overflow:hidden` modal. Computed-position math is conservative + scroll/resize re-anchored, but a 30-second visual check confirms no regressions.
-
-**🟡 PR — refactor `BaseModal` + `MobileHamburgerMenu` to consume new composables (from 2026-04-28 mobile nav v3 ship):**
-
-- Single-purpose cleanup: swap inline scroll-lock + Esc handlers in `src/components/ui/BaseModal.vue` and `src/components/common/MobileHamburgerMenu.vue` for the new `useEscapeClose` + `useBodyScrollLock` composables (`src/composables/`). ~75 lines of inline duplication to remove across 2 files. Isolated regression risk.
 
 **🟢 Net-worth chart follow-ups (from 2026-04-22 plan, explicitly deferred):**
 

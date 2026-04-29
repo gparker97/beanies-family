@@ -182,7 +182,15 @@ const transitionName = computed(() =>
   padding: 0;
   position: fixed;
   transition: opacity 0.3s ease;
-  z-index: 9999;
+
+  /*
+   * 200 matches the documented chrome tier in BaseModal (PublicNav etc.).
+   * BaseModal's layer="top" is z-[250] — that's specifically reserved for
+   * modals that must stack above this overlay (e.g. the InviteWizardModal
+   * spawned from OnboardingInvitePanel on the Complete step). Don't bump
+   * this above 200 without also bumping BaseModal's top layer.
+   */
+  z-index: 200;
 }
 
 .ob-overlay-hidden {

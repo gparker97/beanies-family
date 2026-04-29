@@ -1,14 +1,8 @@
 import type { RegistryEntry } from '@/types/models';
+import { features } from '@/config/features';
 
-const API_URL = import.meta.env.VITE_REGISTRY_API_URL as string | undefined;
-const API_KEY = import.meta.env.VITE_REGISTRY_API_KEY as string | undefined;
-
-export function isRegistryConfigured(): boolean {
-  return Boolean(API_URL && API_KEY);
-}
-
-/** @deprecated internal alias kept for backward compat */
-const isConfigured = isRegistryConfigured;
+const API_URL = import.meta.env.VITE_REGISTRY_API_URL;
+const API_KEY = import.meta.env.VITE_REGISTRY_API_KEY;
 
 async function request(method: string, familyId: string, body?: object): Promise<Response> {
   const res = await fetch(`${API_URL}/family/${familyId}`, {
@@ -27,15 +21,15 @@ async function request(method: string, familyId: string, body?: object): Promise
  * Returns null if not found or if the registry is unavailable.
  */
 export async function lookupFamily(familyId: string): Promise<RegistryEntry | null> {
-  if (!isConfigured()) return null;
+  if (!features.registry) return null;
 
   try {
     const res = await request('GET', familyId);
     if (res.status === 404) return null;
     if (!res.ok) return null;
     return (await res.json()) as RegistryEntry;
-  } catch {
-    console.warn('[registry] lookupFamily failed — registry unavailable');
+  } catch (err) {
+    console.warn('[registry] lookupFamily failed — registry unavailable', err);
     return null;
   }
 }
@@ -48,12 +42,12 @@ export async function registerFamily(
   familyId: string,
   entry: Omit<RegistryEntry, 'familyId' | 'updatedAt'>
 ): Promise<void> {
-  if (!isConfigured()) return;
+  if (!features.registry) return;
 
   try {
     await request('PUT', familyId, entry);
-  } catch {
-    console.warn('[registry] registerFamily failed — registry unavailable');
+  } catch (err) {
+    console.warn('[registry] registerFamily failed — registry unavailable', err);
   }
 }
 
@@ -62,11 +56,11 @@ export async function registerFamily(
  * Fire-and-forget — failures are logged but never block the caller.
  */
 export async function removeFamily(familyId: string): Promise<void> {
-  if (!isConfigured()) return;
+  if (!features.registry) return;
 
   try {
     await request('DELETE', familyId);
-  } catch {
-    console.warn('[registry] removeFamily failed — registry unavailable');
+  } catch (err) {
+    console.warn('[registry] removeFamily failed — registry unavailable', err);
   }
 }

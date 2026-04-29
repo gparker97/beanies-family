@@ -24,11 +24,8 @@ import { useAuthStore } from './authStore';
 import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
-import {
-  getSyncCapabilities,
-  canAutoSync,
-  supportsGoogleDrive,
-} from '@/services/sync/capabilities';
+import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
+import { features } from '@/config/features';
 import { downloadAsFile } from '@/services/sync/fileSync';
 import * as registry from '@/services/registry/registryService';
 import type { RegistryEntry } from '@/types/models';
@@ -120,7 +117,7 @@ export const useSyncStore = defineStore('sync', () => {
   // Capabilities
   const capabilities = computed(() => getSyncCapabilities());
   const supportsAutoSync = computed(() => canAutoSync());
-  const isGoogleDriveAvailable = computed(() => supportsGoogleDrive());
+  const isGoogleDriveAvailable = computed(() => features.drive);
 
   // Encryption is always on in V4 — backward compat computed
   const hasSessionPassword = computed(() => familyKey.value !== null);
@@ -357,8 +354,17 @@ export const useSyncStore = defineStore('sync', () => {
           }
           return { success: false };
         }
-        if (!text && syncService.getProviderType() === 'google_drive') {
-          showGoogleReconnect.value = true;
+        // Don't fire showGoogleReconnect here. Real auth failures are surfaced
+        // by the expiry-callback chain (`setupTokenExpiryHandler`) — that's
+        // the single place that should promote the user to a reconnect banner.
+        // Other failures (transient network blip, 5xx, brief SW-activation
+        // race) shouldn't show a "session expired" prompt — polling will
+        // retry on its next cycle.
+        if (syncService.getProviderType() === 'google_drive') {
+          console.warn(
+            '[syncStore.loadFromFile] Drive read returned no text — letting polling/retry recover. lastError:',
+            lastError
+          );
         }
         return { success: false };
       }
@@ -1468,6 +1474,17 @@ export const useSyncStore = defineStore('sync', () => {
     fileId: string,
     driveFileName: string
   ): Promise<{ success: boolean; needsPassword?: boolean }> {
+    // Defensive: clear any banner state left over from a prior session.
+    // Sign-out should have done this via resetState(), but if we're here we
+    // know the user has a fresh interactive token in hand — there's no
+    // legitimate "session expired" state to display until something else
+    // sets it again.
+    showGoogleReconnect.value = false;
+    showSaveFailureBanner.value = false;
+    saveFailureLevel.value = 'none';
+    lastSaveError.value = null;
+    error.value = null;
+
     try {
       const token = await requestAccessToken();
       await fetchGoogleUserEmail(token);

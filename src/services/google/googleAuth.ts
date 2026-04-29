@@ -347,41 +347,63 @@ async function performSilentRefresh(): Promise<string | null> {
 
   if (!clientId || !refreshToken) return null;
 
-  try {
-    console.warn('[googleAuth] Attempting silent token refresh...');
-    const tokens = await refreshAccessToken({
-      refreshToken,
-      clientId,
-    });
+  // Retry once on transient failures (network blip during SW activation,
+  // brief 5xx from the proxy, mobile-network jitter). `invalid_grant` is
+  // permanent and short-circuits — the refresh token has been revoked.
+  const MAX_ATTEMPTS = 2;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      console.warn(
+        `[googleAuth] Attempting silent token refresh (attempt ${attempt}/${MAX_ATTEMPTS})...`
+      );
+      const tokens = await refreshAccessToken({
+        refreshToken,
+        clientId,
+      });
 
-    accessToken = tokens.access_token;
-    expiresAt = Date.now() + tokens.expires_in * 1000;
+      accessToken = tokens.access_token;
+      expiresAt = Date.now() + tokens.expires_in * 1000;
 
-    // Schedule next auto-refresh
-    scheduleAutoRefresh(tokens.expires_in);
+      // Schedule next auto-refresh
+      scheduleAutoRefresh(tokens.expires_in);
 
-    // Notify subscribers (assertion + telemetry hooks). Fire-and-forget.
-    // interactive=false — background refresh, no user gesture involved.
-    notifyTokenAcquired(tokens.access_token, false).catch(() => {});
+      // Notify subscribers (assertion + telemetry hooks). Fire-and-forget.
+      // interactive=false — background refresh, no user gesture involved.
+      notifyTokenAcquired(tokens.access_token, false).catch(() => {});
 
-    console.warn('[googleAuth] Silent refresh succeeded');
-    return tokens.access_token;
-  } catch (e) {
-    console.warn('[googleAuth] Silent refresh failed:', (e as Error).message);
+      console.warn('[googleAuth] Silent refresh succeeded');
+      return tokens.access_token;
+    } catch (e) {
+      const message = (e as Error).message;
+      const isPermanent =
+        message.includes('invalid_grant') || message.includes('Token has been expired or revoked');
 
-    // If the refresh token is revoked/invalid, clear it
-    if (
-      (e as Error).message.includes('invalid_grant') ||
-      (e as Error).message.includes('Token has been expired or revoked')
-    ) {
-      refreshToken = null;
-      if (currentFamilyId) {
-        await clearGoogleRefreshToken(currentFamilyId);
+      if (isPermanent) {
+        console.warn(
+          '[googleAuth] Silent refresh failed (permanent — refresh token revoked):',
+          message
+        );
+        refreshToken = null;
+        if (currentFamilyId) {
+          await clearGoogleRefreshToken(currentFamilyId);
+        }
+        return null;
       }
-    }
 
-    return null;
+      // Transient failure — retry if attempts remain.
+      if (attempt < MAX_ATTEMPTS) {
+        console.warn(
+          `[googleAuth] Silent refresh failed (transient, retrying in 1.5s): ${message}`
+        );
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+
+      console.warn(`[googleAuth] Silent refresh failed after ${MAX_ATTEMPTS} attempts: ${message}`);
+      return null;
+    }
   }
+  return null;
 }
 
 /**

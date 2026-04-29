@@ -33,7 +33,18 @@ import {
 } from '@/services/google/driveService';
 import { enqueueOfflineSave, setFlushProvider } from '../offlineQueue';
 
-/** Retry a Drive API call with exponential backoff on 5xx errors. */
+/**
+ * Retry a Drive API call with exponential backoff on transient failures.
+ *
+ * Retryable:
+ *   - 5xx / 408 (server-side transient)
+ *   - TypeError from fetch (network-side transient: DNS, TLS, offline blip,
+ *     SW activation race during a deploy). The browser's fetch() throws a
+ *     TypeError for these — common right after sign-in if the network is
+ *     still warming up.
+ *
+ * Not retryable: 4xx (incl. 401 — caller handles auth refresh separately).
+ */
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -41,7 +52,9 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
       return await fn();
     } catch (e) {
       lastError = e;
-      const isRetryable = e instanceof DriveApiError && (e.status >= 500 || e.status === 408);
+      const isRetryable =
+        (e instanceof DriveApiError && (e.status >= 500 || e.status === 408)) ||
+        (e instanceof TypeError && /fetch|network/i.test(e.message));
       if (!isRetryable || attempt === maxRetries) throw e;
       // Exponential backoff: 1s, 2s, 4s
       await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));

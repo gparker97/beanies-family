@@ -262,6 +262,37 @@ router.beforeEach((to) => {
   }
 });
 
+/**
+ * Auth guard for `requiresAuth: true` routes. Without this, browser-back
+ * after a sign-out (or any navigation to an app route while unauthenticated)
+ * lands the user on a page like /nook with empty data — App.vue's init flow
+ * only catches the no-auth case on app boot, not on subsequent navigations.
+ *
+ * Skipped while authStore is still initializing: `isAuthenticated` starts
+ * false and flips to true async during `authStore.initialize()` (session
+ * restore from IndexedDB). Firing the guard before then would bounce a
+ * legitimately-authenticated user opening /nook in a fresh tab to /welcome.
+ * Once init completes, App.vue's `loadFamilyData` handles the no-session
+ * case explicitly. After that, this guard catches any subsequent navigation
+ * while unauthenticated (e.g. browser-back after sign-out).
+ *
+ * The redirect preserves the original `fullPath` as a `?next=` query so
+ * post-sign-in code can route the user back to their intent if it wants
+ * (currently the login flow defaults to /nook on success; the param is
+ * available for future use without changing this guard).
+ */
+router.beforeEach((to) => {
+  if (!to.meta.requiresAuth) return;
+  const authStore = useAuthStore();
+  if (!authStore.isInitialized) return;
+  if (authStore.isAuthenticated) return;
+  return {
+    name: 'Welcome',
+    query: { next: to.fullPath },
+    replace: true,
+  };
+});
+
 // Permission guard: redirect to /no-access if finance permission is missing
 router.beforeEach((to) => {
   if (to.meta.requiresFinance) {

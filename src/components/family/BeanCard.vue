@@ -19,6 +19,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
+import { canInviteFamily } from '@/config/features';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useSayingsStore } from '@/stores/sayingsStore';
@@ -47,6 +48,7 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const router = useRouter();
+const inviteAvailable = computed(() => canInviteFamily());
 
 const favoritesStore = useFavoritesStore();
 const sayingsStore = useSayingsStore();
@@ -264,8 +266,18 @@ const severeAllergyCount = computed(
               </button>
               <button
                 v-if="member.requiresPassword && !member.isPet && canManage"
-                class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
-                :title="t('family.copyInviteLinkHint')"
+                :disabled="!inviteAvailable"
+                :class="[
+                  'flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 dark:hover:bg-slate-700',
+                  inviteAvailable
+                    ? 'hover:bg-gray-100 hover:text-orange-600'
+                    : 'cursor-not-allowed opacity-50',
+                ]"
+                :title="
+                  inviteAvailable
+                    ? t('family.copyInviteLinkHint')
+                    : t('selfHost.inviteUnavailableTooltip')
+                "
                 @click.stop="emit('share-invite')"
               >
                 <BeanieIcon name="share" size="sm" />

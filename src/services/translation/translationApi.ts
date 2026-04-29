@@ -54,8 +54,11 @@ export async function translate(
       const params = new URLSearchParams({
         q: text,
         langpair: `${sourceLang}|${targetLang}`,
-        de: 'gpsp2001@gmail.com', // Increases daily limit from 5000 to 50000 chars
       });
+      // Optional `de` param upgrades daily quota from 5k → 50k chars when set.
+      // Self-hosters set their own VITE_MYMEMORY_EMAIL; cloud build uses greg's.
+      const upgradeEmail = import.meta.env.VITE_MYMEMORY_EMAIL;
+      if (upgradeEmail) params.set('de', upgradeEmail);
 
       const response = await fetch(`${MYMEMORY_API_URL}?${params.toString()}`);
 

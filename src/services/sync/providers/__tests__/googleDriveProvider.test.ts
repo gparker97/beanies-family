@@ -213,15 +213,34 @@ describe('GoogleDriveProvider', () => {
       expect(enqueueOfflineSave).toHaveBeenCalledWith('{"data":"test"}');
     });
 
-    it('queues for offline on network error', async () => {
+    it('queues for offline when network error persists across retries', async () => {
       const { enqueueOfflineSave } = await import('../../offlineQueue');
 
-      mockUpdateFile.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      // withRetry retries network errors up to 3 times before giving up. To
+      // hit the queue-offline path we have to fail every attempt.
+      mockUpdateFile.mockRejectedValue(new TypeError('Failed to fetch'));
 
       await provider.write('{"data":"offline"}');
 
       expect(enqueueOfflineSave).toHaveBeenCalledWith('{"data":"offline"}');
-    });
+    }, 20_000); // exponential backoff: 1s + 2s + 4s = 7s of retries
+
+    it('recovers silently when transient network error resolves on retry', async () => {
+      const { enqueueOfflineSave } = await import('../../offlineQueue');
+      vi.mocked(enqueueOfflineSave).mockClear();
+      // mockReset clears both calls AND implementation (the previous test set
+      // a persistent mockRejectedValue that would otherwise leak into this one).
+      mockUpdateFile.mockReset();
+
+      // First attempt fails with a TypeError; second attempt succeeds.
+      // No banner, no offline queue — purely silent retry.
+      mockUpdateFile.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      await provider.write('{"data":"transient"}');
+
+      expect(enqueueOfflineSave).not.toHaveBeenCalled();
+      expect(mockUpdateFile).toHaveBeenCalledTimes(2);
+    }, 20_000);
   });
 
   describe('read — 401 recovery (silent-only, no popups)', () => {

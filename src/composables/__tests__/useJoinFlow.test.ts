@@ -55,8 +55,26 @@ const mockRegistry = {
   entry: null as { provider?: string; displayPath?: string; familyName?: string } | null,
 };
 vi.mock('@/services/registry/registryService', () => ({
-  isRegistryConfigured: () => mockRegistry.isConfigured,
   lookupFamily: vi.fn(async () => mockRegistry.entry),
+}));
+vi.mock('@/config/features', () => ({
+  features: {
+    get registry() {
+      return mockRegistry.isConfigured;
+    },
+    drive: false,
+    inviteGate: false,
+    slackInvite: false,
+    slackPodCreate: false,
+    errorReporter: false,
+    marketingUrl: false,
+    analytics: false,
+    translationApiUpgrade: false,
+  },
+  canInviteFamily: () => false,
+  getDeploymentMode: () => 'self-host-limited',
+  getDeploymentBadge: () => ({ icon: '🏠', labelKey: 'selfHost.badge.community', docsUrl: '#' }),
+  SELF_HOSTING_DOCS_URL: '#',
 }));
 
 const mockInvite = {

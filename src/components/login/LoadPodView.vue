@@ -5,6 +5,7 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import GoogleDriveFilePicker from '@/components/google/GoogleDriveFilePicker.vue';
+import { features } from '@/config/features';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -399,7 +400,14 @@ const isDriveLoading = ref(false);
 const showDriveEmptyState = ref(false);
 
 async function handleLoadFromGoogleDrive() {
-  if (!syncStore.isGoogleDriveAvailable) return;
+  if (!syncStore.isGoogleDriveAvailable) {
+    // Defense-in-depth: the button is disabled in this state, so this branch
+    // shouldn't fire. If it does, log so a dev can spot the regression.
+    console.warn(
+      '[LoadPodView] Google Drive load handler invoked while features.drive is off — check the disabled binding on the card.'
+    );
+    return;
+  }
 
   isDriveLoading.value = true;
   formError.value = null;
@@ -676,18 +684,28 @@ async function handleDriveRefresh() {
       <!-- Storage source cards -->
       <template v-else>
         <div class="grid grid-cols-2 gap-3">
-          <!-- Google Drive card (always enabled) -->
+          <!-- Google Drive card — disabled when features.drive is off (self-host) -->
           <button
-            class="relative rounded-2xl border-2 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
-            :class="
-              selectedSource === 'google_drive'
-                ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md'
-                : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700/50'
-            "
-            :disabled="isDriveLoading"
+            class="relative rounded-2xl border-2 p-5 text-left transition-all"
+            :class="[
+              !features.drive
+                ? 'cursor-not-allowed border-gray-200 bg-white opacity-50 dark:border-slate-600 dark:bg-slate-700/50'
+                : selectedSource === 'google_drive'
+                  ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md hover:-translate-y-0.5 hover:shadow-lg'
+                  : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-600 dark:bg-slate-700/50',
+            ]"
+            :disabled="isDriveLoading || !features.drive"
+            :title="!features.drive ? t('selfHost.driveUnavailableTooltip') : undefined"
             @click="handleLoadFromGoogleDrive"
           >
             <span
+              v-if="!features.drive"
+              class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
+            >
+              {{ t('selfHost.notConfigured') }}
+            </span>
+            <span
+              v-else
               class="from-primary-500 to-terracotta-400 absolute -top-2.5 right-3 rounded-full bg-gradient-to-r px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
             >
               {{ t('loginV6.recommended') }}
@@ -728,58 +746,6 @@ async function handleDriveRefresh() {
               {{ t('loginV6.googleDriveCardDesc') }}
             </p>
           </button>
-
-          <!-- Dropbox card (coming soon) -->
-          <div
-            class="relative cursor-not-allowed rounded-2xl border-2 border-gray-200 bg-white p-5 text-left opacity-50 dark:border-slate-600 dark:bg-slate-700/50"
-          >
-            <span
-              class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-xs font-bold text-white"
-            >
-              {{ t('loginV6.cloudComingSoon') }}
-            </span>
-            <div
-              class="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20"
-            >
-              <svg class="h-5 w-5 text-[#0061FF]" viewBox="0 0 24 24" fill="currentColor">
-                <path
-                  d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.707 7.293l-1.414 1.414L12 7.414l-3.293 3.293-1.414-1.414L12 4.586l4.707 4.707z"
-                />
-              </svg>
-            </div>
-            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {{ t('storage.dropbox') }}
-            </p>
-            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              {{ t('loginV6.dropboxCardDesc') }}
-            </p>
-          </div>
-
-          <!-- iCloud card (coming soon) -->
-          <div
-            class="relative cursor-not-allowed rounded-2xl border-2 border-gray-200 bg-white p-5 text-left opacity-50 dark:border-slate-600 dark:bg-slate-700/50"
-          >
-            <span
-              class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-xs font-bold text-white"
-            >
-              {{ t('loginV6.cloudComingSoon') }}
-            </span>
-            <div
-              class="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 dark:bg-slate-700"
-            >
-              <svg class="h-5 w-5 text-gray-500" viewBox="0 0 24 24" fill="currentColor">
-                <path
-                  d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83z"
-                />
-              </svg>
-            </div>
-            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {{ t('storage.iCloud') }}
-            </p>
-            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              {{ t('loginV6.iCloudCardDesc') }}
-            </p>
-          </div>
 
           <!-- Local File card -->
           <button
@@ -826,6 +792,35 @@ async function handleDriveRefresh() {
             </p>
           </button>
         </div>
+
+        <!-- Coming-soon providers — collapsed into a disclosure with compact chips
+             instead of disabled full-size cards. Mirrors CreatePodView (setup wizard). -->
+        <details class="group mt-3">
+          <summary
+            class="font-outfit text-secondary-500/70 hover:text-primary-500 inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-2 text-xs font-semibold transition-colors dark:text-gray-400"
+          >
+            <span
+              class="text-primary-500 inline-block text-[10px] transition-transform group-open:rotate-90"
+              aria-hidden="true"
+              >▸</span
+            >
+            <span>{{ t('loginV6.moreProvidersComingSoon') }}</span>
+          </summary>
+          <div class="flex gap-2 pb-2 pl-4">
+            <span
+              class="font-outfit text-secondary-500/50 flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold dark:border-slate-600 dark:bg-slate-700/30 dark:text-gray-400"
+              >📦 {{ t('storage.dropbox') }}</span
+            >
+            <span
+              class="font-outfit text-secondary-500/50 flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold dark:border-slate-600 dark:bg-slate-700/30 dark:text-gray-400"
+              >☁️ {{ t('storage.iCloud') }}</span
+            >
+            <span
+              class="font-outfit text-secondary-500/50 flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold dark:border-slate-600 dark:bg-slate-700/30 dark:text-gray-400"
+              >🪟 OneDrive</span
+            >
+          </div>
+        </details>
 
         <!-- Local file drop zone (appears when Local File selected) -->
         <div
