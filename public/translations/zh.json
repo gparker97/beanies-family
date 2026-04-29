@@ -2,7 +2,7 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-28",
+    "lastUpdated": "2026-04-29",
     "translationCount": 2579
   },
   "translations": {
@@ -2661,11 +2661,6 @@
       "hash": "xjjn5m",
       "lastUpdated": "2026-02-24"
     },
-    "loginV6.cloudComingSoon": {
-      "translation": "即将推出",
-      "hash": "3kerkq",
-      "lastUpdated": "2026-03-03"
-    },
     "loginV6.securityYourData": {
       "translation": "您的数据，您的云",
       "hash": "xxn899",
@@ -3644,16 +3639,6 @@
     "loginV6.googleDriveCardDesc": {
       "translation": "从云存储加载",
       "hash": "cqtri9",
-      "lastUpdated": "2026-03-03"
-    },
-    "loginV6.dropboxCardDesc": {
-      "translation": "与Dropbox同步",
-      "hash": "4p93nd",
-      "lastUpdated": "2026-03-03"
-    },
-    "loginV6.iCloudCardDesc": {
-      "translation": "与iCloud同步",
-      "hash": "1ol6v3",
       "lastUpdated": "2026-03-03"
     },
     "loginV6.localFileCardDesc": {
@@ -12402,9 +12387,9 @@
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.error.invalidGoogleEmail": {
-      "translation": "Google无法与该电子邮件共享—请仔细检查它是Gmail或Workspace地址。",
-      "hash": "3r1tgd",
-      "lastUpdated": "2026-04-26"
+      "translation": "很抱歉，我们无法与该电子邮箱共享！请仔细检查并使用有效的Google帐户电子邮箱。",
+      "hash": "507zcd",
+      "lastUpdated": "2026-04-29"
     },
     "inviteWizard.error.linkGenerationFailed": {
       "translation": "无法创建邀请链接。请重试。",
@@ -12747,38 +12732,23 @@
       "lastUpdated": "2026-04-28"
     },
     "onboarding.invite.lede": {
-      "translation": "每个豆豆都有自己的链接。输入他们的电子邮件，我们会生成一个分享链接，您可以立即通过短信发送或发送。",
-      "hash": "xcpka0",
-      "lastUpdated": "2026-04-28"
+      "translation": "每个豆豆都有自己的个性化邀请链接。轻点发送，我们将引导您通过二维码、短信或电子邮件分享。",
+      "hash": "kaohb",
+      "lastUpdated": "2026-04-29"
     },
     "onboarding.invite.send": {
       "translation": "发送\\ u2192",
       "hash": "djcnc9",
       "lastUpdated": "2026-04-28"
     },
-    "onboarding.invite.sent": {
-      "translation": "\\ u2713已发送",
-      "hash": "6snaso",
-      "lastUpdated": "2026-04-28"
-    },
     "onboarding.invite.noEmail": {
-      "translation": "no email\\ u2014 skip",
-      "hash": "yjdl1e",
-      "lastUpdated": "2026-04-28"
+      "translation": "还没有电子邮件\\ u2014在下一个屏幕上添加一个",
+      "hash": "tqr24z",
+      "lastUpdated": "2026-04-29"
     },
     "onboarding.invite.reminder": {
       "translation": "\\ u2728您以后可以随时从My Pod邀请",
       "hash": "640eg7",
-      "lastUpdated": "2026-04-28"
-    },
-    "onboarding.invite.retry": {
-      "translation": "重试\\ u2192",
-      "hash": "jldbnt",
-      "lastUpdated": "2026-04-28"
-    },
-    "onboarding.invite.editEmail": {
-      "translation": "编辑电子邮箱\\ u2192",
-      "hash": "hodhxx",
       "lastUpdated": "2026-04-28"
     },
     "onboarding.errors.addAccountFailed": {
@@ -12794,11 +12764,6 @@
     "onboarding.errors.addActivityFailed": {
       "translation": "无法添加该活动。请重试\\ u2014客服已收到通知。",
       "hash": "yu6zo9",
-      "lastUpdated": "2026-04-28"
-    },
-    "onboarding.errors.inviteFailed": {
-      "translation": "无法发送该邀请。请重试或编辑电子邮箱，然后重试。",
-      "hash": "yiub3y",
       "lastUpdated": "2026-04-28"
     },
     "onboarding.skipAddLater": {
@@ -12900,6 +12865,41 @@
       "translation": "动态",
       "hash": "rdx4a9",
       "lastUpdated": "2026-04-28"
+    },
+    "selfHost.badge.cloud": {
+      "translation": "云托管版本",
+      "hash": "abavyh",
+      "lastUpdated": "2026-04-29"
+    },
+    "selfHost.badge.devBuild": {
+      "translation": "自托管·开发者构建",
+      "hash": "j9d9op",
+      "lastUpdated": "2026-04-29"
+    },
+    "selfHost.badge.community": {
+      "translation": "自托管·社区建设",
+      "hash": "d4e0kq",
+      "lastUpdated": "2026-04-29"
+    },
+    "selfHost.learnMore": {
+      "translation": "了解更多",
+      "hash": "mxwi0f",
+      "lastUpdated": "2026-04-29"
+    },
+    "selfHost.inviteUnavailableTooltip": {
+      "translation": "邀请家庭成员需要云托管版本的beanies.family。",
+      "hash": "4j1dij",
+      "lastUpdated": "2026-04-29"
+    },
+    "selfHost.driveUnavailableTooltip": {
+      "translation": "此版本中未配置Google云端硬盘同步。请参阅SELF_HOSTING.md。",
+      "hash": "ke8m8f",
+      "lastUpdated": "2026-04-29"
+    },
+    "selfHost.notConfigured": {
+      "translation": "未配置",
+      "hash": "xjpulx",
+      "lastUpdated": "2026-04-29"
     }
   }
 }

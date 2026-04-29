@@ -9,7 +9,7 @@ To learn more about beanies and why it exists, visit [beanies.family/home](https
 You'll need [Node.js](https://nodejs.org/) v20+ and npm.
 
 ```bash
-git clone https://github.com/gregcmartin/beanies-family.git
+git clone https://github.com/gparker97/beanies-family.git
 cd beanies-family
 npm install
 npm run dev
@@ -34,6 +34,12 @@ npm run test:e2e        # end-to-end tests (Playwright)
 ```
 
 For E2E tests, you may need to install Playwright browsers first: `npx playwright install`.
+
+## Self-hosting
+
+beanies.family is open source and self-hostable. A vanilla clone gives you a fully functional offline app with manual `.beanpod` export/import. Some cloud-dependent features (Google Drive sync, magic-link invites, Slack telemetry, analytics) require additional setup — your own Google OAuth client and a few env vars.
+
+See [`docs/SELF_HOSTING.md`](./docs/SELF_HOSTING.md) for the full env-var reference and provisioning steps.
 
 ## Cloud version
 

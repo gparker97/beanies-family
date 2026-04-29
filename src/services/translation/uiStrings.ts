@@ -1695,6 +1695,27 @@ const STRING_DEFS = {
       'Your data is always encrypted, both in transit and at rest, and saved to a file you control. Nothing is stored on our servers — your precious financial and family data never leaves your hands.',
   },
 
+  // Self-host vs cloud-host indicator (Settings footer + cloud-only feature tooltips)
+  'selfHost.badge.cloud': { en: 'Cloud-hosted version', beanie: 'cloud-hosted version' },
+  'selfHost.badge.devBuild': {
+    en: 'Self-hosted · Developer build',
+    beanie: 'self-hosted · developer build',
+  },
+  'selfHost.badge.community': {
+    en: 'Self-hosted · Community build',
+    beanie: 'self-hosted · community build',
+  },
+  'selfHost.learnMore': { en: 'Learn more', beanie: 'learn more' },
+  'selfHost.inviteUnavailableTooltip': {
+    en: 'Inviting family members requires the cloud-hosted version of beanies.family.',
+    beanie: 'inviting family members requires the cloud-hosted version of beanies.family.',
+  },
+  'selfHost.driveUnavailableTooltip': {
+    en: 'Google Drive sync is not configured in this build. See SELF_HOSTING.md.',
+    beanie: 'google drive sync is not configured in this build. see SELF_HOSTING.md.',
+  },
+  'selfHost.notConfigured': { en: 'Not configured', beanie: 'not configured' },
+
   // Form labels
   'form.name': { en: 'Name', beanie: 'name' },
   'form.email': { en: 'Email', beanie: 'email' },
@@ -2566,7 +2587,6 @@ const STRING_DEFS = {
     beanie: 'drop your .beanpod file here',
   },
   'loginV6.dropZoneBrowse': { en: 'or click to browse', beanie: 'or click to browse' },
-  'loginV6.cloudComingSoon': { en: 'Coming soon', beanie: 'coming soon' },
   'loginV6.securityYourData': { en: 'Your Data, Your Cloud', beanie: 'your data, your cloud' },
   'loginV6.securityEncrypted': { en: 'AES-256 Encrypted', beanie: 'aes-256 encrypted' },
   'loginV6.securityZeroServers': {
@@ -2659,8 +2679,6 @@ const STRING_DEFS = {
     en: 'Load from your cloud storage',
     beanie: 'load from your cloud storage',
   },
-  'loginV6.dropboxCardDesc': { en: 'Sync with Dropbox', beanie: 'sync with dropbox' },
-  'loginV6.iCloudCardDesc': { en: 'Sync with iCloud', beanie: 'sync with icloud' },
   'loginV6.localFileCardDesc': {
     en: 'Open a .beanpod from your device',
     beanie: 'open a .beanpod from your device',
@@ -3092,9 +3110,9 @@ const STRING_DEFS = {
     beanie: "couldn't share with google drive. try again or use a different email",
   },
   'inviteWizard.error.invalidGoogleEmail': {
-    en: "Google couldn't share with that email — double-check it's a Gmail or Workspace address.",
+    en: "Sorry, we couldn't share with that email! Please double-check and use a valid Google account email.",
     beanie:
-      "google couldn't share with that email — double-check it's a gmail or workspace address",
+      "sorry, we couldn't share with that email! please double-check and use a valid google account email.",
   },
   'inviteWizard.error.linkGenerationFailed': {
     en: "Couldn't create the invite link. Please try again.",
@@ -4604,22 +4622,19 @@ const STRING_DEFS = {
   'onboarding.invite.title': { en: 'Invite the rest?', beanie: 'invite the rest?' },
   'onboarding.invite.optional': { en: 'Optional', beanie: 'optional' },
   'onboarding.invite.lede': {
-    en: "Each beanie gets their own link. Drop in their email and we'll generate a share link you can text or send right away.",
+    en: "Each beanie gets their own personalised invite link. Tap Send and we'll walk you through sharing it via QR code, text, or email.",
     beanie:
-      "each beanie gets their own link. drop in their email and we'll generate a share link you can text or send right away.",
+      "each beanie gets their own personalised invite link. tap send and we'll walk you through sharing it via qr code, text, or email.",
   },
   'onboarding.invite.send': { en: 'Send \u2192', beanie: 'send \u2192' },
-  'onboarding.invite.sent': { en: '\u2713 Sent', beanie: '\u2713 sent' },
   'onboarding.invite.noEmail': {
-    en: 'no email \u2014 skip',
-    beanie: 'no email \u2014 skip',
+    en: 'no email yet \u2014 add one on the next screen',
+    beanie: 'no email yet \u2014 add one on the next screen',
   },
   'onboarding.invite.reminder': {
     en: '\u2728 you can always invite anytime later from My Pod',
     beanie: '\u2728 you can always invite anytime later from my pod',
   },
-  'onboarding.invite.retry': { en: 'Retry \u2192', beanie: 'retry \u2192' },
-  'onboarding.invite.editEmail': { en: 'Edit email \u2192', beanie: 'edit email \u2192' },
 
   // Error toasts (auto-routed via showToast -> errorReporter -> Slack)
   'onboarding.errors.addAccountFailed': {
@@ -4634,10 +4649,6 @@ const STRING_DEFS = {
   'onboarding.errors.addActivityFailed': {
     en: "Couldn't add that activity. Please try again \u2014 support's been notified.",
     beanie: "couldn't add that activity. please try again \u2014 support's been notified.",
-  },
-  'onboarding.errors.inviteFailed': {
-    en: "Couldn't send that invite. Try again or edit the email and retry.",
-    beanie: "couldn't send that invite. try again or edit the email and retry.",
   },
 
   // Navigation

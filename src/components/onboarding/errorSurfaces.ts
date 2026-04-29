@@ -10,7 +10,6 @@ export const ErrorSurfaces = {
   onboardingAddAccount: 'onboarding-add-account',
   onboardingAddRecurring: 'onboarding-add-recurring',
   onboardingAddActivity: 'onboarding-add-activity',
-  onboardingInviteRow: 'onboarding-invite-row',
   onboardingFinishSync: 'onboarding-finish-sync',
   onboardingSkipSync: 'onboarding-skip-sync',
 } as const;

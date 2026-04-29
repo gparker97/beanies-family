@@ -26,6 +26,7 @@ import { downloadAsFile, tryUnwrapFamilyKey } from '@/services/sync/fileSync';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import { deleteFile } from '@/services/google/driveService';
 import { getValidToken } from '@/services/google/googleAuth';
+import { getDeploymentBadge } from '@/config/features';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -48,6 +49,7 @@ const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
 const { t } = useTranslation();
+const deploymentBadge = computed(() => getDeploymentBadge());
 const { canInstall, isInstalled, installApp } = usePWA();
 const { canManagePod } = usePermissions();
 const { isReconnecting, reconnectError, reconnect } = useGoogleReconnect();
@@ -635,6 +637,18 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         · {{ t('settings.version') }}
       </p>
       <p class="mt-1"><span class="opacity-60">🔒</span> {{ t('settings.privacyNote') }}</p>
+      <p class="mt-1">
+        <span class="opacity-60">{{ deploymentBadge.icon }}</span>
+        {{ t(deploymentBadge.labelKey) }}
+        <a
+          v-if="deploymentBadge.docsUrl"
+          :href="deploymentBadge.docsUrl"
+          target="_blank"
+          rel="noopener"
+          class="ml-1 underline-offset-2 hover:underline"
+          >{{ t('selfHost.learnMore') }}</a
+        >
+      </p>
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════════ -->

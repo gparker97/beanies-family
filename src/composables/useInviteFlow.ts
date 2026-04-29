@@ -58,8 +58,38 @@ export interface InviteFlow {
  *   - User-facing messages come from `inviteWizard.error.*` i18n keys.
  *   - QR generation is non-critical — if it fails, the link is still usable
  *     and the wizard's QR area shows a fallback.
- *   - Folder-share is best-effort — failure is logged warn and ignored.
+ *   - Folder-share is best-effort EXCEPT for the "not a Google account"
+ *     signal — that's promoted to fatal because the asymmetry between Drive's
+ *     file-share (allows pending invites for non-Google emails) and folder-
+ *     share (rejects them) makes the folder-share's 403 our reliable signal
+ *     that the email is bad. Other folder-share failures (network, etc.)
+ *     stay non-fatal.
  */
+
+/**
+ * Detect Drive's "not a Google account" / invalid-email rejection. The API
+ * surfaces this in several shapes depending on which permission endpoint
+ * rejected — match each shape we've seen in production. Used by both the
+ * top-level catch (file share rejected synchronously) and the folder-share
+ * catch (where Drive rejects folders for non-Google emails even when the
+ * file share already created a pending invite).
+ */
+function isInvalidGoogleEmailError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  const msg = e.message.toLowerCase();
+  // Drive surfaces the "no Google account" rejection in two phrasings:
+  //   - file/folder share: "...because they do not have a Google Account..."
+  //   - older permission API: "...is not a Google account..."
+  // plus a couple of "invalid email" variants for the synchronous client check.
+  return (
+    msg.includes('do not have a google account') ||
+    msg.includes('not a google account') ||
+    msg.includes('invitee') ||
+    msg.includes('invalid email') ||
+    msg.includes('invalid_email')
+  );
+}
+
 export function useInviteFlow(): InviteFlow {
   const syncStore = useSyncStore();
   const familyContextStore = useFamilyContextStore();
@@ -238,14 +268,34 @@ export function useInviteFlow(): InviteFlow {
       // Share .beanpod (mandatory)
       await shareFileWithEmail(token, syncStore.driveFileId, trimmed, 'writer');
 
-      // Best-effort: share parent folder so photos uploaded to it by any
-      // member are accessible to everyone. Folder-share failure is non-fatal.
+      // Share parent folder so photos uploaded by any member are accessible
+      // to everyone. Drive treats folders differently from files for non-
+      // Google emails: file shares can create a pending invite (200 OK), but
+      // folder shares 403 with "not a Google Account" — that asymmetry means
+      // the folder-share is also our reliable signal that the email isn't a
+      // Google account. We promote that specific error to fatal so the user
+      // can correct the email; other folder-share failures (network, edge
+      // permissions) stay non-fatal — the .beanpod file share is enough for
+      // joining; photos can be shared later.
       try {
         const folderId = await resolveCanonicalFolderId(token, syncStore.driveFileId);
         if (folderId) {
           await shareFileWithEmail(token, folderId, trimmed, 'writer');
         }
       } catch (folderErr) {
+        if (isInvalidGoogleEmailError(folderErr)) {
+          console.error('[useInviteFlow] folder share rejected — email is not a Google account', {
+            email: trimmed,
+            error: folderErr,
+          });
+          isGenerating.value = false;
+          error.value = {
+            code: 'invalid-google-email',
+            message: t('inviteWizard.error.invalidGoogleEmail'),
+            recovery: 'edit-email',
+          };
+          return false;
+        }
         console.warn('[useInviteFlow] Folder share failed (non-fatal)', folderErr);
       }
 
@@ -258,15 +308,7 @@ export function useInviteFlow(): InviteFlow {
       console.error('[useInviteFlow] shareDriveAccess failed', { email: trimmed, error: e });
       isGenerating.value = false;
 
-      // Distinguish Google "not a Google account" 403 from generic network
-      // / API failures. The Drive API surfaces this in a few shapes.
-      const msg = (e as Error).message?.toLowerCase() ?? '';
-      const isInvalidGoogleEmail =
-        msg.includes('not a google account') ||
-        msg.includes('invitee') ||
-        msg.includes('invalid email') ||
-        msg.includes('invalid_email');
-
+      const isInvalidGoogleEmail = isInvalidGoogleEmailError(e);
       error.value = {
         code: isInvalidGoogleEmail ? 'invalid-google-email' : 'drive-share-failed',
         message: t(

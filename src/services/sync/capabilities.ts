@@ -2,6 +2,8 @@
  * Browser capability detection for sync features
  */
 
+import { features } from '@/config/features';
+
 export interface SyncCapabilities {
   /** Supports File System Access API (persistent file handles) */
   fileSystemAccess: boolean;
@@ -42,13 +44,6 @@ export function supportsWebCrypto(): boolean {
 /**
  * Get all sync capabilities for the current browser
  */
-/**
- * Check if Google Drive integration is configured
- */
-export function supportsGoogleDrive(): boolean {
-  return !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
-}
-
 export function getSyncCapabilities(): SyncCapabilities {
   const hasFileSystemAccess = supportsFileSystemAccess();
 
@@ -57,7 +52,7 @@ export function getSyncCapabilities(): SyncCapabilities {
     showSaveFilePicker: hasFileSystemAccess,
     showOpenFilePicker: hasFileSystemAccess,
     webCrypto: supportsWebCrypto(),
-    googleDrive: supportsGoogleDrive(),
+    googleDrive: features.drive,
     manualSync: true, // Always available via Blob download/upload
   };
 }

@@ -390,6 +390,93 @@ describe('googleAuth (PKCE)', () => {
 
       vi.unstubAllEnvs();
     });
+
+    it('retries once on transient failure and succeeds on the second attempt', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'test@example.com' }),
+      });
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        'stored-refresh-token'
+      );
+      await googleAuth.initializeAuth('family-123');
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+      const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
+      // Queue two implementations: first throws transient, second resolves.
+      // The default factory impl remains in place for tests that follow.
+      refreshFn.mockImplementationOnce(() => {
+        throw new Error('Token refresh failed: network error');
+      });
+      refreshFn.mockImplementationOnce(async () => ({
+        access_token: 'mock-refreshed-token',
+        expires_in: 3600,
+        token_type: 'Bearer',
+      }));
+
+      const result = await googleAuth.attemptSilentRefresh();
+      expect(result).toBe('mock-refreshed-token');
+      expect(refreshFn).toHaveBeenCalledTimes(2);
+
+      vi.unstubAllEnvs();
+    }, 5_000);
+
+    it('does NOT retry when refresh token is permanently invalid', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        'stored-refresh-token'
+      );
+      await googleAuth.initializeAuth('family-123');
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+      const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
+      // invalid_grant means the refresh token has been revoked — retrying is
+      // pointless and would just delay the inevitable banner. Use Once so
+      // the default factory impl remains for subsequent tests.
+      refreshFn.mockImplementationOnce(() => {
+        throw new Error('Token refresh failed: invalid_grant');
+      });
+
+      const result = await googleAuth.attemptSilentRefresh();
+      expect(result).toBeNull();
+      expect(refreshFn).toHaveBeenCalledTimes(1);
+
+      vi.unstubAllEnvs();
+    });
+
+    it('returns null after retrying when transient failure persists', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        'stored-refresh-token'
+      );
+      await googleAuth.initializeAuth('family-123');
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+      const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
+      // Two transient-error throws — covers both attempts. Default factory
+      // remains for subsequent tests.
+      refreshFn.mockImplementationOnce(() => {
+        throw new Error('Token refresh failed: network error');
+      });
+      refreshFn.mockImplementationOnce(() => {
+        throw new Error('Token refresh failed: network error');
+      });
+
+      const result = await googleAuth.attemptSilentRefresh();
+      expect(result).toBeNull();
+      // Two attempts total (initial + one retry), then give up.
+      expect(refreshFn).toHaveBeenCalledTimes(2);
+
+      vi.unstubAllEnvs();
+    }, 5_000);
   });
 
   describe('revokeToken', () => {
