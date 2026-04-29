@@ -283,7 +283,7 @@ describe('useInviteFlow', () => {
       expect(flow.error.value?.recovery).toBe('retry');
     });
 
-    it('treats folder-share failure as non-fatal and still resolves true', async () => {
+    it('treats generic folder-share failure as non-fatal and still resolves true', async () => {
       const flow = useInviteFlow();
       // First share (file) succeeds; second share (folder) fails
       shareFileWithEmailMock.mockResolvedValueOnce(undefined);
@@ -298,6 +298,30 @@ describe('useInviteFlow', () => {
         expect.stringContaining('Folder share failed (non-fatal)'),
         expect.any(Error)
       );
+    });
+
+    it('promotes folder-share "not a Google account" failure to fatal invalid-google-email', async () => {
+      const flow = useInviteFlow();
+      // File-share succeeds (Drive allows pending invites for non-Google
+      // emails on files), folder-share fails with the asymmetric 403 — that's
+      // the reliable "email is not a Google account" signal.
+      shareFileWithEmailMock
+        .mockResolvedValueOnce(undefined) // file share succeeds
+        .mockRejectedValueOnce(
+          new Error(
+            "Forbidden. User message: 'Sorry, you cannot share with kid@beanpod.org because they do not have a Google Account.'"
+          )
+        ); // folder share rejects with the asymmetric 403
+
+      const ok = await flow.shareDriveAccess('kid@beanpod.org');
+
+      expect(shareFileWithEmailMock).toHaveBeenCalledTimes(2);
+      expect(ok).toBe(false);
+      expect(flow.error.value?.code).toBe('invalid-google-email');
+      expect(flow.error.value?.recovery).toBe('edit-email');
+      // lastSharedEmail not set — we don't want callers to render the QR/share
+      // screen for an email that can't actually access the pod.
+      expect(flow.lastSharedEmail.value).toBeNull();
     });
 
     it('rejects when no driveFileId is configured', async () => {

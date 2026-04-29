@@ -18,7 +18,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { lookupFamily, isRegistryConfigured } from '@/services/registry/registryService';
+import { lookupFamily } from '@/services/registry/registryService';
+import { features } from '@/config/features';
 import {
   parseInviteLink,
   hashInviteToken,
@@ -327,7 +328,7 @@ export function useJoinFlow() {
    */
   async function performLookup(): Promise<void> {
     if (!targetFamilyId.value) return;
-    if (!isRegistryConfigured()) return;
+    if (!features.registry) return;
     try {
       const entry = await lookupFamily(targetFamilyId.value);
       registryEntry.value = entry;

@@ -205,7 +205,15 @@ async function handleChooseLocalStorage() {
 }
 
 async function handleChooseGoogleDriveStorage() {
-  if (!syncStore.isGoogleDriveAvailable) return;
+  if (!syncStore.isGoogleDriveAvailable) {
+    // Defense-in-depth: the card is hidden in this state (rendered as the
+    // disabled "Not configured" tile). If this branch fires, log so a dev
+    // can spot the regression.
+    console.warn(
+      '[CreatePodView] Drive storage handler invoked while features.drive is off — check the v-if on the Drive card.'
+    );
+    return;
+  }
   if (storageType.value === 'google_drive') return; // Already connected
   if (isSavingStorage.value) return; // Already in progress
 
@@ -646,6 +654,7 @@ function handleBack() {
           <div
             v-else
             class="flex h-[88px] cursor-not-allowed flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50 px-2.5 opacity-50 dark:bg-slate-700/40"
+            :title="t('selfHost.driveUnavailableTooltip')"
           >
             <svg
               class="mb-1.5 h-6 w-6"
@@ -662,8 +671,8 @@ function handleBack() {
               >{{ t('googleDrive.storageLabel') }}</span
             >
             <span
-              class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-xs font-bold whitespace-nowrap"
-              >{{ t('storage.comingSoon') }}</span
+              class="mt-1 rounded-full bg-gray-400 px-2 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white"
+              >{{ t('selfHost.notConfigured') }}</span
             >
           </div>
 

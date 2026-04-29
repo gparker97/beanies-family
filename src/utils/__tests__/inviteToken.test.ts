@@ -8,16 +8,16 @@ describe('inviteToken', () => {
     vi.resetModules();
   });
 
-  it('isInviteGateEnabled returns false when env var is empty', async () => {
+  it('features.inviteGate is false when env var is empty', async () => {
     vi.stubEnv('VITE_INVITE_BEAN_HASHES', '');
-    const { isInviteGateEnabled } = await import('../inviteToken');
-    expect(isInviteGateEnabled()).toBe(false);
+    const { features } = await import('@/config/features');
+    expect(features.inviteGate).toBe(false);
   });
 
-  it('isInviteGateEnabled returns true when env var has hashes', async () => {
+  it('features.inviteGate is true when env var has hashes', async () => {
     vi.stubEnv('VITE_INVITE_BEAN_HASHES', 'abc123');
-    const { isInviteGateEnabled } = await import('../inviteToken');
-    expect(isInviteGateEnabled()).toBe(true);
+    const { features } = await import('@/config/features');
+    expect(features.inviteGate).toBe(true);
   });
 
   it('validateInviteToken returns true when gate is disabled', async () => {

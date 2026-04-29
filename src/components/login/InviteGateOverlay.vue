@@ -2,12 +2,19 @@
 import { ref, onMounted } from 'vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import { features } from '@/config/features';
 import { useTranslation } from '@/composables/useTranslation';
 import { validateInviteToken } from '@/utils/inviteToken';
 import { isValidEmail } from '@/utils/email';
 import { MARKETING_URL } from '@/utils/marketing';
 
-const emit = defineEmits<{ unlocked: [] }>();
+const emit = defineEmits<{
+  unlocked: [];
+  /** User dismissed the gate without unlocking — parent should return them
+   *  to wherever they came from (e.g. the create/join chooser). */
+  cancel: [];
+}>();
 const { t } = useTranslation();
 
 function goToMarketingHome() {
@@ -86,7 +93,8 @@ async function handleRequest() {
       }),
     });
     mode.value = 'confirmed';
-  } catch {
+  } catch (err) {
+    console.warn('[inviteGate] Slack request webhook POST failed', err);
     reqError.value = t('inviteGate.requestError');
   } finally {
     reqLoading.value = false;
@@ -98,7 +106,19 @@ async function handleRequest() {
   <div
     class="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-sm dark:bg-slate-900/80"
   >
-    <div class="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl dark:bg-slate-800">
+    <div class="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl dark:bg-slate-800">
+      <!-- Close button — returns the user to the create/join chooser. Always
+           visible across all modes (token / request / confirmed) so they
+           can never get trapped in the gate. -->
+      <button
+        type="button"
+        class="absolute top-3 right-3 rounded-xl p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+        :aria-label="t('action.close')"
+        data-testid="invite-gate-close"
+        @click="emit('cancel')"
+      >
+        <BeanieIcon name="close" size="md" />
+      </button>
       <!-- Token mode -->
       <template v-if="mode === 'token'">
         <img
@@ -130,7 +150,10 @@ async function handleRequest() {
           {{ t('inviteGate.unlock') }}
         </BaseButton>
 
-        <p class="mt-4 text-center text-sm text-gray-400 dark:text-gray-500">
+        <p
+          v-if="features.slackInvite"
+          class="mt-4 text-center text-sm text-gray-400 dark:text-gray-500"
+        >
           {{ t('inviteGate.noToken') }}
           <button
             class="text-primary-500 hover:text-primary-600 font-medium"
@@ -142,7 +165,7 @@ async function handleRequest() {
       </template>
 
       <!-- Request mode -->
-      <template v-else-if="mode === 'request'">
+      <template v-else-if="mode === 'request' && features.slackInvite">
         <h2 class="font-outfit mb-1 text-xl font-bold text-gray-900 dark:text-gray-100">
           {{ t('inviteGate.requestTitle') }}
         </h2>
@@ -204,7 +227,12 @@ async function handleRequest() {
           <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
             {{ t('inviteGate.confirmedDescription') }}
           </p>
-          <BaseButton variant="secondary" class="w-full" @click="goToMarketingHome">
+          <BaseButton
+            v-if="features.marketingUrl"
+            variant="secondary"
+            class="w-full"
+            @click="goToMarketingHome"
+          >
             {{ t('inviteGate.backToHome') }}
           </BaseButton>
         </div>

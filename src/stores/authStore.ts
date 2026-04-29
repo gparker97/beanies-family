@@ -509,6 +509,18 @@ export const useAuthStore = defineStore('auth', () => {
     // refresh, leaving the app stuck on the wrong Drive.
     await clearGoogleSessionStateWithTimeout(3000);
 
+    // Reset per-session sync state — banner flags, polling timer, encrypted
+    // pending file, family key, file metadata. Without this, transient UI
+    // state (e.g. `showGoogleReconnect = true` set by an earlier blip) bleeds
+    // into the next session and the user sees a phantom "session expired"
+    // toast immediately after a successful re-login.
+    try {
+      const { useSyncStore } = await import('./syncStore');
+      useSyncStore().resetState();
+    } catch (e) {
+      console.warn('[authStore] syncStore.resetState failed during sign-out', e);
+    }
+
     const familyId = currentUser.value?.familyId;
 
     // Delete the per-family IndexedDB cache unless this is a trusted device
@@ -604,6 +616,14 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Wipe Google session state — same rationale as signOut().
     await clearGoogleSessionStateWithTimeout(3000);
+
+    // Reset per-session sync state — same rationale as signOut().
+    try {
+      const { useSyncStore } = await import('./syncStore');
+      useSyncStore().resetState();
+    } catch (e) {
+      console.warn('[authStore] syncStore.resetState failed during sign-out', e);
+    }
 
     const familyId = currentUser.value?.familyId;
 

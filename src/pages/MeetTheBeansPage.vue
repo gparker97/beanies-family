@@ -17,6 +17,7 @@ import {
   shareFileWithEmail,
 } from '@/services/google/driveService';
 import { getValidToken } from '@/services/google/googleAuth';
+import { canInviteFamily } from '@/config/features';
 import { usePermissions } from '@/composables/usePermissions';
 import { useInviteFlow } from '@/composables/useInviteFlow';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -52,6 +53,8 @@ const photoStore = usePhotoStore();
 const { t } = useTranslation();
 const { canManagePod } = usePermissions();
 const { syncHighlightClass } = useSyncHighlight();
+const inviteAvailable = computed(() => canInviteFamily());
+const inviteUnavailableTooltip = computed(() => t('selfHost.inviteUnavailableTooltip'));
 
 /** Event bar color based on activity category. */
 function getEventBarColor(category: ActivityCategory): string {
@@ -417,7 +420,14 @@ function cancelEditFamilyName() {
         <button
           v-if="familyContextStore.activeFamilyId"
           type="button"
-          class="invite-beanie-cta font-outfit relative inline-flex flex-1 items-center justify-center gap-2.5 overflow-hidden rounded-full bg-gradient-to-br from-[var(--color-primary)] via-[#E67E22] to-[#F4B942] py-2 pr-5 pl-2 text-sm font-bold text-white shadow-[0_6px_16px_rgba(241,93,34,0.32)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_22px_rgba(241,93,34,0.45)] sm:flex-initial"
+          :disabled="!inviteAvailable"
+          :title="inviteAvailable ? undefined : inviteUnavailableTooltip"
+          :class="[
+            'invite-beanie-cta font-outfit relative inline-flex flex-1 items-center justify-center gap-2.5 overflow-hidden rounded-full bg-gradient-to-br from-[var(--color-primary)] via-[#E67E22] to-[#F4B942] py-2 pr-5 pl-2 text-sm font-bold text-white shadow-[0_6px_16px_rgba(241,93,34,0.32)] transition-all sm:flex-initial',
+            inviteAvailable
+              ? 'hover:-translate-y-0.5 hover:shadow-[0_10px_22px_rgba(241,93,34,0.45)]'
+              : 'cursor-not-allowed opacity-50',
+          ]"
           @click="openInviteModal"
         >
           <span
