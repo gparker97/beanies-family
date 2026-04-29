@@ -65,45 +65,13 @@ The first time you connect, Google's OAuth flow will warn you that the app is un
 
 ### Family registry (optional) — `VITE_REGISTRY_API_URL` + `VITE_REGISTRY_API_KEY`
 
-The registry is a smoothness feature, not a hard requirement. With it: magic-link invites resolve directly to the right `.beanpod` file and the login flow can find a family without the user typing a Drive URL. Without it: the invite flow still works — joiners pick the shared file via Google Drive Picker after clicking the invite link, and the rest of the app behaves identically.
+The cloud version points to our production Lambda at `api.beanies.family` to access the family registry, which won't work as the API key is not configured.
 
-The cloud build points at greg's Lambda at `api.beanies.family`. There is no public reference implementation yet, so third-party self-hosters can't currently spin up an equivalent registry. If you want to, please open a GitHub issue — the API is small and a docker-compose shim is on the roadmap.
-
-### Slack telemetry (optional)
-
-Each webhook is independent — set whichever you want.
-
-| Env var                          | Purpose                                                                                                                   |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `VITE_INVITE_WEBHOOK_URL`        | Posts to your Slack when someone fills the "request invite" form on the login gate.                                       |
-| `VITE_SLACK_WEBHOOK_URL`         | Posts when a new pod is created.                                                                                          |
-| `VITE_BEANIES_ERROR_WEBHOOK_URL` | Posts caught errors with build SHA, route, browser context, stack trace. Privacy-allowlisted (only email is sent as PII). |
-
-Create incoming webhooks at <https://api.slack.com/apps> → your app → Incoming Webhooks. The webhook URL is the value to paste.
-
-### Plausible analytics (optional) — `VITE_PLAUSIBLE_DOMAIN`
-
-Set to your Plausible site identifier (the `pa-XXX` part of the script URL — find it in your Plausible site settings). Leave empty to disable analytics entirely; the script tag is conditionally injected at runtime, so a vanilla self-host stays fully offline by default.
+The registry is a convenience feature which improves the functionality of joining links, but joining should still work without a registry - the family member just needs to choose the data file from the Google Drive file picker. This is not necessary for self-hosting.
 
 ### Translation API quota (optional) — `VITE_MYMEMORY_EMAIL`
 
 The free MyMemory translation API has a 5k chars/day anonymous quota; setting `de=<your-email>` upgrades it to 50k. For a single family with translation caching, the lower quota is usually plenty. Set this only if you hit the limit.
-
-### Invite gate (optional) — `VITE_INVITE_BEAN_HASHES`
-
-For closed-beta gating: comma-separated SHA-256 hashes (lowercase hex) of valid invite tokens. Users enter the token to unlock the login page. Generate hashes with:
-
-```bash
-echo -n "my-token" | sha256sum | cut -d' ' -f1
-```
-
-Leave empty for open registration.
-
-### Marketing-site URL (optional) — `VITE_MARKETING_URL`
-
-In-app links to `/help`, `/blog`, `/guides` route through this URL. Defaults to `https://beanies.family` in prod and `http://localhost:4321` in dev. Override if you're running your own marketing site.
-
----
 
 ## Known limitations (cosmetic, non-gated)
 
