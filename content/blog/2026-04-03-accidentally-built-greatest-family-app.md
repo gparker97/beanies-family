@@ -30,9 +30,9 @@ Keeping in mind, vibe coding by yourself at 3am can potentially impact your judg
 ![my real, live, actual beanies.family nook view right now](/blog/beanies-nook-screenshot.webp)
 _my real, live, actual beanies.family nook view right now. well, not *right* now, but right now as of when i wrote this. roughly._
 
-Beanies started as a throwaway project (in fact, it wasn’t even called beanies at first - it actually had a way, way more boring name which I will never divulge) and morphed, through a combined 20 years of parental and financial pain and suffering, into an app I genuinely enjoy using. And there’s not too many apps (whether built by me or not) I can say that about.
+[beanies](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=accidentally-built-greatest-family-app) started as a throwaway project (in fact, it wasn’t even called beanies at first - it actually had a way, way more boring name which I will never divulge) and morphed, through a combined 20 years of parental and financial pain and suffering, into an app I genuinely enjoy using. And there’s not too many apps (whether built by me or not) I can say that about.
 
-**Beanies sits at the intersection of family, finance, and data security**, unlike many apps built by major software corporations or VC-backed startups, who have this pesky obsession with making money, harvesting your data, or both.
+**beanies sits at the intersection of family, finance, and data security**, unlike many apps built by major software corporations or VC-backed startups, who have this pesky obsession with making money, harvesting your data, or both.
 
 I’ll be writing small notes and updates here about cool new features, or things I’m thinking of building, or just whatever. As a former (and now, I guess, in a way, current) founder, we live in a crazy new world of SaaS. A place where founders can build as fast as they can think, which, in my case perhaps, is a truly scary thought.
 
