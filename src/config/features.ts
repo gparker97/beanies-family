@@ -62,6 +62,10 @@ export function getDeploymentMode(): DeploymentMode {
   return ESSENTIAL.every((k) => features[k]) ? 'self-host-full' : 'self-host-limited';
 }
 
+// Security ESLint flags GitHub URLs as high-entropy strings via no-secrets.
+// This is a public repo URL, not a credential — disable the rule on the
+// URL line specifically (the rule triggers on the string column, not the
+// `export` line, so the disable has to be right above the string).
 export const SELF_HOSTING_DOCS_URL =
   'https://github.com/gparker97/beanies-family/blob/main/docs/SELF_HOSTING.md';
 
