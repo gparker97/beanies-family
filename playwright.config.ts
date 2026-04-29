@@ -38,5 +38,19 @@ export default defineConfig({
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
+    // E2E suite covers the cloud-hosted experience (Drive sync, magic-link
+    // invites, etc.). The new self-host gating in `src/config/features.ts`
+    // disables those UI affordances when their env vars are missing — and
+    // CI has no `.env.local`. Provide dummy values so feature flags pass
+    // their `ok()` non-empty-string check. None of these are dialed
+    // outbound: Drive/registry calls in tests are either mocked or never
+    // reached because the wizard exits before requesting a file.
+    env: {
+      VITE_GOOGLE_CLIENT_ID: 'e2e-google-client-id.apps.googleusercontent.com',
+      VITE_GOOGLE_API_KEY: 'e2e-google-api-key',
+      VITE_GOOGLE_PROJECT_NUMBER: '000000000000',
+      VITE_REGISTRY_API_URL: 'https://e2e.registry.invalid',
+      VITE_REGISTRY_API_KEY: 'e2e-registry-api-key',
+    },
   },
 });
