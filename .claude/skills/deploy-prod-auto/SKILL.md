@@ -85,8 +85,10 @@ Astro has no external CI gate — trigger in parallel with the Vue flow below.
 
 **Only if `WEB: yes`:**
 ```
-gh workflow run deploy-web.yml --ref main -f target=production
+gh workflow run deploy-web.yml --ref main
 ```
+
+`deploy-web.yml` accepts no `workflow_dispatch` inputs — passing `-f target=production` (or any other `-f` flag) fails with HTTP 422 "Unexpected inputs provided". If the workflow ever grows inputs, update both this command and the workflow's `on.workflow_dispatch.inputs` block together.
 
 Wait, then list + watch:
 ```
