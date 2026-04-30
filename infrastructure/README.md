@@ -1,6 +1,16 @@
 # beanies.family Infrastructure
 
-Terraform configuration for deploying beanies.family to AWS.
+Terraform configuration for deploying beanies.family to AWS — both the static-site frontend and the supporting Lambdas (OAuth proxy + family registry).
+
+## Self-hosting reference
+
+Self-hosters following Path B of [docs/SELF_HOSTING.md](../docs/SELF_HOSTING.md) deploy their own copies of the Lambdas in this directory. Step-by-step deploy guides:
+
+- **[lambda/oauth/README.md](./lambda/oauth/README.md)** — OAuth proxy Lambda (required for Drive sign-in on self-host). Holds your Google `client_secret` server-side and proxies token exchange + refresh to Google.
+- **[lambda/oauth/SPEC.md](./lambda/oauth/SPEC.md)** — Runtime-agnostic API contract. Implement on Cloudflare Workers, Vercel Edge, or any Node host instead of AWS if you prefer.
+- **[lambda/registry/README.md](./lambda/registry/README.md)** — Optional registry Lambda + DynamoDB. Smooths the magic-link join flow; skip it and joiners use Drive Picker manually.
+
+The cloud build (`app.beanies.family`) uses these same Lambdas via the Terraform setup below.
 
 ## Architecture
 

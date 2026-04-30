@@ -75,7 +75,7 @@ The first time you connect, Google's OAuth screen warns you that the app is unve
 
 ### Step 2: Deploy the OAuth proxy Lambda
 
-The Lambda code lives at [`infrastructure/lambda/oauth/`](../infrastructure/lambda/oauth/) — about 175 lines of Node.js 20, no dependencies beyond the standard runtime. Deploy guide forthcoming at `infrastructure/lambda/oauth/README.md`. The runtime-agnostic API contract will live at `infrastructure/lambda/oauth/SPEC.md` — implement it on Cloudflare Workers, Vercel Edge, or any Node host if AWS isn't your thing.
+The Lambda code lives at [`infrastructure/lambda/oauth/`](../infrastructure/lambda/oauth/) — about 175 lines of Node.js 20, no dependencies beyond the standard runtime. Step-by-step AWS deploy guide at [`infrastructure/lambda/oauth/README.md`](../infrastructure/lambda/oauth/README.md). The runtime-agnostic API contract is at [`infrastructure/lambda/oauth/SPEC.md`](../infrastructure/lambda/oauth/SPEC.md) — implement it on Cloudflare Workers, Vercel Edge, or any Node host if AWS isn't your thing.
 
 The Lambda needs two env vars:
 
@@ -88,7 +88,7 @@ Once deployed, copy the API Gateway / Function URL → `VITE_OAUTH_PROXY_URL` in
 
 The registry stores `(familyId → file location)` pairs in DynamoDB so that joiners following a magic-link invite don't have to manually pick the shared `.beanpod` from a Drive Picker. Without it, joining still works — joiners just click an extra button.
 
-Lambda code at [`infrastructure/lambda/registry/`](../infrastructure/lambda/registry/). DynamoDB schema: one partition key `familyId` (string), on-demand billing. Env vars:
+Lambda code at [`infrastructure/lambda/registry/`](../infrastructure/lambda/registry/). Step-by-step deploy guide at [`infrastructure/lambda/registry/README.md`](../infrastructure/lambda/registry/README.md). DynamoDB schema: one partition key `familyId` (string), on-demand billing. Env vars:
 
 - `TABLE_NAME` — your DynamoDB table name
 - `REGISTRY_API_KEY` — a random secret you generate; the SPA sends it as `x-api-key`

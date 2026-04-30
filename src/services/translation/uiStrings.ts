@@ -3952,6 +3952,16 @@ const STRING_DEFS = {
     en: "Couldn't save your data file. Try again, or check the browser console for details.",
     beanie: "couldn't save your data file. try again, or check the browser console for details.",
   },
+  'storage.localFileConflictDetected': {
+    en: 'This file looks like a conflict copy from your cloud-storage provider. Beanies will merge it on load — you can delete the duplicate after.',
+    beanie:
+      'this file looks like a conflict copy from your cloud-storage provider. beanies will merge it on load — you can delete the duplicate after.',
+  },
+  'storage.localFileBestOnDesktop': {
+    en: 'Multi-device sync via your cloud-storage folder works best on desktop Chrome or Edge. iOS, Android, Safari, and Firefox fall back to manual export/import.',
+    beanie:
+      'multi-device sync via your cloud-storage folder works best on desktop chrome or edge. ios, android, safari, and firefox fall back to manual export/import.',
+  },
   'storage.comingSoon': { en: 'Coming Soon', beanie: 'coming soon' },
   'storage.recommended': { en: 'Recommended', beanie: 'recommended' },
 

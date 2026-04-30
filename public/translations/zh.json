@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-30",
-    "translationCount": 2584
+    "translationCount": 2586
   },
   "translations": {
     "app.name": {
@@ -12924,6 +12924,16 @@
     "storage.localFileWriteFailed": {
       "translation": "无法保存您的数据文件。请重试，或查看浏览器控制台以了解详细信息。",
       "hash": "um10xf",
+      "lastUpdated": "2026-04-30"
+    },
+    "storage.localFileConflictDetected": {
+      "translation": "此文件看起来像来自云存储提供商的冲突副本。Beanies将在加载时合并它—您可以在之后删除重复项。",
+      "hash": "jzfklt",
+      "lastUpdated": "2026-04-30"
+    },
+    "storage.localFileBestOnDesktop": {
+      "translation": "通过云存储文件夹进行的多设备同步在桌面Chrome或Edge上效果最佳。iOS、Android、Safari和Firefox回退到手动导出/导入。",
+      "hash": "ezqdu5",
       "lastUpdated": "2026-04-30"
     }
   }
