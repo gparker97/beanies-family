@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-30",
-    "translationCount": 2594
+    "translationCount": 2595
   },
   "translations": {
     "app.name": {
@@ -12974,6 +12974,11 @@
     "planner.segmentArrivalShort": {
       "translation": "到达",
       "hash": "1f0h",
+      "lastUpdated": "2026-04-30"
+    },
+    "filter.filteredTo": {
+      "translation": "筛选至： {names}",
+      "hash": "veugai",
       "lastUpdated": "2026-04-30"
     }
   }
