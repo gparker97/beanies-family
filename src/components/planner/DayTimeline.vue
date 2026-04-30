@@ -19,8 +19,9 @@ import { useTimeGrid, groupOverlapping } from '@/composables/useCalendarNavigati
 import { useTranslation } from '@/composables/useTranslation';
 import { getActivityColor } from '@/stores/activityStore';
 import { normalizeAssignees } from '@/utils/assignees';
-import { formatTime12 } from '@/utils/date';
-import { tripTypeEmoji } from '@/utils/vacation';
+import { formatTime12, addHourToTime } from '@/utils/date';
+import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
+import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import type { FamilyActivity, FamilyMember, FamilyVacation, TodoItem } from '@/types/models';
 
 type Occurrence = { activity: FamilyActivity; date: string };
@@ -33,6 +34,8 @@ interface Props {
   activities: Occurrence[];
   /** Vacations active on this day. */
   vacations: FamilyVacation[];
+  /** Travel-segment occurrences (flights, trains, etc) on this day. */
+  segments?: TravelSegmentOccurrence[];
   /** Todos due on this day. */
   todos: TodoItem[];
   /** All members, used for color lookup on events. */
@@ -43,29 +46,44 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   isToday: false,
+  segments: () => [],
 });
 
 const emit = defineEmits<{
   'view-activity': [id: string, date: string];
   'view-todo': [todo: TodoItem];
   'vacation-click': [vacationId: string];
+  'view-segment': [vacationId: string, segmentIndex: number];
   'add-activity': [date: string, time?: string];
 }>();
 
 const { t } = useTranslation();
 
-// ── Time grid sizing — driven by timed activities on this day ──
-const timedRef = computed(() =>
-  props.activities
+// Bucket segments once per render — used by both untimed-row and timed-grid render paths.
+const segmentBuckets = computed(() => splitTimedUntimed(props.segments));
+
+// ── Time grid sizing — driven by timed activities + segments on this day ──
+// Caller-side union: include segment times as 1h synthetic blocks so the
+// hour grid auto-extends past the 7am-7pm default for early/late flights.
+const timedRef = computed(() => {
+  const items: { startTime?: string; endTime?: string }[] = props.activities
     .filter((o) => o.activity.startTime)
-    .map((o) => o.activity as { startTime?: string; endTime?: string })
-);
+    .map((o) => o.activity as { startTime?: string; endTime?: string });
+  for (const seg of segmentBuckets.value.timed) {
+    if (seg.time) items.push({ startTime: seg.time, endTime: addHourToTime(seg.time) });
+  }
+  return items;
+});
 const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTimeGrid(timedRef);
 
 // ── Untimed content (all-day row) ──
 const untimedActivities = computed(() => props.activities.filter((o) => !o.activity.startTime));
 const hasUntimedRow = computed(
-  () => props.vacations.length > 0 || props.todos.length > 0 || untimedActivities.value.length > 0
+  () =>
+    props.vacations.length > 0 ||
+    props.todos.length > 0 ||
+    untimedActivities.value.length > 0 ||
+    segmentBuckets.value.untimed.length > 0
 );
 
 // ── Timed activities, lane-packed per overlap cluster ──
@@ -236,6 +254,14 @@ function handleSlotClick(hour: number): void {
       >
         ✅ {{ todo.title }}
       </div>
+
+      <!-- Untimed travel segments (cruise disembark, segments missing time) -->
+      <TravelSegmentChip
+        v-for="seg in segmentBuckets.untimed"
+        :key="'seg-untimed-' + seg.segmentId + '-' + seg.kind"
+        :occurrence="seg"
+        @click="(vid: string, idx: number) => emit('view-segment', vid, idx)"
+      />
     </div>
 
     <!-- Timed grid -->
@@ -327,9 +353,28 @@ function handleSlotClick(hour: number): void {
           </div>
         </button>
 
+        <!-- Timed travel-segment chips (1h synthetic block at the segment time) -->
+        <div
+          v-for="seg in segmentBuckets.timed"
+          :key="'seg-timed-' + seg.segmentId + '-' + seg.kind"
+          class="absolute z-[2]"
+          :style="{
+            ...getPosition(seg.time!, addHourToTime(seg.time!)),
+            left: '0%',
+            width: 'calc(100% - 4px)',
+          }"
+        >
+          <TravelSegmentChip
+            :occurrence="seg"
+            @click="(vid: string, idx: number) => emit('view-segment', vid, idx)"
+          />
+        </div>
+
         <!-- Empty state -->
         <div
-          v-if="positionedEvents.length === 0 && !hasUntimedRow"
+          v-if="
+            positionedEvents.length === 0 && !hasUntimedRow && segmentBuckets.timed.length === 0
+          "
           class="pointer-events-none absolute inset-0 flex items-center justify-center"
         >
           <p class="font-outfit text-secondary-500/30 text-sm dark:text-gray-500">
