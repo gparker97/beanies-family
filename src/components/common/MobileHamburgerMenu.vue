@@ -44,7 +44,6 @@ const { t } = useTranslation();
 const authStore = useAuthStore();
 const familyStore = useFamilyStore();
 const goalsStore = useGoalsStore();
-const memberFilterStore = useMemberFilterStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
@@ -108,17 +107,6 @@ const sections = computed(() =>
 );
 
 const pinnedItems = computed(() => mapItems(PINNED_ITEMS));
-
-// Member filter display
-const memberFilterLabel = computed(() => {
-  if (memberFilterStore.isAllSelected) return t('filter.allMembers');
-  const count = memberFilterStore.selectedMemberIds.size;
-  return `${count} ${t('filter.members')}`;
-});
-
-const memberAvatars = computed(() =>
-  familyStore.members.filter((m) => memberFilterStore.isMemberSelected(m.id)).slice(0, 4)
-);
 
 function close() {
   emit('close');
@@ -262,20 +250,6 @@ const encryptionLabel = computed(() => {
               <p class="text-xs font-semibold tracking-wider text-white/30 uppercase">
                 {{ t('mobile.controls') }}
               </p>
-
-              <!-- Member filter (simplified) -->
-              <div class="flex items-center gap-2">
-                <div class="flex -space-x-1.5">
-                  <BeanieAvatar
-                    v-for="member in memberAvatars"
-                    :key="member.id"
-                    :variant="ownerVariant"
-                    :color="member.color || '#3b82f6'"
-                    size="xs"
-                  />
-                </div>
-                <span class="text-xs text-white/60">{{ memberFilterLabel }}</span>
-              </div>
 
               <!-- Privacy toggle -->
               <button

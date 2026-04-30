@@ -14,6 +14,8 @@ import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import MonthNavigator from '@/components/ui/MonthNavigator.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
+import { useMemberFilterChips } from '@/composables/useMemberFilterChips';
 import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
@@ -60,6 +62,8 @@ import {
 const route = useRoute();
 const router = useRouter();
 const transactionsStore = useTransactionsStore();
+const { isAllActive, isMemberActive, onSelectAll, onSelectMember, activeMemberNames, isFiltered } =
+  useMemberFilterChips();
 const accountsStore = useAccountsStore();
 const activityStore = useActivityStore();
 const assetsStore = useAssetsStore();
@@ -869,6 +873,19 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
         <!-- Month navigator -->
         <MonthNavigator v-model="selectedMonth" />
       </div>
+    </div>
+
+    <!-- Member chip filter (scopes transactions to a single family member's accounts) -->
+    <div>
+      <MemberChipFilter
+        :is-all-active="isAllActive"
+        :is-member-active="isMemberActive"
+        @select-all="onSelectAll"
+        @select-member="onSelectMember"
+      />
+      <p v-if="isFiltered" class="text-secondary-500/70 mt-1 text-xs">
+        {{ t('filter.filteredTo').replace('{names}', activeMemberNames.join(', ')) }}
+      </p>
     </div>
 
     <!-- Summary cards (3 across) -->

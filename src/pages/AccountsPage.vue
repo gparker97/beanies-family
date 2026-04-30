@@ -27,6 +27,8 @@ import { showToast } from '@/composables/useToast';
 import { convertToBaseCurrency } from '@/utils/currency';
 import { isLiabilityType } from '@/utils/finance';
 import { useAccountsStore } from '@/stores/accountsStore';
+import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
+import { useMemberFilterChips } from '@/composables/useMemberFilterChips';
 import { useAdjustBalance } from '@/composables/useAdjustBalance';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -43,6 +45,8 @@ const settingsStore = useSettingsStore();
 const { t } = useTranslation();
 const { getMemberName, getMemberColor } = useMemberInfo();
 const { syncHighlightClass } = useSyncHighlight();
+const { isAllActive, isMemberActive, onSelectAll, onSelectMember, activeMemberNames, isFiltered } =
+  useMemberFilterChips();
 const { playWhoosh } = useSounds();
 const { isUnlocked } = usePrivacyMode();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
@@ -409,6 +413,19 @@ async function deleteAccount(id: string) {
       >
         {{ t('accounts.addAccount') }}
       </button>
+    </div>
+
+    <!-- Member chip filter (scopes accounts list to a single family member) -->
+    <div>
+      <MemberChipFilter
+        :is-all-active="isAllActive"
+        :is-member-active="isMemberActive"
+        @select-all="onSelectAll"
+        @select-member="onSelectMember"
+      />
+      <p v-if="isFiltered" class="text-secondary-500/70 mt-1 text-xs">
+        {{ t('filter.filteredTo').replace('{names}', activeMemberNames.join(', ')) }}
+      </p>
     </div>
 
     <!-- Hero Section: 2:1 layout -->

@@ -1870,6 +1870,7 @@ const STRING_DEFS = {
   // Filter
   'filter.members': { en: 'Members', beanie: 'members' },
   'filter.allMembers': { en: 'All Members', beanie: 'all members' },
+  'filter.filteredTo': { en: 'Filtered to: {names}', beanie: 'filtered to: {names}' },
 
   // Date/Time
   'date.today': { en: 'Today', beanie: 'today' },

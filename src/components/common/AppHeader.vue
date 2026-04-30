@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import MemberFilterDropdown from '@/components/common/MemberFilterDropdown.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -468,9 +467,6 @@ async function confirmSignOutAndClearData() {
 
       <!-- Right side - v4 pill/squircle controls -->
       <div class="flex items-center gap-2">
-        <!-- Member Filter -->
-        <MemberFilterDropdown />
-
         <!-- Currency selector -->
         <!-- Multi-chip mode: 2+ effective currencies -->
         <div
