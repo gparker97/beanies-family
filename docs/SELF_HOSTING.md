@@ -10,9 +10,9 @@ beanies.family is open source. You can clone the repo and run your own copy on y
 
 There are genuine trade-offs to self-hosting beanies.family which should be made clear. The main one is that you need a back-end service to use the Google Drive API (or any other cloud storage providers we may add in the future). A simple Lambda does the trick, but it does require some setup and configuration time.
 
-The easiest path for self-hosting is to use the local file option. The local file can be saved anywhere, including a synced Google Drive / Dropbox / etc folder. For this to work, it requires the File System Access API in the browser for the site to access the file, which is only available on desktop browsers (i.e. Chrome). Support on Android is spotty and iOS is almost totally out of the picture due to stricter privacy concerns.
+The easiest path for self-hosting is to use the local file option. The local file can be saved anywhere, including a synced Google Drive / Dropbox / etc folder. For this to work, it requires the File System Access API in the browser for the site to access the file, which is only available on desktop browsers (i.e. Chrome). Support on Android is spotty, and iOS is almost totally out of the picture due to stricter privacy concerns.
 
-So the main trade-off for self-hosting is that you can collaborate using a shared local file (with a diminished mobile experience), or you can set up your own back-end infra (following the instructions below) to use a cloud storage provider.
+The slightly more complicated path is to set up your own back-end infra (following the instructions below) to use a cloud storage provider (Google Drive at the moment) via API.
 
 In summary:
 
