@@ -3,7 +3,7 @@ import { ref, computed, nextTick, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ViewToggle from '@/components/planner/ViewToggle.vue';
 import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
-import { useMemberFilterStore } from '@/stores/memberFilterStore';
+import { useMemberFilterChips } from '@/composables/useMemberFilterChips';
 import { useFamilyStore } from '@/stores/familyStore';
 import CalendarGrid from '@/components/planner/CalendarGrid.vue';
 import WeeklyCalendarView from '@/components/planner/WeeklyCalendarView.vue';
@@ -51,9 +51,10 @@ const activityStore = useActivityStore();
 const accountsStore = useAccountsStore();
 const recurringStore = useRecurringStore();
 const transactionsStore = useTransactionsStore();
-const memberFilterStore = useMemberFilterStore();
 const familyStore = useFamilyStore();
 const vacationStore = useVacationStore();
+const { isAllActive, isMemberActive, onSelectAll, onSelectMember, activeMemberNames } =
+  useMemberFilterChips();
 const {
   viewingActivity,
   viewingOccurrenceDate,
@@ -76,23 +77,6 @@ watch(
   (val) => {
     if (val) handleActivityQueryParam();
   }
-);
-
-function toggleAllMembers() {
-  if (!memberFilterStore.isAllSelected) memberFilterStore.selectAll();
-}
-function toggleMember(id: string) {
-  if (memberFilterStore.isAllSelected) {
-    memberFilterStore.selectOnly(id);
-  } else {
-    memberFilterStore.toggleMember(id);
-  }
-}
-
-const activeMemberNames = computed(() =>
-  familyStore.humans
-    .filter((m) => memberFilterStore.isMemberSelected(m.id) && !memberFilterStore.isAllSelected)
-    .map((m) => m.name)
 );
 
 const activeView = ref('month');
@@ -429,7 +413,7 @@ function handleActivitySwapped(newId: string) {
             type="button"
             class="font-outfit inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 text-sm font-medium transition-all"
             :class="
-              memberFilterStore.isAllSelected
+              isAllActive
                 ? 'bg-[var(--tint-slate-5)] text-[var(--color-text)]/65 dark:bg-slate-700 dark:text-gray-400'
                 : 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
             "
@@ -437,7 +421,7 @@ function handleActivitySwapped(newId: string) {
           >
             <span class="text-base">👨‍👩‍👧</span>
             {{
-              memberFilterStore.isAllSelected
+              isAllActive
                 ? t('filter.allMembers')
                 : activeMemberNames.length === 1
                   ? activeMemberNames[0]
@@ -466,12 +450,12 @@ function handleActivitySwapped(newId: string) {
                 type="button"
                 class="font-outfit flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
                 :class="
-                  memberFilterStore.isAllSelected
+                  isAllActive
                     ? 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
                     : 'text-[var(--color-text)] hover:bg-[var(--tint-slate-5)] dark:text-gray-300 dark:hover:bg-slate-700'
                 "
                 @click="
-                  toggleAllMembers();
+                  onSelectAll();
                   showMemberFilterMobile = false;
                 "
               >
@@ -484,11 +468,11 @@ function handleActivitySwapped(newId: string) {
                 type="button"
                 class="font-outfit flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
                 :class="
-                  memberFilterStore.isMemberSelected(member.id) && !memberFilterStore.isAllSelected
+                  isMemberActive(member.id)
                     ? 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
                     : 'text-[var(--color-text)] hover:bg-[var(--tint-slate-5)] dark:text-gray-300 dark:hover:bg-slate-700'
                 "
-                @click="toggleMember(member.id)"
+                @click="onSelectMember(member.id)"
               >
                 <span
                   class="inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-white"
@@ -517,12 +501,10 @@ function handleActivitySwapped(newId: string) {
     <!-- Desktop member filter (below header) -->
     <div class="hidden sm:flex">
       <MemberChipFilter
-        :is-all-active="memberFilterStore.isAllSelected"
-        :is-member-active="
-          (id: string) => memberFilterStore.isMemberSelected(id) && !memberFilterStore.isAllSelected
-        "
-        @select-all="toggleAllMembers"
-        @select-member="toggleMember"
+        :is-all-active="isAllActive"
+        :is-member-active="isMemberActive"
+        @select-all="onSelectAll"
+        @select-member="onSelectMember"
       />
     </div>
 
