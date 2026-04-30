@@ -1714,6 +1714,10 @@ const STRING_DEFS = {
     en: 'Google Drive sync is not configured in this build. See SELF_HOSTING.md.',
     beanie: 'google drive sync is not configured in this build. see SELF_HOSTING.md.',
   },
+  'selfHost.driveUnavailableNoProxyTooltip': {
+    en: 'Google Drive sync needs an OAuth proxy. See SELF_HOSTING.md → Path B.',
+    beanie: 'google drive sync needs an oauth proxy. see SELF_HOSTING.md → path b.',
+  },
   'selfHost.notConfigured': { en: 'Not configured', beanie: 'not configured' },
 
   // Form labels
@@ -3929,6 +3933,24 @@ const STRING_DEFS = {
   'storage.localFileContinue': {
     en: 'Continue with Local File',
     beanie: 'continue with local file',
+  },
+  // Classified errors from LocalStorageProvider (see classifyFileError).
+  // Kept generic so they apply equally to read and write paths.
+  'storage.localFilePermissionLost': {
+    en: 'Browser revoked file access. Please re-select your .beanpod file.',
+    beanie: 'browser revoked file access. please re-select your .beanpod file.',
+  },
+  'storage.localFileDiskFull': {
+    en: 'Your disk is full. Free up space and try again.',
+    beanie: 'your disk is full. free up space and try again.',
+  },
+  'storage.localFileCorrupted': {
+    en: "Couldn't read the file — it may be corrupted or another app is editing it.",
+    beanie: "couldn't read the file — it may be corrupted or another app is editing it.",
+  },
+  'storage.localFileWriteFailed': {
+    en: "Couldn't save your data file. Try again, or check the browser console for details.",
+    beanie: "couldn't save your data file. try again, or check the browser console for details.",
   },
   'storage.comingSoon': { en: 'Coming Soon', beanie: 'coming soon' },
   'storage.recommended': { en: 'Recommended', beanie: 'recommended' },

@@ -117,7 +117,10 @@ export const useSyncStore = defineStore('sync', () => {
   // Capabilities
   const capabilities = computed(() => getSyncCapabilities());
   const supportsAutoSync = computed(() => canAutoSync());
-  const isGoogleDriveAvailable = computed(() => features.drive);
+  // Drive needs both the OAuth client (`features.drive`, gates the API)
+  // AND an OAuth proxy (gates token exchange / refresh). On cloud both are
+  // true; on a Path-A self-host neither is set; on Path-B both must be set.
+  const isGoogleDriveAvailable = computed(() => features.drive && features.oauthProxy);
 
   // Encryption is always on in V4 — backward compat computed
   const hasSessionPassword = computed(() => familyKey.value !== null);
@@ -1000,7 +1003,11 @@ export const useSyncStore = defineStore('sync', () => {
 
     const ctx = useFamilyContextStore();
     if (ctx.activeFamilyId) {
-      registry.removeFamily(ctx.activeFamilyId).catch(() => {});
+      registry.removeFamily(ctx.activeFamilyId).catch((e: unknown) => {
+        // Non-critical: registry is optional smoothness; disconnect proceeds
+        // regardless. Logged so the failure isn't silent.
+        console.warn('[syncStore] registry.removeFamily failed (non-critical)', e);
+      });
     }
 
     if (storageProviderType.value === 'google_drive') {
@@ -1733,7 +1740,11 @@ export const useSyncStore = defineStore('sync', () => {
         ownerEmail: authStore.currentUser?.email ?? null,
         subscribeNewsletter: authStore.newsletterOptIn ?? null,
       })
-      .catch(() => {});
+      .catch((e: unknown) => {
+        // Non-critical: registry is optional smoothness; saves proceed
+        // regardless. Logged so the failure isn't silent.
+        console.warn('[syncStore] registry.registerFamily failed (non-critical)', e);
+      });
   }
 
   function ensureRegistered(): void {

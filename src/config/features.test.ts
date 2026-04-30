@@ -8,6 +8,7 @@ const ALL_ENV_KEYS = [
   'VITE_GOOGLE_CLIENT_ID',
   'VITE_GOOGLE_API_KEY',
   'VITE_GOOGLE_PROJECT_NUMBER',
+  'VITE_OAUTH_PROXY_URL',
   'VITE_REGISTRY_API_URL',
   'VITE_REGISTRY_API_KEY',
   'VITE_INVITE_BEAN_HASHES',
@@ -114,16 +115,52 @@ describe('config/features', () => {
     });
   });
 
+  describe('features.oauthProxy — permissive resolver', () => {
+    it('true when only VITE_OAUTH_PROXY_URL is set', async () => {
+      vi.stubEnv('VITE_OAUTH_PROXY_URL', 'https://oauth.example.com');
+      const mod = await importFeatures();
+      expect(mod.features.oauthProxy).toBe(true);
+    });
+
+    it('true when only VITE_REGISTRY_API_URL is set (cloud convention)', async () => {
+      vi.stubEnv('VITE_REGISTRY_API_URL', 'https://api.beanies.family');
+      const mod = await importFeatures();
+      expect(mod.features.oauthProxy).toBe(true);
+    });
+
+    it('false when neither is set', async () => {
+      const mod = await importFeatures();
+      expect(mod.features.oauthProxy).toBe(false);
+    });
+  });
+
   describe('canInviteFamily', () => {
     it('returns false when neither flag is set', async () => {
       const mod = await importFeatures();
       expect(mod.canInviteFamily()).toBe(false);
     });
 
-    it('returns true with only drive (registry is optional — Drive Picker fallback)', async () => {
+    it('returns true with drive + oauth proxy (registry optional — Drive Picker fallback)', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'cid');
+      vi.stubEnv('VITE_OAUTH_PROXY_URL', 'https://oauth.example.com');
       const mod = await importFeatures();
       expect(mod.canInviteFamily()).toBe(true);
+    });
+
+    it('returns true with drive + registry URL (cloud shape — registry URL serves both surfaces)', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'cid');
+      vi.stubEnv('VITE_REGISTRY_API_URL', 'u');
+      vi.stubEnv('VITE_REGISTRY_API_KEY', 'k');
+      const mod = await importFeatures();
+      expect(mod.canInviteFamily()).toBe(true);
+    });
+
+    it('returns false with drive but no OAuth proxy (Path A self-host with only client ID)', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'cid');
+      // Neither VITE_OAUTH_PROXY_URL nor VITE_REGISTRY_API_URL set — Drive
+      // sign-in cannot complete because there's no token-exchange endpoint.
+      const mod = await importFeatures();
+      expect(mod.canInviteFamily()).toBe(false);
     });
 
     it('returns false with only registry (no Drive means no shareable file)', async () => {
@@ -131,14 +168,6 @@ describe('config/features', () => {
       vi.stubEnv('VITE_REGISTRY_API_KEY', 'k');
       const mod = await importFeatures();
       expect(mod.canInviteFamily()).toBe(false);
-    });
-
-    it('returns true with both drive and registry', async () => {
-      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'cid');
-      vi.stubEnv('VITE_REGISTRY_API_URL', 'u');
-      vi.stubEnv('VITE_REGISTRY_API_KEY', 'k');
-      const mod = await importFeatures();
-      expect(mod.canInviteFamily()).toBe(true);
     });
   });
 

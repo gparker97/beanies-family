@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-29",
-    "translationCount": 2579
+    "lastUpdated": "2026-04-30",
+    "translationCount": 2584
   },
   "translations": {
     "app.name": {
@@ -12900,6 +12900,31 @@
       "translation": "未配置",
       "hash": "xjpulx",
       "lastUpdated": "2026-04-29"
+    },
+    "selfHost.driveUnavailableNoProxyTooltip": {
+      "translation": "Google云端硬盘同步需要OAuth代理。请参阅SELF_HOSTING.md→路径B。",
+      "hash": "tesfnf",
+      "lastUpdated": "2026-04-30"
+    },
+    "storage.localFilePermissionLost": {
+      "translation": "浏览器撤销了文件访问权限。请重新选择您的.beanpod文件。",
+      "hash": "1gojq",
+      "lastUpdated": "2026-04-30"
+    },
+    "storage.localFileDiskFull": {
+      "translation": "您的磁盘已满。释放空间，然后重试。",
+      "hash": "p785h4",
+      "lastUpdated": "2026-04-30"
+    },
+    "storage.localFileCorrupted": {
+      "translation": "无法读取文件—文件可能已损坏或其他应用正在编辑它。",
+      "hash": "mrk0bk",
+      "lastUpdated": "2026-04-30"
+    },
+    "storage.localFileWriteFailed": {
+      "translation": "无法保存您的数据文件。请重试，或查看浏览器控制台以了解详细信息。",
+      "hash": "um10xf",
+      "lastUpdated": "2026-04-30"
     }
   }
 }

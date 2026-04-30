@@ -1,11 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { LocalStorageProvider } from '../localProvider';
+import { LocalStorageProvider, classifyFileError } from '../localProvider';
 
 // Mock fileHandleStore
 vi.mock('../../fileHandleStore', () => ({
   storeFileHandle: vi.fn(async () => {}),
   clearFileHandle: vi.fn(async () => {}),
+  clearProviderConfig: vi.fn(async () => {}),
   verifyPermission: vi.fn(async () => true),
+}));
+
+// Mock errorReporter so write/read failure tests don't fire real Slack POSTs
+vi.mock('@/utils/errorReporter', () => ({
+  reportError: vi.fn(),
 }));
 
 function createMockHandle(
@@ -142,5 +148,172 @@ describe('LocalStorageProvider', () => {
       expect(p).toBeInstanceOf(LocalStorageProvider);
       expect(p.getHandle()).toBe(mockHandle);
     });
+  });
+
+  describe('error handling — classified failures', () => {
+    // Helper: build a DOMException-like Error with a specific name (vitest's
+    // happy-dom DOMException isn't always available; fake it via Error).
+    function namedError(name: string, message = 'simulated'): Error {
+      const e = new Error(message);
+      e.name = name;
+      return e;
+    }
+
+    describe('write()', () => {
+      it('classifies NotAllowedError as permission, clears handle, re-throws', async () => {
+        const { reportError } = await import('@/utils/errorReporter');
+        const { clearFileHandle } = await import('../../fileHandleStore');
+        const failingHandle = createMockHandle();
+        (failingHandle.createWritable as ReturnType<typeof vi.fn>).mockRejectedValue(
+          namedError('NotAllowedError')
+        );
+        const p = new LocalStorageProvider(failingHandle);
+
+        await expect(p.write('x')).rejects.toThrow('simulated');
+        expect(reportError).toHaveBeenCalledWith(
+          expect.objectContaining({
+            surface: 'local-file',
+            message: 'write failed (permission)',
+            severity: 'error',
+            context: { action: 'write' },
+          })
+        );
+        expect(clearFileHandle).toHaveBeenCalled();
+      });
+
+      it('classifies QuotaExceededError as quota, does NOT clear handle, re-throws', async () => {
+        const { reportError } = await import('@/utils/errorReporter');
+        const { clearFileHandle } = await import('../../fileHandleStore');
+        vi.mocked(clearFileHandle).mockClear();
+        const failingHandle = createMockHandle();
+        (failingHandle.createWritable as ReturnType<typeof vi.fn>).mockRejectedValue(
+          namedError('QuotaExceededError')
+        );
+        const p = new LocalStorageProvider(failingHandle);
+
+        await expect(p.write('x')).rejects.toThrow('simulated');
+        expect(reportError).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: 'write failed (quota)',
+            severity: 'warning',
+          })
+        );
+        expect(clearFileHandle).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('read()', () => {
+      it('classifies NotFoundError as stale, clears handle, re-throws', async () => {
+        const { reportError } = await import('@/utils/errorReporter');
+        const { clearFileHandle } = await import('../../fileHandleStore');
+        vi.mocked(clearFileHandle).mockClear();
+        const failingHandle = createMockHandle();
+        (failingHandle.getFile as ReturnType<typeof vi.fn>).mockRejectedValue(
+          namedError('NotFoundError')
+        );
+        const p = new LocalStorageProvider(failingHandle);
+
+        await expect(p.read()).rejects.toThrow('simulated');
+        expect(reportError).toHaveBeenCalledWith(
+          expect.objectContaining({
+            surface: 'local-file',
+            message: 'read failed (stale)',
+            context: { action: 'read' },
+          })
+        );
+        expect(clearFileHandle).toHaveBeenCalled();
+      });
+
+      it('classifies unknown error as unknown, does NOT clear handle, re-throws', async () => {
+        const { reportError } = await import('@/utils/errorReporter');
+        const { clearFileHandle } = await import('../../fileHandleStore');
+        vi.mocked(clearFileHandle).mockClear();
+        const failingHandle = createMockHandle();
+        (failingHandle.getFile as ReturnType<typeof vi.fn>).mockRejectedValue(
+          namedError('SomeRandomError')
+        );
+        const p = new LocalStorageProvider(failingHandle);
+
+        await expect(p.read()).rejects.toThrow('simulated');
+        expect(reportError).toHaveBeenCalledWith(
+          expect.objectContaining({ message: 'read failed (unknown)' })
+        );
+        expect(clearFileHandle).not.toHaveBeenCalled();
+      });
+    });
+  });
+});
+
+describe('classifyFileError', () => {
+  // Table-driven: single source of truth for the error-classification rules.
+  // Adding a new error type means adding a row here AND the corresponding
+  // case in classifyFileError; mismatch surfaces as a test failure.
+  const cases: Array<{
+    name: string;
+    expectedKind: 'permission' | 'quota' | 'stale' | 'corrupted' | 'unknown';
+    expectedClearHandle: boolean;
+    expectedSeverity: 'warning' | 'error';
+  }> = [
+    {
+      name: 'NotAllowedError',
+      expectedKind: 'permission',
+      expectedClearHandle: true,
+      expectedSeverity: 'error',
+    },
+    {
+      name: 'SecurityError',
+      expectedKind: 'permission',
+      expectedClearHandle: true,
+      expectedSeverity: 'error',
+    },
+    {
+      name: 'QuotaExceededError',
+      expectedKind: 'quota',
+      expectedClearHandle: false,
+      expectedSeverity: 'warning',
+    },
+    {
+      name: 'InvalidStateError',
+      expectedKind: 'stale',
+      expectedClearHandle: true,
+      expectedSeverity: 'error',
+    },
+    {
+      name: 'NotFoundError',
+      expectedKind: 'stale',
+      expectedClearHandle: true,
+      expectedSeverity: 'error',
+    },
+    {
+      name: 'DataError',
+      expectedKind: 'corrupted',
+      expectedClearHandle: false,
+      expectedSeverity: 'warning',
+    },
+    {
+      name: 'WhateverElse',
+      expectedKind: 'unknown',
+      expectedClearHandle: false,
+      expectedSeverity: 'warning',
+    },
+  ];
+
+  for (const c of cases) {
+    it(`maps ${c.name} → ${c.expectedKind}`, () => {
+      const e = new Error('msg');
+      e.name = c.name;
+      const verdict = classifyFileError(e);
+      expect(verdict.kind).toBe(c.expectedKind);
+      expect(verdict.clearHandle).toBe(c.expectedClearHandle);
+      expect(verdict.severity).toBe(c.expectedSeverity);
+      expect(verdict.userMessageKey).toMatch(/^storage\.localFile/);
+    });
+  }
+
+  it('handles non-Error inputs gracefully (returns unknown verdict)', () => {
+    expect(classifyFileError('string error').kind).toBe('unknown');
+    expect(classifyFileError(null).kind).toBe('unknown');
+    expect(classifyFileError(undefined).kind).toBe('unknown');
+    expect(classifyFileError({ random: 'object' }).kind).toBe('unknown');
   });
 });

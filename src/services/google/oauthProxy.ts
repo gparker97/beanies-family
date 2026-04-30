@@ -1,7 +1,15 @@
 /**
- * OAuth proxy client — calls the Lambda at api.beanies.family for token exchange and refresh.
+ * OAuth proxy client — calls the Lambda for Google OAuth code exchange and token refresh.
  *
- * Uses the same API Gateway as the registry (VITE_REGISTRY_API_URL), so no new env var needed.
+ * Resolves the proxy base URL from a permissive resolver: prefers `VITE_OAUTH_PROXY_URL`
+ * (the OAuth-specific var, used when self-hosters run their own OAuth Lambda separate
+ * from a registry), falling back to `VITE_REGISTRY_API_URL` (the cloud convention,
+ * where one Lambda backs both OAuth and the registry on the same API Gateway).
+ *
+ * Both env vars are first-class. Neither is deprecated — they exist for sustained
+ * reasons: OAuth and the registry are semantically distinct services that *can* run
+ * on the same host but don't *have* to. Cloud sets only `VITE_REGISTRY_API_URL`;
+ * Path-B self-hosters typically set only `VITE_OAUTH_PROXY_URL`.
  */
 
 export interface TokenResponse {
@@ -17,12 +25,19 @@ export interface OAuthError {
   error_description?: string;
 }
 
+// Match features.ts ok() — empty/whitespace strings are treated as unset so a
+// blank `VITE_OAUTH_PROXY_URL=` in .env.local correctly falls back to the
+// registry URL instead of throwing.
+const ok = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0;
+
 function getApiBaseUrl(): string {
-  const url = import.meta.env.VITE_REGISTRY_API_URL;
-  if (!url) {
-    throw new Error('VITE_REGISTRY_API_URL is not configured. Add it to your .env.local file.');
-  }
-  return url;
+  const proxy = import.meta.env.VITE_OAUTH_PROXY_URL;
+  const registry = import.meta.env.VITE_REGISTRY_API_URL;
+  if (ok(proxy)) return proxy;
+  if (ok(registry)) return registry;
+  throw new Error(
+    'OAuth proxy not configured. Set VITE_OAUTH_PROXY_URL (preferred) or VITE_REGISTRY_API_URL in your .env.local. See docs/SELF_HOSTING.md.'
+  );
 }
 
 /**
