@@ -47,9 +47,20 @@ export class AccountsPage {
   /** Click the category and subtype chips to select an account type */
   private async selectAccountType(type: string) {
     const { category, subtype } = this.typeToChipSequence(type);
-    await this.page.getByRole('button', { name: category, exact: true }).click();
+    const categoryBtn = this.page.getByRole('button', { name: category, exact: true });
+    await categoryBtn.click();
     if (subtype) {
-      await this.page.getByRole('button', { name: subtype, exact: true }).click();
+      // The subtype chip group is conditionally rendered (v-if on
+      // expandedCat().subtypes) — only appears after the category click
+      // commits. WebKit under CI contention has been observed to lag the
+      // re-render long enough that locator.click()'s default auto-wait
+      // races against the v-if flip. Explicit waitFor with a 15s budget
+      // surfaces a clearer error if the category click ever silently drops
+      // (matches the pattern hardened on 2026-04-22 / 04-23 in
+      // dismissActivityCreatedConfirm + openEditModal).
+      const subtypeBtn = this.page.getByRole('button', { name: subtype, exact: true });
+      await subtypeBtn.waitFor({ state: 'visible', timeout: 15_000 });
+      await subtypeBtn.click();
     }
   }
 
