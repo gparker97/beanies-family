@@ -29,6 +29,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useLanguageSwitcher } from '@/composables/useLanguageSwitcher';
 import { showToast } from '@/composables/useToast';
 import { isTemporaryEmail } from '@/utils/email';
 import { formatDateFull, toDateInputValue } from '@/utils/date';
@@ -49,6 +50,7 @@ const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
 const { t } = useTranslation();
+const { switchLanguage } = useLanguageSwitcher();
 
 // ── Page title / Dashboard greeting ──────────────────────────────────────
 const isNookOrDashboard = computed(() => route.name === 'Dashboard' || route.name === 'Nook');
@@ -110,10 +112,11 @@ async function selectCurrency(code: CurrencyCode) {
   showCurrencyDropdown.value = false;
 }
 
-async function selectLanguage(code: LanguageCode) {
+function selectLanguage(code: LanguageCode) {
   showLanguageDropdown.value = false;
-  await settingsStore.setLanguage(code);
-  await translationStore.loadTranslations(code);
+  // Fire-and-forget via the composable. DO NOT add `await` back — see
+  // docs/plans/2026-04-30-language-switcher-freeze.md.
+  switchLanguage(code);
 }
 
 function handlePrivacyToggle() {

@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-30",
-    "translationCount": 2595
+    "translationCount": 2597
   },
   "translations": {
     "app.name": {
@@ -12979,6 +12979,16 @@
     "filter.filteredTo": {
       "translation": "筛选至： {names}",
       "hash": "veugai",
+      "lastUpdated": "2026-04-30"
+    },
+    "error.translationLoadFailed": {
+      "translation": "我们无法加载翻译",
+      "hash": "qheq20",
+      "lastUpdated": "2026-04-30"
+    },
+    "error.translationLoadFailedHelp": {
+      "translation": "请检查您的网络连接，然后重试。在此之前，应用将使用您之前的语言。",
+      "hash": "hcx419",
       "lastUpdated": "2026-04-30"
     }
   }
