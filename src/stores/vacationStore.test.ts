@@ -657,4 +657,131 @@ describe('vacationStore', () => {
       expect(map.get('act-999')).toBeUndefined();
     });
   });
+
+  describe('travelSegmentOccurrences', () => {
+    function flightSegment(overrides: Partial<VacationTravelSegment> = {}): VacationTravelSegment {
+      return {
+        id: 'seg-flight-1',
+        type: 'flight_outbound',
+        title: 'SFO → JFK',
+        status: 'booked',
+        departureDate: '2026-06-15',
+        departureTime: '09:00',
+        arrivalDate: '2026-06-15',
+        arrivalTime: '17:30',
+        ...overrides,
+      };
+    }
+
+    it('returns empty list for empty vacations', () => {
+      const store = useVacationStore();
+      store.vacations = [];
+      expect(store.allTravelSegmentOccurrences).toEqual([]);
+    });
+
+    it('travelSegmentOccurrencesInRange filters to the visible window', () => {
+      const store = useVacationStore();
+      store.vacations = [
+        makeVacation({
+          id: 'v1',
+          travelSegments: [
+            flightSegment({ id: 's1', departureDate: '2026-06-15', arrivalDate: '2026-06-15' }),
+            flightSegment({ id: 's2', departureDate: '2026-07-20', arrivalDate: '2026-07-20' }),
+          ],
+        }),
+      ];
+
+      const june = store.travelSegmentOccurrencesInRange('2026-06-01', '2026-06-30');
+      expect(june).toHaveLength(2);
+      expect(june.every((o) => o.segmentId === 's1')).toBe(true);
+
+      const july = store.travelSegmentOccurrencesInRange('2026-07-01', '2026-07-31');
+      expect(july).toHaveLength(2);
+      expect(july.every((o) => o.segmentId === 's2')).toBe(true);
+
+      // Range that excludes both
+      expect(store.travelSegmentOccurrencesInRange('2026-08-01', '2026-08-31')).toEqual([]);
+    });
+
+    it('cross-month overnight flight: departure in June, arrival in July', () => {
+      const store = useVacationStore();
+      store.vacations = [
+        makeVacation({
+          id: 'v1',
+          travelSegments: [
+            flightSegment({
+              id: 's-overnight',
+              departureDate: '2026-06-30',
+              departureTime: '22:00',
+              arrivalDate: '2026-07-01',
+              arrivalTime: '02:30',
+            }),
+          ],
+        }),
+      ];
+
+      const june = store.travelSegmentOccurrencesInRange('2026-06-01', '2026-06-30');
+      expect(june).toHaveLength(1);
+      expect(june[0]).toMatchObject({ kind: 'departure', date: '2026-06-30', time: '22:00' });
+
+      const july = store.travelSegmentOccurrencesInRange('2026-07-01', '2026-07-31');
+      expect(july).toHaveLength(1);
+      expect(july[0]).toMatchObject({ kind: 'arrival', date: '2026-07-01', time: '02:30' });
+    });
+
+    it('safeExtract swallows thrown errors and continues with the rest', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Build a corrupt segment whose data-field access throws. Vue's
+      // reactivity probes for internal symbols (`__v_isRef`, etc.) when
+      // wrapping objects in stores — return undefined for those so we
+      // only blow up on real domain-field access (mimics real-world
+      // CRDT-corruption shape).
+      const corruptSegment = new Proxy({} as VacationTravelSegment, {
+        get(_t, prop) {
+          if (typeof prop === 'symbol') return undefined;
+          if (prop.startsWith('__')) return undefined;
+          if (prop === 'id') return 'corrupt-seg';
+          if (prop === 'type') return 'flight_outbound';
+          throw new Error(`boom on access to ${String(prop)}`);
+        },
+      });
+
+      const store = useVacationStore();
+      store.vacations = [
+        makeVacation({
+          id: 'v1',
+          travelSegments: [corruptSegment, flightSegment({ id: 'good-seg' })],
+        }),
+      ];
+
+      const out = store.allTravelSegmentOccurrences;
+      // Corrupt segment yields 0 occurrences; healthy one still yields 2.
+      expect(out).toHaveLength(2);
+      expect(out.every((o) => o.segmentId === 'good-seg')).toBe(true);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '[vacationStore] failed to extract occurrences for segment corrupt-seg'
+        ),
+        expect.any(Error)
+      );
+
+      errorSpy.mockRestore();
+    });
+
+    it('reactively reflects mutations to vacations[]', () => {
+      const store = useVacationStore();
+      store.vacations = [makeVacation({ id: 'v1', travelSegments: [] })];
+      expect(store.allTravelSegmentOccurrences).toEqual([]);
+
+      store.vacations = [
+        makeVacation({
+          id: 'v1',
+          travelSegments: [flightSegment({ id: 'fresh-seg' })],
+        }),
+      ];
+      expect(store.allTravelSegmentOccurrences).toHaveLength(2);
+      expect(store.allTravelSegmentOccurrences[0].segmentId).toBe('fresh-seg');
+    });
+  });
 });

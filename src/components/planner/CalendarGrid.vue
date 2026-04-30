@@ -4,8 +4,8 @@ import { useActivityStore, CATEGORY_COLORS } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { extractDatePart, formatMonthYear } from '@/utils/date';
-import { tripTypeEmoji } from '@/utils/vacation';
+import { extractDatePart, formatMonthYear, formatTime12 } from '@/utils/date';
+import { tripTypeEmoji, transportEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
 import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
 import type { ActivityCategory } from '@/types/models';
 
@@ -16,6 +16,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   selectDate: [date: string];
   'vacation-click': [vacationId: string];
+  'view-segment': [vacationId: string, segmentIndex: number];
 }>();
 
 const { t } = useTranslation();
@@ -81,6 +82,7 @@ const calendarDays = computed(() => {
     weekRow: number;
     activities: Array<{ category: ActivityCategory; color?: string }>;
     vacations: Array<{ id: string; name: string; emoji: string; isStart: boolean }>;
+    segments: TravelSegmentOccurrence[];
   }> = [];
 
   // Get activity occurrences for this month
@@ -97,6 +99,18 @@ const calendarDays = computed(() => {
     dateActivities
       .get(occ.date)!
       .push({ category: occ.activity.category, color: occ.activity.color });
+  }
+
+  // Build a map of date -> travel-segment occurrences (flights, trains, etc).
+  // Visible window = first padded day of the grid through the last; we pull
+  // a generous month-bounded range and let per-cell filter handle the rest.
+  // (Cross-month occurrences appear in their own month — see validation tests.)
+  const monthStartStr = formatDate(new Date(year, month, 1));
+  const monthEndStr = formatDate(new Date(year, month + 1, 0));
+  const dateSegments = new Map<string, TravelSegmentOccurrence[]>();
+  for (const occ of vacationStore.travelSegmentOccurrencesInRange(monthStartStr, monthEndStr)) {
+    if (!dateSegments.has(occ.date)) dateSegments.set(occ.date, []);
+    dateSegments.get(occ.date)!.push(occ);
   }
 
   // Build a map of date -> vacations covering that date
@@ -137,6 +151,7 @@ const calendarDays = computed(() => {
       weekRow: days.length < 7 ? 0 : Math.floor(days.length / 7),
       activities: dateActivities.get(dateStr) ?? [],
       vacations: dateVacations.get(dateStr) ?? [],
+      segments: dateSegments.get(dateStr) ?? [],
     });
   }
 
@@ -151,6 +166,7 @@ const calendarDays = computed(() => {
       weekRow: Math.floor(days.length / 7),
       activities: dateActivities.get(dateStr) ?? [],
       vacations: dateVacations.get(dateStr) ?? [],
+      segments: dateSegments.get(dateStr) ?? [],
     });
   }
 
@@ -167,6 +183,7 @@ const calendarDays = computed(() => {
         weekRow: Math.floor(days.length / 7),
         activities: dateActivities.get(dateStr) ?? [],
         vacations: dateVacations.get(dateStr) ?? [],
+        segments: dateSegments.get(dateStr) ?? [],
       });
     }
   }
@@ -285,6 +302,47 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
               class="text-secondary-500/30 text-xs dark:text-gray-500"
             >
               +{{ cell.activities.length - 4 }}
+            </span>
+          </div>
+
+          <!-- Travel-segment chips (compact emoji + time; click → opens segment editor) -->
+          <div
+            v-if="cell.segments.length > 0"
+            class="mt-0.5 flex w-full items-center gap-[2px] px-0.5"
+          >
+            <span
+              v-for="seg in cell.segments.slice(0, 2)"
+              :key="seg.segmentId + '-' + seg.kind"
+              class="font-outfit truncate rounded-sm px-0.5 text-[9px] leading-tight font-bold text-[#0077B6] dark:text-[#00B4D8]"
+              :class="
+                seg.status === 'pending'
+                  ? 'border border-dashed border-[var(--vacation-teal)] bg-[var(--vacation-teal-5)] italic opacity-80'
+                  : 'border-l-2 border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)]'
+              "
+              :title="seg.title"
+              @click.stop="emit('view-segment', seg.vacationId, seg.segmentIndex)"
+            >
+              {{ transportEmoji(seg.transportType, seg.kind) }}
+              <span class="opacity-80">{{
+                seg.kind === 'departure'
+                  ? t('planner.segmentDepartureShort')
+                  : t('planner.segmentArrivalShort')
+              }}</span>
+              <template v-if="seg.time">
+                {{ ' ' + formatTime12(seg.time) }}
+              </template>
+              <span class="sr-only">{{
+                seg.kind === 'departure'
+                  ? t('planner.segmentDeparture')
+                  : t('planner.segmentArrival')
+              }}</span>
+            </span>
+            <span
+              v-if="cell.segments.length > 2"
+              class="text-secondary-500/40 text-[9px]"
+              aria-hidden="true"
+            >
+              +{{ cell.segments.length - 2 }}
             </span>
           </div>
 
