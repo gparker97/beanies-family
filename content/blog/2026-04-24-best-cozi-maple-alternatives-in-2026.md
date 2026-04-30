@@ -90,7 +90,7 @@ You may like some of these more than beanies, and that's ok. Remember, this was 
 
 All of the above apps store your family's information on their servers. Some sell it, some don't (as of today), but you're [trusting a third party with your financial data](/guides/local-first-family-finance-planning-tools), family information, or personal details.
 
-**What sets beanies apart: data ownership.**
+**What sets beanies apart? Data ownership.**
 
 [**beanies.family**](/) is [local-first](/guides/local-first-family-finance-planning-tools), [encrypted](/guides/local-first-family-finance-planning-tools#end-to-end-encryption-explained-without-the-math), and your data stays with you. Your data lives in your Google Drive (or other storage location that you choose) as an encrypted .beanpod file - not on our servers, because we don't have any. It's got family planning, links your family with your finances, it's open-source, and it handles multi-currency natively.
 

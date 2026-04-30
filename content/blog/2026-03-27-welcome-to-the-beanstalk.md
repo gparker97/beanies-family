@@ -68,3 +68,4 @@ Peace out, my beans.
 greg 🫘
 
 ![my family (the one I built beanies.family for)](/blog/greg-family-disney.webp)
+_the original beanies at the happiest place on earth. a fight over what to ride next followed shortly after this photo_
