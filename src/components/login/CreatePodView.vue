@@ -8,6 +8,7 @@ import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import SetupProgressModal from '@/components/login/SetupProgressModal.vue';
+import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAuthStore } from '@/stores/authStore';
@@ -1009,48 +1010,12 @@ function handleBack() {
       </button>
     </div>
 
-    <!-- Local file warning modal -->
-    <BaseModal :open="showLocalFileWarning" size="sm" @close="showLocalFileWarning = false">
-      <div class="p-5">
-        <div class="mb-3 flex items-center gap-2">
-          <svg
-            class="h-5 w-5 flex-shrink-0 text-amber-500"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
-            />
-          </svg>
-          <h3 class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
-            {{ t('storage.localFile') }}
-          </h3>
-        </div>
-        <p class="mb-3 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
-          {{ t('storage.localFileWarning') }}
-        </p>
-        <p class="mb-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-          🔒 {{ t('storage.localFileWarningEncryption') }}
-        </p>
-        <div class="flex gap-2">
-          <BaseButton
-            variant="secondary"
-            size="sm"
-            class="flex-1"
-            @click="showLocalFileWarning = false"
-          >
-            {{ t('action.back') }}
-          </BaseButton>
-          <BaseButton size="sm" class="flex-1" @click="handleChooseLocalStorage">
-            {{ t('storage.localFileContinue') }}
-          </BaseButton>
-        </div>
-      </div>
-    </BaseModal>
+    <!-- Local file warning modal — shared with LoadPodView -->
+    <LocalFileSyncWarning
+      :open="showLocalFileWarning"
+      @close="showLocalFileWarning = false"
+      @proceed="handleChooseLocalStorage"
+    />
 
     <!-- Google Drive result modal (success or failure) -->
     <BaseModal :open="showDriveResultModal" @close="showDriveResultModal = false">

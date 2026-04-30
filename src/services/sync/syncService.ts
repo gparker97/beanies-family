@@ -28,6 +28,15 @@ import type { StorageProvider, StorageProviderType } from './storageProvider';
 import { LocalStorageProvider } from './providers/localProvider';
 import { DriveApiError } from '@/services/google/driveService';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
+import {
+  usePollWhileVisible,
+  type PollWhileVisibleHandle,
+} from '@/composables/usePollWhileVisible';
+import { effectScope } from 'vue';
+import { reportError } from '@/utils/errorReporter';
+import { isConflictFilename } from '@/utils/beanpodFilename';
+import { showToast } from '@/composables/useToast';
+import { useTranslationStore } from '@/stores/translationStore';
 
 // Result type for openAndLoadFile
 export interface OpenFileResult {
@@ -65,6 +74,85 @@ let noKeyWarnedOnce = false;
 
 // Drive-reported modifiedTime of the last file we read or wrote
 let lastKnownFileTimestamp: string | null = null;
+
+// Poll-while-visible watcher for providers that opt in via
+// supportsLocalPolling(). Lifecycle is tied to the active provider — started
+// when a polling-capable provider becomes active, stopped when it's swapped
+// out or cleared. Implementation lives in `startPollingIfApplicable` /
+// `stopPolling` below; the effectScope is detached because syncService is
+// a plain module, not a Vue component.
+let pollScope: ReturnType<typeof effectScope> | null = null;
+let pollHandle: PollWhileVisibleHandle | null = null;
+const LOCAL_FILE_POLL_MS = 15_000;
+
+function stopPolling(): void {
+  if (pollHandle) {
+    pollHandle.stop();
+    pollHandle = null;
+  }
+  if (pollScope) {
+    pollScope.stop();
+    pollScope = null;
+  }
+}
+
+/**
+ * If the just-set provider opts into polling (via supportsLocalPolling()),
+ * spin up a `usePollWhileVisible` watcher tied to it. Each tick calls
+ * `fetchAndMergeRemote()`, which is a no-op when nothing has changed —
+ * the per-tick cost is one OS-metadata read (FSA `getLastModified`).
+ *
+ * Re-entrant safe: stops any existing watcher first, so callers don't
+ * have to coordinate.
+ */
+function startPollingIfApplicable(provider: StorageProvider | null): void {
+  stopPolling();
+  if (!provider?.supportsLocalPolling?.()) return;
+  // One-time: if the file the user just opened looks like a cloud-storage
+  // conflict copy (Dropbox / OneDrive / Drive desktop / iCloud), surface it
+  // as a toast so they understand why merging behaviour might be unusual.
+  // Wrapped in try/catch — the poll watcher's lifecycle takes priority over
+  // a cosmetic notification.
+  try {
+    notifyIfConflictFile(provider);
+  } catch (e) {
+    console.warn('[syncService] conflict-filename notify threw', e);
+  }
+  pollScope = effectScope(true);
+  pollScope.run(() => {
+    pollHandle = usePollWhileVisible(
+      async () => {
+        try {
+          await fetchAndMergeRemote();
+        } catch (e) {
+          // fetchAndMergeRemote can throw on decrypt failures, parse errors,
+          // permission revoked mid-poll, etc. The poll loop must keep running
+          // (transient errors recover on the next tick) but the failure must
+          // not be silent.
+          console.warn('[syncService] poll-tick fetchAndMergeRemote threw', e);
+          reportError({
+            surface: 'local-file-polling',
+            message: 'poll-tick merge threw',
+            error: e,
+            severity: 'warning',
+            context: { action: 'poll' },
+          });
+        }
+      },
+      LOCAL_FILE_POLL_MS,
+      { fireImmediatelyOnVisible: true, surface: 'local-file-polling' }
+    );
+  });
+}
+
+function notifyIfConflictFile(provider: StorageProvider): void {
+  const verdict = isConflictFilename(provider.getDisplayName());
+  if (!verdict.isConflict) return;
+  const tStore = useTranslationStore();
+  showToast('warning', tStore.t('storage.localFileConflictDetected'), provider.getDisplayName(), {
+    surface: 'local-file-conflict-detected',
+  });
+}
 
 // When true, mergeDoc → schedulePersist → triggerDebouncedSave is suppressed
 // (we're already inside doSave, so scheduling another save would be redundant)
@@ -228,6 +316,7 @@ export function getProvider(): StorageProvider | null {
 export function setProvider(provider: StorageProvider): void {
   currentProvider = provider;
   currentProviderFamilyId = getActiveFamilyId();
+  startPollingIfApplicable(provider);
   updateState({
     isConfigured: true,
     fileName: provider.getDisplayName(),
@@ -296,6 +385,7 @@ export function getSessionFileHandle(): FileSystemFileHandle | null {
  */
 export function reset(): void {
   cancelPendingSave();
+  stopPolling();
   currentProvider = null;
   currentProviderFamilyId = null;
   currentFamilyKey = null;
@@ -353,6 +443,7 @@ export async function initialize(): Promise<boolean> {
           config.driveAccountEmail
         );
         currentProviderFamilyId = familyId;
+        startPollingIfApplicable(currentProvider);
         updateState({
           isInitialized: true,
           isConfigured: true,
@@ -379,6 +470,7 @@ export async function initialize(): Promise<boolean> {
       if (handle) {
         currentProvider = LocalStorageProvider.fromHandle(handle);
         currentProviderFamilyId = getActiveFamilyId();
+        startPollingIfApplicable(currentProvider);
         updateState({
           isInitialized: true,
           isConfigured: true,
@@ -442,6 +534,7 @@ export async function selectSyncFile(): Promise<boolean> {
     }
     currentProvider = provider;
     currentProviderFamilyId = familyId;
+    startPollingIfApplicable(provider);
 
     updateState({
       isConfigured: true,
@@ -485,12 +578,21 @@ export async function save(): Promise<boolean> {
 }
 
 /**
- * Fetch remote file from Drive and merge into local doc if it has changed.
- * Called by doSave() before writing to prevent overwriting remote changes.
- * Only applies to Google Drive provider (local files don't have this race).
+ * Fetch remote file and merge into local doc if it has changed. Called by
+ * doSave() before writing (Drive race protection) AND by the local-file
+ * polling watcher (catches edits synced down by another device's cloud-
+ * storage client). Provider opts in via `supportsLocalPolling()` returning
+ * true; absent or false means "this provider doesn't participate".
  */
 async function fetchAndMergeRemote(): Promise<void> {
-  if (!currentProvider || currentProvider.type !== 'google_drive') return;
+  if (!currentProvider) return;
+  // Drive's save path always calls this (legacy direct call); the polling
+  // watcher only activates for providers that opt in. Both paths converge
+  // here. The capability check guards against future providers that
+  // shouldn't merge (e.g. a one-shot import-only provider).
+  const opts = currentProvider.supportsLocalPolling?.();
+  const isDrive = currentProvider.type === 'google_drive';
+  if (!isDrive && !opts) return;
   if (!currentFamilyKey || !currentEnvelope) return;
 
   // Fast path: check if remote has changed since we last read/wrote
@@ -984,6 +1086,7 @@ export async function flushPendingSave(): Promise<void> {
  */
 export async function disconnect(): Promise<void> {
   cancelPendingSave();
+  stopPolling();
   if (currentProvider) {
     const familyId = getActiveFamilyId();
     if (familyId) {

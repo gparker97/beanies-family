@@ -250,6 +250,17 @@ export class GoogleDriveProvider implements StorageProvider {
   }
 
   /**
+   * Drive does NOT participate in the per-tick polling loop — an HTTP call
+   * to Drive every 15s is the wrong shape (cost + API quota). Drive uses
+   * save-time `fetchAndMergeRemote` triggered by the syncService's debounced
+   * save path. Returning false here keeps the polling watcher inactive
+   * while a Drive provider is mounted.
+   */
+  supportsLocalPolling(): boolean {
+    return false;
+  }
+
+  /**
    * Check if Google account email has become available (e.g. after token acquisition)
    * and update the in-memory state. Returns true if email changed.
    */

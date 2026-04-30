@@ -40,6 +40,19 @@ export interface StorageProvider {
 
   /** Cloud account email (e.g. Google account), or null for local/unknown */
   getAccountEmail(): string | null;
+
+  /**
+   * Whether this provider can detect external changes via inexpensive local
+   * polling. Implementations returning `true` opt into the per-tick
+   * `fetchAndMergeRemote` loop — the sync engine wires up a
+   * `usePollWhileVisible` watcher when such a provider becomes active.
+   *
+   * `LocalStorageProvider` returns true (FSA `getLastModified()` is O(1) OS
+   * metadata, cheap to poll). `GoogleDriveProvider` returns false (an HTTP
+   * call every 15s is the wrong shape for Drive — it uses save-time
+   * `fetchAndMergeRemote` instead). Optional method; treat absent as false.
+   */
+  supportsLocalPolling?(): boolean;
 }
 
 export type StorageProviderType = StorageProvider['type'];
