@@ -126,7 +126,60 @@ describe('oauthProxy', () => {
       ).rejects.toThrow('Token exchange failed');
     });
 
-    it('throws clear error when VITE_REGISTRY_API_URL is not configured', async () => {
+    it('prefers VITE_OAUTH_PROXY_URL when both env vars are set', async () => {
+      vi.stubEnv('VITE_OAUTH_PROXY_URL', 'https://oauth.example.com');
+      vi.stubEnv('VITE_REGISTRY_API_URL', 'https://registry.example.com');
+
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        mockResponse(true, {
+          access_token: 'ya29.access',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        })
+      );
+
+      await exchangeCodeForTokens({
+        code: 'c',
+        codeVerifier: 'v',
+        redirectUri: 'https://beanies.family/oauth/callback',
+        clientId: 'cid',
+      });
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        'https://oauth.example.com/oauth/google/token',
+        expect.any(Object)
+      );
+    });
+
+    it('falls back to VITE_REGISTRY_API_URL when only registry is set (cloud regression sentinel)', async () => {
+      // Cloud's .env.local sets only VITE_REGISTRY_API_URL — if this test ever
+      // fails, cloud Drive sign-in is broken. Do not delete or weaken.
+      vi.stubEnv('VITE_OAUTH_PROXY_URL', '');
+      vi.stubEnv('VITE_REGISTRY_API_URL', 'https://api.beanies.family');
+
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        mockResponse(true, {
+          access_token: 'ya29.access',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        })
+      );
+
+      await exchangeCodeForTokens({
+        code: 'c',
+        codeVerifier: 'v',
+        redirectUri: 'https://beanies.family/oauth/callback',
+        clientId: 'cid',
+      });
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        'https://api.beanies.family/oauth/google/token',
+        expect.any(Object)
+      );
+    });
+
+    it('throws clear error when neither OAuth proxy nor registry URL is configured', async () => {
+      vi.stubEnv('VITE_OAUTH_PROXY_URL', '');
       vi.stubEnv('VITE_REGISTRY_API_URL', '');
 
       await expect(
@@ -136,7 +189,7 @@ describe('oauthProxy', () => {
           redirectUri: 'https://beanies.family/oauth/callback',
           clientId: 'cid',
         })
-      ).rejects.toThrow('VITE_REGISTRY_API_URL is not configured');
+      ).rejects.toThrow('OAuth proxy not configured');
     });
   });
 
