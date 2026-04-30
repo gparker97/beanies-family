@@ -22,6 +22,8 @@ import type {
   FamilyVacation,
   VacationTripType,
   VacationTravelSegment,
+  VacationTravelType,
+  VacationSegmentStatus,
   VacationAccommodation,
   VacationTransportation,
 } from '@/types/models';
@@ -805,4 +807,165 @@ export function buildCruisePortOptions(): ComboOption[] {
     value: `${p.city} — ${p.name}`,
     label: `${p.city} — ${p.name}, ${p.country}`,
   }));
+}
+
+// ── Travel-segment calendar occurrences ────────────────────────────────────
+//
+// Surface flights, trains, ferries, and cruises on the activities calendar at
+// their actual departure / arrival times. Pure derivation — orchestration sits
+// in `vacationStore` (see `allTravelSegmentOccurrences` + `safeExtract`).
+
+/** Travel-segment types that have a meaningful departure/arrival pair. */
+export type SupportedTravelType =
+  | 'flight_outbound'
+  | 'flight_return'
+  | 'train'
+  | 'ferry'
+  | 'cruise';
+
+/** A single calendar occurrence — one side of a travel segment. */
+export interface TravelSegmentOccurrence {
+  vacationId: string;
+  segmentIndex: number;
+  segmentId: string;
+  transportType: SupportedTravelType;
+  kind: 'departure' | 'arrival';
+  status: VacationSegmentStatus;
+  /** YYYY-MM-DD, local-day (same convention as activities). */
+  date: string;
+  /** HH:mm — undefined → render as untimed/all-day. */
+  time?: string;
+  title: string;
+}
+
+type SideField = {
+  kind: 'departure' | 'arrival';
+  dateField: keyof VacationTravelSegment;
+  timeField?: keyof VacationTravelSegment;
+};
+
+const STD_FLIGHT_RAIL_FERRY_SIDES: SideField[] = [
+  { kind: 'departure', dateField: 'departureDate', timeField: 'departureTime' },
+  { kind: 'arrival', dateField: 'arrivalDate', timeField: 'arrivalTime' },
+];
+
+/**
+ * Per-type extraction recipe. Adding a new transport type means adding one
+ * row here — no branching in extractSegmentOccurrences.
+ */
+const SIDE_FIELDS: Record<SupportedTravelType, SideField[]> = {
+  flight_outbound: STD_FLIGHT_RAIL_FERRY_SIDES,
+  flight_return: STD_FLIGHT_RAIL_FERRY_SIDES,
+  train: STD_FLIGHT_RAIL_FERRY_SIDES,
+  ferry: STD_FLIGHT_RAIL_FERRY_SIDES,
+  cruise: [
+    { kind: 'departure', dateField: 'embarkationDate', timeField: 'embarkationTime' },
+    // Schema has no disembarkationTime — disembark renders as untimed/all-day.
+    { kind: 'arrival', dateField: 'disembarkationDate' },
+  ],
+};
+
+/** True when this travel type has a meaningful departure/arrival to surface on the calendar. */
+export function isSupportedTravelType(t: VacationTravelType): t is SupportedTravelType {
+  return t in SIDE_FIELDS;
+}
+
+/**
+ * Pure: derive 0–2 calendar occurrences for one travel segment.
+ *
+ * - Returns `[]` for unsupported types (`car`, `activity`, `flight_other`).
+ * - Skips a side that's missing its date.
+ * - Skips a side with a malformed date (logs `[vacation]`, never throws).
+ *
+ * Unit-testable in isolation — no Pinia, no Vue, no side effects beyond the
+ * `console.warn` for malformed dates.
+ */
+export function extractSegmentOccurrences(
+  vacationId: string,
+  seg: VacationTravelSegment,
+  segmentIndex: number
+): TravelSegmentOccurrence[] {
+  if (!isSupportedTravelType(seg.type)) return [];
+  const out: TravelSegmentOccurrence[] = [];
+  for (const side of SIDE_FIELDS[seg.type]) {
+    const date = seg[side.dateField] as string | undefined;
+    if (!date) continue;
+    const d = extractDatePart(date);
+    if (!isValidISODate(d)) {
+      console.warn(
+        `[vacation] segment ${seg.id} has invalid ${side.kind} date "${date}" — skipping that side`
+      );
+      continue;
+    }
+    const rawTime = side.timeField ? (seg[side.timeField] as string | undefined) : undefined;
+    out.push({
+      vacationId,
+      segmentIndex,
+      segmentId: seg.id,
+      transportType: seg.type,
+      kind: side.kind,
+      status: seg.status,
+      date: d,
+      time: rawTime || undefined,
+      title: seg.title,
+    });
+  }
+  return out;
+}
+
+const TRANSPORT_EMOJI: Record<SupportedTravelType, string> = {
+  flight_outbound: '✈',
+  flight_return: '✈',
+  train: '🚆',
+  ferry: '⛴',
+  cruise: '🚢',
+};
+
+/**
+ * Single-character transport emoji used as a chip prefix on the calendar.
+ * Pass `kind` to get a direction-aware variant when one is meaningful:
+ * flights map to 🛫 (departure) / 🛬 (arrival) — exact Unicode semantic match.
+ * Other transport types return the same emoji regardless of kind; the
+ * caller is expected to add a textual "Dep"/"Arr" label for disambiguation.
+ */
+export function transportEmoji(type: SupportedTravelType, kind?: 'departure' | 'arrival'): string {
+  if (kind && (type === 'flight_outbound' || type === 'flight_return')) {
+    return kind === 'departure' ? '🛫' : '🛬';
+  }
+  return TRANSPORT_EMOJI[type] ?? '';
+}
+
+/** Bucket items by whether they have a `time`. Used by week/day/DayTimeline rendering. */
+export function splitTimedUntimed<T extends { time?: string }>(
+  items: T[]
+): { timed: T[]; untimed: T[] } {
+  const timed: T[] = [];
+  const untimed: T[] = [];
+  for (const o of items) {
+    if (o.time) timed.push(o);
+    else untimed.push(o);
+  }
+  return { timed, untimed };
+}
+
+/**
+ * Validate that `(vacationId, segmentIndex)` targets a real travel segment.
+ * Pure helper used by the planner page's "click segment chip" handler so the
+ * no-silent-failure path is unit-testable without mounting the page.
+ */
+export function validateSegmentTarget(
+  vacation: FamilyVacation | undefined,
+  vacationId: string,
+  segmentIndex: number
+): { ok: true } | { ok: false; reason: string } {
+  if (!vacation) {
+    return { ok: false, reason: `vacation ${vacationId} not found` };
+  }
+  if (segmentIndex < 0 || segmentIndex >= vacation.travelSegments.length) {
+    return {
+      ok: false,
+      reason: `segment index ${segmentIndex} out of bounds (${vacation.travelSegments.length}) on vacation ${vacationId}`,
+    };
+  }
+  return { ok: true };
 }

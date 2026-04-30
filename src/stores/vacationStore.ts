@@ -4,11 +4,18 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import { showToast } from '@/composables/useToast';
 import * as vacationRepo from '@/services/automerge/repositories/vacationRepository';
 import * as activityRepo from '@/services/automerge/repositories/activityRepository';
-import { computeVacationDates, extendTripDates, collectSegmentDates } from '@/utils/vacation';
+import {
+  computeVacationDates,
+  extendTripDates,
+  collectSegmentDates,
+  extractSegmentOccurrences,
+  type TravelSegmentOccurrence,
+} from '@/utils/vacation';
 import { toISODateString, extractDatePart } from '@/utils/date';
 import { useToday } from '@/composables/useToday';
 import type {
   FamilyVacation,
+  VacationTravelSegment,
   CreateFamilyVacationInput,
   UpdateFamilyVacationInput,
   CreateFamilyActivityInput,
@@ -40,6 +47,48 @@ export const useVacationStore = defineStore('vacations', () => {
 
   function getVacationById(id: string): FamilyVacation | undefined {
     return vacations.value.find((v) => v.id === id);
+  }
+
+  /**
+   * All travel-segment calendar occurrences across every vacation. Pure
+   * derivation — extraction lives in `extractSegmentOccurrences`. Wrapped
+   * in `safeExtract` so a single corrupt segment cannot break calendar
+   * render for the whole vacation: errors are logged with `[vacationStore]`
+   * prefix and the segment contributes zero occurrences instead of throwing.
+   */
+  const allTravelSegmentOccurrences = computed<TravelSegmentOccurrence[]>(() =>
+    vacations.value.flatMap((v) =>
+      v.travelSegments.flatMap((seg, idx) => safeExtract(v.id, seg, idx))
+    )
+  );
+
+  function safeExtract(
+    vacationId: string,
+    seg: VacationTravelSegment,
+    idx: number
+  ): TravelSegmentOccurrence[] {
+    try {
+      return extractSegmentOccurrences(vacationId, seg, idx);
+    } catch (err) {
+      console.error(
+        `[vacationStore] failed to extract occurrences for segment ${seg?.id ?? '<no id>'} on vacation ${vacationId}:`,
+        err
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Filter the all-occurrences list to a date range (inclusive on both
+   * sides). Each calendar view calls this with its visible window.
+   * `startISO` / `endISO` are `YYYY-MM-DD`; lex-compare works because
+   * that format sorts as date.
+   */
+  function travelSegmentOccurrencesInRange(
+    startISO: string,
+    endISO: string
+  ): TravelSegmentOccurrence[] {
+    return allTravelSegmentOccurrences.value.filter((o) => o.date >= startISO && o.date <= endISO);
   }
 
   // Actions
@@ -269,6 +318,8 @@ export const useVacationStore = defineStore('vacations', () => {
     upcomingVacations,
     vacationByActivityId,
     getVacationById,
+    allTravelSegmentOccurrences,
+    travelSegmentOccurrencesInRange,
     // Actions
     loadVacations,
     createVacation,

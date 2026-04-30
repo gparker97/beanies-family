@@ -12,6 +12,9 @@ import UpcomingActivities from '@/components/planner/UpcomingActivities.vue';
 import TodoPreview from '@/components/planner/TodoPreview.vue';
 import ActivityModal from '@/components/planner/ActivityModal.vue';
 import ActivityViewEditModal from '@/components/planner/ActivityViewEditModal.vue';
+import TravelSegmentEditModal from '@/components/travel/TravelSegmentEditModal.vue';
+import { showToast } from '@/composables/useToast';
+import { validateSegmentTarget } from '@/utils/vacation';
 import DayAgendaSidebar from '@/components/planner/DayAgendaSidebar.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import { useActivityStore } from '@/stores/activityStore';
@@ -140,6 +143,50 @@ function handleStartVacationWizard(defaults: { assigneeIds: string[]; date: stri
 function handleVacationClick(id: string) {
   router.push({ path: '/travel', query: { vacation: id } });
 }
+
+// ── Travel-segment in-place editor ─────────────────────────────────────────
+// Click a travel-segment chip on the calendar → open TravelSegmentEditModal
+// directly here (no /travel navigation). Identity is `{vacationId,
+// segmentIndex}` — modal already uses this contract on TravelPlansPage.
+const editingSegment = ref<{ vacationId: string; segmentIndex: number } | null>(null);
+const editingSegmentValue = computed(() => {
+  if (!editingSegment.value) return undefined;
+  return vacationStore.getVacationById(editingSegment.value.vacationId)?.travelSegments[
+    editingSegment.value.segmentIndex
+  ];
+});
+
+function reportSegmentNotFound(reason: string) {
+  console.error(`[FamilyPlannerPage] ${reason}`);
+  showToast('error', t('error.travelSegmentNotFound'), t('error.travelSegmentNotFoundHelp'));
+}
+
+function handleViewSegment(vacationId: string, segmentIndex: number) {
+  const result = validateSegmentTarget(
+    vacationStore.getVacationById(vacationId),
+    vacationId,
+    segmentIndex
+  );
+  if (!result.ok) return reportSegmentNotFound(result.reason);
+  editingSegment.value = { vacationId, segmentIndex };
+}
+
+function closeSegmentModal() {
+  editingSegment.value = null;
+}
+
+// Vanish-mid-edit defense: if the segment being edited is removed by a
+// concurrent Automerge merge, close the modal and surface a warning toast
+// rather than silently dropping the form into empty-create mode.
+watch(editingSegmentValue, (next, prev) => {
+  if (prev && !next && editingSegment.value) {
+    console.warn(
+      `[FamilyPlannerPage] segment vanished mid-edit (vacation ${editingSegment.value.vacationId}, idx ${editingSegment.value.segmentIndex}) — closing modal`
+    );
+    showToast('warning', t('error.travelSegmentVanished'), t('error.travelSegmentVanishedHelp'));
+    editingSegment.value = null;
+  }
+});
 
 const headerSubtitle = computed(() => {
   if (activeView.value === 'day') {
@@ -507,6 +554,7 @@ function handleActivitySwapped(newId: string) {
       :selected-date="focusedDate ?? undefined"
       @select-date="handleCalendarDateClick"
       @vacation-click="handleVacationClick"
+      @view-segment="handleViewSegment"
     />
 
     <WeeklyCalendarView
@@ -518,6 +566,7 @@ function handleActivitySwapped(newId: string) {
       @view-activity="(id: string, date: string) => openViewModal(id, date)"
       @view-todo="openTodoViewModal"
       @vacation-click="handleVacationClick"
+      @view-segment="handleViewSegment"
     />
 
     <DailyCalendarView
@@ -532,6 +581,7 @@ function handleActivitySwapped(newId: string) {
       @view-activity="(id: string, date: string) => openViewModal(id, date)"
       @view-todo="openTodoViewModal"
       @vacation-click="handleVacationClick"
+      @view-segment="handleViewSegment"
     />
 
     <!-- Two-column layout: Upcoming + Todo preview -->
@@ -635,6 +685,15 @@ function handleActivitySwapped(newId: string) {
       @close="viewingActivity = null"
       @open-edit="handleViewOpenEdit"
       @activity-swapped="handleActivitySwapped"
+    />
+
+    <!-- Travel segment in-place editor (opened from calendar travel-segment chips) -->
+    <TravelSegmentEditModal
+      :open="editingSegment !== null"
+      :segment="editingSegmentValue"
+      :vacation-id="editingSegment?.vacationId ?? ''"
+      :segment-index="editingSegment?.segmentIndex ?? -1"
+      @close="closeSegmentModal"
     />
 
     <!-- Activity Created Confirmation -->

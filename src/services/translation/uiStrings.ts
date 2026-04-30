@@ -1825,6 +1825,22 @@ const STRING_DEFS = {
     en: 'Support has been notified.',
     beanie: 'support has been notified.',
   },
+  'error.travelSegmentNotFound': {
+    en: "We couldn't open that travel segment",
+    beanie: "couldn't open that travel segment",
+  },
+  'error.travelSegmentNotFoundHelp': {
+    en: 'It may have just been removed. Try refreshing the calendar.',
+    beanie: 'it may have just been removed. try refreshing the calendar.',
+  },
+  'error.travelSegmentVanished': {
+    en: 'That travel segment was just removed',
+    beanie: 'that travel segment was just removed',
+  },
+  'error.travelSegmentVanishedHelp': {
+    en: 'Someone in your family deleted it on another device. We closed the editor.',
+    beanie: 'someone in your family deleted it on another device. we closed the editor.',
+  },
 
   // Not Found (404)
   'notFound.title': { en: 'Not Found', beanie: 'not found' },
@@ -3972,6 +3988,10 @@ const STRING_DEFS = {
     beanie: '{month} — {count} activities',
   },
   'planner.addActivity': { en: '+ Add Activity', beanie: '+ new activity' },
+  'planner.segmentDeparture': { en: 'Departure', beanie: 'departure' },
+  'planner.segmentArrival': { en: 'Arrival', beanie: 'arrival' },
+  'planner.segmentDepartureShort': { en: 'Dep', beanie: 'dep' },
+  'planner.segmentArrivalShort': { en: 'Arr', beanie: 'arr' },
   'planner.editActivity': { en: 'Edit Activity', beanie: 'edit activity' },
   'planner.editingOccurrence': {
     en: 'Editing occurrence on {date}',

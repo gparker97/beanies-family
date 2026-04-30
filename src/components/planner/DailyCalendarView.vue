@@ -16,8 +16,9 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { normalizeAssignees } from '@/utils/assignees';
-import { extractDatePart, formatTime12 } from '@/utils/date';
-import { tripTypeEmoji } from '@/utils/vacation';
+import { extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
+import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
+import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import type { FamilyActivity, FamilyMember, TodoItem } from '@/types/models';
 
 /**
@@ -36,6 +37,7 @@ const emit = defineEmits<{
   'view-activity': [id: string, date: string];
   'view-todo': [todo: TodoItem];
   'vacation-click': [vacationId: string];
+  'view-segment': [vacationId: string, segmentIndex: number];
   'open-agenda': [date: string];
 }>();
 
@@ -116,12 +118,25 @@ const dayTodos = computed<TodoItem[]>(() =>
   )
 );
 
-// Time grid
-const allTimedActivities = computed(() =>
-  dayActivities.value
+// Travel-segment occurrences on the visible day (flights, trains, etc).
+const daySegments = computed<TravelSegmentOccurrence[]>(() => {
+  const dateStr = currentDay.value.dateStr;
+  return vacationStore.travelSegmentOccurrencesInRange(dateStr, dateStr);
+});
+const segmentBuckets = computed(() => splitTimedUntimed(daySegments.value));
+
+// Time grid — caller-side union of activities + segments-as-1h-blocks.
+// Keeps useTimeGrid agnostic to segments; the composable just sees a list
+// of {startTime, endTime} entries and auto-extends the hour range.
+const allTimedActivities = computed(() => {
+  const items: { startTime?: string; endTime?: string }[] = dayActivities.value
     .filter((o) => o.activity.startTime)
-    .map((o) => o.activity as { startTime?: string; endTime?: string })
-);
+    .map((o) => o.activity as { startTime?: string; endTime?: string });
+  for (const seg of segmentBuckets.value.timed) {
+    if (seg.time) items.push({ startTime: seg.time, endTime: addHourToTime(seg.time) });
+  }
+  return items;
+});
 
 const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } =
   useTimeGrid(allTimedActivities);
@@ -141,6 +156,7 @@ const hasAnyUntimedContent = computed(
   () =>
     activeVacations.value.length > 0 ||
     dayTodos.value.length > 0 ||
+    segmentBuckets.value.untimed.length > 0 ||
     visibleMembers.value.some((m) => memberUntimedActivities(m.id).length > 0)
 );
 
@@ -286,6 +302,18 @@ defineExpose({ dayLabel, activityCount });
           {{ tripTypeEmoji(v.tripType) }} {{ v.name }}
         </div>
 
+        <!-- Untimed travel segments (span all member columns — segments are family-scope) -->
+        <div
+          v-for="seg in segmentBuckets.untimed"
+          :key="'seg-untimed-' + seg.segmentId + '-' + seg.kind"
+          :style="{ gridColumn: `2 / span ${visibleMembers.length}` }"
+        >
+          <TravelSegmentChip
+            :occurrence="seg"
+            @click="(vid: string, idx: number) => emit('view-segment', vid, idx)"
+          />
+        </div>
+
         <!-- Per-member untimed activities + todos -->
         <template v-for="(member, mi) in visibleMembers" :key="'untimed-' + member.id">
           <div
@@ -323,6 +351,25 @@ defineExpose({ dayLabel, activityCount });
 
       <!-- Time grid -->
       <div ref="gridRef" class="relative">
+        <!-- Timed travel-segment overlays (spans all member columns; sits above per-column blocks) -->
+        <div
+          v-for="seg in segmentBuckets.timed"
+          :key="'seg-timed-' + seg.segmentId + '-' + seg.kind"
+          class="pointer-events-none absolute z-20"
+          :style="{
+            ...getPosition(seg.time!, addHourToTime(seg.time!)),
+            left: '56px',
+            right: '0',
+          }"
+        >
+          <div class="pointer-events-auto px-1">
+            <TravelSegmentChip
+              :occurrence="seg"
+              @click="(vid: string, idx: number) => emit('view-segment', vid, idx)"
+            />
+          </div>
+        </div>
+
         <div
           :style="{ display: 'grid', gridTemplateColumns: gridCols, height: totalHeight + 'px' }"
         >
@@ -442,12 +489,14 @@ defineExpose({ dayLabel, activityCount });
         :date-str="currentDay.dateStr"
         :activities="mobileDayActivities"
         :vacations="activeVacations"
+        :segments="daySegments"
         :todos="dayTodos"
         :members="visibleMembers"
         :is-today="currentDay.isToday"
         @view-activity="(id, date) => emit('view-activity', id, date)"
         @view-todo="(todo) => emit('view-todo', todo)"
         @vacation-click="(vid) => emit('vacation-click', vid)"
+        @view-segment="(vid: string, idx: number) => emit('view-segment', vid, idx)"
         @add-activity="(date, time) => emit('add-activity', date, time)"
       />
     </template>

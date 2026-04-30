@@ -16,8 +16,9 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { normalizeAssignees } from '@/utils/assignees';
-import { toDateInputValue, extractDatePart, formatTime12 } from '@/utils/date';
-import { tripTypeEmoji } from '@/utils/vacation';
+import { toDateInputValue, extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
+import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
+import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import type { FamilyActivity, TodoItem } from '@/types/models';
 
 defineProps<{ selectedDate?: string }>();
@@ -27,6 +28,7 @@ const emit = defineEmits<{
   'view-activity': [id: string, date: string];
   'view-todo': [todo: TodoItem];
   'vacation-click': [vacationId: string];
+  'view-segment': [vacationId: string, segmentIndex: number];
 }>();
 
 const { t } = useTranslation();
@@ -88,13 +90,42 @@ const activityCount = computed(() => {
   return count;
 });
 
-// Time grid
+// Travel-segment occurrences for the visible week (flights, trains, etc).
+// Pure derivation — vacationStore exposes the reactive list, we filter once
+// per render. Cross-month segments naturally fall into their own week range.
+const weekSegments = computed<TravelSegmentOccurrence[]>(() => {
+  const days = weekDays.value;
+  if (days.length === 0) return [];
+  return vacationStore.travelSegmentOccurrencesInRange(
+    days[0]!.dateStr,
+    days[days.length - 1]!.dateStr
+  );
+});
+
+// Cache the bucketed split once per render so timed/untimed lookups are O(1).
+const weekSegmentBuckets = computed(() => splitTimedUntimed(weekSegments.value));
+
+function getTimedSegmentsForDay(dateStr: string): TravelSegmentOccurrence[] {
+  return weekSegmentBuckets.value.timed.filter((o) => o.date === dateStr);
+}
+
+function getUntimedSegmentsForDay(dateStr: string): TravelSegmentOccurrence[] {
+  return weekSegmentBuckets.value.untimed.filter((o) => o.date === dateStr);
+}
+
+// Time grid — caller-side union of activities + segments-as-1h-blocks.
+// Keeps `useTimeGrid` agnostic to segment shape; the composable just sees a
+// list of `{ startTime, endTime }` entries and auto-extends its hour range
+// to fit (so a 22:00 flight expands the grid past the 7am-7pm default).
 const allTimedActivities = computed(() => {
   const items: { startTime?: string; endTime?: string }[] = [];
   for (const arr of weekActivities.value.values()) {
     for (const occ of arr) {
       if (occ.activity.startTime) items.push(occ.activity);
     }
+  }
+  for (const occ of weekSegments.value) {
+    if (occ.time) items.push({ startTime: occ.time, endTime: addHourToTime(occ.time) });
   }
   return items;
 });
@@ -260,6 +291,7 @@ function hasUntimedContent(dateStr: string): boolean {
   return (
     getUntimedForDay(dateStr).length > 0 ||
     (weekTodos.value.get(dateStr)?.length ?? 0) > 0 ||
+    getUntimedSegmentsForDay(dateStr).length > 0 ||
     spanningActivities.value.some((s) => {
       const days = weekDays.value;
       const dayCol = days.findIndex((d) => d.dateStr === dateStr);
@@ -268,11 +300,12 @@ function hasUntimedContent(dateStr: string): boolean {
   );
 }
 
-// Check if there are ANY spanning activities, vacation spans, or per-day untimed content
+// Check if there are ANY spanning activities, vacation spans, untimed segments, or per-day untimed content
 const hasAnyUntimedContent = computed(
   () =>
     spanningActivities.value.length > 0 ||
     vacationSpans.value.length > 0 ||
+    weekSegmentBuckets.value.untimed.length > 0 ||
     weekDays.value.some((d) => hasUntimedContent(d.dateStr))
 );
 
@@ -299,6 +332,11 @@ const mobileDayVacations = computed(() =>
     const end = extractDatePart(v.endDate);
     return selectedMobileDay.value >= start && selectedMobileDay.value <= end;
   })
+);
+
+// Mobile: travel-segment occurrences on the selected day (for DayTimeline)
+const mobileDaySegments = computed(() =>
+  vacationStore.travelSegmentOccurrencesInRange(selectedMobileDay.value, selectedMobileDay.value)
 );
 
 // Mobile: density data per day for the pill strip — unique member colors for
@@ -438,12 +476,13 @@ defineExpose({ weekLabel, activityCount });
           {{ span.activity.title }}
         </div>
 
-        <!-- Per-day single-day untimed activities + todos -->
+        <!-- Per-day single-day untimed activities + todos + untimed travel segments -->
         <template v-for="(day, di) in weekDays" :key="'untimed-' + day.dateStr">
           <div
             v-if="
               getUntimedForDay(day.dateStr).length > 0 ||
-              (weekTodos.get(day.dateStr)?.length ?? 0) > 0
+              (weekTodos.get(day.dateStr)?.length ?? 0) > 0 ||
+              getUntimedSegmentsForDay(day.dateStr).length > 0
             "
             class="min-w-0 overflow-hidden px-0.5"
             :style="{ gridColumn: `${di + 2}` }"
@@ -469,6 +508,13 @@ defineExpose({ weekLabel, activityCount });
             >
               {{ todo.title }}
             </div>
+            <TravelSegmentChip
+              v-for="seg in getUntimedSegmentsForDay(day.dateStr)"
+              :key="'seg-untimed-' + seg.segmentId + '-' + seg.kind"
+              :occurrence="seg"
+              class="mb-0.5"
+              @click="(vid: string, idx: number) => emit('view-segment', vid, idx)"
+            />
           </div>
         </template>
       </div>
@@ -566,6 +612,23 @@ defineExpose({ weekLabel, activityCount });
                 </div>
               </div>
             </template>
+
+            <!-- Timed travel-segment chips (1h synthetic block, positioned at the segment time) -->
+            <div
+              v-for="seg in getTimedSegmentsForDay(day.dateStr)"
+              :key="'seg-timed-' + seg.segmentId + '-' + seg.kind"
+              class="absolute z-10"
+              :style="{
+                ...getPosition(seg.time!, addHourToTime(seg.time!)),
+                left: '0%',
+                width: 'calc(100% - 2px)',
+              }"
+            >
+              <TravelSegmentChip
+                :occurrence="seg"
+                @click="(vid: string, idx: number) => emit('view-segment', vid, idx)"
+              />
+            </div>
           </div>
         </div>
 
@@ -654,12 +717,14 @@ defineExpose({ weekLabel, activityCount });
         :date-str="selectedMobileDay"
         :activities="mobileDayActivities"
         :vacations="mobileDayVacations"
+        :segments="mobileDaySegments"
         :todos="weekTodos.get(selectedMobileDay) ?? []"
         :members="familyStore.sortedHumans"
         :is-today="selectedMobileDay === toDateInputValue(new Date())"
         @view-activity="(id, date) => emit('view-activity', id, date)"
         @view-todo="(todo) => emit('view-todo', todo)"
         @vacation-click="(vid) => emit('vacation-click', vid)"
+        @view-segment="(vid: string, idx: number) => emit('view-segment', vid, idx)"
         @add-activity="(date, time) => emit('add-activity', date, time)"
       />
     </template>

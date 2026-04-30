@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-30",
-    "translationCount": 2586
+    "translationCount": 2594
   },
   "translations": {
     "app.name": {
@@ -12934,6 +12934,46 @@
     "storage.localFileBestOnDesktop": {
       "translation": "通过云存储文件夹进行的多设备同步在桌面Chrome或Edge上效果最佳。iOS、Android、Safari和Firefox回退到手动导出/导入。",
       "hash": "ezqdu5",
+      "lastUpdated": "2026-04-30"
+    },
+    "error.travelSegmentNotFound": {
+      "translation": "我们无法打开该行程",
+      "hash": "m65wyk",
+      "lastUpdated": "2026-04-30"
+    },
+    "error.travelSegmentNotFoundHelp": {
+      "translation": "它可能刚刚被删除。请尝试刷新日历。",
+      "hash": "bu47mf",
+      "lastUpdated": "2026-04-30"
+    },
+    "error.travelSegmentVanished": {
+      "translation": "该行程刚刚被移除",
+      "hash": "4y2ocj",
+      "lastUpdated": "2026-04-30"
+    },
+    "error.travelSegmentVanishedHelp": {
+      "translation": "您的家人在另一台设备上删除了它。我们关闭了编辑器。",
+      "hash": "n2g7jw",
+      "lastUpdated": "2026-04-30"
+    },
+    "planner.segmentDeparture": {
+      "translation": "出发时间",
+      "hash": "cz0n9w",
+      "lastUpdated": "2026-04-30"
+    },
+    "planner.segmentArrival": {
+      "translation": "到达时间",
+      "hash": "fdyoyh",
+      "lastUpdated": "2026-04-30"
+    },
+    "planner.segmentDepartureShort": {
+      "translation": "出发",
+      "hash": "1gxb",
+      "lastUpdated": "2026-04-30"
+    },
+    "planner.segmentArrivalShort": {
+      "translation": "到达",
+      "hash": "1f0h",
       "lastUpdated": "2026-04-30"
     }
   }
