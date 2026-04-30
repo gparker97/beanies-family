@@ -16,10 +16,10 @@ The slightly more complicated path is to set up your own back-end infra (followi
 
 In summary:
 
-| You want                                                   | Use        | Setup effort                                   | Multi-device sync                                               | Works on iOS / mobile                              |
-| ---------------------------------------------------------- | ---------- | ---------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------- |
+| You want                                                   | Use        | Setup effort                                   | Multi-device sync                                               | Works on iOS / mobile                                 |
+| ---------------------------------------------------------- | ---------- | ---------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------- |
 | Quick, private, desktop family use — no cloud, no accounts | **Path A** | Minutes                                        | Via your own cloud-storage folder (Dropbox / iCloud / OneDrive) | Yes but limited - you need to load the file each time |
-| Full beanies.family experience on your own infrastructure  | **Path B** | A couple of hours (AWS + Google Cloud Console) | Yes — Google Drive sync via your own OAuth Lambda               | Yes                                                |
+| Full beanies.family experience on your own infrastructure  | **Path B** | A couple of hours (AWS + Google Cloud Console) | Yes — Google Drive sync via your own OAuth Lambda               | Yes                                                   |
 
 If you're not sure, you can always start with **Path A**. You can switch to Path B later by exporting your `.beanpod` and re-importing, which should work fine.
 
@@ -53,7 +53,7 @@ npm run build && npm run preview    # production build, serve dist/ anywhere
 
 - **Desktop Chromium-family browsers are required for file sync** The File System Access API picker methods (which give us a persistent file handle that survives across sessions) are supported on desktop Chrome / Edge / Opera / Brave only — see [caniuse](https://caniuse.com/native-filesystem-api). On iOS Safari, Android Chrome, desktop Firefox, and desktop Safari, the app falls back to a manual file-picker on each open + a "save as" download on each save. That works for one-off edits but isn't real-time sync.
 - **Conflict copies** If two family members edit while one is offline, your cloud-storage provider _may_ create a "conflicted copy" file (Dropbox: `our-family (conflicted copy 2026-04-30).beanpod`; iCloud: `our-family 2.beanpod`; OneDrive: `our-family-conflict-DEVICE.beanpod`). Open the conflict file once after sync following the below steps:
-  1. Open the conflict copy via "Settings → Family Data → Load another Family Data File → Browse..." and select the *conflict* data file. Beanies will load it, Automerge will safely merge all data with your in-memory state, and save the merged result.
+  1. Open the conflict copy via "Settings → Family Data → Load another Family Data File → Browse..." and select the _conflict_ data file. Beanies will load it, Automerge will safely merge all data with your in-memory state, and save the merged result.
   2. Manually move or delete the now-redundant original data file via your file manager (if you want)
 - **Polling delay** The app checks the file for external changes every ~15 seconds while the tab is visible. Real-time collaboration (both editing the same screen at once) is not instant, but near real time.
 - **Cloud-folder choice is a family decision** Every family member needs the same cloud-storage provider syncing the same shared folder. There's no universal "anyone can sync this folder" option — Dropbox shared folders need Dropbox accounts, iCloud is Apple-only, OneDrive needs Microsoft, etc.
@@ -96,12 +96,12 @@ Once deployed, copy the API Gateway / Function URL → `VITE_OAUTH_PROXY_URL` in
 
 ### Path B env-var summary
 
-| Var                          | Required?           | Sourced from                        |
-| ---------------------------- | ------------------- | ----------------------------------- |
-| `VITE_GOOGLE_CLIENT_ID`      | Required for Drive  | Google Cloud Console (OAuth client) |
-| `VITE_OAUTH_PROXY_URL`       | Required for Drive  | Your OAuth Lambda's URL (Step 2)    |
-| `VITE_GOOGLE_API_KEY`        | Picker only         | Google Cloud Console (API key)      |
-| `VITE_GOOGLE_PROJECT_NUMBER` | Picker only         | Google Cloud Console (dashboard)    |
+| Var                          | Required?          | Sourced from                        |
+| ---------------------------- | ------------------ | ----------------------------------- |
+| `VITE_GOOGLE_CLIENT_ID`      | Required for Drive | Google Cloud Console (OAuth client) |
+| `VITE_OAUTH_PROXY_URL`       | Required for Drive | Your OAuth Lambda's URL (Step 2)    |
+| `VITE_GOOGLE_API_KEY`        | Picker only        | Google Cloud Console (API key)      |
+| `VITE_GOOGLE_PROJECT_NUMBER` | Picker only        | Google Cloud Console (dashboard)    |
 
 ---
 
