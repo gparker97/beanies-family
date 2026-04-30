@@ -8,11 +8,11 @@ beanies.family is open source. You can clone the repo and run your own copy on y
 
 ## Self-hosting Trade-offs
 
-There are genuine trade-offs to self-hosting beanies.family which should be made clear. The main one is that you need to setup a back-end service to use the Google Drive (or other cloud storage provider) APIs. A simple Lambda does the trick, but it requires some setup and configuration time.
+There are genuine trade-offs to self-hosting beanies.family which should be made clear. The main one is that you need a back-end service to use the Google Drive API (or any other cloud storage providers we may add in the future). A simple Lambda does the trick, but it does require some setup and configuration time.
 
-The easiest path for self-hosting is to use the local file option. The local file can be saved on a cloud provider, but requires the File System Access API to be accessed from a browser, which is only available on desktop browsers.
+The easiest path for self-hosting is to use the local file option. The local file can be saved anywhere, including a synced Google Drive / Dropbox / etc folder. For this to work, it requires the File System Access API in the browser for the site to access the file, which is only available on desktop browsers (i.e. Chrome). Support on Android is spotty and iOS is almost totally out of the picture due to stricter privacy concerns.
 
-So the main trade-off for self-hosting is that you can collaborate using a shared local file, but the mobile experience is diminished, or you can setup your own back-end infra (following the instructions below) to use a cloud storage provider.
+So the main trade-off for self-hosting is that you can collaborate using a shared local file (with a diminished mobile experience), or you can set up your own back-end infra (following the instructions below) to use a cloud storage provider.
 
 In summary:
 
@@ -51,12 +51,12 @@ npm run build && npm run preview    # production build, serve dist/ anywhere
 
 ### Limitations
 
-- **Desktop Chromium-family browsers are required full sync.** The File System Access API picker methods (which give us a persistent file handle that survives across sessions) are supported on desktop Chrome / Edge / Opera / Brave only — see [caniuse](https://caniuse.com/native-filesystem-api). On iOS Safari, Android Chrome, desktop Firefox, and desktop Safari, the app falls back to a manual file-picker on each open + a "save as" download on each save. That works for one-off edits but isn't real-time sync.
-- **Conflict copies.** If two family members edit while one is offline, your cloud-storage provider _may_ create a "conflicted copy" file (Dropbox: `our-family (conflicted copy 2026-04-30).beanpod`; iCloud: `our-family 2.beanpod`; OneDrive: `our-family-conflict-DEVICE.beanpod`). Open the conflict file once after sync following the below steps:
-  1. Open the conflict copy via Settings → Family Data → Switch File. Beanies will load it, Automerge with safely merge all data with your in-memory state, and save the merged result.
+- **Desktop Chromium-family browsers are required for file sync** The File System Access API picker methods (which give us a persistent file handle that survives across sessions) are supported on desktop Chrome / Edge / Opera / Brave only — see [caniuse](https://caniuse.com/native-filesystem-api). On iOS Safari, Android Chrome, desktop Firefox, and desktop Safari, the app falls back to a manual file-picker on each open + a "save as" download on each save. That works for one-off edits but isn't real-time sync.
+- **Conflict copies** If two family members edit while one is offline, your cloud-storage provider _may_ create a "conflicted copy" file (Dropbox: `our-family (conflicted copy 2026-04-30).beanpod`; iCloud: `our-family 2.beanpod`; OneDrive: `our-family-conflict-DEVICE.beanpod`). Open the conflict file once after sync following the below steps:
+  1. Open the conflict copy via "Settings → Family Data → Load another Family Data File → Browse..." and select the *conflict* data file. Beanies will load it, Automerge will safely merge all data with your in-memory state, and save the merged result.
   2. Manually move or delete the now-redundant original data file via your file manager (if you want)
-- **Polling delay.** The app checks the file for external changes every ~15 seconds while the tab is visible. Real-time collaboration (both editing the same screen at once) is not instant, but near real time.
-- **Cloud-folder choice is a family decision.** Every family member needs the same cloud-storage provider syncing the same shared folder. There's no universal "anyone can sync this folder" option — Dropbox shared folders need Dropbox accounts, iCloud is Apple-only, OneDrive needs Microsoft, etc.
+- **Polling delay** The app checks the file for external changes every ~15 seconds while the tab is visible. Real-time collaboration (both editing the same screen at once) is not instant, but near real time.
+- **Cloud-folder choice is a family decision** Every family member needs the same cloud-storage provider syncing the same shared folder. There's no universal "anyone can sync this folder" option — Dropbox shared folders need Dropbox accounts, iCloud is Apple-only, OneDrive needs Microsoft, etc.
 
 ---
 
