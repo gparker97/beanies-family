@@ -210,7 +210,7 @@ async function handleChooseGoogleDriveStorage() {
     // disabled "Not configured" tile). If this branch fires, log so a dev
     // can spot the regression.
     console.warn(
-      '[CreatePodView] Drive storage handler invoked while features.drive is off — check the v-if on the Drive card.'
+      '[CreatePodView] Drive storage handler invoked while isGoogleDriveAvailable is false (features.drive && features.oauthProxy) — check the v-if on the Drive card.'
     );
     return;
   }

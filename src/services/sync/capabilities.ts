@@ -52,7 +52,7 @@ export function getSyncCapabilities(): SyncCapabilities {
     showSaveFilePicker: hasFileSystemAccess,
     showOpenFilePicker: hasFileSystemAccess,
     webCrypto: supportsWebCrypto(),
-    googleDrive: features.drive,
+    googleDrive: features.drive && features.oauthProxy,
     manualSync: true, // Always available via Blob download/upload
   };
 }

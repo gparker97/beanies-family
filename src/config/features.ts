@@ -23,6 +23,11 @@ export const features = {
   // are required by the Drive Picker specifically, but the picker is opt-in
   // (used during recovery flows); main Drive sync works without them.
   drive: ok(env.VITE_GOOGLE_CLIENT_ID),
+  // OAuth proxy is reachable when *either* env var supplies a URL. See
+  // src/services/google/oauthProxy.ts for the resolver — it prefers
+  // VITE_OAUTH_PROXY_URL (Path B self-host) and falls back to
+  // VITE_REGISTRY_API_URL (cloud, where one Lambda backs both surfaces).
+  oauthProxy: ok(env.VITE_OAUTH_PROXY_URL) || ok(env.VITE_REGISTRY_API_URL),
   registry: ok(env.VITE_REGISTRY_API_URL) && ok(env.VITE_REGISTRY_API_KEY),
   inviteGate: ok(env.VITE_INVITE_BEAN_HASHES),
   slackInvite: ok(env.VITE_INVITE_WEBHOOK_URL),
@@ -37,13 +42,15 @@ export type FeatureKey = keyof typeof features;
 
 /**
  * Inviting family members requires Drive — the invite link points at a
- * Drive-shared `.beanpod` file. The family registry is *not* required: when
- * absent, the joiner falls back to picking the shared file via Google Drive
- * Picker. Registry is a smoothness feature (saves the joiner one click), not
- * a hard prerequisite.
+ * Drive-shared `.beanpod` file. Drive sign-in itself requires the OAuth proxy
+ * (Google's Web Application client type requires a server-side client_secret;
+ * see docs/SELF_HOSTING.md → Path B for the architectural reason). The family
+ * registry is *not* required: when absent, the joiner falls back to picking
+ * the shared file via Google Drive Picker. Registry is a smoothness feature
+ * (saves the joiner one click), not a hard prerequisite.
  */
 export function canInviteFamily(): boolean {
-  return features.drive;
+  return features.drive && features.oauthProxy;
 }
 
 // Discriminator for the "developer build" badge: only the two features that

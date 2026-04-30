@@ -1,83 +1,155 @@
 # Self-hosting beanies.family
 
-beanies.family is open source. You can clone the repo and run your own copy with no extra config — the app is **local-first**, with all data stored in your browser's IndexedDB and exportable to encrypted `.beanpod` files. A handful of cloud-dependent features (Google Drive sync, magic-link family invites, analytics, Slack telemetry) need extra setup. This doc walks through what's available, how to enable it, and what's not currently supported.
+beanies.family is open source. You can clone the repo and run your own copy on your own infrastructure. This doc walks through the two supported self-host paths, what each one gets you, and exactly how to set them up.
 
-> If you're just curious about the codebase or running a local dev environment, the [main README](../README.md) covers the basics. This doc is for self-hosters and anyone setting up the full env-var matrix.
-
----
-
-## What works out of the box (community build)
-
-A `git clone && npm install && npm run dev` (or `npm run build && npm run preview`) gives you:
-
-- **All UI features** — accounts, transactions, assets, goals, family members, todos, calendar, recipes, medications, photos.
-- **Offline-first** — IndexedDB stores the live Automerge document; the app works fully offline.
-- **Manual `.beanpod` export/import** — encrypted backups you keep yourself. Settings → Family Data → Export / Import.
-- **Multi-currency, themes, beanie mode, Chinese translation** — all client-side.
-
-What you **don't** get without further config:
-
-- Google Drive sync (encrypted-cloud `.beanpod` storage)
-- Magic-link family invites + cross-device family lookup (the registry)
-- Slack telemetry (invite requests, pod-creation, error reports)
-- Plausible analytics
-- The `de` upgrade for the MyMemory translation API (you stay on the free 5k chars/day quota — usually plenty for a single family)
-
-The Settings page footer shows a small badge so you know which build you're on:
-
-| Badge                            | Meaning                                                                                                             |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| ☁️ Cloud-hosted version          | You're on `app.beanies.family` (the official cloud build).                                                          |
-| 🛠 Self-hosted · Developer build | All cloud env vars are configured — every feature is wired up.                                                      |
-| 🏠 Self-hosted · Community build | Some cloud env vars are missing. The corresponding UI is disabled (with a tooltip explaining why) or simply absent. |
+> If you just want to read the code or run a local dev environment, the [main README](../README.md) covers the basics. This doc is for self-hosters running the app for actual family use.
 
 ---
 
-## Quick start
+## TL;DR — pick your path
+
+| You want                                                   | Use        | Setup effort                                   | Multi-device sync                                               | Works on iOS / mobile                              |
+| ---------------------------------------------------------- | ---------- | ---------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------- |
+| Quick, private, desktop family use — no cloud, no accounts | **Path A** | Minutes                                        | Via your own cloud-storage folder (Dropbox / iCloud / OneDrive) | Read-only export/import; full sync is desktop only |
+| Full beanies.family experience on your own infrastructure  | **Path B** | A couple of hours (AWS + Google Cloud Console) | Yes — Google Drive sync via your own OAuth Lambda               | Yes                                                |
+
+If you're not sure: start with **Path A**. You can switch to Path B later by exporting your `.beanpod` and re-importing.
+
+---
+
+## Path A — Local file in a synced folder
+
+The simplest self-host story. You build the SPA, point a desktop browser at it, and store your `.beanpod` file inside a folder that your existing cloud-storage provider already syncs across your devices (Dropbox, iCloud Drive, OneDrive, Box, Google Drive desktop client). Each family member opens the same shared folder via their own provider's desktop client. [Automerge](https://automerge.org/) (a CRDT) handles concurrent edits and merges them automatically — no server needed.
+
+### Setup
 
 ```bash
 git clone https://github.com/gparker97/beanies-family.git
 cd beanies-family
 npm install
-npm run dev   # http://localhost:5173
+npm run dev    # local dev — http://localhost:5173
+# OR
+npm run build && npm run preview    # production build, serve dist/ anywhere
 ```
 
-That's it. No `.env.local` needed for the community build. The Settings footer will read **🏠 Self-hosted · Community build**.
+**No `.env.local` required.** Path A is genuinely zero-config — the app's feature gates auto-disable every cloud-dependent surface, and the local-file storage option is always available. The Settings footer will read **🏠 Self-hosted · Community build**.
+
+### Use
+
+1. On first launch, click **Create new pod** → pick **Local File** → save a new `.beanpod` file inside your synced folder (e.g. `~/Dropbox/beanies/our-family.beanpod`).
+2. Wait for your cloud-storage provider's desktop client to sync the file.
+3. On each family member's device, open the same `.beanpod` file from the same synced folder.
+4. Edits made by any family member sync via your cloud-storage provider; Automerge merges them on load and on every poll tick (~15s).
+
+### Honest limitations
+
+- **Desktop Chromium-family browsers only for full sync.** The File System Access API picker methods (which give us a persistent file handle that survives across sessions) are supported on desktop Chrome / Edge / Opera / Brave only — see [caniuse](https://caniuse.com/native-filesystem-api). On iOS Safari, Android Chrome, desktop Firefox, and desktop Safari, the app falls back to a manual file-picker on each open + a "save as" download on each save. That works for one-off edits but isn't real-time sync.
+- **Conflict copies.** If two family members edit while one is offline, your cloud-storage provider may create a "conflicted copy" file (Dropbox: `our-family (conflicted copy 2026-04-30).beanpod`; iCloud: `our-family 2.beanpod`; OneDrive: `our-family-conflict-DEVICE.beanpod`). Open the conflict file once after sync — Automerge will merge the divergent edits — then delete the duplicate.
+- **Polling delay.** The app checks the file for external changes every ~15 seconds while the tab is visible. Real-time collaboration (both editing the same screen at once) won't feel instant. For family planning data, this is fine.
+- **Cloud-folder choice is a family decision.** Every family member needs the same cloud-storage provider syncing the same shared folder. There's no universal "anyone can sync this folder" option — Dropbox shared folders need Dropbox accounts, iCloud is Apple-only, OneDrive needs Microsoft, etc.
 
 ---
 
-## Developer build — full feature set
+## Path B — Run your own OAuth Lambda
 
-Copy `.env.example` to `.env.local` and fill in the vars below. Restart the dev server (Vite inlines env at build time; HMR doesn't pick up `.env` changes).
+Full feature parity with the cloud build at `app.beanies.family`. You register your own Google OAuth Web Application client, deploy a small OAuth proxy Lambda holding your own `client_secret`, optionally deploy a registry Lambda + DynamoDB table for cross-device family lookup, and configure your build with your own env vars.
 
-### Google Drive sync — `VITE_GOOGLE_CLIENT_ID` (required), `VITE_GOOGLE_API_KEY` + `VITE_GOOGLE_PROJECT_NUMBER` (Picker only)
+### Why does Path B need a Lambda?
 
-`VITE_GOOGLE_CLIENT_ID` alone is enough to enable Drive sync — OAuth + listing + read/write of `.beanpod` files all work. The other two are needed only by the **Drive Picker** dialog (used when joining via a shared file or recovering a pod from a different Drive account).
+Google's "Web Application" OAuth client type **requires a server-side `client_secret` for the token-refresh grant, even when using PKCE.** This is a deliberate Google constraint — confirmed by direct testing and a Google Cloud Community statement: _"Google's Identity Platform as of today does not support public applications under the 'Web Application' profile."_ So Drive sign-in cannot work browser-only; you need a tiny server holding your secret.
+
+Our cloud build runs this server at `api.beanies.family`. Self-hosters need to run their own — that's Path B.
+
+### Step 1: Register your Google OAuth client
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → create a new project (or pick an existing one).
-2. Enable the **Google Drive API** (and **Google Picker API** if you want the Picker UX).
-3. **APIs & Services → Credentials → Create credentials → OAuth client ID** (Web application). Under **Authorized JavaScript origins** add `http://localhost:5173` (and your production origin if applicable).
-4. Copy the **Client ID** → `VITE_GOOGLE_CLIENT_ID`. **(Required for Drive sync.)**
-5. _Picker only:_ **APIs & Services → Credentials → Create credentials → API key**. Restrict it to the Drive + Picker APIs. Copy the key → `VITE_GOOGLE_API_KEY`.
-6. _Picker only:_ The **Project Number** is on the Cloud Console dashboard. Copy it → `VITE_GOOGLE_PROJECT_NUMBER`.
+2. Enable the **Google Drive API** (and **Google Picker API** if you want the Drive Picker UX).
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID** (Web application).
+   - **Authorized JavaScript origins**: your SPA's origin (e.g. `https://family.example.com` and `http://localhost:5173` for dev).
+   - **Authorized redirect URIs**: `<your-spa-origin>/oauth/callback` for each origin.
+4. Copy the **Client ID** → `VITE_GOOGLE_CLIENT_ID`.
+5. Copy the **Client Secret** → keep this for the Lambda (Step 2).
+6. _For Picker (recommended):_ Create an **API key**, restrict it to Drive + Picker APIs, copy → `VITE_GOOGLE_API_KEY`. Find the **Project Number** on the dashboard → `VITE_GOOGLE_PROJECT_NUMBER`.
 
-The first time you connect, Google's OAuth flow will warn you that the app is unverified — that's expected for a self-hosted build using your own client. Click through.
+The first time you connect, Google's OAuth screen warns you that the app is unverified — expected for a self-hosted build using your own client. Click through.
 
-### Family registry (optional) — `VITE_REGISTRY_API_URL` + `VITE_REGISTRY_API_KEY`
+### Step 2: Deploy the OAuth proxy Lambda
 
-The cloud version points to our production Lambda at `api.beanies.family` to access the family registry, which won't work as the API key is not configured.
+The Lambda code lives at [`infrastructure/lambda/oauth/`](../infrastructure/lambda/oauth/) — about 175 lines of Node.js 20, no dependencies beyond the standard runtime. Deploy guide forthcoming at `infrastructure/lambda/oauth/README.md`. The runtime-agnostic API contract will live at `infrastructure/lambda/oauth/SPEC.md` — implement it on Cloudflare Workers, Vercel Edge, or any Node host if AWS isn't your thing.
 
-The registry is a convenience feature which improves the functionality of joining links, but joining should still work without a registry - the family member just needs to choose the data file from the Google Drive file picker. This is not necessary for self-hosting.
+The Lambda needs two env vars:
 
-### Translation API quota (optional) — `VITE_MYMEMORY_EMAIL`
+- `GOOGLE_CLIENT_SECRET` — from Step 1
+- `CORS_ORIGIN` — your SPA's origin (the Lambda allowlists this for CORS)
 
-The free MyMemory translation API has a 5k chars/day anonymous quota; setting `de=<your-email>` upgrades it to 50k. For a single family with translation caching, the lower quota is usually plenty. Set this only if you hit the limit.
+Once deployed, copy the API Gateway / Function URL → `VITE_OAUTH_PROXY_URL` in your SPA's `.env.local`.
+
+### Step 3: Optional — Family registry (smoothness)
+
+The registry stores `(familyId → file location)` pairs in DynamoDB so that joiners following a magic-link invite don't have to manually pick the shared `.beanpod` from a Drive Picker. Without it, joining still works — joiners just click an extra button.
+
+Lambda code at [`infrastructure/lambda/registry/`](../infrastructure/lambda/registry/). DynamoDB schema: one partition key `familyId` (string), on-demand billing. Env vars:
+
+- `TABLE_NAME` — your DynamoDB table name
+- `REGISTRY_API_KEY` — a random secret you generate; the SPA sends it as `x-api-key`
+- `CORS_ORIGIN` — your SPA's origin
+
+Once deployed: `VITE_REGISTRY_API_URL` + `VITE_REGISTRY_API_KEY` in `.env.local`.
+
+### Path B env-var summary
+
+| Var                          | Required?           | Sourced from                        |
+| ---------------------------- | ------------------- | ----------------------------------- |
+| `VITE_GOOGLE_CLIENT_ID`      | Required for Drive  | Google Cloud Console (OAuth client) |
+| `VITE_OAUTH_PROXY_URL`       | Required for Drive  | Your OAuth Lambda's URL (Step 2)    |
+| `VITE_GOOGLE_API_KEY`        | Picker only         | Google Cloud Console (API key)      |
+| `VITE_GOOGLE_PROJECT_NUMBER` | Picker only         | Google Cloud Console (dashboard)    |
+| `VITE_REGISTRY_API_URL`      | Optional smoothness | Your Registry Lambda's URL (Step 3) |
+| `VITE_REGISTRY_API_KEY`      | Optional smoothness | Random secret you generate (Step 3) |
+
+If you set both `VITE_OAUTH_PROXY_URL` and `VITE_REGISTRY_API_URL`, OAuth will use the OAuth-specific var. If you only set `VITE_REGISTRY_API_URL` (because one Lambda backs both surfaces, like our cloud build does), OAuth falls back to it. Both env vars are first-class — neither is deprecated.
+
+---
+
+## Settings footer badge
+
+The Settings page footer shows which build you're on:
+
+| Badge                            | Meaning                                                                                                               |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| ☁️ Cloud-hosted version          | You're on `app.beanies.family` (the official cloud build).                                                            |
+| 🛠 Self-hosted · Developer build | Both Drive (`VITE_GOOGLE_CLIENT_ID`) and registry (`VITE_REGISTRY_API_URL` + `VITE_REGISTRY_API_KEY`) are configured. |
+| 🏠 Self-hosted · Community build | One or both essentials are missing. The corresponding UI surfaces are disabled with a tooltip explaining why.         |
+
+---
+
+## Optional features (independent of Path A vs B)
+
+These features have their own env vars and silently disable when unset. They work on either path.
+
+### Translation API quota — `VITE_MYMEMORY_EMAIL`
+
+The free MyMemory translation API has a 5k chars/day anonymous quota; setting your email upgrades it to 50k. For a single family with translation caching, the lower quota is usually plenty. Set this only if you hit the limit.
+
+### Plausible analytics — `VITE_PLAUSIBLE_DOMAIN`
+
+Set your Plausible site identifier to enable analytics. Leave empty to opt out entirely.
+
+### Slack telemetry — `VITE_INVITE_WEBHOOK_URL`, `VITE_SLACK_WEBHOOK_URL`, `VITE_BEANIES_ERROR_WEBHOOK_URL`
+
+Each is independent. Empty = silent disable. Used by our cloud build for invite-request notifications, pod-creation tracking, and the universal error reporter. Self-hosters typically leave all three empty.
+
+### Closed-beta gate — `VITE_INVITE_BEAN_HASHES`
+
+Comma-separated SHA-256 hashes of valid invite tokens. Leave empty to allow open registration (recommended for self-hosters).
+
+---
 
 ## Known limitations (cosmetic, non-gated)
 
 These don't break anything functionally but are mentioned for self-hosters who plan to rebrand or visually polish their build:
 
-- **Open Graph + Twitter meta tags** in `index.html` hard-code `https://beanies.family/` as the canonical URL. Self-hosters who deploy under a different hostname will have wrong URLs in social-share cards. Fix needs a Vite HTML transform plugin — tracked as a follow-up.
+- **Open Graph + Twitter meta tags** in `index.html` hard-code `https://beanies.family/` as the canonical URL. Self-hosters deploying under a different hostname will have wrong URLs in social-share cards. Fix needs a Vite HTML transform plugin — tracked as a follow-up.
 - **Passkey relying-party name** (`src/services/auth/passkeyService.ts`) shows `'beanies.family'` to users in OS-level passkey prompts. Cosmetic; tied to trademark.
 
 ---
@@ -93,5 +165,6 @@ These don't break anything functionally but are mentioned for self-hosters who p
 Open an issue at <https://github.com/gparker97/beanies-family/issues>. Include:
 
 - The footer badge (Cloud / Developer / Community build)
+- Which path you're on (A or B)
 - Browser + version
 - A minimal repro if possible

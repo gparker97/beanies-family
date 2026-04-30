@@ -399,12 +399,21 @@ const isDriveLoading = ref(false);
 
 const showDriveEmptyState = ref(false);
 
+// Tooltip on the disabled Drive card. Branches on which gate is failing so
+// the user gets actionable guidance (set VITE_GOOGLE_CLIENT_ID vs set the
+// OAuth proxy). syncStore.isGoogleDriveAvailable is the canonical "Drive is
+// usable" check — `features.drive && features.oauthProxy`.
+const driveDisabledTooltipKey = computed(() => {
+  if (!features.drive) return 'selfHost.driveUnavailableTooltip';
+  return 'selfHost.driveUnavailableNoProxyTooltip';
+});
+
 async function handleLoadFromGoogleDrive() {
   if (!syncStore.isGoogleDriveAvailable) {
     // Defense-in-depth: the button is disabled in this state, so this branch
     // shouldn't fire. If it does, log so a dev can spot the regression.
     console.warn(
-      '[LoadPodView] Google Drive load handler invoked while features.drive is off — check the disabled binding on the card.'
+      '[LoadPodView] Google Drive load handler invoked while isGoogleDriveAvailable is false (features.drive && features.oauthProxy) — check the disabled binding on the card.'
     );
     return;
   }
@@ -684,22 +693,23 @@ async function handleDriveRefresh() {
       <!-- Storage source cards -->
       <template v-else>
         <div class="grid grid-cols-2 gap-3">
-          <!-- Google Drive card — disabled when features.drive is off (self-host) -->
+          <!-- Google Drive card — disabled when Drive isn't available in this
+               build (Path-A self-host or missing OAuth proxy on Path-B). -->
           <button
             class="relative rounded-2xl border-2 p-5 text-left transition-all"
             :class="[
-              !features.drive
+              !syncStore.isGoogleDriveAvailable
                 ? 'cursor-not-allowed border-gray-200 bg-white opacity-50 dark:border-slate-600 dark:bg-slate-700/50'
                 : selectedSource === 'google_drive'
                   ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md hover:-translate-y-0.5 hover:shadow-lg'
                   : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-600 dark:bg-slate-700/50',
             ]"
-            :disabled="isDriveLoading || !features.drive"
-            :title="!features.drive ? t('selfHost.driveUnavailableTooltip') : undefined"
+            :disabled="isDriveLoading || !syncStore.isGoogleDriveAvailable"
+            :title="!syncStore.isGoogleDriveAvailable ? t(driveDisabledTooltipKey) : undefined"
             @click="handleLoadFromGoogleDrive"
           >
             <span
-              v-if="!features.drive"
+              v-if="!syncStore.isGoogleDriveAvailable"
               class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
             >
               {{ t('selfHost.notConfigured') }}
