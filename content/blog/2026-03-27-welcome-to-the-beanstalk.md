@@ -59,7 +59,7 @@ So there it is. If you're a techie nerd like me, run it locally. If you don't wa
 
 I'm using beanies to track our money, our various (1) houses, our (0) boats, my wife's (currently missing) diamond ring (ask my wife where she lost hers... unfortunately beanies can't tell you that), and more. I'll use it even more for their piano lessons, soccer practices, school plays that, as a respectable father, I really should attend, and to make sure we don't forget to pick up our son from his after school math tutor (again). All while keeping our data safe and secure on my family's personal storage (unless I open read access on my data file to the world and tell everyone the key. Which I won't. Probably.).
 
-If you have a question, comment, suggestion, or just wanna say hi, you can reach me on [GitHub](https://github.com/gparker97/beanies-family/issues). If you're using beanies for free and wanna drop me a satoshi for my time (or just cuz you like the app), that's cool too.
+If you have a question, comment, suggestion, or just wanna say hi, you can reach me on [GitHub](https://github.com/gparker97/beanies-family/issues). If you're using beanies for free and wanna drop me a satoshi for my time (or just cuz you like the app), that's cool too (1beanks5zbnAcptUeSdrepxqrCzxEuA2z).
 
 _simplify your family life. every bean counts._
 
