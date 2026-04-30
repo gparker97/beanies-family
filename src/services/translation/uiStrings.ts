@@ -1841,6 +1841,15 @@ const STRING_DEFS = {
     en: 'Someone in your family deleted it on another device. We closed the editor.',
     beanie: 'someone in your family deleted it on another device. we closed the editor.',
   },
+  'error.translationLoadFailed': {
+    en: "We couldn't load translations",
+    beanie: "couldn't load translations",
+  },
+  'error.translationLoadFailedHelp': {
+    en: 'Check your connection and try again. The app stays in your previous language until then.',
+    beanie:
+      'check your connection and try again. the app stays in your previous language until then.',
+  },
 
   // Not Found (404)
   'notFound.title': { en: 'Not Found', beanie: 'not found' },

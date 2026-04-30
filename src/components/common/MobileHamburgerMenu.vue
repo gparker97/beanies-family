@@ -33,6 +33,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
+import { useLanguageSwitcher } from '@/composables/useLanguageSwitcher';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
 const props = defineProps<{ open: boolean }>();
@@ -47,6 +48,7 @@ const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
+const { switchLanguage } = useLanguageSwitcher();
 const { isUnlocked, toggle: togglePrivacy } = usePrivacyMode();
 const { playBlink } = useSounds();
 const { isOpen, toggle: toggleSection, isItemExpanded, toggleItem } = useSidebarAccordion();
@@ -153,9 +155,10 @@ async function handleSignOutAndClearData() {
   router.replace('/login');
 }
 
-async function selectLanguage(code: LanguageCode) {
-  await settingsStore.setLanguage(code);
-  await translationStore.loadTranslations(code);
+function selectLanguage(code: LanguageCode) {
+  // Fire-and-forget via the composable. DO NOT add `await` back — see
+  // docs/plans/2026-04-30-language-switcher-freeze.md.
+  switchLanguage(code);
 }
 
 async function selectCurrency(code: CurrencyCode) {
@@ -277,20 +280,24 @@ const encryptionLabel = computed(() => {
                 <span v-if="isUnlocked" class="ml-auto h-2 w-2 rounded-full bg-[#27AE60]" />
               </button>
 
-              <!-- Language selector -->
+              <!-- Language selector — never disabled. The switcher must
+                   stay clickable so the user can flip back at any time,
+                   even while a previous load's API backfill is still in
+                   flight. The translationStore handles cancellation
+                   internally via activeLoadToken; the UI only shows a
+                   small spinner on the actively-loading flag for visual
+                   feedback. See docs/plans/2026-04-30-language-switcher-freeze.md. -->
               <div class="flex items-center gap-2">
                 <button
                   v-for="lang in LANGUAGES"
                   :key="lang.code"
                   type="button"
                   class="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors"
-                  :class="[
+                  :class="
                     lang.code === settingsStore.language
                       ? 'bg-primary-500/20 text-white'
-                      : 'text-white/40 hover:bg-white/[0.05] hover:text-white/60',
-                    translationStore.isLoading ? 'pointer-events-none opacity-50' : '',
-                  ]"
-                  :disabled="translationStore.isLoading"
+                      : 'text-white/40 hover:bg-white/[0.05] hover:text-white/60'
+                  "
                   @click="selectLanguage(lang.code)"
                 >
                   <!-- Loading spinner on active language -->
