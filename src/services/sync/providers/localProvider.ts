@@ -262,6 +262,16 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   /**
+   * Local files support inexpensive polling — FSA `getLastModified()` reads
+   * OS metadata only (no I/O), so a per-tick poll loop is the right shape
+   * for catching external changes (e.g. another family member's edit
+   * synced down via Dropbox / iCloud / OneDrive).
+   */
+  supportsLocalPolling(): boolean {
+    return true;
+  }
+
+  /**
    * Create a provider from the file open picker.
    */
   static async fromPicker(): Promise<LocalStorageProvider | null> {
