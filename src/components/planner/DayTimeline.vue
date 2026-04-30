@@ -353,11 +353,17 @@ function handleSlotClick(hour: number): void {
           </div>
         </button>
 
-        <!-- Timed travel-segment chips (1h synthetic block at the segment time) -->
+        <!-- Timed travel-segment chips (1h synthetic block at the segment time).
+             Wrapper is `pointer-events-none` + chip is `pointer-events-auto` so
+             clicks on the empty area below a short chip pass through to the
+             activity card underneath (e.g. a flight chip over a 1h activity:
+             clicking the bottom half of the activity must still open the
+             activity, not be eaten by the wrapper's transparent area).
+             DO NOT REMOVE. -->
         <div
           v-for="seg in segmentBuckets.timed"
           :key="'seg-timed-' + seg.segmentId + '-' + seg.kind"
-          class="absolute z-[2]"
+          class="pointer-events-none absolute z-[2]"
           :style="{
             ...getPosition(seg.time!, addHourToTime(seg.time!)),
             left: '0%',
@@ -366,6 +372,7 @@ function handleSlotClick(hour: number): void {
         >
           <TravelSegmentChip
             :occurrence="seg"
+            class="pointer-events-auto"
             @click="(vid: string, idx: number) => emit('view-segment', vid, idx)"
           />
         </div>

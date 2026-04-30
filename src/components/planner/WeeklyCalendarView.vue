@@ -613,11 +613,17 @@ defineExpose({ weekLabel, activityCount });
               </div>
             </template>
 
-            <!-- Timed travel-segment chips (1h synthetic block, positioned at the segment time) -->
+            <!-- Timed travel-segment chips (1h synthetic block, positioned at
+                 the segment time). The wrapper is `pointer-events-none` and the
+                 chip itself remains clickable — without this, the wrapper's
+                 empty area below the chip would block clicks on activities
+                 underneath (e.g. a flight chip at 10am over a 1h activity at
+                 10am: clicks on the bottom half of the activity card would
+                 hit the empty wrapper, not the activity). DO NOT REMOVE. -->
             <div
               v-for="seg in getTimedSegmentsForDay(day.dateStr)"
               :key="'seg-timed-' + seg.segmentId + '-' + seg.kind"
-              class="absolute z-10"
+              class="pointer-events-none absolute z-10"
               :style="{
                 ...getPosition(seg.time!, addHourToTime(seg.time!)),
                 left: '0%',
@@ -626,6 +632,7 @@ defineExpose({ weekLabel, activityCount });
             >
               <TravelSegmentChip
                 :occurrence="seg"
+                class="pointer-events-auto"
                 @click="(vid: string, idx: number) => emit('view-segment', vid, idx)"
               />
             </div>
