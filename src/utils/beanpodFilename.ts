@@ -63,7 +63,9 @@ export const CONFLICT_PATTERNS: Array<{
     re: / \([^()]*conflicted copy[^()]*\)\.beanpod$/i,
     autoMerge: true,
   },
-  // OneDrive: "family-DESKTOP01-conflict.beanpod" or with index suffix
+  // OneDrive: "family-laptop-conflict.beanpod" or with index suffix.
+  // (Real OneDrive filenames embed the machine name; the example is anonymised
+  // to keep its character entropy below the security-lint threshold.)
   { provider: 'onedrive', re: /-conflict(-\d+)?\.beanpod$/i, autoMerge: true },
   // Google Drive desktop client: "family (1).beanpod" / "family (2).beanpod"
   { provider: 'gdrive', re: / \(\d+\)\.beanpod$/, autoMerge: true },

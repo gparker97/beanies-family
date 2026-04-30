@@ -23,7 +23,7 @@ describe('isConflictFilename', () => {
     const cases = [
       'family-conflict.beanpod',
       'family-conflict-1.beanpod',
-      'family-DESKTOP01-conflict.beanpod', // OneDrive includes machine name as part of base
+      'family-laptop-conflict.beanpod', // OneDrive includes machine name as part of base
     ];
     // OneDrive's actual format puts the conflict suffix at the very end so
     // these all hit the regex.
