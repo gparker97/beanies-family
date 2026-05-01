@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-01
+
+### Fixed
+
+- **The "counting beans" loading label now uses brand-approved colors.** The animated gradient sweep that travels across the words previously included two off-palette colors (a yellow `#ffd93d` and a saturated cyan `#00b4d8`), with the cyan also appearing in the third pulsing dot and the bean graphic's glow at the 33% mark of its breath cycle. All three replaced with Sky Silk `#AED6F1` — the brand's canonical cool partner to Heritage Orange + Terracotta. The sweep now reads `Heritage Orange → Terracotta → Sky Silk → Terracotta → Heritage Orange`, symmetric around the cool middle so the loop has no visible seam. The warm-to-cool-to-warm motion the original designer wanted is preserved; the cool peak just reads as calm-and-safety blue per the brand voice instead of attention-grabbing yellow/cyan.
+
+### Security
+
+- **OAuth proxy CORS hygiene tightened.** Four defense-in-depth improvements to the Lambda that handles Google Drive sign-in token exchange. (1) `Vary: Origin` header on every CORS response — without it, any cache between the client and proxy can serve a wrong-origin response. (2) `Cache-Control: no-store` on every response (success, error, preflight) — token exchanges are credentials and no intermediary should ever cache them. (3) Defense-in-depth `403 forbidden_origin` for POSTs whose Origin header isn't allowlisted — browser CORS only blocks the response read, not the request itself, so without this an attacker page could have the proxy execute requests against Google server-side even though the response would be unreadable to them. POSTs with no Origin header (curl / server-to-server) still pass through. (4) The redirect-URI allowlist is now auto-derived from `CORS_ORIGIN` (`<origin>/oauth/callback` for each origin) rather than hardcoded — single source of truth, one less env var for self-hosters to keep in sync, and matches the SPA's actual callback path. Zero behavior change for cloud users (the auto-derived list matches the previous hardcoded list exactly). Self-hosters following Path B of `SELF_HOSTING.md` no longer need to edit code to add a deploy origin — just set `CORS_ORIGIN`.
+
+---
+
 ## 2026-04-30
 
 ### Fixed
