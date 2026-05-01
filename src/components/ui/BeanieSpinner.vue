@@ -159,19 +159,20 @@ const showHalo = computed(() => props.halo ?? props.label);
   white-space: nowrap;
 }
 
-/* Multi-stop gradient sweeps across the letters. 300% background-size +
-   a 200% position shift means the full palette passes through the word
-   once per cycle — synced near the spin tempo but not exact, so they
-   never look mechanically linked. */
+/* Brand palette sweeps across the letters: Heritage Orange → Terracotta
+   → Sky Silk → Terracotta → Heritage Orange. Symmetric around the cool
+   middle so the loop has no seam (start and end colors match). 300%
+   background-size + a 200% position shift means the full palette passes
+   through the word once per cycle — synced near the spin tempo but not
+   exact, so they never look mechanically linked. */
 .bs-label-text {
   animation: beanie-spinner-sweep 3.2s linear infinite;
   background: linear-gradient(
     90deg,
     #f15d22 0%,
-    #e67e22 18%,
-    #ffd93d 38%,
-    #00b4d8 58%,
-    #e67e22 80%,
+    #e67e22 25%,
+    #aed6f1 50%,
+    #e67e22 75%,
     #f15d22 100%
   );
   background-clip: text;
@@ -210,7 +211,7 @@ const showHalo = computed(() => props.halo ?? props.label);
 
 .bs-dot:nth-child(3) {
   animation-delay: 300ms;
-  background: #00b4d8;
+  background: #aed6f1;
 }
 
 /* Non-atmospheric fallback: use the prior muted grey so inline spinners
@@ -266,8 +267,9 @@ const showHalo = computed(() => props.halo ?? props.label);
   }
 }
 
-/* Cycles the drop-shadow color through the brand palette. Two layers
-   (a tight rim glow + a softer offset shadow) land the beans in space. */
+/* Cycles the drop-shadow color through the brand palette: Heritage
+   Orange → Sky Silk → Terracotta. Two layers (a tight rim glow + a
+   softer Deep Slate offset shadow) land the beans in space. */
 @keyframes beanie-spinner-glow {
   0%,
   100% {
@@ -275,7 +277,7 @@ const showHalo = computed(() => props.halo ?? props.label);
   }
 
   33% {
-    filter: drop-shadow(0 0 8px rgb(0 180 216 / 50%)) drop-shadow(0 3px 6px rgb(44 62 80 / 18%));
+    filter: drop-shadow(0 0 8px rgb(174 214 241 / 60%)) drop-shadow(0 3px 6px rgb(44 62 80 / 18%));
   }
 
   66% {
