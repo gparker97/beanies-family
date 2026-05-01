@@ -215,9 +215,51 @@ export function useJoinFlow() {
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   /**
+   * Single source of truth for join-flow error reporting. Sets
+   * `currentError.value` AND fires a Slack alert via `reportError` with
+   * the underlying detail in the message body. Used by `tryStep` for
+   * caught errors and by every direct caller that knows synchronously
+   * an error has occurred (file mismatch, invite token mismatch, etc.).
+   *
+   * **Allowlist routing — read before adding new context fields:**
+   * fields passed in `context` land in the user-copied diagnostic blob
+   * (read by `buildDiagnosticReport`) but only land in the Slack
+   * `*Context:*` block if they're listed in `ALLOWED_CONTEXT_KEYS` in
+   * `errorReporter.ts`. Anything else is silently dropped (with a
+   * console.warn). The `message` field below is the escape hatch — it's
+   * free text. We embed the disambiguating detail there so future
+   * maintainers don't have to chase the allowlist for every new field.
+   */
+  function recordError(
+    code: JoinErrorCode,
+    context: Record<string, unknown> = {},
+    err?: unknown
+  ): void {
+    currentError.value = { code, context };
+
+    // Build a Slack-bound detail string from whatever the caller gave us.
+    const detail =
+      (typeof context.message === 'string' && context.message) ||
+      (typeof context.error === 'string' && context.error) ||
+      '';
+
+    reportError({
+      surface: `join-flow:${code}`,
+      message: detail ? `${code}: ${detail}` : code,
+      error: err,
+      context: {
+        error_code: code,
+        file_id_tail: targetFileId.value || undefined,
+        invite_token_tail: inviteToken.value || undefined,
+        provider_type: targetProvider.value,
+      },
+    });
+  }
+
+  /**
    * Run an async step with structured error handling. On throw: log,
-   * set `currentError` with the given code, return null. On success:
-   * return the value. Never throws to callers.
+   * route through `recordError` (sets `currentError` + Slack alert),
+   * return null. On success: return the value. Never throws to callers.
    */
   async function tryStep<T>(
     code: JoinErrorCode,
@@ -229,20 +271,7 @@ export function useJoinFlow() {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log(`step ${code} failed`, { err: message });
-      currentError.value = {
-        code,
-        context: { error: message, ...contextExtra },
-      };
-      // Auto-notify support — the join flow shows its own structured error
-      // UI to the user, so we don't double-surface here. Just fire the
-      // Slack message with the registry code as the surface so we can
-      // group onboarding failures by error code in #beanies-errors.
-      reportError({
-        surface: `join-flow:${code}`,
-        message: message || code,
-        error: err,
-        context: { error_code: code },
-      });
+      recordError(code, { error: message, ...contextExtra }, err);
       return null;
     }
   }
@@ -384,14 +413,11 @@ export function useJoinFlow() {
     if (looksLikeMissingAccess) return 'needs-pick';
 
     // Some other error — surface it.
-    currentError.value = {
-      code: 'FILE_READ_FAILED',
-      context: {
-        error: storeError || 'Unknown file-load error',
-        hintEmail: inviteEmailHint.value,
-        actualEmail: getGoogleAccountEmail(),
-      },
-    };
+    recordError('FILE_READ_FAILED', {
+      error: storeError || 'Unknown file-load error',
+      hintEmail: inviteEmailHint.value,
+      actualEmail: getGoogleAccountEmail(),
+    });
     return 'error';
   }
 
@@ -402,8 +428,17 @@ export function useJoinFlow() {
    * whether to advance or bail.
    *
    * Maps the `PickBeanpodFileResult` discriminated union to the right
-   * `JoinErrorCode`: `failed/script` → PICKER_SCRIPT_LOAD_FAILED,
-   * `failed/iframe` → PICKER_FAILED, `failed/timeout` → PICKER_TIMEOUT.
+   * `JoinErrorCode`:
+   *   - `failed/config` or `failed/load` → `PICKER_SCRIPT_LOAD_FAILED`
+   *     (true script/config issues)
+   *   - `failed/timeout` → `PICKER_TIMEOUT`
+   *   - `failed/open` or `failed/auth` or `failed/iframe` →
+   *     `PICKER_FAILED` (picker reachable but wouldn't render)
+   *
+   * The underlying Error message rides in `currentError.context.message`
+   * so the diagnostic blob — and the Slack alert via `recordError` —
+   * carries the actual cause.
+   *
    * `cancelled` is silent (no error; step regresses to `awaiting-auth`).
    */
   async function doPickAndLoad(forceConsent = false): Promise<boolean> {
@@ -419,12 +454,15 @@ export function useJoinFlow() {
 
     if (picked.kind === 'failed') {
       const code: JoinErrorCode =
-        picked.reason === 'script'
-          ? 'PICKER_SCRIPT_LOAD_FAILED'
-          : picked.reason === 'timeout'
-            ? 'PICKER_TIMEOUT'
-            : 'PICKER_FAILED';
-      currentError.value = { code, context: { reason: picked.reason } };
+        picked.reason === 'timeout'
+          ? 'PICKER_TIMEOUT'
+          : picked.reason === 'config' || picked.reason === 'load'
+            ? 'PICKER_SCRIPT_LOAD_FAILED'
+            : 'PICKER_FAILED'; // 'open' | 'auth' | 'iframe'
+      recordError(code, {
+        reason: picked.reason,
+        message: picked.message,
+      });
       return false;
     }
 
@@ -436,14 +474,11 @@ export function useJoinFlow() {
 
     if (!result.success && !result.needsPassword) {
       const storeError = (syncStore.error as string | null) ?? '';
-      currentError.value = {
-        code: 'FILE_READ_FAILED',
-        context: {
-          error: storeError || 'Picked file could not be loaded',
-          hintEmail: inviteEmailHint.value,
-          actualEmail: getGoogleAccountEmail(),
-        },
-      };
+      recordError('FILE_READ_FAILED', {
+        error: storeError || 'Picked file could not be loaded',
+        hintEmail: inviteEmailHint.value,
+        actualEmail: getGoogleAccountEmail(),
+      });
       return false;
     }
     return true;
@@ -465,11 +500,11 @@ export function useJoinFlow() {
     const pkg = pending.envelope.inviteKeys[tokenHash];
 
     if (!pkg) {
-      currentError.value = { code: 'INVITE_TOKEN_INVALID' };
+      recordError('INVITE_TOKEN_INVALID');
       return false;
     }
     if (isInviteExpired(pkg.expiresAt)) {
-      currentError.value = { code: 'INVITE_TOKEN_EXPIRED' };
+      recordError('INVITE_TOKEN_EXPIRED', { expiresAt: pkg.expiresAt });
       return false;
     }
 
@@ -491,15 +526,15 @@ export function useJoinFlow() {
     const loadedFamilyId =
       syncStore.envelope?.familyId ?? familyContextStore.activeFamilyId ?? null;
     if (targetFamilyId.value && loadedFamilyId && loadedFamilyId !== targetFamilyId.value) {
-      currentError.value = {
-        code: 'FILE_FAMILY_MISMATCH',
-        context: { expected: targetFamilyId.value, actual: loadedFamilyId },
-      };
+      recordError('FILE_FAMILY_MISMATCH', {
+        expected: targetFamilyId.value,
+        actual: loadedFamilyId,
+      });
       return;
     }
 
     if (unclaimedMembers.value.length === 0) {
-      currentError.value = { code: 'NO_UNCLAIMED_MEMBERS' };
+      recordError('NO_UNCLAIMED_MEMBERS');
       return;
     }
 
@@ -551,7 +586,13 @@ export function useJoinFlow() {
     }
 
     currentStep.value = 'authenticating';
-    const picked = await doPickAndLoad();
+    // `'needs-pick'` is set when the silent token couldn't reach the
+    // target file (404/403) — strong proof the cached account is wrong.
+    // Force consent so Google's account chooser appears with `loginHint`
+    // pre-filled, instead of silently re-using the same wrong-account
+    // token to render the picker against the wrong Drive.
+    const forceConsent = autoResult === 'needs-pick';
+    const picked = await doPickAndLoad(forceConsent);
     if (!picked) return; // cancel, redirect, or file-read-error — no advance
 
     // File loaded; reflect that in the step before any decrypt-stage

@@ -162,31 +162,36 @@ describe('drivePicker', () => {
     });
 
     const result = await drivePicker.pickBeanpodFile('test-token');
-    expect(result).toEqual({ kind: 'failed', reason: 'iframe' });
+    expect(result).toMatchObject({ kind: 'failed', reason: 'iframe' });
+    if (result.kind === 'failed') expect(result.message).toBeTruthy();
   });
 
-  it("missing API key → { kind: 'failed', reason: 'script' }", async () => {
+  it("missing API key → { kind: 'failed', reason: 'config' } with explanatory message", async () => {
     vi.stubEnv('VITE_GOOGLE_API_KEY', '');
     vi.resetModules();
     drivePicker = await import('../drivePicker');
 
     const result = await drivePicker.pickBeanpodFile('test-token');
-    expect(result).toEqual({ kind: 'failed', reason: 'script' });
+    expect(result).toMatchObject({ kind: 'failed', reason: 'config' });
+    if (result.kind === 'failed') expect(result.message).toMatch(/VITE_GOOGLE_API_KEY/);
   });
 
-  it("Picker open throws → { kind: 'failed', reason: 'script' }", async () => {
-    // Set up google.picker so PickerBuilder constructor throws.
+  it("Picker open throws → { kind: 'failed', reason: 'open' } carrying the underlying message", async () => {
+    // Set up google.picker so the PickerBuilder constructor throws.
+    // DocsView must be a `function` (constructible) — arrow functions
+    // cannot be invoked with `new` and would throw before PickerBuilder.
+    function DocsViewCtor(this: Record<string, unknown>) {
+      this.setQuery = vi.fn().mockReturnThis();
+      this.setMimeTypes = vi.fn().mockReturnThis();
+      this.setOwnedByMe = vi.fn().mockReturnThis();
+      this.setMode = vi.fn().mockReturnThis();
+    }
     (globalThis as Record<string, unknown>).google = {
       picker: {
         PickerBuilder: vi.fn(function () {
           throw new Error('builder boom');
         }),
-        DocsView: vi.fn(() => ({
-          setQuery: vi.fn().mockReturnThis(),
-          setMimeTypes: vi.fn().mockReturnThis(),
-          setOwnedByMe: vi.fn().mockReturnThis(),
-          setMode: vi.fn().mockReturnThis(),
-        })),
+        DocsView: DocsViewCtor,
         ViewId: { DOCS: 'all' },
         Action: { PICKED: 'picked', CANCEL: 'cancel', LOADED: 'loaded' },
         DocsViewMode: { LIST: 'list', GRID: 'grid' },
@@ -194,7 +199,7 @@ describe('drivePicker', () => {
     };
 
     const result = await drivePicker.pickBeanpodFile('test-token');
-    expect(result).toEqual({ kind: 'failed', reason: 'script' });
+    expect(result).toMatchObject({ kind: 'failed', reason: 'open', message: 'builder boom' });
   });
 
   it("no callback within 30s → { kind: 'failed', reason: 'timeout' }", async () => {
@@ -209,7 +214,8 @@ describe('drivePicker', () => {
     // immediately. We need to flush microtasks AND advance timers.
     await vi.advanceTimersByTimeAsync(30_001);
     const result = await promise;
-    expect(result).toEqual({ kind: 'failed', reason: 'timeout' });
+    expect(result).toMatchObject({ kind: 'failed', reason: 'timeout' });
+    if (result.kind === 'failed') expect(result.message).toMatch(/30000ms/);
     vi.useRealTimers();
   });
 
