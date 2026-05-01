@@ -2,9 +2,23 @@ import { ref } from 'vue';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { showToast } from '@/composables/useToast';
+import { reportError } from '@/utils/errorReporter';
 
 vi.mock('@/composables/useToast', () => ({
   showToast: vi.fn(),
+}));
+
+vi.mock('@/utils/errorReporter', () => ({
+  reportError: vi.fn(),
+}));
+
+vi.mock('@/stores/translationStore', () => ({
+  useTranslationStore: () => ({
+    t: (key: string) =>
+      key === 'error.unexpectedFailure'
+        ? 'Something went wrong'
+        : 'Please refresh and try again. Support has been notified.',
+  }),
 }));
 
 describe('wrapAsync — error handling & notifications', () => {
@@ -22,7 +36,9 @@ describe('wrapAsync — error handling & notifications', () => {
       throw new Error('Database connection failed');
     });
 
-    expect(showToast).toHaveBeenCalledWith('error', 'Database connection failed');
+    expect(showToast).toHaveBeenCalledWith('error', 'Database connection failed', undefined, {
+      error: expect.any(Error),
+    });
     expect(error.value).toBe('Database connection failed');
   });
 
@@ -31,7 +47,13 @@ describe('wrapAsync — error handling & notifications', () => {
       throw 'string error';
     });
 
-    expect(showToast).toHaveBeenCalledWith('error', 'An unexpected error occurred');
+    expect(showToast).toHaveBeenCalledWith(
+      'error',
+      'An unexpected error occurred',
+      undefined,
+      // Non-Error throws have no Error instance — `error` field is the raw string.
+      { error: 'string error' }
+    );
     expect(error.value).toBe('An unexpected error occurred');
   });
 
@@ -115,6 +137,21 @@ describe('wrapAsync — error handling & notifications', () => {
 
     expect(error.value).toBeNull();
   });
+
+  it('should pass the original Error to showToast so the stack reaches the reporter', async () => {
+    const original = new Error('Save failed');
+    await wrapAsync(isLoading, error, async () => {
+      throw original;
+    });
+
+    // The 4th arg is the toast options bag — `error` must be the same
+    // Error object the caller threw, not a copy or undefined. Without
+    // this, every store-action throw arrived in #beanies-errors with no
+    // stack frames and surface `app`, leaving each firing un-diagnosable.
+    expect(showToast).toHaveBeenCalledWith('error', 'Save failed', undefined, {
+      error: original,
+    });
+  });
 });
 
 describe('wrapAsync — no silent failures in store operations', () => {
@@ -132,7 +169,12 @@ describe('wrapAsync — no silent failures in store operations', () => {
     });
 
     expect(showToast).toHaveBeenCalledTimes(1);
-    expect(showToast).toHaveBeenCalledWith('error', expect.stringContaining('QuotaExceededError'));
+    expect(showToast).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('QuotaExceededError'),
+      undefined,
+      { error: expect.any(DOMException) }
+    );
   });
 
   it('should surface network errors as toast notifications', async () => {
@@ -140,7 +182,9 @@ describe('wrapAsync — no silent failures in store operations', () => {
       throw new TypeError('Failed to fetch');
     });
 
-    expect(showToast).toHaveBeenCalledWith('error', 'Failed to fetch');
+    expect(showToast).toHaveBeenCalledWith('error', 'Failed to fetch', undefined, {
+      error: expect.any(TypeError),
+    });
   });
 
   it('should never swallow errors — error ref is always set', async () => {
@@ -157,10 +201,70 @@ describe('wrapAsync — no silent failures in store operations', () => {
       });
 
       expect(error.value).toBe(err.message);
-      expect(showToast).toHaveBeenCalledWith('error', err.message);
+      expect(showToast).toHaveBeenCalledWith('error', err.message, undefined, { error: err });
     }
 
     // Each error should have triggered a toast
     expect(showToast).toHaveBeenCalledTimes(errors.length);
+  });
+});
+
+describe('wrapAsync — engine panic friendly-toast wrap', () => {
+  const isLoading = ref(false);
+  const error = ref<string | null>(null);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    error.value = null;
+  });
+
+  it.each([
+    'recursive use of an object detected which would lead to unsafe aliasing in rust',
+    'unreachable executed',
+    'memory access out of bounds',
+    'RuntimeError: index out of bounds',
+    'WASM module trapped',
+  ])('substitutes a friendly message for engine panic: %s', async (rawMessage) => {
+    const original = new Error(rawMessage);
+    await wrapAsync(isLoading, error, async () => {
+      throw original;
+    });
+
+    // User-facing toast renders the friendly substitution + silent so the
+    // automatic reporter doesn't double-report on top of the direct
+    // reportError call below.
+    expect(showToast).toHaveBeenCalledWith(
+      'error',
+      'Something went wrong',
+      'Please refresh and try again. Support has been notified.',
+      { silent: true, error: original }
+    );
+
+    // The raw rust/wasm message ships to Slack with a dedicated surface
+    // and the original Error attached so the stack lands in the alert.
+    expect(reportError).toHaveBeenCalledWith({
+      surface: 'wrapAsync:engine-panic',
+      message: rawMessage,
+      error: original,
+    });
+
+    // The raw message still populates `error.value` for any caller that
+    // wants to render its own diagnostic UI — friendly substitution is
+    // toast-only.
+    expect(error.value).toBe(rawMessage);
+  });
+
+  it('does NOT trigger the engine-panic path for a regular app error', async () => {
+    await wrapAsync(isLoading, error, async () => {
+      throw new Error('Failed to update transaction');
+    });
+
+    // Regular path: raw message in toast, no direct reportError call —
+    // showToast's auto-reporter handles surface 'app' as before, but now
+    // with the Error attached so the stack lands in Slack.
+    expect(showToast).toHaveBeenCalledWith('error', 'Failed to update transaction', undefined, {
+      error: expect.any(Error),
+    });
+    expect(reportError).not.toHaveBeenCalled();
   });
 });
