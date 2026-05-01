@@ -107,10 +107,11 @@ vi.mock('@/services/google/googleAuth', () => ({
   shouldUseRedirectAuth: () => mockGoogleAuth.redirectAuth,
 }));
 
+type PickFailureReason = 'config' | 'load' | 'open' | 'auth' | 'iframe' | 'timeout';
 type PickResult =
   | { kind: 'picked'; fileId: string; fileName: string }
   | { kind: 'cancelled' }
-  | { kind: 'failed'; reason: 'script' | 'iframe' | 'timeout' };
+  | { kind: 'failed'; reason: PickFailureReason; message?: string };
 type PickOpts = { forceConsent?: boolean; loginHint?: string } | undefined;
 const mockPick = vi.fn<(opts?: PickOpts) => Promise<PickResult>>(async () => ({
   kind: 'cancelled',
@@ -121,6 +122,11 @@ vi.mock('@/composables/usePickBeanpodFile', () => ({
     pickError: { value: null },
     pick: (opts?: PickOpts) => mockPick(opts),
   }),
+}));
+
+const mockReportError = vi.fn();
+vi.mock('@/utils/errorReporter', () => ({
+  reportError: (input: unknown) => mockReportError(input),
 }));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -366,7 +372,8 @@ describe('useJoinFlow', () => {
   describe('Picker discriminated-union → JoinErrorCode mapping', () => {
     async function setupAndTap(pickResult: {
       kind: 'failed';
-      reason: 'script' | 'iframe' | 'timeout';
+      reason: PickFailureReason;
+      message?: string;
     }) {
       const { buildInviteLink } = await import('@/services/crypto/inviteService');
       setUrl(
@@ -384,9 +391,40 @@ describe('useJoinFlow', () => {
       return flow;
     }
 
-    it("'script' reason → PICKER_SCRIPT_LOAD_FAILED", async () => {
-      const flow = await setupAndTap({ kind: 'failed', reason: 'script' });
+    it("'config' reason → PICKER_SCRIPT_LOAD_FAILED", async () => {
+      const flow = await setupAndTap({
+        kind: 'failed',
+        reason: 'config',
+        message: 'VITE_GOOGLE_API_KEY is not configured',
+      });
       expect(flow.currentError.value?.code).toBe('PICKER_SCRIPT_LOAD_FAILED');
+      expect(flow.currentError.value?.context).toMatchObject({
+        reason: 'config',
+        message: 'VITE_GOOGLE_API_KEY is not configured',
+      });
+    });
+
+    it("'load' reason → PICKER_SCRIPT_LOAD_FAILED", async () => {
+      const flow = await setupAndTap({ kind: 'failed', reason: 'load', message: 'net::ERR' });
+      expect(flow.currentError.value?.code).toBe('PICKER_SCRIPT_LOAD_FAILED');
+    });
+
+    it("'open' reason → PICKER_FAILED (carries underlying message)", async () => {
+      const flow = await setupAndTap({
+        kind: 'failed',
+        reason: 'open',
+        message: "Cannot read properties of undefined (reading 'PickerBuilder')",
+      });
+      expect(flow.currentError.value?.code).toBe('PICKER_FAILED');
+      expect(flow.currentError.value?.context).toMatchObject({
+        reason: 'open',
+        message: "Cannot read properties of undefined (reading 'PickerBuilder')",
+      });
+    });
+
+    it("'auth' reason → PICKER_FAILED", async () => {
+      const flow = await setupAndTap({ kind: 'failed', reason: 'auth', message: 'Popup blocked' });
+      expect(flow.currentError.value?.code).toBe('PICKER_FAILED');
     });
 
     it("'iframe' reason → PICKER_FAILED", async () => {
@@ -397,6 +435,142 @@ describe('useJoinFlow', () => {
     it("'timeout' reason → PICKER_TIMEOUT", async () => {
       const flow = await setupAndTap({ kind: 'failed', reason: 'timeout' });
       expect(flow.currentError.value?.code).toBe('PICKER_TIMEOUT');
+    });
+  });
+
+  describe('recordError → reportError (Slack alerting plumbing)', () => {
+    async function setupBasicGoogleDriveJoin() {
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      setUrl(
+        buildInviteLink({ familyId: 'fam', provider: 'google_drive' }).replace(
+          'http://localhost:3000',
+          ''
+        )
+      );
+    }
+
+    it('fires reportError on PICKER_FAILED with the underlying message in the body', async () => {
+      await setupBasicGoogleDriveJoin();
+      mockPick.mockResolvedValueOnce({
+        kind: 'failed',
+        reason: 'open',
+        message: 'google.picker is undefined',
+      });
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+      await flow.handleAuthTap();
+
+      expect(flow.currentError.value?.code).toBe('PICKER_FAILED');
+      expect(mockReportError).toHaveBeenCalledTimes(1);
+      const call = mockReportError.mock.calls[0]?.[0] as {
+        surface: string;
+        message: string;
+        context: Record<string, unknown>;
+      };
+      expect(call.surface).toBe('join-flow:PICKER_FAILED');
+      expect(call.message).toContain('google.picker is undefined');
+      expect(call.context).toMatchObject({ error_code: 'PICKER_FAILED' });
+    });
+
+    it('fires reportError on INVITE_TOKEN_INVALID (previously silent)', async () => {
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      setUrl(
+        buildInviteLink({
+          familyId: 'fam',
+          token: 'tok',
+          provider: 'google_drive',
+          fileId: 'drive-1',
+        }).replace('http://localhost:3000', '')
+      );
+      mockGoogleAuth.silent = vi.fn(async () => 'silent-token');
+      mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({
+        success: false,
+        needsPassword: true,
+      }));
+      // No matching key for the token's hash → INVITE_TOKEN_INVALID
+      mockSyncStore.pendingEncryptedFile = {
+        envelope: { inviteKeys: { 'hash:other': {} as unknown as Record<string, unknown> } },
+      };
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+
+      expect(flow.currentError.value?.code).toBe('INVITE_TOKEN_INVALID');
+      expect(mockReportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'join-flow:INVITE_TOKEN_INVALID',
+          context: expect.objectContaining({ error_code: 'INVITE_TOKEN_INVALID' }),
+        })
+      );
+    });
+
+    it('does NOT fire reportError on the cancelled path', async () => {
+      await setupBasicGoogleDriveJoin();
+      mockPick.mockResolvedValueOnce({ kind: 'cancelled' });
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+      await flow.handleAuthTap();
+
+      expect(flow.currentError.value).toBeNull();
+      expect(mockReportError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('runCloudFlow — force consent on needs-pick fallthrough', () => {
+    it("passes forceConsent: true when tryAutoLoadByFileId returns 'needs-pick'", async () => {
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      setUrl(
+        buildInviteLink({
+          familyId: 'fam',
+          provider: 'google_drive',
+          fileId: 'drive-target',
+          inviteeEmail: 'invitee@example.com',
+        }).replace('http://localhost:3000', '')
+      );
+      // Silent token present → tryAutoLoadByFileId runs
+      mockGoogleAuth.silent = vi.fn(async () => 'wrong-account-token');
+      // Drive returns 404-ish → 'needs-pick'
+      mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({ success: false }));
+      mockSyncStore.error = 'File not found';
+      mockPick.mockResolvedValueOnce({ kind: 'cancelled' });
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+      await flow.handleAuthTap();
+
+      expect(mockPick).toHaveBeenCalled();
+      const lastCallArgs = mockPick.mock.calls.at(-1)?.[0];
+      expect(lastCallArgs).toMatchObject({
+        forceConsent: true,
+        loginHint: 'invitee@example.com',
+      });
+    });
+
+    it("does NOT force consent on the regular 'auth' fallthrough (no silent token)", async () => {
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      setUrl(
+        buildInviteLink({ familyId: 'fam', provider: 'google_drive' }).replace(
+          'http://localhost:3000',
+          ''
+        )
+      );
+      mockGoogleAuth.silent = vi.fn(async () => null);
+      mockPick.mockResolvedValueOnce({ kind: 'cancelled' });
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+      await flow.handleAuthTap();
+
+      expect(mockPick).toHaveBeenCalled();
+      const lastCallArgs = mockPick.mock.calls.at(-1)?.[0];
+      expect(lastCallArgs?.forceConsent).toBe(false);
     });
   });
 

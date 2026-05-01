@@ -23,7 +23,12 @@ function loadPickerScript(): Promise<void> {
     script.src = PICKER_SCRIPT_URL;
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Google Picker script'));
+    script.onerror = () => {
+      // Reset cache so a subsequent retry actually re-attempts the fetch
+      // instead of returning the same rejected promise forever.
+      scriptPromise = null;
+      reject(new Error('Failed to load Google Picker script'));
+    };
     document.head.appendChild(script);
   });
 
@@ -139,20 +144,31 @@ export async function pickBeanpodFolder(
  * - `picked`     — user chose a file successfully.
  * - `cancelled`  — user opened the Picker normally (LOADED fired) and
  *                  closed it without picking.
- * - `failed`     — Picker could not be invoked or rendered. `reason`:
- *     - `'script'`  → Google API JS could not be loaded (script error,
- *                     missing API key, library load error).
- *     - `'iframe'`  → Picker iframe errored before LOADED fired. This
- *                     covers iOS WebKit's "API developer key invalid" /
- *                     cookie-consent symptoms where the iframe can't
- *                     bootstrap its auth context across the storage-
- *                     partitioning boundary.
+ * - `failed`     — Picker could not be invoked or rendered. `reason` is a
+ *                  fine-grained taxonomy so the join flow can route the
+ *                  symptom to a useful error message and the diagnostic
+ *                  blob carries the underlying Error.message:
+ *     - `'config'`  → `VITE_GOOGLE_API_KEY` not configured at runtime.
+ *     - `'load'`    → Google API JS or Picker library could not be loaded
+ *                     (network blip, CSP/ITP block, blocked apis.google.com).
+ *     - `'open'`    → Synchronous throw from `PickerBuilder` / `setVisible`
+ *                     (typically `google.picker` undefined post-load).
+ *     - `'auth'`    → Token-acquisition step threw before the Picker call.
+ *                     Set by `usePickBeanpodFile.pick`'s outer catch, not
+ *                     here directly.
+ *     - `'iframe'`  → Picker iframe errored before LOADED fired (iOS WebKit
+ *                     storage-partitioning symptom — "API developer key
+ *                     invalid" / cookie-consent path).
  *     - `'timeout'` → No callback fired within 30s of `setVisible(true)`.
  */
 export type PickBeanpodFileResult =
   | { kind: 'picked'; fileId: string; fileName: string }
   | { kind: 'cancelled' }
-  | { kind: 'failed'; reason: 'script' | 'iframe' | 'timeout' };
+  | {
+      kind: 'failed';
+      reason: 'config' | 'load' | 'open' | 'auth' | 'iframe' | 'timeout';
+      message?: string;
+    };
 
 const PICKER_TIMEOUT_MS = 30_000;
 
@@ -174,15 +190,20 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
   const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
   if (!apiKey) {
     console.error('[drivePicker] VITE_GOOGLE_API_KEY is not configured');
-    return { kind: 'failed', reason: 'script' };
+    return {
+      kind: 'failed',
+      reason: 'config',
+      message: 'VITE_GOOGLE_API_KEY is not configured',
+    };
   }
 
   try {
     await loadPickerScript();
     await loadPickerLibrary();
   } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
     console.error('[drivePicker] script/library load failed', e);
-    return { kind: 'failed', reason: 'script' };
+    return { kind: 'failed', reason: 'load', message };
   }
 
   return new Promise<PickBeanpodFileResult>((resolve) => {
@@ -202,7 +223,11 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
 
     const timeoutHandle = setTimeout(() => {
       console.warn('[drivePicker] timed out waiting for Picker callback');
-      settle({ kind: 'failed', reason: 'timeout' });
+      settle({
+        kind: 'failed',
+        reason: 'timeout',
+        message: `No Picker callback within ${PICKER_TIMEOUT_MS}ms`,
+      });
     }, PICKER_TIMEOUT_MS);
 
     try {
@@ -254,7 +279,15 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
           if (data.action === google.picker.Action.CANCEL) {
             // CANCEL without a preceding LOADED → iframe-bootstrap failure
             // (the iOS WebKit symptom). LOADED-then-CANCEL → real cancel.
-            settle(hasLoaded ? { kind: 'cancelled' } : { kind: 'failed', reason: 'iframe' });
+            settle(
+              hasLoaded
+                ? { kind: 'cancelled' }
+                : {
+                    kind: 'failed',
+                    reason: 'iframe',
+                    message: 'Picker iframe cancelled before LOADED event',
+                  }
+            );
             return;
           }
         })
@@ -262,8 +295,9 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
 
       picker.setVisible(true);
     } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
       console.error('[drivePicker] picker open failed', e);
-      settle({ kind: 'failed', reason: 'script' });
+      settle({ kind: 'failed', reason: 'open', message });
     }
   });
 }

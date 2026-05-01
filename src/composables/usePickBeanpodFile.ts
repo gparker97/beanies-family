@@ -28,15 +28,20 @@ export function usePickBeanpodFile() {
    * Always returns a structured result — never throws. See
    * `PickBeanpodFileResult` for the discriminated outcomes.
    *
-   * For the auth phase preceding the Picker call: a thrown error is
-   * caught and surfaced as `{ kind: 'failed', reason: 'script' }` so
-   * callers have one shape to handle. (Reason `script` covers
-   * "couldn't even reach the Picker"; the join flow's error registry
-   * maps it to `PICKER_SCRIPT_LOAD_FAILED`.) When the auth flow kicks
-   * off a full-page redirect (PWA / iOS Safari standalone), the page
-   * navigates away; the returned promise resolves to `'cancelled'`
-   * since no Picker actually opened — the next session completes
-   * redirect auth and the user re-triggers.
+   * The try/catch here narrowly wraps the auth chain (silent-token /
+   * redirect / popup). A thrown error there is surfaced as
+   * `{ kind: 'failed', reason: 'auth', message }` with the underlying
+   * Error.message captured so the join flow's diagnostic blob carries
+   * the actual cause. The `pickBeanpodFile` call lives outside the try
+   * because it always resolves to a structured result by contract — it
+   * has its own catch sites that map to `'load'` / `'open'` / `'iframe'`
+   * / `'timeout'`. Keeping the two concerns visibly separate prevents
+   * future drift back to a single opaque `'script'` catch-all.
+   *
+   * When the auth flow kicks off a full-page redirect (PWA / iOS Safari
+   * standalone), the page navigates away; the returned promise resolves
+   * to `'cancelled'` since no Picker actually opened — the next session
+   * completes redirect auth and the user re-triggers.
    *
    * @param opts.forceConsent When true, always shows Google's account
    *   chooser even if a valid token is cached. Default `true` because
@@ -57,31 +62,40 @@ export function usePickBeanpodFile() {
     const loginHint = opts?.loginHint;
     isPicking.value = true;
     pickError.value = null;
+
     try {
-      // Recovery flows skip the silent-token fast path so the user
-      // explicitly confirms the account. First-time join flows can
-      // accept a silent token (forceConsent=false).
+      // Auth chain — narrow try/catch so callers can distinguish auth
+      // failures (`reason: 'auth'`) from picker failures (`'load' /
+      // 'open' / 'iframe' / 'timeout'`).
       let token: string | null = null;
-      if (!forceConsent) {
-        token = await tryGetSilentToken();
-      }
-      if (!token) {
-        if (shouldUseRedirectAuth()) {
-          const returnPath = `${window.location.pathname}${window.location.search}`;
-          await startRedirectAuth(returnPath, loginHint);
-          // Page navigates; the next session completes redirect auth and
-          // the user re-triggers. Treat as a cancellation from the
-          // current call's perspective.
-          return { kind: 'cancelled' };
+      try {
+        // Recovery flows skip the silent-token fast path so the user
+        // explicitly confirms the account. First-time join flows can
+        // accept a silent token (forceConsent=false).
+        if (!forceConsent) {
+          token = await tryGetSilentToken();
         }
-        token = await requestAccessToken({ forceConsent, loginHint });
+        if (!token) {
+          if (shouldUseRedirectAuth()) {
+            const returnPath = `${window.location.pathname}${window.location.search}`;
+            await startRedirectAuth(returnPath, loginHint);
+            // Page navigates; the next session completes redirect auth
+            // and the user re-triggers. Treat as a cancellation from
+            // the current call's perspective.
+            return { kind: 'cancelled' };
+          }
+          token = await requestAccessToken({ forceConsent, loginHint });
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        console.warn('[usePickBeanpodFile] auth failed before picker:', message);
+        pickError.value = message || 'Authentication failed';
+        return { kind: 'failed', reason: 'auth', message };
       }
+
+      // pickBeanpodFile always resolves to a structured result by
+      // contract — no try/catch needed at this layer.
       return await pickBeanpodFile(token);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      console.warn('[usePickBeanpodFile] pick failed:', message);
-      pickError.value = message || 'Picker failed';
-      return { kind: 'failed', reason: 'script' };
     } finally {
       isPicking.value = false;
     }
