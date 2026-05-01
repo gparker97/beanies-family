@@ -58,20 +58,7 @@ In the AWS Console → Lambda → Create function:
 
 Upload `lambda.zip` as the function code.
 
-### 3. Update the redirect-URI allowlist
-
-`index.mjs:24-29` hard-codes a list of allowed redirect URIs to prevent open-redirect attacks. **You must edit this for your deployment** — replace the existing entries with your SPA's `/oauth/callback` URL(s):
-
-```js
-const ALLOWED_REDIRECT_URIS = [
-  'https://family.example.com/oauth/callback',
-  'http://localhost:5173/oauth/callback', // for dev
-];
-```
-
-Re-bundle and re-upload after editing.
-
-### 4. Wire up API Gateway HTTP API
+### 3. Wire up API Gateway HTTP API
 
 Create an HTTP API in API Gateway:
 
@@ -82,7 +69,7 @@ Create an HTTP API in API Gateway:
 
 The HTTP API will give you an invoke URL like `https://abc123.execute-api.us-east-1.amazonaws.com`. Optionally configure a custom domain (e.g. `oauth.family.example.com`).
 
-### 5. Configure your SPA
+### 4. Configure your SPA
 
 In your SPA's `.env.local`:
 
@@ -120,13 +107,14 @@ If the SPA hits a `client_secret is missing` error, your Lambda's `GOOGLE_CLIENT
 
 If the SPA hits CORS errors, check `CORS_ORIGIN` matches your SPA's origin exactly (scheme + host + port).
 
-If the SPA hits `Invalid redirect_uri`, the URI in the request doesn't match `ALLOWED_REDIRECT_URIS` in `index.mjs:24` — re-bundle with your origin added.
+If the SPA hits `Invalid redirect_uri`, the request's `redirect_uri` doesn't match `<origin>/oauth/callback` for any origin in `CORS_ORIGIN`. Add the missing origin to `CORS_ORIGIN` (the redirect-URI allowlist is auto-derived).
+
+If the SPA hits `403 forbidden_origin`, the request's `Origin` header isn't in `CORS_ORIGIN`. This is a defense-in-depth check on top of CORS — same fix: add the origin to `CORS_ORIGIN`.
 
 ---
 
 ## Security notes
 
 - `GOOGLE_CLIENT_SECRET` is a credential. Treat it like a password: never commit it, never log it, rotate if exposed. The Lambda code itself logs only error messages, never the secret.
-- `CORS_ORIGIN` is the only thing standing between your Lambda and arbitrary origins. Be explicit — don't use `*`.
-- `ALLOWED_REDIRECT_URIS` prevents an attacker who somehow obtains an auth code from redirecting it elsewhere. Always edit this for your deployment; never wildcard.
+- `CORS_ORIGIN` is the only thing standing between your Lambda and arbitrary origins. Be explicit — don't use `*`. The redirect-URI allowlist is derived from `CORS_ORIGIN` (`<origin>/oauth/callback` for each), so this single env var prevents both cross-origin abuse and open-redirect attacks.
 - The Lambda runs unauthenticated (no API key — different from the registry Lambda). Auth is implicitly handled by the OAuth code flow itself: Google won't issue a code to anyone who didn't go through Google's consent screen first.

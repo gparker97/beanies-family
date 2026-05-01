@@ -94,11 +94,25 @@ The proxy MUST NOT use `Access-Control-Allow-Origin: *`. The SPA's origin must b
 
 Allowed headers: `Content-Type` only.
 
+The proxy MUST also send `Vary: Origin` whenever it emits an `Access-Control-Allow-Origin` header — without it, any cache between the client and proxy can serve a wrong-origin response.
+
+### Origin enforcement on POSTs
+
+The proxy MUST reject any POST whose `Origin` header is set but not in the allowlist, returning HTTP 403 with `{ "error": "forbidden_origin" }`.
+
+This is defense-in-depth: browser CORS only blocks the response read, not the request itself. Without this check, an attacker page could have the proxy execute a request server-side (against Google) even though the response would be unreadable to them. POSTs with no `Origin` header (curl, server-to-server) are allowed.
+
+### Cache-Control
+
+Every response — success, error, preflight — MUST include `Cache-Control: no-store`. Token exchanges are credentials; no intermediary should ever cache them.
+
 ### Redirect URI allowlist
 
-The proxy MUST validate the `redirect_uri` field of `/oauth/{provider}/token` against an explicit allowlist. The allowlist is the set of origins where the SPA is hosted (e.g. production + dev). Wildcards are not permitted.
+The proxy MUST validate the `redirect_uri` field of `/oauth/{provider}/token` against an explicit allowlist. Wildcards are not permitted.
 
 This prevents an open-redirect attack: an attacker who tricks a user into authorizing on Google could otherwise redirect the resulting code to a malicious domain. The allowlist closes that hole.
+
+The reference implementation derives the allowlist from `CORS_ORIGIN` by appending `/oauth/callback` to each origin. This is recommended (single source of truth, no second env var to keep in sync) since the SPA's callback path is fixed at `/oauth/callback`. Implementations MAY use a separate explicit allowlist instead if they need a non-standard callback path.
 
 ### Empty / non-JSON response handling
 
@@ -137,9 +151,9 @@ Anything else → 400.
 
 ## Reference implementations
 
-- **AWS Lambda** (Node.js 20): [`index.mjs`](./index.mjs) — about 175 lines, no external deps.
+- **AWS Lambda** (Node.js 20): [`index.mjs`](./index.mjs) — about 185 lines, no external deps.
 - **Cloudflare Workers**: adapt the AWS handler — `request.method` / `await request.text()` instead of `event.requestContext.http.method` / `event.body`. The token-fetch logic and validation are identical.
 - **Vercel Edge / Netlify Functions**: same as Cloudflare Workers — fetch + plain JS.
-- **Self-hosted Node server**: wrap the handler in any HTTP framework (Express, Fastify, Hono, etc.). The handler is pure logic.
+- **Self-hosted Node server**: wrap the handler in any HTTP framework (Express, Fastify, Hono, etc.) or use plain `node:http`. The handler is pure logic.
 
 The contract above is the source of truth. Any new implementation should be testable against the existing SPA without code changes — set `VITE_OAUTH_PROXY_URL` to point at it and Drive sign-in should just work.
