@@ -14,31 +14,31 @@
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'https://beanies.family')
   .split(',')
-  .map((o) => o.trim());
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 
-// Allowed redirect URIs (prevent open-redirect attacks).
-// Apex stays during the Phase A→C cutover for #167; remove ~30 days after
-// the apex cutover ships and the Google OAuth Console apex URI is removed.
-const ALLOWED_REDIRECT_URIS = [
-  'https://beanies.family/oauth/callback',
-  'https://app.beanies.family/oauth/callback',
-  'http://localhost:5173/oauth/callback',
-  'http://localhost:4173/oauth/callback',
-];
+// Allowed redirect URIs derived from CORS_ORIGIN — every SPA install uses
+// `<origin>/oauth/callback` (hardcoded route in src/router/), so one env
+// var is the single source of truth and self-hosters never edit code.
+const ALLOWED_REDIRECT_URIS = new Set(
+  ALLOWED_ORIGINS.map((origin) => `${origin.replace(/\/+$/, '')}/oauth/callback`)
+);
 
 const SUPPORTED_PROVIDERS = ['google'];
 
 function getHeaders(event) {
-  const origin = event?.headers?.origin || ALLOWED_ORIGINS[0];
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : '';
+  const origin = event?.headers?.origin;
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : '';
   return {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
     ...(allowedOrigin && {
       'Access-Control-Allow-Origin': allowedOrigin,
       'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      Vary: 'Origin',
     }),
   };
 }
@@ -49,6 +49,7 @@ function response(statusCode, body, event) {
 
 export async function handler(event) {
   const method = event.requestContext?.http?.method;
+  const origin = event?.headers?.origin;
 
   // Handle CORS preflight
   if (method === 'OPTIONS') {
@@ -57,6 +58,14 @@ export async function handler(event) {
 
   if (method !== 'POST') {
     return response(405, { error: 'Method not allowed' }, event);
+  }
+
+  // Defense-in-depth: reject browser POSTs from non-allowlisted origins.
+  // Browser CORS only blocks the response read, not the request itself —
+  // an attacker page could otherwise have the proxy execute a request
+  // server-side. No Origin header (curl, server-to-server) is allowed.
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+    return response(403, { error: 'forbidden_origin' }, event);
   }
 
   // Extract provider and action from path: /oauth/{provider}/{action}
@@ -114,7 +123,7 @@ async function handleTokenExchange(body, event) {
   }
   if (!client_id) return response(400, { error: 'Missing required field: client_id' }, event);
 
-  if (!ALLOWED_REDIRECT_URIS.includes(redirect_uri)) {
+  if (!ALLOWED_REDIRECT_URIS.has(redirect_uri)) {
     return response(400, { error: 'Invalid redirect_uri' }, event);
   }
 

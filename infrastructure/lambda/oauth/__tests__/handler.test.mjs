@@ -298,6 +298,129 @@ describe('OAuth Lambda handler', () => {
       const res = await handler(event);
       assert.equal(res.headers['Access-Control-Allow-Origin'], undefined);
     });
+
+    it('sets Vary: Origin when CORS headers are emitted', async () => {
+      const event = makeEvent({ method: 'OPTIONS', origin: 'https://beanies.family' });
+      const res = await handler(event);
+      assert.equal(res.headers['Vary'], 'Origin');
+    });
+
+    it('omits Vary: Origin when no CORS headers are emitted', async () => {
+      const event = makeEvent({ method: 'OPTIONS', origin: 'https://evil.com' });
+      const res = await handler(event);
+      assert.equal(res.headers['Vary'], undefined);
+    });
+  });
+
+  describe('Cache-Control', () => {
+    it('sets Cache-Control: no-store on success responses', async () => {
+      globalThis.fetch = mock.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'a', refresh_token: 'r' }),
+      }));
+      const event = makeEvent({
+        body: {
+          code: 'c',
+          code_verifier: 'v',
+          redirect_uri: 'https://beanies.family/oauth/callback',
+          client_id: 'cid',
+        },
+      });
+      const res = await handler(event);
+      assert.equal(res.headers['Cache-Control'], 'no-store');
+    });
+
+    it('sets Cache-Control: no-store on 4xx responses', async () => {
+      const event = makeEvent({ method: 'GET' });
+      const res = await handler(event);
+      assert.equal(res.headers['Cache-Control'], 'no-store');
+    });
+
+    it('sets Cache-Control: no-store on OPTIONS preflight', async () => {
+      const event = makeEvent({ method: 'OPTIONS', origin: 'https://beanies.family' });
+      const res = await handler(event);
+      assert.equal(res.headers['Cache-Control'], 'no-store');
+    });
+  });
+
+  describe('origin enforcement on POST', () => {
+    it('returns 403 forbidden_origin when Origin header is not allowlisted', async () => {
+      const event = makeEvent({
+        origin: 'https://evil.com',
+        body: {
+          code: 'c',
+          code_verifier: 'v',
+          redirect_uri: 'https://beanies.family/oauth/callback',
+          client_id: 'cid',
+        },
+      });
+      const res = parseResponse(await handler(event));
+      assert.equal(res.statusCode, 403);
+      assert.equal(res.parsedBody.error, 'forbidden_origin');
+    });
+
+    it('allows POSTs with no Origin header (server-to-server / curl)', async () => {
+      globalThis.fetch = mock.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'a' }),
+      }));
+      const event = {
+        rawPath: '/oauth/google/token',
+        requestContext: { http: { method: 'POST' } },
+        headers: {},
+        body: JSON.stringify({
+          code: 'c',
+          code_verifier: 'v',
+          redirect_uri: 'https://beanies.family/oauth/callback',
+          client_id: 'cid',
+        }),
+      };
+      const res = parseResponse(await handler(event));
+      assert.equal(res.statusCode, 200);
+    });
+  });
+
+  describe('redirect URI auto-derivation from CORS_ORIGIN', () => {
+    it('accepts redirect_uri derived from each allowed origin', async () => {
+      // CORS_ORIGIN in beforeEach is 'https://beanies.family,http://localhost:5173'
+      // so both <origin>/oauth/callback paths must be accepted.
+      globalThis.fetch = mock.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'a' }),
+      }));
+
+      for (const origin of ['https://beanies.family', 'http://localhost:5173']) {
+        const event = makeEvent({
+          origin,
+          body: {
+            code: 'c',
+            code_verifier: 'v',
+            redirect_uri: `${origin}/oauth/callback`,
+            client_id: 'cid',
+          },
+        });
+        const res = parseResponse(await handler(event));
+        assert.equal(res.statusCode, 200, `expected 200 for ${origin}`);
+      }
+    });
+
+    it('rejects redirect_uri whose origin is not in CORS_ORIGIN', async () => {
+      const event = makeEvent({
+        origin: 'https://beanies.family',
+        body: {
+          code: 'c',
+          code_verifier: 'v',
+          redirect_uri: 'https://other.example.com/oauth/callback',
+          client_id: 'cid',
+        },
+      });
+      const res = parseResponse(await handler(event));
+      assert.equal(res.statusCode, 400);
+      assert.match(res.parsedBody.error, /redirect_uri/);
+    });
   });
 
   describe('error handling', () => {
