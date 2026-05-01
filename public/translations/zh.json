@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-30",
-    "translationCount": 2597
+    "lastUpdated": "2026-05-01",
+    "translationCount": 2599
   },
   "translations": {
     "app.name": {
@@ -12990,6 +12990,16 @@
       "translation": "请检查您的网络连接，然后重试。在此之前，应用将使用您之前的语言。",
       "hash": "hcx419",
       "lastUpdated": "2026-04-30"
+    },
+    "error.unexpectedFailure": {
+      "translation": "出了点问题",
+      "hash": "h3jr53",
+      "lastUpdated": "2026-05-01"
+    },
+    "error.unexpectedFailureHelp": {
+      "translation": "请刷新并重试。客服已收到通知。",
+      "hash": "h99872",
+      "lastUpdated": "2026-05-01"
     }
   }
 }
