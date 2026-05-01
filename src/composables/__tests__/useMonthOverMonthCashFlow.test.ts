@@ -30,6 +30,25 @@ vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: () => settingsState,
 }));
 
+// useToday captures `localToday()` at module-load time into a singleton
+// ref, so vi.setSystemTime() on its own can't influence it (the real date
+// is already baked in by the time the test runs). Mock it the same way
+// the sibling useNetWorthHistory test does, returning fresh `new Date()`s
+// each call so vi.useFakeTimers + setSystemTime take effect.
+vi.mock('@/composables/useToday', async () => {
+  const { ref, computed } = await import('vue');
+  const { toDateInputValue, getStartOfDay } = await import('@/utils/date');
+  return {
+    useToday: () => ({
+      today: ref(toDateInputValue(new Date())),
+      startOfToday: computed(() => getStartOfDay(new Date())),
+      isVisible: ref(true),
+      lastVisibleAt: ref(0),
+      lastHiddenAt: ref(0),
+    }),
+  };
+});
+
 import { useMonthOverMonthCashFlow } from '../useMonthOverMonthCashFlow';
 
 function tx(overrides: Partial<Transaction> = {}): Transaction {
