@@ -1850,6 +1850,14 @@ const STRING_DEFS = {
     beanie:
       'check your connection and try again. the app stays in your previous language until then.',
   },
+  'error.unexpectedFailure': {
+    en: 'Something went wrong',
+    beanie: 'a bean got stuck',
+  },
+  'error.unexpectedFailureHelp': {
+    en: 'Please refresh and try again. Support has been notified.',
+    beanie: 'please refresh and try again. support has been notified.',
+  },
 
   // Not Found (404)
   'notFound.title': { en: 'Not Found', beanie: 'not found' },
