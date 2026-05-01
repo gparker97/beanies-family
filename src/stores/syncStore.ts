@@ -35,7 +35,8 @@ import {
   initializeAuth,
   migratePendingRefreshToken,
   requestAccessToken,
-  onTokenExpired,
+  onTokenPermanentlyExpired,
+  onTokenAcquired,
   fetchGoogleUserEmail,
 } from '@/services/google/googleAuth';
 import {
@@ -1628,6 +1629,7 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   let tokenExpiryUnsub: (() => void) | null = null;
+  let tokenAcquiredUnsub: (() => void) | null = null;
 
   function updateProviderEmailAfterLoad(): void {
     let attempts = 0;
@@ -1647,13 +1649,40 @@ export const useSyncStore = defineStore('sync', () => {
     }, 500);
   }
 
+  /**
+   * Wires up the reconnect-banner state.
+   *
+   * - **Show on permanent failure only.** The banner appears when Google
+   *   has revoked our refresh token (`invalid_grant`) — the only state
+   *   the user can fix by re-authenticating. Transient failures (network
+   *   blips, brief 5xx, mid-SW activation) do NOT surface the banner;
+   *   the visibility-change wake listener and the next caller's
+   *   `attemptSilentRefresh` will retry silently.
+   *
+   * - **Self-heal on any successful acquisition.** Whether the user
+   *   manually reconnected, a silent refresh succeeded in the background,
+   *   or a redirect-auth round-trip completed — if the banner is up,
+   *   clear it. This makes the banner robust to any transient race we
+   *   didn't catch upstream: the next time auth is healthy, the UI
+   *   reflects that without user action.
+   */
   function setupTokenExpiryHandler(): void {
-    if (tokenExpiryUnsub) return;
-    tokenExpiryUnsub = onTokenExpired(() => {
-      if (storageProviderType.value === 'google_drive') {
-        showGoogleReconnect.value = true;
-      }
-    });
+    if (!tokenExpiryUnsub) {
+      tokenExpiryUnsub = onTokenPermanentlyExpired(() => {
+        if (storageProviderType.value === 'google_drive') {
+          showGoogleReconnect.value = true;
+        }
+      });
+    }
+    if (!tokenAcquiredUnsub) {
+      tokenAcquiredUnsub = onTokenAcquired(() => {
+        if (showGoogleReconnect.value) {
+          handleGoogleReconnected().catch((e) => {
+            console.warn('[syncStore] auto-clear of reconnect banner failed', e);
+          });
+        }
+      });
+    }
   }
 
   // --- Passkey secret management (V4: stored in envelope's passkeyWrappedKeys) ---

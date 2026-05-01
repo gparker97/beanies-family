@@ -43,10 +43,21 @@ let pendingAuthPromise: Promise<string> | null = null;
 // Cached Google account email
 let cachedEmail: string | null = null;
 
-// Expiry callbacks
+// Expiry callbacks — fire from the scheduled-refresh timer when the
+// pre-expiry refresh attempt fails AND the cause is permanent. Transient
+// (network blip / 5xx / `pendingSilentRefresh` race) does NOT fire these
+// — we let the next visibility wake or caller try again silently.
 type ExpiryCallback = () => void;
 const expiryCallbacks: ExpiryCallback[] = [];
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Permanent-failure callbacks — fire ONLY when `performSilentRefresh`
+// detects an `invalid_grant` (refresh token revoked by Google or the user
+// at accounts.google.com). This is the only legitimate trigger for the
+// reconnect banner: the user MUST re-auth interactively because we have
+// no recoverable credential. Subscribers should be idempotent.
+type PermanentFailureCallback = () => void;
+const permanentFailureCallbacks: PermanentFailureCallback[] = [];
 
 // Token-acquisition callbacks. Fires after every successful access-token
 // acquisition (popup, silent refresh, redirect). Subscribers receive the
@@ -120,7 +131,8 @@ function getRedirectUri(): string {
 }
 
 /**
- * Initialize auth for a family — loads stored refresh token from IndexedDB.
+ * Initialize auth for a family — loads stored refresh token from IndexedDB
+ * AND installs the visibility-change wake listener (idempotent).
  * Call this once after login, before any Drive operations.
  */
 export async function initializeAuth(familyId: string): Promise<void> {
@@ -130,6 +142,74 @@ export async function initializeAuth(familyId: string): Promise<void> {
     refreshToken = stored;
     console.warn('[googleAuth] Loaded refresh token for family', familyId);
   }
+  installAuthWakeListener();
+}
+
+// Window of time before `expiresAt` that triggers a proactive refresh on
+// tab-wake / page-mount. 2 min absorbs the typical 5–30s of wake-handler
+// latency without refreshing more often than necessary.
+const WAKE_REFRESH_THRESHOLD_MS = 120_000;
+let wakeListenerInstalled = false;
+let wakeListenerHandler: (() => void) | null = null;
+
+/**
+ * Install a `visibilitychange` listener that proactively refreshes the
+ * access token when the tab becomes visible AND the token expires within
+ * `WAKE_REFRESH_THRESHOLD_MS`. Idempotent — safe to call from every
+ * `initializeAuth` invocation.
+ *
+ * Why this exists: the scheduled-refresh `setTimeout` is module-level
+ * state that dies on full page reload AND is throttled while the tab is
+ * hidden. A user who leaves the tab open overnight returns to an expired
+ * access token; without this listener, the next sync attempt or file
+ * poll fires `getValidTokenSilent`, which throws `TokenExpiredError`,
+ * which bubbles up — and even though our refresh-token flow can recover
+ * silently, the failure surfaces visibly to the user. This listener runs
+ * the silent refresh **before** any sync code can race.
+ *
+ * Idempotency notes:
+ *   - The `wakeListenerInstalled` guard prevents stacked listeners
+ *   - `attemptSilentRefresh` is internally deduplicated via
+ *     `pendingSilentRefresh`, so concurrent triggers (visibility +
+ *     scheduled-timer) don't double-fetch
+ *   - We also fire once at install time, which covers full page reload
+ *     and the SW-update reload path ("get fresh beans" banner).
+ */
+function installAuthWakeListener(): void {
+  if (wakeListenerInstalled) return;
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  wakeListenerInstalled = true;
+
+  const refreshIfStale = (): void => {
+    if (typeof document !== 'undefined' && document.hidden) return;
+    if (!refreshToken) return;
+    const willExpireSoon = Date.now() + WAKE_REFRESH_THRESHOLD_MS >= expiresAt;
+    if (!willExpireSoon) return;
+    void attemptSilentRefresh().catch(() => {
+      // Errors are already logged inside performSilentRefresh; swallow
+      // so the listener never throws into the browser's event loop.
+    });
+  };
+
+  wakeListenerHandler = refreshIfStale;
+  document.addEventListener('visibilitychange', refreshIfStale);
+  // Fire once on install — covers cold boot / full reload / SW update,
+  // where module state has been wiped and the access token is null.
+  refreshIfStale();
+}
+
+/**
+ * Test-only — remove the wake listener and reset install state. Used by
+ * vitest's `afterEach` to clean up before `vi.resetModules()` discards
+ * the module, preventing stale listeners from accumulating on `document`
+ * across test cases. Production code never calls this.
+ */
+export function __resetWakeListenerForTesting(): void {
+  if (wakeListenerHandler && typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', wakeListenerHandler);
+  }
+  wakeListenerHandler = null;
+  wakeListenerInstalled = false;
 }
 
 /**
@@ -347,10 +427,12 @@ async function performSilentRefresh(): Promise<string | null> {
 
   if (!clientId || !refreshToken) return null;
 
-  // Retry once on transient failures (network blip during SW activation,
-  // brief 5xx from the proxy, mobile-network jitter). `invalid_grant` is
-  // permanent and short-circuits — the refresh token has been revoked.
-  const MAX_ATTEMPTS = 2;
+  // Retry up to 3× on transient failures (network blip during SW
+  // activation, brief 5xx from the proxy, mobile-network jitter) with
+  // stepped backoff. `invalid_grant` is permanent and short-circuits —
+  // the refresh token has been revoked at Google's end.
+  const RETRY_BACKOFF_MS = [1500, 3000] as const;
+  const MAX_ATTEMPTS = RETRY_BACKOFF_MS.length + 1;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       console.warn(
@@ -387,15 +469,26 @@ async function performSilentRefresh(): Promise<string | null> {
         if (currentFamilyId) {
           await clearGoogleRefreshToken(currentFamilyId);
         }
+        // Fire permanent-failure subscribers — this is the single
+        // legitimate trigger for the reconnect banner. Wrap each in
+        // try/catch so one bad subscriber can't starve the others.
+        permanentFailureCallbacks.forEach((cb) => {
+          try {
+            cb();
+          } catch (err) {
+            console.warn('[googleAuth] Permanent-failure callback error:', err);
+          }
+        });
         return null;
       }
 
       // Transient failure — retry if attempts remain.
       if (attempt < MAX_ATTEMPTS) {
+        const backoffMs = RETRY_BACKOFF_MS[attempt - 1] ?? 3000;
         console.warn(
-          `[googleAuth] Silent refresh failed (transient, retrying in 1.5s): ${message}`
+          `[googleAuth] Silent refresh failed (transient, retrying in ${backoffMs}ms): ${message}`
         );
-        await new Promise((r) => setTimeout(r, 1500));
+        await new Promise((r) => setTimeout(r, backoffMs));
         continue;
       }
 
@@ -458,12 +551,22 @@ export async function getValidToken(): Promise<string> {
 /**
  * Get a valid access token using silent refresh ONLY. Throws
  * `TokenExpiredError` if the token has expired and silent refresh fails —
- * never opens a Google popup.
+ * never opens a Google popup, **and never directly surfaces the reconnect
+ * banner**.
  *
  * Use this from any background/non-user-gesture context (Drive sync,
- * polling, recurring refreshes, the wake-time stale-tab refresh). The
- * caller should catch `TokenExpiredError` and let the existing reconnect
- * banner (`syncStore.showGoogleReconnect`) prompt the user.
+ * polling, recurring refreshes, the wake-time stale-tab refresh).
+ *
+ * **Banner-firing contract:** the reconnect banner is wired to
+ * `onTokenPermanentlyExpired` only — it fires when Google has actually
+ * revoked our refresh token (`invalid_grant`), not on transient network
+ * blips, brief 5xx, or mid-SW-activation hiccups. Callers that catch
+ * `TokenExpiredError` should treat it as "try again later" — the banner
+ * will surface on its own if the failure is permanent. The next
+ * successful silent refresh (auto-fired on `visibilitychange` via
+ * `installAuthWakeListener`, or by the next caller through
+ * `attemptSilentRefresh`) will clear any banner that did appear via
+ * the `onTokenAcquired` self-heal path.
  *
  * Why this exists: an unsolicited popup that opens because we couldn't
  * silently refresh is the worst kind of UX — it appears without any
@@ -474,19 +577,6 @@ export async function getValidTokenSilent(): Promise<string> {
   if (isTokenValid()) return accessToken!;
   const silentToken = await attemptSilentRefresh();
   if (silentToken) return silentToken;
-
-  // Notify subscribers (syncStore surfaces the reconnect banner) before
-  // throwing. Same channel `scheduleAutoRefresh` uses on its own failure,
-  // so the banner appears whether the failure surfaces via the timer or
-  // via an on-demand silent token request.
-  expiryCallbacks.forEach((cb) => {
-    try {
-      cb();
-    } catch (e) {
-      console.warn('[googleAuth] Expiry callback error:', e);
-    }
-  });
-
   throw new TokenExpiredError();
 }
 
@@ -560,7 +650,10 @@ export async function clearGoogleSessionState(): Promise<void> {
 
 /**
  * Register a callback to be notified when the token is about to expire
- * and automatic refresh has failed.
+ * and automatic refresh has failed (the scheduled-timer pre-expiry path,
+ * after its own retry budget is exhausted with a transient cause). Most
+ * consumers want `onTokenPermanentlyExpired` instead — this hook fires
+ * for transients too and should not surface user-visible UI on its own.
  * Returns an unsubscribe function.
  */
 export function onTokenExpired(callback: ExpiryCallback): () => void {
@@ -568,6 +661,22 @@ export function onTokenExpired(callback: ExpiryCallback): () => void {
   return () => {
     const index = expiryCallbacks.indexOf(callback);
     if (index > -1) expiryCallbacks.splice(index, 1);
+  };
+}
+
+/**
+ * Register a callback for **permanent** silent-refresh failure — fires
+ * only when Google returns `invalid_grant` (the refresh token has been
+ * revoked, expired permanently, or the user removed app access at
+ * accounts.google.com). This is the only legitimate trigger for the
+ * reconnect banner — the user must re-auth interactively because no
+ * credential we have can recover. Returns an unsubscribe function.
+ */
+export function onTokenPermanentlyExpired(callback: PermanentFailureCallback): () => void {
+  permanentFailureCallbacks.push(callback);
+  return () => {
+    const index = permanentFailureCallbacks.indexOf(callback);
+    if (index > -1) permanentFailureCallbacks.splice(index, 1);
   };
 }
 
