@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-01
 
+### Added
+
+- **New beanstalk post: "aloe vera".** A personal essay (~2400 words) about losing my mom and a half-empty bottle of aloe vera that has survived ten moves and one shipping container from Japan to Singapore. Featured on the `/blog` index. Cross-posted to Substack the same day; this is the canonical beanstalk version.
+
 ### Fixed
 
 - **Store-action errors now ship a stack trace + a friendlier user message.** Two related issues with the generic store-action wrapper. (1) `wrapAsync` (the catch-all wrapper used by ~7 stores — transactions, todos, favorites, photos, etc.) called `showToast('error', e.message)` without passing the Error itself, so every caught throw landed in `#beanies-errors` with surface `app` and **no stack frames** — leaving each firing essentially un-diagnosable on the receive side. The Error now travels through to the reporter, so future Slack alerts include the call-site stack. (2) Engine-internal panics (wasm-bindgen `recursive use of an object detected which would lead to unsafe aliasing in rust`, wasm trap messages, `RuntimeError`, etc.) previously rendered the raw rust string directly in a user-facing toast — confusing and scary. wrapAsync now substitutes a friendly "Something went wrong / please refresh / support has been notified" toast for those messages while reporting the original raw text + stack to Slack under a dedicated `wrapAsync:engine-panic` surface, so engineering keeps the diagnostic value without users seeing engine internals. Triggered by an iPad iOS 15 + Google Search App webview firing this morning that floated wasm-bindgen output to a real user. 9 new tests cover the two paths and the engine-panic regex list (`recursive use`, `unsafe aliasing`, `unreachable executed`, `memory access out of bounds`, `RuntimeError`, `wasm`).
