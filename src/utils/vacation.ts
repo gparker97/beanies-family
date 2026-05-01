@@ -300,8 +300,8 @@ export function prefillTransportationDates<T extends VacationTransportation>(
 
 /**
  * Classify a trip date relative to today's local calendar day.
- * Used by `TravelPlansPage` to mute past days and place the
- * `<TodayTimelineMarker>` at the right rail position.
+ * Used by `TravelPlansPage` to mute past days and to gate the inline
+ * `<TodayTimelineMarker>` chip onto today's date-group.
  *
  * The `today` argument is injectable so tests can stub it; in app code
  * it defaults to the device's current local date (no UTC surprises).

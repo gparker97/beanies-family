@@ -39,6 +39,13 @@
 
   --color-primary: #f15d22;
   --color-primary-dark: #d14d1a;
+
+  /* Heritage Orange — brand alias for `--color-primary`. Components that
+     reference `var(--heritage-orange)` (with or without a fallback) read
+     this name; many call sites historically used it without a fallback,
+     so it must be globally defined. Same hex in dark mode (brand color
+     is constant). */
+  --heritage-orange: #f15d22;
   --color-secondary: #2c3e50;
   --color-success: #22c55e;
   --color-warning: #e67e22;

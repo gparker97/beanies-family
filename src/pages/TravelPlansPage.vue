@@ -102,17 +102,15 @@ const selectedVacation = computed(() =>
 
 const { groupedByDate, accommodationGaps, undatedItems } = useVacationTimeline(selectedVacation);
 
-/** Merged timeline: interleave date groups with gap warnings + today marker */
+/** Merged timeline: interleave date groups with gap warnings.
+ *  The "you are here" today indicator is rendered inline inside today's
+ *  date-group as a subordinate chip below the date header (see
+ *  `<TodayTimelineMarker>` in the template), not as a separate entry.
+ *  This keeps every day's rail circle + "Day N · date" header consistent
+ *  across past / today / future. */
 type TimelineEntry =
   | { type: 'group'; data: (typeof groupedByDate)['value'][number] }
-  | { type: 'gap'; date: string; label: string }
-  | {
-      type: 'today-marker';
-      date: string;
-      dayNumber: number;
-      totalDays: number;
-      isFreeDay: boolean;
-    };
+  | { type: 'gap'; date: string; label: string };
 
 /** Split ideas into unplanned and planned */
 const unplannedIdeas = computed(
@@ -169,36 +167,65 @@ const mergedTimeline = computed<TimelineEntry[]>(() => {
     entries.push({ type: 'gap', date: gapDate, label: formatNookDate(gapDate) });
   }
 
-  // Inject the "you are here" marker whenever today sits inside the trip
-  // window. The banner stands in for today's date-node (circle + header)
-  // regardless of whether today has segments — one consistent pulsing rail
-  // anchor for the current day. See 2026-04-21 design decision.
-  const v = selectedVacation.value;
-  if (isMidTrip.value && v?.startDate && v?.endDate) {
-    const dayNumber = tripDayNumber(todayISO.value, v.startDate) ?? 0;
-    const totalDays = tripDurationDays(v.startDate, v.endDate);
-    const hasSegmentsToday = entries.some(
-      (e) => e.type === 'group' && e.data.date === todayISO.value
-    );
-    entries.push({
-      type: 'today-marker',
-      date: todayISO.value,
-      dayNumber,
-      totalDays,
-      isFreeDay: !hasSegmentsToday,
-    });
+  // Inject a synthetic empty group for today when mid-trip and we don't
+  // already have a real one. Ensures today renders the same "Day N · date"
+  // header as every other day even on free-rest days with no segments —
+  // the inline <TodayTimelineMarker> chip below the header then adds the
+  // "you are here" cue without breaking the consistent header pattern.
+  if (isMidTrip.value && selectedVacation.value?.startDate) {
+    const today = todayISO.value;
+    const hasGroup = entries.some((e) => e.type === 'group' && e.data.date === today);
+    if (!hasGroup) {
+      entries.push({
+        type: 'group',
+        data: {
+          date: today,
+          label: formatNookDate(today),
+          items: [],
+        },
+      });
+    }
   }
 
   entries.sort((a, b) => {
     const dateA = a.type === 'group' ? a.data.date : a.date;
     const dateB = b.type === 'group' ? b.data.date : b.date;
     if (dateA !== dateB) return dateA.localeCompare(dateB);
-    // Same-date tiebreak: today-marker first (above), then group, then gap.
-    const prio = (e: TimelineEntry) => (e.type === 'today-marker' ? 0 : e.type === 'group' ? 1 : 2);
+    // Same-date tiebreak: group first (provides the canonical date header),
+    // then gap (whose date-header is suppressed via the groupDates lookup
+    // when a group already names the date).
+    const prio = (e: TimelineEntry) => (e.type === 'group' ? 0 : 1);
     return prio(a) - prio(b);
   });
   return entries;
 });
+
+/** Trip-relative info for the inline TodayTimelineMarker chip. */
+const todayMarkerInfo = computed(() => {
+  const v = selectedVacation.value;
+  if (!isMidTrip.value || !v?.startDate || !v?.endDate) return null;
+  const dayNumber = tripDayNumber(todayISO.value, v.startDate) ?? 0;
+  const totalDays = tripDurationDays(v.startDate, v.endDate);
+  const hasSegmentsToday = groupedByDate.value.some((g) => g.date === todayISO.value);
+  return {
+    dayNumber,
+    totalDays,
+    isFreeDay: !hasSegmentsToday,
+  };
+});
+
+/** Set of dates that have a group entry (real or synthetic). Used to
+ *  suppress duplicate date headers on gap entries that share a date with
+ *  an existing group — the group's header already names the date, so the
+ *  gap can render its card alone. */
+const groupDates = computed(
+  () =>
+    new Set(
+      mergedTimeline.value
+        .filter((e): e is Extract<TimelineEntry, { type: 'group' }> => e.type === 'group')
+        .map((e) => e.data.date)
+    )
+);
 
 const upcomingVacations = computed(() => vacationStore.upcomingVacations);
 
@@ -889,9 +916,32 @@ function addQuickIdea() {
             <template v-for="(entry, ei) in mergedTimeline" :key="ei">
               <!-- ── Gap warning (inline at correct date) ── -->
               <template v-if="entry.type === 'gap'">
-                <div class="relative flex items-center pt-3 pb-1">
+                <!-- Date header suppressed when a date-group exists for the
+                     same date — the group's header already names the date
+                     (and on today, that includes the synthetic empty group
+                     injected for free-rest days), so the gap card can stand
+                     alone here. Past-day muting matches the date-group's
+                     treatment so the past/today boundary lands at one
+                     consistent place on the timeline. -->
+                <div
+                  v-if="!groupDates.has(entry.date)"
+                  :class="[
+                    'relative flex items-center pt-3 pb-1',
+                    classifyTripDay(entry.date) === 'past' ? 'opacity-55 saturate-50' : '',
+                  ]"
+                >
+                  <!-- Gap circle. Today/future use the dashed orange warning
+                       style ("you need to book this"). Past gaps fall back to
+                       the regular solid-teal date-circle so the past-day rail
+                       rhythm reads uniformly — the 🏨 emoji + the gap card
+                       below still convey "no accommodation that night". -->
                   <div
-                    class="absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] border-dashed border-[var(--heritage-orange)] bg-white text-xs dark:bg-slate-800"
+                    :class="[
+                      'absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] bg-white text-xs dark:bg-slate-800',
+                      classifyTripDay(entry.date) === 'past'
+                        ? 'border-[#00B4D8] shadow-[0_2px_8px_rgba(0,180,216,0.12)]'
+                        : 'border-dashed border-[var(--heritage-orange)]',
+                    ]"
                   >
                     🏨
                   </div>
@@ -899,7 +949,12 @@ function addQuickIdea() {
                     {{ entry.label }}
                   </span>
                 </div>
-                <div class="relative mb-2">
+                <div
+                  :class="[
+                    'relative mb-2',
+                    classifyTripDay(entry.date) === 'past' ? 'opacity-55 saturate-50' : '',
+                  ]"
+                >
                   <div
                     class="absolute top-4 -left-[33px] z-[2] h-2 w-2 rounded-full bg-[var(--heritage-orange)] opacity-25"
                   />
@@ -922,32 +977,30 @@ function addQuickIdea() {
                 </div>
               </template>
 
-              <!-- ── Today marker (rail punch-in) ── -->
-              <template v-else-if="entry.type === 'today-marker'">
-                <TodayTimelineMarker
-                  :date="entry.date"
-                  :day-number="entry.dayNumber"
-                  :total-days="entry.totalDays"
-                  :is-free-day="entry.isFreeDay"
-                />
-              </template>
-
               <!-- ── Date group with segment cards ── -->
               <template v-else>
-                <!-- Classification drives past-day muting + today emphasis -->
+                <!-- Classification only drives past-day muting now. Today's
+                     emphasis comes from the inline <TodayTimelineMarker>
+                     chip below the date header and the orange connector
+                     dots on today's segments. -->
                 <div
                   :class="{
                     'opacity-55 saturate-50': classifyTripDay(entry.data.date) === 'past',
                   }"
                 >
-                  <!-- Date node — suppressed for today; the TodayTimelineMarker
-                       banner renders above and stands in for the circle + header. -->
-                  <div
-                    v-if="classifyTripDay(entry.data.date) !== 'today'"
-                    class="relative flex items-center pt-3 pb-1"
-                  >
+                  <!-- Date header — consistent for every day including today.
+                       Today shares the same circle + 📅 + size as every other
+                       day, but swaps the teal border for Heritage Orange and
+                       gets a pulsing halo to signal "you are here" without
+                       breaking the rail's rhythm. -->
+                  <div class="relative flex items-center pt-3 pb-1">
                     <div
-                      class="absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] border-[#00B4D8] bg-white text-xs shadow-[0_2px_8px_rgba(0,180,216,0.12)] dark:bg-slate-800"
+                      :class="[
+                        'absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] bg-white text-xs dark:bg-slate-800',
+                        classifyTripDay(entry.data.date) === 'today'
+                          ? 'today-date-circle'
+                          : 'border-[#00B4D8] shadow-[0_2px_8px_rgba(0,180,216,0.12)]',
+                      ]"
                     >
                       📅
                     </div>
@@ -968,6 +1021,17 @@ function addQuickIdea() {
                       {{ entry.data.label }}
                     </span>
                   </div>
+
+                  <!-- "You are here" chip — subordinate to the date header,
+                       sits above today's segments (or alone, on a free-rest
+                       day with no segments). -->
+                  <TodayTimelineMarker
+                    v-if="classifyTripDay(entry.data.date) === 'today' && todayMarkerInfo"
+                    :date="entry.data.date"
+                    :day-number="todayMarkerInfo.dayNumber"
+                    :total-days="todayMarkerInfo.totalDays"
+                    :is-free-day="todayMarkerInfo.isFreeDay"
+                  />
 
                   <!-- Segment cards within this date -->
                   <div v-for="item in entry.data.items" :key="item.id" class="relative mb-2">
@@ -1375,6 +1439,44 @@ function addQuickIdea() {
 
   50% {
     transform: translateY(-3px);
+  }
+}
+
+/* Today's date-circle — Heritage Orange border + halo + pulse so today
+   reads as "live" / "you are here" without changing shape, size, or
+   the 📅 icon that every other date-circle on the rail uses.
+   border-color lives here (not as a Tailwind arbitrary utility) because
+   `border-[var(--heritage-orange)]` parses ambiguously next to
+   `border-[2.5px]` in Tailwind 4 — the var() form silently falls back
+   to currentColor (≈ black). Hex literals inside the keyframe because
+   browsers don't reliably interpolate CSS vars across @keyframe steps.
+   Heritage Orange = #F15D22. Static fallback for prefers-reduced-motion
+   users keeps a visible still ring instead of the pulse. */
+.today-date-circle {
+  border-color: var(--heritage-orange, #f15d22);
+  box-shadow:
+    0 2px 8px rgb(241 93 34 / 18%),
+    0 0 0 2px rgb(241 93 34 / 18%);
+}
+
+@keyframes today-date-circle-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 2px 8px rgb(241 93 34 / 18%),
+      0 0 0 0 rgb(241 93 34 / 50%);
+  }
+
+  50% {
+    box-shadow:
+      0 2px 8px rgb(241 93 34 / 18%),
+      0 0 0 8px rgb(241 93 34 / 0%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .today-date-circle {
+    animation: today-date-circle-pulse 2s ease-in-out infinite;
   }
 }
 </style>
