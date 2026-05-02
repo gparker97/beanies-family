@@ -56,6 +56,14 @@ export interface RegisterPasskeyParams {
 
 export interface RegisterPasskeyResult {
   success: boolean;
+  /**
+   * True when the user dismissed the platform-authenticator prompt
+   * (`DOMException: NotAllowedError`). Distinct from a real failure so
+   * callers can swallow user-cancellation silently — surfacing an error
+   * toast for a deliberate user gesture is misleading and was leaking
+   * to `#beanies-errors` via the auto-reporter (triage 2026-05-02).
+   */
+  cancelled?: boolean;
   error?: string;
   prfSupported?: boolean;
   passkeySecret?: PasskeySecret;
@@ -108,7 +116,7 @@ export async function registerPasskeyForMember(
     credential = (await navigator.credentials.create(createOptions)) as PublicKeyCredential | null;
   } catch (err) {
     if (err instanceof DOMException && err.name === 'NotAllowedError') {
-      return { success: false, error: 'Registration was cancelled' };
+      return { success: false, cancelled: true, error: 'Registration was cancelled' };
     }
 
     // Platform constraint or PRF extension failed — retry progressively:
@@ -180,6 +188,13 @@ export interface AuthenticatePasskeyParams {
 
 export interface AuthenticatePasskeyResult {
   success: boolean;
+  /**
+   * True when the user dismissed the platform-authenticator prompt
+   * (`DOMException: NotAllowedError`). See `RegisterPasskeyResult.cancelled`
+   * for why callers should swallow this case silently rather than render
+   * an error.
+   */
+  cancelled?: boolean;
   memberId?: string;
   credentialId?: string; // Credential ID (for cross-device registration)
   familyKey?: CryptoKey; // Family key for file decryption
@@ -230,7 +245,7 @@ export async function authenticateWithPasskey(
         };
       }
     } else if (err instanceof DOMException && err.name === 'NotAllowedError') {
-      return { success: false, error: 'Authentication was cancelled' };
+      return { success: false, cancelled: true, error: 'Authentication was cancelled' };
     } else {
       return {
         success: false,

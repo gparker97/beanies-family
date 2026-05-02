@@ -133,47 +133,67 @@ export const useAccountsStore = defineStore('accounts', () => {
 
   // Actions
   async function loadAccounts() {
-    await wrapAsync(isLoading, error, async () => {
-      accounts.value = await accountRepo.getAllAccounts();
-    });
+    await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        accounts.value = await accountRepo.getAllAccounts();
+      },
+      { action: 'accountsStore:loadAccounts' }
+    );
   }
 
   async function createAccount(input: CreateAccountInput): Promise<Account | null> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const account = await accountRepo.createAccount(input);
-      const isFirst = accounts.value.length === 0;
-      // Immutable update: assign a new array so downstream computeds re-evaluate
-      accounts.value = [...accounts.value, account];
-      if (isFirst) {
-        celebrate('first-account');
-      }
-      return account;
-    });
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const account = await accountRepo.createAccount(input);
+        const isFirst = accounts.value.length === 0;
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        accounts.value = [...accounts.value, account];
+        if (isFirst) {
+          celebrate('first-account');
+        }
+        return account;
+      },
+      { action: 'accountsStore:createAccount' }
+    );
     if (result) await syncLinkedRecurringPayment(result);
     return result ?? null;
   }
 
   async function updateAccount(id: string, input: UpdateAccountInput): Promise<Account | null> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const updated = await accountRepo.updateAccount(id, input);
-      if (updated) {
-        // Immutable update: assign a new array so downstream computeds re-evaluate
-        accounts.value = accounts.value.map((a) => (a.id === id ? updated : a));
-      }
-      return updated;
-    });
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const updated = await accountRepo.updateAccount(id, input);
+        if (updated) {
+          // Immutable update: assign a new array so downstream computeds re-evaluate
+          accounts.value = accounts.value.map((a) => (a.id === id ? updated : a));
+        }
+        return updated;
+      },
+      { action: 'accountsStore:updateAccount' }
+    );
     if (result) await syncLinkedRecurringPayment(result);
     return result ?? null;
   }
 
   async function deleteAccount(id: string): Promise<boolean> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const success = await accountRepo.deleteAccount(id);
-      if (success) {
-        accounts.value = accounts.value.filter((a) => a.id !== id);
-      }
-      return success;
-    });
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const success = await accountRepo.deleteAccount(id);
+        if (success) {
+          accounts.value = accounts.value.filter((a) => a.id !== id);
+        }
+        return success;
+      },
+      { action: 'accountsStore:deleteAccount' }
+    );
     return result ?? false;
   }
 

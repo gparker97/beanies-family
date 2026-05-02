@@ -166,6 +166,39 @@ describe('registerPasskeyForMember', () => {
     // V4: no cachedPassword field on registration
     expect('cachedPassword' in saved).toBe(false);
   });
+
+  it('flags result.cancelled when the user dismisses the platform-authenticator prompt', async () => {
+    // NotAllowedError is what `navigator.credentials.create` throws when
+    // the user dismisses the iOS/Android passkey sheet (or the prompt
+    // times out). It's a user gesture, not an error — the result must
+    // carry `cancelled: true` so callers can exit silently instead of
+    // surfacing an error toast that auto-reports to Slack.
+    const cancelError = Object.assign(new Error('cancelled'), { name: 'NotAllowedError' });
+    Object.setPrototypeOf(cancelError, DOMException.prototype);
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: {
+        create: vi.fn(async () => {
+          throw cancelError;
+        }),
+        get: vi.fn(),
+      },
+      userAgent: navigator.userAgent,
+    });
+
+    const result = await registerPasskeyForMember({
+      memberId: 'member-1',
+      memberName: 'Test User',
+      memberEmail: 'test@example.com',
+      familyId: 'family-1',
+      familyKey: {} as CryptoKey,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.cancelled).toBe(true);
+    expect(result.error).toBe('Registration was cancelled');
+    expect(passkeyRepo.savePasskeyRegistration).not.toHaveBeenCalled();
+  });
 });
 
 describe('authenticateWithPasskey', () => {
@@ -360,6 +393,27 @@ describe('authenticateWithPasskey', () => {
     const result = await authenticateWithPasskey({ familyId: 'family-1' });
     expect(result.success).toBe(false);
     expect(result.error).toBe('WRONG_FAMILY_CREDENTIAL');
+  });
+
+  it('flags result.cancelled when the user dismisses the platform-authenticator prompt', async () => {
+    mockRegistrations.push(makeRegistration());
+    const cancelError = Object.assign(new Error('cancelled'), { name: 'NotAllowedError' });
+    Object.setPrototypeOf(cancelError, DOMException.prototype);
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: {
+        get: vi.fn(async () => {
+          throw cancelError;
+        }),
+        create: vi.fn(),
+      },
+      userAgent: navigator.userAgent,
+    });
+
+    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    expect(result.success).toBe(false);
+    expect(result.cancelled).toBe(true);
+    expect(result.error).toBe('Authentication was cancelled');
   });
 });
 

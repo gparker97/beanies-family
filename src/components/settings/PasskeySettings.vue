@@ -57,6 +57,9 @@ async function handleRegister() {
       }
       statusMessage.value = { text: t('passkey.registerSuccess'), type: 'success' };
       await loadPasskeys();
+    } else if (result.cancelled) {
+      // User dismissed the platform-authenticator prompt — silent.
+      console.warn('[passkey] registration cancelled by user');
     } else {
       statusMessage.value = { text: result.error ?? t('passkey.registerError'), type: 'error' };
     }
