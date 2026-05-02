@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-02
+
+### Fixed
+
+- **Dismissing the passkey prompt is now silent — no error toast, no Slack alert.** When the user tapped Cancel (or the prompt timed out) on the post-onboarding "Enable passkey?" sheet, three things were wrong: (1) iOS/Android surface that gesture as `DOMException: NotAllowedError`, which `passkeyService` was returning as `{ success: false, error: 'Registration was cancelled' }`; (2) `App.vue:handleEnablePasskey` was piping the cancellation through `showToast('error', ...)`, telling the user they'd hit an error when in fact they'd just exercised a normal choice; (3) the toast's auto-reporter was forwarding "Registration was cancelled" to `#beanies-errors` as a real production alert. Same shape on the authentication side ('Authentication was cancelled' from the BiometricLoginView passkey sign-in). Caught after a real Xu Family registration test on iOS 18.7 — the user successfully completed the password-based path, but the passkey-dismissal alert still fired to Slack. Fix: added a first-class `cancelled` flag to both `RegisterPasskeyResult` and `AuthenticatePasskeyResult` (set whenever the underlying `NotAllowedError` is caught); all three call sites — App.vue, BiometricLoginView, PasskeySettings — now branch on `result.cancelled` first and exit silently with a console warn instead of surfacing an error. authStore.signInWithPasskey no longer sets `error.value` on cancellation either, so any reactive UI bound to it stays clean. 2 new unit tests cover both result types' cancellation paths.
+
+- **Engine-panic Slack alerts now identify which store action triggered the failure.** Yesterday's `wrapAsync:engine-panic` surface (added to catch wasm-bindgen "recursive use of an object detected" panics like the one a real iPad iOS 15 + Google Search App user hit) shipped without any caller-identifying context — the alert carried the rust message and the wasm stack but nothing about which of the ~7 stores or 90 wrapAsync call sites actually threw, leaving each firing un-actionable. wrapAsync now accepts an optional `action` label and threads it into the alert as `context.action`. Backfilled the highest-traffic call sites first — todoStore, activityStore, transactionsStore, vacationStore, goalsStore, accountsStore (25 actions total) — covering every CRUD path through which a real user would reach an engine panic. Long-tail stores (sayings, favorites, member notes, etc.) still emit unlabeled alerts for now; those will be backfilled when traffic justifies. Triggered by a 2026-05-02 j&m household firing on the same iPad iOS 15.8 + GSA WKWebView shape — same family fired twice in 48 sec, suggesting a reproducible per-user trigger we couldn't act on without knowing the action.
+
+---
+
 ## 2026-05-01
 
 ### Added

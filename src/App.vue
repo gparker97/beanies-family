@@ -151,6 +151,11 @@ async function handleEnablePasskey() {
         await syncStore.syncNow(true);
       }
       showToast('success', t('passkey.registerSuccess'));
+    } else if (result.cancelled) {
+      // User dismissed the platform-authenticator prompt — a deliberate
+      // gesture, not an error. Stay silent (no toast, no Slack alert).
+      // They can enable passkey later from Settings.
+      console.warn('[passkey] registration cancelled by user');
     } else {
       showToast('error', result.error ?? t('passkey.registerError'));
     }

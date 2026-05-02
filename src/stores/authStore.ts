@@ -356,6 +356,7 @@ export const useAuthStore = defineStore('auth', () => {
     passkeySecrets?: PasskeySecret[]
   ): Promise<{
     success: boolean;
+    cancelled?: boolean;
     memberId?: string;
     familyKey?: CryptoKey;
     credentialId?: string;
@@ -367,8 +368,18 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const result = await authenticateWithPasskey({ familyId, passkeySecrets });
       if (!result.success || !result.memberId) {
-        error.value = result.error ?? 'Passkey authentication failed';
-        return { success: false, credentialId: result.credentialId, error: error.value };
+        // Don't pollute `error.value` with a user-cancellation — keeps
+        // any reactive UI bound to authStore.error from rendering an
+        // error state for a deliberate dismiss gesture.
+        if (!result.cancelled) {
+          error.value = result.error ?? 'Passkey authentication failed';
+        }
+        return {
+          success: false,
+          cancelled: result.cancelled,
+          credentialId: result.credentialId,
+          error: result.error,
+        };
       }
 
       // The member data may not be loaded yet (file not decrypted),

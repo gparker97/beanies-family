@@ -93,9 +93,14 @@ export const useVacationStore = defineStore('vacations', () => {
 
   // Actions
   async function loadVacations() {
-    await wrapAsync(isLoading, error, async () => {
-      vacations.value = await vacationRepo.getAllVacations();
-    });
+    await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        vacations.value = await vacationRepo.getAllVacations();
+      },
+      { action: 'vacationStore:loadVacations' }
+    );
   }
 
   /**
@@ -111,46 +116,51 @@ export const useVacationStore = defineStore('vacations', () => {
   async function createVacation(
     input: Omit<CreateFamilyVacationInput, 'activityId'>
   ): Promise<FamilyVacation | null> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      let startDate = input.startDate;
-      let endDate = input.endDate;
-      if (!startDate && !endDate) {
-        const seed = computeVacationDates(input);
-        startDate = seed.startDate;
-        endDate = seed.endDate;
-      }
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        let startDate = input.startDate;
+        let endDate = input.endDate;
+        if (!startDate && !endDate) {
+          const seed = computeVacationDates(input);
+          startDate = seed.startDate;
+          endDate = seed.endDate;
+        }
 
-      // Create linked FamilyActivity (all-day calendar entry)
-      const activityInput: CreateFamilyActivityInput = {
-        title: input.name,
-        category: 'other_activity',
-        icon: '✈️',
-        date: startDate ?? extractDatePart(new Date().toISOString()),
-        endDate: endDate,
-        isAllDay: true,
-        recurrence: 'none',
-        feeSchedule: 'none',
-        reminderMinutes: 0,
-        isActive: true,
-        assigneeIds: [...input.assigneeIds],
-        createdBy: input.createdBy,
-      };
-      const activity = await activityRepo.createActivity(activityInput);
+        // Create linked FamilyActivity (all-day calendar entry)
+        const activityInput: CreateFamilyActivityInput = {
+          title: input.name,
+          category: 'other_activity',
+          icon: '✈️',
+          date: startDate ?? extractDatePart(new Date().toISOString()),
+          endDate: endDate,
+          isAllDay: true,
+          recurrence: 'none',
+          feeSchedule: 'none',
+          reminderMinutes: 0,
+          isActive: true,
+          assigneeIds: [...input.assigneeIds],
+          createdBy: input.createdBy,
+        };
+        const activity = await activityRepo.createActivity(activityInput);
 
-      // Create vacation with link to activity
-      const vacation = await vacationRepo.createVacation({
-        ...input,
-        activityId: activity.id,
-        startDate,
-        endDate,
-      });
+        // Create vacation with link to activity
+        const vacation = await vacationRepo.createVacation({
+          ...input,
+          activityId: activity.id,
+          startDate,
+          endDate,
+        });
 
-      // Set bidirectional link: activity → vacation
-      await activityRepo.updateActivity(activity.id, { vacationId: vacation.id });
+        // Set bidirectional link: activity → vacation
+        await activityRepo.updateActivity(activity.id, { vacationId: vacation.id });
 
-      vacations.value = [...vacations.value, vacation];
-      return vacation;
-    });
+        vacations.value = [...vacations.value, vacation];
+        return vacation;
+      },
+      { action: 'vacationStore:createVacation' }
+    );
     if (result) window.plausible?.('feature_used', { props: { feature: 'vacation' } });
     return result ?? null;
   }
@@ -173,83 +183,88 @@ export const useVacationStore = defineStore('vacations', () => {
     id: string,
     input: UpdateFamilyVacationInput
   ): Promise<FamilyVacation | null> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const existing = vacations.value.find((v) => v.id === id);
-      if (!existing) {
-        console.error(`[vacation] updateVacation: no vacation with id "${id}"`);
-        return null;
-      }
-
-      let nextStart = existing.startDate;
-      let nextEnd = existing.endDate;
-
-      // (1) Manual-edit path: caller explicitly set a date → use it.
-      if (input.startDate !== undefined) nextStart = input.startDate;
-      if (input.endDate !== undefined) nextEnd = input.endDate;
-
-      // (2) Seed fallback for historical vacations without any dates.
-      //     Only runs when the caller DIDN'T explicitly set either
-      //     date, so we don't stomp a manual edit.
-      if (input.startDate === undefined && input.endDate === undefined) {
-        if (!existing.startDate && !existing.endDate) {
-          const merged = {
-            travelSegments: input.travelSegments ?? existing.travelSegments,
-            accommodations: input.accommodations ?? existing.accommodations,
-            transportation: input.transportation ?? existing.transportation,
-          };
-          const seed = computeVacationDates(merged);
-          nextStart = seed.startDate;
-          nextEnd = seed.endDate;
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const existing = vacations.value.find((v) => v.id === id);
+        if (!existing) {
+          console.error(`[vacation] updateVacation: no vacation with id "${id}"`);
+          return null;
         }
-      }
 
-      // (3) Auto-extend: widen the window to include any incoming
-      //     segment dates. Never narrows. Runs regardless of (1)/(2)
-      //     so even a manual date edit can still be extended by a
-      //     concurrently-added out-of-range segment.
-      const candidates = collectSegmentDates({
-        travelSegments: input.travelSegments,
-        accommodations: input.accommodations,
-        transportation: input.transportation,
-      });
-      if (candidates.length > 0) {
-        const extended = extendTripDates({ start: nextStart, end: nextEnd }, ...candidates);
-        nextStart = extended.start;
-        nextEnd = extended.end;
-      }
+        let nextStart = existing.startDate;
+        let nextEnd = existing.endDate;
 
-      const updated = await vacationRepo.updateVacation(id, {
-        ...input,
-        startDate: nextStart,
-        endDate: nextEnd,
-      });
-      if (!updated) return null;
+        // (1) Manual-edit path: caller explicitly set a date → use it.
+        if (input.startDate !== undefined) nextStart = input.startDate;
+        if (input.endDate !== undefined) nextEnd = input.endDate;
 
-      // Sync linked activity. If this fails, the vacation itself is
-      // already persisted — rolling back would destroy user work.
-      // Surface a clear warning toast instead of silently drifting.
-      try {
-        await activityRepo.updateActivity(existing.activityId, {
-          title: input.name ?? existing.name,
-          date: nextStart ?? extractDatePart(new Date().toISOString()),
-          endDate: nextEnd,
-          assigneeIds: input.assigneeIds ?? existing.assigneeIds,
+        // (2) Seed fallback for historical vacations without any dates.
+        //     Only runs when the caller DIDN'T explicitly set either
+        //     date, so we don't stomp a manual edit.
+        if (input.startDate === undefined && input.endDate === undefined) {
+          if (!existing.startDate && !existing.endDate) {
+            const merged = {
+              travelSegments: input.travelSegments ?? existing.travelSegments,
+              accommodations: input.accommodations ?? existing.accommodations,
+              transportation: input.transportation ?? existing.transportation,
+            };
+            const seed = computeVacationDates(merged);
+            nextStart = seed.startDate;
+            nextEnd = seed.endDate;
+          }
+        }
+
+        // (3) Auto-extend: widen the window to include any incoming
+        //     segment dates. Never narrows. Runs regardless of (1)/(2)
+        //     so even a manual date edit can still be extended by a
+        //     concurrently-added out-of-range segment.
+        const candidates = collectSegmentDates({
+          travelSegments: input.travelSegments,
+          accommodations: input.accommodations,
+          transportation: input.transportation,
         });
-      } catch (activityErr) {
-        console.error(
-          `[vacation] Vacation updated but linked activity "${existing.activityId}" did not sync:`,
-          activityErr
-        );
-        showToast(
-          'warning',
-          'Trip saved, but your calendar may be out of date',
-          'Try refreshing the page to re-sync.'
-        );
-      }
+        if (candidates.length > 0) {
+          const extended = extendTripDates({ start: nextStart, end: nextEnd }, ...candidates);
+          nextStart = extended.start;
+          nextEnd = extended.end;
+        }
 
-      vacations.value = vacations.value.map((v) => (v.id === id ? updated : v));
-      return updated;
-    });
+        const updated = await vacationRepo.updateVacation(id, {
+          ...input,
+          startDate: nextStart,
+          endDate: nextEnd,
+        });
+        if (!updated) return null;
+
+        // Sync linked activity. If this fails, the vacation itself is
+        // already persisted — rolling back would destroy user work.
+        // Surface a clear warning toast instead of silently drifting.
+        try {
+          await activityRepo.updateActivity(existing.activityId, {
+            title: input.name ?? existing.name,
+            date: nextStart ?? extractDatePart(new Date().toISOString()),
+            endDate: nextEnd,
+            assigneeIds: input.assigneeIds ?? existing.assigneeIds,
+          });
+        } catch (activityErr) {
+          console.error(
+            `[vacation] Vacation updated but linked activity "${existing.activityId}" did not sync:`,
+            activityErr
+          );
+          showToast(
+            'warning',
+            'Trip saved, but your calendar may be out of date',
+            'Try refreshing the page to re-sync.'
+          );
+        }
+
+        vacations.value = vacations.value.map((v) => (v.id === id ? updated : v));
+        return updated;
+      },
+      { action: 'vacationStore:updateVacation' }
+    );
     return result ?? null;
   }
 
@@ -257,23 +272,28 @@ export const useVacationStore = defineStore('vacations', () => {
    * Delete a vacation and its linked activity.
    */
   async function deleteVacation(id: string): Promise<boolean> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const vacation = vacations.value.find((v) => v.id === id);
-      if (!vacation) return false;
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const vacation = vacations.value.find((v) => v.id === id);
+        if (!vacation) return false;
 
-      // Delete the linked activity first (repo + in-memory store)
-      await activityRepo.deleteActivity(vacation.activityId);
-      const { useActivityStore } = await import('@/stores/activityStore');
-      const activityStore = useActivityStore();
-      activityStore.removeFromMemory(vacation.activityId);
+        // Delete the linked activity first (repo + in-memory store)
+        await activityRepo.deleteActivity(vacation.activityId);
+        const { useActivityStore } = await import('@/stores/activityStore');
+        const activityStore = useActivityStore();
+        activityStore.removeFromMemory(vacation.activityId);
 
-      // Delete the vacation
-      const success = await vacationRepo.deleteVacation(id);
-      if (success) {
-        vacations.value = vacations.value.filter((v) => v.id !== id);
-      }
-      return success;
-    });
+        // Delete the vacation
+        const success = await vacationRepo.deleteVacation(id);
+        if (success) {
+          vacations.value = vacations.value.filter((v) => v.id !== id);
+        }
+        return success;
+      },
+      { action: 'vacationStore:deleteVacation' }
+    );
     return result ?? false;
   }
 
