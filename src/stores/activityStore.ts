@@ -234,18 +234,28 @@ export const useActivityStore = defineStore('activities', () => {
 
   // Actions
   async function loadActivities() {
-    await wrapAsync(isLoading, error, async () => {
-      activities.value = await activityRepo.getAllActivities();
-    });
+    await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        activities.value = await activityRepo.getAllActivities();
+      },
+      { action: 'activityStore:loadActivities' }
+    );
   }
 
   async function createActivity(input: CreateFamilyActivityInput): Promise<FamilyActivity | null> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const activity = await activityRepo.createActivity(input);
-      // Immutable update: assign a new array so downstream computeds re-evaluate
-      activities.value = [...activities.value, activity];
-      return activity;
-    });
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const activity = await activityRepo.createActivity(input);
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        activities.value = [...activities.value, activity];
+        return activity;
+      },
+      { action: 'activityStore:createActivity' }
+    );
     if (result) await syncLinkedRecurringPayment(result);
     return result ?? null;
   }
@@ -254,14 +264,19 @@ export const useActivityStore = defineStore('activities', () => {
     id: string,
     input: UpdateFamilyActivityInput
   ): Promise<FamilyActivity | null> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const updated = await activityRepo.updateActivity(id, input);
-      if (updated) {
-        // Immutable update: assign a new array so downstream computeds re-evaluate
-        activities.value = activities.value.map((a) => (a.id === id ? updated : a));
-      }
-      return updated;
-    });
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const updated = await activityRepo.updateActivity(id, input);
+        if (updated) {
+          // Immutable update: assign a new array so downstream computeds re-evaluate
+          activities.value = activities.value.map((a) => (a.id === id ? updated : a));
+        }
+        return updated;
+      },
+      { action: 'activityStore:updateActivity' }
+    );
     if (result) await syncLinkedRecurringPayment(result);
     return result ?? null;
   }
@@ -275,13 +290,18 @@ export const useActivityStore = defineStore('activities', () => {
       );
       return false;
     }
-    const result = await wrapAsync(isLoading, error, async () => {
-      const success = await activityRepo.deleteActivity(id);
-      if (success) {
-        activities.value = activities.value.filter((a) => a.id !== id);
-      }
-      return success;
-    });
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const success = await activityRepo.deleteActivity(id);
+        if (success) {
+          activities.value = activities.value.filter((a) => a.id !== id);
+        }
+        return success;
+      },
+      { action: 'activityStore:deleteActivity' }
+    );
     return result ?? false;
   }
 

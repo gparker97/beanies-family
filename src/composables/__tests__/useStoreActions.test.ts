@@ -267,4 +267,37 @@ describe('wrapAsync — engine panic friendly-toast wrap', () => {
     });
     expect(reportError).not.toHaveBeenCalled();
   });
+
+  it('threads `options.action` into the engine-panic Slack alert as context', async () => {
+    const original = new Error('recursive use of an object detected');
+    await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        throw original;
+      },
+      { action: 'todoStore:createTodo' }
+    );
+
+    expect(reportError).toHaveBeenCalledWith({
+      surface: 'wrapAsync:engine-panic',
+      message: 'recursive use of an object detected',
+      error: original,
+      context: { action: 'todoStore:createTodo' },
+    });
+  });
+
+  it('omits context when no action label is provided (back-compat)', async () => {
+    const original = new Error('recursive use of an object detected');
+    await wrapAsync(isLoading, error, async () => {
+      throw original;
+    });
+
+    expect(reportError).toHaveBeenCalledWith({
+      surface: 'wrapAsync:engine-panic',
+      message: 'recursive use of an object detected',
+      error: original,
+      context: undefined,
+    });
+  });
 });

@@ -98,18 +98,28 @@ export const useGoalsStore = defineStore('goals', () => {
 
   // Actions
   async function loadGoals() {
-    await wrapAsync(isLoading, error, async () => {
-      goals.value = await goalRepo.getAllGoals();
-    });
+    await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        goals.value = await goalRepo.getAllGoals();
+      },
+      { action: 'goalsStore:loadGoals' }
+    );
   }
 
   async function createGoal(input: CreateGoalInput): Promise<Goal | null> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const goal = await goalRepo.createGoal(input);
-      // Immutable update: assign a new array so downstream computeds re-evaluate
-      goals.value = [...goals.value, goal];
-      return goal;
-    });
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const goal = await goalRepo.createGoal(input);
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        goals.value = [...goals.value, goal];
+        return goal;
+      },
+      { action: 'goalsStore:createGoal' }
+    );
     if (result) window.plausible?.('feature_used', { props: { feature: 'goal' } });
     return result ?? null;
   }
@@ -119,46 +129,56 @@ export const useGoalsStore = defineStore('goals', () => {
     input: UpdateGoalInput,
     options?: UpdateGoalOptions
   ): Promise<Goal | null> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const existing = goals.value.find((g) => g.id === id);
-      const wasCompleted = existing?.isCompleted ?? false;
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const existing = goals.value.find((g) => g.id === id);
+        const wasCompleted = existing?.isCompleted ?? false;
 
-      // Auto-complete if currentAmount meets targetAmount
-      if (existing && input.currentAmount !== undefined && !input.isCompleted) {
-        if (input.currentAmount >= existing.targetAmount) {
-          input = { ...input, isCompleted: true };
+        // Auto-complete if currentAmount meets targetAmount
+        if (existing && input.currentAmount !== undefined && !input.isCompleted) {
+          if (input.currentAmount >= existing.targetAmount) {
+            input = { ...input, isCompleted: true };
+          }
         }
-      }
 
-      // User-initiated contribution audit (only when the caller passed
-      // `options.contribution` — automated paths skip this branch).
-      if (options?.contribution && existing) {
-        input = appendContributionIfChanged(existing, input, options.contribution);
-      }
-
-      const updated = await goalRepo.updateGoal(id, input);
-      if (updated) {
-        // Immutable update: assign a new array so downstream computeds re-evaluate
-        goals.value = goals.value.map((g) => (g.id === id ? updated : g));
-
-        // Fire celebration when goal transitions to completed
-        if (updated.isCompleted && !wasCompleted) {
-          celebrate(updated.type === 'debt_payoff' ? 'debt-free' : 'goal-reached');
+        // User-initiated contribution audit (only when the caller passed
+        // `options.contribution` — automated paths skip this branch).
+        if (options?.contribution && existing) {
+          input = appendContributionIfChanged(existing, input, options.contribution);
         }
-      }
-      return updated;
-    });
+
+        const updated = await goalRepo.updateGoal(id, input);
+        if (updated) {
+          // Immutable update: assign a new array so downstream computeds re-evaluate
+          goals.value = goals.value.map((g) => (g.id === id ? updated : g));
+
+          // Fire celebration when goal transitions to completed
+          if (updated.isCompleted && !wasCompleted) {
+            celebrate(updated.type === 'debt_payoff' ? 'debt-free' : 'goal-reached');
+          }
+        }
+        return updated;
+      },
+      { action: 'goalsStore:updateGoal' }
+    );
     return result ?? null;
   }
 
   async function deleteGoal(id: string): Promise<boolean> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const success = await goalRepo.deleteGoal(id);
-      if (success) {
-        goals.value = goals.value.filter((g) => g.id !== id);
-      }
-      return success;
-    });
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const success = await goalRepo.deleteGoal(id);
+        if (success) {
+          goals.value = goals.value.filter((g) => g.id !== id);
+        }
+        return success;
+      },
+      { action: 'goalsStore:deleteGoal' }
+    );
     return result ?? false;
   }
 

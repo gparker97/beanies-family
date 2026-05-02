@@ -43,6 +43,13 @@ async function handleBiometricLogin() {
     );
 
     if (!result.success) {
+      // User dismissed the platform-authenticator prompt — silent exit
+      // so they can pick another sign-in method without an error
+      // message accusing them of failure.
+      if (result.cancelled) {
+        console.warn('[passkey] authentication cancelled by user');
+        return;
+      }
       if (result.error === 'WRONG_FAMILY_CREDENTIAL') {
         errorMessage.value = t('passkey.wrongFamilyError');
       } else {

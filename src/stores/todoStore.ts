@@ -53,41 +53,61 @@ export const useTodoStore = defineStore('todos', () => {
 
   // Actions
   async function loadTodos() {
-    await wrapAsync(isLoading, error, async () => {
-      todos.value = await todoRepo.getAllTodos();
-    });
+    await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        todos.value = await todoRepo.getAllTodos();
+      },
+      { action: 'todoStore:loadTodos' }
+    );
   }
 
   async function createTodo(input: CreateTodoInput): Promise<TodoItem | null> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const todo = await todoRepo.createTodo(input);
-      // Immutable update: assign a new array so downstream computeds re-evaluate
-      todos.value = [...todos.value, todo];
-      return todo;
-    });
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const todo = await todoRepo.createTodo(input);
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        todos.value = [...todos.value, todo];
+        return todo;
+      },
+      { action: 'todoStore:createTodo' }
+    );
     return result ?? null;
   }
 
   async function updateTodo(id: string, input: UpdateTodoInput): Promise<TodoItem | null> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const updated = await todoRepo.updateTodo(id, input);
-      if (updated) {
-        // Immutable update: assign a new array so downstream computeds re-evaluate
-        todos.value = todos.value.map((t) => (t.id === id ? updated : t));
-      }
-      return updated;
-    });
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const updated = await todoRepo.updateTodo(id, input);
+        if (updated) {
+          // Immutable update: assign a new array so downstream computeds re-evaluate
+          todos.value = todos.value.map((t) => (t.id === id ? updated : t));
+        }
+        return updated;
+      },
+      { action: 'todoStore:updateTodo' }
+    );
     return result ?? null;
   }
 
   async function deleteTodo(id: string): Promise<boolean> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const success = await todoRepo.deleteTodo(id);
-      if (success) {
-        todos.value = todos.value.filter((t) => t.id !== id);
-      }
-      return success;
-    });
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const success = await todoRepo.deleteTodo(id);
+        if (success) {
+          todos.value = todos.value.filter((t) => t.id !== id);
+        }
+        return success;
+      },
+      { action: 'todoStore:deleteTodo' }
+    );
     return result ?? false;
   }
 

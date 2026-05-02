@@ -339,52 +339,62 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
   // Actions
   async function loadTransactions() {
-    await wrapAsync(isLoading, error, async () => {
-      const raw = await transactionRepo.getAllTransactions();
-      // Remove CRDT-duplicated recurring transactions at the source so all
-      // consumers (budget, reports, dashboard) see clean data.
-      transactions.value = deduplicateRecurring(raw);
-    });
+    await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const raw = await transactionRepo.getAllTransactions();
+        // Remove CRDT-duplicated recurring transactions at the source so all
+        // consumers (budget, reports, dashboard) see clean data.
+        transactions.value = deduplicateRecurring(raw);
+      },
+      { action: 'transactionsStore:loadTransactions' }
+    );
   }
 
   async function createTransaction(input: CreateTransactionInput): Promise<Transaction | null> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      // Balance adjustments are audit echoes of an already-applied balance change.
-      // Skip all cascading side effects (balance mutation, goal/loan application)
-      // and force isReconciled: true so the invariant lives in one place.
-      if (input.type === 'balance_adjustment') {
-        const normalized = { ...input, isReconciled: true };
-        const transaction = await transactionRepo.createTransaction(normalized);
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        // Balance adjustments are audit echoes of an already-applied balance change.
+        // Skip all cascading side effects (balance mutation, goal/loan application)
+        // and force isReconciled: true so the invariant lives in one place.
+        if (input.type === 'balance_adjustment') {
+          const normalized = { ...input, isReconciled: true };
+          const transaction = await transactionRepo.createTransaction(normalized);
+          transactions.value = [...transactions.value, transaction];
+          return transaction;
+        }
+
+        const transaction = await transactionRepo.createTransaction(input);
+        const isFirst = transactions.value.length === 0;
+        // Immutable update: assign a new array so downstream computeds re-evaluate
         transactions.value = [...transactions.value, transaction];
+        if (isFirst) {
+          celebrate('first-transaction');
+        }
+
+        // Update account balance
+        const adjustment = calculateBalanceAdjustment(input.type, input.amount, true);
+        await adjustAccountBalance(input.accountId, adjustment);
+
+        // For transfers, also update destination account
+        if (input.type === 'transfer' && input.toAccountId) {
+          const destAdjustment = calculateBalanceAdjustment(input.type, input.amount, false);
+          await adjustAccountBalance(input.toAccountId, destAdjustment);
+        }
+
+        // Apply goal allocation (if linked)
+        await applyGoalAllocation(transaction);
+
+        // Apply loan payment (if linked)
+        await applyLoanPayment(transaction);
+
         return transaction;
-      }
-
-      const transaction = await transactionRepo.createTransaction(input);
-      const isFirst = transactions.value.length === 0;
-      // Immutable update: assign a new array so downstream computeds re-evaluate
-      transactions.value = [...transactions.value, transaction];
-      if (isFirst) {
-        celebrate('first-transaction');
-      }
-
-      // Update account balance
-      const adjustment = calculateBalanceAdjustment(input.type, input.amount, true);
-      await adjustAccountBalance(input.accountId, adjustment);
-
-      // For transfers, also update destination account
-      if (input.type === 'transfer' && input.toAccountId) {
-        const destAdjustment = calculateBalanceAdjustment(input.type, input.amount, false);
-        await adjustAccountBalance(input.toAccountId, destAdjustment);
-      }
-
-      // Apply goal allocation (if linked)
-      await applyGoalAllocation(transaction);
-
-      // Apply loan payment (if linked)
-      await applyLoanPayment(transaction);
-
-      return transaction;
-    });
+      },
+      { action: 'transactionsStore:createTransaction' }
+    );
     if (result) window.plausible?.('feature_used', { props: { feature: 'transaction' } });
     return result ?? null;
   }
@@ -393,133 +403,154 @@ export const useTransactionsStore = defineStore('transactions', () => {
     id: string,
     input: UpdateTransactionInput
   ): Promise<Transaction | null> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      // Get the original transaction to calculate balance adjustments
-      const original = transactions.value.find((t) => t.id === id);
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        // Get the original transaction to calculate balance adjustments
+        const original = transactions.value.find((t) => t.id === id);
 
-      const updated = await transactionRepo.updateTransaction(id, input);
-      if (updated) {
-        // Immutable update: assign a new array so downstream computeds re-evaluate
-        transactions.value = transactions.value.map((t) => (t.id === id ? updated : t));
+        const updated = await transactionRepo.updateTransaction(id, input);
+        if (updated) {
+          // Immutable update: assign a new array so downstream computeds re-evaluate
+          transactions.value = transactions.value.map((t) => (t.id === id ? updated : t));
 
-        // Balance adjustments carry no side effects (see createTransaction for rationale).
-        // Skip the reverse-and-reapply dance for both the original and updated shape.
-        if (original?.type === 'balance_adjustment' || updated.type === 'balance_adjustment') {
-          return updated;
-        }
+          // Balance adjustments carry no side effects (see createTransaction for rationale).
+          // Skip the reverse-and-reapply dance for both the original and updated shape.
+          if (original?.type === 'balance_adjustment' || updated.type === 'balance_adjustment') {
+            return updated;
+          }
 
-        // If amount, type, or account changed, adjust balances
-        if (original) {
-          // Reverse the original transaction's effect
-          const originalAdjustment = calculateBalanceAdjustment(
-            original.type,
-            original.amount,
-            true
-          );
-          await adjustAccountBalance(original.accountId, -originalAdjustment);
-
-          // If it was a transfer, also reverse destination
-          if (original.type === 'transfer' && original.toAccountId) {
-            const originalDestAdjustment = calculateBalanceAdjustment(
+          // If amount, type, or account changed, adjust balances
+          if (original) {
+            // Reverse the original transaction's effect
+            const originalAdjustment = calculateBalanceAdjustment(
               original.type,
               original.amount,
-              false
+              true
             );
-            await adjustAccountBalance(original.toAccountId, -originalDestAdjustment);
+            await adjustAccountBalance(original.accountId, -originalAdjustment);
+
+            // If it was a transfer, also reverse destination
+            if (original.type === 'transfer' && original.toAccountId) {
+              const originalDestAdjustment = calculateBalanceAdjustment(
+                original.type,
+                original.amount,
+                false
+              );
+              await adjustAccountBalance(original.toAccountId, -originalDestAdjustment);
+            }
+
+            // Apply the new transaction's effect
+            const newType = input.type ?? original.type;
+            const newAmount = input.amount ?? original.amount;
+            const newAccountId = input.accountId ?? original.accountId;
+            const newToAccountId = input.toAccountId ?? original.toAccountId;
+
+            const newAdjustment = calculateBalanceAdjustment(newType, newAmount, true);
+            await adjustAccountBalance(newAccountId, newAdjustment);
+
+            // For transfers, also update destination
+            if (newType === 'transfer' && newToAccountId) {
+              const newDestAdjustment = calculateBalanceAdjustment(newType, newAmount, false);
+              await adjustAccountBalance(newToAccountId, newDestAdjustment);
+            }
+
+            // Reverse old goal allocation
+            await adjustGoalProgress(original.goalId, original.goalAllocApplied, true);
+
+            // Reverse old loan payment
+            await reverseLoanPayment(original);
           }
 
-          // Apply the new transaction's effect
-          const newType = input.type ?? original.type;
-          const newAmount = input.amount ?? original.amount;
-          const newAccountId = input.accountId ?? original.accountId;
-          const newToAccountId = input.toAccountId ?? original.toAccountId;
+          // Apply new goal allocation (if linked)
+          await applyGoalAllocation(updated);
 
-          const newAdjustment = calculateBalanceAdjustment(newType, newAmount, true);
-          await adjustAccountBalance(newAccountId, newAdjustment);
-
-          // For transfers, also update destination
-          if (newType === 'transfer' && newToAccountId) {
-            const newDestAdjustment = calculateBalanceAdjustment(newType, newAmount, false);
-            await adjustAccountBalance(newToAccountId, newDestAdjustment);
-          }
-
-          // Reverse old goal allocation
-          await adjustGoalProgress(original.goalId, original.goalAllocApplied, true);
-
-          // Reverse old loan payment
-          await reverseLoanPayment(original);
+          // Apply new loan payment (if linked)
+          await applyLoanPayment(updated);
         }
-
-        // Apply new goal allocation (if linked)
-        await applyGoalAllocation(updated);
-
-        // Apply new loan payment (if linked)
-        await applyLoanPayment(updated);
-      }
-      return updated;
-    });
+        return updated;
+      },
+      { action: 'transactionsStore:updateTransaction' }
+    );
     return result ?? null;
   }
 
   async function deleteTransaction(id: string): Promise<boolean> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      // Get the transaction before deleting to reverse balance
-      const transaction = transactions.value.find((t) => t.id === id);
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        // Get the transaction before deleting to reverse balance
+        const transaction = transactions.value.find((t) => t.id === id);
 
-      const success = await transactionRepo.deleteTransaction(id);
-      if (success) {
-        transactions.value = transactions.value.filter((t) => t.id !== id);
+        const success = await transactionRepo.deleteTransaction(id);
+        if (success) {
+          transactions.value = transactions.value.filter((t) => t.id !== id);
 
-        // Balance adjustments carry no side effects — skip reversal.
-        if (transaction?.type === 'balance_adjustment') {
-          return success;
-        }
-
-        // Reverse the transaction's effect on account balance
-        if (transaction) {
-          const adjustment = calculateBalanceAdjustment(transaction.type, transaction.amount, true);
-          await adjustAccountBalance(transaction.accountId, -adjustment);
-
-          // For transfers, also reverse destination
-          if (transaction.type === 'transfer' && transaction.toAccountId) {
-            const destAdjustment = calculateBalanceAdjustment(
-              transaction.type,
-              transaction.amount,
-              false
-            );
-            await adjustAccountBalance(transaction.toAccountId, -destAdjustment);
+          // Balance adjustments carry no side effects — skip reversal.
+          if (transaction?.type === 'balance_adjustment') {
+            return success;
           }
 
-          // Reverse goal allocation
-          await adjustGoalProgress(transaction.goalId, transaction.goalAllocApplied, true);
+          // Reverse the transaction's effect on account balance
+          if (transaction) {
+            const adjustment = calculateBalanceAdjustment(
+              transaction.type,
+              transaction.amount,
+              true
+            );
+            await adjustAccountBalance(transaction.accountId, -adjustment);
 
-          // Reverse loan payment
-          await reverseLoanPayment(transaction);
+            // For transfers, also reverse destination
+            if (transaction.type === 'transfer' && transaction.toAccountId) {
+              const destAdjustment = calculateBalanceAdjustment(
+                transaction.type,
+                transaction.amount,
+                false
+              );
+              await adjustAccountBalance(transaction.toAccountId, -destAdjustment);
+            }
+
+            // Reverse goal allocation
+            await adjustGoalProgress(transaction.goalId, transaction.goalAllocApplied, true);
+
+            // Reverse loan payment
+            await reverseLoanPayment(transaction);
+          }
         }
-      }
-      return success;
-    });
+        return success;
+      },
+      { action: 'transactionsStore:deleteTransaction' }
+    );
     return result ?? false;
   }
 
   async function deleteTransactionsByRecurringItemId(recurringItemId: string): Promise<number> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      const toDelete = transactions.value.filter((t) => t.recurringItemId === recurringItemId);
-      let count = 0;
-      for (const tx of toDelete) {
-        const success = await transactionRepo.deleteTransaction(tx.id);
-        if (success) {
-          // Reverse balance
-          const adjustment = calculateBalanceAdjustment(tx.type, tx.amount, true);
-          await adjustAccountBalance(tx.accountId, -adjustment);
-          // Reverse goal allocation
-          await adjustGoalProgress(tx.goalId, tx.goalAllocApplied, true);
-          count++;
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const toDelete = transactions.value.filter((t) => t.recurringItemId === recurringItemId);
+        let count = 0;
+        for (const tx of toDelete) {
+          const success = await transactionRepo.deleteTransaction(tx.id);
+          if (success) {
+            // Reverse balance
+            const adjustment = calculateBalanceAdjustment(tx.type, tx.amount, true);
+            await adjustAccountBalance(tx.accountId, -adjustment);
+            // Reverse goal allocation
+            await adjustGoalProgress(tx.goalId, tx.goalAllocApplied, true);
+            count++;
+          }
         }
-      }
-      transactions.value = transactions.value.filter((t) => t.recurringItemId !== recurringItemId);
-      return count;
-    });
+        transactions.value = transactions.value.filter(
+          (t) => t.recurringItemId !== recurringItemId
+        );
+        return count;
+      },
+      { action: 'transactionsStore:deleteTransactionsByRecurringItemId' }
+    );
     return result ?? 0;
   }
 

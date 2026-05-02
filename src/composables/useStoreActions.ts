@@ -8,6 +8,13 @@ interface WrapAsyncOptions {
   errorToast?: boolean;
   /** Optional success toast message */
   successToast?: string;
+  /**
+   * Caller label, e.g. `'todoStore:createTodo'`. Threaded into the Slack
+   * `wrapAsync:engine-panic` alert as `context.action` so engine panics
+   * carry which store/action triggered the failed mutation — without this
+   * the wasm stack alone is unactionable (see triage 2026-05-02).
+   */
+  action?: string;
 }
 
 /**
@@ -49,7 +56,7 @@ export async function wrapAsync<T>(
   fn: () => Promise<T>,
   options?: WrapAsyncOptions
 ): Promise<T | undefined> {
-  const { errorToast = true, successToast } = options ?? {};
+  const { errorToast = true, successToast, action } = options ?? {};
 
   isLoading.value = true;
   error.value = null;
@@ -77,6 +84,7 @@ export async function wrapAsync<T>(
           surface: 'wrapAsync:engine-panic',
           message: rawMessage,
           error: e,
+          context: action ? { action } : undefined,
         });
       } else {
         // Pass `error: e` so the stack lands in the Slack alert. Without
