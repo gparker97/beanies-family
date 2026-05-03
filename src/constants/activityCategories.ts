@@ -69,16 +69,44 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
     group: 'Educational',
   },
 
-  // Fun
-  { id: 'bar_mitzvah', name: 'Bar Mitzvah', emoji: '✡️', color: '#D97706', group: 'Fun' },
-  { id: 'birthday', name: 'Birthday Party', emoji: '🎂', color: '#F15D22', group: 'Fun' },
-  { id: 'wedding', name: 'Wedding', emoji: '💒', color: '#E67E22', group: 'Fun' },
+  // Entertainment
+  { id: 'movie', name: 'Movie', emoji: '🎬', color: '#DB2777', group: 'Entertainment' },
+  { id: 'show', name: 'Show / Musical', emoji: '🎭', color: '#EC4899', group: 'Entertainment' },
+  { id: 'concert', name: 'Concert', emoji: '🎵', color: '#BE185D', group: 'Entertainment' },
+  { id: 'theme_park', name: 'Theme Park', emoji: '🎢', color: '#E11D48', group: 'Entertainment' },
+  {
+    id: 'sporting_event',
+    name: 'Sporting Event',
+    emoji: '🏟️',
+    color: '#BE123C',
+    group: 'Entertainment',
+  },
+  { id: 'museum', name: 'Museum', emoji: '🏛️', color: '#9D174D', group: 'Entertainment' },
+  {
+    id: 'festival',
+    name: 'Festival / Fair',
+    emoji: '🎪',
+    color: '#F472B6',
+    group: 'Entertainment',
+  },
+  {
+    id: 'other_entertainment',
+    name: 'Other Entertainment',
+    emoji: '✨',
+    color: '#831843',
+    group: 'Entertainment',
+  },
+
+  // Party
+  { id: 'bar_mitzvah', name: 'Bar Mitzvah', emoji: '✡️', color: '#D97706', group: 'Party' },
+  { id: 'birthday', name: 'Birthday Party', emoji: '🎂', color: '#F15D22', group: 'Party' },
+  { id: 'wedding', name: 'Wedding', emoji: '💒', color: '#E67E22', group: 'Party' },
   {
     id: 'other_celebration',
     name: 'Other Celebration',
     emoji: '🎉',
     color: '#F59E0B',
-    group: 'Fun',
+    group: 'Party',
   },
 
   // Lessons
@@ -170,8 +198,9 @@ export const ACTIVITY_GROUP_EMOJI_MAP: Record<string, string> = {
   Appointments: '🩺',
   Competitions: '🏆',
   Educational: '📚',
-  Fun: '🎉',
+  Entertainment: '🎬',
   Lessons: '🎵',
+  Party: '🎉',
   School: '🏫',
   Sports: '⚽',
   Other: '📌',

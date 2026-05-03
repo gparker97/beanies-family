@@ -792,11 +792,20 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     after_school: 'school_fees',
     school_recital: 'school_fees',
     other_school: 'school_fees',
-    // Fun → Entertainment
+    // Party → Entertainment (expense)
     birthday: 'entertainment',
     wedding: 'entertainment',
     bar_mitzvah: 'entertainment',
     other_celebration: 'entertainment',
+    // Entertainment → Entertainment (expense)
+    movie: 'entertainment',
+    show: 'entertainment',
+    concert: 'entertainment',
+    theme_park: 'entertainment',
+    sporting_event: 'entertainment',
+    museum: 'entertainment',
+    festival: 'entertainment',
+    other_entertainment: 'other_entertainment',
     // Appointments → Medical / Personal
     doctor: 'healthcare',
     dentist: 'dental',
