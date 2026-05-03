@@ -912,6 +912,7 @@ async function confirmReschedule() {
                 :model-value="draftAssigneeIds"
                 mode="multi"
                 compact
+                include-pets
                 @update:model-value="handleAssigneeChange"
               />
               <div class="mt-1.5 flex gap-1.5">
