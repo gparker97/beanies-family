@@ -29,11 +29,15 @@ watch(
   }
 );
 
-// Fire toast on background sync error
+// Fire toast on background sync error — but stay quiet when the failure is
+// auth-transient (token expired + silent refresh failed). The auth layer
+// (`setupTokenExpiryHandler` + Google reconnect banner) owns the user-facing
+// escalation in that case; a competing "beans got lost" toast on every
+// failed reload would just confuse the message.
 watch(
   () => syncStore.backgroundSyncError,
   (err) => {
-    if (err) {
+    if (err && syncStore.backgroundSyncErrorKind !== 'auth-transient') {
       showToast('warning', t('sync.backgroundError'));
     }
   }
