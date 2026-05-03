@@ -616,7 +616,7 @@ function handleSave() {
 
       <!-- 6. Who? -->
       <FormFieldGroup :label="t('modal.whosGoing')" required :error="errorAssignees">
-        <FamilyChipPicker v-model="assigneeIds" mode="multi" />
+        <FamilyChipPicker v-model="assigneeIds" mode="multi" include-pets />
       </FormFieldGroup>
 
       <!-- 7. Category picker -->

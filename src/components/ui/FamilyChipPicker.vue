@@ -8,12 +8,20 @@ interface Props {
   mode?: 'single' | 'multi';
   compact?: boolean;
   showShared?: boolean;
+  /**
+   * Opt-in to include pets. Default false — most assignment contexts
+   * (todos, financial owners, dropoff/pickup duties) are humans-only.
+   * Activities can include pets as participants ("walk with Buddy"),
+   * so the activity-assignee call sites pass `:include-pets="true"`.
+   */
+  includePets?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   mode: 'single',
   compact: false,
   showShared: false,
+  includePets: false,
 });
 
 const emit = defineEmits<{
@@ -23,11 +31,14 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
 
-// FamilyChipPicker is always used for ASSIGNMENT (todos, activities,
-// account/asset/goal owners, vacation travelers). Pets can never be
-// assignees or owners — filter them out globally here so every call
-// site inherits the correct behavior.
-const members = computed(() => familyStore.sortedHumans);
+// FamilyChipPicker is used for ASSIGNMENT contexts. Most assignment
+// contexts are humans-only (todos, account/asset/goal owners, vacation
+// travelers, activity dropoff/pickup duties), so the default excludes
+// pets. Activity assignees opt in via `include-pets` because pets can
+// be participants in family activities (e.g. "walk with Buddy").
+const members = computed(() =>
+  props.includePets ? familyStore.sortedMembers : familyStore.sortedHumans
+);
 
 const SHARED_ID = '__shared__';
 

@@ -112,7 +112,10 @@ interface PickerTile {
 const tiles = computed<PickerTile[]>(() => {
   switch (contextKey.value) {
     case 'memberId':
-      return familyStore.sortedHumans.map((m) => ({
+      // Includes pets — every memberId-context item the FAB triggers
+      // (saying, favorite, note, medication, allergy) applies to pets
+      // too. See `QuickAddMemberPicker` for the inline-variant comment.
+      return familyStore.sortedMembers.map((m) => ({
         id: m.id,
         name: m.name,
         visual: {

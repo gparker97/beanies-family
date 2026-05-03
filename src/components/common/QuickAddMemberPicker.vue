@@ -35,10 +35,11 @@ const { t } = useTranslation();
 const { stage, commitPicker, cancelPicker } = useQuickAdd();
 const familyStore = useFamilyStore();
 
-// Pets can't be the target of sayings / favorites / notes / meds /
-// allergies per the existing pod conventions — same filter the Bean
-// detail page + scrapbook use elsewhere.
-const members = computed(() => familyStore.sortedHumans);
+// All pod-side member-required items (sayings / favorites / notes /
+// medications / allergies) apply to pets too — pets are family members
+// who can take meds, have allergies, get favorite toys, etc. Roster
+// order (sortedMembers) keeps humans first and pets after.
+const members = computed(() => familyStore.sortedMembers);
 
 // The pending item backs the header copy ("Pick a beanie for
 // <Label>"). Guarded — this component should only mount when
