@@ -49,10 +49,17 @@ const authStore = useAuthStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
+const familyStore = useFamilyStore();
 const { t } = useTranslation();
 const deploymentBadge = computed(() => getDeploymentBadge());
 const { canInstall, isInstalled, installApp } = usePWA();
 const { canManagePod, isOwner } = usePermissions();
+
+// Current pod owner — surfaced inside the Family Data modal's Pod Ownership
+// section so members can see who holds the super-admin role at a glance.
+const currentOwnerName = computed(
+  () => familyStore.members.find((m) => m.role === 'owner')?.name ?? null
+);
 const { isReconnecting, reconnectError, reconnect } = useGoogleReconnect();
 
 // ── Modal state ──────────────────────────────────────────────────────────────
@@ -528,14 +535,6 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         :description="t('settings.card.securityDesc')"
         icon-bg="var(--tint-orange-8)"
         @click="showSecurity = true"
-      />
-      <SettingsCard
-        v-if="isOwner"
-        icon="👑"
-        :title="t('settings.transferOwnership')"
-        :description="t('settings.transferOwnershipDesc')"
-        icon-bg="var(--tint-orange-8)"
-        @click="showTransferOwnership = true"
       />
     </div>
 
@@ -1256,6 +1255,37 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           <p class="text-sm text-green-600 dark:text-green-400">
             {{ t('settings.dataLoadedSuccess') }}
           </p>
+        </div>
+      </div>
+
+      <!-- ── Pod Ownership ───────────────────────────────────────────────
+           Owner-only. Rare action (once-per-pod-lifetime), so it lives
+           inside Family Data rather than getting its own Settings tile.
+           Members never see this section at all. -->
+      <div v-if="isOwner" class="mt-6 border-t border-gray-200 pt-4 dark:border-slate-700">
+        <h3 class="font-outfit mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
+          👑 {{ t('settings.podOwnershipSection') }}
+        </h3>
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0 flex-1">
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t('settings.currentOwner') }}
+            </p>
+            <p class="truncate font-medium text-gray-900 dark:text-gray-100">
+              {{ currentOwnerName ?? '—' }}
+            </p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('settings.transferOwnershipDesc') }}
+            </p>
+          </div>
+          <BaseButton
+            variant="secondary"
+            size="sm"
+            class="flex-shrink-0"
+            @click="showTransferOwnership = true"
+          >
+            {{ t('settings.transferOwnershipAction') }}
+          </BaseButton>
         </div>
       </div>
     </BeanieFormModal>
