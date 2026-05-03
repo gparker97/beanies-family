@@ -282,7 +282,13 @@ function handleSave() {
         : email.value.trim() || `${Date.now()}@temp.beanies.family`,
       gender: gender.value,
       ageGroup: ageGroup.value,
-      role: 'member' as const,
+      // CREATE only — every new member starts as 'member'. NEVER set role
+      // on UPDATE: this modal is not the role-management surface (that's
+      // TransferOwnershipModal). Hardcoding role: 'member' on edit silently
+      // demoted the owner every time anyone fixed a typo on their profile;
+      // normalizeRoles() then re-promoted on next load, masking the issue
+      // until you noticed the chip flipping mid-session.
+      ...(isEditing.value ? {} : { role: 'member' as const }),
       color: color.value,
       requiresPassword: !isPet.value,
       canViewFinances: isPet.value ? false : canViewFinances.value,
