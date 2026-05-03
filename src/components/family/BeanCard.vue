@@ -234,8 +234,6 @@ const severeAllergyCount = computed(
           size="xl"
           class="flex-shrink-0"
           :aria-label="member.name"
-          :owner-badge="member.role === 'owner'"
-          :owner-badge-label="t('family.role.ownerBadge')"
           @photo-error="refreshAvatar"
         />
         <div class="min-w-0 flex-1">
@@ -286,7 +284,16 @@ const severeAllergyCount = computed(
           <div
             class="font-inter text-secondary-500/60 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs dark:text-gray-400"
           >
+            <!-- Owner gets a Heritage Orange chip with crown — unmistakable at a glance. -->
             <span
+              v-if="member.role === 'owner'"
+              class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[#F15D22] uppercase dark:bg-orange-900/30 dark:text-orange-200"
+            >
+              <span aria-hidden="true">👑</span>
+              {{ t('family.role.ownerBadge') }}
+            </span>
+            <span
+              v-else
               class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--color-secondary)] uppercase dark:bg-slate-700 dark:text-gray-300"
             >
               {{ roleLabel }}
