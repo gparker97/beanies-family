@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-01",
-    "translationCount": 2599
+    "lastUpdated": "2026-05-03",
+    "translationCount": 2608
   },
   "translations": {
     "app.name": {
@@ -6971,11 +6971,6 @@
       "hash": "sn8nx7",
       "lastUpdated": "2026-03-15"
     },
-    "planner.group.fun": {
-      "translation": "好玩的",
-      "hash": "1isf",
-      "lastUpdated": "2026-03-15"
-    },
     "planner.category.after_school": {
       "translation": "课后活动",
       "hash": "b3uwq1",
@@ -7437,9 +7432,9 @@
       "lastUpdated": "2026-03-18"
     },
     "vacation.planningATrip": {
-      "translation": "让它成为一个家庭度假！",
-      "hash": "4i2hyi",
-      "lastUpdated": "2026-03-20"
+      "translation": "添加旅行计划！",
+      "hash": "u7pn5c",
+      "lastUpdated": "2026-05-03"
     },
     "vacation.planningSubtitle": {
       "translation": "规划行程，了解机票、酒店、创意等",
@@ -13000,6 +12995,56 @@
       "translation": "请刷新并重试。客服已收到通知。",
       "hash": "h99872",
       "lastUpdated": "2026-05-01"
+    },
+    "planner.group.party": {
+      "translation": "聚会",
+      "hash": "19rwli",
+      "lastUpdated": "2026-05-03"
+    },
+    "planner.group.entertainment": {
+      "translation": "娱乐",
+      "hash": "lhdeg8",
+      "lastUpdated": "2026-05-03"
+    },
+    "planner.category.movie": {
+      "translation": "电影",
+      "hash": "18djbk",
+      "lastUpdated": "2026-05-03"
+    },
+    "planner.category.show": {
+      "translation": "表演/音乐剧",
+      "hash": "9dhpks",
+      "lastUpdated": "2026-05-03"
+    },
+    "planner.category.concert": {
+      "translation": "我喜欢你的陪伴",
+      "hash": "rrt08q",
+      "lastUpdated": "2026-05-03"
+    },
+    "planner.category.theme_park": {
+      "translation": "游乐园",
+      "hash": "tyj65b",
+      "lastUpdated": "2026-05-03"
+    },
+    "planner.category.sporting_event": {
+      "translation": "体育赛事",
+      "hash": "913mzc",
+      "lastUpdated": "2026-05-03"
+    },
+    "planner.category.museum": {
+      "translation": "博物馆",
+      "hash": "wq7mxa",
+      "lastUpdated": "2026-05-03"
+    },
+    "planner.category.festival": {
+      "translation": "节日/集市",
+      "hash": "5qpgwz",
+      "lastUpdated": "2026-05-03"
+    },
+    "planner.category.other_entertainment": {
+      "translation": "其他娱乐行业",
+      "hash": "aim2tk",
+      "lastUpdated": "2026-05-03"
     }
   }
 }
