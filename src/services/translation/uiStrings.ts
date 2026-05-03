@@ -1582,6 +1582,12 @@ const STRING_DEFS = {
     en: 'Move the super-admin role to another adult.',
     beanie: 'move the super-admin role to another adult.',
   },
+  'settings.podOwnershipSection': { en: 'Pod Ownership', beanie: 'pod ownership' },
+  'settings.currentOwner': { en: 'Current owner', beanie: 'current owner' },
+  'settings.transferOwnershipAction': {
+    en: 'Transfer ownership…',
+    beanie: 'transfer ownership…',
+  },
   'family.email': { en: 'Email', beanie: 'email' },
   'family.gender': { en: 'Gender', beanie: 'gender' },
   'family.gender.male': { en: 'Male', beanie: 'boy beanie' },
