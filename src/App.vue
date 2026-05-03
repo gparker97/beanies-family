@@ -23,6 +23,7 @@ import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
 import { formatDeviceInfo } from '@/utils/diagnostics';
+import { hardReload } from '@/utils/hardReload';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
 import ContentSkeleton from '@/components/ui/ContentSkeleton.vue';
 import BackgroundSyncBar from '@/components/common/BackgroundSyncBar.vue';
@@ -708,7 +709,11 @@ onMounted(async () => {
 const getDeviceDiagnostics = formatDeviceInfo;
 
 function handleReload() {
-  window.location.reload();
+  // `hardReload()` evicts the SW precache before navigating — without it,
+  // a soft `location.reload()` just hits the same cached `index.html` that
+  // referenced the dead chunk in the first place, putting the user right
+  // back on the error overlay.
+  void hardReload();
 }
 
 async function handleClearDataAndSignOut() {
@@ -719,7 +724,7 @@ async function handleClearDataAndSignOut() {
   } catch {
     // Best effort — continue with reload
   }
-  window.location.reload();
+  void hardReload();
 }
 
 // Save data when going hidden; check for external file changes when becoming visible.

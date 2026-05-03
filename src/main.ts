@@ -4,7 +4,10 @@ import App from './App.vue';
 import router from './router';
 import { initAnalytics } from './services/analytics/plausible';
 import { reportError } from './utils/errorReporter';
+import { hardReload, isChunkLoadError } from './utils/hardReload';
 import './style.css';
+
+const CHUNK_RELOAD_FLAG = 'chunkReloadAttempted';
 
 initAnalytics();
 
@@ -47,11 +50,30 @@ window.addEventListener('error', (event) => {
 // Unhandled promise rejections (the dominant source of "where did this come from?" errors)
 window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason;
+  // Stale-chunk failures self-heal via `router.onError` + `vite:preloadError`
+  // below — surface them to console for devs but skip the Slack reporter.
+  if (isChunkLoadError(reason)) {
+    console.warn('[main] chunk load failure — recovering via hardReload:', reason);
+    return;
+  }
   reportError({
     surface: 'unhandled-promise-rejection',
     message: reason instanceof Error ? reason.message : String(reason),
     error: reason instanceof Error ? reason : undefined,
   });
+});
+
+// Vite emits `vite:preloadError` when a `<link rel="modulepreload">` fails —
+// same root cause as `router.onError`'s chunk-load failures (stale precached
+// index.html points at rotated hashed filenames after a deploy), but a
+// different code path that doesn't go through the router. `event.preventDefault()`
+// tells Vite we're handling the recovery; `hardReload()` evicts the SW
+// precache and replaces the URL.
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault();
+  if (sessionStorage.getItem(CHUNK_RELOAD_FLAG) === '1') return;
+  sessionStorage.setItem(CHUNK_RELOAD_FLAG, '1');
+  void hardReload();
 });
 
 // E2E data bridge (dev-only, tree-shaken from production)
