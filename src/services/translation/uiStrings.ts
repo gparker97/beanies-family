@@ -4071,7 +4071,8 @@ const STRING_DEFS = {
   'planner.group.sports': { en: 'Sports', beanie: 'active beans' },
   'planner.group.competitions': { en: 'Competitions', beanie: 'competition beans' },
   'planner.group.lessons': { en: 'Lessons', beanie: 'lesson beans' },
-  'planner.group.fun': { en: 'Fun', beanie: 'fun beans' },
+  'planner.group.party': { en: 'Party', beanie: 'party beans' },
+  'planner.group.entertainment': { en: 'Entertainment', beanie: 'entertainment beans' },
 
   // Planner — Activity Categories
   'planner.category.after_school': { en: 'After School Activity', beanie: 'after school' },
@@ -4110,6 +4111,17 @@ const STRING_DEFS = {
   'planner.category.wedding': { en: 'Wedding', beanie: 'wedding' },
   'planner.category.bar_mitzvah': { en: 'Bar Mitzvah', beanie: 'bar mitzvah' },
   'planner.category.other_celebration': { en: 'Other Celebration', beanie: 'other celebration' },
+  'planner.category.movie': { en: 'Movie', beanie: 'movie' },
+  'planner.category.show': { en: 'Show / Musical', beanie: 'show / musical' },
+  'planner.category.concert': { en: 'Concert', beanie: 'concert' },
+  'planner.category.theme_park': { en: 'Theme Park', beanie: 'theme park' },
+  'planner.category.sporting_event': { en: 'Sporting Event', beanie: 'sporting event' },
+  'planner.category.museum': { en: 'Museum', beanie: 'museum' },
+  'planner.category.festival': { en: 'Festival / Fair', beanie: 'festival / fair' },
+  'planner.category.other_entertainment': {
+    en: 'Other Entertainment',
+    beanie: 'other entertainment',
+  },
 
   // Planner — Recurrence labels
   'planner.recurrence.weekly': { en: 'Weekly', beanie: 'weekly' },
@@ -4765,8 +4777,8 @@ const STRING_DEFS = {
 
   // Toggle & entry
   'vacation.planningATrip': {
-    en: 'Make It a Family Vacation!',
-    beanie: 'make it a family vacation!',
+    en: 'Add a Travel Plan!',
+    beanie: 'add a travel plan!',
   },
   'vacation.planningSubtitle': {
     en: 'Plan a trip with flights, hotels, ideas & more',
