@@ -1991,6 +1991,11 @@ const STRING_DEFS = {
     en: 'No cloud sync configured',
     beanie: 'no cloud sync configured',
   },
+  'header.newVersionReady': {
+    en: 'A new version is ready',
+    beanie: 'fresh beans are ready',
+  },
+  'header.reloadNow': { en: 'Reload Now', beanie: 'reload now' },
 
   // Sidebar
   'sidebar.noDataFile': { en: 'No data file', beanie: 'no data file' },

@@ -35,6 +35,7 @@ import { isTemporaryEmail } from '@/utils/email';
 import { formatDateFull, toDateInputValue } from '@/utils/date';
 import { MARKETING_URL } from '@/utils/marketing';
 import { safeServiceWorkerUpdate } from '@/utils/safeServiceWorkerUpdate';
+import { hardReload } from '@/utils/hardReload';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
@@ -176,10 +177,16 @@ async function handleRefreshAll() {
   isRefreshing.value = true;
 
   try {
-    // Check for app updates (SW)
+    // Check for app updates (SW). If `update()` finds a new build, the SW
+    // installs it as a waiting worker — surface that to the user with a
+    // "Reload now" action instead of leaving them on stale code.
+    let newVersionWaiting = false;
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.getRegistration();
-      if (registration) safeServiceWorkerUpdate(registration, 'refresh-all');
+      if (registration) {
+        safeServiceWorkerUpdate(registration, 'refresh-all');
+        newVersionWaiting = !!registration.waiting;
+      }
     }
 
     // Refresh data from Drive
@@ -190,6 +197,16 @@ async function handleRefreshAll() {
       }
     } else {
       showToast('info', t('header.refreshNoSync'));
+    }
+
+    // Offer the user the reload they came here for. Stacked after the
+    // data-refresh toast so both signals are visible.
+    if (newVersionWaiting) {
+      showToast('info', t('header.newVersionReady'), undefined, {
+        actionLabel: t('header.reloadNow'),
+        actionFn: () => hardReload(),
+        durationMs: 8000,
+      });
     }
   } catch {
     showToast('warning', t('sync.backgroundError'));
