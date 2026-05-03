@@ -16,7 +16,6 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
-import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { canInviteFamily } from '@/config/features';
@@ -43,7 +42,6 @@ const emit = defineEmits<{
   edit: [];
   delete: [];
   'share-invite': [];
-  'role-change': [role: 'admin' | 'member'];
 }>();
 
 const { t } = useTranslation();
@@ -236,6 +234,8 @@ const severeAllergyCount = computed(
           size="xl"
           class="flex-shrink-0"
           :aria-label="member.name"
+          :owner-badge="member.role === 'owner'"
+          :owner-badge-label="t('family.role.ownerBadge')"
           @photo-error="refreshAvatar"
         />
         <div class="min-w-0 flex-1">
@@ -246,14 +246,6 @@ const severeAllergyCount = computed(
               >
                 {{ member.name }}
               </h3>
-              <span v-if="!member.isPet" @click.stop>
-                <MemberRoleManager
-                  :current-role="member.role"
-                  :member-id="member.id"
-                  :disabled="!canManage"
-                  @change="emit('role-change', $event)"
-                />
-              </span>
             </div>
             <div class="flex flex-shrink-0 gap-1">
               <button

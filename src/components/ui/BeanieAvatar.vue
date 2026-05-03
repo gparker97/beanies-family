@@ -19,6 +19,15 @@ interface Props {
    * with The Pod's avatar-photo feature.
    */
   photoUrl?: string | null;
+  /**
+   * Renders a Heritage Orange crown badge in the top-right corner — used
+   * to mark the pod owner on bean cards. If a second per-avatar badge is
+   * ever needed, evolve to a slot or `{ icon, color, position }` prop
+   * pattern; one boolean is sufficient today.
+   */
+  ownerBadge?: boolean;
+  /** Accessible label for the owner badge (e.g. "Pod Owner"). */
+  ownerBadgeLabel?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -26,6 +35,8 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'md',
   ariaLabel: undefined,
   photoUrl: null,
+  ownerBadge: false,
+  ownerBadgeLabel: 'Pod Owner',
 });
 
 /**
@@ -116,6 +127,16 @@ function onPhotoError() {
       >
         <path d="M1 2h14L10 8.5V13l-4 2V8.5L1 2Z" fill="white" opacity="0.9" />
       </svg>
+    </div>
+    <!-- Owner crown overlay — top-right, Heritage Orange. -->
+    <div
+      v-if="ownerBadge"
+      class="absolute top-0 right-0 flex h-[36%] w-[36%] items-center justify-center rounded-full bg-[#F15D22] text-white shadow ring-2 ring-white dark:ring-slate-800"
+      :aria-label="ownerBadgeLabel"
+      role="img"
+      data-testid="owner-badge"
+    >
+      <span class="text-[60%] leading-none select-none" aria-hidden="true">👑</span>
     </div>
   </div>
 </template>

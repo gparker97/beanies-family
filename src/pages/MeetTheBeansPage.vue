@@ -342,10 +342,6 @@ async function deleteMember(id: string) {
   }
 }
 
-async function handleRoleChange(memberId: string, newRole: 'admin' | 'member') {
-  await familyStore.updateMemberRole(memberId, newRole);
-}
-
 function startEditFamilyName() {
   editFamilyName.value = familyContextStore.activeFamilyName ?? '';
   isEditingFamilyName.value = true;
@@ -468,7 +464,6 @@ function cancelEditFamilyName() {
             @edit="openEditModal(member)"
             @delete="deleteMember(member.id)"
             @share-invite="openShareModal(member)"
-            @role-change="handleRoleChange(member.id, $event)"
           />
         </div>
 

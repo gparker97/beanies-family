@@ -1486,6 +1486,102 @@ const STRING_DEFS = {
   'family.role.admin': { en: 'Admin', beanie: 'admin beanie' },
   'family.role.member': { en: 'Member', beanie: 'beanie' },
   'family.role.pet': { en: '🐾 Pet Beanie', beanie: '🐾 pet beanie' },
+  'family.role.ownerBadge': { en: 'Pod Owner', beanie: 'pod owner' },
+  'family.normalizeRolesFailed': {
+    en: 'Could not finish updating member roles. Reload the page to try again.',
+    beanie: 'could not finish updating bean roles. reload to try again.',
+  },
+
+  // ── Transfer Ownership ────────────────────────────────────────────────────
+  'transferOwnership.entryTitle': {
+    en: 'Transfer Pod Ownership',
+    beanie: 'transfer pod ownership',
+  },
+  'transferOwnership.entryDescription': {
+    en: 'Hand the super-admin role to another adult in your pod.',
+    beanie: 'hand the super-admin role to another adult in your pod.',
+  },
+  'transferOwnership.pickTitle': { en: 'Choose New Owner', beanie: 'choose new owner' },
+  'transferOwnership.pickDescription': {
+    en: 'Pick the adult who should become the pod owner. Children and pets cannot be owners.',
+    beanie: 'pick the adult who should become the pod owner. children and pets cannot be owners.',
+  },
+  'transferOwnership.warning': {
+    en: "You'll lose super-admin rights. The new owner can revoke any of your permissions, including transferring ownership back to you.",
+    beanie:
+      "you'll lose super-admin rights. the new owner can revoke any of your permissions, including transferring ownership back to you.",
+  },
+  'transferOwnership.noEligibleRecipients': {
+    en: 'No eligible recipients. Add another adult to your pod first.',
+    beanie: 'no eligible recipients. add another adult to your pod first.',
+  },
+  'transferOwnership.continue': { en: 'Continue', beanie: 'continue' },
+  'transferOwnership.reauthTitle': { en: 'Verify Identity', beanie: 'verify identity' },
+  'transferOwnership.reauthDescription': {
+    en: 'Confirm it’s really you before transferring ownership.',
+    beanie: 'confirm it’s really you before transferring ownership.',
+  },
+  'transferOwnership.reauthPasswordDescription': {
+    en: 'Enter your password to confirm the transfer.',
+    beanie: 'enter your password to confirm the transfer.',
+  },
+  'transferOwnership.reauthPasskeyButton': {
+    en: 'Verify with Passkey',
+    beanie: 'verify with passkey',
+  },
+  'transferOwnership.reauthPasswordButton': {
+    en: 'Use Password Instead',
+    beanie: 'use password instead',
+  },
+  'transferOwnership.reauthVerifyButton': { en: 'Verify', beanie: 'verify' },
+  'transferOwnership.reauthPasskeyFailed': {
+    en: 'Passkey verification failed. Try again or use your password.',
+    beanie: 'passkey verification failed. try again or use your password.',
+  },
+  'transferOwnership.reauthWrongPassword': {
+    en: 'Incorrect password. Try again.',
+    beanie: 'incorrect password. try again.',
+  },
+  'transferOwnership.reauthWrongMember': {
+    en: 'That passkey belongs to a different member. Use yours.',
+    beanie: 'that passkey belongs to a different member. use yours.',
+  },
+  'transferOwnership.reauthSessionMissing': {
+    en: 'Your session expired. Sign in again to continue.',
+    beanie: 'your session expired. sign in again to continue.',
+  },
+  'transferOwnership.reauthNoPassword': {
+    en: 'This account has no password on file.',
+    beanie: 'this account has no password on file.',
+  },
+  'transferOwnership.reauthNoCredential': {
+    en: 'You need a passkey or a password set up to transfer ownership. Open Settings → Security to add one, then try again.',
+    beanie:
+      'you need a passkey or a password set up to transfer ownership. open settings → security to add one, then try again.',
+  },
+  'transferOwnership.confirmTitle': { en: 'Confirm Transfer', beanie: 'confirm transfer' },
+  'transferOwnership.confirmMessage': {
+    en: '{name} will become the pod owner. You will become a regular member.',
+    beanie: '{name} will become the pod owner. you will become a regular member.',
+  },
+  'transferOwnership.confirmAction': { en: 'Transfer Ownership', beanie: 'transfer ownership' },
+  'transferOwnership.success': {
+    en: 'Ownership transferred to {name}.',
+    beanie: 'ownership transferred to {name}.',
+  },
+  'transferOwnership.failed': {
+    en: 'Could not transfer ownership. Please try again.',
+    beanie: 'could not transfer ownership. please try again.',
+  },
+  'transferOwnership.invalidTarget': {
+    en: 'That member can’t become the owner.',
+    beanie: 'that bean can’t become the owner.',
+  },
+  'settings.transferOwnership': { en: 'Transfer Pod Ownership', beanie: 'transfer pod ownership' },
+  'settings.transferOwnershipDesc': {
+    en: 'Move the super-admin role to another adult.',
+    beanie: 'move the super-admin role to another adult.',
+  },
   'family.email': { en: 'Email', beanie: 'email' },
   'family.gender': { en: 'Gender', beanie: 'gender' },
   'family.gender.male': { en: 'Male', beanie: 'boy beanie' },

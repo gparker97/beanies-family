@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-03
 
+### Added
+
+- **Owner crown badge + Transfer Pod Ownership flow.** Bean cards now show a Heritage Orange 👑 crown overlaid on the owner's avatar (top-right corner) — finally a clear visual answer to "who's the super-admin of this pod?". The redundant Admin/Member dropdown next to every name is gone; granular permissions stay where they always have been (the pencil-icon edit modal, where canManagePod / canViewFinances / canEditActivities live as toggles). And ownership is no longer permanent — Settings now has a "Transfer Pod Ownership" tile (owner-only) that opens a three-step flow: pick an adult → re-authenticate (passkey first, password fallback) → confirm. Atomic Automerge change handles both the demote and promote in one transaction; the auth session role updates inline so the UI reflects the new state without a reload. Re-auth was extracted into a reusable `<ReauthChallenge>` component since the next high-stakes operations (delete pod, leave pod, change family name) will all want it.
+
+### Fixed
+
+- **Self-heal for pods missing an Owner record.** Some early prod families ended up with no member having `role === 'owner'` — likely a legacy migration that stripped the field. The Owner pill never showed because there was nobody to put it on. `applyDefaults()` in the family-member repository now backfills `role: 'member'` so undefined never silently slips through any read path, and a new `normalizeRoles()` step runs every load to ensure exactly one Owner exists. If none is found, it promotes the earliest-created human (preferring the family-creator seat that doesn't require a password) and stamps full permissions. Also migrates legacy `admin` rows to `member` while preserving `canManagePod=true` so existing admins keep their effective permissions. Fully idempotent — the heal writes nothing on subsequent loads and is gated behind a single atomic Automerge change. 12 new unit tests cover the normalization paths and the transfer flow.
+
 ### Changed
 
 - **Activity categories: "Fun" group renamed to "Party"; new "Entertainment" group added.** The Party group still holds the same celebration-style life events (birthday party, wedding, bar mitzvah, other celebration) — just the label changes. The new Entertainment group covers media and live events: Movie, Show / Musical, Concert, Theme Park, Sporting Event, Museum, Festival / Fair, and Other Entertainment, with a distinct rose/pink color palette so it doesn't blur into existing groups in the picker. All eight new entertainment activities map to the existing `entertainment` expense category, so logging a transaction tied to "Friday movie night" pre-fills the right budget bucket. Travel-planner banner copy at the top of the activity drawer also tightened from "Make It a Family Vacation!" to "Add a Travel Plan!" — closer match to what tapping it actually does.
