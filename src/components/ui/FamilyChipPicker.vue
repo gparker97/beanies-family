@@ -15,6 +15,14 @@ interface Props {
    * so the activity-assignee call sites pass `:include-pets="true"`.
    */
   includePets?: boolean;
+  /**
+   * Override the default member list. When provided, the picker renders
+   * exactly these members in this order (no internal filtering, no pet
+   * inclusion logic). Used by callers that need a custom slice — e.g.
+   * "adults only, excluding the current owner" for ownership transfer.
+   * `includePets` is ignored when this prop is set.
+   */
+  members?: import('@/types/models').FamilyMember[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -22,6 +30,7 @@ const props = withDefaults(defineProps<Props>(), {
   compact: false,
   showShared: false,
   includePets: false,
+  members: undefined,
 });
 
 const emit = defineEmits<{
@@ -36,9 +45,10 @@ const familyStore = useFamilyStore();
 // travelers, activity dropoff/pickup duties), so the default excludes
 // pets. Activity assignees opt in via `include-pets` because pets can
 // be participants in family activities (e.g. "walk with Buddy").
-const members = computed(() =>
-  props.includePets ? familyStore.sortedMembers : familyStore.sortedHumans
-);
+const members = computed(() => {
+  if (props.members) return props.members;
+  return props.includePets ? familyStore.sortedMembers : familyStore.sortedHumans;
+});
 
 const SHARED_ID = '__shared__';
 

@@ -5,6 +5,7 @@ import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue
 import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import ProfileHeader from '@/components/settings/ProfileHeader.vue';
 import SettingsCard from '@/components/settings/SettingsCard.vue';
+import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
 import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
@@ -51,7 +52,7 @@ const translationStore = useTranslationStore();
 const { t } = useTranslation();
 const deploymentBadge = computed(() => getDeploymentBadge());
 const { canInstall, isInstalled, installApp } = usePWA();
-const { canManagePod } = usePermissions();
+const { canManagePod, isOwner } = usePermissions();
 const { isReconnecting, reconnectError, reconnect } = useGoogleReconnect();
 
 // ── Modal state ──────────────────────────────────────────────────────────────
@@ -60,6 +61,7 @@ const showCurrency = ref(false);
 const showSecurity = ref(false);
 const showFamilyData = ref(false);
 const showDataManagement = ref(false);
+const showTransferOwnership = ref(false);
 
 // ── Deep-link: open a specific card from a route query (e.g. ?open=family-data)
 //    Generalizable — additional cards can opt in by extending the map below.
@@ -526,6 +528,14 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         :description="t('settings.card.securityDesc')"
         icon-bg="var(--tint-orange-8)"
         @click="showSecurity = true"
+      />
+      <SettingsCard
+        v-if="isOwner"
+        icon="👑"
+        :title="t('settings.transferOwnership')"
+        :description="t('settings.transferOwnershipDesc')"
+        icon-bg="var(--tint-orange-8)"
+        @click="showTransferOwnership = true"
       />
     </div>
 
@@ -1424,6 +1434,9 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       @close="handleDecryptModalClose"
       @confirm="handleDecryptFile"
     />
+
+    <!-- ── Transfer Ownership ──────────────────────────────────────────── -->
+    <TransferOwnershipModal :open="showTransferOwnership" @close="showTransferOwnership = false" />
 
     <!-- ── Encryption error toast ──────────────────────────────────────── -->
     <div

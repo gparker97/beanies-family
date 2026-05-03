@@ -435,6 +435,17 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Update the role on the current session (used by ownership transfer).
+   * Mutates currentUser.value.role and re-persists the session so a
+   * page reload picks up the new role.
+   */
+  function updateCurrentUserRole(role: 'owner' | 'admin' | 'member'): void {
+    if (!currentUser.value) return;
+    currentUser.value = { ...currentUser.value, role };
+    persistSession(currentUser.value);
+  }
+
+  /**
    * After file decryption, update the auth session with full member data.
    */
   function updateSessionWithMemberData(): void {
@@ -678,6 +689,7 @@ export const useAuthStore = defineStore('auth', () => {
     signInWithPasskey,
     createSessionForVerifiedMember,
     updateSessionWithMemberData,
+    updateCurrentUserRole,
     registerPasskeyForCurrentUser,
     checkHasRegisteredPasskeys,
     signUp,
