@@ -167,6 +167,30 @@ export const useSyncStore = defineStore('sync', () => {
   // Background sync state (cache-first loading)
   const isBackgroundSyncing = ref(false);
   const backgroundSyncError = ref<string | null>(null);
+  /**
+   * Classifies why `backgroundSyncError` is set so consumers can pick an
+   * appropriate UI response:
+   * - `auth-transient`: token expired + silent refresh failed. The auth
+   *   layer (`setupTokenExpiryHandler`) owns the user-facing escalation
+   *   (reconnect banner on `invalid_grant`); the sync layer should stay
+   *   quiet so the user sees one consistent signal, not two.
+   * - `decrypt`: family key couldn't decrypt the remote payload (password
+   *   may have changed). Surface to user.
+   * - `network`: anything else — transient Drive 5xx, network blip, etc.
+   *   Surface to user.
+   */
+  const backgroundSyncErrorKind = ref<'auth-transient' | 'decrypt' | 'network' | null>(null);
+
+  /**
+   * Match the message shapes produced by `TokenExpiredError` (in
+   * `googleAuth.ts` and `googleDriveProvider.ts`) — both contain the
+   * substring "silent refresh failed". When the auth layer flags this,
+   * the reconnect banner (or auth-layer self-heal on next attempt) is
+   * the right user-facing signal — not a sync toast.
+   */
+  function isAuthTransientSyncError(msg: string | null | undefined): boolean {
+    return !!msg && /silent refresh failed/i.test(msg);
+  }
 
   // Subscribe to cache persistence failure changes
   const cachePersistFailed = ref(false);
@@ -1187,6 +1211,7 @@ export const useSyncStore = defineStore('sync', () => {
 
     isBackgroundSyncing.value = true;
     backgroundSyncError.value = null;
+    backgroundSyncErrorKind.value = null;
 
     try {
       const loadResult = await loadFromFile({ merge: true });
@@ -1228,15 +1253,29 @@ export const useSyncStore = defineStore('sync', () => {
 
         // Can't decrypt — stale cached data is still usable
         backgroundSyncError.value = 'Could not refresh data — password may have changed';
+        backgroundSyncErrorKind.value = 'decrypt';
         pendingEncryptedFile.value = null;
         return;
       }
 
-      // Non-password failure (network, 404, etc.)
-      backgroundSyncError.value = 'Could not refresh data from cloud';
+      // Non-password failure (network, 404, auth-transient, etc.)
+      const lastErr = syncService.getState().lastError;
+      if (isAuthTransientSyncError(lastErr)) {
+        // Auth layer owns the escalation here — stay quiet so the user
+        // doesn't get a competing toast on top of the eventual reconnect
+        // banner. `backgroundSyncError` is still set (kind=auth-transient)
+        // so the success toast in callers like AppHeader.handleRefreshAll
+        // is correctly suppressed.
+        backgroundSyncError.value = lastErr ?? 'Token expired';
+        backgroundSyncErrorKind.value = 'auth-transient';
+      } else {
+        backgroundSyncError.value = 'Could not refresh data from cloud';
+        backgroundSyncErrorKind.value = 'network';
+      }
     } catch (e) {
-      backgroundSyncError.value =
-        e instanceof Error ? e.message : 'Could not refresh data from cloud';
+      const msg = e instanceof Error ? e.message : 'Could not refresh data from cloud';
+      backgroundSyncError.value = msg;
+      backgroundSyncErrorKind.value = isAuthTransientSyncError(msg) ? 'auth-transient' : 'network';
     } finally {
       isBackgroundSyncing.value = false;
       // Always start polling — even on error, next poll may succeed
@@ -1812,6 +1851,7 @@ export const useSyncStore = defineStore('sync', () => {
     cachePersistFailed,
     isBackgroundSyncing,
     backgroundSyncError,
+    backgroundSyncErrorKind,
     // Actions
     initialize,
     requestPermission,
