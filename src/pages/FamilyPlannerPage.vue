@@ -268,9 +268,19 @@ async function handleSave(
     }
   } else {
     const created = await activityStore.createActivity(data as CreateFamilyActivityInput);
+    // Close the ActivityModal BEFORE opening CreatedConfirmModal so two
+    // role=dialog / aria-modal=true overlays never coexist in the DOM.
+    // WebKit under CI contention has been observed to stall the second
+    // modal's visibility for >15s when the first is still teleported in
+    // — surfaces as the recurring "Activity Created" E2E flake (see
+    // docs/E2E_HEALTH.md 2026-05-03 entry). nextTick lets Vue flush the
+    // v-if removal of the first dialog before we mount the second.
+    showModal.value = false;
     if (created) {
+      await nextTick();
       showActivityCreatedConfirmation(data as CreateFamilyActivityInput);
     }
+    return;
   }
 
   // When fee amount changes on a linked activity, update future materialized transactions
