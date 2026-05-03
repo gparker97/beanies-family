@@ -11,6 +11,9 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 import { MARKETING_URL } from '@/utils/marketing';
 import { showToast } from '@/composables/useToast';
 import { QUICK_ADD_CONTEXT_KEYS } from '@/constants/quickAddItems';
+import { hardReload, isChunkLoadError } from '@/utils/hardReload';
+
+const CHUNK_RELOAD_FLAG = 'chunkReloadAttempted';
 
 /** Route that cross-origin-redirects to the Astro marketing site, preserving the full path. */
 function externalRedirect(path: string, name: string): RouteRecordRaw {
@@ -345,6 +348,29 @@ router.afterEach((to) => {
   const translationStore = useTranslationStore();
   const title = titleKey ? translationStore.t(titleKey) : undefined;
   document.title = title ? `${title} | beanies.family` : 'beanies.family';
+});
+
+// Auto-recover from stale-chunk failures after a deploy. The PWA's
+// precached `index.html` references hashed JS chunk filenames that no
+// longer exist on the server once a new build ships; the next lazy
+// `import()` rejects with `Failed to fetch dynamically imported module`.
+// `hardReload()` evicts the workbox precache and forces a fresh
+// navigation so the user lands on the new build's chunk URLs.
+router.onError((err) => {
+  if (!isChunkLoadError(err)) return;
+  if (sessionStorage.getItem(CHUNK_RELOAD_FLAG) === '1') {
+    // Already attempted recovery this session — let the error surface
+    // through the global handler instead of reload-looping.
+    return;
+  }
+  sessionStorage.setItem(CHUNK_RELOAD_FLAG, '1');
+  void hardReload();
+});
+
+router.afterEach(() => {
+  // Successful navigation proves the new chunk set is reachable; clear
+  // the guard so a future deploy gap can recover too.
+  sessionStorage.removeItem(CHUNK_RELOAD_FLAG);
 });
 
 export default router;
