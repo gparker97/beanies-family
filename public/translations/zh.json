@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-03",
-    "translationCount": 2608
+    "translationCount": 2637
   },
   "translations": {
     "app.name": {
@@ -13044,6 +13044,151 @@
     "planner.category.other_entertainment": {
       "translation": "其他娱乐行业",
       "hash": "aim2tk",
+      "lastUpdated": "2026-05-03"
+    },
+    "family.role.ownerBadge": {
+      "translation": "Pod所有者",
+      "hash": "j6hgpk",
+      "lastUpdated": "2026-05-03"
+    },
+    "family.normalizeRolesFailed": {
+      "translation": "无法完成更新成员角色。请重新加载页面以重试。",
+      "hash": "atnbtx",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.entryTitle": {
+      "translation": "转移Pod所有权",
+      "hash": "rj9kqp",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.entryDescription": {
+      "translation": "将超级管理员角色交给您的Pod中的另一位成人。",
+      "hash": "x63bqc",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.pickTitle": {
+      "translation": "选择新所有者",
+      "hash": "rx0iie",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.pickDescription": {
+      "translation": "选择应该成为豆荚所有者的成年人。儿童和宠物不能是主人。",
+      "hash": "3bo25",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.warning": {
+      "translation": "您将失去超级管理员权限。新所有者可以撤销您的任何权限，包括将所有权转让给您。",
+      "hash": "bk8r3v",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.noEligibleRecipients": {
+      "translation": "没有符合条件的收件人。请先将另一名成人添加到您的Pod。",
+      "hash": "kq44dj",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.continue": {
+      "translation": "继续",
+      "hash": "8b7kmx",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.reauthTitle": {
+      "translation": "验证身份",
+      "hash": "2275vf",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.reauthDescription": {
+      "translation": "在转让所有权之前，请确认您的身份。",
+      "hash": "gvtvoi",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.reauthPasswordDescription": {
+      "translation": "输入您的密码以确认转移。",
+      "hash": "vaqju9",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.reauthPasskeyButton": {
+      "translation": "使用密钥验证",
+      "hash": "feigrf",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.reauthPasswordButton": {
+      "translation": "请改用密码",
+      "hash": "i69vvu",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.reauthVerifyButton": {
+      "translation": "验证",
+      "hash": "spmb8n",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.reauthPasskeyFailed": {
+      "translation": "密钥验证失败。请重试或使用您的密码。",
+      "hash": "l1svh1",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.reauthWrongPassword": {
+      "translation": "密码不正确。<x id=\"1\"/>请再试一次。",
+      "hash": "dchse3",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.reauthWrongMember": {
+      "translation": "该密钥属于其他成员。使用您的密钥。",
+      "hash": "80o8hz",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.reauthSessionMissing": {
+      "translation": "您的会话已过期。请重新登录以继续。",
+      "hash": "4igom2",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.reauthNoPassword": {
+      "translation": "此帐户没有记录密码。",
+      "hash": "ek2qha",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.reauthNoCredential": {
+      "translation": "您需要设置密钥或密码才能转移所有权。打开设置→安全添加一个，然后重试。",
+      "hash": "sfh8f6",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.confirmTitle": {
+      "translation": "确认赠送",
+      "hash": "sgb5or",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.confirmMessage": {
+      "translation": "{name}将成为Pod所有者。您将成为普通会员。",
+      "hash": "ky94gy",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.confirmAction": {
+      "translation": "转移所有权",
+      "hash": "oaly0q",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.success": {
+      "translation": "所有权已转移到{name}。",
+      "hash": "sywcot",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.failed": {
+      "translation": "无法转移所有权。请重试。",
+      "hash": "4o64zz",
+      "lastUpdated": "2026-05-03"
+    },
+    "transferOwnership.invalidTarget": {
+      "translation": "该成员无法成为所有者。",
+      "hash": "y2g8u9",
+      "lastUpdated": "2026-05-03"
+    },
+    "settings.transferOwnership": {
+      "translation": "转移Pod所有权",
+      "hash": "rj9kqp",
+      "lastUpdated": "2026-05-03"
+    },
+    "settings.transferOwnershipDesc": {
+      "translation": "将超级管理员角色移至另一位成人。",
+      "hash": "r8obzh",
       "lastUpdated": "2026-05-03"
     }
   }

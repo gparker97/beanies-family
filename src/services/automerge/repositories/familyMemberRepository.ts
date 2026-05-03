@@ -5,16 +5,29 @@ import type {
   UpdateFamilyMemberInput,
 } from '@/types/models';
 
-/** Apply defaults for legacy records missing gender/ageGroup/requiresPassword fields */
+/**
+ * Apply defaults for legacy records missing gender/ageGroup/requiresPassword fields.
+ *
+ * Role defaults to 'member' so an undefined role can never silently slip
+ * through any read path. The owner backfill itself is handled by
+ * `familyStore.normalizeRoles()` on load — that's the single source of
+ * truth for "ensure exactly one owner exists."
+ *
+ * canManagePod defaults to true only for owners. The legacy "admin" role
+ * no longer implies canManagePod here; normalizeRoles persists
+ * canManagePod=true on every legacy admin before this default takes
+ * effect, so existing admins keep their effective permissions.
+ */
 function applyDefaults(member: FamilyMember): FamilyMember {
   return {
     ...member,
+    role: member.role ?? 'member',
     gender: member.gender ?? 'other',
     ageGroup: member.ageGroup ?? 'adult',
     requiresPassword: !member.passwordHash,
     canViewFinances: member.canViewFinances ?? true,
     canEditActivities: member.canEditActivities ?? true,
-    canManagePod: member.canManagePod ?? (member.role === 'owner' || member.role === 'admin'),
+    canManagePod: member.canManagePod ?? member.role === 'owner',
   };
 }
 

@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import * as familyRepo from '@/services/automerge/repositories/familyMemberRepository';
+import { changeDoc } from '@/services/automerge/docService';
+import { reportError } from '@/utils/errorReporter';
 import { wrapAsync } from '@/composables/useStoreActions';
 import type {
   FamilyMember,
@@ -169,7 +171,8 @@ export const useFamilyStore = defineStore('family', () => {
   async function loadMembers() {
     await wrapAsync(isLoading, error, async () => {
       const prevMemberId = currentMemberId.value;
-      members.value = await familyRepo.getAllFamilyMembers();
+      const loaded = await familyRepo.getAllFamilyMembers();
+      members.value = await normalizeRoles(loaded);
       logDuplicateMembers(members.value);
 
       // Restore currentMemberId: prefer authStore session, then previous value, then owner
@@ -255,15 +258,185 @@ export const useFamilyStore = defineStore('family', () => {
     return result ?? false;
   }
 
-  async function updateMemberRole(
-    id: string,
-    role: 'admin' | 'member'
-  ): Promise<FamilyMember | null> {
-    const member = members.value.find((m) => m.id === id);
-    if (!member || member.role === 'owner') {
-      return null;
+  /**
+   * Idempotent self-heal that runs on every load. Ensures exactly one
+   * owner exists and migrates legacy `admin` rows to `member` while
+   * preserving their effective canManagePod permission.
+   *
+   * All mutations happen inside a single `changeDoc()` call for atomicity.
+   * Returns the (possibly mutated) member list with defaults re-applied.
+   * Fast-path: if no writes are needed, returns the input unchanged.
+   */
+  async function normalizeRoles(list: FamilyMember[]): Promise<FamilyMember[]> {
+    if (list.length === 0) return list;
+
+    type Patch = Partial<
+      Pick<FamilyMember, 'role' | 'canManagePod' | 'canViewFinances' | 'canEditActivities'>
+    >;
+    const patches = new Map<string, Patch>();
+
+    const merge = (id: string, p: Patch) => patches.set(id, { ...(patches.get(id) ?? {}), ...p });
+
+    // 1. Ensure exactly one owner.
+    const owners = list.filter((m) => m.role === 'owner');
+    if (owners.length > 1) {
+      // Keep the earliest createdAt; demote the rest. Preserve their flags.
+      const sorted = [...owners].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      for (const m of sorted.slice(1)) {
+        merge(m.id, { role: 'member' });
+      }
+    } else if (owners.length === 0) {
+      const humansOnly = list.filter((m) => !m.isPet);
+      const candidates = humansOnly.filter((m) => m.requiresPassword === false);
+      const pool = candidates.length > 0 ? candidates : humansOnly;
+      const candidate = [...pool].sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+      if (candidate) {
+        merge(candidate.id, {
+          role: 'owner',
+          canManagePod: true,
+          canViewFinances: true,
+          canEditActivities: true,
+        });
+        reportError({
+          surface: 'familyStore.normalize-roles',
+          message: 'No owner found — promoting earliest human to owner',
+          severity: 'warning',
+          context: { candidateId: candidate.id, memberCount: list.length },
+        });
+      } else {
+        reportError({
+          surface: 'familyStore.normalize-roles',
+          message: 'No owner and no human candidate — pod has only pets',
+          severity: 'warning',
+          context: { memberCount: list.length },
+        });
+      }
     }
-    return updateMember(id, { role });
+
+    // 2. Migrate legacy `admin` rows to `member`. Lock in canManagePod=true
+    //    so their effective permission survives the applyDefaults rule change.
+    for (const m of list) {
+      if (m.role === 'admin') {
+        merge(m.id, {
+          role: 'member',
+          canManagePod: m.canManagePod ?? true,
+        });
+      }
+    }
+
+    if (patches.size === 0) return list;
+
+    // Apply all patches in a single Automerge transaction.
+    try {
+      changeDoc((doc) => {
+        for (const [id, patch] of patches) {
+          const target = doc.familyMembers[id];
+          if (!target) continue;
+          if (patch.role !== undefined) target.role = patch.role;
+          if (patch.canManagePod !== undefined) target.canManagePod = patch.canManagePod;
+          if (patch.canViewFinances !== undefined) target.canViewFinances = patch.canViewFinances;
+          if (patch.canEditActivities !== undefined)
+            target.canEditActivities = patch.canEditActivities;
+        }
+      }, 'normalize roles');
+    } catch (e) {
+      console.error(
+        '[familyStore.normalizeRoles] Automerge change rejected. Pod may render without an owner until reload.',
+        e
+      );
+      reportError({
+        surface: 'familyStore.normalize-roles',
+        message: 'changeDoc rejected during role normalization',
+        error: e,
+        context: { patchCount: patches.size },
+      });
+      // Return the unmodified list rather than throw — the rest of load
+      // should proceed; the user just won't see the owner crown until next reload.
+      return list;
+    }
+
+    // Re-fetch via the repository so applyDefaults runs on the patched records.
+    return familyRepo.getAllFamilyMembers();
+  }
+
+  /**
+   * Transfer the Owner role from the current owner to `toMemberId`.
+   * Atomic: both demote + promote happen in a single Automerge change.
+   * Updates authStore.currentUser.role if the session belongs to either
+   * the outgoing or incoming owner so the UI re-renders without a reload.
+   */
+  async function transferOwnership(toMemberId: string): Promise<boolean> {
+    const result = await wrapAsync(isLoading, error, async () => {
+      const target = members.value.find((m) => m.id === toMemberId);
+      const currentOwner = owner.value;
+      if (!target || target.isPet || target.id === currentOwner?.id) {
+        reportError({
+          surface: 'familyStore.transferOwnership',
+          message: 'Invalid transfer target',
+          severity: 'warning',
+          context: {
+            toMemberId,
+            currentOwnerId: currentOwner?.id,
+            isPet: target?.isPet,
+          },
+        });
+        return false;
+      }
+
+      changeDoc((doc) => {
+        if (currentOwner) {
+          const out = doc.familyMembers[currentOwner.id];
+          if (out) out.role = 'member';
+        }
+        const t = doc.familyMembers[toMemberId];
+        if (!t) {
+          throw new Error(`Target member ${toMemberId} not found in document`);
+        }
+        t.role = 'owner';
+        t.canManagePod = true;
+        t.canViewFinances = true;
+        t.canEditActivities = true;
+      }, 'transfer ownership');
+
+      // In-place local state update — same pattern as updateMember above.
+      members.value = members.value.map((m) => {
+        if (currentOwner && m.id === currentOwner.id) return { ...m, role: 'member' };
+        if (m.id === toMemberId) {
+          return {
+            ...m,
+            role: 'owner',
+            canManagePod: true,
+            canViewFinances: true,
+            canEditActivities: true,
+          };
+        }
+        return m;
+      });
+
+      // Reflect role change in authStore session if applicable.
+      try {
+        const { useAuthStore } = await import('@/stores/authStore');
+        const authStore = useAuthStore();
+        if (currentOwner && authStore.currentUser?.memberId === currentOwner.id) {
+          authStore.updateCurrentUserRole('member');
+        } else if (authStore.currentUser?.memberId === toMemberId) {
+          authStore.updateCurrentUserRole('owner');
+        }
+      } catch (e) {
+        // Session role update is non-fatal — the doc transfer already succeeded.
+        // Worst case: a UI permission gate uses the old role until next reload.
+        console.warn('[familyStore.transferOwnership] authStore role sync failed', e);
+        reportError({
+          surface: 'familyStore.transferOwnership',
+          message: 'authStore role sync after transfer failed',
+          error: e,
+          context: { currentOwnerId: currentOwner?.id, toMemberId },
+        });
+      }
+
+      return true;
+    });
+    return result ?? false;
   }
 
   function setCurrentMember(id: string) {
@@ -299,7 +472,7 @@ export const useFamilyStore = defineStore('family', () => {
     createMember,
     updateMember,
     deleteMember,
-    updateMemberRole,
+    transferOwnership,
     setCurrentMember,
     resetState,
   };
