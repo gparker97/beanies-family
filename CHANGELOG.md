@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-03
+
+### Fixed
+
+- **Pets now selectable when adding medications, allergies, sayings, favorites, notes, and family activities.** The FAB inline + sheet member picker filtered out pets — adding a medication or allergy for the dog was impossible from the FAB despite the data model allowing it. Same gap on the activity assignee picker (pets couldn't be added as participants in "morning walk with Buddy"). Audit covered 16 surfaces across the app that filter family members; categorized each as keep-humans-only (todos, accounts, transactions, assets, financial goals, recipes, dropoff/pickup duties, vacation travelers, invite/login flows) vs allow-pets (medications, allergies, sayings, favorites, notes, activities). Surgical changeset: the two FAB pickers switched from sortedHumans to sortedMembers; the shared FamilyChipPicker gained an opt-in `includePets` prop (default false — every existing call site preserves humans-only behavior unchanged); ActivityModal + ActivityViewEditModal pass `include-pets` on the assignee picker only (dropoff/pickup stay humans-only since they require a driver). The FAB picker also previously carried a misleading code comment claiming pets can't be the target of meds/allergies — corrected. **Deferred**: activities-page filter chip strip pet support (architecturally non-trivial since `memberFilterStore` is shared with Accounts + Transactions and is humans-only by design), and goals (schema is financial-only — "allow pets" is a no-op until a non-financial goal type exists).
+
+---
+
 ## 2026-05-02
 
 ### Fixed
