@@ -91,8 +91,19 @@ function onPhotoError() {
       class="h-full w-full object-contain"
       draggable="false"
     />
-    <!-- Optional user photo overlay. Only shows once `load` fires —
-         the beanie underneath stays visible during loading and on error. -->
+    <!--
+      Optional user photo overlay. Only shows once `load` fires — the
+      beanie underneath stays visible during loading and on error.
+
+      `referrerpolicy="no-referrer"` strips the Referer header from the
+      request to Google's lh3 CDN. lh3 rate-limits per-Referer; without
+      this, dev (Vite default port localhost:5173, shared across
+      millions of devs) hits 429 fast since the global per-Referer
+      bucket is exhausted. With no-referrer, requests rate-limit by IP
+      only — effectively unlimited for a single user. Caught
+      2026-05-04 from greg's localhost showing 429 while prod's
+      app.beanies.family origin had its own clean bucket.
+    -->
     <img
       v-if="photoUrl"
       :src="photoUrl"
@@ -100,6 +111,7 @@ function onPhotoError() {
       class="absolute inset-0 h-full w-full object-cover transition-opacity duration-200"
       :class="photoLoaded ? 'opacity-100' : 'opacity-0'"
       draggable="false"
+      referrerpolicy="no-referrer"
       @load="onPhotoLoad"
       @error="onPhotoError"
     />

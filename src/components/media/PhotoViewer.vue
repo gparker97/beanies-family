@@ -234,12 +234,20 @@ async function handleRemoveMissing(): Promise<void> {
         The drop-shadow gives the photo a subtle float against the
         backdrop — same trick as a polaroid against a dark surface.
       -->
+      <!--
+        `referrerpolicy="no-referrer"` strips the Referer so Google's
+        lh3 CDN rate-limits by IP rather than per-origin (see
+        BeanieAvatar.vue for the full rationale — caught 2026-05-04
+        with localhost:5173 hitting 429s on a shared per-Referer
+        bucket).
+      -->
       <img
         v-else-if="fullUrl"
         :src="fullUrl"
         :alt="''"
         class="max-h-full max-w-full object-contain"
         style="filter: drop-shadow(0 25px 50px rgb(0 0 0 / 60%))"
+        referrerpolicy="no-referrer"
         @load="handleImgLoaded"
         @error="handleImgError"
       />
