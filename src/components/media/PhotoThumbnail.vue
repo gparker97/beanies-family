@@ -109,13 +109,18 @@ watch(
     <!-- Loading shimmer -->
     <div v-else-if="loading && !url" class="animate-beanie-shimmer h-full w-full bg-white/10" />
 
-    <!-- Resolved image -->
+    <!--
+      Resolved image. `referrerpolicy="no-referrer"` strips the Referer
+      so Google's lh3 CDN rate-limits by IP rather than per-origin (see
+      BeanieAvatar.vue for the full rationale).
+    -->
     <img
       v-else-if="url"
       :src="url"
       :alt="''"
       class="h-full w-full object-cover"
       loading="lazy"
+      referrerpolicy="no-referrer"
       @load="handleImgLoaded"
       @error="handleImgError"
     />

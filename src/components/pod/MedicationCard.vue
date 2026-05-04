@@ -80,6 +80,7 @@ const scheduleLabel = computed(() => {
           :src="photoUrl"
           :alt="medication.name"
           class="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          referrerpolicy="no-referrer"
         />
         <div
           v-else

@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-04
 
+### Fixed
+
+- **Photos no longer randomly fail to load with no apparent error.** Google's `lh3.googleusercontent.com` image CDN rate-limits per-Referer, and the global per-Referer bucket for `http://localhost:5173` (the Vite default dev port, shared across millions of devs worldwide) was getting exhausted — so dev environments and any other shared-origin contexts would silently 429 on `<img>` loads while production's distinct origin (`https://app.beanies.family`) had its own clean bucket. The IMG element fired `onerror` with no useful diagnostics, so the symptom in the wild was "photos work in production but break on localhost," with a fallback to the beanie variant. Added `referrerpolicy="no-referrer"` to every `<img>` tag that resolves to a Drive-hosted URL (avatar overlays, photo thumbnails, the lightbox itself, medication cards, polaroid recipe heroes, scrapbook photos). With no Referer header, Google rate-limits by IP only — effectively unlimited for a single user. Caught live from greg's localhost throwing 429s while the same files loaded fine on prod and via direct-link in a fresh tab; a small privacy bonus too (Google no longer learns which page is rendering its hosted images).
+
 ### Added
 
 - **Tap a recipe photo to open it full-screen.** Recipe detail page hero polaroid is now clickable when there's a photo — opens the same shared photo lightbox that's already used for member avatars, medication snaps, and per-entity photo attachments. Cookbook landing-page polaroids deliberately stay non-clickable since their tap navigates to the recipe detail; the lightbox lives on the detail page.

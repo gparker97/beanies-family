@@ -26,12 +26,19 @@ defineProps<{
         var(--card-shadow);
     "
   >
+    <!--
+      `referrerpolicy="no-referrer"` strips the Referer so Google's lh3
+      CDN rate-limits by IP rather than per-origin. Polaroid images come
+      from the photo store (recipes, scrapbook), which means lh3 URLs
+      under the hood. See BeanieAvatar.vue for the full rationale.
+    -->
     <img
       v-if="src"
       :src="src"
       :alt="alt ?? ''"
       class="block w-full bg-cover bg-center"
       :style="{ aspectRatio: aspectRatio ?? '4 / 3' }"
+      referrerpolicy="no-referrer"
     />
     <div
       v-else
