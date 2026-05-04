@@ -85,14 +85,18 @@ The first time you connect, Google's OAuth screen warns you that the app is unve
 
 ### Step 2: Deploy the OAuth proxy Lambda
 
-The Lambda code lives at [`infrastructure/lambda/oauth/`](../infrastructure/lambda/oauth/) — about 175 lines of Node.js 20, no dependencies beyond the standard runtime. Step-by-step AWS deploy guide at [`infrastructure/lambda/oauth/README.md`](../infrastructure/lambda/oauth/README.md). The runtime-agnostic API contract is at [`infrastructure/lambda/oauth/SPEC.md`](../infrastructure/lambda/oauth/SPEC.md) — implement it on Cloudflare Workers, Vercel Edge, or any Node host if AWS isn't your thing.
+You have two options here — pick whichever matches your infrastructure.
 
-The Lambda needs two env vars:
+**Option 1 — AWS Lambda (in-tree reference).** The Lambda code lives at [`infrastructure/lambda/oauth/`](../infrastructure/lambda/oauth/) — about 175 lines of Node.js 20, no dependencies beyond the standard runtime. Step-by-step AWS deploy guide at [`infrastructure/lambda/oauth/README.md`](../infrastructure/lambda/oauth/README.md). The runtime-agnostic API contract is at [`infrastructure/lambda/oauth/SPEC.md`](../infrastructure/lambda/oauth/SPEC.md) — implement it on Cloudflare Workers, Vercel Edge, or any Node host if AWS isn't your thing.
+
+**Option 2 — Node side-car via Docker / Dokploy / Coolify (community reference).** Sam Ledoux maintains [`Snaxilla/beanies-oauth-proxy`](https://github.com/Snaxilla/beanies-oauth-proxy), a clean, dependency-free Node implementation of the same SPEC, designed to run as a side-car alongside other Docker services. If you already run a VPS with Dokploy, Coolify, Railway, or even a Raspberry Pi at home, this is usually the easier path — no AWS account required. It's a community project (not maintained by the beanies.family team), but conforms to [`infrastructure/lambda/oauth/SPEC.md`](../infrastructure/lambda/oauth/SPEC.md) and is suitable for production family use.
+
+Either option needs two env vars:
 
 - `GOOGLE_CLIENT_SECRET` — from Step 1
-- `CORS_ORIGIN` — your SPA's origin (the Lambda allowlists this for CORS)
+- `CORS_ORIGIN` — your SPA's origin (the proxy allowlists this for CORS)
 
-Once deployed, copy the API Gateway / Function URL → `VITE_OAUTH_PROXY_URL` in your SPA's `.env.local`.
+Once deployed, copy the proxy's URL (API Gateway URL for AWS, your Dokploy domain for the Node side-car, etc.) → `VITE_OAUTH_PROXY_URL` in your SPA's `.env.local`.
 
 ### Path B env-var summary
 

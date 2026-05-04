@@ -91,6 +91,10 @@ The Lambda is plain ES modules with `fetch`, so it ports easily:
 - **Vercel Edge / Netlify Functions** — same shape; adapt the request parsing.
 - **Self-hosted Node server** (e.g. behind Caddy/Nginx) — wrap the handler with any HTTP framework. The handler returns `{ statusCode, headers, body }` which maps cleanly to a Node `res` object.
 
+### Community Node implementation
+
+Sam Ledoux maintains [`Snaxilla/beanies-oauth-proxy`](https://github.com/Snaxilla/beanies-oauth-proxy) — a clean, dependency-free Node side-car implementing the same [SPEC](./SPEC.md). It deploys via Docker (Dokploy / Coolify / Railway / Raspberry Pi at home), so it's a good reference if you already run a VPS and don't want to introduce AWS into your stack. It's a community project (not maintained by the beanies.family team), but it's SPEC-conformant and suitable for production family use.
+
 See [SPEC.md](./SPEC.md) for the precise request/response contract every implementation must honor.
 
 ---
