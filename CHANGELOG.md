@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-04
 
+### Fixed
+
+- **Header date and greeting now refresh after a desktop sleep / tab wake.** Reported live by greg: a tab left open overnight (Mac sleeping in between) showed yesterday's date in the header even after switching to another tab and back. The wake-detection plumbing itself (`useToday` + `useStaleTabRefresh`) was working correctly — `today.value` advances on `visibilitychange → visible`, on `pageshow` with bfcache, and on the self-rearming midnight timer, and the heavy refresh fires correctly. The bug was downstream: `AppHeader.vue`'s `todayFormatted` and `greeting` computeds called `new Date()` directly, with no reactive dependency on `useToday().today`, so they evaluated once on mount and never recomputed. Wired both to read `today` (and `lastVisibleAt` for the morning/afternoon/evening greeting transitions) so Vue tracks them as deps and the header re-renders on every wake. Confirmed via the existing `useToday` and `useStaleTabRefresh` test suites — both still green.
+
 ### Changed
 
 - **Self-hosting docs now reference Sam Ledoux's community OAuth-proxy implementation.** Path B (the Drive-sync self-host path) previously documented only the in-tree AWS Lambda reference. [`Snaxilla/beanies-oauth-proxy`](https://github.com/Snaxilla/beanies-oauth-proxy) is now linked as a community alternative for self-hosters who'd rather run a Node side-car via Docker / Dokploy / Coolify / Railway / Raspberry Pi than spin up an AWS account. SPEC-conformant, ~190 lines, zero deps. Updates in `docs/SELF_HOSTING.md` Step 2 and `infrastructure/lambda/oauth/README.md` "Alternative runtimes".
