@@ -59,15 +59,24 @@ export async function hardReload(): Promise<void> {
  * Match the various module-load error shapes produced by Vite + browsers
  * when a hashed chunk filename has rotated (post-deploy stale-SW gap).
  *
- * Covers Chrome/Edge ("Failed to fetch dynamically imported module"),
- * Firefox ("error loading dynamically imported module"), and Safari
- * ("Importing a module script failed").
+ * Covers:
+ *   - Chrome/Edge: "Failed to fetch dynamically imported module"
+ *   - Firefox: "error loading dynamically imported module"
+ *   - Safari: "Importing a module script failed"
+ *   - Vue Router fallback: "Couldn't resolve component "<name>" at "<path>""
+ *     fires when the route's lazy `import()` resolves to something that
+ *     isn't a valid module (e.g., CloudFront serves the SPA's 404 HTML
+ *     in place of the rotated chunk filename — import() succeeds but
+ *     the module has no `default` export, so Vue Router's resolver
+ *     throws). Same root cause, different observable error shape.
+ *     Caught live 2026-05-04 from a stale tab three deploys behind HEAD.
  */
 export function isChunkLoadError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? '');
   return (
     /Failed to fetch dynamically imported module/i.test(msg) ||
     /error loading dynamically imported module/i.test(msg) ||
-    /Importing a module script failed/i.test(msg)
+    /Importing a module script failed/i.test(msg) ||
+    /Couldn't resolve component .+ at /i.test(msg)
   );
 }
