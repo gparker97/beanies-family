@@ -67,8 +67,7 @@ export type RecoveryAction =
   | 'retry'
   | 'signInDifferentAccount'
   | 'tryAnotherDevice'
-  | 'pickDifferentBean'
-  | 'askForNewInvite';
+  | 'pickDifferentBean';
 
 export interface JoinErrorEntry {
   messageKey: string;
@@ -126,31 +125,36 @@ export const JOIN_ERRORS = {
   },
   FILE_DECRYPT_FAILED: {
     messageKey: 'join.error.fileDecrypt',
-    recoveries: ['askForNewInvite'],
+    recoveries: [],
     severity: 'critical',
   },
   FILE_FAMILY_MISMATCH: {
     messageKey: 'join.error.familyMismatch',
-    recoveries: ['signInDifferentAccount', 'askForNewInvite'],
+    recoveries: ['signInDifferentAccount'],
     severity: 'critical',
   },
   INVITE_TOKEN_EXPIRED: {
     messageKey: 'join.error.tokenExpired',
-    recoveries: ['retry', 'askForNewInvite'],
+    recoveries: ['retry'],
     severity: 'critical',
   },
   INVITE_TOKEN_INVALID: {
     // Most common cause is a stale Drive read — the inviter just generated
-    // the link, but the iPhone read a CDN-cached version of the .beanpod
-    // from before the new inviteKey was persisted. `retry` re-runs the
-    // load, which typically picks up the freshest version.
+    // the link, but the device read a cached version of the .beanpod from
+    // before the new inviteKey was persisted. `retry` re-runs the load,
+    // which typically picks up the freshest version. The error copy
+    // already directs the user to ask the inviter for a new link if retry
+    // doesn't help — no in-app button is honest here, since the only real
+    // remedy is out-of-band (a new link from the inviter).
     messageKey: 'join.error.tokenInvalid',
-    recoveries: ['retry', 'askForNewInvite'],
+    recoveries: ['retry'],
     severity: 'critical',
   },
   NO_UNCLAIMED_MEMBERS: {
+    // No in-app recovery — the user must contact a family admin out-of-band.
+    // Empty recoveries render no buttons; the prose copy carries the action.
     messageKey: 'join.error.noUnclaimed',
-    recoveries: ['askForNewInvite'],
+    recoveries: [],
     severity: 'warning',
   },
 } as const satisfies Record<JoinErrorCode, JoinErrorEntry>;
@@ -276,7 +280,7 @@ export function useJoinFlow() {
     }
   }
 
-  function buildDiagnosticReport(): string {
+  async function buildDiagnosticReport(): Promise<string> {
     // Capture inviteKey hash prefixes from the loaded (or pending) envelope
     // so debugging can correlate the URL token's hash against what's
     // actually in the file. Hashes are non-secret (storage keys derived
@@ -285,6 +289,23 @@ export function useJoinFlow() {
     const inviteKeyHashes = envelopeWithKeys?.inviteKeys
       ? Object.keys(envelopeWithKeys.inviteKeys).map((h) => `${h.slice(0, 8)}…`)
       : [];
+
+    // Hash of the URL's invite token. Including this lets us tell at a
+    // glance whether the URL token's hash IS in the envelope (different
+    // bug — should not happen given the equality check at line 500) or
+    // is NOT (the documented "stale envelope" case where Drive returned
+    // a copy from before addInvitePackage's syncNow landed). Empty when
+    // no token is present in the URL (password-only join).
+    let urlTokenHash: string | null = null;
+    if (inviteToken.value) {
+      try {
+        const { hashInviteToken } = await import('@/services/crypto/inviteService');
+        const full = await hashInviteToken(inviteToken.value);
+        urlTokenHash = `${full.slice(0, 8)}…`;
+      } catch {
+        urlTokenHash = 'hash-failed';
+      }
+    }
 
     return JSON.stringify(
       {
@@ -310,6 +331,7 @@ export function useJoinFlow() {
               : null,
           inviteKeyCount: inviteKeyHashes.length,
           inviteKeyHashes,
+          urlTokenHash,
         },
         redirectAuth: shouldUseRedirectAuth(),
         googleEmail: getGoogleAccountEmail(),

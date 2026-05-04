@@ -43,8 +43,8 @@ const localFormError = ref<string | null>(null);
 const showDiagnosticModal = ref(false);
 const diagnosticReport = ref('');
 
-function openDiagnostic(): void {
-  diagnosticReport.value = flow.buildDiagnosticReport();
+async function openDiagnostic(): Promise<void> {
+  diagnosticReport.value = await flow.buildDiagnosticReport();
   showDiagnosticModal.value = true;
 }
 
@@ -97,17 +97,6 @@ const recoveryHandlers: Record<RecoveryAction, () => void | Promise<void>> = {
     // when the file is already loaded; otherwise this is a no-op (the
     // error registry only lists this recovery for codes that fire after
     // the member grid is reachable).
-  },
-  askForNewInvite: () => {
-    // Dead-end recovery — the user must contact the inviter for a new
-    // link. Clear the error AND reset the flow to `awaiting-auth` so
-    // the view shows the Picker CTA again, ready to accept a fresh
-    // link the user has just received. Without the step reset, the
-    // view falls back to the busy spinner since `currentStep` is
-    // still mid-flight ('loading' / 'authenticating') from the
-    // failed attempt.
-    flow.clearError();
-    flow.currentStep.value = 'awaiting-auth';
   },
 };
 
