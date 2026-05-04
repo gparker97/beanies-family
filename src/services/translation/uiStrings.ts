@@ -669,6 +669,10 @@ const STRING_DEFS = {
     en: 'Back to the Cookbook',
     beanie: 'back to the cookbook',
   },
+  'recipes.detail.openPhoto': {
+    en: 'View recipe photo',
+    beanie: 'view recipe photo',
+  },
   'recipes.detail.ingredients': { en: 'Ingredients', beanie: 'ingredients' },
   'recipes.detail.steps': { en: 'How to make it', beanie: 'how to make it' },
   'recipes.detail.notes': { en: 'Family notes', beanie: 'family notes' },

@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-04
 
+### Added
+
+- **Tap a recipe photo to open it full-screen.** Recipe detail page hero polaroid is now clickable when there's a photo — opens the same shared photo lightbox that's already used for member avatars, medication snaps, and per-entity photo attachments. Cookbook landing-page polaroids deliberately stay non-clickable since their tap navigates to the recipe detail; the lightbox lives on the detail page.
+
+### Changed
+
+- **Photo lightbox chrome is now slightly more refined and consistent.** All photo-viewing surfaces in the app already shared one component (`PhotoViewer.vue`), but its chrome was a touch generic. Subtle refinements: warm-shifted backdrop (rgb(20 15 15 / 0.96) instead of pure black) so the modal stops feeling clinical against the Heritage Orange / Cloud White palette elsewhere, larger tap targets on close + chevrons with smoother hover transitions and a tactile scale cue, and a cleaner photo-position indicator — when there are multiple photos, a centered row of dot pips appears at the bottom of the image (Heritage Orange for the current photo) instead of the previous tiny "1 of 3" footer text. Photo gets a soft drop-shadow so it floats off the dark backdrop. Restraint over flair — the photo is the hero, the chrome supports it.
+
 ### Fixed
 
 - **Stale-tab self-heal now also catches Vue Router's "Couldn't resolve component" failure mode.** The May-3 PWA stale-chunk recovery (`b19a106`) installed a `router.onError → hardReload()` chain that automatically replaces a stale tab when a lazy route import fails after a deploy. Its matcher covered the three browser-native shapes (Chrome's "Failed to fetch dynamically imported module", Firefox's "error loading dynamically imported module", Safari's "Importing a module script failed") but missed the Vue Router fallback shape: when the lazy `import()` resolves to something that isn't a valid module — e.g., CloudFront serves the SPA's 404 HTML in place of a rotated chunk filename — Vue Router throws `Couldn't resolve component "default" at "<path>"` instead. Same root cause, different observable error, no auto-recovery. Caught live from a tab three deploys behind HEAD; user got the error overlay instead of the silent flash-and-reload the May-3 fix was designed to deliver. Matcher widened to also recognize this Vue Router shape, and the existing recovery chain handles the rest. 6 unit tests now lock in all four matcher shapes plus negative cases.

@@ -18,6 +18,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
 import StatStrip from '@/components/pod/shared/StatStrip.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
+import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import CookLogFormModal from '@/components/pod/CookLogFormModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -51,6 +52,17 @@ const stats = computed(() =>
 const editRecipeOpen = ref(false);
 const cookLogOpen = ref(false);
 const editingEntry = ref<CookLogEntry | null>(null);
+
+// Photo lightbox — opens when the user taps the polaroid hero. Read-only:
+// edits flow through the recipe edit drawer, not the lightbox itself, so
+// download is the only useful action and we let the standard PhotoViewer
+// chrome handle that.
+const lightboxOpen = ref(false);
+const lightboxPhotoIds = computed<string[]>(() => recipe.value?.photoIds ?? []);
+function openLightbox(): void {
+  if (lightboxPhotoIds.value.length === 0) return;
+  lightboxOpen.value = true;
+}
 
 function openAddCookLog(): void {
   editingEntry.value = null;
@@ -133,9 +145,35 @@ function onRecipeDeleted(): void {
       <section
         class="mb-6 grid gap-5 rounded-[var(--sq)] border border-[rgb(230_126_34_/_12%)] bg-[#fbf3e3] p-4 sm:gap-6 sm:p-6 lg:grid-cols-[1.1fr_1fr]"
       >
+        <!--
+          Hero polaroid is clickable when a photo exists — opens the
+          shared PhotoViewer lightbox. Wrapped in a button (vs adding a
+          @click prop to PolaroidImage) so the polaroid component stays
+          purely presentational; each call site decides whether the
+          surface is interactive. The cookbook landing page deliberately
+          keeps PolaroidImage non-clickable since its tile-tap navigates
+          to this detail page instead. Subtle scale-up on hover signals
+          the affordance without disturbing the polaroid's restful
+          geometry.
+        -->
+        <button
+          v-if="heroUrl"
+          type="button"
+          class="group block rounded-[var(--sq)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#fbf3e3]"
+          :aria-label="t('recipes.detail.openPhoto')"
+          @click="openLightbox"
+        >
+          <PolaroidImage
+            :src="heroUrl"
+            :caption="recipe.subtitle ?? recipe.name"
+            aspect-ratio="4 / 3"
+            class="cursor-zoom-in transition-transform duration-200 group-hover:-translate-y-0.5 group-active:scale-[0.99]"
+          />
+        </button>
         <PolaroidImage
-          :src="heroUrl"
-          :caption="heroUrl ? (recipe.subtitle ?? recipe.name) : t('cookbook.card.noPhoto')"
+          v-else
+          :src="null"
+          :caption="t('cookbook.card.noPhoto')"
           aspect-ratio="4 / 3"
         />
         <div class="flex flex-col">
@@ -309,6 +347,18 @@ function onRecipeDeleted(): void {
           cookLogOpen = false;
           editingEntry = null;
         "
+      />
+      <!--
+        Photo lightbox — read-only. Edits route through the recipe edit
+        drawer, not the lightbox, so the standard read-only chrome
+        (close + chevrons + dot pips) is what we want.
+      -->
+      <PhotoViewer
+        v-if="lightboxPhotoIds.length"
+        :open="lightboxOpen"
+        :photo-ids="lightboxPhotoIds"
+        read-only
+        @close="lightboxOpen = false"
       />
     </template>
     <div
