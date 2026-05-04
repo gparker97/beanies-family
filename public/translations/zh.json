@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-03",
-    "translationCount": 2637
+    "lastUpdated": "2026-05-04",
+    "translationCount": 2642
   },
   "translations": {
     "app.name": {
@@ -13082,9 +13082,9 @@
       "lastUpdated": "2026-05-03"
     },
     "transferOwnership.noEligibleRecipients": {
-      "translation": "没有符合条件的收件人。请先将另一名成人添加到您的Pod。",
-      "hash": "kq44dj",
-      "lastUpdated": "2026-05-03"
+      "translation": "没有符合条件的收件人。成人必须先加入您的POD （设置其帐户） ，然后才能成为所有者。",
+      "hash": "q40l7q",
+      "lastUpdated": "2026-05-04"
     },
     "transferOwnership.continue": {
       "translation": "继续",
@@ -13190,6 +13190,31 @@
       "translation": "将超级管理员角色移至另一位成人。",
       "hash": "r8obzh",
       "lastUpdated": "2026-05-03"
+    },
+    "settings.podOwnershipSection": {
+      "translation": "Pod所有权",
+      "hash": "2sa2hg",
+      "lastUpdated": "2026-05-04"
+    },
+    "settings.currentOwner": {
+      "translation": "当前站长",
+      "hash": "q3c65o",
+      "lastUpdated": "2026-05-04"
+    },
+    "settings.transferOwnershipAction": {
+      "translation": "  转让所有权  ",
+      "hash": "9ux1vw",
+      "lastUpdated": "2026-05-04"
+    },
+    "header.newVersionReady": {
+      "translation": "新版本已准备就绪",
+      "hash": "bum7ik",
+      "lastUpdated": "2026-05-04"
+    },
+    "header.reloadNow": {
+      "translation": "立即重载",
+      "hash": "cbuz0v",
+      "lastUpdated": "2026-05-04"
     }
   }
 }

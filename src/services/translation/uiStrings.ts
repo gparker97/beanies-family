@@ -1512,8 +1512,9 @@ const STRING_DEFS = {
       "you'll lose super-admin rights. the new owner can revoke any of your permissions, including transferring ownership back to you.",
   },
   'transferOwnership.noEligibleRecipients': {
-    en: 'No eligible recipients. Add another adult to your pod first.',
-    beanie: 'no eligible recipients. add another adult to your pod first.',
+    en: 'No eligible recipients. Adults must join your pod (set up their account) before they can become owner.',
+    beanie:
+      'no eligible recipients. adults must join your pod (set up their account) before they can become owner.',
   },
   'transferOwnership.continue': { en: 'Continue', beanie: 'continue' },
   'transferOwnership.reauthTitle': { en: 'Verify Identity', beanie: 'verify identity' },
