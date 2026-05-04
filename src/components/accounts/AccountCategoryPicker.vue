@@ -52,8 +52,6 @@ function isAutoSelected(cat: AccountCategory): boolean {
   return !!cat.autoSelect && props.modelValue === cat.autoSelect;
 }
 
-const expandedCat = () => ACCOUNT_CATEGORIES.find((c) => c.id === expandedCategory.value);
-
 // Sort alphabetically by translated label, "Other" always last
 function sortOtherLast<T>(
   items: T[],
@@ -75,6 +73,10 @@ const sortedCategories = computed(() =>
   )
 );
 
+// Categories that expand to a subtype picker. Cash/Loan/Other auto-select and
+// have no expanded view, so we exclude them from the pre-mounted set.
+const expandableCategories = computed(() => ACCOUNT_CATEGORIES.filter((c) => !c.autoSelect));
+
 function sortedSubtypes(subtypes: AccountSubtype[]): AccountSubtype[] {
   return sortOtherLast(
     subtypes,
@@ -87,7 +89,7 @@ function sortedSubtypes(subtypes: AccountSubtype[]): AccountSubtype[] {
 <template>
   <div class="space-y-2">
     <!-- All category chips (shown when no category is expanded) -->
-    <div v-if="!expandedCategory" class="flex flex-wrap gap-2">
+    <div v-show="!expandedCategory" class="flex flex-wrap gap-2">
       <button
         v-for="cat in sortedCategories"
         :key="cat.id"
@@ -105,16 +107,28 @@ function sortedSubtypes(subtypes: AccountSubtype[]): AccountSubtype[] {
       </button>
     </div>
 
-    <!-- Expanded state: selected category chip + subtypes -->
-    <template v-if="expandedCategory && expandedCat()">
+    <!--
+      One pre-mounted expanded block per expandable category, gated by v-show.
+      Pre-mounting keeps every subtype button in the DOM and a11y tree from
+      first paint, so selecting a category is a CSS visibility flip rather
+      than a v-if mount + a11y tree population. WebKit-CI under contention
+      previously stalled the v-if remount path for >15s, hard-failing E2E
+      tests like cross-entity.spec.ts (`AccountsPage.selectAccountType`).
+    -->
+    <div
+      v-for="cat in expandableCategories"
+      v-show="expandedCategory === cat.id"
+      :key="cat.id"
+      class="space-y-2"
+    >
       <div class="flex items-center gap-2">
         <button
           type="button"
           class="font-outfit border-primary-500 text-primary-500 dark:bg-primary-500/15 rounded-full border-2 bg-[var(--tint-orange-8)] px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
           @click="collapse"
         >
-          <span class="mr-1">{{ expandedCat()!.emoji }}</span>
-          {{ t(expandedCat()!.labelKey) }}
+          <span class="mr-1">{{ cat.emoji }}</span>
+          {{ t(cat.labelKey) }}
           <span class="ml-1 opacity-60">&times;</span>
         </button>
         <span class="font-outfit text-xs text-[var(--color-text-muted)]">
@@ -122,10 +136,10 @@ function sortedSubtypes(subtypes: AccountSubtype[]): AccountSubtype[] {
         </span>
       </div>
 
-      <!-- Flat subtypes (e.g. Bank) -->
-      <div v-if="expandedCat()!.subtypes" class="flex flex-wrap gap-2">
+      <!-- Flat subtypes (e.g. Bank). v-if is static per category so never re-evaluates during interaction. -->
+      <div v-if="cat.subtypes" class="flex flex-wrap gap-2">
         <button
-          v-for="sub in sortedSubtypes(expandedCat()!.subtypes!)"
+          v-for="sub in sortedSubtypes(cat.subtypes)"
           :key="sub.type"
           type="button"
           class="font-outfit rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
@@ -141,13 +155,9 @@ function sortedSubtypes(subtypes: AccountSubtype[]): AccountSubtype[] {
         </button>
       </div>
 
-      <!-- Grouped subtypes (e.g. Investment) -->
-      <template v-if="expandedCat()!.subgroups">
-        <div
-          v-for="(group, idx) in expandedCat()!.subgroups"
-          :key="group.labelKey ?? idx"
-          class="space-y-1.5"
-        >
+      <!-- Grouped subtypes (e.g. Investment with section labels). Static branch. -->
+      <template v-if="cat.subgroups">
+        <div v-for="(group, idx) in cat.subgroups" :key="group.labelKey ?? idx" class="space-y-1.5">
           <!-- Section label (skip for ungrouped = no labelKey) -->
           <div
             v-if="group.labelKey"
@@ -174,6 +184,6 @@ function sortedSubtypes(subtypes: AccountSubtype[]): AccountSubtype[] {
           </div>
         </div>
       </template>
-    </template>
+    </div>
   </div>
 </template>
