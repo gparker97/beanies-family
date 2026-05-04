@@ -282,14 +282,23 @@ async function handleDecrypt() {
     if (result.success) {
       showDecryptModal.value = false;
 
-      // If we got a memberId back, try auto-sign-in to skip PickBeanView
-      if (result.memberId) {
-        const signInResult = await authStore.signIn(result.memberId, decryptPassword.value);
+      // Auto-sign-in is safe ONLY when exactly one member's wrappedKey
+      // unwrapped with this password. If more than one matched, multiple
+      // members share this password — we cannot infer identity from the
+      // unwrap alone. Fall through to PickBeanView so the user explicitly
+      // chooses which bean they are; the per-member verifyPassword check
+      // there is salt-scoped per member, so identity is unambiguous after
+      // they pick.
+      const unambiguousMemberId =
+        result.memberIds && result.memberIds.length === 1 ? result.memberIds[0] : null;
+
+      if (unambiguousMemberId) {
+        const signInResult = await authStore.signIn(unambiguousMemberId, decryptPassword.value);
         decryptPassword.value = '';
         if (signInResult.success) {
           // Cross-device: register passkey on this device and wrap family key with new PRF
           if (props.crossDeviceContext) {
-            await registerCrossDevicePasskey(result.memberId);
+            await registerCrossDevicePasskey(unambiguousMemberId);
           }
           emit('signed-in', '/nook');
           return;
