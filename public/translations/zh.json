@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-04",
-    "translationCount": 2658
+    "translationCount": 2659
   },
   "translations": {
     "app.name": {
@@ -13294,6 +13294,11 @@
     "changePassword.error.failed": {
       "translation": "无法更新密码。请重试。",
       "hash": "4ieawh",
+      "lastUpdated": "2026-05-04"
+    },
+    "recipes.detail.openPhoto": {
+      "translation": "食谱照片",
+      "hash": "8b5tut",
       "lastUpdated": "2026-05-04"
     }
   }
