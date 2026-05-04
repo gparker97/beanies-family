@@ -1492,6 +1492,59 @@ const STRING_DEFS = {
     beanie: 'could not finish updating bean roles. reload to try again.',
   },
 
+  // ── Change Password (Settings → Security & Privacy) ──────────────────────
+  'changePassword.tileTitle': { en: 'Password', beanie: 'password' },
+  'changePassword.tileDescription': {
+    en: 'Change the password you use to unlock your beanpod and sign in.',
+    beanie: 'change the password you use to unlock your beanpod and sign in.',
+  },
+  'changePassword.tileAction': { en: 'Change', beanie: 'change' },
+  'changePassword.modalTitle': { en: 'Change Password', beanie: 'change password' },
+  'changePassword.modalDescription': {
+    en: 'Enter your current password, then choose a new one. Other devices will pick up the change next time they sync.',
+    beanie:
+      'enter your current password, then choose a new one. other devices will pick up the change next time they sync.',
+  },
+  'changePassword.currentPassword': { en: 'Current Password', beanie: 'current password' },
+  'changePassword.currentPasswordPlaceholder': {
+    en: 'Your current password',
+    beanie: 'your current password',
+  },
+  'changePassword.newPassword': { en: 'New Password', beanie: 'new password' },
+  'changePassword.newPasswordPlaceholder': {
+    en: 'Choose a new password',
+    beanie: 'choose a new password',
+  },
+  'changePassword.confirmNewPassword': {
+    en: 'Confirm New Password',
+    beanie: 'confirm new password',
+  },
+  'changePassword.confirmNewPasswordPlaceholder': {
+    en: 'Re-enter the new password',
+    beanie: 're-enter the new password',
+  },
+  'changePassword.submit': { en: 'Update Password', beanie: 'update password' },
+  'changePassword.success': {
+    en: 'Password updated.',
+    beanie: 'password updated.',
+  },
+  'changePassword.error.required': {
+    en: 'Please fill in all three fields.',
+    beanie: 'please fill in all three fields.',
+  },
+  'changePassword.error.mismatch': {
+    en: "New password and confirmation don't match.",
+    beanie: "new password and confirmation don't match.",
+  },
+  'changePassword.error.sameAsCurrent': {
+    en: 'New password must be different from your current one.',
+    beanie: 'new password must be different from your current one.',
+  },
+  'changePassword.error.failed': {
+    en: 'Could not update password. Please try again.',
+    beanie: 'could not update password. please try again.',
+  },
+
   // ── Transfer Ownership ────────────────────────────────────────────────────
   'transferOwnership.entryTitle': {
     en: 'Transfer Pod Ownership',

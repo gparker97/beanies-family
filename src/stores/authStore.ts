@@ -260,6 +260,77 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Change the current authenticated member's password.
+   *
+   * Verifies the current password, re-wraps the family key under the new
+   * password (replacing the existing wrappedKeys[memberId] entry so the
+   * old password can no longer unwrap), and updates the stored password
+   * hash. Caller must pass both old and new — there is no admin path
+   * to reset a forgotten password (by design: data is encrypted at rest
+   * with no recovery key).
+   */
+  async function changePassword(
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!isAuthenticated.value || !currentUser.value) {
+      return { success: false, error: 'Not authenticated' };
+    }
+    if (!newPassword) {
+      return { success: false, error: 'New password is required' };
+    }
+    if (newPassword === currentPassword) {
+      return { success: false, error: 'New password must be different from current' };
+    }
+
+    try {
+      const familyStore = useFamilyStore();
+      const memberId = currentUser.value.memberId;
+      const member = familyStore.members.find((m) => m.id === memberId);
+      if (!member?.passwordHash) {
+        return { success: false, error: 'No current password set for this account' };
+      }
+
+      const valid = await verifyPassword(currentPassword, member.passwordHash);
+      if (!valid) {
+        return { success: false, error: 'Current password is incorrect' };
+      }
+
+      // Family key must be loaded in memory to re-wrap. After any successful
+      // sign-in (password OR passkey), syncStore.familyKey is populated; if
+      // it's missing here the user's session is in an unexpected state and
+      // we ask them to sign in again rather than silently corrupting the
+      // wrappedKeys entry.
+      const { useSyncStore } = await import('@/stores/syncStore');
+      const syncStore = useSyncStore();
+      if (!syncStore.familyKey) {
+        return {
+          success: false,
+          error: 'Could not load family key — please sign out and back in, then try again',
+        };
+      }
+
+      // Replace the existing wrappedKey for this member. After this call the
+      // OLD password will no longer unwrap (different salt + new wrapping
+      // key), and any future file-open with this member will require the
+      // new password. wrapFamilyKeyForMember overwrites by memberId.
+      await syncStore.wrapFamilyKeyForMember(memberId, newPassword);
+
+      const newHash = await hashPassword(newPassword);
+      await familyStore.updateMember(memberId, { passwordHash: newHash });
+
+      // Best-effort push to remote so other devices pick up the change on
+      // next pull. Local change is already persisted regardless.
+      await syncStore.syncNow(true);
+
+      return { success: true };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to change password';
+      return { success: false, error: message };
+    }
+  }
+
+  /**
    * Set password for an existing member (used during joiner onboarding).
    */
   async function setPassword(
@@ -694,6 +765,7 @@ export const useAuthStore = defineStore('auth', () => {
     checkHasRegisteredPasskeys,
     signUp,
     setPassword,
+    changePassword,
     joinFamily,
     signOut,
     signOutAndClearData,

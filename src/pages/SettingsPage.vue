@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
 import PasskeySettings from '@/components/settings/PasskeySettings.vue';
+import ChangePasswordSettings from '@/components/settings/ChangePasswordSettings.vue';
 import ProfileHeader from '@/components/settings/ProfileHeader.vue';
 import SettingsCard from '@/components/settings/SettingsCard.vue';
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
@@ -917,6 +918,9 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           @update:model-value="settingsStore.setTrustedDevice($event)"
         />
       </div>
+
+      <!-- Change Password -->
+      <ChangePasswordSettings class="mt-4" />
 
       <!-- Passkey Settings -->
       <PasskeySettings />
