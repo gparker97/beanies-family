@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-04
+
+### Fixed
+
+- **Account picker no longer races webkit's accessibility tree under CI load.** The account category chip picker (used everywhere accounts are added or edited) used to mount and unmount its expanded subtype panel on every category click via `v-if` — a totally fine pattern on every browser except WebKit-CI under contention, where the accessibility tree could lag the new panel by >15 seconds. Symptom in the wild: an E2E test trying to click "🏦 Checking" right after "🏦 Bank" hard-failed about once a week, recurring four times in three weeks. Restructured to pre-mount one expanded block per expandable category (Bank / Investment / Retirement) and gate visibility with `v-show`, so picking a category is now a CSS display toggle rather than a Vue mount + a11y-tree repopulation. No visible change for users; the racing E2E test should stop hard-failing on webkit.
+
+---
+
 ## 2026-05-03
 
 ### Added
