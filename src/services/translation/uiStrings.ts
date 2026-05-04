@@ -3069,11 +3069,6 @@ const STRING_DEFS = {
     en: 'Pick a different bean',
     beanie: 'pick a different bean',
   },
-  'join.recovery.askForNewInvite': {
-    en: 'Ask for a new invite',
-    beanie: 'ask for a new invite',
-  },
-
   // Diagnostic-info copy modal — shown from a small link below the error
   // block. The body is a JSON blob the user can paste back to support.
   'join.diagnostic.link': {

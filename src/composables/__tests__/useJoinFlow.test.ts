@@ -186,12 +186,18 @@ describe('useJoinFlow', () => {
       expect(keys).toEqual([...ALL_ERROR_CODES].sort());
     });
 
-    it('every entry has a non-empty messageKey, ≥1 recovery, and a valid severity', async () => {
+    it('every entry has a non-empty messageKey, a recoveries array, and a valid severity', async () => {
       const { JOIN_ERRORS } = await import('../useJoinFlow');
       for (const code of ALL_ERROR_CODES) {
         const entry = JOIN_ERRORS[code];
         expect(entry.messageKey, `entry ${code}.messageKey`).toBeTruthy();
-        expect(entry.recoveries.length, `entry ${code}.recoveries`).toBeGreaterThan(0);
+        // Empty recoveries are legitimate when the only real remedy is
+        // out-of-band (e.g. INVITE_TOKEN_INVALID — ask the inviter for
+        // a new link; NO_UNCLAIMED_MEMBERS — ask a family admin to add
+        // you). The prose copy carries the action; we no longer offer
+        // a dead-end "Ask for a new invite" button that resets the
+        // flow to a useless picker CTA.
+        expect(Array.isArray(entry.recoveries), `entry ${code}.recoveries`).toBe(true);
         expect(['warning', 'critical'], `entry ${code}.severity`).toContain(entry.severity);
       }
     });
@@ -974,12 +980,14 @@ describe('useJoinFlow', () => {
     it('returns valid JSON with device + step + error fields', async () => {
       const { useJoinFlow } = await import('../useJoinFlow');
       const flow = useJoinFlow();
-      const blob = flow.buildDiagnosticReport();
+      const blob = await flow.buildDiagnosticReport();
       const parsed = JSON.parse(blob);
       expect(parsed.device.userAgent).toBeDefined();
       expect(parsed.step).toBe('lookup');
       expect(parsed.error).toBeNull();
       expect(parsed.timestamp).toBeDefined();
+      // urlTokenHash is null when no invite token was parsed from the URL.
+      expect(parsed.envelope.urlTokenHash).toBeNull();
     });
   });
 

@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-04",
-    "translationCount": 2642
+    "translationCount": 2641
   },
   "translations": {
     "app.name": {
@@ -12179,11 +12179,6 @@
     "join.recovery.pickDifferentBean": {
       "translation": "选择不同的豆类",
       "hash": "gjrtij",
-      "lastUpdated": "2026-04-26"
-    },
-    "join.recovery.askForNewInvite": {
-      "translation": "请求新的邀请",
-      "hash": "kp1e9y",
       "lastUpdated": "2026-04-26"
     },
     "googleDrive.thisAccount": {
