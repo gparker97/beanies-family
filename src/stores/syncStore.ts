@@ -550,15 +550,20 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function decryptPendingFile(
     password: string
-  ): Promise<{ success: boolean; error?: string; memberId?: string }> {
+  ): Promise<{ success: boolean; error?: string; memberIds?: string[] }> {
     const pending = pendingEncryptedFile.value;
     if (!pending) {
       return { success: false, error: 'No pending encrypted file' };
     }
 
     try {
-      // Try to unwrap the family key using the password
-      const { familyKey: fk, memberId } = await tryUnwrapFamilyKey(pending.envelope, password);
+      // Try to unwrap the family key using the password. memberIds is the
+      // list of every member whose wrappedKey successfully unwrapped with
+      // this password — typically 1, but >1 if multiple members happen to
+      // share the same password. Callers must NOT assume the first id is
+      // the authenticated user; they should use it for auto-sign-in only
+      // when length === 1.
+      const { familyKey: fk, memberIds } = await tryUnwrapFamilyKey(pending.envelope, password);
 
       // Decrypt the Automerge payload
       const doc = await decryptBeanpodPayload(pending.envelope, fk);
@@ -672,7 +677,7 @@ export const useSyncStore = defineStore('sync', () => {
       // Arm auto-sync
       setupAutoSync();
 
-      return { success: true, memberId };
+      return { success: true, memberIds };
     } catch (e) {
       const errorMessage = (e as Error).message;
       if (errorMessage.includes('Incorrect password')) {

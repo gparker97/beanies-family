@@ -122,22 +122,37 @@ export async function decryptBeanpodPayload(
 /**
  * Try to unwrap the family key using a password.
  *
- * Iterates over all wrapped keys in the envelope and tries to derive
- * the member wrapping key from the password + salt. Returns the first
- * successful unwrap.
+ * Iterates over EVERY wrappedKey in the envelope and collects all
+ * memberIds whose wrappedKey successfully unwraps with this password.
+ * Each member's wrappedKey carries its own salt, so two members who
+ * happen to share the same password will both unwrap successfully —
+ * we expose this as `memberIds: string[]` so the caller can detect
+ * the collision and refuse to auto-sign-in as an arbitrary winner.
  *
- * @returns { familyKey, memberId } on success
+ * The recovered familyKey is the same in every successful unwrap
+ * (a family has exactly one family key, just wrapped multiple ways
+ * for different members), so we return the first one we recover.
+ *
+ * Cost: O(N) PBKDF2 + AES-KW operations where N = number of members.
+ * For a typical family this is <1s; we accept the cost over the
+ * security risk of returning the first match without checking for
+ * ambiguity.
+ *
+ * @returns { familyKey, memberIds } on success — memberIds.length ≥ 1
  * @throws Error('Incorrect password') if no wrapped key matches
  */
 export async function tryUnwrapFamilyKey(
   envelope: BeanpodFileV4,
   password: string
-): Promise<{ familyKey: CryptoKey; memberId: string }> {
+): Promise<{ familyKey: CryptoKey; memberIds: string[] }> {
   const entries = Object.entries(envelope.wrappedKeys);
 
   if (entries.length === 0) {
     throw new Error('No wrapped keys in beanpod file — cannot unlock');
   }
+
+  let familyKey: CryptoKey | null = null;
+  const memberIds: string[] = [];
 
   for (const [memberId, wrappedKey] of entries) {
     try {
@@ -145,15 +160,20 @@ export async function tryUnwrapFamilyKey(
       if (salt.length !== SALT_LENGTH) continue;
 
       const memberKey = await deriveMemberKey(password, salt);
-      const familyKey = await unwrapFamilyKey(wrappedKey.wrapped, memberKey);
-      return { familyKey, memberId };
+      const fk = await unwrapFamilyKey(wrappedKey.wrapped, memberKey);
+      familyKey ??= fk;
+      memberIds.push(memberId);
     } catch {
       // Wrong password for this member — try the next one
       continue;
     }
   }
 
-  throw new Error('Incorrect password');
+  if (!familyKey || memberIds.length === 0) {
+    throw new Error('Incorrect password');
+  }
+
+  return { familyKey, memberIds };
 }
 
 /**

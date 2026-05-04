@@ -15,8 +15,12 @@ import {
   parseBeanpodV4,
   decryptBeanpodPayload,
   detectFileVersion,
+  tryUnwrapFamilyKey,
 } from './fileSync';
+import { deriveMemberKey, wrapFamilyKey } from '@/services/crypto/familyKeyService';
+import { bufferToBase64 } from '@/utils/encoding';
 import type { FamilyDocument } from '@/types/automerge';
+import type { BeanpodFileV4 } from '@/types/syncFileV4';
 
 describe('fileSync V4 format', () => {
   let familyKey: CryptoKey;
@@ -314,6 +318,59 @@ describe('fileSync V4 format', () => {
 
     it('returns null for missing version', () => {
       expect(detectFileVersion(JSON.stringify({ familyId: 'f' }))).toBeNull();
+    });
+  });
+
+  // ── Test 7: tryUnwrapFamilyKey password-collision behavior ─────────
+
+  describe('tryUnwrapFamilyKey detects same-password collisions', () => {
+    async function buildEnvelopeWithMembers(
+      members: Array<{ memberId: string; password: string }>
+    ): Promise<BeanpodFileV4> {
+      const wrappedKeys: Record<string, { wrapped: string; salt: string }> = {};
+      for (const m of members) {
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const memberKey = await deriveMemberKey(m.password, salt);
+        const wrapped = await wrapFamilyKey(familyKey, memberKey);
+        wrappedKeys[m.memberId] = { wrapped, salt: bufferToBase64(salt) };
+      }
+      return {
+        version: '4.0',
+        familyId: 'fam-test',
+        familyName: 'Test',
+        encryptedPayload: '',
+        wrappedKeys,
+      } as BeanpodFileV4;
+    }
+
+    it('returns the single matching memberId when only one member uses this password', async () => {
+      const envelope = await buildEnvelopeWithMembers([
+        { memberId: 'alice', password: 'alice-pw' },
+        { memberId: 'bob', password: 'bob-pw' },
+      ]);
+
+      const result = await tryUnwrapFamilyKey(envelope, 'alice-pw');
+      expect(result.memberIds).toEqual(['alice']);
+      expect(result.familyKey).toBeDefined();
+    });
+
+    it('returns BOTH memberIds when two members share the same password', async () => {
+      const envelope = await buildEnvelopeWithMembers([
+        { memberId: 'alice', password: 'shared-pw' },
+        { memberId: 'bob', password: 'shared-pw' },
+        { memberId: 'carol', password: 'different-pw' },
+      ]);
+
+      const result = await tryUnwrapFamilyKey(envelope, 'shared-pw');
+      expect(result.memberIds.sort()).toEqual(['alice', 'bob']);
+    });
+
+    it('throws Incorrect password when no member uses this password', async () => {
+      const envelope = await buildEnvelopeWithMembers([
+        { memberId: 'alice', password: 'alice-pw' },
+      ]);
+
+      await expect(tryUnwrapFamilyKey(envelope, 'wrong')).rejects.toThrow('Incorrect password');
     });
   });
 });
