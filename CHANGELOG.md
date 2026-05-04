@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-04
 
+### Changed
+
+- **Self-hosting docs now reference Sam Ledoux's community OAuth-proxy implementation.** Path B (the Drive-sync self-host path) previously documented only the in-tree AWS Lambda reference. [`Snaxilla/beanies-oauth-proxy`](https://github.com/Snaxilla/beanies-oauth-proxy) is now linked as a community alternative for self-hosters who'd rather run a Node side-car via Docker / Dokploy / Coolify / Railway / Raspberry Pi than spin up an AWS account. SPEC-conformant, ~190 lines, zero deps. Updates in `docs/SELF_HOSTING.md` Step 2 and `infrastructure/lambda/oauth/README.md` "Alternative runtimes".
+
 ### Added
 
 - **Change Password — new tile in Settings → Security & Privacy.** You can now change the password you use to unlock your beanpod and sign in. The flow asks for your current password, then a new one (with confirmation), verifies the current one against your salted hash, re-wraps the family key under the new password (so the old password can no longer unwrap), and updates the stored hash. Other devices pick up the change next time they sync. Passkey-only members (no current password) don't see the tile — a separate "Set Password" affordance can be added later if needed. Note: there's no admin path to reset a forgotten password — by design, since data is encrypted at rest with no recovery key. 7 unit tests cover the auth orchestration (not authenticated, empty new password, same as current, wrong current, no password set, missing family key, happy path).
