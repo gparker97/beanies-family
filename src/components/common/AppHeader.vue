@@ -28,11 +28,12 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
+import { useToday } from '@/composables/useToday';
 import { useTranslation } from '@/composables/useTranslation';
 import { useLanguageSwitcher } from '@/composables/useLanguageSwitcher';
 import { showToast } from '@/composables/useToast';
 import { isTemporaryEmail } from '@/utils/email';
-import { formatDateFull, toDateInputValue } from '@/utils/date';
+import { formatDateFull } from '@/utils/date';
 import { MARKETING_URL } from '@/utils/marketing';
 import { safeServiceWorkerUpdate } from '@/utils/safeServiceWorkerUpdate';
 import { hardReload } from '@/utils/hardReload';
@@ -51,6 +52,7 @@ const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
 const { t } = useTranslation();
+const { today, lastVisibleAt } = useToday();
 const { switchLanguage } = useLanguageSwitcher();
 
 // ── Page title / Dashboard greeting ──────────────────────────────────────
@@ -59,7 +61,15 @@ const memberName = computed(
   () => familyStore.currentMember?.name || familyStore.owner?.name || 'there'
 );
 
+// Greeting + date both depend on the current wall-clock day. They reference
+// `today` (and `lastVisibleAt` for sub-day hour transitions) so Vue tracks
+// them as reactive deps — `useToday` advances both on tab wake, midnight
+// roll, and bfcache restore, which forces these to recompute. Without the
+// refs, the computeds evaluate once on mount and the header sticks on
+// yesterday after a desktop sleep / multi-hour idle. (Reported 2026-05-04.)
 const greeting = computed(() => {
+  void today.value;
+  void lastVisibleAt.value;
   const hour = new Date().getHours();
   if (hour < 12) return `${t('greeting.morning')} ${memberName.value}`;
   if (hour < 18) return `${t('greeting.afternoon')} ${memberName.value}`;
@@ -67,7 +77,7 @@ const greeting = computed(() => {
 });
 
 const todayFormatted = computed(() => {
-  return formatDateFull(toDateInputValue(new Date()));
+  return formatDateFull(today.value);
 });
 
 const pageTitle = computed(() => {
