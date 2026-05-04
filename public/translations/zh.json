@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-04",
-    "translationCount": 2641
+    "translationCount": 2658
   },
   "translations": {
     "app.name": {
@@ -13209,6 +13209,91 @@
     "header.reloadNow": {
       "translation": "立即重载",
       "hash": "cbuz0v",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.tileTitle": {
+      "translation": "密码",
+      "hash": "l71ry3",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.tileDescription": {
+      "translation": "更改用于解锁Beanpod并登录的密码。",
+      "hash": "vmxxps",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.tileAction": {
+      "translation": "改",
+      "hash": "xczjyo",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.modalTitle": {
+      "translation": "更改密码",
+      "hash": "54747f",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.modalDescription": {
+      "translation": "输入当前密码，然后选择一个新密码。其他设备将在下次同步时接收更改。",
+      "hash": "xbjm2h",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.currentPassword": {
+      "translation": "原密码",
+      "hash": "uu7rmq",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.currentPasswordPlaceholder": {
+      "translation": "你当前的密码",
+      "hash": "31azyn",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.newPassword": {
+      "translation": "新密码",
+      "hash": "xp0vob",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.newPasswordPlaceholder": {
+      "translation": "<ph x=\"1\"/> \"选取新密码\"",
+      "hash": "5xr5vn",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.confirmNewPassword": {
+      "translation": "确认新密码",
+      "hash": "rupuxn",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.confirmNewPasswordPlaceholder": {
+      "translation": "重新輸入新密码",
+      "hash": "598prg",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.submit": {
+      "translation": "更新密码",
+      "hash": "te2ple",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.success": {
+      "translation": "密码已更新。",
+      "hash": "k36jdk",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.error.required": {
+      "translation": "请填写所有字段。",
+      "hash": "2pc03k",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.error.mismatch": {
+      "translation": "新密码与确认密码不符合",
+      "hash": "7qjpzq",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.error.sameAsCurrent": {
+      "translation": "新密码不能与当前密码一致",
+      "hash": "n8d0ew",
+      "lastUpdated": "2026-05-04"
+    },
+    "changePassword.error.failed": {
+      "translation": "无法更新密码。请重试。",
+      "hash": "4ieawh",
       "lastUpdated": "2026-05-04"
     }
   }
