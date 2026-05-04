@@ -37,12 +37,19 @@ const isSubmitting = ref(false);
 const currentOwner = computed(() => familyStore.owner);
 
 /**
- * Adult humans, excluding the current owner. Recipients must be adults
- * to prevent accidental transfer to a child's account; pets are excluded
- * by sortedHumans.
+ * Adult humans who have joined the pod, excluding the current owner.
+ * Recipients must be adults to prevent accidental transfer to a child's
+ * account; pets are excluded by sortedHumans. `requiresPassword === false`
+ * is the canonical "has joined" signal — invitees who have not set up
+ * their account yet have no auth identity, so they cannot exercise
+ * ownership; transferring to them would strand the pod with no working
+ * owner. The store-level transferOwnership guard enforces the same rule
+ * as defense in depth.
  */
 const eligibleRecipients = computed(() =>
-  familyStore.sortedHumans.filter((m) => m.ageGroup === 'adult' && m.id !== currentOwner.value?.id)
+  familyStore.sortedHumans.filter(
+    (m) => m.ageGroup === 'adult' && m.requiresPassword === false && m.id !== currentOwner.value?.id
+  )
 );
 
 const targetMember = computed(() => familyStore.members.find((m) => m.id === selectedId.value));

@@ -369,7 +369,18 @@ export const useFamilyStore = defineStore('family', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const target = members.value.find((m) => m.id === toMemberId);
       const currentOwner = owner.value;
-      if (!target || target.isPet || target.id === currentOwner?.id) {
+      // requiresPassword === true ⇒ invitee hasn't joined yet (no passwordHash,
+      // no auth identity bound to the pod). Transferring to such a member would
+      // strand the pod with no working owner: the new "owner" can't log in and
+      // the previous owner has demoted themselves out of the transfer flow.
+      // normalizeRoles() does NOT self-heal this — it only fires on 0 or >1
+      // owners, and exactly one owner exists (just an unreachable one).
+      if (
+        !target ||
+        target.isPet ||
+        target.id === currentOwner?.id ||
+        target.requiresPassword === true
+      ) {
         reportError({
           surface: 'familyStore.transferOwnership',
           message: 'Invalid transfer target',
@@ -378,6 +389,7 @@ export const useFamilyStore = defineStore('family', () => {
             toMemberId,
             currentOwnerId: currentOwner?.id,
             isPet: target?.isPet,
+            requiresPassword: target?.requiresPassword,
           },
         });
         return false;

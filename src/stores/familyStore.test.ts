@@ -234,10 +234,11 @@ describe('familyStore — transferOwnership', () => {
   });
 
   it('demotes current owner and promotes target with full permissions', async () => {
-    const owner = makeMember({ id: 'owner', role: 'owner' });
+    const owner = makeMember({ id: 'owner', role: 'owner', requiresPassword: false });
     const target = makeMember({
       id: 'target',
       role: 'member',
+      requiresPassword: false,
       canManagePod: false,
       canViewFinances: false,
       canEditActivities: false,
@@ -327,9 +328,33 @@ describe('familyStore — transferOwnership', () => {
     expect(changeDoc).not.toHaveBeenCalled();
   });
 
+  it('rejects unjoined target (requiresPassword === true)', async () => {
+    const owner = makeMember({ id: 'owner', role: 'owner', requiresPassword: false });
+    const unjoined = makeMember({
+      id: 'unjoined',
+      role: 'member',
+      requiresPassword: true,
+    });
+    vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([owner, unjoined]);
+    vi.mocked(changeDoc).mockImplementation((fn) => {
+      fn({ familyMembers: {} } as never);
+      return {} as never;
+    });
+
+    const store = useFamilyStore();
+    await store.loadMembers();
+    vi.mocked(changeDoc).mockClear();
+
+    const result = await store.transferOwnership('unjoined');
+
+    expect(result).toBe(false);
+    expect(changeDoc).not.toHaveBeenCalled();
+    expect(store.owner?.id).toBe('owner');
+  });
+
   it('updates authStore role when current session is the outgoing owner', async () => {
-    const owner = makeMember({ id: 'owner', role: 'owner' });
-    const target = makeMember({ id: 'target', role: 'member' });
+    const owner = makeMember({ id: 'owner', role: 'owner', requiresPassword: false });
+    const target = makeMember({ id: 'target', role: 'member', requiresPassword: false });
     vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([owner, target]);
     const updateRole = vi.fn();
     vi.mocked(useAuthStore).mockReturnValue({
