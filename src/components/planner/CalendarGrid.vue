@@ -7,6 +7,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { extractDatePart, formatMonthYear, formatTime12 } from '@/utils/date';
 import { tripTypeEmoji, transportEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
 import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
+import { useHorizontalSwipe } from '@/composables/useHorizontalSwipe';
 import type { ActivityCategory } from '@/types/models';
 
 const props = defineProps<{
@@ -238,11 +239,24 @@ function goToToday() {
 function handleDayClick(date: string) {
   emit('selectDate', date);
 }
+
+// ── Swipe gesture ──────────────────────────────────────────────────────────
+// Horizontal swipe on the calendar surface advances/retreats by one month.
+const swipeRef = ref<HTMLElement | null>(null);
+useHorizontalSwipe(swipeRef, {
+  onSwipeLeft: nextMonth,
+  onSwipeRight: prevMonth,
+});
+
 defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
 </script>
 
 <template>
-  <div class="rounded-3xl bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800">
+  <div
+    ref="swipeRef"
+    class="rounded-3xl bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
+    style="touch-action: pan-y"
+  >
     <CalendarNavBar :label="monthLabel" @prev="prevMonth" @next="nextMonth" @today="goToToday" />
 
     <!-- Day headers -->
