@@ -3,7 +3,27 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 
 export interface ComboboxOption {
   value: string;
+  /**
+   * Single-line full label. Used as the search target, the trigger-button
+   * display after selection, and the dropdown rendering when `rich` is
+   * not provided. Keep this long enough that searching by any meaningful
+   * substring (e.g. airport name) still matches.
+   */
   label: string;
+  /**
+   * Optional structured rendering for the dropdown item. When present, the
+   * dropdown shows a two-line item — primary text large, secondary text
+   * smaller below, with an optional right-aligned monospace badge (e.g. an
+   * IATA airport code). Trigger button + search behaviour are unchanged.
+   * Use this for long disambiguation strings like
+   *   "Singapore - Singapore Changi (SIN)" → primary "Singapore",
+   *    secondary "Singapore Changi", badge "SIN".
+   */
+  rich?: {
+    primary: string;
+    secondary?: string;
+    badge?: string;
+  };
   isCustom?: boolean;
 }
 
@@ -374,15 +394,35 @@ function clearSelection() {
             :key="option.value"
             type="button"
             :data-testid="`combobox-option-${option.value}`"
-            class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
-            :class="
+            class="flex w-full items-center gap-2 px-3 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
+            :class="[
+              option.rich ? 'py-2.5' : 'py-2',
               option.value === modelValue && !isOtherMode
                 ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
-                : 'text-gray-700 dark:text-gray-300'
-            "
+                : 'text-gray-700 dark:text-gray-300',
+            ]"
             @click="selectOption(option)"
           >
-            <span class="flex-1 truncate">{{ option.label }}</span>
+            <!-- Rich (two-line) layout: primary + optional secondary + optional right-aligned badge -->
+            <div v-if="option.rich" class="flex min-w-0 flex-1 flex-col gap-0.5">
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="font-outfit truncate font-semibold">{{ option.rich.primary }}</span>
+                <span
+                  v-if="option.rich.badge"
+                  class="flex-shrink-0 font-mono text-[11px] font-semibold tracking-wider opacity-60"
+                >
+                  {{ option.rich.badge }}
+                </span>
+              </div>
+              <span
+                v-if="option.rich.secondary"
+                class="truncate text-xs leading-snug opacity-55 dark:opacity-50"
+              >
+                {{ option.rich.secondary }}
+              </span>
+            </div>
+            <!-- Plain (single-line) fallback — existing behaviour for any consumer that hasn't opted into rich -->
+            <span v-else class="flex-1 truncate">{{ option.label }}</span>
             <span v-if="option.isCustom" class="flex items-center gap-1">
               <span
                 class="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-slate-700 dark:text-gray-400"
