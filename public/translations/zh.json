@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-05",
-    "translationCount": 2669
+    "translationCount": 2672
   },
   "translations": {
     "app.name": {
@@ -13349,6 +13349,21 @@
     "openFromDrive.tryAgain": {
       "translation": "再试一次",
       "hash": "agecuz",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.continue": {
+      "translation": "继续",
+      "hash": "8b7kmx",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.popupBlockedTitle": {
+      "translation": "再点击一下即可登录",
+      "hash": "y2ylbg",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.popupBlockedHint": {
+      "translation": "您的浏览器阻止了Google登录弹出窗口，因为它不是从点击开始的。点击继续，我们将再次打开它—这次它会通过。",
+      "hash": "r2ho8u",
       "lastUpdated": "2026-05-05"
     }
   }
