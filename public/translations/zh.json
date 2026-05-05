@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-04",
-    "translationCount": 2659
+    "lastUpdated": "2026-05-05",
+    "translationCount": 2669
   },
   "translations": {
     "app.name": {
@@ -13300,6 +13300,56 @@
       "translation": "食谱照片",
       "hash": "8b5tut",
       "lastUpdated": "2026-05-04"
+    },
+    "openFromDrive.title": {
+      "translation": "从驱动器打开",
+      "hash": "wm5ztw",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.loading": {
+      "translation": "正在从您的驱动器中计数豆类...",
+      "hash": "n1c9kr",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.loadingHint": {
+      "translation": "我们正在准备您的家庭吊舱。",
+      "hash": "hf62f9",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.errorTitle": {
+      "translation": "无法打开此pod",
+      "hash": "q82p03",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.invalidState": {
+      "translation": "我们无法从云端硬盘读取文件信息。请从云端硬盘的右键菜单重试，或直接登录。",
+      "hash": "yrdun3",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.loadFailed": {
+      "translation": "我们无法加载此pod。文件可能已被移动、删除，或者您可能无权访问它。",
+      "hash": "50erbl",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.driveNotConfigured": {
+      "translation": "此版本的beanies.family未启用Google云端硬盘同步。直接登录以使用本地文件。",
+      "hash": "ixv7rz",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.unsupportedTitle": {
+      "translation": "无法从云端硬盘打开",
+      "hash": "5h3kjr",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.goToSignIn": {
+      "translation": "直接登入",
+      "hash": "49rgmq",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.tryAgain": {
+      "translation": "再试一次",
+      "hash": "agecuz",
+      "lastUpdated": "2026-05-05"
     }
   }
 }
