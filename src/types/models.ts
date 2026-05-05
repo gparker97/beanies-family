@@ -23,7 +23,6 @@ export interface UserFamilyMapping {
   id: UUID;
   email: string;
   familyId: UUID;
-  familyRole: 'owner' | 'admin' | 'member';
   memberId: UUID; // FK to FamilyMember in per-family DB
   lastActiveAt: ISODateString;
 }
