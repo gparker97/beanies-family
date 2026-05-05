@@ -6,7 +6,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
   title="privacy policy — beanies.family"
   description="beanies.family is local-first. your family's data lives on your device. we don't collect it, we don't store it, and we don't sell it. ever."
   canonicalPath="/privacy"
-  lastUpdated="9 April 2026"
+  lastUpdated="5 May 2026"
   breadcrumbLabel="privacy policy"
 >
   <section>
@@ -72,28 +72,47 @@ import LegalLayout from '../layouts/LegalLayout.astro';
     <p>
       if you choose to enable Google Drive sync, your family data file (<code>.beanpod</code>) is
       encrypted on your device <strong>before</strong> it leaves your browser, using AES-GCM
-      encryption with a key that only you control. we never see the unencrypted contents.
+      encryption with a key that only you control. Google never sees the unencrypted contents,
+      and we never see them either.
     </p>
     <ul>
-      <li><strong>encryption:</strong> your data is encrypted locally using the Web Crypto API (AES-GCM) before upload</li>
-      <li><strong>your key, your control:</strong> the encryption key is derived from your passphrase and never leaves your device</li>
-      <li><strong>google's role:</strong> Google Drive acts as a storage medium only — we access only the app-specific folder created by beanies.family</li>
-      <li><strong>OAuth scopes:</strong> we request only <code>drive.file</code> scope, which limits access to files created by our app</li>
-      <li><strong>revocable:</strong> you can disconnect Google Drive at any time from Settings, and revoke access from your Google account</li>
+      <li><strong>encryption:</strong> your <code>.beanpod</code> is encrypted locally using the Web Crypto API (AES-GCM) before any byte leaves your device</li>
+      <li><strong>your key, your control:</strong> the encryption key is derived from your password and never leaves your device — not even to us</li>
+      <li><strong>OAuth scope:</strong> we request only the <code>drive.file</code> scope. this is a per-file scope - it grants access to a specific <code>.beanpod</code> only when you explicitly select it via Drive's file picker, drag and drop it into the app, create it with the app, or open it via Drive's "Open with beanies.family" menu. we cannot list, search, browse, or access any other files in your Drive</li>
+      <li><strong>file metadata:</strong> we read the file name, modified time, and the encrypted contents of <code>.beanpod</code> files you've explicitly granted access to. we do not read any other Drive metadata</li>
+      <li><strong>what's in a <code>.beanpod</code>:</strong> family member profiles, accounts, transactions, activities, goals, to-dos, and other family planning data — all encrypted at rest, unreadable to anyone without your password (including us, including Google)</li>
+      <li><strong>revocable:</strong> you can disconnect Google Drive at any time from Settings, and revoke access entirely from your Google account at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a></li>
     </ul>
+  </section>
+
+  <section>
+    <h2>google workspace marketplace</h2>
+    <p>
+      beanies.family is listed on the Google Workspace Marketplace. the listing enables the
+      <strong>"Open with beanies.family"</strong> entry in Google Drive's right-click menu for
+      <code>.beanpod</code> files. when you use it, Drive grants the app per-file access to that
+      specific <code>.beanpod</code> using the same <code>drive.file</code> scope described above.
+      no broader Drive access is granted, and no additional data is collected by being listed.
+    </p>
+    <p>
+      the marketplace listing itself is purely a discoverability shortcut - it does not change how
+      the app handles your data, and removing the listing would not change your data flows.
+    </p>
   </section>
 
   <section>
     <h2>google authentication</h2>
     <p>
-      when you sign in with Google, we receive basic profile information (name, email, profile
-      picture) from Google's OAuth service. this information is:
+      when you sign in with Google for Drive sync, we request only your email address from Google's
+      OAuth service (<code>userinfo.email</code> scope). we do <strong>not</strong> request your
+      name, profile picture, friends list, calendar, contacts, or any other profile data.
     </p>
+    <p>your email address is:</p>
     <ul>
-      <li>stored only in your browser's local session</li>
-      <li>used solely to identify family members within your local data</li>
+      <li>used solely to label which Google account is connected to which family pod, so you can recognise it in the app's settings</li>
+      <li>stored locally in your browser (IndexedDB), alongside the rest of your family data</li>
       <li>never transmitted to or stored on our servers</li>
-      <li>cleared when you sign out</li>
+      <li>cleared when you sign out of beanies.family or revoke the Google authorisation</li>
     </ul>
   </section>
 
