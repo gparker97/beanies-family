@@ -190,7 +190,19 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
       });
     },
     async saveDraft(field) {
-      if (!activity.value) return;
+      // Capture the activity once at function entry. `activity` is a computed
+      // ref that flips to `null` whenever `props.activity` becomes null (e.g.
+      // user dismisses the modal or navigates away). The function is async
+      // and awaits chooseScope() + store calls in the recurring-edit branch,
+      // and any post-await `activity.value.id` access would hit a null deref
+      // if the modal got dismissed mid-save (production error 2026-05-05 from
+      // an iOS Safari user — `null is not an object (evaluating 't.value.id')`
+      // in the minified bundle). Capturing once gives us a stable identity
+      // across awaits AND has the desirable side effect that the user's edit
+      // still persists even if they swipe the modal away mid-save — the store
+      // call uses the captured id, which is still valid in IndexedDB.
+      const editing = activity.value;
+      if (!editing) return;
       const update: Record<string, string | null> = {};
       let changed = false;
 
@@ -198,14 +210,14 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         case 'title': {
           const trimmed = draftTitle.value.trim();
           if (!trimmed) return;
-          if (trimmed !== activity.value.title) {
+          if (trimmed !== editing.title) {
             update.title = trimmed;
             changed = true;
           }
           break;
         }
         case 'assignee': {
-          const current = normalizeAssignees(activity.value);
+          const current = normalizeAssignees(editing);
           const draft = draftAssigneeIds.value;
           // Activities require at least 1 assignee
           if (draft.length === 0) return;
@@ -219,7 +231,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         }
         case 'date': {
           const val = draftDate.value || null;
-          const cur = activity.value.date?.split('T')[0] ?? null;
+          const cur = editing.date?.split('T')[0] ?? null;
           if (val !== cur) {
             update.date = val;
             changed = true;
@@ -228,7 +240,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         }
         case 'endDate': {
           const val = draftEndDate.value || null;
-          const cur = activity.value.endDate?.split('T')[0] ?? null;
+          const cur = editing.endDate?.split('T')[0] ?? null;
           if (val !== cur) {
             update.endDate = val;
             changed = true;
@@ -237,7 +249,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         }
         case 'startTime': {
           const val = draftStartTime.value || null;
-          if (val !== (activity.value.startTime ?? null)) {
+          if (val !== (editing.startTime ?? null)) {
             update.startTime = val;
             changed = true;
             // Auto-update endTime to startTime + 1hr
@@ -250,11 +262,11 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         case 'endTime': {
           let val = draftEndTime.value || null;
           // Clamp: endTime cannot be before startTime
-          const currentStart = activity.value.startTime ?? null;
+          const currentStart = editing.startTime ?? null;
           if (val && currentStart && val < currentStart) {
             val = currentStart;
           }
-          if (val !== (activity.value.endTime ?? null)) {
+          if (val !== (editing.endTime ?? null)) {
             update.endTime = val;
             changed = true;
           }
@@ -262,7 +274,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         }
         case 'dropoff': {
           const val = draftDropoffMemberId.value || null;
-          if (val !== (activity.value.dropoffMemberId ?? null)) {
+          if (val !== (editing.dropoffMemberId ?? null)) {
             update.dropoffMemberId = val;
             changed = true;
           }
@@ -270,7 +282,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         }
         case 'pickup': {
           const val = draftPickupMemberId.value || null;
-          if (val !== (activity.value.pickupMemberId ?? null)) {
+          if (val !== (editing.pickupMemberId ?? null)) {
             update.pickupMemberId = val;
             changed = true;
           }
@@ -278,7 +290,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         }
         case 'instructorName': {
           const val = draftInstructorName.value.trim() || null;
-          if (val !== (activity.value.instructorName ?? null)) {
+          if (val !== (editing.instructorName ?? null)) {
             update.instructorName = val;
             changed = true;
           }
@@ -286,7 +298,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         }
         case 'instructorContact': {
           const val = draftInstructorContact.value.trim() || null;
-          if (val !== (activity.value.instructorContact ?? null)) {
+          if (val !== (editing.instructorContact ?? null)) {
             update.instructorContact = val;
             changed = true;
           }
@@ -294,7 +306,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         }
         case 'notes': {
           const val = draftNotes.value.trim() || null;
-          if (val !== (activity.value.notes ?? null)) {
+          if (val !== (editing.notes ?? null)) {
             update.notes = val;
             changed = true;
           }
@@ -309,11 +321,11 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           if (!scope) return; // cancelled — discard edit
 
           if (scope === 'all') {
-            await activityStore.updateActivity(activity.value.id, update);
+            await activityStore.updateActivity(editing.id, update);
             scopeResolved.value = true;
           } else if (scope === 'this-only') {
             const override = await activityStore.materializeOverride(
-              activity.value.id,
+              editing.id,
               props.occurrenceDate,
               update
             );
@@ -323,10 +335,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
             }
             // Override has recurrence:'none' so future edits skip scope naturally
           } else if (scope === 'this-and-future') {
-            const newTemplate = await activityStore.splitActivity(
-              activity.value.id,
-              props.occurrenceDate
-            );
+            const newTemplate = await activityStore.splitActivity(editing.id, props.occurrenceDate);
             if (newTemplate) {
               await activityStore.updateActivity(newTemplate.id, update);
               effectiveTargetId.value = newTemplate.id;
@@ -336,7 +345,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           }
         } else {
           // Non-recurring, or scope already resolved — direct update
-          const targetId = effectiveTargetId.value ?? activity.value.id;
+          const targetId = effectiveTargetId.value ?? editing.id;
           await activityStore.updateActivity(targetId, update);
         }
       }

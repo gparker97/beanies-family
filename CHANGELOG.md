@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-05
+
+### Fixed
+
+- **Inline edits on recurring activities no longer silently fail when you dismiss the scope picker mid-save.** Caught from a production error in `#beanies-errors` — an iOS Safari user inline-edited a recurring activity field, the scope picker (this only / this and future / all) opened as expected, and something — modal swipe, navigation, Drive sync deleting the activity in the background — nullified the modal's bound props mid-await. When the scope picker resolved, the save handler tried to read `activity.id` off a now-null reference and threw, swallowed by the unhandled-rejection path. Net effect: the user's edit was lost without any visible error. `saveDraft` now captures the activity once at function entry and uses that stable local for all subsequent store calls, so the post-await accesses can't race the prop nullification. Side benefit: edits also persist correctly even if the user does dismiss the modal while the scope picker is up — the captured ID is still valid in IndexedDB, so the update lands.
+
+---
+
 ## 2026-05-04
 
 ### Fixed
