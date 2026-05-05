@@ -66,6 +66,16 @@ const routes: RouteRecordRaw[] = [
     props: { initialView: 'join' },
   },
   {
+    // Drive "Open with beanies.family" landing page. See OpenFromDrivePage.vue
+    // for the full flow. Route is unauthenticated because new users may land
+    // here before having a beanies session — Drive auto-handles OAuth before
+    // the redirect, so we already have drive.file scope on arrival.
+    path: '/open',
+    name: 'OpenFromDrive',
+    component: () => import('@/pages/OpenFromDrivePage.vue'),
+    meta: { titleKey: 'openFromDrive.title', requiresAuth: false, hideQuickAdd: true },
+  },
+  {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/pages/DashboardPage.vue'),

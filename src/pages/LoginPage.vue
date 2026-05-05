@@ -66,6 +66,20 @@ onMounted(async () => {
     await familyContextStore.initialize();
     await syncStore.initialize();
 
+    // Pre-loaded pending file (e.g. user arrived via /open from Drive's
+    // "Open with beanies.family" gesture): skip the welcome gate + family
+    // picker and jump straight to LoadPodView's auto-decrypt UI. The
+    // pending envelope is already in the store from OpenFromDrivePage's
+    // call to `loadFromGoogleDrive`, so LoadPodView's autoLoadFile() will
+    // see `hasPendingEncryptedFile === true` and show the password modal
+    // immediately — no file picker, no second OAuth.
+    if (syncStore.hasPendingEncryptedFile) {
+      autoLoadPod.value = true;
+      activeView.value = 'load-pod';
+      isInitializing.value = false;
+      return;
+    }
+
     // Single-family fast login: skip WelcomeGate + FamilyPicker
     const allFamilies = familyContextStore.allFamilies;
     const singleFamily = allFamilies.length === 1 ? allFamilies[0] : undefined;

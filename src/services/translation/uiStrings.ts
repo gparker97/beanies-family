@@ -4010,6 +4010,45 @@ const STRING_DEFS = {
     en: 'Failed to load from Google Drive',
     beanie: 'failed to load from google drive',
   },
+
+  // Drive "Open with beanies.family" landing page (/open). Reached when the
+  // user clicks "Open with" on a .beanpod file in Google Drive — see
+  // OpenFromDrivePage.vue.
+  'openFromDrive.title': { en: 'Opening from Drive', beanie: 'opening from drive' },
+  'openFromDrive.loading': {
+    en: 'counting beans from your drive...',
+    beanie: 'counting beans from your drive...',
+  },
+  'openFromDrive.loadingHint': {
+    en: "We're getting your family pod ready.",
+    beanie: "we're getting your family pod ready.",
+  },
+  'openFromDrive.errorTitle': {
+    en: "Couldn't open this pod",
+    beanie: "couldn't open this pod",
+  },
+  'openFromDrive.invalidState': {
+    en: "We couldn't read the file information from Drive. Try again from Drive's right-click menu, or sign in directly.",
+    beanie:
+      "we couldn't read the file information from drive. try again from drive's right-click menu, or sign in directly.",
+  },
+  'openFromDrive.loadFailed': {
+    en: "We couldn't load this pod. The file may have been moved, deleted, or you may not have access to it.",
+    beanie:
+      "we couldn't load this pod. the file may have been moved, deleted, or you may not have access to it.",
+  },
+  'openFromDrive.driveNotConfigured': {
+    en: "This build of beanies.family doesn't have Google Drive sync enabled. Sign in directly to use a local file instead.",
+    beanie:
+      "this build of beanies.family doesn't have google drive sync enabled. sign in directly to use a local file instead.",
+  },
+  'openFromDrive.unsupportedTitle': {
+    en: "Can't open from Drive",
+    beanie: "can't open from drive",
+  },
+  'openFromDrive.goToSignIn': { en: 'Sign in directly', beanie: 'sign in directly' },
+  'openFromDrive.tryAgain': { en: 'Try again', beanie: 'try again' },
+
   'googleDrive.filePickerTitle': {
     en: 'Your pods on Google Drive',
     beanie: 'your pods on google drive',
