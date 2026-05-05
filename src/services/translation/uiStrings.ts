@@ -4048,6 +4048,16 @@ const STRING_DEFS = {
   },
   'openFromDrive.goToSignIn': { en: 'Sign in directly', beanie: 'sign in directly' },
   'openFromDrive.tryAgain': { en: 'Try again', beanie: 'try again' },
+  'openFromDrive.continue': { en: 'Continue', beanie: 'continue' },
+  'openFromDrive.popupBlockedTitle': {
+    en: 'One more click to sign in',
+    beanie: 'one more click to sign in',
+  },
+  'openFromDrive.popupBlockedHint': {
+    en: "Your browser blocked the Google sign-in popup because it didn't start from a click. Click Continue and we'll open it again — this time it'll come through.",
+    beanie:
+      "your browser blocked the google sign-in popup because it didn't start from a click. click continue and we'll open it again - this time it'll come through.",
+  },
 
   'googleDrive.filePickerTitle': {
     en: 'Your pods on Google Drive',
