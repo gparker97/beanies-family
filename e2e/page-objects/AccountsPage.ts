@@ -50,16 +50,17 @@ export class AccountsPage {
     const categoryBtn = this.page.getByRole('button', { name: category, exact: true });
     await categoryBtn.click();
     if (subtype) {
-      // The subtype chip group is conditionally rendered (v-if on
-      // expandedCat().subtypes) — only appears after the category click
-      // commits. WebKit under CI contention has been observed to lag the
-      // re-render long enough that locator.click()'s default auto-wait
-      // races against the v-if flip. Explicit waitFor with a 15s budget
-      // surfaces a clearer error if the category click ever silently drops
-      // (matches the pattern hardened on 2026-04-22 / 04-23 in
-      // dismissActivityCreatedConfirm + openEditModal).
+      // The picker pre-mounts every category's subtype block under v-show
+      // (see f56ec11 — fix for the original v-if remount race), so the
+      // subtype DOM exists from first paint. But webkit-CI under sustained
+      // contention can still lag the v-show display:none flip + a11y-tree
+      // visibility recompute after the category click. Recurrences logged
+      // 2026-04-22/23/30, 2026-05-03, and 2026-05-05 (cross-entity.spec.ts:347
+      // and :379) — the structural fixes have helped but not eliminated the
+      // tail latency. Bumped from 15s to 30s on 2026-05-05 to absorb the
+      // worst observed case while still failing fast on real bugs.
       const subtypeBtn = this.page.getByRole('button', { name: subtype, exact: true });
-      await subtypeBtn.waitFor({ state: 'visible', timeout: 15_000 });
+      await subtypeBtn.waitFor({ state: 'visible', timeout: 30_000 });
       await subtypeBtn.click();
     }
   }
