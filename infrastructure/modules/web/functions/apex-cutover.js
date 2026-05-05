@@ -94,10 +94,24 @@ function handler(event) {
     return redirect('https://app.beanies.family' + uri + qs);
   }
 
-  // 3. Astro static-site URL rewrite (clean URL → .html on S3)
-  if (uri === '/' || uri.endsWith('/')) {
-    request.uri = uri + 'index.html';
+  // 3. Astro static-site URL handling.
+  //    Astro is built with `format: 'file'` + `trailingSlash: 'never'`, so
+  //    output is flat .html files (e.g. /blog.html, /guides/foo.html). The
+  //    only literal index.html is at the bucket root.
+  //
+  //    - '/'              → rewrite to /index.html
+  //    - '/path/'         → 301 to /path  (preserving query string; aligns
+  //                         with trailingSlash:'never' canonical). Rewriting
+  //                         to /path/index.html would 404 since Astro emits
+  //                         path.html, not path/index.html.
+  //    - '/path'          → rewrite to /path.html for S3 lookup
+  //    - '/path.ext'      → pass through
+  if (uri === '/') {
+    request.uri = '/index.html';
     return request;
+  }
+  if (uri.endsWith('/')) {
+    return redirect('https://beanies.family' + uri.slice(0, -1) + qs);
   }
   var lastSlash = uri.lastIndexOf('/');
   var lastSegment = uri.slice(lastSlash + 1);
