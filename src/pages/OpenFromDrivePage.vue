@@ -33,6 +33,13 @@
  * popup-blocked failure and switch into a "popup-blocked" state with a
  * Continue button. Clicking the button satisfies the popup-blocker's
  * gesture requirement, and the retry succeeds.
+ *
+ * ── UI hierarchy ──
+ * Each non-loading state has ONE clear primary action (full-width gradient
+ * button, the universal beanies CTA pattern) and a small text-link escape
+ * hatch underneath. The previous side-by-side equal-weight buttons were
+ * misleading — both looked equally important, but only the right-hand one
+ * was the path the user actually wanted.
  */
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
@@ -113,62 +120,94 @@ function goToWelcome(): void {
   <div
     class="bg-cloud-white dark:bg-secondary-900 flex min-h-screen items-center justify-center p-4"
   >
-    <div class="max-w-md text-center">
+    <div
+      class="w-full max-w-[420px] rounded-3xl bg-white p-8 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
+    >
+      <!-- Beanie icon (consistent with LoadPodView's password-decrypt screen) -->
+      <img
+        src="/brand/beanies_family_icon_transparent_384x384.png"
+        alt=""
+        class="mx-auto mb-4 h-20 w-20"
+      />
+
       <!-- Loading: download + decrypt envelope -->
       <template v-if="status === 'loading'">
-        <BeanieSpinner size="lg" class="mx-auto mb-4" />
-        <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
-          {{ t('openFromDrive.loading') }}
-        </h2>
-        <p class="text-secondary-500/60 mt-2 text-sm dark:text-gray-400">
-          {{ t('openFromDrive.loadingHint') }}
-        </p>
+        <div class="text-center">
+          <BeanieSpinner size="md" class="mx-auto mb-3" />
+          <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+            {{ t('openFromDrive.loading') }}
+          </h2>
+          <p class="text-secondary-500/60 mt-2 text-sm dark:text-gray-400">
+            {{ t('openFromDrive.loadingHint') }}
+          </p>
+        </div>
       </template>
 
       <!-- Popup blocked: requires a user-gesture click to proceed -->
       <template v-else-if="status === 'popup-blocked'">
-        <div class="mb-3 text-4xl">🪟</div>
-        <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
-          {{ t('openFromDrive.popupBlockedTitle') }}
-        </h2>
-        <p class="text-secondary-500/70 mt-2 text-sm dark:text-gray-300">
-          {{ t('openFromDrive.popupBlockedHint') }}
-        </p>
-        <div class="mt-6 flex justify-center gap-2">
-          <BaseButton variant="secondary" @click="goToWelcome">
-            {{ t('openFromDrive.goToSignIn') }}
-          </BaseButton>
-          <BaseButton @click="tryLoad">
-            {{ t('openFromDrive.continue') }}
-          </BaseButton>
+        <div class="text-center">
+          <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+            {{ t('openFromDrive.popupBlockedTitle') }}
+          </h2>
+          <p class="text-secondary-500/70 mt-2 text-sm leading-relaxed dark:text-gray-300">
+            {{ t('openFromDrive.popupBlockedHint') }}
+          </p>
         </div>
+        <BaseButton
+          class="from-primary-500 to-terracotta-400 mt-6 w-full bg-gradient-to-r"
+          @click="tryLoad"
+        >
+          {{ t('openFromDrive.continueWithGoogle') }}
+        </BaseButton>
+        <button
+          type="button"
+          class="text-secondary-500/55 hover:text-primary-500 font-outfit mt-4 block w-full text-center text-xs font-semibold transition-colors dark:text-gray-400"
+          @click="goToWelcome"
+        >
+          {{ t('openFromDrive.useDifferentFile') }}
+        </button>
       </template>
 
       <!-- Error: download failed, file inaccessible, or invalid state -->
       <template v-else-if="status === 'error'">
-        <div class="mb-3 text-4xl">😕</div>
-        <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
-          {{ t('openFromDrive.errorTitle') }}
-        </h2>
-        <p class="text-secondary-500/70 mt-2 text-sm dark:text-gray-300">{{ errorMessage }}</p>
-        <div class="mt-6 flex justify-center gap-2">
-          <BaseButton variant="secondary" @click="goToWelcome">
-            {{ t('openFromDrive.goToSignIn') }}
-          </BaseButton>
-          <BaseButton @click="tryLoad">
-            {{ t('openFromDrive.tryAgain') }}
-          </BaseButton>
+        <div class="text-center">
+          <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+            {{ t('openFromDrive.errorTitle') }}
+          </h2>
+          <p class="text-secondary-500/70 mt-2 text-sm leading-relaxed dark:text-gray-300">
+            {{ errorMessage }}
+          </p>
         </div>
+        <BaseButton
+          class="from-primary-500 to-terracotta-400 mt-6 w-full bg-gradient-to-r"
+          @click="tryLoad"
+        >
+          {{ t('openFromDrive.tryAgain') }}
+        </BaseButton>
+        <button
+          type="button"
+          class="text-secondary-500/55 hover:text-primary-500 font-outfit mt-4 block w-full text-center text-xs font-semibold transition-colors dark:text-gray-400"
+          @click="goToWelcome"
+        >
+          {{ t('openFromDrive.useDifferentFile') }}
+        </button>
       </template>
 
       <!-- Unsupported: Drive sync not configured in this build -->
       <template v-else>
-        <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
-          {{ t('openFromDrive.unsupportedTitle') }}
-        </h2>
-        <p class="text-secondary-500/70 mt-2 text-sm dark:text-gray-300">{{ errorMessage }}</p>
-        <BaseButton class="mt-6" @click="goToWelcome">
-          {{ t('openFromDrive.goToSignIn') }}
+        <div class="text-center">
+          <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+            {{ t('openFromDrive.unsupportedTitle') }}
+          </h2>
+          <p class="text-secondary-500/70 mt-2 text-sm leading-relaxed dark:text-gray-300">
+            {{ errorMessage }}
+          </p>
+        </div>
+        <BaseButton
+          class="from-primary-500 to-terracotta-400 mt-6 w-full bg-gradient-to-r"
+          @click="goToWelcome"
+        >
+          {{ t('openFromDrive.signIn') }}
         </BaseButton>
       </template>
     </div>
