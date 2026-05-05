@@ -37,7 +37,7 @@ beanies.family is the focal point of your family. It is a local-first, PWA-enabl
 - **App name:** `beanies.family` — always lowercase with `.family`. Never "Beanies", "beanies", or "GP Family Planner".
 - **Tagline:** _Every bean counts_ (sentence case, no period)
 - **Primary font:** Outfit (headings, values) + Inter (body, data)
-- **Primary color:** Heritage Orange `#F15D22` (energy, actions, CTAs, alerts — never use Alert Red)
+- **Primary color:** Heritage Orange `#F15D22` (energy, actions, CTAs, routine alerts — never use Alert Red for warnings, budget overruns, or notifications. Red is reserved for destructive confirmations like delete/leave and hard form-validation errors only.)
 - **Foundation color:** Deep Slate `#2C3E50` (anchor, trust, sidebar, headings, body text)
 - **Accent colors:** Sky Silk `#AED6F1` (calm, safety, backgrounds), Terracotta `#E67E22` (warmth, milestones, gradient partner)
 - **Background color:** Cloud White `#F8F9FA` (space, clarity, page backgrounds, cards)
@@ -499,7 +499,7 @@ E2E tests live in `e2e/specs/` and cover **critical user journeys only**. See `d
 - **MVO pattern**: The app is MVO (Model/View/Orchestrator), not MVC. Views read reactive state and emit intents. Stores orchestrate workflows (CRDT → encrypt → persist → sync). Never put orchestration logic in components, and never let views call services directly. See the "Architecture Pattern" section above.
 - All data operations go through Pinia stores -> Automerge repositories
 - Use existing UI components from `src/components/ui/`
-- **UI theme**: Always read `.claude/skills/beanies-theme/SKILL.md` before any UI work. Use the three-tier modal system (BaseModal/BeanieFormModal/ConfirmModal). Use brand colors, squircle corners, and Outfit/Inter typography. Never use Alert Red — Heritage Orange is the alert color. Follow the typography standard (six levels: Display/Page Title/Section Title/Item Title/Body/Caption). Never use custom `text-[X.Xrem]` sizes — only standard Tailwind classes (`text-xs` through `text-4xl`). Minimum font size is `text-xs` (12px).
+- **UI theme**: Always read `.claude/skills/beanies-theme/SKILL.md` before any UI work. Use the three-tier modal system (BaseModal/BeanieFormModal/ConfirmModal). Use brand colors, squircle corners, and Outfit/Inter typography. Never use Alert Red for routine alerts — Heritage Orange is the alert color. Red is reserved for destructive confirmations (delete/leave) and hard form-validation errors only. Follow the typography standard (six levels: Display/Page Title/Section Title/Item Title/Body/Caption). Never use custom `text-[X.Xrem]` sizes — only standard Tailwind classes (`text-xs` through `text-4xl`). Minimum font size is `text-xs` (12px).
 - Follow Vue 3 Composition API patterns
 - Maintain TypeScript type safety
 - Use Tailwind CSS for styling
