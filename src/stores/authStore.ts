@@ -224,7 +224,6 @@ export const useAuthStore = defineStore('auth', () => {
           id: generateUUID(),
           email: params.email,
           familyId: family.id,
-          familyRole: 'owner',
           memberId: member.id,
           lastActiveAt: toISODateString(new Date()),
         });
@@ -397,7 +396,6 @@ export const useAuthStore = defineStore('auth', () => {
         id: generateUUID(),
         email: member?.email ?? '',
         familyId: params.familyId,
-        familyRole: member?.role === 'owner' ? 'owner' : 'member',
         memberId: params.memberId,
         lastActiveAt: toISODateString(new Date()),
       });
