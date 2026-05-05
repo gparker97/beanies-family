@@ -771,6 +771,12 @@ export function isBusinessTrip(v?: { tripPurpose?: string }): boolean {
 export interface ComboOption {
   value: string;
   label: string;
+  /** Optional structured rendering — see BaseCombobox.vue's ComboboxOption.rich. */
+  rich?: {
+    primary: string;
+    secondary?: string;
+    badge?: string;
+  };
 }
 
 export function buildAirlineOptions(): ComboOption[] {
@@ -783,7 +789,16 @@ export function buildAirlineOptions(): ComboOption[] {
 export function buildAirportOptions(): ComboOption[] {
   return AIRPORTS.map((a) => ({
     value: `${a.city} (${a.code})`,
+    // `label` stays full-form so search by city, airport name, or code all match.
     label: `${a.city} - ${a.name} (${a.code})`,
+    // Rich layout: city primary, airport name secondary, IATA code as a
+    // right-aligned monospace badge — visually distinctive when scanning a
+    // multi-airport city like "London" or "New York".
+    rich: {
+      primary: a.city,
+      secondary: a.name,
+      badge: a.code,
+    },
   }));
 }
 
@@ -806,6 +821,13 @@ export function buildCruisePortOptions(): ComboOption[] {
   return CRUISE_PORTS.map((p) => ({
     value: `${p.city} — ${p.name}`,
     label: `${p.city} — ${p.name}, ${p.country}`,
+    // Rich layout: city primary, "port name · country" secondary. No badge
+    // for ports — there's no universal short code (cruise ports lack an
+    // IATA-equivalent), and country names are too long to fit a chip.
+    rich: {
+      primary: p.city,
+      secondary: `${p.name} · ${p.country}`,
+    },
   }));
 }
 
