@@ -97,6 +97,14 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
     group: 'Entertainment',
   },
 
+  // Food
+  { id: 'brunch', name: 'Brunch', emoji: '🥞', color: '#06B6D4', group: 'Food' },
+  { id: 'coffee', name: 'Coffee', emoji: '☕', color: '#0E7490', group: 'Food' },
+  { id: 'dining_out', name: 'Dining Out', emoji: '🍽️', color: '#0891B2', group: 'Food' },
+  { id: 'drinks', name: 'Drinks', emoji: '🍹', color: '#14B8A6', group: 'Food' },
+  { id: 'picnic', name: 'Picnic', emoji: '🧺', color: '#0D9488', group: 'Food' },
+  { id: 'other_food', name: 'Other Food', emoji: '🍴', color: '#155E75', group: 'Food' },
+
   // Party
   { id: 'bar_mitzvah', name: 'Bar Mitzvah', emoji: '✡️', color: '#D97706', group: 'Party' },
   { id: 'birthday', name: 'Birthday Party', emoji: '🎂', color: '#F15D22', group: 'Party' },
@@ -199,6 +207,7 @@ export const ACTIVITY_GROUP_EMOJI_MAP: Record<string, string> = {
   Competitions: '🏆',
   Educational: '📚',
   Entertainment: '🎬',
+  Food: '🍽️',
   Lessons: '🎵',
   Party: '🎉',
   School: '🏫',

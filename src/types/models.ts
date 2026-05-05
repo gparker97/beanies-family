@@ -418,7 +418,14 @@ export type ActivityCategory =
   | 'dance'
   | 'swimming'
   | 'other_lesson'
-  // Fun
+  // Food
+  | 'brunch'
+  | 'coffee'
+  | 'dining_out'
+  | 'drinks'
+  | 'picnic'
+  | 'other_food'
+  // Party
   | 'birthday'
   | 'wedding'
   | 'bar_mitzvah'

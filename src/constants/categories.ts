@@ -797,6 +797,13 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     wedding: 'entertainment',
     bar_mitzvah: 'entertainment',
     other_celebration: 'entertainment',
+    // Food → Food (expense)
+    dining_out: 'dining_out',
+    brunch: 'dining_out',
+    drinks: 'dining_out',
+    coffee: 'coffee',
+    picnic: 'other_food',
+    other_food: 'other_food',
     // Entertainment → Entertainment (expense)
     movie: 'entertainment',
     show: 'entertainment',
