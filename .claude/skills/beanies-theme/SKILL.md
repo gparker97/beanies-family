@@ -26,7 +26,7 @@ Use this skill whenever writing UI copy, designing components, choosing colors, 
 
 ### Critical Color Rules
 
-- **Heritage Orange is the alert colour — never use Alert Red.** Financial apps commonly use red for warnings, but beanies.family deliberately avoids this. Red creates anxiety. Heritage Orange delivers the same visual prominence with warmth instead of alarm. Budget overruns, missed targets, and notifications all use Heritage Orange.
+- **Heritage Orange is the alert colour for routine signals — never use Alert Red for warnings.** Financial apps commonly use red for warnings, but beanies.family deliberately avoids this. Red creates anxiety. Heritage Orange delivers the same visual prominence with warmth instead of alarm. Budget overruns, missed targets, and notifications all use Heritage Orange. The only exception is destructive confirmations (delete, leave, remove) and hard form-validation errors, where red is the learned visual signal users rely on — see the next rule.
 - **Negative financial values** use Heritage Orange (never red)
 - **Positive financial values** use soft green (`#27AE60`)
 - **Neutral financial values** use slate grey
@@ -640,7 +640,7 @@ Security is foundational but should feel safe, never scary. Security UI communic
 
 ### Always Do
 
-- Use Heritage Orange for all alerts — never Alert Red
+- Use Heritage Orange for routine alerts — Alert Red is reserved for destructive confirmations (delete/leave) and hard validation errors only
 - Maintain squircle corners (24px+) on all containers
 - Use soft, diffused shadows only
 - Keep the beanies together — parent and child always hold hands
@@ -653,7 +653,7 @@ Security is foundational but should feel safe, never scary. Security UI communic
 
 ### Never Do
 
-- Use Alert Red for any purpose — budget overruns, errors, or warnings
+- Use Alert Red for routine alerts — budget overruns, warnings, or notifications (Heritage Orange is the colour for these; red is only for destructive confirmations)
 - Use sharp corners or hard-edged shadows
 - Separate the parent and child beanies in the logo
 - Rotate, flip, stretch, or distort the logo
