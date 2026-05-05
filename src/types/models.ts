@@ -379,9 +379,15 @@ export type CreateTodoInput = Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateTodoInput = Partial<Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>>;
 
 // Family Activity — The Treehouse planner's central entity
+//
+// IMPORTANT: This union must stay in sync with ACTIVITY_CATEGORIES in
+// src/constants/activityCategories.ts and the activityCategoryToExpenseCategory
+// mapping in src/constants/categories.ts. See activityCategories.test.ts for
+// the structural invariant tests that lock all three sources together.
 export type ActivityCategory =
   // School
   | 'after_school'
+  | 'field_trip'
   | 'school_recital'
   | 'other_school'
   // Educational
@@ -402,6 +408,8 @@ export type ActivityCategory =
   | 'rugby'
   | 'multi_sport'
   | 'gymnastics'
+  | 'mma'
+  | 'taekwondo'
   | 'other_sports_activity'
   // Competitions
   | 'spelling_bee'
@@ -418,6 +426,15 @@ export type ActivityCategory =
   | 'dance'
   | 'swimming'
   | 'other_lesson'
+  // Entertainment
+  | 'movie'
+  | 'show'
+  | 'concert'
+  | 'theme_park'
+  | 'sporting_event'
+  | 'museum'
+  | 'festival'
+  | 'other_entertainment'
   // Food
   | 'brunch'
   | 'coffee'

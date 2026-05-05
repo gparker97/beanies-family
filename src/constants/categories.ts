@@ -790,6 +790,7 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     other_competition: 'other_education',
     // School → School Fees
     after_school: 'school_fees',
+    field_trip: 'school_fees',
     school_recital: 'school_fees',
     other_school: 'school_fees',
     // Party → Entertainment (expense)
