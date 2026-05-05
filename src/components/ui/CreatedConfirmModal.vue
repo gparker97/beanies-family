@@ -9,14 +9,31 @@ export interface ConfirmDetail {
   highlight?: boolean;
 }
 
-defineProps<{
-  open: boolean;
-  title: string;
-  message: string;
-  details: ConfirmDetail[];
-}>();
+withDefaults(
+  defineProps<{
+    open: boolean;
+    title: string;
+    message: string;
+    details: ConfirmDetail[];
+    /**
+     * When true, render a small text-link below the primary OK button that
+     * lets the user immediately start creating a similar item (e.g. another
+     * activity on the same day). Used by the planner's batch-create flow —
+     * setting up a kid's term-of-school routine often means 4-6 activities
+     * back-to-back, and skipping the close → reopen → choose-date dance is
+     * meaningful friction relief.
+     */
+    allowCreateAnother?: boolean;
+    /** Custom label for the create-another link (defaults to "+ add another"). */
+    createAnotherLabel?: string;
+  }>(),
+  {
+    allowCreateAnother: false,
+    createAnotherLabel: '',
+  }
+);
 
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; 'create-another': [] }>();
 const { t } = useTranslation();
 </script>
 
@@ -54,10 +71,18 @@ const { t } = useTranslation();
     </div>
 
     <template #footer>
-      <div class="flex justify-end">
+      <div class="flex flex-col items-end gap-2">
         <BaseButton variant="primary" size="sm" @click="emit('close')">
           {{ t('action.ok') }}
         </BaseButton>
+        <button
+          v-if="allowCreateAnother"
+          type="button"
+          class="text-secondary-500/55 hover:text-primary-500 font-outfit text-xs font-semibold transition-colors dark:text-gray-400"
+          @click="emit('create-another')"
+        >
+          {{ createAnotherLabel || t('planner.addAnotherActivity') }}
+        </button>
       </div>
     </template>
   </BaseModal>
