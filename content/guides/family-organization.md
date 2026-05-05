@@ -4,7 +4,7 @@ slug: family-organization
 excerpt: 'a practical guide to organizing your family life - calendars, chores, and mental load. systems that actually work.'
 heroEmoji: 🏠
 publishedDate: 2026-04-22
-lastUpdated: 2026-04-25
+lastUpdated: 2026-05-05
 relatedPosts:
   - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
@@ -136,9 +136,9 @@ Your little one will love it either way.
 
 Before kids, saying no to a party or a night out was a rarity. Life without children is like a fantasy where compromises and trade-offs don't exist. You have time, energy, and freedom - what a concept.
 
-Our weekends being packed, even if it was just with personal errands and watching TV. We had the freedom to plan our own days, and do it all over again the same way or different the next.
+Our weekends were packed, even if it was just with personal errands and watching TV. We had the freedom to plan our own days, and do it all over again the same way or different the next.
 
-Kids rewrites those rules. Now there are trade-offs - a yes to one person is a no to somebody else, and that something else is usually you. When you're struggling just to keep your head above water with school pick ups and drop offs, homework, activities, and meals, sometimes the most productive thing you can do with a free hour is absolutely nothing.
+Kids rewrite those rules. Now there are trade-offs - a yes to one person is a no to somebody else, and that somebody else is usually you. When you're struggling just to keep your head above water with school pick ups and drop offs, homework, activities, and meals, sometimes the most productive thing you can do with a free hour is absolutely nothing.
 
 If skipping something means a hurt child or a damaged relationship, it matters. Organize it, plan, and put it in the system. But if you're rearranging your entire weekend to schlep your kid to a distant acquaintance's bar mitzvah just to show your face, maybe that's something that can be skipped.
 
@@ -146,7 +146,7 @@ As Eve Rodsky puts it in Fair Play, you can't hold every card. Trying to do ever
 
 ## tools vs habits - what actually helps?
 
-**short answer:** A tool without a habit is an abandoned house, and a habit without a tool doesn't scale. You need both - but the habit comes first.
+**short answer:** A tool without a habit is an abandoned house, and a habit without a tool doesn't scale. You need both, but the habit comes first.
 
 I'll be the first one to admit: I love tools. As an IT guy, I'm a software addict, and a sucker for anything that promises to improve my productivity. I've probably tried 20 different apps, notebook systems, and calendar widgets that were each perfectly suited for what I needed at the time. But for one reason or another, most of them just didn't stick.
 
