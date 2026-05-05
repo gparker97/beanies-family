@@ -94,13 +94,29 @@ const focusedDate = ref<string | null>(null);
 const sidebarDate = ref<string | null>(null);
 const defaultStartTime = ref<string | undefined>(undefined);
 
-// Activity created confirmation modal
+// Activity created confirmation modal. `lastCreatedDate` holds the date the
+// just-created activity was scheduled on, so the "+ add another" link in the
+// confirmation modal can pre-fill the new form with the same date — meaningful
+// friction relief for batch-create flows (kid's term-of-school routine,
+// vacation-week setup, etc.) where the user is doing 4-6 activities in a row
+// on the same day.
 const createdConfirm = ref<{
   open: boolean;
   title: string;
   message: string;
   details: ConfirmDetail[];
-}>({ open: false, title: '', message: '', details: [] });
+  lastCreatedDate?: string;
+}>({ open: false, title: '', message: '', details: [], lastCreatedDate: undefined });
+
+function handleCreateAnother() {
+  const date = createdConfirm.value.lastCreatedDate;
+  createdConfirm.value.open = false;
+  // openAddModal resets all defaults; passing the prior date pre-fills it.
+  // Time + member are intentionally NOT carried forward — most batch creates
+  // use different times or assignees per activity (piano @ 4pm for kid A,
+  // swim @ 5pm for kid B). Date is the dimension that almost always stays.
+  openAddModal(date);
+}
 
 const calendarGridRef = ref<InstanceType<typeof CalendarGrid> | null>(null);
 const weeklyViewRef = ref<InstanceType<typeof WeeklyCalendarView> | null>(null);
@@ -377,6 +393,7 @@ function showActivityCreatedConfirmation(data: CreateFamilyActivityInput) {
     title: t('planner.activityCreatedTitle'),
     message: t('planner.activityCreatedMessage'),
     details,
+    lastCreatedDate: data.date,
   };
 }
 
@@ -694,7 +711,9 @@ function handleActivitySwapped(newId: string) {
       :title="createdConfirm.title"
       :message="createdConfirm.message"
       :details="createdConfirm.details"
+      allow-create-another
       @close="createdConfirm.open = false"
+      @create-another="handleCreateAnother"
     />
   </div>
 </template>

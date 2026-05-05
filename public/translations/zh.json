@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-05",
-    "translationCount": 2673
+    "translationCount": 2674
   },
   "translations": {
     "app.name": {
@@ -13369,6 +13369,11 @@
     "openFromDrive.signIn": {
       "translation": "登录beanies.family",
       "hash": "h7drs",
+      "lastUpdated": "2026-05-05"
+    },
+    "planner.addAnotherActivity": {
+      "translation": "+添加其他活动",
+      "hash": "2f2jgg",
       "lastUpdated": "2026-05-05"
     }
   }

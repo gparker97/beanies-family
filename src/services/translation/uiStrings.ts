@@ -4237,6 +4237,10 @@ const STRING_DEFS = {
     en: 'Are you sure you want to delete this activity?',
     beanie: 'are you sure you want to delete this activity?',
   },
+  'planner.addAnotherActivity': {
+    en: '+ add another activity',
+    beanie: '+ add another activity',
+  },
   'planner.activityCreatedTitle': {
     en: 'Activity Created',
     beanie: 'activity created',
