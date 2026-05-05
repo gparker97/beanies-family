@@ -4046,17 +4046,24 @@ const STRING_DEFS = {
     en: "Can't open from Drive",
     beanie: "can't open from drive",
   },
-  'openFromDrive.goToSignIn': { en: 'Sign in directly', beanie: 'sign in directly' },
   'openFromDrive.tryAgain': { en: 'Try again', beanie: 'try again' },
-  'openFromDrive.continue': { en: 'Continue', beanie: 'continue' },
+  'openFromDrive.continueWithGoogle': {
+    en: 'Continue with Google',
+    beanie: 'continue with google',
+  },
+  'openFromDrive.useDifferentFile': {
+    en: 'or pick a different pod →',
+    beanie: 'or pick a different pod →',
+  },
+  'openFromDrive.signIn': { en: 'Sign in to beanies.family', beanie: 'sign in to beanies.family' },
   'openFromDrive.popupBlockedTitle': {
-    en: 'One more click to sign in',
-    beanie: 'one more click to sign in',
+    en: 'One more click to continue',
+    beanie: 'one more click to continue',
   },
   'openFromDrive.popupBlockedHint': {
-    en: "Your browser blocked the Google sign-in popup because it didn't start from a click. Click Continue and we'll open it again — this time it'll come through.",
+    en: "Your browser blocked the Google sign-in popup because it didn't follow a click. Tap Continue to bring it back.",
     beanie:
-      "your browser blocked the google sign-in popup because it didn't start from a click. click continue and we'll open it again - this time it'll come through.",
+      "your browser blocked the google sign-in popup because it didn't follow a click. tap continue to bring it back.",
   },
 
   'googleDrive.filePickerTitle': {
