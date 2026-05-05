@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-05",
-    "translationCount": 2672
+    "translationCount": 2673
   },
   "translations": {
     "app.name": {
@@ -13341,29 +13341,34 @@
       "hash": "5h3kjr",
       "lastUpdated": "2026-05-05"
     },
-    "openFromDrive.goToSignIn": {
-      "translation": "直接登入",
-      "hash": "49rgmq",
-      "lastUpdated": "2026-05-05"
-    },
     "openFromDrive.tryAgain": {
       "translation": "再试一次",
       "hash": "agecuz",
       "lastUpdated": "2026-05-05"
     },
-    "openFromDrive.continue": {
-      "translation": "继续",
-      "hash": "8b7kmx",
-      "lastUpdated": "2026-05-05"
-    },
     "openFromDrive.popupBlockedTitle": {
-      "translation": "再点击一下即可登录",
-      "hash": "y2ylbg",
+      "translation": "再点击一次即可继续",
+      "hash": "nf187x",
       "lastUpdated": "2026-05-05"
     },
     "openFromDrive.popupBlockedHint": {
-      "translation": "您的浏览器阻止了Google登录弹出窗口，因为它不是从点击开始的。点击继续，我们将再次打开它—这次它会通过。",
-      "hash": "r2ho8u",
+      "translation": "您的浏览器阻止了Google登录弹出窗口，因为它没有点击。轻触“继续”即可恢复。",
+      "hash": "qaqi84",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.continueWithGoogle": {
+      "translation": "继续使用 Google 浏览",
+      "hash": "9jvb4q",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.useDifferentFile": {
+      "translation": "或选择其他pod →",
+      "hash": "syfgdr",
+      "lastUpdated": "2026-05-05"
+    },
+    "openFromDrive.signIn": {
+      "translation": "登录beanies.family",
+      "hash": "h7drs",
       "lastUpdated": "2026-05-05"
     }
   }
