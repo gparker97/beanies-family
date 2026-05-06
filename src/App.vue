@@ -529,10 +529,20 @@ onMounted(async () => {
     // If not authenticated, redirect to the welcome/login gate (unless already on an auth page).
     // The marketing homepage lives at beanies.family; app.beanies.family is always the app surface,
     // so unauthenticated users land on /welcome and can sign in or create a pod from there.
+    //
+    // OpenFromDrive (/open) is a legitimate unauthenticated entry point — Drive's "Open with"
+    // gesture sends users here directly with a file ID; the page handles its own auth flow.
+    // CreateFamily (/create) is a direct deep-link into the create-pod flow, also unauthenticated.
     if (authStore.needsAuth) {
       // E2E auto-auth: restore from sessionStorage (dev mode only)
       if (!authStore.restoreE2EAuth()) {
-        const authPages: Array<string | undefined> = ['Welcome', 'Login', 'JoinFamily'];
+        const authPages: Array<string | undefined> = [
+          'Welcome',
+          'Login',
+          'JoinFamily',
+          'CreateFamily',
+          'OpenFromDrive',
+        ];
         if (!authPages.includes(route.name as string)) {
           initBreadcrumbs.push('auth: redirecting to /welcome (not authenticated)');
           router.replace('/welcome');
