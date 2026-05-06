@@ -3,8 +3,10 @@
  * OAuth callback page — receives authorization code from Google.
  *
  * Popup mode: sends code to parent window via postMessage, then closes.
+ * Iframe mode (silent auth attempt): posts to window.parent — the iframe
+ *   container in googleAuth.ts removes the iframe after receiving the message.
  * Redirect mode (mobile): saves code to sessionStorage and redirects back
- * to the original page so completeRedirectAuth() can finish the exchange.
+ *   to the original page so completeRedirectAuth() can finish the exchange.
  */
 import { onMounted } from 'vue';
 
@@ -17,6 +19,12 @@ onMounted(() => {
     // Popup mode — send code to parent and close
     window.opener.postMessage({ type: 'oauth-callback', code, error }, window.location.origin);
     setTimeout(() => window.close(), 300);
+    return;
+  }
+
+  if (window.parent !== window) {
+    // Iframe mode (silent auth) — post to the iframe's parent window
+    window.parent.postMessage({ type: 'oauth-callback', code, error }, window.location.origin);
     return;
   }
 

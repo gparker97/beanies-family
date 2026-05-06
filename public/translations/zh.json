@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-06",
-    "translationCount": 2675
+    "translationCount": 2677
   },
   "translations": {
     "app.name": {
@@ -13379,6 +13379,16 @@
     "create.title": {
       "translation": "创建家庭",
       "hash": "tzi0p4",
+      "lastUpdated": "2026-05-06"
+    },
+    "loginV6.unlockNoPasswordTitle": {
+      "translation": "没有密码？",
+      "hash": "bclhjn",
+      "lastUpdated": "2026-05-06"
+    },
+    "loginV6.unlockNoPasswordHint": {
+      "translation": "此文件包含另一个系列的加密数据。如需加入，请要求家庭所有者向您发送邀请链接。您将通过该流程设置自己的账号，无需预先输入密码。",
+      "hash": "6faxdu",
       "lastUpdated": "2026-05-06"
     }
   }
