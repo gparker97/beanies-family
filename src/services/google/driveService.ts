@@ -128,14 +128,18 @@ export async function getOrCreateAppFolder(token: string): Promise<string> {
  *
  * Accepts string, Blob, or Uint8Array content. For binary content
  * (photos), pass the blob + its MIME type (e.g. 'image/jpeg'). Default
- * MIME is 'application/json' to preserve existing .beanpod callers.
+ * MIME is 'application/octet-stream' which fits .beanpod V4 envelopes
+ * (encrypted binary). Tagging .beanpods as application/json (the previous
+ * default) made Drive's "Open with..." matcher fall back to "unknown" type
+ * because the bytes don't validate as JSON, which in turn blocked the
+ * Marketplace SDK Drive integration from surfacing.
  */
 export async function createFile(
   token: string,
   folderId: string,
   fileName: string,
   content: string | Blob | Uint8Array,
-  contentMimeType: string = 'application/json'
+  contentMimeType: string = 'application/octet-stream'
 ): Promise<{ fileId: string; name: string }> {
   const metadata = {
     name: fileName,
@@ -173,12 +177,41 @@ export async function createFile(
 
 /**
  * Update an existing file's content.
+ *
+ * On `uploadType=media`, the request's Content-Type header IS the file's
+ * stored MIME type — Drive will overwrite the metadata mimeType to match.
+ * Default 'application/octet-stream' for .beanpod (encrypted binary); pass
+ * an explicit mime for other content.
  */
-export async function updateFile(token: string, fileId: string, content: string): Promise<void> {
+export async function updateFile(
+  token: string,
+  fileId: string,
+  content: string,
+  contentMimeType: string = 'application/octet-stream'
+): Promise<void> {
   await driveRequest(token, `${DRIVE_UPLOAD_API}/files/${fileId}?uploadType=media`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': contentMimeType },
     body: content,
+  });
+}
+
+/**
+ * Patch a Drive file's metadata fields (does NOT touch content).
+ *
+ * Used to migrate legacy .beanpod files that were uploaded with the wrong
+ * mimeType ('application/json'). Idempotent: calling with the file's
+ * current mimeType is a no-op from Drive's perspective.
+ */
+export async function patchFileMetadata(
+  token: string,
+  fileId: string,
+  fields: Record<string, unknown>
+): Promise<void> {
+  await driveRequest(token, `${DRIVE_API}/files/${fileId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
   });
 }
 

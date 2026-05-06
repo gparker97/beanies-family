@@ -22,6 +22,8 @@ vi.mock('@/services/google/googleAuth', () => ({
 const mockUpdateFile = vi.fn();
 const mockReadFile = vi.fn().mockResolvedValue('{"version":"4.0"}');
 const mockGetFileModifiedTime = vi.fn().mockResolvedValue('2026-02-26T12:00:00Z');
+const mockGetFileMetadata = vi.fn().mockResolvedValue({ mimeType: 'application/octet-stream' });
+const mockPatchFileMetadata = vi.fn().mockResolvedValue(undefined);
 const mockGetOrCreateAppFolder = vi.fn().mockResolvedValue('folder-id');
 const mockCreateFile = vi.fn().mockResolvedValue({ fileId: 'new-file-id', name: 'test.beanpod' });
 const mockClearFolderCache = vi.fn();
@@ -30,6 +32,8 @@ vi.mock('@/services/google/driveService', () => ({
   updateFile: (...args: unknown[]) => mockUpdateFile(...args),
   readFile: (...args: unknown[]) => mockReadFile(...args),
   getFileModifiedTime: (...args: unknown[]) => mockGetFileModifiedTime(...args),
+  getFileMetadata: (...args: unknown[]) => mockGetFileMetadata(...args),
+  patchFileMetadata: (...args: unknown[]) => mockPatchFileMetadata(...args),
   getOrCreateAppFolder: (...args: unknown[]) => mockGetOrCreateAppFolder(...args),
   createFile: (...args: unknown[]) => mockCreateFile(...args),
   clearFolderCache: () => mockClearFolderCache(),
@@ -78,6 +82,45 @@ describe('GoogleDriveProvider', () => {
       const content = await provider.read();
       expect(content).toBe('{"version":"4.0"}');
       expect(mockReadFile).toHaveBeenCalledWith('mock-token', 'file-123');
+    });
+  });
+
+  describe('mimeType migration (legacy .beanpod fix)', () => {
+    it('patches legacy application/json mimeType to application/octet-stream after first read', async () => {
+      mockGetFileMetadata.mockResolvedValueOnce({ mimeType: 'application/json' });
+      await provider.read();
+      // Migration is fire-and-forget after read returns. Flush microtasks so it runs.
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockGetFileMetadata).toHaveBeenCalledWith('mock-token', 'file-123', 'mimeType');
+      expect(mockPatchFileMetadata).toHaveBeenCalledWith('mock-token', 'file-123', {
+        mimeType: 'application/octet-stream',
+      });
+    });
+
+    it('skips PATCH when mimeType is already application/octet-stream', async () => {
+      mockGetFileMetadata.mockResolvedValueOnce({ mimeType: 'application/octet-stream' });
+      await provider.read();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockGetFileMetadata).toHaveBeenCalled();
+      expect(mockPatchFileMetadata).not.toHaveBeenCalled();
+    });
+
+    it('only checks once per provider session (subsequent reads skip the metadata fetch)', async () => {
+      mockGetFileMetadata.mockResolvedValue({ mimeType: 'application/octet-stream' });
+      await provider.read();
+      await new Promise((r) => setTimeout(r, 0));
+      await provider.read();
+      await provider.read();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockGetFileMetadata).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not block read or surface errors when migration check fails', async () => {
+      mockGetFileMetadata.mockRejectedValueOnce(new Error('metadata fetch failed'));
+      const content = await provider.read();
+      expect(content).toBe('{"version":"4.0"}');
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockPatchFileMetadata).not.toHaveBeenCalled();
     });
   });
 
