@@ -66,6 +66,13 @@ const routes: RouteRecordRaw[] = [
     props: { initialView: 'join' },
   },
   {
+    path: '/create',
+    name: 'CreateFamily',
+    component: () => import('@/pages/LoginPage.vue'),
+    meta: { titleKey: 'create.title', requiresAuth: false, hideQuickAdd: true },
+    props: { initialView: 'create' },
+  },
+  {
     // Drive "Open with beanies.family" landing page. See OpenFromDrivePage.vue
     // for the full flow. Route is unauthenticated because new users may land
     // here before having a beanies session — Drive auto-handles OAuth before

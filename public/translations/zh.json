@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-05",
-    "translationCount": 2674
+    "lastUpdated": "2026-05-06",
+    "translationCount": 2675
   },
   "translations": {
     "app.name": {
@@ -13375,6 +13375,11 @@
       "translation": "+添加其他活动",
       "hash": "2f2jgg",
       "lastUpdated": "2026-05-05"
+    },
+    "create.title": {
+      "translation": "创建家庭",
+      "hash": "tzi0p4",
+      "lastUpdated": "2026-05-06"
     }
   }
 }
