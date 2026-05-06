@@ -8,6 +8,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-06
+
+### Added
+
+- **Direct `/create` route for jumping straight into the create-pod flow.** New URL `app.beanies.family/create` lands users directly on the create-a-new-family-pod view, mirroring the existing `/join` route's pattern. Useful for marketing CTAs, contact-form replies, and any other path that wants to drop a brand-new user into pod creation without first walking them through the welcome selector. `LoginPage` already supported the `'create'` initial-view; this just wires the route to it. New `create.title` translation key auto-synced to Chinese via `npm run translate`.
+
+- **"Don't have the password?" disclosure on the file-unlock screen.** When someone lands on the password unlock screen via Drive's "Open with beanies.family" gesture (or a copy-pasted `/open` URL) and doesn't have the password, they now see a clear, brand-aligned info card below the password form explaining they need an invite link from the family owner — not a new pod of their own. White squircle card with soft brand shadow + Sky Silk icon-circle (matches the existing security-messaging cards in the same view) and a key icon that semantically ties to "no password = no key". First version was a generic SaaS info-notice pattern; refined after a frontend-design pass to mirror the brand's existing visual vocabulary so it reads as part of the same system rather than a third-party widget.
+
+### Fixed
+
+- **`.beanpod` files in Google Drive are now correctly tagged as `application/octet-stream`.** Legacy `.beanpod` files were uploaded with `mimeType: 'application/json'` even though the V4 envelope is encrypted binary. Drive's content-sniff couldn't validate the bytes as JSON, fell back to "File Type: unknown" in its UI, and (more importantly) the Google Workspace Marketplace SDK's "Open with..." matcher refused to surface the integration for those files — almost certainly the actual root cause of the Marketplace review's "Drive integration not appearing" rejection point. The fix has three parts: every new `.beanpod` is now created with the correct MIME type, every save overwrites legacy metadata via the upload's Content-Type header, and a one-shot opportunistic migration runs on first read per session to PATCH any pod still on the wrong type. Migration is idempotent and non-critical (failures swallowed and retried next session); console emits `[GoogleDriveProvider] migrated .beanpod mimeType: application/json → application/octet-stream` when it actually patches.
+
+- **`/open` and `/create` no longer redirect to `/welcome` for unauthenticated users.** Both routes are legitimate pre-auth entry points (Drive's "Open with..." gesture sends users to `/open` directly with a file ID; `/create` is a deep-link into the create-pod flow), but the App.vue runtime auth-redirect was hardcoded to allow only `Welcome`, `Login`, and `JoinFamily` route names through. The two new routes have `meta.requiresAuth: false` set, but App.vue's runtime check uses `route.name` not meta — and they were missing. Symptom in incognito testing: hitting `/open?state=...` flashed a loading screen then redirected to `/welcome` before the page could even parse its state.
+
+### Changed
+
+- **Drive sync OAuth is now silent for users who installed via Google Workspace Marketplace.** When a user installs beanies.family from the Marketplace listing, Google grants the listing's scopes (`drive.file` + `userinfo.email`) at install time. Previously, when the user later clicked "Connect Drive" in the app, our OAuth call still showed Google's account-chooser popup — the second consent screen Google's review team flagged as a duplicate-permissions issue. The app now first attempts a fully-silent auth-code request via a hidden iframe with `prompt=none`. For Marketplace-installed users with pre-granted scopes, this completes silently in under a second with no popup at all. For direct-signup users who haven't pre-granted scopes, Google returns `login_required` and the existing popup-based flow runs as before — no behavioral change. The `OAuthCallbackPage` was extended to handle iframe context (posts to `window.parent` when there's no opener but it's inside a frame) alongside the existing popup and full-page-redirect modes.
+
+---
+
 ## 2026-05-05
 
 ### Added
