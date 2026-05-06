@@ -53,7 +53,7 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1037.0",
+    "@aws-sdk/client-dynamodb": "^3.1041.0",
     "@aws-sdk/util-dynamodb": "^3.996.2",
     "@eslint/js": "^9.39.2",
     "@heroicons/vue": "^2.2.0",
@@ -63,7 +63,7 @@
     "@types/node": "^25.6.0",
     "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-vue": "^6.0.6",
-    "@vue/test-utils": "^2.4.9",
+    "@vue/test-utils": "^2.4.10",
     "@vue/tsconfig": "^0.9.1",
     "autoprefixer": "^10.5.0",
     "concurrently": "^9.2.1",
@@ -78,7 +78,7 @@
     "happy-dom": "^20.9.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "postcss": "^8.5.12",
+    "postcss": "^8.5.14",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "stylelint": "^16.26.1",
@@ -87,14 +87,14 @@
     "stylelint-order": "^8.1.1",
     "tailwindcss": "^4.2.4",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.59.0",
+    "typescript-eslint": "^8.59.1",
     "vite": "^7.3.2",
     "vite-plugin-pwa": "^1.2.0",
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.6.0",
     "vitest": "^4.1.5",
     "vue-eslint-parser": "^10.4.0",
-    "vue-tsc": "^3.2.7"
+    "vue-tsc": "^3.2.8"
   },
   "overrides": {
     "serialize-javascript": "^7.0.3"
