@@ -304,6 +304,17 @@ export async function requestAccessToken(options?: {
     }
   }
 
+  // Try silent auth-code (handles the Marketplace-installed case where
+  // scopes are pre-granted at install time). forceConsent skips this —
+  // the caller is explicitly asking for a fresh consent flow.
+  if (!options?.forceConsent) {
+    const silentToken = await attemptSilentAuthCode(clientId);
+    if (silentToken) {
+      if (!popup.closed) popup.close();
+      return silentToken;
+    }
+  }
+
   const promise = performPopupAuth(clientId, popup, options);
   pendingAuthPromise = promise;
 
@@ -314,6 +325,139 @@ export async function requestAccessToken(options?: {
     if (pendingAuthPromise === promise) {
       pendingAuthPromise = null;
     }
+  }
+}
+
+/**
+ * Attempt a fully-silent OAuth authorization-code flow via a hidden iframe.
+ *
+ * Used for the Marketplace-installed case: when a user installs beanies.family
+ * from the Google Workspace Marketplace, Google grants the listing's scopes
+ * (drive.file + userinfo.email) at install time. A subsequent OAuth call from
+ * our app with prompt=none will then return an authorization code without
+ * showing any consent UI — eliminating the "second SSO" Google's review team
+ * flagged.
+ *
+ * Returns the access token on success, or null if silent auth is not possible
+ * (no Google session, scopes not pre-granted, X-Frame blocked the iframe,
+ * timed out, or any other failure mode). Callers fall back to interactive
+ * popup auth on null.
+ *
+ * Listener model: the iframe's OAuthCallbackPage detects iframe context (no
+ * window.opener, but window.parent !== window) and posts to window.parent.
+ * We listen for the same `oauth-callback` message type as the popup flow;
+ * timing is sequential (silent runs to completion before popup auth begins),
+ * so the two listeners don't collide.
+ */
+async function attemptSilentAuthCode(clientId: string): Promise<string | null> {
+  let codeVerifier: string;
+  let codeChallenge: string;
+  try {
+    codeVerifier = generateCodeVerifier();
+    codeChallenge = await generateCodeChallenge(codeVerifier);
+  } catch (e) {
+    console.warn('[googleAuth] silent: PKCE setup failed', e);
+    return null;
+  }
+
+  const authUrl = buildAuthUrl(clientId, codeChallenge, 'none');
+
+  const code = await new Promise<string | null>((resolve) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.setAttribute('aria-hidden', 'true');
+
+    let resolved = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    function cleanup() {
+      window.removeEventListener('message', handler);
+      if (timer) clearTimeout(timer);
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }
+
+    function handler(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== 'oauth-callback') return;
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      if (event.data.error) {
+        // Expected silent-fail signals: login_required, consent_required,
+        // interaction_required. Logged at info level — they're normal for
+        // direct-signup users who haven't pre-granted scopes.
+        console.info('[googleAuth] silent auth-code returned non-fatal error:', event.data.error);
+        resolve(null);
+        return;
+      }
+      if (event.data.code) {
+        resolve(event.data.code);
+        return;
+      }
+      resolve(null);
+    }
+
+    window.addEventListener('message', handler);
+
+    // Cap the wait. Silent flows resolve in ~1s typically; 5s leaves plenty
+    // of headroom while keeping the about:blank popup visible only briefly
+    // when silent is going to fail.
+    timer = setTimeout(() => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      console.info('[googleAuth] silent auth-code attempt timed out');
+      resolve(null);
+    }, 5000);
+
+    iframe.src = authUrl;
+    document.body.appendChild(iframe);
+  });
+
+  if (!code) return null;
+
+  try {
+    const tokens = await exchangeCodeForTokens({
+      code,
+      codeVerifier,
+      redirectUri: getRedirectUri(),
+      clientId,
+    });
+
+    if (tokens.scope && !tokens.scope.includes('drive.file')) {
+      console.info('[googleAuth] silent auth-code returned without drive.file scope');
+      return null;
+    }
+
+    accessToken = tokens.access_token;
+    expiresAt = Date.now() + tokens.expires_in * 1000;
+
+    if (tokens.refresh_token) {
+      refreshToken = tokens.refresh_token;
+      const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
+      try {
+        await storeGoogleRefreshToken(storageKey, tokens.refresh_token);
+      } catch (e) {
+        console.warn('[googleAuth] silent: failed to persist refresh token (non-critical)', e);
+      }
+    }
+
+    scheduleAutoRefresh(tokens.expires_in);
+
+    // interactive=false: this acquisition was fully silent. Subscribers
+    // (e.g. account-assertion) use this flag to distinguish a deliberate
+    // user-driven sign-in from an incidental background acquisition.
+    notifyTokenAcquired(tokens.access_token, false).catch(() => {});
+
+    console.info(
+      `[googleAuth] silent auth-code succeeded — token acquired without consent prompt (expires in ${tokens.expires_in}s)`
+    );
+    return tokens.access_token;
+  } catch (e) {
+    console.warn('[googleAuth] silent auth-code token exchange failed (non-critical)', e);
+    return null;
   }
 }
 

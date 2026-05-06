@@ -2816,6 +2816,15 @@ const STRING_DEFS = {
     en: "This password decrypts your local data. We don't store or recover it.",
     beanie: "this password decrypts your local data. we don't store or recover it.",
   },
+  'loginV6.unlockNoPasswordTitle': {
+    en: "Don't have the password?",
+    beanie: "don't have the password?",
+  },
+  'loginV6.unlockNoPasswordHint': {
+    en: 'This file contains another family’s encrypted data. To join, ask the family owner to send you an invite link. You’ll set up your own account through that flow, no password needed up front.',
+    beanie:
+      'this file is another family’s encrypted data. to join, ask the family owner for an invite link. you’ll set up your own bean through that flow.',
+  },
   // Family picker view
   'familyPicker.title': { en: 'Which family?', beanie: 'which beanies?' },
   'familyPicker.subtitle': { en: 'Choose a family to sign into', beanie: 'pick your pod of beans' },

@@ -637,6 +637,27 @@ async function handleDriveRefresh() {
           {{ t('loginV6.unlockFooter') }}
         </p>
       </form>
+
+      <!-- Cold-arrival hint: user landed on this screen via a shared .beanpod
+           (e.g. Drive's "Open with") but doesn't have the password. They are
+           NOT supposed to create a new family — that would just create an
+           empty pod separate from this one. The right path is to ask the
+           family owner for an invite link, which goes through /join. -->
+      <details class="group mt-6 border-t border-gray-100 pt-4 dark:border-slate-700">
+        <summary
+          class="text-secondary-500/70 hover:text-primary-500 font-outfit inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold transition-colors dark:text-gray-400"
+        >
+          <span
+            class="text-primary-500 inline-block text-[10px] transition-transform group-open:rotate-90"
+            aria-hidden="true"
+            >▸</span
+          >
+          <span>{{ t('loginV6.unlockNoPasswordTitle') }}</span>
+        </summary>
+        <p class="text-secondary-500/60 mt-2 pl-4 text-xs leading-relaxed dark:text-gray-400">
+          {{ t('loginV6.unlockNoPasswordHint') }}
+        </p>
+      </details>
     </template>
 
     <!-- ═══════════════════════════════════════════════════════════
