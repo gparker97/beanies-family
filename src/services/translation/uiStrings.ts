@@ -2743,6 +2743,7 @@ const STRING_DEFS = {
   'login.welcome': { en: 'Welcome', beanie: 'welcome' },
   'login.title': { en: 'Login', beanie: 'login' },
   'join.title': { en: 'Join Family', beanie: 'join the pod' },
+  'create.title': { en: 'Create Family', beanie: 'start your pod' },
 
   // Login — Invite / Join
   'login.inviteTitle': { en: 'Invite family member', beanie: 'invite your beanies' },
