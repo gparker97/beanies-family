@@ -26,6 +26,8 @@ import {
   readFile,
   updateFile,
   getFileModifiedTime,
+  getFileMetadata,
+  patchFileMetadata,
   getOrCreateAppFolder,
   createFile,
   clearFolderCache,
@@ -68,11 +70,45 @@ export class GoogleDriveProvider implements StorageProvider {
   private fileId: string;
   private fileName: string;
   private accountEmail: string | null;
+  private mimeTypeMigrationDone = false;
 
   constructor(fileId: string, fileName: string, accountEmail?: string | null) {
     this.fileId = fileId;
     this.fileName = fileName;
     this.accountEmail = accountEmail ?? null;
+  }
+
+  /**
+   * Legacy .beanpod files were uploaded as `application/json` even though the
+   * V4 envelope is encrypted binary. Drive then refused to recognize the type
+   * (content didn't validate as JSON) and showed "File Type: unknown", which
+   * suppressed the Marketplace SDK's "Open with beanies.family" handler.
+   * Patches metadata to `application/octet-stream` once per session for any
+   * file still on the wrong type. Failures are non-critical — the file
+   * remains usable; the next successful sync will write the correct MIME
+   * via updateFile's Content-Type header.
+   */
+  private async ensureCorrectMimeType(token: string): Promise<void> {
+    if (this.mimeTypeMigrationDone) return;
+    try {
+      const meta = await getFileMetadata(token, this.fileId, 'mimeType');
+      const currentMime = meta.mimeType as string | undefined;
+      if (currentMime === 'application/json') {
+        await patchFileMetadata(token, this.fileId, {
+          mimeType: 'application/octet-stream',
+        });
+        console.info(
+          '[GoogleDriveProvider] migrated .beanpod mimeType: application/json → application/octet-stream',
+          this.fileId
+        );
+      }
+      this.mimeTypeMigrationDone = true;
+    } catch (e) {
+      console.warn(
+        '[GoogleDriveProvider] mimeType migration check failed (non-critical, will retry next session):',
+        (e as Error).message
+      );
+    }
   }
 
   /**
@@ -147,6 +183,9 @@ export class GoogleDriveProvider implements StorageProvider {
       console.log('[GoogleDrive.read] token obtained, reading file...');
       const result = await withRetry(() => readFile(token, this.fileId));
       console.log('[GoogleDrive.read] read complete, length=', result?.length ?? 0);
+      // Fire-and-forget: don't block the read on metadata migration. Internal
+      // try/catch handles its own errors.
+      void this.ensureCorrectMimeType(token);
       return result;
       /* eslint-enable no-console */
     } catch (e) {
