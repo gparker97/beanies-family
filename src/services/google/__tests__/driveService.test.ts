@@ -240,7 +240,7 @@ describe('driveService', () => {
   });
 
   describe('createFile', () => {
-    it('sends multipart upload with metadata and string content (default json mime)', async () => {
+    it('sends multipart upload with metadata and string content (default octet-stream mime for .beanpod)', async () => {
       globalThis.fetch = mockFetch({ id: 'file-new', name: 'test.beanpod' });
 
       const result = await createFile(mockToken, 'folder-1', 'test.beanpod', '{"data":"test"}');
@@ -252,8 +252,11 @@ describe('driveService', () => {
       const body = await (call[1]?.body as Blob).text();
       expect(body).toContain('test.beanpod');
       expect(body).toContain('{"data":"test"}');
-      // Default mime type used in metadata + part header
-      expect(body).toContain('"mimeType":"application/json"');
+      // Default mime type used in metadata + part header — .beanpod V4 is
+      // encrypted binary, not JSON. Tagging as JSON broke Drive's "Open with..."
+      // matching for the Marketplace SDK integration.
+      expect(body).toContain('"mimeType":"application/octet-stream"');
+      expect(body).toContain('Content-Type: application/octet-stream');
     });
 
     it('sends multipart upload with Blob content and explicit mime', async () => {
@@ -341,7 +344,7 @@ describe('driveService', () => {
   });
 
   describe('updateFile', () => {
-    it('patches file content', async () => {
+    it('patches file content with default octet-stream Content-Type', async () => {
       globalThis.fetch = mockFetch({});
 
       await updateFile(mockToken, 'file-1', '{"updated":"data"}');
@@ -351,6 +354,41 @@ describe('driveService', () => {
       expect(call[0]).toContain('uploadType=media');
       expect(call[1]?.method).toBe('PATCH');
       expect(call[1]?.body).toBe('{"updated":"data"}');
+      // Content-Type on uploadType=media IS the file's stored mimeType. Drive
+      // overwrites metadata to match this header on every save.
+      const headers = call[1]?.headers as Record<string, string>;
+      expect(headers['Content-Type']).toBe('application/octet-stream');
+    });
+
+    it('respects an explicit contentMimeType', async () => {
+      globalThis.fetch = mockFetch({});
+
+      await updateFile(mockToken, 'file-1', 'binary-blob', 'image/jpeg');
+
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+      const headers = call[1]?.headers as Record<string, string>;
+      expect(headers['Content-Type']).toBe('image/jpeg');
+    });
+  });
+
+  describe('patchFileMetadata', () => {
+    it('PATCHes metadata fields without touching content', async () => {
+      const { patchFileMetadata } = await import('../driveService');
+      globalThis.fetch = mockFetch({});
+
+      await patchFileMetadata(mockToken, 'file-legacy', {
+        mimeType: 'application/octet-stream',
+      });
+
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+      // Hits the regular Drive API (not the upload endpoint) — content is preserved.
+      expect(call[0]).toContain('/drive/v3/files/file-legacy');
+      expect(call[0]).not.toContain('uploadType=');
+      expect(call[1]?.method).toBe('PATCH');
+      const headers = call[1]?.headers as Record<string, string>;
+      expect(headers['Content-Type']).toBe('application/json');
+      const body = JSON.parse(call[1]?.body as string);
+      expect(body).toEqual({ mimeType: 'application/octet-stream' });
     });
   });
 
