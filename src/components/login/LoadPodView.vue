@@ -642,22 +642,36 @@ async function handleDriveRefresh() {
            (e.g. Drive's "Open with") but doesn't have the password. They are
            NOT supposed to create a new family — that would just create an
            empty pod separate from this one. The right path is to ask the
-           family owner for an invite link, which goes through /join. -->
-      <details class="group mt-6 border-t border-gray-100 pt-4 dark:border-slate-700">
-        <summary
-          class="text-secondary-500/70 hover:text-primary-500 font-outfit inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold transition-colors dark:text-gray-400"
+           family owner for an invite link, which goes through /join.
+           Mirrors the brand's existing security-card styling (white squircle +
+           soft shadow + Sky Silk icon-circle) so it reads as part of the same
+           visual system rather than a generic SaaS info notice. The key icon
+           ties semantically to "no password = no key". -->
+      <div
+        class="mt-6 flex items-start gap-3 rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
+      >
+        <div
+          class="bg-sky-silk-300/[0.22] dark:bg-sky-silk-300/[0.15] flex h-9 w-9 flex-none items-center justify-center rounded-full"
+          aria-hidden="true"
         >
-          <span
-            class="text-primary-500 inline-block text-[10px] transition-transform group-open:rotate-90"
-            aria-hidden="true"
-            >▸</span
-          >
-          <span>{{ t('loginV6.unlockNoPasswordTitle') }}</span>
-        </summary>
-        <p class="text-secondary-500/60 mt-2 pl-4 text-xs leading-relaxed dark:text-gray-400">
-          {{ t('loginV6.unlockNoPasswordHint') }}
-        </p>
-      </details>
+          <svg class="h-4 w-4 text-[#3498db]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+            />
+          </svg>
+        </div>
+        <div class="flex-1">
+          <p class="text-secondary-500 text-sm font-bold dark:text-gray-100">
+            {{ t('loginV6.unlockNoPasswordTitle') }}
+          </p>
+          <p class="text-secondary-500/70 mt-1 text-xs leading-relaxed dark:text-gray-300">
+            {{ t('loginV6.unlockNoPasswordHint') }}
+          </p>
+        </div>
+      </div>
     </template>
 
     <!-- ═══════════════════════════════════════════════════════════
