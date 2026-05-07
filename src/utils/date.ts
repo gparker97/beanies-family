@@ -1,4 +1,5 @@
 import type { DateOfBirth, ISODateString } from '@/types/models';
+import { reportError } from '@/utils/errorReporter';
 
 // ── Shared month abbreviations (dd MMM yyyy standard) ──────────────────────
 const MONTHS_SHORT = [
@@ -419,4 +420,34 @@ export function formatTime12(time: string): string {
   const hour = h! % 12 || 12;
   const ampm = h! < 12 ? 'am' : 'pm';
   return m ? `${hour}:${String(m).padStart(2, '0')}${ampm}` : `${hour}${ampm}`;
+}
+
+/**
+ * Returns `occurredOn` if it parses as a date, otherwise `fallback`.
+ * Used by date-anchored items (milestones) to keep feeds + timelines
+ * rendering even when an item has a corrupt or missing date — without
+ * a graceful fallback, a single bad item produces a NaN year bucket on
+ * the timeline or breaks `localeCompare` sorting on the scrapbook feed.
+ *
+ * Failure is reported via `reportError` (Slack `#beanies-errors`) plus a
+ * `[surface]`-prefixed `console.warn`, so support sees the dangling item
+ * id and the bad value without users seeing a broken UI.
+ *
+ * Single-source for the malformed-date handling — both `useScrapbookFeed`
+ * and `useFamilyTimeline` route through this util.
+ */
+export function safeOccurredOn(
+  occurredOn: string,
+  fallback: string,
+  context: { surface: string; itemId: string }
+): string {
+  const parsed = Date.parse(occurredOn);
+  if (Number.isFinite(parsed)) return occurredOn;
+  console.warn(`[${context.surface}] invalid occurredOn:`, context.itemId, occurredOn);
+  reportError({
+    surface: context.surface,
+    message: 'invalid occurredOn date',
+    context: { itemId: context.itemId, occurredOn },
+  });
+  return fallback;
 }

@@ -217,6 +217,7 @@ describe('docService', () => {
         allergies: {},
         medications: {},
         medicationLogs: {},
+        milestones: {},
         recipes: {},
         cookLogs: {},
         emergencyContacts: {},

@@ -916,6 +916,62 @@ export type CreateMedicationLogEntryInput = Omit<
 export type UpdateMedicationLogEntryInput = Partial<CreateMedicationLogEntryInput>;
 
 /**
+ * A family milestone — a one-off life event captured for posterity. Lost a
+ * tooth, first day of school, graduation, wedding, new home, etc.
+ *
+ * Per-member by default (`memberId` set). When `memberId` is null, the
+ * milestone is family-wide ("we moved house", "first family vacation") —
+ * no phantom "family bean" object; consumers key off the null check for
+ * presentation.
+ *
+ * The category union is derived from `MILESTONE_CATEGORIES` in
+ * `src/constants/milestoneCategories.ts` so adding a new category is one
+ * edit. Unknown categories at read-time fall back to `'custom'` for
+ * rendering with a one-time `reportError` per unknown category — see
+ * the milestonesStore.
+ */
+export type MilestoneCategory =
+  | 'birthday'
+  | 'lost_tooth'
+  | 'first_word'
+  | 'first_step'
+  | 'first_day_school'
+  | 'graduation'
+  | 'big_test'
+  | 'recital'
+  | 'big_win'
+  | 'new_home'
+  | 'new_job'
+  | 'new_pet'
+  | 'new_little_bean'
+  | 'wedding'
+  | 'anniversary'
+  | 'big_trip'
+  | 'license'
+  | 'custom';
+
+export interface Milestone {
+  id: UUID;
+  /** null = family-wide; non-null = single bean owner. */
+  memberId: UUID | null;
+  category: MilestoneCategory;
+  /** User-visible title. Auto-fills from category default when empty; never overwrites a non-empty user-typed value. */
+  title: string;
+  /**
+   * Date-only ISO string (YYYY-MM-DD). No time component — milestones are
+   * day-anchored. Sorted lexically (ISO dates sort correctly as strings).
+   * Don't store as a full datetime; timezone shifts could silently move a
+   * milestone to the wrong day.
+   */
+  occurredOn: ISODateString;
+  description?: string;
+  photoIds?: UUID[];
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+/**
  * A family recipe — "secret family recipe" in the Family Cookbook.
  * Family-wide; any member can link a `FavoriteItem` to it.
  */

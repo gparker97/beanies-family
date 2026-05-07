@@ -417,11 +417,17 @@ body {
   min-height: 100vh;
 }
 
-/* Outfit for headings and financial values */
-h1,
-h2,
-h3 {
-  font-family: Outfit, sans-serif;
+/* Outfit for headings and financial values. Lives in @layer base so
+ * utility classes (e.g. `font-caveat` for handwritten accents) can
+ * override per element. Unlayered CSS otherwise beats layered utilities
+ * in the cascade-layer order, which silently breaks `font-caveat` on
+ * any heading element. */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: Outfit, sans-serif;
+  }
 }
 
 #app {
@@ -546,4 +552,124 @@ input[type='time']::-webkit-calendar-picker-indicator:hover {
 
 .attention-pulse {
   animation: attention-pulse 1.5s ease-out;
+}
+
+/* ── Family Scrapbook decorative utilities ─────────────────────────────
+ * Used by /pod/scrapbook spreads. CSS-only (no images, no JS). Each
+ * class is self-contained re positioning so parents can add their own
+ * positioning without colliding with these.
+ *
+ * See docs/plans/2026-05-07-family-scrapbook-redesign.md for context.
+ * ─────────────────────────────────────────────────────────────────── */
+
+/* Page background — kraft warm-cream + tinted radial wash + subtle
+   noise overlay. The noise is a fractal-turbulence SVG inlined as a
+   data URI so we don't ship an image. */
+.scrapbook-paper {
+  background-color: #f7efe1;
+  background-image:
+    radial-gradient(circle at 18% 12%, rgb(241 93 34 / 4%), transparent 42%),
+    radial-gradient(circle at 82% 64%, rgb(174 214 241 / 6%), transparent 40%);
+  position: relative;
+}
+
+.scrapbook-paper::before {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.06'/></svg>");
+  content: '';
+  inset: 0;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  position: absolute;
+}
+
+:root.dark .scrapbook-paper {
+  background-color: #2c2620;
+  background-image:
+    radial-gradient(circle at 18% 12%, rgb(241 93 34 / 5%), transparent 42%),
+    radial-gradient(circle at 82% 64%, rgb(174 214 241 / 4%), transparent 40%);
+}
+
+:root.dark .scrapbook-paper::before {
+  opacity: 0.4;
+}
+
+/* Taped paper card — kraft card with a small "tape strip" pseudo at
+   the top-right corner. Self-positions (relative) so callers can add
+   their own classes without colliding. */
+.scrap-taped {
+  --tape-color: rgb(241 93 34 / 28%);
+
+  background: #fffaf0;
+  border-radius: 0.875rem;
+  box-shadow: 0 4px 14px rgb(44 62 80 / 8%);
+  padding: 1rem;
+  position: relative;
+}
+
+.scrap-taped::before {
+  background: var(--tape-color);
+  box-shadow: 0 1px 2px rgb(44 62 80 / 12%);
+  content: '';
+  height: 1.125rem;
+  position: absolute;
+  right: -0.625rem;
+  top: -0.5rem;
+  transform: rotate(8deg);
+  width: 3.5rem;
+}
+
+:root.dark .scrap-taped {
+  background: rgb(255 250 240 / 6%);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 30%);
+}
+
+/* Ripped-edge note — kraft card with a faintly torn paper top + bottom.
+   Realised via two layered linear-gradient masks combined with
+   `mask-composite: intersect`; the inner gradient softens the strict
+   block edge so the card reads as torn paper without an image. */
+.scrap-ripped {
+  background: #fff8e7;
+  box-shadow: 0 3px 10px rgb(44 62 80 / 8%);
+  padding: 1.125rem 1rem;
+  position: relative;
+}
+
+:root.dark .scrap-ripped {
+  background: rgb(255 248 231 / 6%);
+}
+
+/* Washi tape divider — small colored rectangle at slight rotation,
+   with frayed-end pseudo-elements. Color cycled via `--washi-color`. */
+.scrap-washi {
+  --washi-color: rgb(174 214 241 / 60%);
+
+  background: var(--washi-color);
+  border-radius: 1px;
+  box-shadow: 0 1px 2px rgb(44 62 80 / 8%);
+  display: inline-block;
+  height: 1.125rem;
+  margin: 0.75rem 0;
+  position: relative;
+  transform: rotate(-1.5deg);
+  width: 6rem;
+}
+
+.scrap-washi::before,
+.scrap-washi::after {
+  background: inherit;
+  content: '';
+  height: 100%;
+  position: absolute;
+  top: 0;
+  width: 0.375rem;
+}
+
+.scrap-washi::before {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 80%, 30% 60%, 0 40%, 30% 20%);
+  left: -0.375rem;
+}
+
+.scrap-washi::after {
+  clip-path: polygon(0 0, 100% 0, 70% 20%, 100% 40%, 70% 60%, 100% 80%, 100% 100%, 0 100%);
+  right: -0.375rem;
 }

@@ -26,9 +26,9 @@ describe('navigation: MOBILE_NAV_CATEGORIES', () => {
     }
   });
 
-  it('total stack items = 14 (matches v3 mockup spec)', () => {
+  it('total stack items = 15 (matches v3 mockup spec, +1 for Family Timeline)', () => {
     const total = MOBILE_NAV_CATEGORIES.reduce((sum, c) => sum + (c.items?.length ?? 0), 0);
-    expect(total).toBe(14);
+    expect(total).toBe(15);
   });
 
   it('Planning has Activities, To-do, Travel', () => {
@@ -48,11 +48,12 @@ describe('navigation: MOBILE_NAV_CATEGORIES', () => {
     ]);
   });
 
-  it('Pod has 5 sub-routes', () => {
+  it('Pod has 6 sub-routes', () => {
     const pod = MOBILE_NAV_CATEGORIES.find((c) => c.id === 'pod')!;
     expect(pod.items!.map((i) => i.path)).toEqual([
       '/pod',
       '/pod/scrapbook',
+      '/pod/milestones',
       '/pod/cookbook',
       '/pod/safety',
       '/pod/contacts',

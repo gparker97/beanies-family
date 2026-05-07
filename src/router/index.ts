@@ -139,7 +139,7 @@ const routes: RouteRecordRaw[] = [
     redirect: (to) => `/pod/${to.params.memberId as string}/overview`,
   },
   {
-    path: '/pod/:memberId([0-9a-f-]{36})/:tab(overview|favorites|sayings|allergies|medications|notes)',
+    path: '/pod/:memberId([0-9a-f-]{36})/:tab(overview|favorites|sayings|allergies|medications|notes|milestones)',
     name: 'BeanDetail',
     component: () => import('@/pages/BeanDetailPage.vue'),
     meta: { titleKey: 'bean.detail.title', requiresAuth: true },
@@ -149,6 +149,12 @@ const routes: RouteRecordRaw[] = [
     name: 'FamilyScrapbook',
     component: () => import('@/pages/FamilyScrapbookPage.vue'),
     meta: { titleKey: 'scrapbook.title', requiresAuth: true },
+  },
+  {
+    path: '/pod/milestones',
+    name: 'FamilyMilestones',
+    component: () => import('@/pages/FamilyTimelinePage.vue'),
+    meta: { titleKey: 'milestones.pageTitle', requiresAuth: true },
   },
   {
     path: '/pod/cookbook',

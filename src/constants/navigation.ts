@@ -111,6 +111,12 @@ export const NAV_ITEMS: NavItemDef[] = [
         mobileCategory: 'pod',
       },
       {
+        labelKey: 'nav.pod.milestones',
+        path: '/pod/milestones',
+        emoji: '\u{1F31F}',
+        mobileCategory: 'pod',
+      },
+      {
         labelKey: 'nav.pod.cookbook',
         path: '/pod/cookbook',
         emoji: '\u{1F35C}',
@@ -229,6 +235,7 @@ const HINT_KEY_BY_PATH: Record<string, UIStringKey> = {
   '/assets': 'mobileNav.hint.assets',
   '/pod': 'mobileNav.hint.meetBeans',
   '/pod/scrapbook': 'mobileNav.hint.scrapbook',
+  '/pod/milestones': 'mobileNav.hint.milestones',
   '/pod/cookbook': 'mobileNav.hint.cookbook',
   '/pod/safety': 'mobileNav.hint.safety',
   '/pod/contacts': 'mobileNav.hint.contacts',

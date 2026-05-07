@@ -112,9 +112,9 @@ describe('MobileNavBeanStack', () => {
     expect(wrapper.findAll('[role=menuitem]')).toHaveLength(6);
   });
 
-  it('renders 5 beans for Pod', () => {
+  it('renders 6 beans for Pod', () => {
     const wrapper = mountStack({ category: pod });
-    expect(wrapper.findAll('[role=menuitem]')).toHaveLength(5);
+    expect(wrapper.findAll('[role=menuitem]')).toHaveLength(6);
   });
 
   it('emits navigate with the bean path on tap', async () => {
