@@ -1981,6 +1981,14 @@ const STRING_DEFS = {
     beanie:
       'some beans may be out of date. try refreshing the app. if it keeps happening, sign out and sign back in.',
   },
+  'error.refreshFailed': {
+    en: 'Refresh failed',
+    beanie: "couldn't refresh",
+  },
+  'error.refreshFailedHelp': {
+    en: 'Try closing and reopening the app.',
+    beanie: 'try closing and reopening the app.',
+  },
   'error.supportNotified': {
     en: 'Support has been notified.',
     beanie: 'support has been notified.',
@@ -4103,29 +4111,12 @@ const STRING_DEFS = {
     beanie: "your data isn't being saved",
   },
   'googleDrive.saveFailureBody': {
-    en: "Recent changes haven't been saved to Google Drive. Reconnect to prevent data loss.",
-    beanie: "recent changes haven't been saved to google drive. reconnect to prevent data loss.",
+    en: "Recent changes haven't been saved to Google Drive. Try refreshing the app.",
+    beanie: "recent changes haven't been saved to google drive. try refreshing the app.",
   },
-  'googleDrive.saveFailureReconnect': {
-    en: 'Reconnect to Google Drive',
-    beanie: 'reconnect to google drive',
-  },
-  'googleDrive.downloadBackup': { en: 'Download backup', beanie: 'download backup' },
-  'googleDrive.downloadBackupUnavailableTitle': {
-    en: "Can't prepare a backup right now",
-    beanie: "can't prepare a backup right now",
-  },
-  'googleDrive.downloadBackupUnavailableBody': {
-    en: 'Your session key or pod envelope is missing. Reconnect to Google Drive and try again.',
-    beanie: 'your session key or pod envelope is missing. reconnect to google drive and try again.',
-  },
-  'googleDrive.downloadBackupFailedTitle': {
-    en: 'Backup download failed',
-    beanie: 'backup download failed',
-  },
-  'googleDrive.downloadBackupFailedBody': {
-    en: "We couldn't prepare your backup file. Check your connection and try again.",
-    beanie: "we couldn't prepare your backup. check your connection and try again.",
+  'googleDrive.saveFailureRefresh': {
+    en: 'Refresh app',
+    beanie: 'refresh app',
   },
   'googleDrive.saveRetrying': {
     en: 'Save failed — retrying...',
