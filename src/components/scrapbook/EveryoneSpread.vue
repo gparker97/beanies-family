@@ -316,9 +316,7 @@ function onOpenAdd(): void {
     </div>
 
     <div v-if="familyWideEntries.length" class="flex justify-center">
-      <span class="scrap-washi" style="
-
---washi-color: rgb(174 214 241 / 60%)" aria-hidden="true" />
+      <span class="scrap-washi" aria-hidden="true" />
     </div>
 
     <!-- 4. Family moments — family-wide milestones in their own footer
