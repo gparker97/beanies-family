@@ -1,10 +1,16 @@
 <script setup lang="ts">
 /**
- * Fixed-top severity-tinted banner with an icon + content slots. Shared
- * chrome for `SaveFailureBanner`, `PhotoAccessRecoveryBanner`, and any
- * future persistent error UI — each caller supplies its own title,
- * message, and action buttons via named slots; this component owns
- * layout, transitions, positioning, and dark-mode styling.
+ * Inline-flow severity-tinted banner with an icon + content slots. Shared
+ * chrome for `SaveFailureBanner` and any future persistent error UI —
+ * each caller supplies its own title, message, and action buttons via
+ * named slots; this component owns layout, transitions, and dark-mode
+ * styling.
+ *
+ * Renders inline at the top of the document flow (not `position: fixed`)
+ * so it pushes the page chrome (AppHeader, etc.) down rather than
+ * overlapping it. This keeps refresh affordances and primary navigation
+ * accessible — important on standalone PWAs where there is no browser
+ * chrome to fall back to.
  *
  * Severity tokens:
  *   - `critical` — red (blocks user flow; data loss risk)
@@ -30,7 +36,7 @@ const props = withDefaults(defineProps<Props>(), { severity: 'critical' });
   >
     <div
       v-if="props.show"
-      class="fixed top-0 right-0 left-0 z-[250] px-4 py-3 text-white shadow-lg"
+      class="w-full px-4 py-3 text-white shadow-lg"
       :class="
         props.severity === 'critical'
           ? 'bg-red-600 dark:bg-red-800'

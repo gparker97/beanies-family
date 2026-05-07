@@ -535,6 +535,16 @@ export function getAccessToken(): string | null {
 let pendingSilentRefresh: Promise<string | null> | null = null;
 
 /**
+ * Whether a silent token refresh is currently in flight. Read by callers
+ * that want to coalesce or defer their own UI signals while recovery is
+ * underway (e.g. the save-failure banner waits out this window before
+ * alarming the user).
+ */
+export function isSilentRefreshPending(): boolean {
+  return pendingSilentRefresh !== null;
+}
+
+/**
  * Attempt a silent token refresh using the stored refresh token.
  * Returns the new access token on success, or null if interactive auth is required.
  * Concurrent calls are deduplicated — only one refresh runs at a time.

@@ -38,7 +38,10 @@ import {
   onTokenPermanentlyExpired,
   onTokenAcquired,
   fetchGoogleUserEmail,
+  isSilentRefreshPending,
 } from '@/services/google/googleAuth';
+import { reportError } from '@/utils/errorReporter';
+import type { SaveFailureLevel } from '@/services/sync/syncService';
 import {
   searchBeanpodFilesGlobal,
   clearFolderCache,
@@ -115,6 +118,64 @@ export const useSyncStore = defineStore('sync', () => {
   const lastSaveError = ref<string | null>(null);
   const showSaveFailureBanner = ref(false);
 
+  // Banner is mutually exclusive with the GoogleReconnectToast (the canonical
+  // surface for permanent expiry). When the toast is up, the toast handles
+  // recovery — no need to also alarm with a top banner.
+  const shouldShowSaveFailureBanner = computed(
+    () => showSaveFailureBanner.value && !showGoogleReconnect.value
+  );
+
+  // Wake-time race window — saves can fail briefly while silent refresh is
+  // settling. Defer the banner that long so fix #1 (saveNow on tokenAcquired)
+  // can clear the failure before the user is alarmed. Tuned from
+  // observed silent-refresh timings (~1-3s typically); see docs/plans/
+  // 2026-05-07-quiet-save-failure-banner.md.
+  const BANNER_DEFER_MS = 5000;
+  let bannerDeferTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function cancelBannerDefer(): void {
+    if (bannerDeferTimer) {
+      clearTimeout(bannerDeferTimer);
+      bannerDeferTimer = null;
+    }
+  }
+
+  function showBannerWithTelemetry(deferred: boolean): void {
+    showSaveFailureBanner.value = true;
+    reportError({
+      surface: 'save-failure-banner',
+      message: deferred
+        ? 'banner shown after deferred recovery window'
+        : 'banner shown immediately (no recovery in flight)',
+      context: { lastSaveError: lastSaveError.value, deferred },
+    });
+  }
+
+  function handleSaveFailureChange(level: SaveFailureLevel, failError: string | null): void {
+    cancelBannerDefer();
+    saveFailureLevel.value = level;
+    lastSaveError.value = failError;
+
+    if (level !== 'critical') {
+      showSaveFailureBanner.value = false;
+      return;
+    }
+
+    if (!isSilentRefreshPending()) {
+      showBannerWithTelemetry(false);
+      return;
+    }
+
+    // Recovery in flight — give it a chance. If fix #1 clears the failure
+    // (level returns to 'none' via recordSaveSuccess on a post-recovery
+    // saveNow), the timer's re-check will skip the alarm.
+    bannerDeferTimer = setTimeout(() => {
+      bannerDeferTimer = null;
+      if (saveFailureLevel.value !== 'critical') return;
+      showBannerWithTelemetry(true);
+    }, BANNER_DEFER_MS);
+  }
+
   // Capabilities
   const capabilities = computed(() => getSyncCapabilities());
   const supportsAutoSync = computed(() => canAutoSync());
@@ -153,16 +214,8 @@ export const useSyncStore = defineStore('sync', () => {
     lastSync.value = timestamp;
   });
 
-  // Subscribe to save failure level changes
-  syncService.onSaveFailureChange((level, failError) => {
-    saveFailureLevel.value = level;
-    lastSaveError.value = failError;
-    if (level === 'critical') {
-      showSaveFailureBanner.value = true;
-    } else if (level === 'none') {
-      showSaveFailureBanner.value = false;
-    }
-  });
+  // Subscribe to save failure level changes — see handleSaveFailureChange above.
+  syncService.onSaveFailureChange(handleSaveFailureChange);
 
   // Background sync state (cache-first loading)
   const isBackgroundSyncing = ref(false);
@@ -1437,6 +1490,7 @@ export const useSyncStore = defineStore('sync', () => {
       autoSyncStopHandle = null;
     }
     stopFilePolling();
+    cancelBannerDefer();
     syncService.reset();
     useSyncHighlightStore().clearHighlights();
     isInitialized.value = false;
@@ -1724,6 +1778,22 @@ export const useSyncStore = defineStore('sync', () => {
           handleGoogleReconnected().catch((e) => {
             console.warn('[syncStore] auto-clear of reconnect banner failed', e);
           });
+          return;
+        }
+        // Token healthy. If the save-failure banner is up because saves failed
+        // during a wake-time auth race, kick a save now: success → banner
+        // auto-clears via recordSaveSuccess; failure → banner stays accurately
+        // up. saveNow doesn't normally throw (internal try/catch routes
+        // failures through recordSaveFailure); the catch here is defensive.
+        if (saveFailureLevel.value === 'critical' && !driveFileNotFound.value) {
+          syncService.saveNow().catch((e) => {
+            console.error('[syncStore] post-token-acquired saveNow rejected unexpectedly', e);
+            reportError({
+              surface: 'syncStore',
+              message: 'post-token-acquired saveNow rejected',
+              error: e,
+            });
+          });
         }
       });
     }
@@ -1853,6 +1923,7 @@ export const useSyncStore = defineStore('sync', () => {
     saveFailureLevel,
     lastSaveError,
     showSaveFailureBanner,
+    shouldShowSaveFailureBanner,
     cachePersistFailed,
     isBackgroundSyncing,
     backgroundSyncError,
