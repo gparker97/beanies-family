@@ -1,61 +1,109 @@
 <script setup lang="ts">
 /**
- * Family Scrapbook — `/pod/scrapbook`. Cross-bean merged feed of
- * favorites + sayings + notes, sorted newest-first, with type +
- * member filter chips and a CSS-columns masonry layout.
+ * Family Scrapbook — `/pod/scrapbook`. Tabbed scrapbook of spreads.
  *
- * Page loads 30 items at a time; "Load more" appends +30. Each item
- * type gets its own template — sticky notes for sayings, polaroid-
- * style cards for photo entries (phase coming up), simple cards for
- * favorites + notes. Clicking an entry routes to the owning bean's
- * tab so the user can edit there.
+ * The horizontal `<ScrapbookSpine>` pages between **Everyone** (the
+ * family bulletin board) and each bean's individual magazine-style
+ * spread. Kraft-paper page background; CSS-only scrapbook decorations
+ * (taped paper, ripped paper, washi tape) on the cards.
+ *
+ * Default landing tab = Everyone. The page's `+ Add` button opens the
+ * existing QuickAddSheet flow (filtered to scrapbook-relevant items)
+ * via the `useQuickAdd` singleton.
+ *
+ * Lightbox: `useMilestoneLightbox` is a module-level singleton (post
+ * 2026-05-07 redesign), so any deeply-nested card calls `openFor(m)`
+ * and the page-level `<PhotoViewer>` responds. No prop drilling.
+ *
+ * See docs/plans/2026-05-07-family-scrapbook-redesign.md for context.
  */
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
-import EmptyState from '@/components/pod/shared/EmptyState.vue';
+import PhotoViewer from '@/components/media/PhotoViewer.vue';
+import ScrapbookSpine from '@/components/scrapbook/ScrapbookSpine.vue';
+import EveryoneSpread from '@/components/scrapbook/EveryoneSpread.vue';
+import BeanSpread from '@/components/scrapbook/BeanSpread.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
+import { useQuickAdd } from '@/composables/useQuickAdd';
+import { useMilestoneLightbox } from '@/composables/useMilestoneLightbox';
 import { useFamilyStore } from '@/stores/familyStore';
-import {
-  useScrapbookFeed,
-  type ScrapType,
-  type ScrapbookEntry,
-} from '@/composables/useScrapbookFeed';
-import type {
-  FamilyMember,
-  FavoriteItem,
-  FavoriteCategory,
-  MemberNote,
-  SayingItem,
-  UUID,
-} from '@/types/models';
+import type { ScrapbookEntry, ScrapType } from '@/composables/useScrapbookFeed';
+import type { Milestone, UUID } from '@/types/models';
 
 const router = useRouter();
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
+const { open: openQuickAddSheet } = useQuickAdd();
+const lightbox = useMilestoneLightbox();
 
-// --- Filter state -----------------------------------------------------
+// --- Spread switcher --------------------------------------------------
 
-const allMemberIds = computed<UUID[]>(() => familyStore.members.map((m) => m.id));
-const selectedMemberIds = ref<UUID[]>([]);
-const selectedTypes = ref<Set<ScrapType>>(new Set());
+const activeSpread = ref<'everyone' | UUID>('everyone');
 
-// "Everyone" = nothing explicitly selected → feed uses all member ids.
-const effectiveMemberIds = computed(() =>
-  selectedMemberIds.value.length === 0 ? allMemberIds.value : selectedMemberIds.value
+/**
+ * Direction the next page-turn animation should play. `'forward'` =
+ * the new spread is later in the roster than the current one (the
+ * "right page" turning leftward). `'backward'` = inverse. Set
+ * BEFORE mutating `activeSpread` so the `<Transition :name>` is
+ * correct by the time Vue runs the leave/enter cycle.
+ */
+const transitionDirection = ref<'forward' | 'backward'>('forward');
+
+const transitionName = computed(() =>
+  transitionDirection.value === 'forward' ? 'page-flip-forward' : 'page-flip-backward'
 );
 
-// Quick-add FAB handlers.
-//
-// When `memberId` context is present (the user tapped a scrapbook
-// entity from a bean detail route), forward to that bean's matching
-// tab with `?action=` preserved — BeanSayingsTab/BeanFavoritesTab/
-// BeanNotesTab consume the intent and open their add modal.
-//
-// Without memberId, no-op on Phase 1. Phase 2 ships a bean-picker-
-// first flow; landing on the scrapbook IS a reasonable place for the
-// user to pick a bean manually in the meantime.
+/**
+ * Index of a spread in the spine's render order. `'everyone'` is
+ * always at 0; beans follow `sortedMembers` order (humans + pets).
+ * Used to decide whether a tap is forward or backward in the "book."
+ */
+function spreadIndex(id: 'everyone' | UUID): number {
+  if (id === 'everyone') return 0;
+  return familyStore.sortedMembers.findIndex((h) => h.id === id) + 1;
+}
+
+function onSpineSelect(id: 'everyone' | UUID): void {
+  if (id === activeSpread.value) return;
+  const oldIdx = spreadIndex(activeSpread.value);
+  const newIdx = spreadIndex(id);
+  transitionDirection.value = newIdx >= oldIdx ? 'forward' : 'backward';
+  activeSpread.value = id;
+}
+
+// Activeguard: if the chosen bean is removed (delete / family change),
+// bounce back to Everyone so we never render a BeanSpread with a stale
+// UUID. `immediate: true` covers the initial-load case where
+// activeSpread might somehow be a pre-existing UUID that's now gone.
+watch(
+  () => familyStore.sortedMembers,
+  (members) => {
+    if (activeSpread.value === 'everyone') return;
+    const stillExists = members.some((m) => m.id === activeSpread.value);
+    if (!stillExists) {
+      // Treat the auto-bounce as a backward turn (returning to the
+      // overview) — feels more natural than a forward-flip into the
+      // overview the user didn't choose.
+      transitionDirection.value = 'backward';
+      activeSpread.value = 'everyone';
+    }
+  },
+  { immediate: true }
+);
+
+// --- Add-to-scrapbook --------------------------------------------------
+
+function openAddSheet(): void {
+  openQuickAddSheet({
+    filter: ['add-saying', 'add-favorite', 'add-note', 'add-milestone'],
+  });
+}
+
+// FAB-driven intents arriving with `?action=add-X&memberId=Y` route
+// directly to the bean's pod tab — same behaviour as before the
+// redesign.
 const ACTION_TO_BEAN_TAB: Record<string, 'sayings' | 'favorites' | 'notes'> = {
   'add-saying': 'sayings',
   'add-favorite': 'favorites',
@@ -71,140 +119,38 @@ useQuickAddIntent(async (action, { memberId }) => {
   });
 });
 
-const { entries } = useScrapbookFeed({
-  memberIds: effectiveMemberIds,
-  contentTypes: selectedTypes,
-});
+// --- Entry click dispatch ----------------------------------------------
+//
+// Both spreads emit `entry-click` with a ScrapbookEntry. Family-wide
+// milestones (memberId === null) have no per-bean tab to route to, so
+// we open the lightbox if photos exist and otherwise no-op. Bean-owned
+// entries route to the owning bean's pod tab.
 
-// --- Paging -----------------------------------------------------------
-
-const PAGE_SIZE = 30;
-const visibleCount = ref(PAGE_SIZE);
-
-// Reset pagination whenever filters change — otherwise hidden items
-// could already be past the visible cutoff from a previous filter.
-function resetPaging(): void {
-  visibleCount.value = PAGE_SIZE;
-}
-
-const visibleEntries = computed(() => entries.value.slice(0, visibleCount.value));
-const canLoadMore = computed(() => entries.value.length > visibleCount.value);
-
-// --- Type filter chips ------------------------------------------------
-
-function toggleType(t: ScrapType): void {
-  const next = new Set(selectedTypes.value);
-  if (next.has(t)) next.delete(t);
-  else next.add(t);
-  selectedTypes.value = next;
-  resetPaging();
-}
-
-function isTypeSelected(t: ScrapType): boolean {
-  return selectedTypes.value.size === 0 || selectedTypes.value.has(t);
-}
-
-// --- Member filter chips ----------------------------------------------
-
-function toggleMember(id: UUID): void {
-  const idx = selectedMemberIds.value.indexOf(id);
-  if (idx >= 0) selectedMemberIds.value = selectedMemberIds.value.filter((x) => x !== id);
-  else selectedMemberIds.value = [...selectedMemberIds.value, id];
-  resetPaging();
-}
-
-function isMemberSelected(id: UUID): boolean {
-  return selectedMemberIds.value.length === 0 || selectedMemberIds.value.includes(id);
-}
-
-function clearFilters(): void {
-  selectedMemberIds.value = [];
-  selectedTypes.value = new Set();
-  resetPaging();
-}
-
-const hasAnyFilter = computed(
-  () => selectedMemberIds.value.length > 0 || selectedTypes.value.size > 0
-);
-
-// --- Render helpers ---------------------------------------------------
-
-const FAVORITE_EMOJI: Record<FavoriteCategory, string> = {
-  food: '\u{1F35C}',
-  place: '\u{1F4CD}',
-  book: '\u{1F4DA}',
-  song: '\u{1F3B5}',
-  toy: '\u{1F9F8}',
-  other: '\u2728',
+const TYPE_TO_TAB: Record<ScrapType, string> = {
+  saying: 'sayings',
+  favorite: 'favorites',
+  note: 'notes',
+  milestone: 'milestones',
 };
 
-const TYPE_LABEL: Record<ScrapType, string> = {
-  favorite: 'scrapbook.type.favorite',
-  saying: 'scrapbook.type.saying',
-  note: 'scrapbook.type.note',
-};
-
-function memberFor(id: UUID): FamilyMember | undefined {
-  return familyStore.members.find((m) => m.id === id);
-}
-
-function shortDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const MONTHS = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-function openEntry(entry: ScrapbookEntry): void {
-  // Route to the owning bean's tab so edits happen where the canonical
-  // content lives. The scrapbook is a read-focused surface.
-  const tab =
-    entry.type === 'favorite' ? 'favorites' : entry.type === 'saying' ? 'sayings' : 'notes';
+function onEntryClick(entry: ScrapbookEntry): void {
+  if (entry.type === 'milestone' && entry.memberId === null) {
+    lightbox.openFor(entry.payload as Milestone);
+    return;
+  }
+  if (entry.memberId === null) return;
+  const tab = TYPE_TO_TAB[entry.type];
+  if (!tab) return;
   router.push(`/pod/${entry.memberId}/${tab}`);
-}
-
-// Pastel paper palette for saying entries — whole card gets the tint
-// so the feed reads as a scatter of sticky notes (matches the mockup's
-// `.scrap-saying.paper-*` classes). Cycled deterministically by index
-// in the visible window so re-renders don't re-shuffle.
-const PAPER_COLORS = ['#fff7c8', '#d4f1f4', '#ffe4d6', '#e8f5e8'] as const;
-
-function sayingPaperColor(entry: ScrapbookEntry): string {
-  const idx = visibleEntries.value.findIndex((e) => e.id === entry.id);
-  return PAPER_COLORS[idx % PAPER_COLORS.length] ?? PAPER_COLORS[0]!;
-}
-
-// Typed accessors for the template (v-if narrowing across our union
-// types doesn't pipe through into slot expressions reliably, so we
-// expose plain helper functions instead).
-function asFavorite(entry: ScrapbookEntry): FavoriteItem {
-  return entry.payload as FavoriteItem;
-}
-function asSaying(entry: ScrapbookEntry): SayingItem {
-  return entry.payload as SayingItem;
-}
-function asNote(entry: ScrapbookEntry): MemberNote {
-  return entry.payload as MemberNote;
 }
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Hero — multi-color pastel gradient that echoes the sticky
-         notes in the feed, with a faded 📖 watermark on the right. -->
+  <div
+    class="scrapbook-paper relative -mx-4 -my-4 min-h-screen px-4 py-4 sm:-mx-6 sm:-my-6 sm:px-6 sm:py-6"
+  >
+    <!-- Hero header — kept from previous design (multicolor kraft band
+         with 📖 watermark). The "+ Add to scrapbook" button stays here. -->
     <header
       class="relative mb-5 overflow-hidden rounded-[var(--sq)] px-5 py-5 sm:px-8 sm:py-7"
       style="
@@ -226,206 +172,152 @@ function asNote(entry: ScrapbookEntry): MemberNote {
         <BeanieIcon name="chevron-left" size="xs" />
         <span>{{ t('bean.backToPod') }}</span>
       </button>
-      <h1
-        class="font-outfit text-secondary-500 text-2xl leading-tight font-extrabold break-words sm:text-3xl sm:leading-none dark:text-gray-100"
-      >
-        {{ t('scrapbook.title') }}
-      </h1>
-      <p class="font-caveat mt-1 text-xl text-[#E67E22]">{{ t('scrapbook.subtitle') }}</p>
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <h1
+            class="font-outfit text-secondary-500 text-2xl leading-tight font-extrabold break-words sm:text-3xl sm:leading-none dark:text-gray-100"
+          >
+            {{ t('scrapbook.title') }}
+          </h1>
+          <p class="font-caveat mt-1 text-xl font-medium text-[#E67E22]">
+            {{ t('scrapbook.subtitle') }}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="font-outfit bg-primary-500 hover:bg-primary-600 inline-flex flex-shrink-0 items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors"
+          :aria-label="t('scrapbook.add')"
+          @click="openAddSheet"
+        >
+          <BeanieIcon name="plus" size="xs" />
+          <span class="hidden sm:inline">{{ t('scrapbook.add') }}</span>
+        </button>
+      </div>
     </header>
 
-    <!-- Filter row -->
-    <div
-      v-if="entries.length || hasAnyFilter"
-      class="mb-5 flex flex-wrap items-center gap-4 rounded-2xl bg-white p-4 shadow-[var(--card-shadow)] dark:bg-slate-800"
-    >
-      <div class="flex flex-wrap items-center gap-2">
-        <span
-          class="font-outfit text-[10px] font-semibold tracking-[0.08em] text-[var(--color-text-muted)] uppercase"
-        >
-          {{ t('scrapbook.filter.types') }}
-        </span>
-        <button
-          v-for="ty in ['favorite', 'saying', 'note'] as ScrapType[]"
-          :key="ty"
-          type="button"
-          class="font-outfit inline-flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors"
-          :class="
-            isTypeSelected(ty) && selectedTypes.size > 0
-              ? 'border-transparent bg-[var(--color-primary)] text-white'
-              : 'text-secondary-500 border-[var(--tint-slate-10)] bg-[var(--color-background)] hover:bg-[var(--tint-orange-4)]'
-          "
-          @click="toggleType(ty)"
-        >
-          <span>{{ t(`scrapbook.filter.${ty}s` as never) }}</span>
-        </button>
-      </div>
+    <ScrapbookSpine
+      :beans="familyStore.sortedMembers"
+      :active-id="activeSpread"
+      @select="onSpineSelect"
+    />
 
-      <div class="hidden h-6 w-px bg-[var(--tint-slate-10)] sm:block" />
-
-      <div class="flex flex-wrap items-center gap-2">
-        <span
-          class="font-outfit text-[10px] font-semibold tracking-[0.08em] text-[var(--color-text-muted)] uppercase"
-        >
-          {{ t('scrapbook.filter.members') }}
-        </span>
-        <button
-          v-for="m in familyStore.sortedMembers"
-          :key="m.id"
-          type="button"
-          class="font-outfit inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors"
-          :class="
-            isMemberSelected(m.id) && selectedMemberIds.length > 0
-              ? 'border-transparent bg-[var(--color-primary)] text-white'
-              : 'text-secondary-500 border-[var(--tint-slate-10)] bg-[var(--color-background)] hover:bg-[var(--tint-orange-4)]'
-          "
-          @click="toggleMember(m.id)"
-        >
-          <span
-            class="inline-block h-4 w-4 flex-shrink-0 rounded-md"
-            :style="{ backgroundColor: m.color }"
-            aria-hidden="true"
-          />
-          <span>{{ m.name }}</span>
-        </button>
-      </div>
-
-      <button
-        v-if="hasAnyFilter"
-        type="button"
-        class="font-outfit text-primary-500 ml-auto text-xs font-semibold hover:underline"
-        @click="clearFilters"
-      >
-        {{ t('action.clear') }}
-      </button>
+    <div class="spread-stage">
+      <Transition :name="transitionName" mode="out-in">
+        <EveryoneSpread
+          v-if="activeSpread === 'everyone'"
+          key="everyone"
+          @entry-click="onEntryClick"
+          @open-add="openAddSheet"
+          @select-bean="onSpineSelect"
+        />
+        <BeanSpread
+          v-else
+          :key="activeSpread"
+          :member-id="activeSpread"
+          @entry-click="onEntryClick"
+          @open-add="openAddSheet"
+        />
+      </Transition>
     </div>
 
-    <!-- Masonry feed -->
-    <div
-      v-if="visibleEntries.length"
-      class="scrapbook-feed"
-      style="column-count: 3; column-gap: 18px"
-    >
-      <article
-        v-for="entry in visibleEntries"
-        :key="`${entry.type}-${entry.id}`"
-        class="mb-4 cursor-pointer overflow-hidden rounded-2xl shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)]"
-        :class="entry.type === 'saying' ? '' : 'bg-white dark:bg-slate-800'"
-        :style="
-          entry.type === 'saying'
-            ? { background: sayingPaperColor(entry), breakInside: 'avoid' }
-            : { breakInside: 'avoid' }
-        "
-        @click="openEntry(entry)"
-      >
-        <!-- Header: bean color dot + name + type label -->
-        <header
-          class="font-outfit text-secondary-500/70 flex items-center gap-2 px-4 pt-3 text-[11px] font-semibold"
-          :class="entry.type === 'saying' ? '' : 'dark:text-gray-400'"
-        >
-          <span
-            class="inline-block h-4 w-4 flex-shrink-0 rounded-md"
-            :style="{ backgroundColor: memberFor(entry.memberId)?.color ?? '#3b82f6' }"
-            aria-hidden="true"
-          />
-          <span class="truncate">{{ memberFor(entry.memberId)?.name ?? '—' }}</span>
-          <span class="ml-auto tracking-[0.06em] uppercase opacity-70">
-            {{ t(TYPE_LABEL[entry.type] as never) }}
-          </span>
-        </header>
-
-        <!-- Body — type-specific -->
-        <!-- Saying → Caveat quote on the colored card (no nested note) -->
-        <div v-if="entry.type === 'saying'" class="px-4 pt-2 pb-3">
-          <p class="font-caveat text-secondary-500 text-2xl leading-snug font-medium">
-            {{ asSaying(entry).words }}
-          </p>
-        </div>
-
-        <!-- Favorite → big category emoji + name + optional description -->
-        <div v-else-if="entry.type === 'favorite'" class="flex gap-3 px-4 py-3">
-          <div
-            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--tint-orange-8)] text-xl"
-            aria-hidden="true"
-          >
-            {{ FAVORITE_EMOJI[asFavorite(entry).category] }}
-          </div>
-          <div class="min-w-0 flex-1">
-            <h4
-              class="font-outfit text-secondary-500 text-sm leading-tight font-bold dark:text-gray-100"
-            >
-              {{ asFavorite(entry).name }}
-            </h4>
-            <p
-              v-if="asFavorite(entry).description"
-              class="font-inter text-secondary-500/70 mt-1 text-xs leading-snug dark:text-gray-400"
-            >
-              {{ asFavorite(entry).description }}
-            </p>
-            <span
-              class="font-outfit text-secondary-500/50 mt-1 inline-block text-[10px] font-semibold tracking-wide uppercase"
-            >
-              {{ asFavorite(entry).category }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Note → title + body clamp -->
-        <div v-else class="px-4 py-3">
-          <h4 class="font-outfit text-secondary-500 text-sm font-bold dark:text-gray-100">
-            {{ asNote(entry).title }}
-          </h4>
-          <p
-            class="font-inter text-secondary-500/70 mt-1 line-clamp-4 text-xs leading-snug dark:text-gray-400"
-          >
-            {{ asNote(entry).body }}
-          </p>
-        </div>
-
-        <!-- Date line -->
-        <div
-          class="font-outfit text-secondary-500/50 px-4 pb-3 text-[10px] font-semibold tracking-[0.08em] uppercase"
-        >
-          {{ shortDate(entry.createdAt) }}
-        </div>
-      </article>
-    </div>
-
-    <!-- Load more -->
-    <div v-if="canLoadMore" class="mt-4 flex justify-center">
-      <button
-        type="button"
-        class="font-outfit text-secondary-500 rounded-2xl border-2 border-[var(--tint-slate-10)] bg-white px-5 py-2 text-sm font-semibold transition-colors hover:bg-[var(--tint-orange-4)] dark:bg-slate-800 dark:text-gray-100"
-        @click="visibleCount += PAGE_SIZE"
-      >
-        {{ t('scrapbook.loadMore') }}
-        <span class="text-secondary-500/50 ml-1"> ({{ entries.length - visibleCount }}) </span>
-      </button>
-    </div>
-
-    <!-- Empty states -->
-    <div
-      v-if="!entries.length"
-      class="rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)] dark:bg-slate-800"
-    >
-      <EmptyState
-        emoji="📖"
-        :message="hasAnyFilter ? t('scrapbook.noResults') : t('scrapbook.empty')"
-      />
-    </div>
+    <!-- Read-only lightbox for milestone photos. Wired to the
+         module-level `useMilestoneLightbox` singleton so any
+         deeply-nested card opens it directly via `openFor`. -->
+    <PhotoViewer
+      :open="lightbox.isOpen.value"
+      :photo-ids="lightbox.photoIds.value"
+      :initial-index="0"
+      read-only
+      @close="lightbox.close"
+    />
   </div>
 </template>
 
 <style scoped>
-@media (width <= 980px) {
-  .scrapbook-feed {
-    column-count: 2 !important;
-  }
+/* 3D perspective on the spread container so child rotateY transforms
+   read as a paper-page hinging in/out, not a flat sprite skew. */
+.spread-stage {
+  perspective: 1500px;
 }
 
-@media (width <= 640px) {
-  .scrapbook-feed {
-    column-count: 1 !important;
+/* ── Page-flip transition between spreads ─────────────────────────────
+ * Two directional variants — `forward` plays when the user picks a
+ * spread later in the spine roster; `backward` for earlier. Both pivot
+ * the leaving page on its inside edge (toward the spine of the book)
+ * so the motion reads as turning a real page.
+ *
+ * Uses `mode="out-in"` (set in the template), so the leave finishes
+ * before the enter starts. Total ~530ms — long enough to register as
+ * a deliberate gesture, short enough not to feel sluggish.
+ *
+ * Falls back to a simple opacity crossfade under prefers-reduced-motion.
+ * ─────────────────────────────────────────────────────────────────── */
+
+/* Forward turn — old page hinges on its LEFT edge and rotates out
+   leftward; new page enters from the right hinged on its left edge. */
+.page-flip-forward-leave-active {
+  transform-origin: left center;
+  transition:
+    transform 260ms cubic-bezier(0.4, 0, 0.7, 0.2),
+    opacity 220ms ease-in;
+}
+
+.page-flip-forward-leave-to {
+  opacity: 0;
+  transform: rotateY(-65deg);
+}
+
+.page-flip-forward-enter-active {
+  transform-origin: left center;
+  transition:
+    transform 280ms cubic-bezier(0.2, 0.6, 0.3, 1),
+    opacity 240ms ease-out;
+}
+
+.page-flip-forward-enter-from {
+  opacity: 0;
+  transform: rotateY(65deg);
+}
+
+/* Backward turn — mirror image, hinge on the RIGHT edge. */
+.page-flip-backward-leave-active {
+  transform-origin: right center;
+  transition:
+    transform 260ms cubic-bezier(0.4, 0, 0.7, 0.2),
+    opacity 220ms ease-in;
+}
+
+.page-flip-backward-leave-to {
+  opacity: 0;
+  transform: rotateY(65deg);
+}
+
+.page-flip-backward-enter-active {
+  transform-origin: right center;
+  transition:
+    transform 280ms cubic-bezier(0.2, 0.6, 0.3, 1),
+    opacity 240ms ease-out;
+}
+
+.page-flip-backward-enter-from {
+  opacity: 0;
+  transform: rotateY(-65deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-flip-forward-enter-active,
+  .page-flip-forward-leave-active,
+  .page-flip-backward-enter-active,
+  .page-flip-backward-leave-active {
+    transition: opacity 200ms ease;
+  }
+
+  .page-flip-forward-enter-from,
+  .page-flip-forward-leave-to,
+  .page-flip-backward-enter-from,
+  .page-flip-backward-leave-to {
+    opacity: 0;
+    transform: none;
   }
 }
 </style>

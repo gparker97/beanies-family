@@ -21,6 +21,7 @@ import BeanSayingsTab from '@/components/pod/BeanSayingsTab.vue';
 import BeanNotesTab from '@/components/pod/BeanNotesTab.vue';
 import BeanAllergiesTab from '@/components/pod/BeanAllergiesTab.vue';
 import BeanMedicationsTab from '@/components/pod/BeanMedicationsTab.vue';
+import BeanMilestonesTab from '@/components/pod/BeanMilestonesTab.vue';
 import FamilyMemberModal from '@/components/family/FamilyMemberModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -29,6 +30,7 @@ import { useSayingsStore } from '@/stores/sayingsStore';
 import { useMemberNotesStore } from '@/stores/memberNotesStore';
 import { useAllergiesStore } from '@/stores/allergiesStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
+import { useMilestonesStore } from '@/stores/milestonesStore';
 import { usePermissions } from '@/composables/usePermissions';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
@@ -44,6 +46,7 @@ const sayingsStore = useSayingsStore();
 const memberNotesStore = useMemberNotesStore();
 const allergiesStore = useAllergiesStore();
 const medicationsStore = useMedicationsStore();
+const milestonesStore = useMilestonesStore();
 const { canManagePod } = usePermissions();
 
 const memberId = computed(() => (route.params.memberId as string) ?? '');
@@ -89,6 +92,7 @@ const counts = computed(() => ({
   notes: memberNotesStore.byMember(memberId.value).value.length,
   allergies: allergiesStore.byMember(memberId.value).value.length,
   medications: medicationsStore.byMember(memberId.value).value.length,
+  milestones: milestonesStore.byMember(memberId.value).value.length,
 }));
 
 function selectTab(tab: BeanTabId): void {
@@ -109,6 +113,7 @@ function selectTab(tab: BeanTabId): void {
       <BeanAllergiesTab v-else-if="activeTab === 'allergies'" :member-id="member.id" />
       <BeanMedicationsTab v-else-if="activeTab === 'medications'" :member-id="member.id" />
       <BeanNotesTab v-else-if="activeTab === 'notes'" :member-id="member.id" />
+      <BeanMilestonesTab v-else-if="activeTab === 'milestones'" :member-id="member.id" />
 
       <FamilyMemberModal
         :open="showEditModal"

@@ -27,17 +27,24 @@ import { usePermissions } from '@/composables/usePermissions';
 
 const { t } = useTranslation();
 const { canViewFinances, canEditActivities } = usePermissions();
-const { isOpen, stage, close, triggerAction } = useQuickAdd();
+const { isOpen, stage, allowedActions, close, triggerAction } = useQuickAdd();
 
 /**
  * Per-member filter applied to every group. Items declare a
  * `requiredPermission` ('finance' | 'activities'); the sheet hides
  * any item the current member can't act on — and hides a whole
  * section when it ends up empty.
+ *
+ * Caller-supplied `allowedActions` filter (set via `openQuickAdd({ filter })`)
+ * scopes the sheet to a subset of actions — used by consolidation pages
+ * (Family Scrapbook, Family Timeline) to keep the sheet relevant.
  */
 function itemAllowed(item: QuickAddItem): boolean {
-  if (item.requiredPermission === 'finance') return canViewFinances.value;
-  return canEditActivities.value;
+  if (item.requiredPermission === 'finance' && !canViewFinances.value) return false;
+  if (item.requiredPermission === 'activities' && !canEditActivities.value) return false;
+  const filter = allowedActions.value;
+  if (filter && !filter.includes(item.action)) return false;
+  return true;
 }
 
 const allowedByGroup = computed<Record<QuickAddGroup, readonly QuickAddItem[]>>(() => ({

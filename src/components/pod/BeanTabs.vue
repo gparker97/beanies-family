@@ -16,7 +16,8 @@ export type BeanTabId =
   | 'sayings'
   | 'allergies'
   | 'medications'
-  | 'notes';
+  | 'notes'
+  | 'milestones';
 
 const props = defineProps<{
   active: BeanTabId;
@@ -35,10 +36,17 @@ interface TabDef {
   emoji: string;
 }
 
+// Tab order groups by mental-model affinity:
+//   1. Identity-ish     \u2014 overview, favorites
+//   2. Memory cluster   \u2014 sayings, milestones (kept together; both are
+//                          memory-keeping artifacts)
+//   3. Health cluster   \u2014 allergies, medications
+//   4. Catch-all        \u2014 notes
 const TABS: TabDef[] = [
   { id: 'overview', emoji: '\u{1F4CB}' },
   { id: 'favorites', emoji: '\u{1F49D}' },
   { id: 'sayings', emoji: '\u{1F4AC}' },
+  { id: 'milestones', emoji: '\u{1F31F}' },
   { id: 'allergies', emoji: '\u26A0\uFE0F' },
   { id: 'medications', emoji: '\u{1F48A}' },
   { id: 'notes', emoji: '\u{1F4DD}' },
@@ -66,6 +74,8 @@ function labelFor(id: BeanTabId): string {
       return t('bean.tab.medications');
     case 'notes':
       return t('bean.tab.notes');
+    case 'milestones':
+      return t('milestone.tab.label');
   }
 }
 </script>

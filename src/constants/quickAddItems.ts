@@ -173,6 +173,18 @@ export const QUICK_ADD_ITEMS = [
     contextKey: 'vacationId',
     requiredPermission: 'activities',
   },
+  {
+    id: 'milestone',
+    group: 'family',
+    order: 5,
+    emoji: '\u{1F31F}', // 🌟
+    labelKey: 'quickAdd.milestone.label',
+    hintKey: 'quickAdd.milestone.hint',
+    route: '/pod/milestones',
+    action: 'add-milestone',
+    contextKey: 'memberId',
+    requiredPermission: 'activities',
+  },
 
   // — Money (setup) —
   {

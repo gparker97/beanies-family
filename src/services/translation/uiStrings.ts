@@ -200,6 +200,7 @@ const STRING_DEFS = {
   'nav.pod': { en: 'The Pod', beanie: 'the pod' },
   'nav.pod.meetBeans': { en: 'Meet the Beans', beanie: 'meet the beans' },
   'nav.pod.scrapbook': { en: 'Family Scrapbook', beanie: 'family scrapbook' },
+  'nav.pod.milestones': { en: 'Family Milestones', beanie: 'family milestones' },
   'nav.pod.cookbook': { en: 'Family Cookbook', beanie: 'family cookbook' },
   'nav.pod.safety': { en: 'Care & Safety', beanie: 'care & safety' },
   'nav.pod.contacts': { en: 'Emergency Contacts', beanie: 'emergency contacts' },
@@ -469,6 +470,151 @@ const STRING_DEFS = {
     beanie:
       'all dose history for this medication will also be removed. the bottle photo will be cleaned up after 24 hours',
   },
+  // ── Milestones ───────────────────────────────────────────────────────────
+  // Big-moment captures: lost a tooth, first day of school, graduation,
+  // wedding, new home, etc. Per-bean by default with a family-wide toggle.
+  // Voice: warm, simple. Beanie variants are all lowercase.
+  'milestone.tab.label': { en: 'Milestones', beanie: 'milestones' },
+  'milestone.addTile': { en: 'Add a milestone', beanie: 'add a milestone' },
+  'milestone.empty': {
+    en: 'No big moments yet',
+    beanie: 'no big moments yet',
+  },
+  'milestone.emptyCTA': { en: 'Capture the first one', beanie: 'capture the first one' },
+  'milestone.addTitle': { en: 'Add Milestone', beanie: 'add milestone' },
+  'milestone.editTitle': { en: 'Edit Milestone', beanie: 'edit milestone' },
+  'milestone.field.for': { en: 'For', beanie: 'for' },
+  'milestone.field.milestone': { en: 'Milestone', beanie: 'milestone' },
+  'milestone.field.title': { en: 'Title', beanie: 'title' },
+  'milestone.field.date': { en: 'Date', beanie: 'date' },
+  'milestone.field.description': { en: 'Description', beanie: 'description' },
+  'milestone.field.photos': { en: 'Photos', beanie: 'photos' },
+  'milestone.placeholder.title': {
+    en: 'A few words to remember it by',
+    beanie: 'a few words to remember it by',
+  },
+  'milestone.placeholder.description': {
+    en: 'Anything else worth remembering...',
+    beanie: 'anything else worth remembering...',
+  },
+  'milestone.familyPill': { en: 'Family', beanie: 'family' },
+  'milestone.familyChip': { en: 'Family', beanie: 'family' },
+  'milestone.unknownBean': { en: 'Unknown bean', beanie: 'unknown bean' },
+  'milestone.addPhotos': { en: 'Add photos', beanie: 'add photos' },
+  'milestone.addPhotosHint': {
+    en: 'Pick a bean first, then add photos any time.',
+    beanie: 'pick a bean first, then add photos any time.',
+  },
+  'milestone.group.firsts': { en: 'Firsts', beanie: 'firsts' },
+  'milestone.group.achievements': { en: 'Achievements', beanie: 'achievements' },
+  'milestone.group.family': { en: 'Family Events', beanie: 'family events' },
+  'milestone.group.celebrations': { en: 'Celebrations', beanie: 'celebrations' },
+  'milestone.invalidDate': {
+    en: 'Please pick a valid date',
+    beanie: 'please pick a valid date',
+  },
+  'milestone.deleteConfirm.title': {
+    en: 'Delete this milestone?',
+    beanie: 'delete this milestone?',
+  },
+  'milestone.deleteConfirm.body': {
+    en: 'This will be removed from the timeline and the scrapbook. Photos will be cleaned up after 24 hours.',
+    beanie:
+      'this will be removed from the timeline and the scrapbook. photos will be cleaned up after 24 hours',
+  },
+  // ── Milestone categories ────────────────────────────────────────────────
+  'milestone.cat.birthday': { en: 'Birthday', beanie: 'birthday' },
+  'milestone.cat.lostTooth': { en: 'Lost a Tooth', beanie: 'lost a tooth' },
+  'milestone.cat.firstWord': { en: 'First Word', beanie: 'first word' },
+  'milestone.cat.firstStep': { en: 'First Step', beanie: 'first step' },
+  'milestone.cat.firstDaySchool': { en: 'First Day of School', beanie: 'first day of school' },
+  'milestone.cat.graduation': { en: 'Graduation', beanie: 'graduation' },
+  'milestone.cat.bigTest': { en: 'Big Test', beanie: 'big test' },
+  'milestone.cat.recital': { en: 'Recital', beanie: 'recital' },
+  'milestone.cat.bigWin': { en: 'Big Win', beanie: 'big win' },
+  'milestone.cat.newHome': { en: 'New Home', beanie: 'new home' },
+  'milestone.cat.newJob': { en: 'New Job', beanie: 'new job' },
+  'milestone.cat.newPet': { en: 'New Pet', beanie: 'new pet' },
+  'milestone.cat.newLittleBean': { en: 'New Little Bean', beanie: 'new little bean' },
+  'milestone.cat.wedding': { en: 'Wedding Day', beanie: 'wedding day' },
+  'milestone.cat.anniversary': { en: 'Anniversary', beanie: 'anniversary' },
+  'milestone.cat.bigTrip': { en: 'Big Trip', beanie: 'big trip' },
+  'milestone.cat.license': { en: 'License', beanie: 'license' },
+  'milestone.cat.custom': { en: 'Custom Milestone', beanie: 'custom milestone' },
+  // ── Milestones page (cross-family chronological view) ───────────────────
+  'milestones.pageTitle': { en: 'Milestones', beanie: 'milestones' },
+  'milestones.pageSubtitle': {
+    en: 'Big moments, year by year',
+    beanie: 'big moments, year by year',
+  },
+  'milestones.empty': {
+    en: 'No big moments yet',
+    beanie: 'no big moments yet',
+  },
+  'milestones.emptyHint': {
+    en: 'Tap + to capture the first one.',
+    beanie: 'tap + to capture the first one.',
+  },
+  'milestones.filter.beans': { en: 'Beans', beanie: 'beans' },
+  'milestones.filter.categories': { en: 'Categories', beanie: 'categories' },
+  'milestones.filter.includeFamilyWide': {
+    en: 'Include family-wide moments',
+    beanie: 'include family-wide moments',
+  },
+  'milestones.filter.allBeans': { en: 'All beans', beanie: 'all beans' },
+  'milestones.filter.allCategories': { en: 'All categories', beanie: 'all categories' },
+  'milestones.add': { en: 'Add a milestone', beanie: 'add a milestone' },
+  // ── Quick-add (FAB) wiring ──────────────────────────────────────────────
+  'quickAdd.milestone.label': { en: 'Milestone', beanie: 'milestone' },
+  'quickAdd.milestone.hint': {
+    en: 'Capture a big moment',
+    beanie: 'capture a big moment',
+  },
+  // ── Errors ─────────────────────────────────────────────────────────────
+  'error.milestoneSaveFailed': {
+    en: "Couldn't save your milestone",
+    beanie: "couldn't save your milestone",
+  },
+  'error.milestoneSaveFailedHelp': {
+    en: 'Check your connection and try again. Support has been notified.',
+    beanie: 'check your connection and try again. support has been notified.',
+  },
+  // ── Scrapbook chip filter ──────────────────────────────────────────────
+  'scrapbook.chip.milestones': { en: 'Milestones', beanie: 'milestones' },
+  'scrapbook.add': { en: 'Add to scrapbook', beanie: 'add to scrapbook' },
+  // ── Scrapbook spreads (v3 redesign — tabbed scrapbook of spreads) ──────
+  'scrapbook.spine.everyone': { en: 'Everyone', beanie: 'everyone' },
+  'scrapbook.everyone.title': {
+    en: 'Our family scrapbook',
+    beanie: 'our family scrapbook',
+  },
+  'scrapbook.everyone.familyMoments': {
+    en: 'Family moments',
+    beanie: 'family moments',
+  },
+  'scrapbook.everyone.lately': {
+    en: "What's happening lately",
+    beanie: "what's happening lately",
+  },
+  'scrapbook.everyone.empty': {
+    en: 'no scraps yet — tap + to add the first one',
+    beanie: 'no scraps yet — tap + to add the first one',
+  },
+  'scrapbook.bean.empty': {
+    en: 'no scraps yet for {name} — tap + to start',
+    beanie: 'no scraps yet for {name} — tap + to start',
+  },
+  'scrapbook.bean.subtitle.age': { en: 'age {age}', beanie: 'age {age}' },
+  'scrapbook.bean.subtitle.joined': { en: 'joined {year}', beanie: 'joined {year}' },
+  'scrapbook.bean.subtitle.both': {
+    en: 'age {age} · joined {year}',
+    beanie: 'age {age} · joined {year}',
+  },
+  'scrapbook.section.sayings': { en: 'Things they say', beanie: 'things they say' },
+  'scrapbook.section.favorites': { en: 'Favorites', beanie: 'favorites' },
+  'scrapbook.section.milestones': { en: 'Big moments', beanie: 'big moments' },
+  'scrapbook.section.notes': { en: 'About them', beanie: 'about them' },
+  'scrapbook.seeAll': { en: 'see all →', beanie: 'see all →' },
   // ── Medication administration log ────────────────────────────────────────
   // Log-entry creation, undo, confirmation, and delete strings.
   // Brand voice: friendly + factual. Heritage Orange for the confirm variant,
@@ -3983,6 +4129,7 @@ const STRING_DEFS = {
   'mobileNav.hint.assets': { en: 'home, cars, and more', beanie: 'home, cars, and more' },
   'mobileNav.hint.meetBeans': { en: 'everyone in the pod', beanie: 'everyone in the pod' },
   'mobileNav.hint.scrapbook': { en: 'photos & memories', beanie: 'photos & memories' },
+  'mobileNav.hint.milestones': { en: 'big moments by year', beanie: 'big moments by year' },
   'mobileNav.hint.cookbook': { en: 'family recipes', beanie: 'family recipes' },
   'mobileNav.hint.safety': { en: 'meds, allergies, doses', beanie: 'meds, allergies, doses' },
   'mobileNav.hint.contacts': { en: 'contacts & info', beanie: 'contacts & info' },
@@ -5542,6 +5689,10 @@ const STRING_DEFS = {
     beanie: "couldn't upload photo — try again",
   },
   'photos.addPhotos': { en: 'Add Photos', beanie: 'add photos' },
+  'photos.attachAfterSave': {
+    en: 'Save first, then add photos when editing.',
+    beanie: 'save first, then add photos when editing.',
+  },
   'photos.noPhotos': { en: 'No photos yet', beanie: 'no photos yet' },
   'photos.uploading': { en: 'Uploading…', beanie: 'counting beans\u2026' },
   'photos.uploadFailed': {
