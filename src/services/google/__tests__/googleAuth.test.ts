@@ -55,6 +55,10 @@ describe('googleAuth (PKCE)', () => {
     // discards the module — otherwise stale listeners from prior modules
     // accumulate on `document` and trigger spurious refresh calls.
     googleAuth?.__resetWakeListenerForTesting?.();
+    // Restore real timers in case a test set fake timers and exited before
+    // restoring them (assertion failure mid-test). Without this, subsequent
+    // tests that use real setTimeout hang forever.
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -493,7 +497,7 @@ describe('googleAuth (PKCE)', () => {
       vi.unstubAllEnvs();
     }, 10_000);
 
-    it('fires onTokenPermanentlyExpired ONLY on invalid_grant', async () => {
+    it('fires onTokenPermanentlyExpired immediately on invalid_grant — but NOT on a single retry-exhausted transient failure', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
@@ -508,7 +512,8 @@ describe('googleAuth (PKCE)', () => {
       const { refreshAccessToken } = await import('../oauthProxy');
       const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
 
-      // Transient failure → permanent callback should NOT fire.
+      // ONE retry-exhausted transient failure → counter = 1 (below the
+      // escalation threshold of 3). Permanent callback should NOT fire.
       refreshFn.mockImplementationOnce(() => {
         throw new Error('Token refresh failed: network error');
       });
@@ -521,12 +526,9 @@ describe('googleAuth (PKCE)', () => {
       await googleAuth.attemptSilentRefresh();
       expect(permanentSpy).not.toHaveBeenCalled();
 
-      // invalid_grant → permanent callback SHOULD fire. The previous
-      // attempt cleared currentFamilyId-scoped state but did NOT
-      // permanently null refreshToken (transient path), so we can call
-      // attemptSilentRefresh again directly.
-      // Re-prime in-memory refreshToken via initializeAuth, since the
-      // transient path may have left it intact but we want a clean slate.
+      // invalid_grant → permanent callback SHOULD fire immediately, no
+      // counter waiting. Re-prime in-memory refreshToken via initializeAuth
+      // for a clean slate (the transient path above leaves it intact).
       (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
         'stored-refresh-token'
       );
@@ -539,6 +541,121 @@ describe('googleAuth (PKCE)', () => {
 
       vi.unstubAllEnvs();
     }, 10_000);
+
+    it('escalates to onTokenPermanentlyExpired after N consecutive retry-exhausted failures', async () => {
+      // Models the bug greg hit: silent refresh kept failing for transient
+      // reasons (proxy hiccup, mobile-network jitter) without ever getting
+      // classified as `invalid_grant`. The auth-transient classification
+      // suppressed all UI signals and the user had to discover the dead
+      // state manually via Settings. The escalation threshold turns a
+      // streak of soft failures into the same permanent-failure signal.
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        'stored-refresh-token'
+      );
+      await googleAuth.initializeAuth('family-123');
+
+      const permanentSpy = vi.fn();
+      googleAuth.onTokenPermanentlyExpired(permanentSpy);
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+      const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
+      // Queue 12 transient throws — 4 attempts × 3 retries each. `Once`
+      // variants don't leak past their consumed call; `mockImplementation`
+      // (without Once) would persist to subsequent tests since vi.mock
+      // factory state isn't reset by `vi.restoreAllMocks` / `resetModules`.
+      const queueTransientThrow = () =>
+        refreshFn.mockImplementationOnce(() => {
+          throw new Error('Token refresh failed: network error');
+        });
+      for (let i = 0; i < 12; i++) queueTransientThrow();
+
+      // Use vi.useFakeTimers to skip the 1.5s + 3s backoff between retries;
+      // otherwise this test would take ~14 real seconds.
+      vi.useFakeTimers();
+
+      // Calls 1 + 2 — counter goes 1, 2. No callback yet.
+      for (let i = 0; i < 2; i++) {
+        const p = googleAuth.attemptSilentRefresh();
+        await vi.advanceTimersByTimeAsync(5000); // backoff is 1.5+3s; bounded so the ~55min auto-refresh timer (set on success) doesn't also fire
+        expect(await p).toBeNull();
+        expect(permanentSpy).not.toHaveBeenCalled();
+      }
+
+      // Call 3 — counter = 3, threshold crossed, callback fires exactly once.
+      const p3 = googleAuth.attemptSilentRefresh();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(await p3).toBeNull();
+      expect(permanentSpy).toHaveBeenCalledTimes(1);
+
+      // Call 4 — counter = 4, past threshold (`===` check). Should NOT fire
+      // again; subscribers are idempotent but we still avoid noisy re-fires.
+      const p4 = googleAuth.attemptSilentRefresh();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(await p4).toBeNull();
+      expect(permanentSpy).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    });
+
+    it('resets the consecutive-failure counter on a successful refresh', async () => {
+      // Two failures, then a success, then two more failures should NOT
+      // trip the escalation threshold — the counter must reset on success
+      // so a recovered transient blip doesn't permanently sit at N-1 and
+      // promote the next single failure to a banner.
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        'stored-refresh-token'
+      );
+      await googleAuth.initializeAuth('family-123');
+
+      const permanentSpy = vi.fn();
+      googleAuth.onTokenPermanentlyExpired(permanentSpy);
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+      const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
+      // Use Once-variants so the override doesn't leak past this test —
+      // `mockImplementation` (without Once) persists across `resetModules`
+      // and pollutes downstream tests in this file.
+      const queueTransientThrow = () =>
+        refreshFn.mockImplementationOnce(() => {
+          throw new Error('Token refresh failed: network error');
+        });
+
+      vi.useFakeTimers();
+
+      // Two retry-exhausted failures (counter = 2). 6 throws cover both.
+      for (let i = 0; i < 6; i++) queueTransientThrow();
+      for (let i = 0; i < 2; i++) {
+        const p = googleAuth.attemptSilentRefresh();
+        await vi.advanceTimersByTimeAsync(5000); // backoff is 1.5+3s; bounded so the ~55min auto-refresh timer (set on success) doesn't also fire
+        await p;
+      }
+      expect(permanentSpy).not.toHaveBeenCalled();
+
+      // One successful refresh — counter resets to 0. Queue is empty, so
+      // the next call falls through to the factory's default success impl.
+      const ok = await googleAuth.attemptSilentRefresh();
+      expect(ok).toBe('mock-refreshed-token');
+
+      // Two more retry-exhausted failures. Counter is now 2 again, NOT 4.
+      // Permanent callback must still not have fired.
+      for (let i = 0; i < 6; i++) queueTransientThrow();
+      for (let i = 0; i < 2; i++) {
+        const p = googleAuth.attemptSilentRefresh();
+        await vi.advanceTimersByTimeAsync(5000);
+        await p;
+      }
+      expect(permanentSpy).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    });
   });
 
   describe('getValidTokenSilent (banner-firing contract)', () => {
