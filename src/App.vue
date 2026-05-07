@@ -961,13 +961,6 @@ watch(
     <!-- PWA banners -->
     <OfflineBanner />
 
-    <!-- Save failure banner (non-dismissable, shows when 3+ saves fail) -->
-    <SaveFailureBanner
-      :show="syncStore.showSaveFailureBanner && !authStore.needsAuth"
-      :file-not-found="syncStore.driveFileNotFound"
-      @reconnected="handleGoogleReconnected"
-    />
-
     <!-- Bottom-right toast stack -->
     <div
       class="fixed right-4 bottom-4 z-[200] flex flex-col items-end gap-3 md:right-6 md:bottom-6"
@@ -1229,6 +1222,21 @@ watch(
       <AppSidebar v-if="isDesktop" />
 
       <div class="flex min-w-0 flex-1 flex-col">
+        <!--
+          Inline-flow banner at the top of the column. Renders above
+          AppHeader so it pushes the header down rather than overlapping
+          it (matters for standalone PWAs where there's no browser
+          chrome refresh button to fall back on). Suppressed when the
+          GoogleReconnectToast is up — the toast is the canonical
+          surface for permanent expiry; rolled up via
+          `shouldShowSaveFailureBanner` in syncStore.
+        -->
+        <SaveFailureBanner
+          :show="syncStore.shouldShowSaveFailureBanner && !authStore.needsAuth"
+          :file-not-found="syncStore.driveFileNotFound"
+          @reconnected="handleGoogleReconnected"
+        />
+
         <AppHeader @toggle-menu="isMenuOpen = !isMenuOpen" />
 
         <main

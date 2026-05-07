@@ -8,6 +8,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-07
+
+### Fixed
+
+- **The "Your data isn't being saved" red banner no longer appears on overnight wakes when auth has already self-healed.** Root cause: when a tab woke from long idle, the access token had expired and the wake-time refresh sequence (`processRecurringItems` → debounced save) raced ahead of silent-token refresh. Three back-to-back save failures crossed the `consecutiveFailures ≥ 3` threshold and showed the banner — but silent refresh then succeeded silently, leaving the banner stuck because nothing reset the failure counter. The fix has three parts: (1) `onTokenAcquired` now triggers a `saveNow()` when the save-failure banner is up, so a successful save through the recovered token clears the banner via the existing `recordSaveSuccess` chain; (2) the banner is deferred up to 5 seconds when a silent refresh is in flight, giving recovery a fair shot before alarming the user; (3) telemetry (`save-failure-banner` events to `#beanies-errors`) classifies whether the banner fires immediately or after the deferred window, so we can tune the recovery window and catch genuine save failures separately.
+- **The save-failure banner no longer covers the AppHeader.** Previously rendered as `position: fixed top-0` at `z-[250]`, the banner physically blocked the header on standalone PWAs (where there's no browser-chrome refresh button to fall back to). It now renders inline at the top of the app shell, pushing the header down rather than overlapping it. Sidebar, mobile bottom-nav, and main scrollable area are unaffected.
+
+### Changed
+
+- **Save-failure banner CTAs simplified to a single "Refresh app" action.** "Reconnect to Google Drive" was duplicate UX — `GoogleReconnectToast` is the canonical reconnect surface and is now mutually exclusive with the banner via a new `shouldShowSaveFailureBanner` computed (true only when the banner is up AND the reconnect toast is not). "Download backup" was rare-case panic UX with a working path in Settings; removed from the banner. The new "Refresh app" button calls `hardReload()` (the canonical refresh primitive that evicts stale service-worker caches), matching the action that historically resolved the stuck-banner state in practice.
+
+---
+
 ## 2026-05-06
 
 ### Added

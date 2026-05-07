@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-06",
-    "translationCount": 2677
+    "lastUpdated": "2026-05-07",
+    "translationCount": 2674
   },
   "translations": {
     "app.name": {
@@ -4537,19 +4537,9 @@
       "lastUpdated": "2026-03-03"
     },
     "googleDrive.saveFailureBody": {
-      "translation": "最近的更改尚未保存到Google云端硬盘。重新连接以防止数据丢失。",
-      "hash": "38an7h",
-      "lastUpdated": "2026-03-01"
-    },
-    "googleDrive.saveFailureReconnect": {
-      "translation": "重新连接到Google云端硬盘",
-      "hash": "kocb5r",
-      "lastUpdated": "2026-03-03"
-    },
-    "googleDrive.downloadBackup": {
-      "translation": "下载备份",
-      "hash": "h2zeti",
-      "lastUpdated": "2026-03-03"
+      "translation": "最近的更改尚未保存到Google云端硬盘。请尝试刷新应用。",
+      "hash": "esiozw",
+      "lastUpdated": "2026-05-07"
     },
     "googleDrive.saveRetrying": {
       "translation": "保存失败—正在重试...",
@@ -11131,26 +11121,6 @@
       "hash": "h706c8",
       "lastUpdated": "2026-04-20"
     },
-    "googleDrive.downloadBackupUnavailableTitle": {
-      "translation": "目前无法准备备份",
-      "hash": "z5ngkv",
-      "lastUpdated": "2026-04-20"
-    },
-    "googleDrive.downloadBackupUnavailableBody": {
-      "translation": "您的会话密钥或Pod信封丢失。请重新连接到Google云端硬盘，然后重试。",
-      "hash": "qabze7",
-      "lastUpdated": "2026-04-20"
-    },
-    "googleDrive.downloadBackupFailedTitle": {
-      "translation": "备份下载失败",
-      "hash": "nwk2af",
-      "lastUpdated": "2026-04-20"
-    },
-    "googleDrive.downloadBackupFailedBody": {
-      "translation": "我们无法准备您的备份文件。请检查您的网络连接，然后重试。",
-      "hash": "rwttgr",
-      "lastUpdated": "2026-04-20"
-    },
     "photos.avatar.viewLarger": {
       "translation": "查看大的",
       "hash": "p1essy",
@@ -13390,6 +13360,21 @@
       "translation": "此文件包含另一个系列的加密数据。如需加入，请要求家庭所有者向您发送邀请链接。您将通过该流程设置自己的账号，无需预先输入密码。",
       "hash": "6faxdu",
       "lastUpdated": "2026-05-06"
+    },
+    "error.refreshFailed": {
+      "translation": "刷新失败",
+      "hash": "mga3pe",
+      "lastUpdated": "2026-05-07"
+    },
+    "error.refreshFailedHelp": {
+      "translation": "请尝试关闭并重新打开应用。",
+      "hash": "6nrrk",
+      "lastUpdated": "2026-05-07"
+    },
+    "googleDrive.saveFailureRefresh": {
+      "translation": "刷新应用",
+      "hash": "4m45ks",
+      "lastUpdated": "2026-05-07"
     }
   }
 }
