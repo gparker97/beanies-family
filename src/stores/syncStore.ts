@@ -16,6 +16,7 @@ import { useSayingsStore } from './sayingsStore';
 import { useMemberNotesStore } from './memberNotesStore';
 import { useAllergiesStore } from './allergiesStore';
 import { useMedicationsStore } from './medicationsStore';
+import { useMilestonesStore } from './milestonesStore';
 import { useRecipesStore } from './recipesStore';
 import { useEmergencyContactsStore } from './emergencyContactsStore';
 import { useSettingsStore } from './settingsStore';
@@ -1173,6 +1174,7 @@ export const useSyncStore = defineStore('sync', () => {
       const memberNotesStoreInst = useMemberNotesStore();
       const allergiesStoreInst = useAllergiesStore();
       const medicationsStoreInst = useMedicationsStore();
+      const milestonesStoreInst = useMilestonesStore();
       const recipesStoreInst = useRecipesStore();
       const emergencyContactsStoreInst = useEmergencyContactsStore();
 
@@ -1197,6 +1199,7 @@ export const useSyncStore = defineStore('sync', () => {
         memberNotesStoreInst.loadMemberNotes(),
         allergiesStoreInst.loadAllergies(),
         medicationsStoreInst.loadMedications(),
+        milestonesStoreInst.loadMilestones(),
         recipesStoreInst.loadRecipes(),
         emergencyContactsStoreInst.loadEmergencyContacts(),
       ]);

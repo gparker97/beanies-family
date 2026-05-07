@@ -24,7 +24,12 @@ import { computed, ref } from 'vue';
 import type { RouteLocationNormalizedLoaded } from 'vue-router';
 import router from '@/router';
 import { hasOpenOverlays } from '@/utils/overlayStack';
+import { reportError } from '@/utils/errorReporter';
+import { QUICK_ADD_ITEMS } from '@/constants/quickAddItems';
 import type { QuickAddContextKey, QuickAddItem } from '@/constants/quickAddItems';
+
+/** Action ID type — derived from QUICK_ADD_ITEMS so it's automatically up-to-date. */
+export type QuickAddAction = (typeof QUICK_ADD_ITEMS)[number]['action'];
 
 // --- Module singleton state ------------------------------------------------
 
@@ -34,6 +39,13 @@ const isOpen = ref(false);
 export type QuickAddStage = { mode: 'main' } | { mode: 'picker'; pending: QuickAddItem };
 
 const stage = ref<QuickAddStage>({ mode: 'main' });
+
+/**
+ * When set, only items whose `action` is in this list render in the sheet.
+ * Used by consolidation pages (Family Scrapbook, Family Timeline) to scope
+ * the sheet to relevant adds. Reset to `null` on every close.
+ */
+const allowedActions = ref<readonly QuickAddAction[] | null>(null);
 
 // --- History integration --------------------------------------------------
 
@@ -68,6 +80,7 @@ if (typeof window !== 'undefined') {
     if (isOpen.value) {
       isOpen.value = false;
       stage.value = { mode: 'main' };
+      allowedActions.value = null;
     }
   });
 }
@@ -83,8 +96,57 @@ if (typeof window !== 'undefined') {
  * swipe, browser back button) dismisses the sheet instead of leaving
  * the app.
  */
-export function openQuickAdd(): void {
-  if (hasOpenOverlays()) return;
+export function openQuickAdd(options?: { filter?: readonly QuickAddAction[] }): void {
+  if (hasOpenOverlays()) {
+    // Silent-fail prevention: if openQuickAdd was called but the sheet
+    // doesn't appear on screen, this is the most common cause. Surface
+    // a warning + Slack report so we can debug stuck-counter cases
+    // (e.g. a modal that mounted with `:open=true` initially but never
+    // emitted its close, leaking a body-scroll lock).
+    console.warn(
+      '[useQuickAdd] openQuickAdd blocked — another overlay is registered as open. ' +
+        'If no modal is visibly on screen, the overlay-stack counter has leaked; ' +
+        'reload the page to reset.'
+    );
+    reportError({
+      surface: 'useQuickAdd',
+      message: 'openQuickAdd blocked by overlay stack',
+    });
+    return;
+  }
+
+  // Filter normalisation. Empty arrays are caller bugs — they would render
+  // an empty sheet. In dev, surface loudly so the call site is fixed; in
+  // prod, fall back to no filter so the user still gets a usable sheet.
+  // Filter is typed against `QuickAddAction` so most typos fail at compile
+  // time; the dev-mode unknown-action guard catches dynamically-built lists.
+  const filter = options?.filter;
+  if (filter !== undefined) {
+    if (filter.length === 0) {
+      if (import.meta.env.DEV) {
+        console.error(
+          '[useQuickAdd] openQuickAdd called with empty filter — falling back to no filter'
+        );
+      }
+      reportError({
+        surface: 'useQuickAdd',
+        message: 'openQuickAdd called with empty filter',
+      });
+      allowedActions.value = null;
+    } else {
+      if (import.meta.env.DEV) {
+        const valid = new Set(QUICK_ADD_ITEMS.map((i) => i.action));
+        const unknown = filter.filter((a) => !valid.has(a));
+        if (unknown.length > 0) {
+          console.warn('[useQuickAdd] filter contains unknown actions:', unknown);
+        }
+      }
+      allowedActions.value = filter;
+    }
+  } else {
+    allowedActions.value = null;
+  }
+
   stage.value = { mode: 'main' };
   isOpen.value = true;
   pushSheetHistoryMarker();
@@ -99,6 +161,7 @@ export function closeQuickAdd(): void {
   const shouldPop = isOpen.value && hasSheetHistoryMarker();
   isOpen.value = false;
   stage.value = { mode: 'main' };
+  allowedActions.value = null;
   if (shouldPop) {
     window.history.back();
   }
@@ -114,6 +177,7 @@ export function closeQuickAdd(): void {
 function closeSheetForNavigation(): void {
   isOpen.value = false;
   stage.value = { mode: 'main' };
+  allowedActions.value = null;
 }
 
 export function toggleQuickAdd(): void {
@@ -264,6 +328,7 @@ export function useQuickAdd() {
   return {
     isOpen: computed(() => isOpen.value),
     stage: computed(() => stage.value),
+    allowedActions: computed(() => allowedActions.value),
     open: openQuickAdd,
     close: closeQuickAdd,
     toggle: toggleQuickAdd,

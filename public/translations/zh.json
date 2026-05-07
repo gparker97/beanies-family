@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-07",
-    "translationCount": 2674
+    "translationCount": 2751
   },
   "translations": {
     "app.name": {
@@ -13374,6 +13374,391 @@
     "googleDrive.saveFailureRefresh": {
       "translation": "刷新应用",
       "hash": "4m45ks",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.tab.label": {
+      "translation": "里程碑：",
+      "hash": "fv6yfx",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.addTile": {
+      "translation": "添加里程碑",
+      "hash": "8ksmge",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.empty": {
+      "translation": "还没有重要时刻",
+      "hash": "x490k",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.emptyCTA": {
+      "translation": "捕捉第一个",
+      "hash": "qq9oqb",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.addTitle": {
+      "translation": "添加里程碑",
+      "hash": "y5zu5t",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.editTitle": {
+      "translation": "编辑里程碑",
+      "hash": "u4prdm",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.field.title": {
+      "translation": "<g id=\"Bold\">课程名称</g>",
+      "hash": "1c4854",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.field.date": {
+      "translation": "更改日期",
+      "hash": "19hvy",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.field.description": {
+      "translation": "描述",
+      "hash": "xqskk",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.field.photos": {
+      "translation": "照片",
+      "hash": "viacf3",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.placeholder.title": {
+      "translation": "几句话来记住它",
+      "hash": "df0z7k",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.placeholder.description": {
+      "translation": "还有什么值得记住的……",
+      "hash": "t26a2c",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.familyPill": {
+      "translation": "科",
+      "hash": "yohf9g",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.unknownBean": {
+      "translation": "未知bean",
+      "hash": "k2l9ne",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.invalidDate": {
+      "translation": "请选择一个有效的日期",
+      "hash": "3va7ba",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.deleteConfirm.title": {
+      "translation": "删除此里程碑？",
+      "hash": "nyq1bw",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.deleteConfirm.body": {
+      "translation": "这将从时间轴和剪贴簿中删除。照片将在24小时后清理干净。",
+      "hash": "gw9yc1",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.birthday": {
+      "translation": "生日",
+      "hash": "ir5zml",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.lostTooth": {
+      "translation": "失去一颗牙齿",
+      "hash": "1v3m19",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.firstWord": {
+      "translation": "第一个字",
+      "hash": "tbyym2",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.firstStep": {
+      "translation": "第一步",
+      "hash": "tbwi2k",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.firstDaySchool": {
+      "translation": "这是开学的第一天。",
+      "hash": "7nfm4p",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.graduation": {
+      "translation": "毕业",
+      "hash": "s7u5wy",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.bigTest": {
+      "translation": "大测试",
+      "hash": "c94ovm",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.recital": {
+      "translation": "汇报",
+      "hash": "plkqnu",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.bigWin": {
+      "translation": "大奖次数",
+      "hash": "plle9o",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.newHome": {
+      "translation": "新房源",
+      "hash": "mv3ijj",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.newJob": {
+      "translation": "新岗位",
+      "hash": "d0dekj",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.newPet": {
+      "translation": "新宠物",
+      "hash": "d0dach",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.newLittleBean": {
+      "translation": "New Little Bean",
+      "hash": "1z0zra",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.wedding": {
+      "translation": "婚礼日 ,结婚纪念日",
+      "hash": "578034",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.anniversary": {
+      "translation": "每年",
+      "hash": "c0ya28",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.bigTrip": {
+      "translation": "大型旅程",
+      "hash": "c94y9x",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.license": {
+      "translation": "许可证",
+      "hash": "uadhk1",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.cat.custom": {
+      "translation": "自定义里程碑",
+      "hash": "95n24h",
+      "lastUpdated": "2026-05-07"
+    },
+    "quickAdd.milestone.label": {
+      "translation": "节点",
+      "hash": "fizj2o",
+      "lastUpdated": "2026-05-07"
+    },
+    "quickAdd.milestone.hint": {
+      "translation": "捕捉重要时刻",
+      "hash": "agwf7d",
+      "lastUpdated": "2026-05-07"
+    },
+    "error.milestoneSaveFailed": {
+      "translation": "无法保存您的里程碑",
+      "hash": "xm5jls",
+      "lastUpdated": "2026-05-07"
+    },
+    "error.milestoneSaveFailedHelp": {
+      "translation": "请检查您的网络连接，然后重试。客服已收到通知。",
+      "hash": "jagmnk",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.chip.milestones": {
+      "translation": "里程碑：",
+      "hash": "fv6yfx",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.add": {
+      "translation": "添加到剪贴簿",
+      "hash": "84fmc",
+      "lastUpdated": "2026-05-07"
+    },
+    "photos.attachAfterSave": {
+      "translation": "先保存，然后在编辑时添加照片。",
+      "hash": "ytyhuq",
+      "lastUpdated": "2026-05-07"
+    },
+    "nav.pod.milestones": {
+      "translation": "家庭里程碑",
+      "hash": "57bnlr",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestones.pageTitle": {
+      "translation": "里程碑：",
+      "hash": "fv6yfx",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestones.pageSubtitle": {
+      "translation": "年复一年的重要时刻",
+      "hash": "5y8zrq",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestones.empty": {
+      "translation": "还没有重要时刻",
+      "hash": "x490k",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestones.emptyHint": {
+      "translation": "轻触“+”以捕获第一个。",
+      "hash": "idsbjg",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestones.filter.beans": {
+      "translation": "豆荚",
+      "hash": "124zhf",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestones.filter.categories": {
+      "translation": "类别",
+      "hash": "gmcc04",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestones.filter.includeFamilyWide": {
+      "translation": "包括全家人的美好时光",
+      "hash": "n21ajt",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestones.filter.allBeans": {
+      "translation": "所有豆类",
+      "hash": "1ksles",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestones.filter.allCategories": {
+      "translation": "所有类别",
+      "hash": "99mbrv",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestones.add": {
+      "translation": "添加里程碑",
+      "hash": "8ksmge",
+      "lastUpdated": "2026-05-07"
+    },
+    "mobileNav.hint.milestones": {
+      "translation": "每年的重要时刻",
+      "hash": "82zyc9",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.field.for": {
+      "translation": "对于",
+      "hash": "1ind",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.field.milestone": {
+      "translation": "节点",
+      "hash": "fizj2o",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.familyChip": {
+      "translation": "科",
+      "hash": "yohf9g",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.addPhotos": {
+      "translation": "添加图片",
+      "hash": "6w22v4",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.addPhotosHint": {
+      "translation": "先挑一颗豆子，然后随时添加照片。",
+      "hash": "2odd5u",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.group.firsts": {
+      "translation": "Firsts",
+      "hash": "ysz6jn",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.group.achievements": {
+      "translation": "成就",
+      "hash": "opil6k",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.group.family": {
+      "translation": "家庭活动",
+      "hash": "xm1phx",
+      "lastUpdated": "2026-05-07"
+    },
+    "milestone.group.celebrations": {
+      "translation": "庆祝活动",
+      "hash": "lsfeg9",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.spine.everyone": {
+      "translation": "所有人",
+      "hash": "5qdaq3",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.everyone.empty": {
+      "translation": "还没有废料—点击+添加第一个",
+      "hash": "35zko",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.bean.empty": {
+      "translation": "{name}还没有碎片—点击+开始",
+      "hash": "libxjq",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.bean.subtitle.age": {
+      "translation": "年龄{age}",
+      "hash": "62wvzs",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.bean.subtitle.joined": {
+      "translation": "已于{year}加入",
+      "hash": "ntwv7o",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.bean.subtitle.both": {
+      "translation": "年龄{age} ·已加入{year}",
+      "hash": "skri97",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.section.sayings": {
+      "translation": "他们说的话",
+      "hash": "d7rycy",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.section.favorites": {
+      "translation": "收藏",
+      "hash": "3m84dz",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.section.milestones": {
+      "translation": "重要时刻",
+      "hash": "yunob1",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.section.notes": {
+      "translation": "关于他们",
+      "hash": "fd5pg1",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.seeAll": {
+      "translation": "閱讀所有",
+      "hash": "lrjeii",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.everyone.familyMoments": {
+      "translation": "家庭时光",
+      "hash": "7tbtbd",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.everyone.lately": {
+      "translation": "最近发生了什么",
+      "hash": "gdvk2r",
+      "lastUpdated": "2026-05-07"
+    },
+    "scrapbook.everyone.title": {
+      "translation": "我们的家庭剪贴簿",
+      "hash": "cg8u7m",
       "lastUpdated": "2026-05-07"
     }
   }
