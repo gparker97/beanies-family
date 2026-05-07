@@ -570,6 +570,13 @@ input[type='time']::-webkit-calendar-picker-indicator:hover {
   background-image:
     radial-gradient(circle at 18% 12%, rgb(241 93 34 / 4%), transparent 42%),
     radial-gradient(circle at 82% 64%, rgb(174 214 241 / 6%), transparent 40%);
+
+  /* Clip the visual overflow from rotated entry cards (every card carries an
+     inline `transform: rotate(±X deg)` for the scrapbook tilt effect) and
+     from the rotateY(±65deg) page-flip transition. `clip` rather than
+     `hidden` so we don't create a horizontal scroll context — keeps sticky
+     ancestors (AppHeader) working. */
+  overflow-x: clip;
   position: relative;
 }
 

@@ -51,13 +51,38 @@ type ExpiryCallback = () => void;
 const expiryCallbacks: ExpiryCallback[] = [];
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-// Permanent-failure callbacks — fire ONLY when `performSilentRefresh`
-// detects an `invalid_grant` (refresh token revoked by Google or the user
-// at accounts.google.com). This is the only legitimate trigger for the
-// reconnect banner: the user MUST re-auth interactively because we have
-// no recoverable credential. Subscribers should be idempotent.
+// Permanent-failure callbacks — fire when the silent-refresh path is no
+// longer recoverable on its own. Two trigger conditions:
+//
+//   1. `invalid_grant` — refresh token revoked by Google or the user at
+//      accounts.google.com. Definitive, fires immediately.
+//   2. Retry-exhaustion streak — `SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD`
+//      consecutive `attemptSilentRefresh` calls have failed after exhausting
+//      their internal 3-attempt retry budget. Catches the case where each
+//      individual failure looks transient (network/5xx/proxy hiccup) but the
+//      system as a whole isn't recovering — without this, the reconnect
+//      surface never appears and the user has to discover the dead state
+//      manually via Settings.
+//
+// Subscribers should be idempotent. Counter resets on any successful token
+// acquisition (silent or interactive) via `notifyTokenAcquired`, and the
+// reconnect surface auto-clears via the existing `onTokenAcquired` self-heal
+// path — so a recovered transient blip doesn't leave a stale banner.
 type PermanentFailureCallback = () => void;
 const permanentFailureCallbacks: PermanentFailureCallback[] = [];
+
+let consecutiveSilentRefreshFailures = 0;
+const SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD = 3;
+
+function firePermanentFailureCallbacks(): void {
+  permanentFailureCallbacks.forEach((cb) => {
+    try {
+      cb();
+    } catch (err) {
+      console.warn('[googleAuth] Permanent-failure callback error:', err);
+    }
+  });
+}
 
 // Token-acquisition callbacks. Fires after every successful access-token
 // acquisition (popup, silent refresh, redirect). Subscribers receive the
@@ -623,16 +648,7 @@ async function performSilentRefresh(): Promise<string | null> {
         if (currentFamilyId) {
           await clearGoogleRefreshToken(currentFamilyId);
         }
-        // Fire permanent-failure subscribers — this is the single
-        // legitimate trigger for the reconnect banner. Wrap each in
-        // try/catch so one bad subscriber can't starve the others.
-        permanentFailureCallbacks.forEach((cb) => {
-          try {
-            cb();
-          } catch (err) {
-            console.warn('[googleAuth] Permanent-failure callback error:', err);
-          }
-        });
+        firePermanentFailureCallbacks();
         return null;
       }
 
@@ -646,7 +662,23 @@ async function performSilentRefresh(): Promise<string | null> {
         continue;
       }
 
-      console.warn(`[googleAuth] Silent refresh failed after ${MAX_ATTEMPTS} attempts: ${message}`);
+      // All retries exhausted. Increment the consecutive-failure counter;
+      // when the threshold is crossed, escalate to permanent-failure even
+      // though no individual attempt was classified as `invalid_grant`. The
+      // user's experience of "silent refresh keeps failing forever" is the
+      // same regardless of cause, and the reconnect surface auto-clears
+      // when a later refresh succeeds via the `notifyTokenAcquired` path.
+      consecutiveSilentRefreshFailures++;
+      console.warn(
+        `[googleAuth] Silent refresh failed after ${MAX_ATTEMPTS} attempts ` +
+          `(consecutive: ${consecutiveSilentRefreshFailures}/${SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD}): ${message}`
+      );
+      if (consecutiveSilentRefreshFailures === SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD) {
+        console.warn(
+          '[googleAuth] Escalating to permanent failure — silent refresh has not recovered'
+        );
+        firePermanentFailureCallbacks();
+      }
       return null;
     }
   }
@@ -712,15 +744,17 @@ export async function getValidToken(): Promise<string> {
  * polling, recurring refreshes, the wake-time stale-tab refresh).
  *
  * **Banner-firing contract:** the reconnect banner is wired to
- * `onTokenPermanentlyExpired` only — it fires when Google has actually
- * revoked our refresh token (`invalid_grant`), not on transient network
- * blips, brief 5xx, or mid-SW-activation hiccups. Callers that catch
- * `TokenExpiredError` should treat it as "try again later" — the banner
- * will surface on its own if the failure is permanent. The next
- * successful silent refresh (auto-fired on `visibilitychange` via
+ * `onTokenPermanentlyExpired`, which fires in two cases: (1) Google has
+ * revoked the refresh token (`invalid_grant`), or (2) silent refresh
+ * has failed `SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD` consecutive
+ * times — the system isn't recovering on its own and the user needs a
+ * way to re-authenticate. Single transient blips (network jitter, brief
+ * 5xx, mid-SW-activation hiccups) do NOT fire the banner; callers that
+ * catch `TokenExpiredError` should treat it as "try again later". The
+ * next successful silent refresh (auto-fired on `visibilitychange` via
  * `installAuthWakeListener`, or by the next caller through
- * `attemptSilentRefresh`) will clear any banner that did appear via
- * the `onTokenAcquired` self-heal path.
+ * `attemptSilentRefresh`) clears any banner that did appear via the
+ * `onTokenAcquired` self-heal path AND resets the failure counter.
  *
  * Why this exists: an unsolicited popup that opens because we couldn't
  * silently refresh is the worst kind of UX — it appears without any
@@ -863,6 +897,11 @@ export function onTokenAcquired(callback: AcquiredCallback): () => void {
  * one bad subscriber must not break others.
  */
 async function notifyTokenAcquired(token: string, interactive: boolean): Promise<void> {
+  // Any successful acquisition — silent refresh, popup, redirect — breaks
+  // the silent-refresh failure streak. Reset before subscribers run so any
+  // future refresh failure starts counting fresh from 0.
+  consecutiveSilentRefreshFailures = 0;
+
   if (acquiredCallbacks.length === 0) return;
   const email = await fetchGoogleUserEmail(token);
   for (const cb of acquiredCallbacks) {
@@ -881,6 +920,7 @@ function clearTokenState(): void {
   expiresAt = 0;
   refreshToken = null;
   cachedEmail = null;
+  consecutiveSilentRefreshFailures = 0;
 
   // Clean up legacy localStorage token (from GIS flow)
   try {
