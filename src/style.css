@@ -37,16 +37,20 @@
 :root {
   color-scheme: light;
 
-  --color-primary: #f15d22;
-  --color-primary-dark: #d14d1a;
+  /* Legacy single-stop aliases — derive from the brand scale defined in
+     `packages/brand/theme.css` (`--color-primary-500` etc.) so brand-color
+     updates land in one place. Resolved values are visually identical to
+     the previous hardcoded hexes (#f15d22 / #d14d1a / #2c3e50). */
+  --color-primary: var(--color-primary-500);
+  --color-primary-dark: var(--color-primary-600);
 
   /* Heritage Orange — brand alias for `--color-primary`. Components that
      reference `var(--heritage-orange)` (with or without a fallback) read
      this name; many call sites historically used it without a fallback,
      so it must be globally defined. Same hex in dark mode (brand color
      is constant). */
-  --heritage-orange: #f15d22;
-  --color-secondary: #2c3e50;
+  --heritage-orange: var(--color-primary-500);
+  --color-secondary: var(--color-secondary-500);
   --color-success: #22c55e;
   --color-warning: #e67e22;
   --color-danger: #ef4444;
@@ -355,11 +359,6 @@
   transform: translateY(-2px);
 }
 
-/* Nook card dark-mode background (shared across nook widgets) */
-.dark .nook-card-dark {
-  background: rgb(30 41 59) !important;
-}
-
 /* Reduced motion: disable all beanie animations */
 @media (prefers-reduced-motion: reduce) {
   .animate-beanie-bounce,
@@ -371,7 +370,8 @@
   .animate-beanie-spring-in,
   .beanie-sync-in,
   .beanie-sync-pulse,
-  .animate-beanie-shimmer {
+  .animate-beanie-shimmer,
+  .attention-pulse {
     animation: none !important;
   }
 
@@ -396,109 +396,110 @@
   }
 }
 
-/* ─── Base styles ───────────────────────────────────────────────────────── */
-html,
-body {
-  overscroll-behavior: none;
-}
+/* ─── Base styles ───────────────────────────────────────────────────────── *
+ * All declarations live inside `@layer base` so utility classes
+ * (`font-caveat`, `bg-white`, etc.) can override per element. Unlayered
+ * CSS otherwise beats layered utilities in cascade-layer order — which is
+ * what silently broke `font-caveat` on `<h2>` headings before the fix.
+ * Multiple `@layer base { }` blocks are valid (they merge into one layer);
+ * grouped near related context for discoverability.
+ * ─────────────────────────────────────────────────────────────────────── */
 
-body {
-  background-color: var(--color-background);
-  color: var(--color-text);
-  font-family:
-    Inter,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-  margin: 0;
-  min-height: 100vh;
-}
-
-/* Outfit for headings and financial values. Lives in @layer base so
- * utility classes (e.g. `font-caveat` for handwritten accents) can
- * override per element. Unlayered CSS otherwise beats layered utilities
- * in the cascade-layer order, which silently breaks `font-caveat` on
- * any heading element. */
 @layer base {
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-inter);
+    margin: 0;
+    min-height: 100vh;
+  }
+
   h1,
   h2,
   h3 {
     font-family: Outfit, sans-serif;
   }
+
+  #app {
+    min-height: 100vh;
+  }
 }
 
-#app {
-  min-height: 100vh;
-}
+/* ─── Themed form input (reusable class for date, time, textarea) ──────── *
+ * Wrapped in @layer base so utility classes can override per element —
+ * same cascade-layer reasoning as the body / heading rules above.
+ * ─────────────────────────────────────────────────────────────────────── */
+@layer base {
+  .beanies-input {
+    appearance: none;
+    background-color: white;
+    border: 1px solid #d1d5db;
+    border-radius: 0.75rem;
+    color: #111827;
+    font-size: 0.875rem;
+    outline: none;
+    padding: 0.5rem 0.75rem;
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s;
+  }
 
-/* ─── Themed form input (reusable class for date, time, textarea) ──────── */
-.beanies-input {
-  appearance: none;
-  background-color: white;
-  border: 1px solid #d1d5db;
-  border-radius: 0.75rem;
-  color: #111827;
-  font-size: 0.875rem;
-  outline: none;
-  padding: 0.5rem 0.75rem;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-}
+  .beanies-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-sky-silk-100, #daeef9);
+  }
 
-.beanies-input:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px var(--color-sky-silk-100, #daeef9);
-}
+  .dark .beanies-input {
+    background-color: rgb(30 41 59);
+    border-color: rgb(71 85 105);
+    color: #f3f4f6;
+  }
 
-.dark .beanies-input {
-  background-color: rgb(30 41 59);
-  border-color: rgb(71 85 105);
-  color: #f3f4f6;
-}
+  .dark .beanies-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgb(241 93 34 / 20%);
+  }
 
-.dark .beanies-input:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgb(241 93 34 / 20%);
-}
+  /* Native select theming */
+  select.beanies-input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1rem;
+    cursor: pointer;
+    padding-right: 2rem;
+  }
 
-/* ─── Native select theming ───────────────────────────────────────────── */
-select.beanies-input {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
-  background-position: right 0.5rem center;
-  background-repeat: no-repeat;
-  background-size: 1rem;
-  cursor: pointer;
-  padding-right: 2rem;
-}
+  /* Date / time picker theming */
+  input[type='date'],
+  input[type='time'] {
+    accent-color: var(--color-primary, #f15d22);
+    font-family: Outfit, sans-serif;
+  }
 
-/* ─── Date / time picker theming ──────────────────────────────────────── */
-input[type='date'],
-input[type='time'] {
-  accent-color: var(--color-primary, #f15d22);
-  font-family: Outfit, sans-serif;
-}
+  input[type='date']::-webkit-calendar-picker-indicator,
+  input[type='time']::-webkit-calendar-picker-indicator {
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.6;
+    padding: 2px;
+    transition: opacity 0.15s;
+  }
 
-input[type='date']::-webkit-calendar-picker-indicator,
-input[type='time']::-webkit-calendar-picker-indicator {
-  border-radius: 4px;
-  cursor: pointer;
-  opacity: 0.6;
-  padding: 2px;
-  transition: opacity 0.15s;
-}
+  input[type='date']::-webkit-calendar-picker-indicator:hover,
+  input[type='time']::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
 
-input[type='date']::-webkit-calendar-picker-indicator:hover,
-input[type='time']::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
-}
-
-.dark input[type='date']::-webkit-calendar-picker-indicator,
-.dark input[type='time']::-webkit-calendar-picker-indicator {
-  filter: invert(1);
+  .dark input[type='date']::-webkit-calendar-picker-indicator,
+  .dark input[type='time']::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
 }
 
 /* ───── Shared Card Entry Animation ───── */
@@ -514,17 +515,21 @@ input[type='time']::-webkit-calendar-picker-indicator:hover {
   }
 }
 
-/* Chromium-based date picker popup (Chrome 131+) */
-@supports selector(::picker(select)) {
-  input[type='date']::picker(select),
-  input[type='time']::picker(select) {
-    color-scheme: light;
-    font-family: Outfit, Inter, sans-serif;
-  }
+/* Chromium-based date picker popup (Chrome 131+).
+ * @supports nested INSIDE @layer base — keeps everything in one
+ * layer-tracking context for future maintainers; one less nesting level. */
+@layer base {
+  @supports selector(::picker(select)) {
+    input[type='date']::picker(select),
+    input[type='time']::picker(select) {
+      color-scheme: light;
+      font-family: Outfit, Inter, sans-serif;
+    }
 
-  .dark input[type='date']::picker(select),
-  .dark input[type='time']::picker(select) {
-    color-scheme: dark;
+    .dark input[type='date']::picker(select),
+    .dark input[type='time']::picker(select) {
+      color-scheme: dark;
+    }
   }
 }
 

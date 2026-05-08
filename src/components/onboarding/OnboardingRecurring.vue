@@ -315,3 +315,23 @@ function formatFrequency(freq: RecurringFrequency): string {
     </div>
   </OnboardingStepShell>
 </template>
+
+<style scoped>
+/* BaseSelect background overrides — moved here from onboarding-shared.css
+ * (global) so Vue's scoped-style [data-v] specificity boost retires the
+ * previous !important workaround. Light + dark mode mirror onboarding's
+ * other input surfaces. */
+.ob-account-select :deep(select) {
+  background: white;
+  border-color: rgb(44 62 80 / 8%);
+  box-shadow: 0 1px 4px rgb(44 62 80 / 4%);
+  font-family: Outfit, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+:global(.dark) .ob-account-select :deep(select) {
+  background: #243342;
+  border-color: rgb(255 255 255 / 8%);
+}
+</style>

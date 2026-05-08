@@ -549,12 +549,15 @@ async function deleteCompletedGoal(id: string) {
                 :class="{ 'blur-sm': !isUnlocked }"
               >
                 <div
-                  class="progress-fill from-primary-500 to-terracotta-500 h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out"
-                  :class="{
-                    'progress-fill-green': goal.isCompleted,
-                    'progress-fill-glowing':
-                      goalsStore.getGoalProgress(goal) >= 75 && !goal.isCompleted,
-                  }"
+                  class="progress-fill h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out"
+                  :class="[
+                    goal.isCompleted
+                      ? 'from-green-500 to-emerald-500'
+                      : 'from-primary-500 to-terracotta-500',
+                    goalsStore.getGoalProgress(goal) >= 75 &&
+                      !goal.isCompleted &&
+                      'progress-fill-glowing',
+                  ]"
                   :style="{
                     width: progressMounted ? `${goalsStore.getGoalProgress(goal)}%` : '0%',
                   }"
@@ -868,11 +871,11 @@ async function deleteCompletedGoal(id: string) {
   color: var(--heritage-orange);
 }
 
-/* ───── Progress Glow ───── */
-.progress-fill-green {
-  background: linear-gradient(90deg, #27ae60, #2ecc71) !important;
-}
-
+/* ───── Progress Glow ─────
+ * Goal-completed gradient now lives on the element via Tailwind's
+ * `from-green-500 to-emerald-500` utilities (toggled in :class binding
+ * above). No custom CSS rule + !important needed.
+ */
 .progress-fill-glowing {
   position: relative;
 }
