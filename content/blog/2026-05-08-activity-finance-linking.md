@@ -5,20 +5,19 @@ date: 2026-05-08
 category: use-case
 coverImage: /blog/activity-finance-linking.png
 excerpt: 'your family married to your finances (with apologies to lin-manuel miranda).'
+subtitle: 'your family married to your finances (with apologies to lin-manuel miranda)'
 featured: true
 author: greg
 draft: false
 ---
 
-_your family married to your finances (with apologies to lin-manuel miranda)_
-
 As Thomas Jefferson said to James Madison after Hamilton spent an entire song reminiscing about his son Phillip, can we get back to **beanies**? I'm paraphrasing of course. (Apologies to the non-_Hamilton_ fans out there. By the way, how can you not like _Hamilton_?! But that's a topic for another post, I guess.)
 
-Sorry about last week's post. I honestly didn't mean to write that, it just sort of happened.
+I want to apologize for last week's post. I honestly didn't mean to write that, it just sort of happened.
 
 From time to time, I may get the urge to write about my family, or vibe coding (a term that seems to be falling out of favor lately), or just technology in general.
 
-From now on, I'll try to avoid ambushing my precious Substack subscribers with sad, emotionally heavy memoirs just as you were sitting down with your morning coffee, probably getting ready to enjoy a light read. I'll try, but I can't promise I'll succeed.
+From now on though, I'll try to avoid ambushing my precious Substack subscribers with sad, emotionally heavy memoirs just as you were sitting down with your morning coffee, probably getting ready to enjoy a light read. I'll try, but I can't promise I'll succeed.
 
 Maybe if it happens again, I'll post a warning.
 
