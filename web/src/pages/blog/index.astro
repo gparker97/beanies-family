@@ -577,7 +577,22 @@ const latestDate = byDateDesc[0]?.data.date;
     margin: 0 auto 56px;
     max-width: 980px;
   }
-  .issue-featured .issue-media { aspect-ratio: auto; height: 100%; min-height: 340px; }
+  /* Bound the media height so a portrait/screenshot cover image can't
+     stretch the entire card to the image's natural height. The 16:10
+     aspect ratio matches back-issue cards, the max-height clamps the
+     extreme case, and `object-fit: contain` (override below) means
+     portrait images render in full inside the kraft frame as a polaroid
+     mat — no top/bottom hard-crop that would lose annotated content. */
+  .issue-featured .issue-media {
+    aspect-ratio: 16 / 10;
+    height: auto;
+    max-height: 480px;
+    min-height: 0;
+  }
+  .issue-featured .issue-media-frame img {
+    object-fit: contain;
+    object-position: center;
+  }
   .issue-featured .issue-body {
     display: flex;
     flex-direction: column;
