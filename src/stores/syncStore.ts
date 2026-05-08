@@ -40,6 +40,7 @@ import {
   onTokenAcquired,
   fetchGoogleUserEmail,
   isSilentRefreshPending,
+  isTokenValid,
 } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
 import type { SaveFailureLevel } from '@/services/sync/syncService';
@@ -126,20 +127,65 @@ export const useSyncStore = defineStore('sync', () => {
     () => showSaveFailureBanner.value && !showGoogleReconnect.value
   );
 
+  // ─── Deferred-action primitive (shared by save-failure-banner and cold-start escalation) ──
+  //
+  // Why a factory: there are two timer-based deferrals in this store with
+  // identical semantics — schedule once, cancel on recovery, re-check
+  // condition at fire time. Inlining each one diverges over time. One
+  // primitive, two named consumers below.
+  type DeferredAction = {
+    schedule: (action: () => void) => void;
+    cancel: () => void;
+    readonly isScheduled: boolean;
+  };
+
+  function createDeferredAction(deferMs: number): DeferredAction {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    return {
+      schedule(action) {
+        if (timer) return; // idempotent — first schedule wins until cancel
+        timer = setTimeout(() => {
+          timer = null;
+          try {
+            action();
+          } catch (e) {
+            console.error('[syncStore] Deferred action threw', e);
+            reportError({
+              surface: 'syncStore-deferred-action',
+              message: 'Deferred action threw',
+              error: e instanceof Error ? e : new Error(String(e)),
+            });
+          }
+        }, deferMs);
+      },
+      cancel() {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+      },
+      get isScheduled() {
+        return timer !== null;
+      },
+    };
+  }
+
   // Wake-time race window — saves can fail briefly while silent refresh is
   // settling. Defer the banner that long so fix #1 (saveNow on tokenAcquired)
   // can clear the failure before the user is alarmed. Tuned from
   // observed silent-refresh timings (~1-3s typically); see docs/plans/
   // 2026-05-07-quiet-save-failure-banner.md.
   const BANNER_DEFER_MS = 5000;
-  let bannerDeferTimer: ReturnType<typeof setTimeout> | null = null;
+  const saveFailureBannerDefer = createDeferredAction(BANNER_DEFER_MS);
 
-  function cancelBannerDefer(): void {
-    if (bannerDeferTimer) {
-      clearTimeout(bannerDeferTimer);
-      bannerDeferTimer = null;
-    }
-  }
+  // Cold-start reconnect window — when the boot-time background load fails
+  // with `TokenExpiredError`, give wake-event-triggered refreshes (focus,
+  // pageshow, online) a chance to land before alarming with the reconnect
+  // banner. The `onTokenAcquired` self-heal handler below cancels this
+  // timer on any successful acquisition. See docs/plans/
+  // 2026-05-08-silent-refresh-regression.md.
+  const COLD_START_RECONNECT_DEFER_MS = 4000;
+  const coldStartReconnectDefer = createDeferredAction(COLD_START_RECONNECT_DEFER_MS);
 
   function showBannerWithTelemetry(deferred: boolean): void {
     showSaveFailureBanner.value = true;
@@ -153,7 +199,7 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   function handleSaveFailureChange(level: SaveFailureLevel, failError: string | null): void {
-    cancelBannerDefer();
+    saveFailureBannerDefer.cancel();
     saveFailureLevel.value = level;
     lastSaveError.value = failError;
 
@@ -170,11 +216,10 @@ export const useSyncStore = defineStore('sync', () => {
     // Recovery in flight — give it a chance. If fix #1 clears the failure
     // (level returns to 'none' via recordSaveSuccess on a post-recovery
     // saveNow), the timer's re-check will skip the alarm.
-    bannerDeferTimer = setTimeout(() => {
-      bannerDeferTimer = null;
+    saveFailureBannerDefer.schedule(() => {
       if (saveFailureLevel.value !== 'critical') return;
       showBannerWithTelemetry(true);
-    }, BANNER_DEFER_MS);
+    });
   }
 
   // Capabilities
@@ -1263,6 +1308,33 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Surface the reconnect banner if the boot-time data load is stuck on a
+   * silent-refresh-failed `TokenExpiredError`. Deferred ~4s so wake events
+   * (focus, pageshow, online) have a chance to land first; the
+   * `onTokenAcquired` self-heal handler cancels the timer on any
+   * successful acquisition.
+   *
+   * Boundary: only fires for Google Drive (the only provider with token
+   * expiry semantics) and only when the banner isn't already up.
+   */
+  function scheduleColdStartReconnectEscalation(lastErr: string | null): void {
+    if (storageProviderType.value !== 'google_drive') return;
+    if (showGoogleReconnect.value) return;
+    coldStartReconnectDefer.schedule(() => {
+      if (isTokenValid()) return; // recovered via wake event; nothing to do
+      if (showGoogleReconnect.value) return; // raced with the auth-layer escalation
+      showGoogleReconnect.value = true;
+      reportError({
+        surface: 'cold-start-reconnect-escalation',
+        message:
+          'Cold-start data load stuck on auth-transient (silent refresh failed); ' +
+          `banner surfaced after ${COLD_START_RECONNECT_DEFER_MS}ms defer window. ` +
+          `lastError: ${lastErr ?? 'unknown'}`,
+      });
+    });
+  }
+
+  /**
    * Background sync from file after cache-first load.
    * Fetches fresh data from Drive, CRDT-merges into the live doc.
    * Non-blocking — UI remains interactive throughout.
@@ -1322,13 +1394,9 @@ export const useSyncStore = defineStore('sync', () => {
       // Non-password failure (network, 404, auth-transient, etc.)
       const lastErr = syncService.getState().lastError;
       if (isAuthTransientSyncError(lastErr)) {
-        // Auth layer owns the escalation here — stay quiet so the user
-        // doesn't get a competing toast on top of the eventual reconnect
-        // banner. `backgroundSyncError` is still set (kind=auth-transient)
-        // so the success toast in callers like AppHeader.handleRefreshAll
-        // is correctly suppressed.
         backgroundSyncError.value = lastErr ?? 'Token expired';
         backgroundSyncErrorKind.value = 'auth-transient';
+        scheduleColdStartReconnectEscalation(lastErr);
       } else {
         backgroundSyncError.value = 'Could not refresh data from cloud';
         backgroundSyncErrorKind.value = 'network';
@@ -1336,7 +1404,9 @@ export const useSyncStore = defineStore('sync', () => {
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not refresh data from cloud';
       backgroundSyncError.value = msg;
-      backgroundSyncErrorKind.value = isAuthTransientSyncError(msg) ? 'auth-transient' : 'network';
+      const isAuth = isAuthTransientSyncError(msg);
+      backgroundSyncErrorKind.value = isAuth ? 'auth-transient' : 'network';
+      if (isAuth) scheduleColdStartReconnectEscalation(msg);
     } finally {
       isBackgroundSyncing.value = false;
       // Always start polling — even on error, next poll may succeed
@@ -1493,7 +1563,8 @@ export const useSyncStore = defineStore('sync', () => {
       autoSyncStopHandle = null;
     }
     stopFilePolling();
-    cancelBannerDefer();
+    saveFailureBannerDefer.cancel();
+    coldStartReconnectDefer.cancel();
     syncService.reset();
     useSyncHighlightStore().clearHighlights();
     isInitialized.value = false;
@@ -1777,9 +1848,18 @@ export const useSyncStore = defineStore('sync', () => {
     }
     if (!tokenAcquiredUnsub) {
       tokenAcquiredUnsub = onTokenAcquired(() => {
+        // Recovery via any path (wake event, popup, redirect) — cancel any
+        // in-flight cold-start escalation before the banner ever appears.
+        coldStartReconnectDefer.cancel();
+
         if (showGoogleReconnect.value) {
           handleGoogleReconnected().catch((e) => {
             console.warn('[syncStore] auto-clear of reconnect banner failed', e);
+            reportError({
+              surface: 'syncStore-reconnect-clear',
+              message: 'auto-clear of reconnect banner failed',
+              error: e instanceof Error ? e : new Error(String(e)),
+            });
           });
           return;
         }
