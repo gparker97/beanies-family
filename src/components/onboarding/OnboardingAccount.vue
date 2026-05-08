@@ -243,3 +243,20 @@ function formatBalanceMeta(currency: string, balance: number): string {
     </div>
   </OnboardingStepShell>
 </template>
+
+<style scoped>
+/* BaseCombobox trigger background overrides — moved here from
+ * onboarding-shared.css (global) so Vue's scoped-style [data-v]
+ * specificity boost retires the previous !important workaround.
+ * Light + dark mode mirror onboarding's other input surfaces. */
+.ob-bank-combo :deep([data-testid='combobox-trigger']) {
+  background: white;
+  border-color: rgb(44 62 80 / 8%);
+  box-shadow: 0 1px 4px rgb(44 62 80 / 4%);
+}
+
+:global(.dark) .ob-bank-combo :deep([data-testid='combobox-trigger']) {
+  background: #243342;
+  border-color: rgb(255 255 255 / 8%);
+}
+</style>

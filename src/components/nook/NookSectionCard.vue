@@ -19,7 +19,7 @@ withDefaults(defineProps<Props>(), {
 
 <template>
   <div
-    class="nook-card-dark rounded-[20px] bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.04)] dark:shadow-none"
+    class="rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800"
     :class="borderColor ? 'border-l-4' : ''"
     :style="borderColor ? { borderLeftColor: borderColor } : {}"
   >

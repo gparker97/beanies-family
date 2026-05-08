@@ -99,11 +99,15 @@ function handleClick() {
 </template>
 
 <style scoped>
+/* Vue scoped styles get a [data-v] specificity boost (0,2,0) over Tailwind's
+ * `bg-white` utility (0,1,0) on the wrapped NookSectionCard root, so no
+ * !important needed. If specificity ever stops being sufficient, prefer
+ * reinstating !important here over restructuring the wrapper component. */
 .nook-vacation-tint {
-  background: linear-gradient(180deg, rgb(0 180 216 / 6%), rgb(0 180 216 / 14%)) !important;
+  background: linear-gradient(180deg, rgb(0 180 216 / 6%), rgb(0 180 216 / 14%));
 }
 
 :global(.dark) .nook-vacation-tint {
-  background: linear-gradient(180deg, rgb(0 180 216 / 8%), rgb(0 180 216 / 18%)) !important;
+  background: linear-gradient(180deg, rgb(0 180 216 / 8%), rgb(0 180 216 / 18%));
 }
 </style>
