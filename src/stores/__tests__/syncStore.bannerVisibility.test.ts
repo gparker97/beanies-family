@@ -23,8 +23,12 @@ const {
   saveFailureCallbackHolder,
   tokenAcquiredCallbackHolder,
   tokenPermanentlyExpiredCallbackHolder,
+  stateChangeCallbackHolder,
   isSilentRefreshPendingMock,
+  isTokenValidMock,
   saveNowMock,
+  loadMock,
+  getStateMock,
 } = vi.hoisted(() => ({
   saveFailureCallbackHolder: {
     cb: null as ((level: string, error: string | null) => void) | null,
@@ -35,8 +39,28 @@ const {
   tokenPermanentlyExpiredCallbackHolder: {
     cb: null as (() => void) | null,
   },
+  stateChangeCallbackHolder: {
+    cb: null as
+      | ((state: {
+          lastError: string | null;
+          isInitialized: boolean;
+          isConfigured: boolean;
+          fileName: string | null;
+          isSyncing: boolean;
+        }) => void)
+      | null,
+  },
   isSilentRefreshPendingMock: vi.fn(() => false),
+  isTokenValidMock: vi.fn(() => false),
   saveNowMock: vi.fn(async () => true),
+  loadMock: vi.fn(async () => null as string | null),
+  getStateMock: vi.fn(() => ({
+    isInitialized: true,
+    isConfigured: true,
+    fileName: 'test.beanpod',
+    isSyncing: false,
+    lastError: null as string | null,
+  })),
 }));
 
 // Auto-mock for syncService — picked up via the shared __mocks__ defaults,
@@ -49,7 +73,13 @@ vi.mock('@/services/sync/syncService', async () => {
       saveFailureCallbackHolder.cb = cb;
       return () => {};
     }),
+    onStateChange: vi.fn((cb) => {
+      stateChangeCallbackHolder.cb = cb;
+      return () => {};
+    }),
     saveNow: saveNowMock,
+    load: loadMock,
+    getState: getStateMock,
     initialize: vi.fn(async () => true),
     getProviderType: vi.fn(() => 'google_drive'),
     hasPermission: vi.fn(async () => true),
@@ -70,6 +100,7 @@ vi.mock('@/services/google/googleAuth', () => ({
   }),
   fetchGoogleUserEmail: vi.fn(async () => null),
   isSilentRefreshPending: isSilentRefreshPendingMock,
+  isTokenValid: isTokenValidMock,
 }));
 
 // Minimal stubs for the rest of syncStore's import surface
@@ -179,8 +210,18 @@ describe('syncStore — save-failure banner visibility', () => {
     saveFailureCallbackHolder.cb = null;
     tokenAcquiredCallbackHolder.cb = null;
     tokenPermanentlyExpiredCallbackHolder.cb = null;
+    stateChangeCallbackHolder.cb = null;
     isSilentRefreshPendingMock.mockReturnValue(false);
+    isTokenValidMock.mockReturnValue(false);
     saveNowMock.mockResolvedValue(true);
+    loadMock.mockResolvedValue(null);
+    getStateMock.mockReturnValue({
+      isInitialized: true,
+      isConfigured: true,
+      fileName: 'test.beanpod',
+      isSyncing: false,
+      lastError: null,
+    });
 
     setActivePinia(createPinia());
 
@@ -341,6 +382,131 @@ describe('syncStore — save-failure banner visibility', () => {
       // Past where the timer would have fired
       vi.advanceTimersByTime(10_000);
       expect(store.showSaveFailureBanner).toBe(false);
+    });
+  });
+
+  // ─── Cold-start reconnect escalation (2026-05-08 regression fix) ─────────────
+  //
+  // Closes the gap where boot-time `loadFromFile` failures with
+  // `TokenExpiredError` left the user on stale cache with no UI signal —
+  // the in-flight escalation counter only crossed threshold after multiple
+  // separate refresh attempts, but each page reload reset the counter.
+  describe('cold-start reconnect escalation', () => {
+    /**
+     * Drive the store into the auth-transient cold-start path:
+     *   1. Set the syncService state so `storageProviderType.value` is
+     *      'google_drive' (the gate inside scheduleColdStartReconnectEscalation).
+     *   2. Make `syncService.load()` return null and `getState().lastError`
+     *      match the silent-refresh-failed regex.
+     *   3. Call `backgroundSyncFromFile()` to trigger the auth-transient
+     *      branch and schedule the deferred banner.
+     */
+    async function triggerColdStartAuthTransient(
+      store: ReturnType<typeof useSyncStore>
+    ): Promise<void> {
+      // Push the state-change subscription past the provider-type read so the
+      // store's storageProviderType ref reflects 'google_drive' for the gate.
+      stateChangeCallbackHolder.cb?.({
+        isInitialized: true,
+        isConfigured: true,
+        fileName: 'test.beanpod',
+        isSyncing: false,
+        lastError: 'Drive read failed: token rejected and silent refresh failed',
+      });
+      loadMock.mockResolvedValue(null);
+      getStateMock.mockReturnValue({
+        isInitialized: true,
+        isConfigured: true,
+        fileName: 'test.beanpod',
+        isSyncing: false,
+        lastError: 'Drive read failed: token rejected and silent refresh failed',
+      });
+      await store.backgroundSyncFromFile();
+    }
+
+    it('schedules deferred banner on auth-transient cold-start; surfaces after ~4s if still expired', async () => {
+      const store = useSyncStore();
+      await store.initialize();
+
+      await triggerColdStartAuthTransient(store);
+
+      // Banner not shown immediately — still inside the defer window.
+      expect(store.showGoogleReconnect).toBe(false);
+
+      // Token still invalid at fire time → banner surfaces.
+      isTokenValidMock.mockReturnValue(false);
+      vi.advanceTimersByTime(3999);
+      expect(store.showGoogleReconnect).toBe(false);
+
+      vi.advanceTimersByTime(2);
+      expect(store.showGoogleReconnect).toBe(true);
+    });
+
+    it('cancels the deferred banner when onTokenAcquired fires before the window expires', async () => {
+      const store = useSyncStore();
+      await store.initialize();
+
+      await triggerColdStartAuthTransient(store);
+      expect(store.showGoogleReconnect).toBe(false);
+
+      // Recovery via wake event halfway through the defer window.
+      vi.advanceTimersByTime(2000);
+      tokenAcquiredCallbackHolder.cb!();
+
+      // Past the original 4s mark — banner stays hidden.
+      vi.advanceTimersByTime(5000);
+      expect(store.showGoogleReconnect).toBe(false);
+    });
+
+    it('skips the banner if isTokenValid returns true at fire time (recovered, no event captured)', async () => {
+      const store = useSyncStore();
+      await store.initialize();
+
+      await triggerColdStartAuthTransient(store);
+
+      // Token quietly recovered (the wake-event path silently restored
+      // state without firing onTokenAcquired in this test scenario).
+      isTokenValidMock.mockReturnValue(true);
+      vi.advanceTimersByTime(5000);
+      expect(store.showGoogleReconnect).toBe(false);
+    });
+
+    it('does NOT schedule the timer for non-auth-transient errors (network, 5xx, decrypt)', async () => {
+      const store = useSyncStore();
+      await store.initialize();
+
+      stateChangeCallbackHolder.cb?.({
+        isInitialized: true,
+        isConfigured: true,
+        fileName: 'test.beanpod',
+        isSyncing: false,
+        lastError: 'Network unreachable',
+      });
+      getStateMock.mockReturnValue({
+        isInitialized: true,
+        isConfigured: true,
+        fileName: 'test.beanpod',
+        isSyncing: false,
+        lastError: 'Network unreachable',
+      });
+      loadMock.mockResolvedValue(null);
+
+      await store.backgroundSyncFromFile();
+
+      vi.advanceTimersByTime(10_000);
+      expect(store.showGoogleReconnect).toBe(false);
+    });
+
+    it('resetState cancels a scheduled cold-start banner timer', async () => {
+      const store = useSyncStore();
+      await store.initialize();
+
+      await triggerColdStartAuthTransient(store);
+
+      store.resetState();
+
+      vi.advanceTimersByTime(10_000);
+      expect(store.showGoogleReconnect).toBe(false);
     });
   });
 });

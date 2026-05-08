@@ -18,6 +18,7 @@ import {
   clearGoogleRefreshToken,
 } from '@/services/sync/fileHandleStore';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
+import { reportError } from '@/utils/errorReporter';
 
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
@@ -71,8 +72,53 @@ let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 type PermanentFailureCallback = () => void;
 const permanentFailureCallbacks: PermanentFailureCallback[] = [];
 
-let consecutiveSilentRefreshFailures = 0;
-const SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD = 3;
+// Counter persistence — sessionStorage-backed (per-tab, survives reload,
+// cleans up on tab close) so reload-loops accumulate failures correctly.
+// Same persistence tier as the offline queue. If sessionStorage is
+// unavailable (private mode, quota), we fall back to in-memory counting
+// and warn once per session — never silently skip the escalation path.
+const FAILURE_COUNTER_KEY = 'beanies_silent_refresh_failures';
+let storageWarnedThisSession = false;
+
+function loadFailureCounter(): number {
+  try {
+    const v =
+      typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(FAILURE_COUNTER_KEY) : null;
+    return v ? Math.max(0, parseInt(v, 10) || 0) : 0;
+  } catch (e) {
+    warnStorageOnce('read', e);
+    return 0;
+  }
+}
+function persistFailureCounter(n: number): void {
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(FAILURE_COUNTER_KEY, String(n));
+    }
+  } catch (e) {
+    warnStorageOnce('write', e);
+  }
+}
+function warnStorageOnce(op: 'read' | 'write', err: unknown): void {
+  if (storageWarnedThisSession) return;
+  storageWarnedThisSession = true;
+  console.warn(
+    `[googleAuth] sessionStorage ${op} failed — silent-refresh failure counter ` +
+      `will not survive page reloads. Falls back to in-memory counting.`,
+    err
+  );
+  reportError({
+    surface: 'silent-refresh-counter-storage',
+    message: `sessionStorage ${op} failed; counter persistence unavailable`,
+    error: err instanceof Error ? err : new Error(String(err)),
+  });
+}
+
+let consecutiveSilentRefreshFailures = loadFailureCounter();
+// 2 retry-exhausted failures = 6 OAuth proxy fetches across two
+// `attemptSilentRefresh` calls. Plenty of patience for transients while
+// reaching the user fast on real failures.
+const SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD = 2;
 
 function firePermanentFailureCallbacks(): void {
   permanentFailureCallbacks.forEach((cb) => {
@@ -177,6 +223,34 @@ const WAKE_REFRESH_THRESHOLD_MS = 120_000;
 let wakeListenerInstalled = false;
 let wakeListenerHandler: (() => void) | null = null;
 
+// Wake events that should trigger a silent refresh if the access token is
+// near or past expiry. Each event covers a real-world recovery path that
+// the others miss:
+//
+//   - `visibilitychange` — tab becomes visible (the original handler).
+//   - `focus`            — cross-window/cross-tab focus restore on
+//                          Chrome desktop (visibilitychange doesn't always
+//                          fire for window-to-window switches).
+//   - `pageshow`         — BFCache restore on mobile Safari/Chrome after
+//                          device sleep/wake (load-bearing on mobile —
+//                          neither visibilitychange nor focus fires here).
+//   - `online`           — network recovery after offline. Cheap;
+//                          deduplicated via `pendingSilentRefresh`.
+//
+// All triggers funnel through the same `refreshIfStale` callback and are
+// coalesced by the `pendingSilentRefresh` dedupe in `attemptSilentRefresh`.
+type WakeEventBinding = readonly [target: EventTarget, event: string];
+function getWakeEventBindings(): readonly WakeEventBinding[] {
+  // Resolved at install/teardown time, not module-eval time, so we don't
+  // crash in non-DOM contexts (vitest happy-dom, SSR).
+  return [
+    [document, 'visibilitychange'],
+    [window, 'focus'],
+    [window, 'pageshow'],
+    [window, 'online'],
+  ] as const;
+}
+
 /**
  * Install a `visibilitychange` listener that proactively refreshes the
  * access token when the tab becomes visible AND the token expires within
@@ -217,21 +291,25 @@ function installAuthWakeListener(): void {
   };
 
   wakeListenerHandler = refreshIfStale;
-  document.addEventListener('visibilitychange', refreshIfStale);
+  for (const [target, event] of getWakeEventBindings()) {
+    target.addEventListener(event, refreshIfStale);
+  }
   // Fire once on install — covers cold boot / full reload / SW update,
   // where module state has been wiped and the access token is null.
   refreshIfStale();
 }
 
 /**
- * Test-only — remove the wake listener and reset install state. Used by
+ * Test-only — remove all wake listeners and reset install state. Used by
  * vitest's `afterEach` to clean up before `vi.resetModules()` discards
- * the module, preventing stale listeners from accumulating on `document`
- * across test cases. Production code never calls this.
+ * the module, preventing stale listeners from accumulating across test
+ * cases. Production code never calls this.
  */
 export function __resetWakeListenerForTesting(): void {
-  if (wakeListenerHandler && typeof document !== 'undefined') {
-    document.removeEventListener('visibilitychange', wakeListenerHandler);
+  if (wakeListenerHandler && typeof document !== 'undefined' && typeof window !== 'undefined') {
+    for (const [target, event] of getWakeEventBindings()) {
+      target.removeEventListener(event, wakeListenerHandler);
+    }
   }
   wakeListenerHandler = null;
   wakeListenerInstalled = false;
@@ -592,14 +670,30 @@ async function performSilentRefresh(): Promise<string | null> {
   // If in-memory refreshToken was lost (page reload / SW update), try loading
   // from IndexedDB before giving up. This closes the race window where
   // getValidToken() is called before initializeAuth() completes.
+  //
+  // Wrapped in try/catch: an IDB reject (corruption, schema upgrade race,
+  // quota) used to throw past the wake listener's `.catch(() => {})`
+  // boundary as a silent failure that prevented the counter from ever
+  // incrementing. We now warn + report and continue with no stored token
+  // (the caller chain still gets a clean null/`TokenExpiredError` signal).
   if (!refreshToken) {
     const familyId = currentFamilyId ?? getActiveFamilyId();
     if (familyId) {
-      const stored = await getGoogleRefreshToken(familyId);
-      if (stored) {
-        refreshToken = stored;
-        currentFamilyId = familyId;
-        console.warn('[googleAuth] Recovered refresh token from IndexedDB during silent refresh');
+      try {
+        const stored = await getGoogleRefreshToken(familyId);
+        if (stored) {
+          refreshToken = stored;
+          currentFamilyId = familyId;
+          console.warn('[googleAuth] Recovered refresh token from IndexedDB during silent refresh');
+        }
+      } catch (e) {
+        console.error('[googleAuth] Failed to read refresh token from IndexedDB:', e);
+        reportError({
+          surface: 'silent-refresh-idb-read',
+          message: 'Failed to read refresh token from IndexedDB',
+          error: e instanceof Error ? e : new Error(String(e)),
+          context: { family_id: familyId },
+        });
       }
     }
   }
@@ -662,18 +756,22 @@ async function performSilentRefresh(): Promise<string | null> {
         continue;
       }
 
-      // All retries exhausted. Increment the consecutive-failure counter;
-      // when the threshold is crossed, escalate to permanent-failure even
-      // though no individual attempt was classified as `invalid_grant`. The
-      // user's experience of "silent refresh keeps failing forever" is the
-      // same regardless of cause, and the reconnect surface auto-clears
-      // when a later refresh succeeds via the `notifyTokenAcquired` path.
+      // All retries exhausted. Increment the consecutive-failure counter
+      // (persisted across reloads via sessionStorage); when the threshold
+      // is crossed, escalate to permanent-failure even though no individual
+      // attempt was classified as `invalid_grant`. The user's experience of
+      // "silent refresh keeps failing forever" is the same regardless of
+      // cause, and the reconnect surface auto-clears when a later refresh
+      // succeeds via the `notifyTokenAcquired` path. `>=` (not `===`)
+      // protects against a counter-overshoot race; the subscriber
+      // (`syncStore.setupTokenExpiryHandler` ref-set) is idempotent.
       consecutiveSilentRefreshFailures++;
+      persistFailureCounter(consecutiveSilentRefreshFailures);
       console.warn(
         `[googleAuth] Silent refresh failed after ${MAX_ATTEMPTS} attempts ` +
           `(consecutive: ${consecutiveSilentRefreshFailures}/${SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD}): ${message}`
       );
-      if (consecutiveSilentRefreshFailures === SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD) {
+      if (consecutiveSilentRefreshFailures >= SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD) {
         console.warn(
           '[googleAuth] Escalating to permanent failure — silent refresh has not recovered'
         );
@@ -901,6 +999,7 @@ async function notifyTokenAcquired(token: string, interactive: boolean): Promise
   // the silent-refresh failure streak. Reset before subscribers run so any
   // future refresh failure starts counting fresh from 0.
   consecutiveSilentRefreshFailures = 0;
+  persistFailureCounter(0);
 
   if (acquiredCallbacks.length === 0) return;
   const email = await fetchGoogleUserEmail(token);
@@ -921,6 +1020,7 @@ function clearTokenState(): void {
   refreshToken = null;
   cachedEmail = null;
   consecutiveSilentRefreshFailures = 0;
+  persistFailureCounter(0);
 
   // Clean up legacy localStorage token (from GIS flow)
   try {

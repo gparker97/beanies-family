@@ -1,5 +1,26 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
+// Capture the onTokenAcquired callback so tests can drive it directly,
+// simulating a silent refresh succeeding in the auth layer.
+const { tokenAcquiredCallbackHolder } = vi.hoisted(() => ({
+  tokenAcquiredCallbackHolder: {
+    cb: null as (() => void) | null,
+  },
+}));
+
+vi.mock('@/services/google/googleAuth', () => ({
+  onTokenAcquired: vi.fn((cb: () => void) => {
+    tokenAcquiredCallbackHolder.cb = cb;
+    return () => {
+      tokenAcquiredCallbackHolder.cb = null;
+    };
+  }),
+}));
+
+vi.mock('@/utils/errorReporter', () => ({
+  reportError: vi.fn(),
+}));
+
 // Must reset modules between tests to clear module-level state
 let offlineQueue: typeof import('../offlineQueue');
 
@@ -8,6 +29,7 @@ describe('offlineQueue', () => {
     vi.resetModules();
     // Clear sessionStorage before each test
     sessionStorage.clear();
+    tokenAcquiredCallbackHolder.cb = null;
     // Fresh import to reset module state
     offlineQueue = await import('../offlineQueue');
   });
@@ -189,6 +211,137 @@ describe('offlineQueue', () => {
       expect(mockWrite).toHaveBeenCalledTimes(1);
 
       vi.useRealTimers();
+    });
+  });
+
+  // ─── Recovery hooks (2026-05-08 regression fix) ───────────────────────────
+  // The original queue retried only on the `online` window event. When
+  // a queue got stuck because of an auth failure (token expired, network
+  // was fine all along), there was no `online` event coming and the queue
+  // sat forever. Two new recovery paths fix this:
+  //   - onTokenAcquired (silent refresh succeeded → flush)
+  //   - visibilitychange to visible (user returned to tab → flush)
+
+  describe('tokenAcquired flush hook', () => {
+    it('flushes queue when onTokenAcquired callback fires', async () => {
+      const mockWrite = vi.fn().mockResolvedValue(undefined);
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      offlineQueue.enqueueOfflineSave('{"data":"auth-recovery"}');
+
+      // setFlushProvider auto-flushed (online), so clear the call history
+      // and start from a known state.
+      await Promise.resolve();
+      mockWrite.mockClear();
+      // Re-queue (auto-flush above cleared the queue if it succeeded)
+      offlineQueue.enqueueOfflineSave('{"data":"auth-recovery"}');
+
+      expect(tokenAcquiredCallbackHolder.cb).toBeTruthy();
+      tokenAcquiredCallbackHolder.cb!();
+
+      await vi.waitFor(() => expect(mockWrite).toHaveBeenCalledWith('{"data":"auth-recovery"}'));
+    });
+
+    it('does not flush after clearQueue removes the subscription', async () => {
+      const mockWrite = vi.fn().mockResolvedValue(undefined);
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      offlineQueue.enqueueOfflineSave('{"data":"will-clear"}');
+
+      // Subscription registered via startListening above. Clear it.
+      await Promise.resolve();
+      offlineQueue.clearQueue();
+      mockWrite.mockClear();
+
+      // After clearQueue, the unsub was called — callback holder is null.
+      expect(tokenAcquiredCallbackHolder.cb).toBeNull();
+    });
+
+    it('does not throw when provider is unset by the time the hook fires', () => {
+      // Enqueue first to register the subscription, then never set a provider.
+      offlineQueue.enqueueOfflineSave('{"data":"no-provider"}');
+
+      expect(tokenAcquiredCallbackHolder.cb).toBeTruthy();
+      // tryFlush bails on the no-provider check; must not throw.
+      expect(() => tokenAcquiredCallbackHolder.cb!()).not.toThrow();
+    });
+
+    it('reports flush failures via reportError with the token-acquired reason', async () => {
+      const { reportError } = await import('@/utils/errorReporter');
+      // First enqueue with no provider so the subscription registers without
+      // an immediate auto-flush triggering reportError.
+      offlineQueue.enqueueOfflineSave('{"data":"will-fail"}');
+
+      const mockWrite = vi.fn().mockRejectedValue(new Error('Network down'));
+      // setFlushProvider auto-flushes if onLine; navigate around that by
+      // forcing onLine=false during this attach window, then restore.
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+      vi.mocked(reportError).mockClear();
+
+      tokenAcquiredCallbackHolder.cb!();
+
+      await vi.waitFor(() => {
+        expect(reportError).toHaveBeenCalledWith(
+          expect.objectContaining({
+            surface: 'offline-queue-flush',
+            message: 'flush rejected after token-acquired',
+          })
+        );
+      });
+    });
+  });
+
+  describe('visibilitychange flush hook', () => {
+    it('flushes queue when tab becomes visible', async () => {
+      const mockWrite = vi.fn().mockResolvedValue(undefined);
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      offlineQueue.enqueueOfflineSave('{"data":"visible-recovery"}');
+
+      // Drain auto-flush.
+      await Promise.resolve();
+      mockWrite.mockClear();
+      offlineQueue.enqueueOfflineSave('{"data":"visible-recovery"}');
+
+      // Tab not hidden → visibility handler triggers a flush.
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      await vi.waitFor(() => expect(mockWrite).toHaveBeenCalledWith('{"data":"visible-recovery"}'));
+    });
+
+    it('does not flush when tab becomes hidden', async () => {
+      const mockWrite = vi.fn().mockResolvedValue(undefined);
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      offlineQueue.enqueueOfflineSave('{"data":"stay-queued"}');
+
+      await Promise.resolve();
+      mockWrite.mockClear();
+      offlineQueue.enqueueOfflineSave('{"data":"stay-queued"}');
+
+      Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      // Wait one microtask cycle — should NOT have flushed.
+      await Promise.resolve();
+      expect(mockWrite).not.toHaveBeenCalled();
+    });
+
+    it('clearQueue removes the visibility listener', async () => {
+      const mockWrite = vi.fn().mockResolvedValue(undefined);
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      offlineQueue.enqueueOfflineSave('{"data":"will-clear"}');
+
+      await Promise.resolve();
+      offlineQueue.clearQueue();
+      mockWrite.mockClear();
+
+      // After clearing, dispatching visibilitychange should not trigger flush.
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      await Promise.resolve();
+      expect(mockWrite).not.toHaveBeenCalled();
     });
   });
 
