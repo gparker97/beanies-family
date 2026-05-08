@@ -15,7 +15,7 @@ As Thomas Jefferson said to James Madison after Hamilton spent an entire song re
 
 I want to apologize for last week's post. I honestly didn't mean to write that, it just sort of happened.
 
-From time to time, I may get the urge to write about my family, or vibe coding (a term that seems to be falling out of favor lately), or just technology in general.
+From time to time, I may get the urge to write about my family, or vibe coding (a term that seems to be rapidly falling out of favor), or just technology in general.
 
 From now on though, I'll try to avoid ambushing my precious Substack subscribers with sad, emotionally heavy memoirs just as you were sitting down with your morning coffee, probably getting ready to enjoy a light read. I'll try, but I can't promise I'll succeed.
 
