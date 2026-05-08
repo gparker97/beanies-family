@@ -415,40 +415,17 @@
   color: #e2e8f0;
 }
 
-/* ─── BaseCombobox/BaseSelect overrides (used in Recurring header + Account) ──
- * Loaded as a global stylesheet (not Vue scoped), so descendant selectors
- * pierce nested components naturally — no `:deep()` wrapper needed. */
-
-.ob-bank-combo [data-testid='combobox-trigger'] {
-  background: white !important;
-  border-color: rgb(44 62 80 / 8%);
-  box-shadow: 0 1px 4px rgb(44 62 80 / 4%);
-}
-
-.dark .ob-bank-combo [data-testid='combobox-trigger'] {
-  background: #243342 !important;
-  border-color: rgb(255 255 255 / 8%);
-}
-
-/* Note: the BaseCombobox dropdown is teleported to <body> with computed
- * fixed positioning (see BaseCombobox.vue's `updatePopoverPosition`), so
- * it can't be styled via descendant selectors here. The Teleport handles
- * sizing + edge-aware positioning (flip upward when near viewport bottom)
- * inline. No dropdown overrides needed. */
-
-.ob-account-select select {
-  background: white !important;
-  border-color: rgb(44 62 80 / 8%);
-  box-shadow: 0 1px 4px rgb(44 62 80 / 4%);
-  font-family: Outfit, sans-serif;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.dark .ob-account-select select {
-  background: #243342 !important;
-  border-color: rgb(255 255 255 / 8%);
-}
+/* Note: BaseCombobox/BaseSelect background overrides previously lived here
+ * with !important (because this is a global stylesheet, no [data-v]
+ * specificity boost). They've been moved into the owning components'
+ * scoped style blocks (OnboardingAccount.vue for `.ob-bank-combo`,
+ * OnboardingRecurring.vue for `.ob-account-select`) where Vue's scoped
+ * [data-v] boost retires the !important workaround.
+ *
+ * The BaseCombobox dropdown is teleported to <body> with computed fixed
+ * positioning (see BaseCombobox.vue's `updatePopoverPosition`), so
+ * dropdown styling can't be reached via descendant selectors anyway —
+ * the Teleport handles sizing + edge-aware positioning inline. */
 
 /* ─── Added confirmation rows (rendered by OnboardingAddedRow.vue) ─────── */
 
