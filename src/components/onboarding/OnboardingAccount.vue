@@ -131,16 +131,16 @@ function formatBalanceMeta(currency: string, balance: number): string {
 <template>
   <OnboardingStepShell>
     <template #decorations>
-      <div class="ob-float-emoji" style="font-size: 24px; left: 40px; top: 40px">💰</div>
+      <div class="ob-float-emoji" style="font-size: 1.5rem; left: 40px; top: 40px">💰</div>
       <div
         class="ob-float-emoji"
-        style="animation-delay: 1s; font-size: 20px; right: 50px; top: 130px"
+        style="animation-delay: 1s; font-size: 1.25rem; right: 50px; top: 130px"
       >
         🐷
       </div>
       <div
         class="ob-float-emoji"
-        style="animation-delay: 0.5s; bottom: 100px; font-size: 22px; left: 60px"
+        style="animation-delay: 0.5s; bottom: 100px; font-size: 1.375rem; left: 60px"
       >
         🏦
       </div>

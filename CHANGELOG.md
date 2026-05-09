@@ -10,8 +10,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-09
 
+### Added
+
+- **Large reading mode — `Settings → Appearance → Text size`.** Two-level user preference (`Normal` / `Large`) that scales the entire app's typography and spacing by 1.1875× (16 px root → 19 px root). Made comfortably readable on a phone held at arm's length without resorting to pinch-zoom (which on iOS PWAs has a known stuck-zoom failure mode where users can't zoom back out cleanly). The whole app rescales from a single CSS rule because every Tailwind utility and custom rem value is rem-based — there is no per-component large-mode variant. Persists per-device (IndexedDB, applies pre-login) and per-family (Automerge, syncs across devices). Composes orthogonally with Dark mode and Beanie mode.
+- **Beanie tip-of-the-day for Large text mode.** Surfaces in the Family Nook tip rotation alongside the Dark-mode tip, with a "try it →" pill that jumps to Settings.
+
 ### Changed
 
+- **DRY pass on `settingsStore` — `setTheme`, `setLanguage`, and the new `setTextSize` now share one `persistDualSetting<K>()` helper.** The 14-line dual-write try/catch was duplicated three times before; collapsed to one well-tested code path with toast on failure (with retry action), `error.value` populated, `console.error` with field+value+stack, and exception re-throw so `BaseSelect` can revert visual state.
+- **Cleaned ~180 hardcoded px font-sizes across the codebase.** All `text-[Xpx]` arbitrary classes (~160 across 64 components) and inline `font-size: Xpx` in `<style>` blocks (~20) converted to rem-based equivalents so they participate in Large mode. Calendar `ROW_HEIGHT` constant is now in rem; `MobileBottomNav` tab cells use `min-h-14` instead of `min-h-[56px]`. Decorative exceptions (onboarding hero confetti, brand-mark dimensions, fixed-size icon containers) keep px with explicit stylelint-disable comments naming the reason.
+- **Stop-the-regression lint rails.** Stylelint's `declaration-property-value-disallowed-list` forbids `font-size: Xpx`; ESLint's `vue/no-restricted-class` forbids `text-[Xpx]` arbitrary classes in templates. Both link to SKILL.md § Text-size accessibility mode in their messages.
+- **CIG slide added — "Accessibility & Modes."** New slide 7 in `docs/brand/beanies-cig-v2.html` documents Dark, Beanie, and Large text together. Trailing slide numbers bumped 7→8 … 16→17. SKILL.md typography section gains the "Text-size accessibility mode" subsection codifying the rem rule and the `--text-scale-large` token.
+- **Anti-FOUC bootstrap.** Synchronous inline script in `index.html` reads persisted theme + textSize from localStorage before any CSS loads, so cold reloads don't flash default styling. The settings store mirrors both keys via `STORAGE_KEYS` constants on every change. Pays down a pre-existing dark-mode FOUC bug as a bonus.
 - **Travel-plan airport dropdown now covers ~4,200 commercial airports globally, up from ~200 hand-curated ones.** The previous list missed plenty of perfectly mainstream destinations — HGH (Hangzhou Xiaoshan), CKG (Chongqing), GMP (Seoul Gimpo), and many others. The list is now generated from [OurAirports](https://ourairports.com/data/) (public domain) filtered to airports with `scheduled_service=yes` and a valid IATA code, so anywhere with regular commercial flights is in. General-aviation strips (e.g. TOA Torrance) remain excluded; the combobox's "Other" entry covers that case. The list also picks up an optional `country` field (ISO alpha-2) for future disambiguation UI.
 
 ### Added
