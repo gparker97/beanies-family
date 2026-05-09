@@ -289,6 +289,7 @@ function handleItemClick(item: CriticalItem) {
   box-shadow: 0 0 12px rgb(255 255 255 / 6%);
   display: flex;
   flex-shrink: 0;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative emoji icon in fixed-size container */
   font-size: 15px;
   height: 30px;
   justify-content: center;

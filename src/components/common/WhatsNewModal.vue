@@ -189,7 +189,7 @@ function handleSeeAll() {
   display: inline-flex;
   flex-shrink: 0;
   font-family: Outfit, sans-serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   gap: 5px;
   margin-top: 2px;
@@ -203,6 +203,7 @@ function handleSeeAll() {
 }
 
 .wn-tryit-arrow {
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative arrow glyph paired with adjacent button text */
   font-size: 14px;
   transition: transform 0.15s;
 }

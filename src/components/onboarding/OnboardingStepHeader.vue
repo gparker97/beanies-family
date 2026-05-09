@@ -51,6 +51,7 @@ const { t } = useTranslation();
 }
 
 .ob-step-emoji {
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative hero emoji */
   font-size: 38px;
   line-height: 1;
   margin-bottom: 4px;
@@ -59,7 +60,7 @@ const { t } = useTranslation();
 .ob-step-title {
   color: var(--deep-slate, #2c3e50);
   font-family: Outfit, sans-serif;
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 800;
   letter-spacing: -0.012em;
   margin: 0;
