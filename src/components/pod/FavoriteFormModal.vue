@@ -210,7 +210,9 @@ const showRecipePicker = computed(() => category.value === 'food');
       v-if="category === 'food'"
       class="flex flex-col gap-2.5 rounded-[14px] border border-[var(--tint-orange-15)] bg-[var(--tint-orange-8)] p-3.5"
     >
-      <div class="font-outfit text-[11px] font-semibold tracking-[0.06em] text-[#E67E22] uppercase">
+      <div
+        class="font-outfit text-[0.6875rem] font-semibold tracking-[0.06em] text-[#E67E22] uppercase"
+      >
         {{ t('favorites.food.detailsLabel') }}
       </div>
       <p class="font-caveat -mt-1 text-base text-[#E67E22]">
@@ -225,7 +227,7 @@ const showRecipePicker = computed(() => category.value === 'food');
            since the type-it-in input becomes the only option. -->
       <div
         v-if="showRecipePicker"
-        class="font-outfit text-secondary-500/50 flex items-center gap-2.5 text-[11px] font-semibold tracking-[0.08em] uppercase"
+        class="font-outfit text-secondary-500/50 flex items-center gap-2.5 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase"
       >
         <span class="h-px flex-1 bg-[var(--tint-slate-10)]" aria-hidden="true" />
         <span>{{ t('favorites.food.or') }}</span>

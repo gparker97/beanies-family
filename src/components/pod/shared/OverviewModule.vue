@@ -69,7 +69,7 @@ defineEmits<{
         </h3>
         <span
           v-if="headerChip"
-          class="font-outfit inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase"
+          class="font-outfit inline-flex items-center rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-wide uppercase"
           :class="
             headerChip.variant === 'success'
               ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'

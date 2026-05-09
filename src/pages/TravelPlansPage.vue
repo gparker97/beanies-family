@@ -570,7 +570,7 @@ function addQuickIdea() {
             <div class="mt-2.5 flex flex-wrap items-center gap-2">
               <span
                 v-if="vacationCountdown(vacation) !== null && vacationCountdown(vacation)! > 0"
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-3 py-1 text-[11px] font-bold text-white"
+                class="font-outfit inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-3 py-1 text-[0.6875rem] font-bold text-white"
               >
                 {{ tripTypeEmoji(vacation.tripType, vacation.tripPurpose) }}
                 {{ vacationCountdown(vacation) }}
@@ -580,7 +580,7 @@ function addQuickIdea() {
                 v-else-if="
                   vacationCountdown(vacation) !== null && vacationCountdown(vacation)! <= 0
                 "
-                class="font-outfit inline-flex items-center gap-1 rounded-lg bg-[var(--tint-slate-5)] px-2.5 py-1 text-[11px] font-semibold text-gray-400"
+                class="font-outfit inline-flex items-center gap-1 rounded-lg bg-[var(--tint-slate-5)] px-2.5 py-1 text-[0.6875rem] font-semibold text-gray-400"
               >
                 ✓ {{ t('travel.completed') }}
               </span>
@@ -591,10 +591,10 @@ function addQuickIdea() {
               <span
                 v-for="member in vacationAssignees(vacation)"
                 :key="member.id"
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300"
+                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-[0.6875rem] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300"
               >
                 <span
-                  class="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[8px] font-bold text-white"
+                  class="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[0.5rem] font-bold text-white"
                   :style="{ backgroundColor: member.color }"
                 >
                   {{ member.name.charAt(0).toUpperCase() }}
@@ -611,7 +611,9 @@ function addQuickIdea() {
                   :style="{ width: vacationProgress(vacation).percent + '%' }"
                 />
               </div>
-              <span class="font-outfit text-[10px] font-semibold whitespace-nowrap text-[#00B4D8]">
+              <span
+                class="font-outfit text-[0.625rem] font-semibold whitespace-nowrap text-[#00B4D8]"
+              >
                 {{ vacationProgress(vacation).booked }}/{{ vacationProgress(vacation).total }}
                 booked
               </span>
@@ -623,7 +625,7 @@ function addQuickIdea() {
               class="mt-1.5"
             >
               <span
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[rgba(255,217,61,0.12)] px-2.5 py-0.5 text-[9px] font-semibold text-[#B8860B]"
+                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[rgba(255,217,61,0.12)] px-2.5 py-0.5 text-[0.5625rem] font-semibold text-[#B8860B]"
               >
                 ⏳
                 {{ vacationProgress(vacation).total - vacationProgress(vacation).booked }}
@@ -634,7 +636,7 @@ function addQuickIdea() {
             <!-- Accommodation gap warning -->
             <div v-if="computeAccommodationGaps(vacation).length > 0" class="mt-1.5">
               <span
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2.5 py-0.5 text-[9px] font-semibold text-[var(--heritage-orange)]"
+                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2.5 py-0.5 text-[0.5625rem] font-semibold text-[var(--heritage-orange)]"
               >
                 🏨 {{ computeAccommodationGaps(vacation).length }}
                 {{ computeAccommodationGaps(vacation).length === 1 ? 'night' : 'nights' }}
@@ -687,7 +689,7 @@ function addQuickIdea() {
                 📅 {{ vacationDateRange(vacation) }}
               </div>
               <span
-                class="font-outfit mt-2 inline-block rounded-lg bg-[var(--tint-slate-5)] px-2.5 py-1 text-[11px] font-semibold text-gray-400"
+                class="font-outfit mt-2 inline-block rounded-lg bg-[var(--tint-slate-5)] px-2.5 py-1 text-[0.6875rem] font-semibold text-gray-400"
               >
                 ✓ {{ t('travel.completed') }}
               </span>
@@ -768,13 +770,13 @@ function addQuickIdea() {
           <!-- Row 2: emoji + name -->
           <div class="flex items-center gap-3.5">
             <span
-              class="shrink-0 text-[40px] drop-shadow-lg"
+              class="shrink-0 text-[2.5rem] drop-shadow-lg"
               style="animation: hero-float 4s ease-in-out infinite"
             >
               {{ tripTypeEmoji(selectedVacation.tripType, selectedVacation.tripPurpose) }}
             </span>
             <div class="min-w-0 flex-1">
-              <h2 class="font-outfit text-xl font-extrabold text-white sm:text-[22px]">
+              <h2 class="font-outfit text-xl font-extrabold text-white sm:text-[1.375rem]">
                 {{ selectedVacation.name }}
               </h2>
               <div class="mt-0.5 text-xs text-white/50">
@@ -793,7 +795,7 @@ function addQuickIdea() {
                 <span class="font-outfit text-xl leading-none font-extrabold text-[#FFD93D]">
                   {{ vacationCountdown(selectedVacation) }}
                 </span>
-                <span class="font-outfit text-[11px] font-semibold text-white/70">
+                <span class="font-outfit text-[0.6875rem] font-semibold text-white/70">
                   {{
                     t(
                       tripCountdownKey(
@@ -806,7 +808,7 @@ function addQuickIdea() {
                 </span>
               </template>
               <template v-else>
-                <span class="font-outfit text-[11px] font-semibold text-white/70">
+                <span class="font-outfit text-[0.6875rem] font-semibold text-white/70">
                   ✓ {{ t('travel.completed') }}
                 </span>
               </template>
@@ -816,10 +818,10 @@ function addQuickIdea() {
               <span
                 v-for="member in vacationAssignees(selectedVacation)"
                 :key="member.id"
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-white/8 px-2.5 py-0.5 text-[11px] font-medium text-white/75"
+                class="font-outfit inline-flex items-center gap-1 rounded-full bg-white/8 px-2.5 py-0.5 text-[0.6875rem] font-medium text-white/75"
               >
                 <span
-                  class="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[8px] font-bold text-white"
+                  class="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[0.5rem] font-bold text-white"
                   :style="{ backgroundColor: member.color }"
                 >
                   {{ member.name.charAt(0).toUpperCase() }}
@@ -891,7 +893,7 @@ function addQuickIdea() {
             <span class="text-2xl">🌟</span>
             <div class="font-outfit flex-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
               {{ selectedVacation.ideas.length }} {{ t('travel.ideasTeaser').toLowerCase() }}
-              <span class="mt-0.5 block text-[11px] font-normal text-gray-400">
+              <span class="mt-0.5 block text-[0.6875rem] font-normal text-gray-400">
                 {{ t('travel.ideasTeaserHint') }}
               </span>
             </div>
@@ -945,7 +947,9 @@ function addQuickIdea() {
                   >
                     🏨
                   </div>
-                  <span class="font-outfit text-[13px] font-bold text-[var(--heritage-orange)]">
+                  <span
+                    class="font-outfit text-[0.8125rem] font-bold text-[var(--heritage-orange)]"
+                  >
                     {{ entry.label }}
                   </span>
                 </div>
@@ -970,7 +974,7 @@ function addQuickIdea() {
                         {{ t('travel.accommodationGap') }}
                       </span>
                     </div>
-                    <span class="font-outfit text-[10px] font-semibold text-[#00B4D8]">
+                    <span class="font-outfit text-[0.625rem] font-semibold text-[#00B4D8]">
                       {{ t('travel.addSegment') }}
                     </span>
                   </button>
@@ -1005,14 +1009,14 @@ function addQuickIdea() {
                       📅
                     </div>
                     <span
-                      class="font-outfit flex items-baseline gap-1.5 text-[13px] font-bold text-gray-900 dark:text-gray-100"
+                      class="font-outfit flex items-baseline gap-1.5 text-[0.8125rem] font-bold text-gray-900 dark:text-gray-100"
                     >
                       <span
                         v-if="
                           selectedVacation.startDate &&
                           tripDayNumber(entry.data.date, selectedVacation.startDate) !== null
                         "
-                        class="font-outfit text-[10px] font-semibold tracking-[0.14em] text-[var(--color-text-muted)] uppercase"
+                        class="font-outfit text-[0.625rem] font-semibold tracking-[0.14em] text-[var(--color-text-muted)] uppercase"
                       >
                         {{ t('travel.today.dayPrefix') }}
                         {{ tripDayNumber(entry.data.date, selectedVacation.startDate) }}
@@ -1234,7 +1238,7 @@ function addQuickIdea() {
           <!-- Unbooked items -->
           <div v-if="undatedItems.length > 0" class="mt-4 space-y-2">
             <div
-              class="font-outfit text-[10px] font-semibold tracking-wide text-[#B8860B] uppercase"
+              class="font-outfit text-[0.625rem] font-semibold tracking-wide text-[#B8860B] uppercase"
             >
               🤔 {{ t('vacation.stillDeciding' as any) }}
             </div>
@@ -1269,7 +1273,7 @@ function addQuickIdea() {
             style="background: linear-gradient(135deg, rgb(255 217 61 / 10%), rgb(0 180 216 / 6%))"
           >
             <div
-              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white/70 text-[22px] shadow-[0_2px_8px_rgba(44,62,80,0.06)]"
+              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white/70 text-[1.375rem] shadow-[0_2px_8px_rgba(44,62,80,0.06)]"
             >
               🌟
             </div>
@@ -1277,13 +1281,15 @@ function addQuickIdea() {
               <h3 class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
                 {{ t('travel.ideas') }}
               </h3>
-              <div class="text-[11px] text-gray-400">{{ selectedVacation.ideas.length }} ideas</div>
+              <div class="text-[0.6875rem] text-gray-400">
+                {{ selectedVacation.ideas.length }} ideas
+              </div>
             </div>
           </div>
 
           <!-- Ideas section -->
           <div
-            class="font-outfit mt-4 mb-2 text-[10px] font-semibold tracking-[0.08em] text-gray-300 uppercase"
+            class="font-outfit mt-4 mb-2 text-[0.625rem] font-semibold tracking-[0.08em] text-gray-300 uppercase"
           >
             ideas & wishes
           </div>
@@ -1312,7 +1318,7 @@ function addQuickIdea() {
           <!-- Planned section -->
           <template v-if="plannedIdeas.length > 0">
             <div
-              class="font-outfit mt-5 mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.08em] text-green-600 uppercase dark:text-green-400"
+              class="font-outfit mt-5 mb-2 flex items-center gap-1.5 text-[0.625rem] font-semibold tracking-[0.08em] text-green-600 uppercase dark:text-green-400"
             >
               ✓ {{ t('vacation.ideas.plannedSection') }}
             </div>

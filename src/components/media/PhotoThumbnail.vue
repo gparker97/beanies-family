@@ -93,7 +93,9 @@ watch(
       class="border-primary-500/40 bg-primary-500/10 text-primary-600 dark:text-primary-300 flex h-full w-full animate-pulse flex-col items-center justify-center gap-1 border-2 border-dashed"
     >
       <BeanieSpinner size="sm" />
-      <span class="font-outfit text-[9px] leading-tight font-semibold">{{ pendingLabel }}</span>
+      <span class="font-outfit text-[0.5625rem] leading-tight font-semibold">{{
+        pendingLabel
+      }}</span>
     </div>
 
     <!-- Broken / missing state -->
@@ -103,7 +105,7 @@ watch(
       :aria-label="t('photos.missing.tile')"
     >
       <BeanieIcon name="image-broken" size="md" />
-      <span class="text-[10px]">{{ t('photos.missing.tile') }}</span>
+      <span class="text-[0.625rem]">{{ t('photos.missing.tile') }}</span>
     </div>
 
     <!-- Loading shimmer -->

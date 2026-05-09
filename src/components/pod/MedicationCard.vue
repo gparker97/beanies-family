@@ -110,7 +110,7 @@ const scheduleLabel = computed(() => {
           />
           <!-- Rx watermark -->
           <span
-            class="font-outfit absolute top-1.5 left-2 text-[9px] font-bold tracking-[0.2em] text-[#F15D22]/45"
+            class="font-outfit absolute top-1.5 left-2 text-[0.5625rem] font-bold tracking-[0.2em] text-[#F15D22]/45"
             aria-hidden="true"
           >
             Rx
@@ -166,7 +166,7 @@ const scheduleLabel = computed(() => {
           </h4>
           <span
             v-if="!isActive"
-            class="font-outfit flex-shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold tracking-wider text-slate-600 uppercase dark:bg-slate-700 dark:text-slate-400"
+            class="font-outfit flex-shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[0.625rem] font-bold tracking-wider text-slate-600 uppercase dark:bg-slate-700 dark:text-slate-400"
           >
             {{ t('medications.ended') }}
           </span>
@@ -178,7 +178,7 @@ const scheduleLabel = computed(() => {
         </p>
         <p
           v-if="scheduleLabel"
-          class="font-outfit text-[10px] font-semibold tracking-[0.1em] text-[#2C3E50]/50 uppercase"
+          class="font-outfit text-[0.625rem] font-semibold tracking-[0.1em] text-[#2C3E50]/50 uppercase"
         >
           {{ scheduleLabel }}
         </p>

@@ -43,7 +43,7 @@ const avatarEmoji = computed(() => {
 
 <template>
   <span
-    class="font-outfit inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+    class="font-outfit inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.6875rem] font-semibold"
     :class="
       tone === 'dark'
         ? 'text-secondary-500 bg-white/90'

@@ -189,7 +189,7 @@ function sayingFooter(s: SayingItem): string {
       />
       <span
         v-if="(milestone.photoIds?.length ?? 0) > 1"
-        class="font-outfit pointer-events-none absolute right-2 bottom-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-black/65 px-1.5 text-[10px] font-bold text-white"
+        class="font-outfit pointer-events-none absolute right-2 bottom-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-black/65 px-1.5 text-[0.625rem] font-bold text-white"
         aria-hidden="true"
       >
         +{{ (milestone.photoIds?.length ?? 0) - 1 }}
@@ -201,7 +201,7 @@ function sayingFooter(s: SayingItem): string {
       @click="handleCardClick"
     >
       <p
-        class="font-outfit text-primary-600 text-[10px] font-semibold tracking-wide uppercase dark:text-orange-300"
+        class="font-outfit text-primary-600 text-[0.625rem] font-semibold tracking-wide uppercase dark:text-orange-300"
       >
         {{ formatDateShort(milestone.occurredOn) }}
       </p>
@@ -230,7 +230,7 @@ function sayingFooter(s: SayingItem): string {
       />
       <div class="min-w-0 flex-1">
         <p
-          class="font-outfit text-primary-600 text-[10px] font-semibold tracking-wide uppercase dark:text-orange-300"
+          class="font-outfit text-primary-600 text-[0.625rem] font-semibold tracking-wide uppercase dark:text-orange-300"
         >
           {{ formatDateShort(milestone.occurredOn) }}
         </p>

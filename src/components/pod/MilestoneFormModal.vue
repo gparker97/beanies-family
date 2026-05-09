@@ -422,7 +422,7 @@ async function handleDelete(): Promise<void> {
       </button>
       <p
         v-if="selectedMemberId === undefined"
-        class="font-outfit mt-1 text-[11px] text-[var(--color-text-muted)] italic dark:text-gray-400"
+        class="font-outfit mt-1 text-[0.6875rem] text-[var(--color-text-muted)] italic dark:text-gray-400"
       >
         {{ t('milestone.addPhotosHint') }}
       </p>

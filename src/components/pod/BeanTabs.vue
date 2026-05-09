@@ -102,7 +102,7 @@ function labelFor(id: BeanTabId): string {
       <span :class="tab.id === active ? 'inline' : 'hidden sm:inline'">{{ tab.label }}</span>
       <span
         v-if="tab.badge > 0"
-        class="font-outfit inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--tint-slate-5)] px-1.5 py-0.5 text-[10px] font-semibold"
+        class="font-outfit inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--tint-slate-5)] px-1.5 py-0.5 text-[0.625rem] font-semibold"
         :class="tab.id === active ? 'text-primary-500' : 'text-secondary-500/60'"
       >
         {{ tab.badge }}

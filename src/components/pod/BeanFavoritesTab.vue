@@ -94,13 +94,13 @@ function closeModal(): void {
           {{ f.description }}
         </p>
         <span
-          class="font-outfit text-secondary-500/50 text-[11px] font-semibold tracking-wide uppercase"
+          class="font-outfit text-secondary-500/50 text-[0.6875rem] font-semibold tracking-wide uppercase"
         >
           {{ t(`favorites.category.${f.category}`) }}
         </span>
         <span
           v-if="f.recipeId && recipeExists(f.recipeId)"
-          class="font-outfit text-primary-500 mt-auto text-[11px] font-semibold hover:underline"
+          class="font-outfit text-primary-500 mt-auto text-[0.6875rem] font-semibold hover:underline"
           role="link"
           @click="(e: Event) => openRecipe(f.recipeId!, e)"
         >

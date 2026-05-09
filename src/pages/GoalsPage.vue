@@ -736,7 +736,7 @@ async function deleteCompletedGoal(id: string) {
           >
             <div class="flex items-center gap-2">
               <div
-                class="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white/30 text-[10px] font-bold text-white"
+                class="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white/30 text-[0.625rem] font-bold text-white"
                 :style="{
                   backgroundColor: getMemberColor(goal.memberId, '#2C3E50'),
                 }"

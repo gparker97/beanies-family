@@ -170,7 +170,7 @@ defineExpose({
         @click="cameraPicker.open"
       >
         <BeanieIcon name="camera" size="md" />
-        <span class="text-[10px]">{{ t('photos.takePhoto') }}</span>
+        <span class="text-[0.625rem]">{{ t('photos.takePhoto') }}</span>
       </button>
       <button
         v-if="canAdd"
@@ -184,7 +184,7 @@ defineExpose({
         @click="galleryPicker.open"
       >
         <BeanieIcon name="image" size="md" />
-        <span class="text-[10px]">{{
+        <span class="text-[0.625rem]">{{
           isTouchPrimary ? t('photos.fromLibrary') : t('photos.addPhoto')
         }}</span>
       </button>

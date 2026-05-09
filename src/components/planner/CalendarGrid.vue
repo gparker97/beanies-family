@@ -327,7 +327,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
             <span
               v-for="seg in cell.segments.slice(0, 2)"
               :key="seg.segmentId + '-' + seg.kind"
-              class="font-outfit truncate rounded-sm px-0.5 text-[9px] leading-tight font-bold text-[#0077B6] dark:text-[#00B4D8]"
+              class="font-outfit truncate rounded-sm px-0.5 text-[0.5625rem] leading-tight font-bold text-[#0077B6] dark:text-[#00B4D8]"
               :class="
                 seg.status === 'pending'
                   ? 'border border-dashed border-[var(--vacation-teal)] bg-[var(--vacation-teal-5)] italic opacity-80'
@@ -353,7 +353,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
             </span>
             <span
               v-if="cell.segments.length > 2"
-              class="text-secondary-500/40 text-[9px]"
+              class="text-secondary-500/40 text-[0.5625rem]"
               aria-hidden="true"
             >
               +{{ cell.segments.length - 2 }}
@@ -373,7 +373,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
           >
             <span
               v-if="vac.isStart"
-              class="font-outfit block truncate text-[8px] leading-tight font-bold text-[#0077B6] dark:text-[#00B4D8]"
+              class="font-outfit block truncate text-[0.5rem] leading-tight font-bold text-[#0077B6] dark:text-[#00B4D8]"
             >
               {{ vac.emoji }} {{ vac.name }}
             </span>

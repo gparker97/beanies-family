@@ -104,13 +104,15 @@ const screenshot = computed<string | null>(() => {
         <div class="font-outfit text-secondary-500 mb-1 text-sm font-semibold dark:text-gray-100">
           🫘 {{ t('pwaReinstall.reassuranceTitle') }}
         </div>
-        <div class="text-secondary-500/75 text-[13px] leading-relaxed dark:text-gray-300/80">
+        <div class="text-secondary-500/75 text-[0.8125rem] leading-relaxed dark:text-gray-300/80">
           {{ t('pwaReinstall.reassurance') }}
         </div>
       </div>
 
       <!-- Context -->
-      <div class="text-secondary-500/75 mb-5 text-[13px] leading-relaxed dark:text-gray-300/80">
+      <div
+        class="text-secondary-500/75 mb-5 text-[0.8125rem] leading-relaxed dark:text-gray-300/80"
+      >
         {{ t('pwaReinstall.context') }}
       </div>
 
@@ -126,7 +128,7 @@ const screenshot = computed<string | null>(() => {
         <li
           v-for="(step, i) in steps"
           :key="i"
-          class="flex items-start gap-3 text-[13px] leading-relaxed"
+          class="flex items-start gap-3 text-[0.8125rem] leading-relaxed"
         >
           <span
             class="bg-primary-500 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
@@ -165,7 +167,7 @@ const screenshot = computed<string | null>(() => {
           :href="guideUrl"
           target="_blank"
           rel="noopener noreferrer"
-          class="hover:text-primary-500 dark:hover:text-primary-400 text-[13px] text-gray-400/60 transition-all dark:text-gray-500/50"
+          class="hover:text-primary-500 dark:hover:text-primary-400 text-[0.8125rem] text-gray-400/60 transition-all dark:text-gray-500/50"
           @click="trackInstallClicked"
         >
           {{ t('pwaReinstall.seeFullGuide') }}

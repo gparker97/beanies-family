@@ -91,7 +91,7 @@ function closeModal(): void {
       class="relative mb-6 overflow-hidden rounded-[var(--sq)] border border-[rgb(230_126_34_/_15%)] bg-[#fbf3e3] px-5 py-6 sm:px-9 sm:py-8"
     >
       <span
-        class="pointer-events-none absolute top-2.5 right-8 text-[150px] opacity-[0.09]"
+        class="pointer-events-none absolute top-2.5 right-8 text-[9.375rem] opacity-[0.09]"
         style="transform: rotate(-8deg)"
         aria-hidden="true"
       >
@@ -118,7 +118,7 @@ function closeModal(): void {
             {{ recipes.length }}
           </span>
           <span
-            class="font-outfit text-secondary-500/60 mt-1 text-[11px] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+            class="font-outfit text-secondary-500/60 mt-1 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
           >
             {{ t('cookbook.stats.recipes') }}
           </span>
@@ -128,7 +128,7 @@ function closeModal(): void {
             {{ totalCookCount }}
           </span>
           <span
-            class="font-outfit text-secondary-500/60 mt-1 text-[11px] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+            class="font-outfit text-secondary-500/60 mt-1 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
           >
             {{ t('cookbook.stats.cooked') }}
           </span>
@@ -138,7 +138,7 @@ function closeModal(): void {
             ⭐ {{ avgRating }}
           </span>
           <span
-            class="font-outfit text-secondary-500/60 mt-1 text-[11px] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+            class="font-outfit text-secondary-500/60 mt-1 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
           >
             {{ t('cookbook.stats.avgRating') }}
           </span>

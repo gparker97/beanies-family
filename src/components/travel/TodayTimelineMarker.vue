@@ -34,7 +34,7 @@ const { t } = useTranslation();
   >
     <div class="flex min-w-0 items-baseline gap-2">
       <span
-        class="font-outfit text-[10px] font-bold tracking-[0.16em] whitespace-nowrap text-[var(--heritage-orange)] uppercase"
+        class="font-outfit text-[0.625rem] font-bold tracking-[0.16em] whitespace-nowrap text-[var(--heritage-orange)] uppercase"
       >
         ● {{ t('travel.today.label') }}
       </span>
@@ -46,7 +46,7 @@ const { t } = useTranslation();
       </span>
     </div>
     <span
-      class="font-outfit flex-shrink-0 text-[10px] font-semibold tracking-[0.14em] whitespace-nowrap text-[var(--heritage-orange)]/80 uppercase"
+      class="font-outfit flex-shrink-0 text-[0.625rem] font-semibold tracking-[0.14em] whitespace-nowrap text-[var(--heritage-orange)]/80 uppercase"
     >
       {{ t('travel.today.dayPrefix') }} {{ props.dayNumber }} {{ t('travel.today.of') }}
       {{ props.totalDays }}

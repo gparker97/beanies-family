@@ -575,7 +575,7 @@ async function confirmSignOutAndClearData() {
               :alt="currentLanguageInfo.name"
               class="h-6 w-8 rounded-sm object-cover"
             />
-            <span v-else class="text-[26px] leading-none">
+            <span v-else class="text-[1.625rem] leading-none">
               {{ currentLanguageInfo?.flag || '🌐' }}
             </span>
             <span class="text-secondary-500/30 text-[0.5rem]">▼</span>
@@ -910,7 +910,7 @@ async function confirmSignOutAndClearData() {
             </div>
             <div class="flex justify-end">
               <span class="flex items-center gap-1">
-                <span class="text-[10px] text-gray-400 dark:text-gray-500">
+                <span class="text-[0.625rem] text-gray-400 dark:text-gray-500">
                   {{ t('common.whatsThis') }}
                 </span>
                 <InfoHintBadge :text="t('auth.signOutClearDataHint')" />
