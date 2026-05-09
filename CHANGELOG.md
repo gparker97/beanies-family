@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-09
+
+### Changed
+
+- **Travel-plan airport dropdown now covers ~4,200 commercial airports globally, up from ~200 hand-curated ones.** The previous list missed plenty of perfectly mainstream destinations — HGH (Hangzhou Xiaoshan), CKG (Chongqing), GMP (Seoul Gimpo), and many others. The list is now generated from [OurAirports](https://ourairports.com/data/) (public domain) filtered to airports with `scheduled_service=yes` and a valid IATA code, so anywhere with regular commercial flights is in. General-aviation strips (e.g. TOA Torrance) remain excluded; the combobox's "Other" entry covers that case. The list also picks up an optional `country` field (ISO alpha-2) for future disambiguation UI.
+
+### Added
+
+- **`npm run update-airports` and a monthly GitHub Action (`airport-sync.yml`) keep the airport list current.** The action runs on the 1st of each month, regenerates `src/constants/airports.ts` from the latest OurAirports data, and opens a PR if anything changed. Same operational pattern as the daily translation-sync workflow.
+
+---
+
 ## 2026-05-08
 
 ### Added
