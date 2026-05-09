@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
+import { showToast } from '@/composables/useToast';
+import { useTranslation } from '@/composables/useTranslation';
+import { STORAGE_KEYS } from '@/constants/storageKeys';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import * as globalSettingsRepo from '@/services/indexeddb/repositories/globalSettingsRepository';
 import type {
@@ -23,9 +26,12 @@ export const useSettingsStore = defineStore('settings', () => {
   const displayCurrency = computed(
     () => settings.value.displayCurrency ?? settings.value.baseCurrency
   );
-  // Theme and language are global (device-level) settings
+  // Theme, language, and text-size are global (device-level) settings
   const theme = computed(() => globalSettings.value.theme);
   const language = computed(() => globalSettings.value.language ?? 'en');
+  const textSize = computed<'normal' | 'large'>(
+    () => globalSettings.value.textSize ?? settings.value.textSize ?? 'normal'
+  );
   const syncEnabled = computed(() => settings.value.syncEnabled);
   const aiProvider = computed(() => settings.value.aiProvider);
   // Use the most recent rates between per-family (synced via .beanpod) and
@@ -84,7 +90,8 @@ export const useSettingsStore = defineStore('settings', () => {
   );
   const passkeyPromptShown = computed(() => globalSettings.value.passkeyPromptShown ?? false);
 
-  // Apply theme to document
+  // Apply theme to document. Mirrors to localStorage so the synchronous
+  // bootstrap script in index.html can apply it before CSS loads (no FOUC).
   watch(
     theme,
     (newTheme) => {
@@ -96,16 +103,52 @@ export const useSettingsStore = defineStore('settings', () => {
         isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       }
 
-      if (isDark) {
-        html.classList.add('dark');
-      } else {
-        html.classList.remove('dark');
-      }
+      // Flicker guard — only mutate the class if the bootstrap script's
+      // initial decision differs from the store's resolved value.
+      const hasDark = html.classList.contains('dark');
+      if (isDark && !hasDark) html.classList.add('dark');
+      else if (!isDark && hasDark) html.classList.remove('dark');
 
       // Keep browser chrome in sync
       const meta = document.querySelector('meta[name="theme-color"]');
       if (meta) {
         meta.setAttribute('content', isDark ? '#1a252f' : '#F8F9FA');
+      }
+
+      // Mirror to localStorage for the FOUC-prevention bootstrap.
+      try {
+        localStorage.setItem(STORAGE_KEYS.THEME, newTheme);
+      } catch {
+        // Storage disabled — bootstrap may not see this value on next reload;
+        // watcher still applies live. See bootstrap script for the warning.
+      }
+    },
+    { immediate: true }
+  );
+
+  // Apply text-size to document. Single attribute on <html> drives the
+  // entire app's Large reading mode via the CSS rule in src/style.css and
+  // the brand token --text-scale-large.
+  watch(
+    textSize,
+    (newSize) => {
+      const html = document.documentElement;
+      const target = newSize === 'large' ? 'large' : null;
+      const current = html.getAttribute('data-text-size');
+
+      // Flicker guard: bootstrap script may have already applied the
+      // attribute on cold load. If DOM matches resolved value, no-op.
+      if (current === target) return;
+
+      if (target) html.setAttribute('data-text-size', target);
+      else html.removeAttribute('data-text-size');
+
+      // Mirror to localStorage for the FOUC bootstrap.
+      try {
+        localStorage.setItem(STORAGE_KEYS.TEXT_SIZE, newSize);
+      } catch {
+        // Storage disabled — watcher continues applying live; bootstrap
+        // on next reload will fall back to default until the store loads.
       }
     },
     { immediate: true }
@@ -173,35 +216,54 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  async function setTheme(newTheme: 'light' | 'dark' | 'system'): Promise<void> {
+  /**
+   * Persist a Settings field that is dual-tracked in both GlobalSettings
+   * (device, IndexedDB) and Settings (per-family, Automerge). Surfaces
+   * failures via toast + console; never silent.
+   *
+   * Used by setTheme / setLanguage / setTextSize. Adding a fourth
+   * dual-persisted preference is a one-line wrapper below.
+   */
+  async function persistDualSetting<K extends keyof Settings & keyof GlobalSettings>(
+    key: K,
+    value: Settings[K]
+  ): Promise<void> {
     isLoading.value = true;
     error.value = null;
     try {
-      // Save to global settings (device-level)
-      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({ theme: newTheme });
-      // Also save to per-family settings for backward compatibility
-      settings.value = await settingsRepo.setTheme(newTheme);
+      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+        [key]: value,
+      } as Partial<GlobalSettings>);
+      settings.value = await settingsRepo.saveSettings({ [key]: value } as Partial<Settings>);
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update theme';
+      const detail = e instanceof Error ? e.message : String(e);
+      error.value = detail;
+      // User-facing — toast with retry action. Field name goes in the
+      // message slot (no interpolation in t() — see uiStrings.ts).
+      const { t } = useTranslation();
+      const fieldLabel = t(`settings.${String(key)}` as Parameters<typeof t>[0]);
+      showToast('error', t('settings.persistFailed'), fieldLabel, {
+        actionLabel: t('common.retry'),
+        actionFn: () => persistDualSetting(key, value),
+        error: e,
+        surface: 'settings-persist',
+        context: { field: String(key) },
+      });
+      // Dev-facing — full attempted value + cause for production telemetry.
+      console.error(
+        `[settingsStore] persistDualSetting('${String(key)}', ${JSON.stringify(value)}) failed — ` +
+          `check IndexedDB quota, family-doc lock state, or Automerge schema.`,
+        e
+      );
+      throw e; // re-throw so callers (e.g. BaseSelect via @update:modelValue) can revert visual state.
     } finally {
       isLoading.value = false;
     }
   }
 
-  async function setLanguage(lang: LanguageCode): Promise<void> {
-    isLoading.value = true;
-    error.value = null;
-    try {
-      // Save to global settings (device-level)
-      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({ language: lang });
-      // Also save to per-family settings for backward compatibility
-      settings.value = await settingsRepo.setLanguage(lang);
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update language';
-    } finally {
-      isLoading.value = false;
-    }
-  }
+  const setTheme = (v: Settings['theme']) => persistDualSetting('theme', v);
+  const setLanguage = (v: LanguageCode) => persistDualSetting('language', v);
+  const setTextSize = (v: 'normal' | 'large') => persistDualSetting('textSize', v);
 
   async function setSyncEnabled(enabled: boolean): Promise<void> {
     isLoading.value = true;
@@ -479,6 +541,7 @@ export const useSettingsStore = defineStore('settings', () => {
     displayCurrency,
     theme,
     language,
+    textSize,
     syncEnabled,
     aiProvider,
     exchangeRates,
@@ -501,6 +564,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setDisplayCurrency,
     setTheme,
     setLanguage,
+    setTextSize,
     setSyncEnabled,
     setAutoSyncEnabled,
     setAIProvider,

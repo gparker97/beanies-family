@@ -53,4 +53,13 @@
        variable font hasn't loaded yet. */
   --font-outfit: 'Outfit Variable', 'Outfit', sans-serif;
   --font-inter: 'Inter Variable', 'Inter', system-ui, sans-serif;
+
+  /* Reading modes
+     ──────────────────────────────────────────────────────────────────────
+     Single source of truth for the Large reading mode scale factor. Read
+     by the CSS rule in `src/style.css` (html[data-text-size='large'])
+     AND by JS that needs the live scale (e.g. useChartScale). Bumping
+     the multiplier here is a one-line change that re-tunes the whole app.
+     1.1875× = 16 px → 19 px root, the default Large mode bump. */
+  --text-scale-large: 1.1875;
 }
