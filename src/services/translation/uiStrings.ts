@@ -1906,6 +1906,18 @@ const STRING_DEFS = {
     en: 'Choose your preferred color scheme',
     beanie: 'choose your preferred color scheme',
   },
+  'settings.textSize': { en: 'Text Size', beanie: 'text size' },
+  'settings.textSize.normal': { en: 'Normal', beanie: 'normal' },
+  'settings.textSize.large': { en: 'Large', beanie: 'large' },
+  'settings.textSizeHint': {
+    en: 'Make text and buttons easier to read',
+    beanie: 'make text and buttons easier to read',
+  },
+  'settings.persistFailed': {
+    en: "Couldn't save your preference",
+    beanie: "couldn't save your preference",
+  },
+  'common.retry': { en: 'Retry', beanie: 'retry' },
   'settings.weekStart': { en: 'Week Starts On', beanie: 'week starts on' },
   'settings.weekStart.sunday': { en: 'Sunday', beanie: 'sunday' },
   'settings.weekStart.monday': { en: 'Monday', beanie: 'monday' },

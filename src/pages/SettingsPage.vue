@@ -159,6 +159,11 @@ const themeOptions = computed(() => [
   { value: 'system', label: t('settings.theme.system') },
 ]);
 
+const textSizeOptions = computed(() => [
+  { value: 'normal', label: t('settings.textSize.normal') },
+  { value: 'large', label: t('settings.textSize.large') },
+]);
+
 const showRatesWarning = ref(false);
 const pendingCurrency = ref<string | null>(null);
 const isFetchingRates = ref(false);
@@ -209,6 +214,10 @@ function handleSwitchWithoutRates() {
 
 async function updateTheme(value: string | number) {
   await settingsStore.setTheme(value as 'light' | 'dark' | 'system');
+}
+
+async function updateTextSize(value: string | number) {
+  await settingsStore.setTextSize(value as 'normal' | 'large');
 }
 
 // ── Family Data handlers ─────────────────────────────────────────────────────
@@ -734,6 +743,14 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         :label="t('settings.theme')"
         :hint="t('settings.themeHint')"
         @update:model-value="updateTheme"
+      />
+
+      <BaseSelect
+        :model-value="settingsStore.textSize"
+        :options="textSizeOptions"
+        :label="t('settings.textSize')"
+        :hint="t('settings.textSizeHint')"
+        @update:model-value="updateTextSize"
       />
 
       <BaseSelect

@@ -31,6 +31,16 @@
   [role='button'][aria-disabled='true'] {
     cursor: not-allowed;
   }
+
+  /* Large reading mode — Settings → Appearance → Text size.
+     Scales the root font-size, which (because every Tailwind utility and
+     custom rem value in the codebase is rem-based) cascades to every
+     padding, gap, height, width and font-size in the app. The scale
+     factor lives in packages/brand/theme.css as the single source of
+     truth — see --text-scale-large. */
+  html[data-text-size='large'] {
+    font-size: calc(1rem * var(--text-scale-large));
+  }
 }
 
 /* ─── CSS custom properties (used in non-Tailwind contexts) ─────────────── */

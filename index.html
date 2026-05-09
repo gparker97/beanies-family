@@ -52,6 +52,40 @@
 
     <title>beanies.family</title>
 
+    <!--
+      Synchronous appearance bootstrap.
+      Applies persisted theme + text-size preferences from localStorage BEFORE
+      any CSS loads, so cold reloads don't flash default styling. The settings
+      store mirrors these keys on every change; IndexedDB / Automerge is the
+      durable source of truth and confirms or corrects shortly after Vue mounts.
+
+      Storage keys MUST stay in sync with src/constants/storageKeys.ts. Inline
+      scripts can't import — duplication is intentional. If you rename a key
+      there, update both literals here in the same commit.
+    -->
+    <script>
+      try {
+        var ts = localStorage.getItem('beanies:textSize');
+        if (ts === 'large') document.documentElement.setAttribute('data-text-size', 'large');
+
+        var theme = localStorage.getItem('beanies:theme');
+        var prefersDark =
+          window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = theme === 'dark' || (theme === 'system' && prefersDark) || (!theme && prefersDark);
+        if (isDark) document.documentElement.classList.add('dark');
+      } catch (e) {
+        // localStorage unavailable (Safari private mode, Storage Access denied,
+        // quota exceeded). Watcher in the settings store will correct shortly
+        // after Vue mounts; user sees a brief flash, nothing else breaks.
+        console.warn(
+          '[bootstrap] localStorage unavailable for appearance preferences. ' +
+            'Likely cause: private browsing, Storage Access disabled, or quota. ' +
+            'Page will render with defaults until the store loads from IndexedDB.',
+          e
+        );
+      }
+    </script>
+
     <!-- Google Fonts - Outfit (headings/values) + Inter (body/data) + Caveat (handwritten accents only) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
