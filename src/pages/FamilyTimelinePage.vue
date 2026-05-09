@@ -126,7 +126,7 @@ function openMilestone(m: Milestone): void {
       style="background: linear-gradient(135deg, #fff7c8 0%, #ffe4d6 50%, #d4f1f4 100%)"
     >
       <span
-        class="pointer-events-none absolute top-3 right-7 text-[130px] opacity-10"
+        class="pointer-events-none absolute top-3 right-7 text-[8.125rem] opacity-10"
         style="transform: rotate(-8deg)"
         aria-hidden="true"
       >
@@ -216,7 +216,7 @@ function openMilestone(m: Milestone): void {
                 @click="openMilestone(m)"
               >
                 <p
-                  class="font-outfit text-primary-600 text-[10px] font-semibold tracking-wide uppercase dark:text-orange-300"
+                  class="font-outfit text-primary-600 text-[0.625rem] font-semibold tracking-wide uppercase dark:text-orange-300"
                 >
                   {{ formatDateShort(m.occurredOn) }}
                 </p>
@@ -229,7 +229,7 @@ function openMilestone(m: Milestone): void {
                   <template v-if="memberLabel(m).kind === 'family'">
                     <span class="text-base leading-none" aria-hidden="true">🏡</span>
                     <span
-                      class="font-outfit text-secondary-500/70 text-[11px] font-semibold dark:text-gray-400"
+                      class="font-outfit text-secondary-500/70 text-[0.6875rem] font-semibold dark:text-gray-400"
                     >
                       {{ t('milestone.familyPill') }}
                     </span>
@@ -241,14 +241,14 @@ function openMilestone(m: Milestone): void {
                       aria-hidden="true"
                     />
                     <span
-                      class="font-outfit text-secondary-500/70 truncate text-[11px] font-semibold dark:text-gray-400"
+                      class="font-outfit text-secondary-500/70 truncate text-[0.6875rem] font-semibold dark:text-gray-400"
                     >
                       {{ memberLabel(m).member!.name }}
                     </span>
                   </template>
                   <template v-else>
                     <span
-                      class="font-outfit text-secondary-500/60 text-[11px] font-semibold italic dark:text-gray-500"
+                      class="font-outfit text-secondary-500/60 text-[0.6875rem] font-semibold italic dark:text-gray-500"
                     >
                       {{ t('milestone.unknownBean') }}
                     </span>

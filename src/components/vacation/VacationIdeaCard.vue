@@ -115,7 +115,7 @@ function patch(fields: Partial<VacationIdea>) {
         <!-- Description (2-line clamp) -->
         <div
           v-if="idea.description"
-          class="mt-0.5 line-clamp-2 text-[11px] text-[var(--color-text-muted)]"
+          class="mt-0.5 line-clamp-2 text-[0.6875rem] text-[var(--color-text-muted)]"
         >
           {{ idea.description }}
         </div>
@@ -124,13 +124,13 @@ function patch(fields: Partial<VacationIdea>) {
         <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
           <span
             v-if="idea.category"
-            class="rounded-full bg-[var(--vacation-teal-tint)] px-2 py-0.5 text-[9px] font-semibold text-[var(--vacation-teal)]"
+            class="rounded-full bg-[var(--vacation-teal-tint)] px-2 py-0.5 text-[0.5625rem] font-semibold text-[var(--vacation-teal)]"
           >
             {{ categoryEmoji }} {{ t(`vacation.ideas.category.${idea.category}`) }}
           </span>
           <span
             v-if="costTag"
-            class="rounded-full px-2 py-0.5 text-[9px] font-semibold"
+            class="rounded-full px-2 py-0.5 text-[0.5625rem] font-semibold"
             :class="
               idea.costType === 'free'
                 ? 'bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
@@ -141,7 +141,7 @@ function patch(fields: Partial<VacationIdea>) {
           </span>
           <span
             v-if="idea.isPlanned"
-            class="rounded-full bg-[rgba(39,174,96,0.08)] px-2 py-0.5 text-[9px] font-semibold text-[#27AE60]"
+            class="rounded-full bg-[rgba(39,174,96,0.08)] px-2 py-0.5 text-[0.5625rem] font-semibold text-[#27AE60]"
           >
             ✓ planned
           </span>
@@ -150,17 +150,17 @@ function patch(fields: Partial<VacationIdea>) {
             :href="idea.link"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex items-center gap-0.5 rounded-full bg-[rgba(0,180,216,0.08)] px-2 py-0.5 text-[9px] font-semibold text-[#00B4D8] transition-colors hover:bg-[rgba(0,180,216,0.15)]"
+            class="inline-flex items-center gap-0.5 rounded-full bg-[rgba(0,180,216,0.08)] px-2 py-0.5 text-[0.5625rem] font-semibold text-[#00B4D8] transition-colors hover:bg-[rgba(0,180,216,0.15)]"
             @click.stop
           >
             🔗 {{ idea.linkPreview?.siteName || idea.linkPreview?.title || 'link' }}
           </a>
           <span
             v-if="author"
-            class="inline-flex items-center gap-1 text-[10px] text-[var(--color-text-muted)]"
+            class="inline-flex items-center gap-1 text-[0.625rem] text-[var(--color-text-muted)]"
           >
             <span
-              class="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[7px] font-bold text-white"
+              class="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[0.4375rem] font-bold text-white"
               :style="{ backgroundColor: author.color }"
             >
               {{ author.name.charAt(0).toUpperCase() }}
@@ -176,7 +176,7 @@ function patch(fields: Partial<VacationIdea>) {
       <!-- Author info line -->
       <div v-if="author" class="flex items-center gap-1.5">
         <span
-          class="flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white"
+          class="flex h-4 w-4 items-center justify-center rounded-full text-[0.5rem] font-bold text-white"
           :style="{ backgroundColor: author.color }"
         >
           {{ author.name.charAt(0).toUpperCase() }}
@@ -335,7 +335,7 @@ function patch(fields: Partial<VacationIdea>) {
           <span
             v-for="voter in voters"
             :key="voter!.id"
-            class="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white"
+            class="flex h-6 w-6 items-center justify-center rounded-full text-[0.625rem] font-bold text-white"
             :style="{ backgroundColor: voter!.color }"
             :title="voter!.name"
           >
@@ -373,7 +373,7 @@ function patch(fields: Partial<VacationIdea>) {
       <!-- Delete -->
       <button
         v-if="!readOnly"
-        class="mt-1 text-[10px] font-medium text-red-400 hover:text-red-500"
+        class="mt-1 text-[0.625rem] font-medium text-red-400 hover:text-red-500"
         @click="$emit('delete')"
       >
         {{ t('common.delete') }}

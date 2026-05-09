@@ -199,7 +199,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
         >
           <span aria-hidden="true" class="text-base">{{ CATEGORY_EMOJI[group.category] }}</span>
           <span>{{ t(`contacts.category.${group.category}`) }}</span>
-          <span class="text-secondary-500/40 text-[10px] font-semibold">{{
+          <span class="text-secondary-500/40 text-[0.625rem] font-semibold">{{
             group.entries.length
           }}</span>
         </h2>
@@ -226,7 +226,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
                 </h3>
                 <span
                   v-if="c.category === 'other' && c.customCategory"
-                  class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[10px] font-bold tracking-wide text-[var(--color-primary)] uppercase"
+                  class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.625rem] font-bold tracking-wide text-[var(--color-primary)] uppercase"
                 >
                   {{ c.customCategory }}
                 </span>

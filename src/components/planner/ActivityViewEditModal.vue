@@ -1054,7 +1054,7 @@ async function confirmReschedule() {
                     </span>
                     <button
                       v-if="findCompletion(activity.dropoffCompletions, occurrenceDate)"
-                      class="mt-1 flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-[11px] font-medium text-green-700 transition-colors hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                      class="mt-1 flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-[0.6875rem] font-medium text-green-700 transition-colors hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
                       @click.stop="toggleDuty('dropoff')"
                     >
                       <span>✓</span>
@@ -1066,7 +1066,7 @@ async function confirmReschedule() {
                     </button>
                     <button
                       v-else-if="occurrenceDate"
-                      class="mt-1 flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-[var(--color-primary-500)] dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-orange-900/20 dark:hover:text-orange-400"
+                      class="mt-1 flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[0.6875rem] font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-[var(--color-primary-500)] dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-orange-900/20 dark:hover:text-orange-400"
                       @click.stop="toggleDuty('dropoff')"
                     >
                       <span class="h-3 w-3 rounded-sm border-[1.5px] border-current" />
@@ -1107,7 +1107,7 @@ async function confirmReschedule() {
                     </span>
                     <button
                       v-if="findCompletion(activity.pickupCompletions, occurrenceDate)"
-                      class="mt-1 flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-[11px] font-medium text-green-700 transition-colors hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                      class="mt-1 flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-[0.6875rem] font-medium text-green-700 transition-colors hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
                       @click.stop="toggleDuty('pickup')"
                     >
                       <span>✓</span>
@@ -1119,7 +1119,7 @@ async function confirmReschedule() {
                     </button>
                     <button
                       v-else-if="occurrenceDate"
-                      class="mt-1 flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-[var(--color-primary-500)] dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-orange-900/20 dark:hover:text-orange-400"
+                      class="mt-1 flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[0.6875rem] font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-[var(--color-primary-500)] dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-orange-900/20 dark:hover:text-orange-400"
                       @click.stop="toggleDuty('pickup')"
                     >
                       <span class="h-3 w-3 rounded-sm border-[1.5px] border-current" />

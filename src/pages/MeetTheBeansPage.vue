@@ -365,7 +365,7 @@ function cancelEditFamilyName() {
     <header class="flex flex-wrap items-start justify-between gap-4">
       <div class="min-w-0 flex-1">
         <div
-          class="font-outfit text-secondary-500/60 text-[11px] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+          class="font-outfit text-secondary-500/60 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
         >
           {{ t('family.hub.kicker') }}
         </div>
@@ -499,7 +499,7 @@ function cancelEditFamilyName() {
               <blockquote class="text-secondary-500 line-clamp-4 text-lg leading-snug font-medium">
                 "{{ saying.words }}"
               </blockquote>
-              <footer class="font-inter text-secondary-500/60 mt-3 text-[11px] font-semibold">
+              <footer class="font-inter text-secondary-500/60 mt-3 text-[0.6875rem] font-semibold">
                 — {{ memberFor(saying.memberId)?.name ?? t('family.title') }}
               </footer>
             </button>
@@ -560,7 +560,7 @@ function cancelEditFamilyName() {
                 </div>
               </div>
               <div class="px-2.5 py-2">
-                <h3 class="font-outfit truncate text-[13px] font-bold" style="color: #2c3e50">
+                <h3 class="font-outfit truncate text-[0.8125rem] font-bold" style="color: #2c3e50">
                   {{ recipe.name }}
                 </h3>
               </div>
@@ -593,7 +593,7 @@ function cancelEditFamilyName() {
           <ul v-if="sidebarAllergies.length > 0" class="space-y-2">
             <li v-for="a in sidebarAllergies" :key="a.id" class="flex items-start gap-2">
               <span
-                class="font-outfit mt-0.5 flex-shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase"
+                class="font-outfit mt-0.5 flex-shrink-0 rounded-full px-1.5 py-0.5 text-[0.5625rem] font-bold tracking-wider uppercase"
                 :class="
                   a.severity === 'severe'
                     ? 'bg-[#F15D22] text-white'
@@ -610,7 +610,7 @@ function cancelEditFamilyName() {
                 >
                   {{ a.name }}
                 </div>
-                <div class="text-secondary-500/50 truncate text-[11px] dark:text-gray-500">
+                <div class="text-secondary-500/50 truncate text-[0.6875rem] dark:text-gray-500">
                   {{ memberFor(a.memberId)?.name ?? '—' }}
                 </div>
               </div>
@@ -647,10 +647,10 @@ function cancelEditFamilyName() {
                 >
                   {{ m.name }}
                 </div>
-                <div class="text-secondary-500/60 truncate text-[11px] dark:text-gray-400">
+                <div class="text-secondary-500/60 truncate text-[0.6875rem] dark:text-gray-400">
                   {{ m.dose }} · {{ m.frequency }}
                 </div>
-                <div class="text-secondary-500/40 truncate text-[10px] dark:text-gray-500">
+                <div class="text-secondary-500/40 truncate text-[0.625rem] dark:text-gray-500">
                   {{ memberFor(m.memberId)?.name ?? '—' }}
                 </div>
               </div>
@@ -691,7 +691,7 @@ function cancelEditFamilyName() {
                 :style="{ backgroundColor: getEventBarColor(event.activity.category) }"
               />
               <div class="min-w-0 flex-1">
-                <div class="text-secondary-500/40 text-[10px] dark:text-gray-500">
+                <div class="text-secondary-500/40 text-[0.625rem] dark:text-gray-500">
                   {{ event.date
                   }}{{ event.activity.startTime ? ', ' + event.activity.startTime : '' }}
                 </div>

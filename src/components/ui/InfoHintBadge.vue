@@ -66,7 +66,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
     <button
       ref="btn"
       type="button"
-      class="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-[10px] leading-none font-bold"
+      class="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-[0.625rem] leading-none font-bold"
       :class="
         dark
           ? 'bg-white/15 text-white/60 hover:bg-white/25'

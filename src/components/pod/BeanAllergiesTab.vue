@@ -101,13 +101,13 @@ function closeModal(): void {
               </h4>
             </div>
             <span
-              class="font-outfit text-secondary-500/60 mt-0.5 text-[11px] font-semibold tracking-wide uppercase"
+              class="font-outfit text-secondary-500/60 mt-0.5 text-[0.6875rem] font-semibold tracking-wide uppercase"
             >
               {{ t(`allergies.type.${a.allergyType}`) }}
             </span>
           </div>
           <span
-            class="font-outfit inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase"
+            class="font-outfit inline-flex items-center rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-wide uppercase"
             :class="SEVERITY_STYLE[a.severity].badge"
           >
             {{ t(`allergies.severity.${a.severity}`) }}

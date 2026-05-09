@@ -197,7 +197,7 @@ function handleSlotClick(hour: number): void {
       class="mb-3 space-y-1.5 rounded-xl border border-gray-200/60 bg-[var(--tint-slate-5)] p-2 dark:border-slate-600/40 dark:bg-slate-700/30"
     >
       <div
-        class="font-outfit text-secondary-500/40 text-[10px] font-semibold tracking-[0.14em] uppercase dark:text-gray-500"
+        class="font-outfit text-secondary-500/40 text-[0.625rem] font-semibold tracking-[0.14em] uppercase dark:text-gray-500"
       >
         {{ t('planner.allDay') }}
       </div>
@@ -331,7 +331,7 @@ function handleSlotClick(hour: number): void {
               >
                 {{ ev.occurrence.activity.title }}
               </div>
-              <div class="text-secondary-500/60 truncate text-[10px] dark:text-gray-400">
+              <div class="text-secondary-500/60 truncate text-[0.625rem] dark:text-gray-400">
                 {{ eventTimeLabel(ev.occurrence.activity)
                 }}<template v-if="ev.occurrence.activity.location">
                   · 📍 {{ ev.occurrence.activity.location }}</template

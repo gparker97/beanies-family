@@ -228,7 +228,7 @@ function onOpenAdd(): void {
           <!-- Section header — kicker + see-all link -->
           <div class="mb-3 flex items-end justify-between">
             <h3
-              class="font-outfit text-secondary-500 text-[11px] font-semibold tracking-[0.12em] uppercase dark:text-gray-300"
+              class="font-outfit text-secondary-500 text-[0.6875rem] font-semibold tracking-[0.12em] uppercase dark:text-gray-300"
               style="
                 border-bottom: 2px dashed var(--color-primary);
                 display: inline-block;

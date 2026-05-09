@@ -466,7 +466,7 @@ function handleSave() {
             >
               {{ t('vacation.planningATrip') }}
             </span>
-            <span class="block text-[10px] text-[var(--color-text-muted)] opacity-60">
+            <span class="block text-[0.625rem] text-[var(--color-text-muted)] opacity-60">
               {{ t('vacation.planningSubtitle') }}
             </span>
           </div>
@@ -514,7 +514,7 @@ function handleSave() {
               {{ opt.label }}
             </span>
             <span
-              class="text-[10px]"
+              class="text-[0.625rem]"
               :class="
                 recurrenceMode === opt.value
                   ? 'text-[var(--color-text-muted)]'

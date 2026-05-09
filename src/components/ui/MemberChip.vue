@@ -26,7 +26,7 @@ const initial = computed(() => name.value.charAt(0).toUpperCase());
 <template>
   <span
     v-if="size === 'dot'"
-    class="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white ring-1 ring-white dark:ring-slate-800"
+    class="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[0.5625rem] font-bold text-white ring-1 ring-white dark:ring-slate-800"
     :style="{ backgroundColor: color }"
     :title="name"
     :aria-label="name"

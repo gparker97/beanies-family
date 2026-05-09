@@ -351,7 +351,7 @@ const resultCount = computed(() => results.value.length);
             <!-- Result count pill -->
             <div v-if="query.trim() && resultCount > 0" class="px-5 pb-2.5">
               <span
-                class="font-outfit inline-flex items-center rounded-full bg-gradient-to-r from-[var(--tint-orange-8)] to-[rgba(230,126,34,0.06)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--heritage-orange)]"
+                class="font-outfit inline-flex items-center rounded-full bg-gradient-to-r from-[var(--tint-orange-8)] to-[rgba(230,126,34,0.06)] px-2.5 py-0.5 text-[0.625rem] font-semibold text-[var(--heritage-orange)]"
               >
                 {{ resultCount }} {{ resultCount === 1 ? 'result' : 'results' }}
               </span>
@@ -372,11 +372,11 @@ const resultCount = computed(() => results.value.length);
                 "
               >
                 <div
-                  class="font-outfit flex items-center gap-2 px-5 py-1.5 text-[10px] font-bold tracking-[0.12em] text-gray-400/70 uppercase dark:text-gray-500"
+                  class="font-outfit flex items-center gap-2 px-5 py-1.5 text-[0.625rem] font-bold tracking-[0.12em] text-gray-400/70 uppercase dark:text-gray-500"
                 >
                   <span>{{ group.label }}</span>
                   <span
-                    class="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--tint-slate-5)] px-1 text-[9px] font-bold text-gray-400 dark:bg-slate-700"
+                    class="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--tint-slate-5)] px-1 text-[0.5625rem] font-bold text-gray-400 dark:bg-slate-700"
                   >
                     {{ group.items.length }}
                   </span>

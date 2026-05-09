@@ -54,7 +54,7 @@ const hasSelection = computed(() =>
 );
 
 const avatarClasses = computed(() =>
-  props.size === 'sm' ? 'h-5 w-5 text-[9px]' : 'h-6 w-6 text-[10px]'
+  props.size === 'sm' ? 'h-5 w-5 text-[0.5625rem]' : 'h-6 w-6 text-[0.625rem]'
 );
 
 function handlePickerUpdate(value: string | string[]) {

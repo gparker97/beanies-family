@@ -38,7 +38,7 @@ const completedByMember = computed(() => {
       style="background: #27ae60"
       @click="emit('toggle', todo.id)"
     >
-      <span class="text-[10px] font-bold text-white md:text-xs">✓</span>
+      <span class="text-[0.625rem] font-bold text-white md:text-xs">✓</span>
     </button>
 
     <!-- Content (clickable for view) -->

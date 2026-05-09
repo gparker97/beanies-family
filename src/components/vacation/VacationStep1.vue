@@ -83,7 +83,7 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
           <!-- Selected checkmark -->
           <span
             v-if="tripType === tt.value"
-            class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--vacation-teal)] text-[10px] text-white"
+            class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--vacation-teal)] text-[0.625rem] text-white"
           >
             ✓
           </span>
@@ -93,7 +93,7 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
           >
             {{ t(`vacation.type.${tt.key}` as any) }}
           </span>
-          <span class="text-[10px] text-[var(--color-text-muted)]">
+          <span class="text-[0.625rem] text-[var(--color-text-muted)]">
             {{ t(`vacation.type.${tt.key}.desc` as any) }}
           </span>
         </button>
