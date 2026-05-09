@@ -55,10 +55,21 @@ export class AccountsPage {
       // subtype DOM exists from first paint. But webkit-CI under sustained
       // contention can still lag the v-show display:none flip + a11y-tree
       // visibility recompute after the category click. Recurrences logged
-      // 2026-04-22/23/30, 2026-05-03, and 2026-05-05 (cross-entity.spec.ts:347
-      // and :379) — the structural fixes have helped but not eliminated the
-      // tail latency. Bumped from 15s to 30s on 2026-05-05 to absorb the
-      // worst observed case while still failing fast on real bugs.
+      // 2026-04-22/23/30, 2026-05-03, 2026-05-05, and 2026-05-09 — six
+      // hits in 18 days, all webkit-only.
+      //
+      // Per the E2E_HEALTH guidance after the 5th recurrence, we now poll
+      // for a stronger expanded-state signal first: the "Select a type"
+      // hint text (rendered only inside the expanded category block, see
+      // AccountCategoryPicker.vue:135). Once that hint is visible, the
+      // a11y tree has recomputed and the subtype button is reliably
+      // clickable — the subsequent waitFor returns immediately on the
+      // happy path. This reduces the failure mode from "subtype timeout
+      // at 30s" to "expansion-stall surfaced in <5s" so a real bug would
+      // fail fast and a flake still gets the full retry budget.
+      await this.page
+        .getByText(ui('modal.selectSubcategory'), { exact: true })
+        .waitFor({ state: 'visible', timeout: 30_000 });
       const subtypeBtn = this.page.getByRole('button', { name: subtype, exact: true });
       await subtypeBtn.waitFor({ state: 'visible', timeout: 30_000 });
       await subtypeBtn.click();
