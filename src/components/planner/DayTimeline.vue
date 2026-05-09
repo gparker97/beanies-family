@@ -165,7 +165,7 @@ onUnmounted(() => {
 
 const nowIndicatorTop = computed(() => {
   const start = hours.value[0] ?? 7;
-  return `${((nowMinutes.value - start * 60) / 60) * ROW_HEIGHT}px`;
+  return `${((nowMinutes.value - start * 60) / 60) * ROW_HEIGHT}rem`;
 });
 
 const showNowIndicator = computed(() => {
@@ -270,7 +270,7 @@ function handleSlotClick(hour: number): void {
       :style="{
         display: 'grid',
         gridTemplateColumns: '56px 1fr',
-        height: totalHeight + 'px',
+        height: totalHeight + 'rem',
       }"
     >
       <!-- Hour label column -->
@@ -279,7 +279,7 @@ function handleSlotClick(hour: number): void {
           v-for="(hour, hi) in hours"
           :key="hour"
           class="absolute right-0 pr-2"
-          :style="{ top: `${hi * ROW_HEIGHT}px`, height: ROW_HEIGHT + 'px' }"
+          :style="{ top: `${hi * ROW_HEIGHT}rem`, height: ROW_HEIGHT + 'rem' }"
         >
           <span class="text-secondary-500/30 text-xs leading-none dark:text-gray-600">
             {{ formatHourLabel(hour) }}
@@ -294,7 +294,7 @@ function handleSlotClick(hour: number): void {
           v-for="(hour, hi) in hours"
           :key="'slot-' + hour"
           class="group/slot absolute inset-x-0 cursor-pointer border-t border-gray-100 transition-all hover:bg-[rgba(241,93,34,0.06)] dark:border-slate-700/50 dark:hover:bg-[rgba(241,93,34,0.12)]"
-          :style="{ top: `${hi * ROW_HEIGHT}px`, height: ROW_HEIGHT + 'px' }"
+          :style="{ top: `${hi * ROW_HEIGHT}rem`, height: ROW_HEIGHT + 'rem' }"
           @click="handleSlotClick(hour)"
         />
 

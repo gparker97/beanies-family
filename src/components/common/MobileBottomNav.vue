@@ -166,7 +166,7 @@ watch(
       :key="cat.id"
       :ref="(el) => setTabRef(el, cat.id)"
       type="button"
-      class="flex min-h-[56px] flex-1 cursor-pointer flex-col items-center justify-center gap-1 transition-colors"
+      class="flex min-h-14 flex-1 cursor-pointer flex-col items-center justify-center gap-1 transition-colors"
       :aria-label="t(cat.labelKey)"
       :aria-haspopup="cat.items ? 'menu' : undefined"
       :aria-expanded="cat.items ? openCategoryId === cat.id : undefined"

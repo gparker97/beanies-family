@@ -101,8 +101,12 @@ export function useWeekNavigation(referenceDate: Ref<Date>) {
 
 // ── Time Grid Utilities ────────────────────────────────────────────────────
 
-const ROW_HEIGHT = 60; // px per hour
-const MIN_CARD_HEIGHT = 24; // px minimum for short activities
+// Per-hour row height in rem units. 3.75rem = 60px at the default 16px root —
+// preserves the original pixel rendering — and grows proportionally in Large
+// reading mode (3.75rem × 19px root = 71.25px) so time labels never clip.
+// Consumers of this constant must render with the `rem` unit, not `px`.
+const ROW_HEIGHT = 3.75;
+const MIN_CARD_HEIGHT = 1.5; // rem — minimum for short activities (1.5rem = 24px at default root)
 
 export interface TimeGridConfig {
   timeRange: { start: number; end: number };
@@ -137,7 +141,7 @@ export function useTimeGrid(timedItems: Ref<Array<{ startTime?: string; endTime?
       : startMinutes + 60;
     const top = (startMinutes / 60) * ROW_HEIGHT;
     const height = Math.max(((endMinutes - startMinutes) / 60) * ROW_HEIGHT, MIN_CARD_HEIGHT);
-    return { top: `${top}px`, height: `${height}px` };
+    return { top: `${top}rem`, height: `${height}rem` };
   }
 
   function formatHourLabel(hour: number): string {
