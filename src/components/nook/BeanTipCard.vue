@@ -74,7 +74,7 @@ function handleMute() {
         <!-- Actions -->
         <div class="mt-3 flex items-center justify-end gap-2.5">
           <button
-            class="text-[11px] text-gray-400/35 transition-opacity hover:opacity-65 dark:text-gray-500/40"
+            class="text-[0.6875rem] text-gray-400/35 transition-opacity hover:opacity-65 dark:text-gray-500/40"
             @click="handleMute"
           >
             {{ t('tips.dontShowTips') }}

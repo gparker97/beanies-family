@@ -43,7 +43,7 @@ const emit = defineEmits<{
       <!-- Disabled hint tooltip -->
       <span
         v-if="opt.disabled && opt.disabledHint"
-        class="pointer-events-none absolute bottom-full left-0 z-50 mb-1.5 rounded-lg bg-gray-800 px-2.5 py-1 text-[10px] font-medium whitespace-nowrap text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-slate-600"
+        class="pointer-events-none absolute bottom-full left-0 z-50 mb-1.5 rounded-lg bg-gray-800 px-2.5 py-1 text-[0.625rem] font-medium whitespace-nowrap text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-slate-600"
       >
         {{ opt.disabledHint }}
       </span>

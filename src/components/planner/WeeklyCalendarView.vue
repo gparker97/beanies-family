@@ -567,7 +567,7 @@ defineExpose({ weekLabel, activityCount });
                 class="from-primary-500/80 to-terracotta-400/80 pointer-events-none flex h-full flex-col items-center justify-center gap-0 rounded-xl bg-gradient-to-r bg-clip-text text-transparent opacity-0 transition-all group-hover/slot:scale-110 group-hover/slot:opacity-50"
               >
                 <span class="text-xl leading-none font-black">+</span>
-                <span class="font-outfit text-[9px] leading-tight font-bold">
+                <span class="font-outfit text-[0.5625rem] leading-tight font-bold">
                   {{ formatHourLabel(hour) }} &ndash; {{ formatHourLabel(hour + 1) }}
                 </span>
               </span>
@@ -600,13 +600,13 @@ defineExpose({ weekLabel, activityCount });
                   {{ activity.title }}
                 </div>
                 <div class="flex min-w-0 items-center gap-1">
-                  <span class="text-primary-500 truncate text-[11px] leading-tight opacity-70">
+                  <span class="text-primary-500 truncate text-[0.6875rem] leading-tight opacity-70">
                     {{ formatTime12(activity.startTime!)
                     }}{{ activity.endTime ? `-${formatTime12(activity.endTime)}` : '' }}
                   </span>
                   <span
                     v-if="activity.location"
-                    class="text-secondary-500/60 min-w-0 flex-1 truncate text-[11px] leading-tight dark:text-gray-400"
+                    class="text-secondary-500/60 min-w-0 flex-1 truncate text-[0.6875rem] leading-tight dark:text-gray-400"
                   >
                     · 📍 {{ activity.location }}
                   </span>
@@ -701,7 +701,7 @@ defineExpose({ weekLabel, activityCount });
             />
             <span
               v-if="(dayDensities.get(day.dateStr)?.moreCount ?? 0) > 0"
-              class="text-[8px] leading-none font-semibold"
+              class="text-[0.5rem] leading-none font-semibold"
               :class="
                 selectedMobileDay === day.dateStr
                   ? 'text-white/90'

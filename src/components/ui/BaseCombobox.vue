@@ -409,7 +409,7 @@ function clearSelection() {
                 <span class="font-outfit truncate font-semibold">{{ option.rich.primary }}</span>
                 <span
                   v-if="option.rich.badge"
-                  class="flex-shrink-0 font-mono text-[11px] font-semibold tracking-wider opacity-60"
+                  class="flex-shrink-0 font-mono text-[0.6875rem] font-semibold tracking-wider opacity-60"
                 >
                   {{ option.rich.badge }}
                 </span>

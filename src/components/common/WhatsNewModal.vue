@@ -84,7 +84,9 @@ function handleSeeAll() {
             >
               {{ txt(feature.title) }}
             </div>
-            <div class="text-secondary-500/55 text-[13px] leading-relaxed dark:text-gray-400/80">
+            <div
+              class="text-secondary-500/55 text-[0.8125rem] leading-relaxed dark:text-gray-400/80"
+            >
               {{ txt(feature.description) }}
             </div>
           </div>
@@ -137,7 +139,7 @@ function handleSeeAll() {
           {{ t('whatsNew.gotItThanks') }}
         </button>
         <button
-          class="hover:text-primary-500 dark:hover:text-primary-400 text-[13px] text-gray-400/60 transition-all dark:text-gray-500/50"
+          class="hover:text-primary-500 dark:hover:text-primary-400 text-[0.8125rem] text-gray-400/60 transition-all dark:text-gray-500/50"
           @click="handleSeeAll"
         >
           {{ t('whatsNew.seeAll') }}

@@ -88,7 +88,7 @@ function closeModal(): void {
           <MilestoneThumb :milestone="m" size="md" @open-lightbox="lightbox.openFor(m)" />
           <div class="min-w-0 flex-1">
             <p
-              class="font-outfit text-primary-600 text-[11px] font-semibold tracking-wide uppercase dark:text-orange-300"
+              class="font-outfit text-primary-600 text-[0.6875rem] font-semibold tracking-wide uppercase dark:text-orange-300"
             >
               {{ formatDateShort(m.occurredOn) }}
             </p>
@@ -97,7 +97,7 @@ function closeModal(): void {
             >
               {{ m.title }}
             </p>
-            <p class="font-outfit text-secondary-500/60 mt-0.5 text-[11px] dark:text-gray-400">
+            <p class="font-outfit text-secondary-500/60 mt-0.5 text-[0.6875rem] dark:text-gray-400">
               {{ categoryLabel(m) }}
             </p>
             <p

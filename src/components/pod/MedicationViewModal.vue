@@ -223,7 +223,7 @@ const scheduleMeta = computed(() => {
         />
         <div class="min-w-0 flex-1">
           <p
-            class="font-outfit text-[10px] font-semibold tracking-[0.14em] text-[var(--color-text-muted)] uppercase"
+            class="font-outfit text-[0.625rem] font-semibold tracking-[0.14em] text-[var(--color-text-muted)] uppercase"
           >
             For
           </p>

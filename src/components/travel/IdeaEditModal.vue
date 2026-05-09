@@ -261,13 +261,13 @@ function handleSave() {
           <div class="min-w-0 flex-1 px-3 py-2">
             <div
               v-if="linkPreview.siteName"
-              class="font-outfit mb-0.5 truncate text-[10px] font-semibold tracking-wide text-[#00B4D8] uppercase"
+              class="font-outfit mb-0.5 truncate text-[0.625rem] font-semibold tracking-wide text-[#00B4D8] uppercase"
             >
               {{ linkPreview.siteName }}
             </div>
             <div
               v-else-if="normalizedLink"
-              class="font-outfit mb-0.5 truncate text-[10px] font-semibold tracking-wide text-gray-400 uppercase"
+              class="font-outfit mb-0.5 truncate text-[0.625rem] font-semibold tracking-wide text-gray-400 uppercase"
             >
               {{ extractDomain(normalizedLink) }}
             </div>
@@ -279,7 +279,7 @@ function handleSave() {
             </div>
             <div
               v-if="linkPreview.description"
-              class="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500"
+              class="mt-0.5 line-clamp-2 text-[0.6875rem] leading-relaxed text-gray-400 dark:text-gray-500"
             >
               {{ linkPreview.description }}
             </div>
@@ -398,10 +398,10 @@ function handleSave() {
           <span
             v-for="voter in voters"
             :key="voter!.id"
-            class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300"
+            class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-[0.6875rem] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300"
           >
             <span
-              class="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[8px] font-bold text-white"
+              class="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[0.5rem] font-bold text-white"
               :style="{ backgroundColor: voter!.color }"
             >
               {{ voter!.name.charAt(0).toUpperCase() }}

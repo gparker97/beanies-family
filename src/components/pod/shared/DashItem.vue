@@ -61,13 +61,13 @@ const toneClass = (): string => TONE_BG[props.tone ?? 'fav'];
     </span>
     <span class="flex min-w-0 flex-col gap-0.5">
       <span
-        class="font-outfit text-secondary-500 truncate text-[13px] leading-tight font-semibold dark:text-gray-100"
+        class="font-outfit text-secondary-500 truncate text-[0.8125rem] leading-tight font-semibold dark:text-gray-100"
       >
         {{ title }}
       </span>
       <span
         v-if="sub"
-        class="font-inter text-secondary-500/60 truncate text-[11px] leading-tight dark:text-gray-400"
+        class="font-inter text-secondary-500/60 truncate text-[0.6875rem] leading-tight dark:text-gray-400"
       >
         {{ sub }}
       </span>

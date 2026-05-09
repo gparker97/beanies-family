@@ -372,7 +372,7 @@ function getRouteForCategory(key: string): string {
                     {{ item.name }}
                   </div>
                   <div class="mt-0.5 flex items-center justify-between">
-                    <span class="truncate text-[11px] text-slate-400 dark:text-gray-500">
+                    <span class="truncate text-[0.6875rem] text-slate-400 dark:text-gray-500">
                       {{ t(item.typeLabelKey as UIStringKey) }}
                     </span>
                     <CurrencyAmount
@@ -389,7 +389,7 @@ function getRouteForCategory(key: string): string {
               <!-- View all link -->
               <router-link
                 :to="getRouteForCategory(cat.key)"
-                class="text-primary-500 font-outfit mt-2 block text-center text-[11px] font-semibold hover:underline"
+                class="text-primary-500 font-outfit mt-2 block text-center text-[0.6875rem] font-semibold hover:underline"
                 @click.stop
               >
                 {{
@@ -451,7 +451,7 @@ function getRouteForCategory(key: string): string {
                   {{ item.name }}
                 </div>
                 <div class="mt-0.5 flex items-center justify-between">
-                  <span class="truncate text-[11px] text-slate-400 dark:text-gray-500">
+                  <span class="truncate text-[0.6875rem] text-slate-400 dark:text-gray-500">
                     {{ t(item.typeLabelKey as UIStringKey) }}
                   </span>
                   <CurrencyAmount
@@ -469,7 +469,7 @@ function getRouteForCategory(key: string): string {
             <!-- View all link -->
             <router-link
               to="/accounts?groupBy=category"
-              class="text-primary-500 font-outfit mt-2 block text-center text-[11px] font-semibold hover:underline"
+              class="text-primary-500 font-outfit mt-2 block text-center text-[0.6875rem] font-semibold hover:underline"
               @click.stop
             >
               {{ t('dashboard.breakdown.viewAllAccounts') }} &rarr;

@@ -117,7 +117,7 @@ function handleSelect(tile: Tile): void {
           />
           <div class="min-w-0 flex-1">
             <div
-              class="font-outfit text-secondary-500 truncate text-[15px] font-bold dark:text-gray-100"
+              class="font-outfit text-secondary-500 truncate text-[0.9375rem] font-bold dark:text-gray-100"
             >
               {{ tile.member.name }}
             </div>

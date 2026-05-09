@@ -287,21 +287,21 @@ const severeAllergyCount = computed(
             <!-- Owner gets a Heritage Orange chip with crown — unmistakable at a glance. -->
             <span
               v-if="member.role === 'owner'"
-              class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[#F15D22] uppercase dark:bg-orange-900/30 dark:text-orange-200"
+              class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide text-[#F15D22] uppercase dark:bg-orange-900/30 dark:text-orange-200"
             >
               <span aria-hidden="true">👑</span>
               {{ t('family.role.ownerBadge') }}
             </span>
             <span
               v-else
-              class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--color-secondary)] uppercase dark:bg-slate-700 dark:text-gray-300"
+              class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide text-[var(--color-secondary)] uppercase dark:bg-slate-700 dark:text-gray-300"
             >
               {{ roleLabel }}
             </span>
             <span v-if="ageLabel !== null">· age {{ ageLabel }}</span>
             <span
               v-if="member.requiresPassword && !member.isPet"
-              class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+              class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[0.625rem] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
             >
               <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
               {{ t('family.status.waitingToJoin') }}
@@ -326,13 +326,13 @@ const severeAllergyCount = computed(
             class="font-inter text-secondary-500 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm leading-snug dark:text-gray-200"
           >
             <span
-              class="font-outfit text-secondary-500/60 text-[10px] font-semibold tracking-[0.08em] uppercase opacity-80 dark:text-gray-400"
+              class="font-outfit text-secondary-500/60 text-[0.625rem] font-semibold tracking-[0.08em] uppercase opacity-80 dark:text-gray-400"
             >
               {{ t('family.card.fave') }}
             </span>
             <span class="truncate">{{ topFavorite.name }}</span>
             <span
-              class="font-outfit inline-flex items-center gap-1 rounded-full bg-[rgb(230_126_34_/_12%)] px-2 py-0.5 text-[10px] font-semibold text-[#E67E22]"
+              class="font-outfit inline-flex items-center gap-1 rounded-full bg-[rgb(230_126_34_/_12%)] px-2 py-0.5 text-[0.625rem] font-semibold text-[#E67E22]"
             >
               {{ FAV_EMOJI[topFavorite.category] }}
               {{ t(`favorites.category.${topFavorite.category}`) }}
@@ -349,7 +349,7 @@ const severeAllergyCount = computed(
           <span class="text-lg leading-none" aria-hidden="true">💬</span>
           <div>
             <div
-              class="font-outfit text-secondary-500/60 text-[10px] font-semibold tracking-[0.08em] uppercase opacity-80 dark:text-gray-400"
+              class="font-outfit text-secondary-500/60 text-[0.625rem] font-semibold tracking-[0.08em] uppercase opacity-80 dark:text-gray-400"
             >
               {{ t('family.card.latestSaying') }}
             </div>
@@ -379,7 +379,7 @@ const severeAllergyCount = computed(
             "
           >
             <span
-              class="font-outfit mr-1.5 text-[10px] font-semibold tracking-[0.08em] uppercase opacity-80"
+              class="font-outfit mr-1.5 text-[0.625rem] font-semibold tracking-[0.08em] uppercase opacity-80"
             >
               {{ headsUp.label }}
             </span>
@@ -395,19 +395,19 @@ const severeAllergyCount = computed(
         <div class="flex flex-wrap gap-1.5">
           <span
             v-if="favorites.length"
-            class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-secondary)] dark:bg-slate-700 dark:text-gray-300"
+            class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-secondary)] dark:bg-slate-700 dark:text-gray-300"
           >
             {{ favorites.length }} {{ favorites.length === 1 ? 'fave' : 'faves' }}
           </span>
           <span
             v-if="sayings.length"
-            class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-secondary)] dark:bg-slate-700 dark:text-gray-300"
+            class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-secondary)] dark:bg-slate-700 dark:text-gray-300"
           >
             {{ sayings.length }} {{ sayings.length === 1 ? 'saying' : 'sayings' }}
           </span>
           <span
             v-if="allergies.length"
-            class="font-outfit inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+            class="font-outfit inline-flex items-center rounded-full px-2 py-0.5 text-[0.625rem] font-semibold"
             :class="
               severeAllergyCount > 0
                 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
@@ -419,14 +419,14 @@ const severeAllergyCount = computed(
           </span>
           <span
             v-if="activeMedications.length"
-            class="font-outfit inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+            class="font-outfit inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[0.625rem] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
           >
             {{ activeMedications.length }}
             {{ activeMedications.length === 1 ? t('family.card.med') : t('family.card.meds') }}
           </span>
           <span
             v-if="notes.length"
-            class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-secondary)] dark:bg-slate-700 dark:text-gray-300"
+            class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-secondary)] dark:bg-slate-700 dark:text-gray-300"
           >
             {{ notes.length }} {{ notes.length === 1 ? 'note' : 'notes' }}
           </span>

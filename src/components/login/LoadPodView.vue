@@ -854,7 +854,7 @@ async function handleDriveRefresh() {
             class="font-outfit text-secondary-500/70 hover:text-primary-500 inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-2 text-xs font-semibold transition-colors dark:text-gray-400"
           >
             <span
-              class="text-primary-500 inline-block text-[10px] transition-transform group-open:rotate-90"
+              class="text-primary-500 inline-block text-[0.625rem] transition-transform group-open:rotate-90"
               aria-hidden="true"
               >▸</span
             >

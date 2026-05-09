@@ -299,7 +299,7 @@ function onRecipeDeleted(): void {
                   <span :class="e.rating >= n ? '' : 'opacity-30 grayscale'">⭐</span>
                 </span>
               </div>
-              <span class="font-outfit text-secondary-500/60 text-[11px] font-semibold">
+              <span class="font-outfit text-secondary-500/60 text-[0.6875rem] font-semibold">
                 {{ e.cookedOn }}
               </span>
             </div>
@@ -315,7 +315,7 @@ function onRecipeDeleted(): void {
             >
               ✏️ {{ e.toImprove }}
             </p>
-            <span class="font-inter text-secondary-500/50 mt-1 text-[11px]">
+            <span class="font-inter text-secondary-500/50 mt-1 text-[0.6875rem]">
               {{ t('cookLog.byline.cookedBy') }} {{ memberName(e.cookedBy) }}
             </span>
           </button>

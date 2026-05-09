@@ -105,7 +105,7 @@ function handleClick(e: MouseEvent): void {
       </span>
       <span
         v-if="photoCount > 1"
-        class="font-outfit pointer-events-none absolute right-1 bottom-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-black/65 px-1 text-[9px] font-bold text-white"
+        class="font-outfit pointer-events-none absolute right-1 bottom-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-black/65 px-1 text-[0.5625rem] font-bold text-white"
         aria-hidden="true"
       >
         +{{ photoCount - 1 }}

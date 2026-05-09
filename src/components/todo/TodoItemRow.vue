@@ -94,7 +94,7 @@ const timeAgo = computed(() => {
         <!-- Overdue date badge -->
         <span
           v-if="formattedDate && isOverdue"
-          class="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary-500)] px-2 py-0.5 text-[10px] font-semibold text-white md:gap-1.5 md:px-2.5 md:text-xs"
+          class="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary-500)] px-2 py-0.5 text-[0.625rem] font-semibold text-white md:gap-1.5 md:px-2.5 md:text-xs"
           :class="compact ? 'font-outfit' : ''"
         >
           ⏰{{ compact ? ' ' : '' }}{{ formattedDate
@@ -109,7 +109,7 @@ const timeAgo = computed(() => {
         <!-- Normal date -->
         <span
           v-else-if="formattedDate"
-          class="text-[10px] font-semibold md:text-xs"
+          class="text-[0.625rem] font-semibold md:text-xs"
           :class="compact ? 'font-outfit' : ''"
           :style="{ color: 'var(--color-primary-500)' }"
         >
@@ -117,7 +117,7 @@ const timeAgo = computed(() => {
         </span>
 
         <!-- No date (full mode only) -->
-        <span v-else-if="!compact" class="text-[10px] opacity-35 md:text-xs">
+        <span v-else-if="!compact" class="text-[0.625rem] opacity-35 md:text-xs">
           {{ t('todo.noDateSet') }}
         </span>
 

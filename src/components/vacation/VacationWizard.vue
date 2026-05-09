@@ -323,7 +323,7 @@ const saveLabel = computed(() => {
             <span v-else>{{ step.num }}</span>
           </div>
           <span
-            class="font-outfit hidden text-[10px] font-semibold sm:inline"
+            class="font-outfit hidden text-[0.625rem] font-semibold sm:inline"
             :class="
               step.num < currentStep
                 ? 'text-[#27AE60]'

@@ -59,7 +59,7 @@ const ACCENT_CLASS: Record<NonNullable<Stat['accent']>, string> = {
         {{ stat.value }}
       </span>
       <span
-        class="font-outfit text-secondary-500/60 text-[11px] leading-tight font-medium dark:text-gray-400"
+        class="font-outfit text-secondary-500/60 text-[0.6875rem] leading-tight font-medium dark:text-gray-400"
       >
         {{ stat.label }}
       </span>

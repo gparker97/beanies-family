@@ -67,7 +67,7 @@ const gapCount = computed(() => computeAccommodationGaps(props.vacation).length)
     <div class="mt-2 flex items-center justify-between">
       <span
         v-if="days !== null && days >= 0"
-        class="inline-flex items-center rounded-lg px-2.5 py-0.5 text-[10px] font-bold text-white"
+        class="inline-flex items-center rounded-lg px-2.5 py-0.5 text-[0.625rem] font-bold text-white"
         style="background: linear-gradient(135deg, var(--vacation-teal), #0096c7)"
       >
         {{ emoji }} {{ days }}
@@ -78,7 +78,7 @@ const gapCount = computed(() => computeAccommodationGaps(props.vacation).length)
         <span
           v-for="(m, i) in assignees"
           :key="m!.id"
-          class="inline-flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white ring-1 ring-white dark:ring-slate-800"
+          class="inline-flex h-4 w-4 items-center justify-center rounded-full text-[0.5rem] font-bold text-white ring-1 ring-white dark:ring-slate-800"
           :class="{ '-ml-1': i > 0 }"
           :style="{ backgroundColor: m!.color }"
           >{{ m!.name.charAt(0) }}</span
@@ -104,13 +104,13 @@ const gapCount = computed(() => computeAccommodationGaps(props.vacation).length)
     <div v-if="unbookedCount > 0 || gapCount > 0" class="mt-2 flex flex-wrap gap-1.5">
       <span
         v-if="unbookedCount > 0"
-        class="inline-flex items-center rounded-lg bg-[var(--vacation-gold-tint)] px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300"
+        class="inline-flex items-center rounded-lg bg-[var(--vacation-gold-tint)] px-2 py-0.5 text-[0.625rem] font-semibold text-amber-700 dark:text-amber-300"
       >
         ⏳ {{ unbookedCount }} {{ unbookedCount === 1 ? 'item needs' : 'items need' }} booking
       </span>
       <span
         v-if="gapCount > 0"
-        class="inline-flex items-center rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-[10px] font-semibold text-[var(--heritage-orange)]"
+        class="inline-flex items-center rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--heritage-orange)]"
       >
         🏨 {{ gapCount }} {{ gapCount === 1 ? 'night' : 'nights' }} unaccommodated
       </span>

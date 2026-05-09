@@ -631,7 +631,7 @@ function dismissLinkPrompt() {
             {{ opt.label }}
           </span>
           <span
-            class="text-[10px]"
+            class="text-[0.625rem]"
             :class="
               recurrenceMode === opt.value
                 ? 'text-[var(--color-text-muted)]'
@@ -712,7 +712,7 @@ function dismissLinkPrompt() {
         <button
           v-if="hasLinkableActivities"
           type="button"
-          class="font-outfit rounded-lg bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--color-text)] shadow-sm transition-all hover:shadow-md dark:bg-slate-700 dark:text-gray-200"
+          class="font-outfit rounded-lg bg-white px-2.5 py-1 text-[0.6875rem] font-bold text-[var(--color-text)] shadow-sm transition-all hover:shadow-md dark:bg-slate-700 dark:text-gray-200"
           @click="selectQuickLink('activity')"
         >
           📋 {{ t('txLink.activity') }}
@@ -720,14 +720,14 @@ function dismissLinkPrompt() {
         <button
           v-if="hasLinkableLoans"
           type="button"
-          class="font-outfit rounded-lg bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--color-text)] shadow-sm transition-all hover:shadow-md dark:bg-slate-700 dark:text-gray-200"
+          class="font-outfit rounded-lg bg-white px-2.5 py-1 text-[0.6875rem] font-bold text-[var(--color-text)] shadow-sm transition-all hover:shadow-md dark:bg-slate-700 dark:text-gray-200"
           @click="selectQuickLink('loan')"
         >
           🏦 {{ t('txLink.loan') }}
         </button>
         <button
           type="button"
-          class="rounded-lg px-1.5 py-1 text-[11px] text-[var(--color-text-muted)] transition-colors hover:bg-gray-100 dark:hover:bg-slate-600"
+          class="rounded-lg px-1.5 py-1 text-[0.6875rem] text-[var(--color-text-muted)] transition-colors hover:bg-gray-100 dark:hover:bg-slate-600"
           @click="dismissLinkPrompt"
         >
           ✕

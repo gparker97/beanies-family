@@ -336,7 +336,7 @@ function handleClose() {
         data-testid="invite-wizard-invitee-chip"
       >
         <span
-          class="font-outfit text-[10px] font-semibold tracking-[0.08em] text-gray-400 uppercase"
+          class="font-outfit text-[0.625rem] font-semibold tracking-[0.08em] text-gray-400 uppercase"
         >
           {{ t('inviteWizard.invitee.label') }}
         </span>
@@ -387,7 +387,7 @@ function handleClose() {
             data-testid="invite-wizard-child-hint-toggle"
           >
             <span
-              class="text-[10px] text-[var(--color-primary)] transition-transform group-open:rotate-90"
+              class="text-[0.625rem] text-[var(--color-primary)] transition-transform group-open:rotate-90"
               aria-hidden="true"
               >▸</span
             >

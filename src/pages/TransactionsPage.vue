@@ -1153,7 +1153,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
             <!-- Account (desktop) — member-color pill; transfers render "from → to" -->
             <div class="hidden min-w-0 md:flex md:items-center">
               <span
-                class="font-outfit max-w-full truncate rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                class="font-outfit max-w-full truncate rounded-full px-2.5 py-0.5 text-[0.6875rem] font-semibold"
                 :style="{
                   backgroundColor: `${getMemberColorByAccountId(tx.accountId)}22`,
                   color: getMemberColorByAccountId(tx.accountId),
@@ -1167,7 +1167,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
             <!-- Member (desktop) -->
             <div class="hidden items-center gap-1.5 md:flex">
               <div
-                class="flex h-5 w-5 items-center justify-center rounded-full text-[9px]"
+                class="flex h-5 w-5 items-center justify-center rounded-full text-[0.5625rem]"
                 :style="{
                   background: `linear-gradient(135deg, ${getMemberColorByAccountId(tx.accountId)}, ${getMemberColorByAccountId(tx.accountId)}88)`,
                 }"

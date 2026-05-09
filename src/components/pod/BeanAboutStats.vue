@@ -36,7 +36,7 @@ const { t } = useTranslation();
     <div class="flex items-center gap-1.5 px-5 pt-3 pb-1">
       <span class="text-xs leading-none" aria-hidden="true">🫘</span>
       <span
-        class="font-outfit text-secondary-500/55 text-[10px] font-semibold tracking-[0.14em] uppercase dark:text-gray-400"
+        class="font-outfit text-secondary-500/55 text-[0.625rem] font-semibold tracking-[0.14em] uppercase dark:text-gray-400"
       >
         {{ t('bean.overview.about') }}
       </span>
@@ -49,7 +49,7 @@ const { t } = useTranslation();
     >
       <div v-for="(stat, i) in stats" :key="i" class="about-cell flex flex-col gap-0.5 px-4 py-2">
         <span
-          class="font-outfit text-secondary-500/55 text-[10px] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+          class="font-outfit text-secondary-500/55 text-[0.625rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
         >
           {{ stat.label }}
         </span>
@@ -58,7 +58,7 @@ const { t } = useTranslation();
         >
           {{ stat.value }}
         </span>
-        <span v-if="stat.sub" class="text-secondary-500/60 text-[11px] dark:text-gray-400">
+        <span v-if="stat.sub" class="text-secondary-500/60 text-[0.6875rem] dark:text-gray-400">
           {{ stat.sub }}
         </span>
       </div>

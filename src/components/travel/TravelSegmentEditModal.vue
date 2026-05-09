@@ -495,7 +495,7 @@ async function handleSave() {
       <template v-if="isFlight">
         <div>
           <div
-            class="font-outfit mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
+            class="font-outfit mb-2 flex items-center gap-1.5 text-[0.625rem] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
           >
             <span>✈️</span>
             <span>{{ t('vacation.essentials') }}</span>
@@ -537,7 +537,7 @@ async function handleSave() {
 
         <div>
           <div
-            class="font-outfit mb-2 text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+            class="font-outfit mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
           >
             {{ t('vacation.bookingDetails') }}
           </div>
@@ -611,7 +611,7 @@ async function handleSave() {
       <template v-if="isCruise">
         <div>
           <div
-            class="font-outfit mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
+            class="font-outfit mb-2 flex items-center gap-1.5 text-[0.625rem] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
           >
             <span>🚢</span>
             <span>{{ t('vacation.essentials') }}</span>
@@ -649,7 +649,7 @@ async function handleSave() {
 
         <div>
           <div
-            class="font-outfit mb-2 text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+            class="font-outfit mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
           >
             {{ t('vacation.bookingDetails') }}
           </div>

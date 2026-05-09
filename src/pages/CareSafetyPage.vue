@@ -172,7 +172,7 @@ function openMedication(m: Medication): void {
               <p class="text-secondary-500/60 text-xs">{{ memberFor(a.memberId)?.name ?? '—' }}</p>
             </div>
             <span
-              class="font-outfit inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase"
+              class="font-outfit inline-flex items-center rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-wide uppercase"
               :class="SEVERITY_STYLE[a.severity].badge"
             >
               {{ t(`allergies.severity.${a.severity}`) }}
@@ -206,7 +206,7 @@ function openMedication(m: Medication): void {
             <h3 class="font-outfit text-secondary-500 text-sm font-bold dark:text-gray-100">
               {{ m.name }}
             </h3>
-            <span class="text-secondary-500/60 text-[11px]">{{
+            <span class="text-secondary-500/60 text-[0.6875rem]">{{
               memberFor(m.memberId)?.name ?? '—'
             }}</span>
           </div>

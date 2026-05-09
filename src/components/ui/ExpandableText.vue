@@ -105,7 +105,7 @@ const html = computed(() => renderText(props.text));
     <button
       v-if="overflowed || expanded"
       type="button"
-      class="font-outfit mt-1 inline-flex items-center gap-0.5 text-[10px] font-semibold tracking-[0.12em] text-[var(--vacation-teal)] uppercase hover:underline"
+      class="font-outfit mt-1 inline-flex items-center gap-0.5 text-[0.625rem] font-semibold tracking-[0.12em] text-[var(--vacation-teal)] uppercase hover:underline"
       :aria-expanded="expanded"
       @click="expanded = !expanded"
     >

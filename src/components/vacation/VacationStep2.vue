@@ -336,7 +336,7 @@ function removeSegment(index: number) {
       <template v-if="isFlightType(seg.type)">
         <div>
           <div
-            class="font-outfit mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
+            class="font-outfit mb-2 flex items-center gap-1.5 text-[0.625rem] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
           >
             <span>✈️</span>
             <span>{{ t('vacation.essentials') }}</span>
@@ -379,7 +379,7 @@ function removeSegment(index: number) {
 
         <div>
           <div
-            class="font-outfit mb-2 text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+            class="font-outfit mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
           >
             {{ t('vacation.bookingDetails') }}
           </div>
@@ -462,7 +462,7 @@ function removeSegment(index: number) {
       <template v-else-if="seg.type === 'cruise'">
         <div>
           <div
-            class="font-outfit mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
+            class="font-outfit mb-2 flex items-center gap-1.5 text-[0.625rem] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
           >
             <span>🚢</span>
             <span>{{ t('vacation.essentials') }}</span>
@@ -500,7 +500,7 @@ function removeSegment(index: number) {
 
         <div>
           <div
-            class="font-outfit mb-2 text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+            class="font-outfit mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
           >
             {{ t('vacation.bookingDetails') }}
           </div>
@@ -600,7 +600,7 @@ function removeSegment(index: number) {
       <template v-else-if="isTrainOrFerry(seg.type)">
         <div>
           <div
-            class="font-outfit mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
+            class="font-outfit mb-2 flex items-center gap-1.5 text-[0.625rem] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
           >
             <span>{{ seg.type === 'train' ? '🚅' : '⛴️' }}</span>
             <span>{{ t('vacation.essentials') }}</span>
@@ -635,7 +635,7 @@ function removeSegment(index: number) {
 
         <div>
           <div
-            class="font-outfit mb-2 text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+            class="font-outfit mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
           >
             {{ t('vacation.bookingDetails') }}
           </div>

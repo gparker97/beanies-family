@@ -158,7 +158,7 @@ function onEntryClick(entry: ScrapbookEntry): void {
       "
     >
       <span
-        class="pointer-events-none absolute top-3 right-7 text-[130px] opacity-10"
+        class="pointer-events-none absolute top-3 right-7 text-[8.125rem] opacity-10"
         style="transform: rotate(-8deg)"
         aria-hidden="true"
       >
