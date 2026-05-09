@@ -509,7 +509,25 @@ onMounted(async () => {
     // blocks app boot.
     try {
       const { completeRedirectAuth } = await import('@/services/google/googleAuth');
-      const redirectToken = await completeRedirectAuth();
+      // Defense-in-depth: even with the inner fetch timeout in oauthProxy, an
+      // outer race ensures app init never wedges at `isInitializing=true` if
+      // a future code path adds another awaited fetch here. 20s is generous
+      // (the inner fetch already times out at 15s).
+      const REDIRECT_AUTH_TIMEOUT_MS = 20_000;
+      const redirectToken = await Promise.race([
+        completeRedirectAuth(),
+        new Promise<null>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  `completeRedirectAuth() timed out after ${REDIRECT_AUTH_TIMEOUT_MS}ms — silent refresh failed`
+                )
+              ),
+            REDIRECT_AUTH_TIMEOUT_MS
+          )
+        ),
+      ]);
       if (redirectToken) {
         initBreadcrumbs.push('auth: consumed pending redirect-auth token');
       } else {
