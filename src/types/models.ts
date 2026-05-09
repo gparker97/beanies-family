@@ -32,6 +32,7 @@ export interface GlobalSettings {
   id: 'global_settings';
   theme: 'light' | 'dark' | 'system';
   language: LanguageCode;
+  textSize?: 'normal' | 'large';
   lastActiveFamilyId: UUID | null;
   exchangeRates: ExchangeRate[];
   exchangeRateAutoUpdate: boolean;
@@ -1066,6 +1067,7 @@ export interface Settings {
   exchangeRateLastFetch: ISODateString | null;
   theme: 'light' | 'dark' | 'system';
   language: LanguageCode;
+  textSize?: 'normal' | 'large';
   syncEnabled: boolean;
   syncFilePath?: string; // Display name of sync file
   autoSyncEnabled: boolean;

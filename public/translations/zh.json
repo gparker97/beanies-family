@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-07",
-    "translationCount": 2751
+    "lastUpdated": "2026-05-09",
+    "translationCount": 2757
   },
   "translations": {
     "app.name": {
@@ -13760,6 +13760,36 @@
       "translation": "我们的家庭剪贴簿",
       "hash": "cg8u7m",
       "lastUpdated": "2026-05-07"
+    },
+    "settings.textSize": {
+      "translation": "文字大小",
+      "hash": "f057v8",
+      "lastUpdated": "2026-05-09"
+    },
+    "settings.textSize.normal": {
+      "translation": "正常",
+      "hash": "wch9mh",
+      "lastUpdated": "2026-05-09"
+    },
+    "settings.textSize.large": {
+      "translation": "大型",
+      "hash": "17kpwb",
+      "lastUpdated": "2026-05-09"
+    },
+    "settings.textSizeHint": {
+      "translation": "使文本和按钮更易于阅读",
+      "hash": "iskqil",
+      "lastUpdated": "2026-05-09"
+    },
+    "settings.persistFailed": {
+      "translation": "无法保存您的偏好设置",
+      "hash": "myajhx",
+      "lastUpdated": "2026-05-09"
+    },
+    "common.retry": {
+      "translation": "重试",
+      "hash": "1ay360",
+      "lastUpdated": "2026-05-09"
     }
   }
 }
