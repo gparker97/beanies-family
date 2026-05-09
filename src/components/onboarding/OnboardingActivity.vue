@@ -176,16 +176,16 @@ function formatActivityMeta(activity: AddedActivity): string {
 <template>
   <OnboardingStepShell>
     <template #decorations>
-      <div class="ob-float-emoji" style="font-size: 24px; right: 50px; top: 36px">📅</div>
+      <div class="ob-float-emoji" style="font-size: 1.5rem; right: 50px; top: 36px">📅</div>
       <div
         class="ob-float-emoji"
-        style="animation-delay: 0.8s; font-size: 22px; left: 50px; top: 130px"
+        style="animation-delay: 0.8s; font-size: 1.375rem; left: 50px; top: 130px"
       >
         ⚽
       </div>
       <div
         class="ob-float-emoji"
-        style="animation-delay: 0.4s; bottom: 100px; font-size: 20px; right: 60px"
+        style="animation-delay: 0.4s; bottom: 100px; font-size: 1.25rem; right: 60px"
       >
         🎨
       </div>

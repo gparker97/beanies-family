@@ -18,6 +18,14 @@
       }
     ],
     "function-no-unknown": [true, { "ignoreFunctions": ["theme"] }],
-    "order/properties-alphabetical-order": true
+    "order/properties-alphabetical-order": true,
+    "declaration-property-value-disallowed-list": [
+      {
+        "font-size": ["/\\d+px(\\s|$|;|!)/", "/^\\d+px$/"]
+      },
+      {
+        "message": "Use rem (or @apply text-*). px font-size breaks the Large reading mode (see .claude/skills/beanies-theme/SKILL.md § Text-size accessibility mode). Decorative exception? Add /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative ... */"
+      }
+    ]
   }
 }

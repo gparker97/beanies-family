@@ -7,7 +7,7 @@
  * Usage:
  *   <OnboardingStepShell>
  *     <template #decorations>
- *       <div class="ob-float-emoji" style="top:40px;left:40px;font-size:24px">💰</div>
+ *       <div class="ob-float-emoji" style="top:40px;left:40px;font-size: 1.5rem">💰</div>
  *       <!-- ... -->
  *     </template>
  *     <!-- step content -->

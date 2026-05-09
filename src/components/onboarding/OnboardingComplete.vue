@@ -187,15 +187,13 @@ const activityCount = computed(() => activityStore.activities.length);
 }
 
 .ob-hero-emoji {
-  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative hero confetti emoji */
-  font-size: 72px;
+  font-size: 4.5rem;
   margin-bottom: 16px;
 }
 
 @media (width >= 640px) {
   .ob-hero-emoji {
-    /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative hero confetti emoji */
-    font-size: 100px;
+    font-size: 6.25rem;
     margin-bottom: 20px;
   }
 }
