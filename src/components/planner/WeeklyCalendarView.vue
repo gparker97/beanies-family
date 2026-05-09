@@ -153,7 +153,7 @@ function updateNow() {
 
 const nowIndicatorTop = computed(() => {
   const start = hours.value[0] ?? 7;
-  return `${((nowMinutes.value - start * 60) / 60) * ROW_HEIGHT}px`;
+  return `${((nowMinutes.value - start * 60) / 60) * ROW_HEIGHT}rem`;
 });
 
 const showNowIndicator = computed(() => {
@@ -176,7 +176,10 @@ onMounted(async () => {
   if (gridRef.value && mainEl && mainEl.scrollTop < 100) {
     const scrollHour = Math.max(0, Math.floor(nowMinutes.value / 60) - 1);
     const start = hours.value[0] ?? 7;
-    const offsetWithinGrid = Math.max(0, (scrollHour - start) * ROW_HEIGHT);
+    // ROW_HEIGHT is in rem units (so calendar cells participate in the Large
+    // text-size mode); convert to px here because scrollTop wants pixels.
+    const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const offsetWithinGrid = Math.max(0, (scrollHour - start) * ROW_HEIGHT * rootPx);
     const gridTop = gridRef.value.getBoundingClientRect().top + window.scrollY;
     mainEl.scrollTop = gridTop - mainEl.getBoundingClientRect().top + offsetWithinGrid - 80;
   }
@@ -537,7 +540,7 @@ defineExpose({ weekLabel, activityCount });
         <!-- Grid container: hour labels + 7 day columns -->
         <div
           class="grid grid-cols-[56px_repeat(7,1fr)] gap-px"
-          :style="{ height: totalHeight + 'px' }"
+          :style="{ height: totalHeight + 'rem' }"
         >
           <!-- Hour labels column -->
           <div class="relative">
@@ -545,7 +548,7 @@ defineExpose({ weekLabel, activityCount });
               v-for="(hour, hi) in hours"
               :key="hour"
               class="absolute right-0 pr-2"
-              :style="{ top: `${hi * ROW_HEIGHT}px`, height: ROW_HEIGHT + 'px' }"
+              :style="{ top: `${hi * ROW_HEIGHT}rem`, height: ROW_HEIGHT + 'rem' }"
             >
               <span class="text-secondary-500/30 text-xs leading-none dark:text-gray-600">
                 {{ formatHourLabel(hour) }}
@@ -560,7 +563,7 @@ defineExpose({ weekLabel, activityCount });
               v-for="(hour, hi) in hours"
               :key="hour"
               class="group/slot absolute inset-x-0 cursor-pointer border-t border-gray-100 transition-all hover:bg-[rgba(241,93,34,0.08)] dark:border-slate-700/50 dark:hover:bg-[rgba(241,93,34,0.12)]"
-              :style="{ top: `${hi * ROW_HEIGHT}px`, height: ROW_HEIGHT + 'px' }"
+              :style="{ top: `${hi * ROW_HEIGHT}rem`, height: ROW_HEIGHT + 'rem' }"
               @click="handleEmptySlotClick(day.dateStr, hour)"
             >
               <span
