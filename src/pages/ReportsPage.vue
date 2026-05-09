@@ -22,6 +22,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useChartScale } from '@/composables/useChartScale';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { ALL_CATEGORIES, getCategoryById, normalizeCategoryId } from '@/constants/categories';
@@ -46,6 +47,12 @@ import type {
 } from '@/types/models';
 
 const { t } = useTranslation();
+
+// Rescale Chart.js text when the user toggles Settings → Appearance → Text size.
+const netWorthChartRef = ref<InstanceType<typeof Line> | null>(null);
+const incomeExpenseChartRef = ref<InstanceType<typeof Bar> | null>(null);
+useChartScale(netWorthChartRef);
+useChartScale(incomeExpenseChartRef);
 
 // Register Chart.js components
 ChartJS.register(
@@ -748,7 +755,7 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
 
       <!-- Chart -->
       <div class="h-80 transition-all duration-300" :class="{ 'blur-md': !isUnlocked }">
-        <Line :data="netWorthChartData" :options="netWorthChartOptions" />
+        <Line ref="netWorthChartRef" :data="netWorthChartData" :options="netWorthChartOptions" />
       </div>
     </BaseCard>
 
@@ -806,7 +813,11 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
 
       <!-- Chart -->
       <div class="h-96 transition-all duration-300" :class="{ 'blur-md': !isUnlocked }">
-        <Bar :data="incomeExpenseChartData" :options="incomeExpenseChartOptions" />
+        <Bar
+          ref="incomeExpenseChartRef"
+          :data="incomeExpenseChartData"
+          :options="incomeExpenseChartOptions"
+        />
       </div>
     </BaseCard>
   </div>

@@ -10,6 +10,7 @@ import {
   Filler,
   Tooltip,
 } from 'chart.js';
+import { useChartScale } from '@/composables/useChartScale';
 import { useCountUp } from '@/composables/useCountUp';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay, formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
@@ -62,6 +63,10 @@ const emit = defineEmits<{
 const { isUnlocked, MASK } = usePrivacyMode();
 const { convertToDisplay } = useCurrencyDisplay();
 const { t } = useTranslation();
+
+// Rescale Chart.js text when the user toggles Settings → Appearance → Text size.
+const chartRef = ref<InstanceType<typeof Line> | null>(null);
+useChartScale(chartRef);
 
 const converted = computed(() => convertToDisplay(props.amount, props.currency));
 
@@ -361,6 +366,7 @@ const periodLabel = computed(() => {
         :class="{ 'pointer-events-none blur-md': !isUnlocked }"
       >
         <Line
+          ref="chartRef"
           :key="chartCanvasKey"
           :data="chartDataWithDot"
           :options="chartOptions"
