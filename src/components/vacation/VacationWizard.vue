@@ -491,6 +491,7 @@ const saveLabel = computed(() => {
   background: linear-gradient(135deg, rgb(0 180 216 / 8%), rgb(255 217 61 / 8%));
   border-radius: 50%;
   display: flex;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative hero emoji in fixed-size circle */
   font-size: 56px;
   height: 120px;
   justify-content: center;
@@ -522,7 +523,7 @@ const saveLabel = computed(() => {
   color: white;
   display: inline-flex;
   font-family: Outfit, sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   gap: 5px;
   padding: 6px 16px;
@@ -542,6 +543,7 @@ const saveLabel = computed(() => {
 }
 
 .cele-emoji {
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative emoji in fixed-width container */
   font-size: 14px;
   text-align: center;
   width: 22px;
@@ -550,7 +552,7 @@ const saveLabel = computed(() => {
 .cele-lbl {
   color: rgb(44 62 80 / 35%);
   font-family: Outfit, sans-serif;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 600;
   min-width: 50px;
   text-transform: uppercase;
@@ -563,7 +565,7 @@ const saveLabel = computed(() => {
 .cele-val {
   flex: 1;
   font-family: Outfit, sans-serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 </style>
