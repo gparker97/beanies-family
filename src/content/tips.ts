@@ -119,6 +119,16 @@ export const ALL_TIPS: BeanTip[] = [
     },
   },
   {
+    id: 'tip-large-text',
+    category: 'general',
+    tryItRoute: '/settings',
+    message: {
+      en: 'text feels small on your phone? settings → appearance → text size has a large mode. the whole app gets bigger and friendlier — buttons, cards, everything.',
+      beanie:
+        'text feels small on your phone? settings → appearance → text size has a large mode. the whole app gets bigger and friendlier — buttons, cards, everything.',
+    },
+  },
+  {
     id: 'tip-fee-schedule',
     category: 'planner',
     tryItRoute: '/activities',

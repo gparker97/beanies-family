@@ -51,8 +51,7 @@ const { t } = useTranslation();
 }
 
 .ob-step-emoji {
-  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative hero emoji */
-  font-size: 38px;
+  font-size: 2.375rem;
   line-height: 1;
   margin-bottom: 4px;
 }

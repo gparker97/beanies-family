@@ -55,16 +55,16 @@ const sliderLabels = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
 <template>
   <OnboardingStepShell>
     <template #decorations>
-      <div class="ob-float-emoji" style="font-size: 22px; left: 50px; top: 36px">🌱</div>
+      <div class="ob-float-emoji" style="font-size: 1.375rem; left: 50px; top: 36px">🌱</div>
       <div
         class="ob-float-emoji"
-        style="animation-delay: 0.7s; font-size: 24px; right: 60px; top: 130px"
+        style="animation-delay: 0.7s; font-size: 1.5rem; right: 60px; top: 130px"
       >
         🫘
       </div>
       <div
         class="ob-float-emoji"
-        style="animation-delay: 0.3s; bottom: 110px; font-size: 20px; left: 70px"
+        style="animation-delay: 0.3s; bottom: 110px; font-size: 1.25rem; left: 70px"
       >
         🎯
       </div>

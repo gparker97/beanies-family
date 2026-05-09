@@ -92,6 +92,33 @@ These specific elements may use custom sizes for decorative purposes:
 - "NEW" sidebar badges — decorative indicator
 - Background decorative emoji (e.g., large watermark emoji)
 
+### Text-size accessibility mode
+
+beanies.family supports two reading modes selectable from **Settings → Appearance → Text size**:
+
+| Mode | Root font-size | Scale | Use |
+|---|---|---|---|
+| Normal (default) | 16 px (browser default) | 1× | Standard view |
+| Large | 19 px | 1.1875× | Comfortable on mobile and for eyes that prefer larger type |
+
+**Single source of truth** for the scale is the CSS custom property `--text-scale-large` in `packages/brand/theme.css`. The mode rule in `src/style.css` is one line:
+
+```css
+html[data-text-size='large'] { font-size: calc(1rem * var(--text-scale-large)); }
+```
+
+Because the six-level scale and all Tailwind spacing/sizing utilities are rem-based, the entire UI rescales from this rule alone. **There is no per-component large-mode variant — there must not be one.**
+
+**Authoring rule:** every text-bearing or sizing utility uses rem. Concretely:
+
+- Standard six-level scale only (`text-xs`–`text-4xl`) — never `text-[Xpx]`. Sub-`text-xs` ornament can use `text-[X.Xrem]`.
+- In scoped `<style>` blocks, use rem (or Tailwind tokens via `@apply`) for `font-size`. Never px.
+- Stylelint and the `vue/no-restricted-class` ESLint rule enforce both. Opt-out requires an explicit comment naming the reason — e.g. `/* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative emoji in fixed-size container */`.
+
+**Decorative exceptions** (intentionally outside the scale and excluded from rem-based scaling): hero typography ≥50 px (onboarding confetti, vacation hero numerals), brand-mark dimensions (`h-[44px]` logo squares), and ornament smaller than `text-xs`. These stay px-pinned with an inline rationale comment.
+
+**For chart text** (Chart.js): wire `useChartScale(chartRef)` from `src/composables/useChartScale.ts`. It observes the `<html data-text-size>` attribute and rescales `Chart.defaults.font.size` automatically. One line per chart.
+
 ### Font Loading
 
 ```html

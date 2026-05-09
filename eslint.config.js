@@ -42,6 +42,13 @@ export default [
       'prettier/prettier': 'error',
       'vue/multi-word-component-names': 'off',
       'vue/component-api-style': ['error', ['script-setup']],
+
+      // Forbid `text-[Xpx]` arbitrary classes — px sizes don't participate in
+      // the Large reading mode (see .claude/skills/beanies-theme/SKILL.md
+      // § Text-size accessibility mode). Use standard Tailwind text-* classes
+      // (text-xs through text-4xl) or text-[X.Xrem] for sub-text-xs ornament.
+      'vue/no-restricted-class': ['error', '/^text-\\[\\d+px\\]$/'],
+
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': [
         'error',
