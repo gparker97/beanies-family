@@ -16,6 +16,7 @@ import { nextTick } from 'vue';
 import MilestoneFormModal from '@/components/pod/MilestoneFormModal.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import { useMilestonesStore } from '@/stores/milestonesStore';
+import { toDateInputValue } from '@/utils/date';
 import type { Milestone } from '@/types/models';
 
 vi.mock('@/composables/useTranslation', () => ({
@@ -95,7 +96,12 @@ describe('MilestoneFormModal', () => {
     const { wrapper } = await mountModal(null);
     const dateInput = wrapper.find('input[type="date"]');
     expect(dateInput.exists()).toBe(true);
-    const today = new Date().toISOString().slice(0, 10);
+    // Use the same local-timezone helper the form uses (`toDateInputValue` —
+    // YYYY-MM-DD from `getFullYear`/`getMonth`/`getDate`). The previous
+    // `new Date().toISOString().slice(0, 10)` was UTC, which diverged from
+    // the form's local-time value at date boundaries (midnight UTC vs local
+    // crossings — pre-push hook caught it on a 2026-05-10 ~00:41 UTC run).
+    const today = toDateInputValue(new Date());
     expect((dateInput.element as HTMLInputElement).value).toBe(today);
   });
 
