@@ -253,4 +253,95 @@ describe('oauthProxy', () => {
       ).rejects.toThrow('Token refresh failed');
     });
   });
+
+  // Network timeout — iOS Safari over flaky cellular / Wi-Fi handover can let
+  // fetch() hang silently for minutes. Without these timeouts, a single hung
+  // fetch wedges silent refresh (via pendingSilentRefresh dedupe) AND wedges
+  // app init (completeRedirectAuth -> exchangeCodeForTokens). Both paths now
+  // fail fast with an error message containing "silent refresh failed" so
+  // the sync-store classifier routes the failure through the auth-transient
+  // → reconnect-banner path.
+  describe('fetch timeout', () => {
+    /**
+     * Build a fetch mock that holds the request open until the test's abort
+     * signal fires. Rejection is pre-attached with a no-op .catch so that
+     * vitest's unhandled-rejection tracker doesn't fire when the abort
+     * settles after the awaiting expect() has already observed it.
+     */
+    function makeHangingFetch(): typeof fetch {
+      return vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+        const promise = new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+          });
+        });
+        promise.catch(() => {});
+        return promise;
+      }) as unknown as typeof fetch;
+    }
+
+    it('aborts exchangeCodeForTokens after the timeout and throws a transient-classified error', async () => {
+      vi.useFakeTimers();
+      globalThis.fetch = makeHangingFetch();
+
+      const promise = exchangeCodeForTokens({
+        code: 'c',
+        codeVerifier: 'v',
+        redirectUri: 'https://beanies.family/oauth/callback',
+        clientId: 'cid',
+      });
+      // Pre-attach a tap so the rejection is consumed before fake-timer advance
+      // triggers the abort. The expect().rejects below still observes it.
+      const observed = expect(promise).rejects.toThrow(/timed out.*silent refresh failed/);
+
+      // Advance past the 15s timeout
+      await vi.advanceTimersByTimeAsync(15_001);
+
+      await observed;
+      vi.useRealTimers();
+    });
+
+    it('aborts refreshAccessToken after the timeout and throws a transient-classified error', async () => {
+      vi.useFakeTimers();
+      globalThis.fetch = makeHangingFetch();
+
+      const promise = refreshAccessToken({
+        refreshToken: 'r',
+        clientId: 'cid',
+      });
+      // Message MUST contain "silent refresh failed" so the sync store's
+      // isAuthTransientSyncError regex (/silent refresh failed/i in
+      // syncStore.ts) classifies this as auth-transient and surfaces the
+      // reconnect banner via the cold-start escalation path.
+      const observed = expect(promise).rejects.toThrow(/silent refresh failed/i);
+
+      await vi.advanceTimersByTimeAsync(15_001);
+
+      await observed;
+      vi.useRealTimers();
+    });
+
+    it('does NOT add an extra delay on the happy path (no spurious timeouts)', async () => {
+      // Sanity: a fast successful fetch should not be slowed by the timeout
+      // wrapper. Verifies that the timer is properly cleared on success.
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        mockResponse(true, {
+          access_token: 'ya29.access',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        })
+      );
+
+      const start = Date.now();
+      const result = await refreshAccessToken({
+        refreshToken: 'r',
+        clientId: 'cid',
+      });
+      const elapsed = Date.now() - start;
+
+      expect(result.access_token).toBe('ya29.access');
+      // Generous bound — happy path should be sub-100ms in vitest
+      expect(elapsed).toBeLessThan(1_000);
+    });
+  });
 });
