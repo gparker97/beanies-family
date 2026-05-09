@@ -359,6 +359,7 @@ const sideClass = computed(() => (side.value === 'left' ? 'side-left' : 'side-ri
     inset 0 0 0 1px rgb(44 62 80 / 8%);
   display: grid;
   flex: 0 0 auto;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative emoji in fixed-size brand circle */
   font-size: 22px;
   height: 46px;
   place-items: center;

@@ -282,6 +282,7 @@ function handleMute() {
 
 .beanie-tip-bulb {
   animation: bulb-pulse 2s ease-in-out infinite;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative emoji animation */
   font-size: 15px;
 }
 
@@ -293,6 +294,7 @@ function handleMute() {
   color: #6b7b8d;
   cursor: pointer;
   display: flex;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative close glyph in fixed-size container */
   font-size: 13px;
   height: 26px;
   justify-content: center;
@@ -316,7 +318,7 @@ function handleMute() {
   cursor: pointer;
   display: inline-flex;
   font-family: Outfit, sans-serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   gap: 4px;
   padding: 6px 14px;
@@ -329,6 +331,7 @@ function handleMute() {
 }
 
 .beanie-tip-tryit-arrow {
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative arrow glyph paired with adjacent button text */
   font-size: 12px;
   transition: transform 0.15s;
 }
@@ -345,7 +348,7 @@ function handleMute() {
   color: white;
   cursor: pointer;
   font-family: Outfit, sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   padding: 8px 22px;
   transition: all 0.2s;

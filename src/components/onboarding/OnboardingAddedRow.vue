@@ -80,6 +80,7 @@ const { t } = useTranslation();
   color: var(--heritage-orange, #f15d22);
   cursor: pointer;
   font-family: Outfit, sans-serif;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative X glyph in fixed-size button */
   font-size: 14px;
   font-weight: 700;
   height: 22px;
