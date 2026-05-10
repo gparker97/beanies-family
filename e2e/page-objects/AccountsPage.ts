@@ -67,8 +67,17 @@ export class AccountsPage {
       // happy path. This reduces the failure mode from "subtype timeout
       // at 30s" to "expansion-stall surfaced in <5s" so a real bug would
       // fail fast and a flake still gets the full retry budget.
+      //
+      // The picker pre-mounts every expandable category's expanded block
+      // under v-show (one per category), so the hint text exists in 3
+      // hidden DOM nodes from first paint and only one becomes visible
+      // after the click. `.filter({ visible: true })` is required —
+      // without it, strict mode violates on the 3 matches. Pinned by the
+      // 2026-05-10 cross-browser regression where the harden broke
+      // chromium too on its first push.
       await this.page
         .getByText(ui('modal.selectSubcategory'), { exact: true })
+        .filter({ visible: true })
         .waitFor({ state: 'visible', timeout: 30_000 });
       const subtypeBtn = this.page.getByRole('button', { name: subtype, exact: true });
       await subtypeBtn.waitFor({ state: 'visible', timeout: 30_000 });
