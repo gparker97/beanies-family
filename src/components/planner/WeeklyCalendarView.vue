@@ -18,8 +18,10 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { normalizeAssignees } from '@/utils/assignees';
 import { toDateInputValue, extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
+import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
+import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
 import type { FamilyActivity, TodoItem } from '@/types/models';
 
 defineProps<{ selectedDate?: string }>();
@@ -202,57 +204,32 @@ function getTimedForDay(dateStr: string): Occurrence[] {
     .sort((a, b) => (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? ''));
 }
 
-// Multi-day all-day activities: compute spanning bars
-interface SpanningActivity {
-  activity: FamilyActivity;
-  startCol: number; // 0-indexed column within the week (0–6)
-  span: number; // number of columns to span
-}
-
-const spanningActivities = computed<SpanningActivity[]>(() => {
+// Multi-day all-day activities + single-day buckets — delegated to the
+// shared `computeAllDaySpans` util (`@/utils/allDaySpans.ts`) that the
+// monthly view also consumes. Keeps weekly + monthly span logic in one
+// place: any future changes to the algorithm land once.
+const allDayResult = computed(() => {
   const days = weekDays.value;
-  if (days.length === 0) return [];
-
-  // Collect unique multi-day all-day activities that appear this week
-  const seen = new Set<string>();
-  const spans: SpanningActivity[] = [];
-
-  for (let col = 0; col < 7; col++) {
-    const dateStr = days[col]!.dateStr;
-    const occs = weekActivities.value.get(dateStr) ?? [];
-    for (const occ of occs) {
-      const a = occ.activity;
-      if (!a.isAllDay || !a.endDate || seen.has(a.id)) continue;
-      seen.add(a.id);
-
-      // Find the column range this activity covers within the visible week
-      const actStart = a.date;
-      const actEnd = a.endDate;
-      let startCol = 0;
-      let endCol = 6;
-      for (let i = 0; i < 7; i++) {
-        if (days[i]!.dateStr >= actStart && startCol === 0 && i > 0) startCol = i;
-        if (days[i]!.dateStr <= actEnd) endCol = i;
-      }
-      // Clamp: activity may start before or extend after the visible week
-      startCol = days.findIndex((d) => d.dateStr >= actStart);
-      if (startCol < 0) startCol = 0;
-      const endIdx = [...days].reverse().findIndex((d) => d.dateStr <= actEnd);
-      endCol = endIdx >= 0 ? 6 - endIdx : 6;
-
-      const span = endCol - startCol + 1;
-      if (span >= 2) {
-        spans.push({ activity: a, startCol, span });
-      }
-    }
+  if (days.length === 0) {
+    return {
+      spans: [] as ReturnType<typeof computeAllDaySpans>['spans'],
+      singleByDate: new Map<string, FamilyActivity[]>(),
+      spanningIds: new Set<string>(),
+    };
   }
-  return spans;
+  // Flatten all per-day occurrences for the week into one list. The util
+  // dedupes by activity.id so multi-day activities (one occurrence per
+  // covered day) collapse to a single span entry.
+  const occurrences: Array<{ activity: FamilyActivity; date: string }> = [];
+  for (const day of days) {
+    const occs = weekActivities.value.get(day.dateStr) ?? [];
+    for (const occ of occs) occurrences.push({ activity: occ.activity, date: day.dateStr });
+  }
+  return computeAllDaySpans(occurrences, days);
 });
 
-// IDs of multi-day spanning activities (to exclude from per-day untimed lists)
-const spanningActivityIds = computed(
-  () => new Set(spanningActivities.value.map((s) => s.activity.id))
-);
+const spanningActivities = computed(() => allDayResult.value.spans);
+const spanningActivityIds = computed(() => allDayResult.value.spanningIds);
 
 // Vacation span bars — read directly from vacationStore (matches CalendarGrid approach)
 interface VacationSpan {
@@ -476,20 +453,22 @@ defineExpose({ weekLabel, activityCount });
           {{ vs.emoji }} {{ vs.name }}
         </div>
 
-        <!-- Spanning multi-day activities (positioned across columns) -->
+        <!-- Spanning multi-day activities — wrapper handles cross-column
+             grid placement; the chip component owns the visual treatment
+             (single source of truth shared with the monthly view). -->
         <div
           v-for="span in spanningActivities"
           :key="'span-' + span.activity.id"
-          class="cursor-pointer truncate rounded-md px-2 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80"
-          :style="{
-            gridColumn: `${span.startCol + 2} / span ${span.span}`,
-            background: getActivityColor(span.activity) + '20',
-            color: getActivityColor(span.activity),
-            borderLeft: `3px solid ${getActivityColor(span.activity)}`,
-          }"
-          @click="emit('view-activity', span.activity.id, span.activity.date)"
+          class="min-w-0"
+          :style="{ gridColumn: `${span.startCol + 2} / span ${span.span}` }"
         >
-          {{ span.activity.title }}
+          <AllDayActivityChip
+            :activity="span.activity"
+            :is-start="true"
+            :is-end="true"
+            class="block w-full"
+            @click="emit('view-activity', span.activity.id, span.activity.date)"
+          />
         </div>
 
         <!-- Per-day single-day untimed activities + todos + untimed travel segments -->
@@ -503,18 +482,15 @@ defineExpose({ weekLabel, activityCount });
             class="min-w-0 overflow-hidden px-0.5"
             :style="{ gridColumn: `${di + 2}` }"
           >
-            <div
+            <AllDayActivityChip
               v-for="occ in getUntimedForDay(day.dateStr)"
               :key="occ.activity.id"
-              class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
-              :style="{
-                borderLeftColor: getActivityColor(occ.activity),
-                background: getActivityColor(occ.activity) + '15',
-              }"
+              :activity="occ.activity"
+              :is-start="true"
+              :is-end="true"
+              class="mb-0.5 block w-full"
               @click="emit('view-activity', occ.activity.id, day.dateStr)"
-            >
-              {{ occ.activity.title }}
-            </div>
+            />
             <div
               v-for="todo in weekTodos.get(day.dateStr) ?? []"
               :key="todo.id"

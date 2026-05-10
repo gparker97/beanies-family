@@ -564,6 +564,7 @@ function handleActivitySwapped(newId: string) {
       @select-date="handleCalendarDateClick"
       @vacation-click="handleVacationClick"
       @view-segment="handleViewSegment"
+      @view-activity="(id: string, date: string) => openViewModal(id, date)"
     />
 
     <WeeklyCalendarView
