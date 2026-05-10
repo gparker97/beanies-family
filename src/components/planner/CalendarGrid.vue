@@ -5,10 +5,25 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { extractDatePart, formatMonthYear, formatTime12 } from '@/utils/date';
+import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { tripTypeEmoji, transportEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
 import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
+import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
 import { useHorizontalSwipe } from '@/composables/useHorizontalSwipe';
-import type { ActivityCategory } from '@/types/models';
+import type { ActivityCategory, FamilyActivity } from '@/types/models';
+
+/**
+ * Per-cell all-day item — either a slice of a multi-day run or a single-day
+ * chip. The view layer doesn't need to distinguish them; both render via
+ * `<AllDayActivityChip>` with the right isStart/isEnd flags. Carrying the
+ * activity reference (not just an id) lets the chip resolve color + title
+ * without a second store lookup.
+ */
+interface CellAllDayItem {
+  activity: FamilyActivity;
+  isStart: boolean;
+  isEnd: boolean;
+}
 
 const props = defineProps<{
   selectedDate?: string;
@@ -18,6 +33,7 @@ const emit = defineEmits<{
   selectDate: [date: string];
   'vacation-click': [vacationId: string];
   'view-segment': [vacationId: string, segmentIndex: number];
+  'view-activity': [activityId: string, date: string];
 }>();
 
 const { t } = useTranslation();
@@ -28,6 +44,12 @@ const settingsStore = useSettingsStore();
 const today = new Date();
 const currentYear = ref(today.getFullYear());
 const currentMonth = ref(today.getMonth());
+
+// Visible cap for the all-day lane in each cell. Cells are tight (60–72 px
+// at default root) — 2 chips + the dots row + travel chips + vacation bar
+// is the practical ceiling before overflow. Overflow falls into the
+// existing day-click handler.
+const ALL_DAY_VISIBLE_CAP = 2;
 
 const allDayLabels = [
   () => t('planner.day.sun'),
@@ -84,16 +106,27 @@ const calendarDays = computed(() => {
     activities: Array<{ category: ActivityCategory; color?: string }>;
     vacations: Array<{ id: string; name: string; emoji: string; isStart: boolean }>;
     segments: TravelSegmentOccurrence[];
+    allDayItems: CellAllDayItem[];
   }> = [];
 
   // Get activity occurrences for this month
   const monthOccurrences = activityStore.monthActivities(year, month);
 
   // Build a map of date -> activity info (category + optional color override)
-  // Skip vacation-linked activities — they render as span bars instead
+  // for the timed-dot row. Skip vacation-linked activities (they render as
+  // vacation bars at the bottom) AND skip all-day activities (they render
+  // as category-colored chips in the all-day lane, not as dots — that's
+  // the entire point of this lane).
   const dateActivities = new Map<string, Array<{ category: ActivityCategory; color?: string }>>();
+  // All-day occurrences for the all-day lane. Same vacation-linked skip
+  // (those land in the vacation bar). The util dedupes multi-day per-id.
+  const allDayOccurrences: Array<{ activity: FamilyActivity; date: string }> = [];
   for (const occ of monthOccurrences) {
     if (occ.activity.vacationId) continue;
+    if (occ.activity.isAllDay) {
+      allDayOccurrences.push({ activity: occ.activity, date: occ.date });
+      continue;
+    }
     if (!dateActivities.has(occ.date)) {
       dateActivities.set(occ.date, []);
     }
@@ -153,6 +186,7 @@ const calendarDays = computed(() => {
       activities: dateActivities.get(dateStr) ?? [],
       vacations: dateVacations.get(dateStr) ?? [],
       segments: dateSegments.get(dateStr) ?? [],
+      allDayItems: [], // populated below, per week-row
     });
   }
 
@@ -168,6 +202,7 @@ const calendarDays = computed(() => {
       activities: dateActivities.get(dateStr) ?? [],
       vacations: dateVacations.get(dateStr) ?? [],
       segments: dateSegments.get(dateStr) ?? [],
+      allDayItems: [], // populated below, per week-row
     });
   }
 
@@ -185,7 +220,51 @@ const calendarDays = computed(() => {
         activities: dateActivities.get(dateStr) ?? [],
         vacations: dateVacations.get(dateStr) ?? [],
         segments: dateSegments.get(dateStr) ?? [],
+        allDayItems: [], // populated below, per week-row
       });
+    }
+  }
+
+  // Compute per-week-row all-day spans + single-day chips. Run the util
+  // ONCE per week (not once per cell) — each invocation handles one row's
+  // worth of days and the activity occurrences in the same range. The util
+  // dedupes multi-day activities by id, so a 3-day activity that produces
+  // 3 occurrences becomes one span entry.
+  const numRows = Math.ceil(days.length / 7);
+  for (let row = 0; row < numRows; row++) {
+    const rowDays = days.slice(row * 7, row * 7 + 7);
+    if (rowDays.length === 0) continue;
+    const rowDateSet = new Set(rowDays.map((d) => d.date));
+    // Filter occurrences down to this row's visible dates so the util's
+    // dedup-by-id doesn't see a multi-day activity from a different row
+    // first and skip later rows.
+    const rowOccurrences = allDayOccurrences.filter((o) => rowDateSet.has(o.date));
+    // Util expects `{ dateStr }` keyed days (matches WeeklyCalendarView's
+    // `weekDays` shape); CalendarGrid uses `{ date }`. Map once per row.
+    const result = computeAllDaySpans(
+      rowOccurrences,
+      rowDays.map((d) => ({ dateStr: d.date }))
+    );
+
+    // Attach multi-day slices: walk each span's covered cells, marking
+    // isStart on the first cell of the run and isEnd on the last.
+    for (const span of result.spans) {
+      for (let i = 0; i < span.span; i++) {
+        const cell = rowDays[span.startCol + i];
+        if (!cell) continue;
+        cell.allDayItems.push({
+          activity: span.activity,
+          isStart: i === 0,
+          isEnd: i === span.span - 1,
+        });
+      }
+    }
+    // Attach single-day chips: each is its own start AND end.
+    for (const cell of rowDays) {
+      const singles = result.singleByDate.get(cell.date) ?? [];
+      for (const a of singles) {
+        cell.allDayItems.push({ activity: a, isStart: true, isEnd: true });
+      }
     }
   }
 
@@ -302,6 +381,29 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
           >
             {{ cell.day }}
           </span>
+
+          <!-- All-day lane: multi-day slices + single-day chips, capped at
+               2 visible with `+N` overflow (overflow falls back to the
+               existing day-click handler that opens the day-detail surface).
+               Per-cell slices form a continuous bar across adjacent cells
+               via rounded-corner CSS conditional on isStart/isEnd. -->
+          <div v-if="cell.allDayItems.length > 0" class="mt-0.5 flex w-full flex-col gap-px px-px">
+            <AllDayActivityChip
+              v-for="(item, i) in cell.allDayItems.slice(0, ALL_DAY_VISIBLE_CAP)"
+              :key="item.activity.id + ':' + i"
+              :activity="item.activity"
+              :is-start="item.isStart"
+              :is-end="item.isEnd"
+              class="block w-full"
+              @click.stop="emit('view-activity', item.activity.id, cell.date)"
+            />
+            <span
+              v-if="cell.allDayItems.length > ALL_DAY_VISIBLE_CAP"
+              class="text-secondary-500/40 px-0.5 text-[0.5625rem] leading-tight dark:text-gray-500"
+            >
+              +{{ cell.allDayItems.length - ALL_DAY_VISIBLE_CAP }}
+            </span>
+          </div>
 
           <!-- Activity dots -->
           <div v-if="cell.activities.length > 0" class="mt-0.5 flex items-center gap-[3px]">
