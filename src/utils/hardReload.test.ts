@@ -33,10 +33,45 @@ describe('isChunkLoadError', () => {
     );
   });
 
+  it('matches destructure-of-null TypeError when a dynamic import resolves to null', () => {
+    // Caught 2026-05-10 from greg's iPhone PWA mid-update. SW served a
+    // response for the rotated chunk URL that Vite parsed as a null module
+    // (instead of a fetch failure), so the standard chunk-load error
+    // shapes never appeared and `vite:preloadError` didn't fire. Every
+    // `const { foo } = await import(...)` then threw this V8/Firefox/modern-
+    // WebKit shape, which previously slipped through to App.vue's init
+    // catch as a generic TypeError → scary error overlay flashing
+    // mid-update. Now recognized as the chunk-load symptom it actually is.
+    expect(
+      isChunkLoadError(
+        new TypeError(
+          "Cannot destructure property 'registerGoogleAccountAssertion' of '(intermediate value)' as it is null."
+        )
+      )
+    ).toBe(true);
+    expect(
+      isChunkLoadError(
+        new TypeError("Cannot destructure property 'completeRedirectAuth' of 'mod' as it is null")
+      )
+    ).toBe(true);
+    expect(
+      isChunkLoadError(
+        new TypeError("Cannot destructure property 'foo' of 'bar' as it is undefined.")
+      )
+    ).toBe(true);
+  });
+
   it('does not match unrelated errors', () => {
     expect(isChunkLoadError(new Error('TypeError: Cannot read property of undefined'))).toBe(false);
     expect(isChunkLoadError(new Error('NetworkError: Failed to fetch'))).toBe(false);
     expect(isChunkLoadError(new Error('Incorrect password'))).toBe(false);
+    // Real null-deref bugs that aren't destructure-shaped should still
+    // surface — we only catch the destructure-of-null shape because it's
+    // the dependable symptom of an import-resolved-to-null.
+    expect(isChunkLoadError(new TypeError("Cannot read properties of null (reading 'foo')"))).toBe(
+      false
+    );
+    expect(isChunkLoadError(new TypeError("null is not an object (evaluating 'x.y')"))).toBe(false);
   });
 
   it('handles non-Error inputs gracefully', () => {

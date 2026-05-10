@@ -11,9 +11,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 import { MARKETING_URL } from '@/utils/marketing';
 import { showToast } from '@/composables/useToast';
 import { QUICK_ADD_CONTEXT_KEYS } from '@/constants/quickAddItems';
-import { hardReload, isChunkLoadError } from '@/utils/hardReload';
-
-const CHUNK_RELOAD_FLAG = 'chunkReloadAttempted';
+import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
 
 /** Route that cross-origin-redirects to the Astro marketing site, preserving the full path. */
 function externalRedirect(path: string, name: string): RouteRecordRaw {

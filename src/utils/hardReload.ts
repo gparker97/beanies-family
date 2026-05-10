@@ -70,6 +70,16 @@ export async function hardReload(): Promise<void> {
  *     the module has no `default` export, so Vue Router's resolver
  *     throws). Same root cause, different observable error shape.
  *     Caught live 2026-05-04 from a stale tab three deploys behind HEAD.
+ *   - Destructure-of-null TypeError: when the dynamic `import()` resolves
+ *     to `null` (rather than throwing one of the shapes above), every
+ *     downstream `const { foo } = await import(...)` throws this. Observed
+ *     live 2026-05-10 from greg's iPhone PWA mid-update — the SW served a
+ *     response for the rotated chunk URL that parsed as a null module
+ *     instead of a fetch failure, so `vite:preloadError` didn't fire and
+ *     the App.vue init catch saw a generic TypeError. The destructure
+ *     site (`App.vue:499` for `registerGoogleAccountAssertion`) named the
+ *     property in the message — distinctive enough to recognize without
+ *     swallowing real null-deref bugs.
  */
 export function isChunkLoadError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? '');
@@ -77,6 +87,18 @@ export function isChunkLoadError(err: unknown): boolean {
     /Failed to fetch dynamically imported module/i.test(msg) ||
     /error loading dynamically imported module/i.test(msg) ||
     /Importing a module script failed/i.test(msg) ||
-    /Couldn't resolve component .+ at /i.test(msg)
+    /Couldn't resolve component .+ at /i.test(msg) ||
+    // V8/Firefox/modern WebKit shape when a dynamic import resolves to
+    // null/undefined and the result is destructured.
+    /Cannot destructure property .+ as it is (?:null|undefined)/i.test(msg)
   );
 }
+
+/**
+ * sessionStorage flag the chunk-load recovery paths set before invoking
+ * `hardReload()` so a still-broken new HTML doesn't re-trigger an infinite
+ * recovery loop. Cleared by `router.beforeEach`/`afterEach` on the next
+ * successful navigation. Single source of truth — previously duplicated
+ * across `main.ts`, `router/index.ts`, and now `App.vue` init.
+ */
+export const CHUNK_RELOAD_FLAG = 'chunkReloadAttempted';
