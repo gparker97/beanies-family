@@ -4,10 +4,8 @@ import App from './App.vue';
 import router from './router';
 import { initAnalytics } from './services/analytics/plausible';
 import { reportError } from './utils/errorReporter';
-import { hardReload, isChunkLoadError } from './utils/hardReload';
+import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from './utils/hardReload';
 import './style.css';
-
-const CHUNK_RELOAD_FLAG = 'chunkReloadAttempted';
 
 initAnalytics();
 

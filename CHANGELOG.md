@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-10
+
+### Fixed
+
+- **Error modal no longer flashes mid-PWA-update on stale-cache cold starts.** When a service worker served an old `index.html` that referenced rotated chunk filenames, certain SW response shapes let the dynamic `import()` resolve to `null` instead of throwing the standard chunk-load error — every downstream `const { foo } = await import(...)` then threw a `TypeError: Cannot destructure property '<X>' of '...' as it is null` that didn't match the existing `isChunkLoadError` regex. App.vue's init catch fell into the generic-error path and rendered the scary error overlay, which flashed several times as the chunk-recovery `hardReload()` cycled the page. Now `isChunkLoadError` recognizes the destructure-of-null shape as the chunk-load symptom it actually is; App.vue's init catch routes those through `hardReload()` with the same once-guard the router/main listeners use, and keeps the initial spinner visible (instead of dismissing into a blank screen) until `location.replace()` lands. DRY pass extracted the `CHUNK_RELOAD_FLAG` constant from `main.ts` + `router/index.ts` into `hardReload.ts` as the single source of truth. Surfaced by greg testing an older-version iPhone PWA mid-update.
+
+---
+
 ## 2026-05-09
 
 ### Fixed
