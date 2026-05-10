@@ -23,7 +23,7 @@ import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
 import { formatDeviceInfo } from '@/utils/diagnostics';
-import { hardReload } from '@/utils/hardReload';
+import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
 import ContentSkeleton from '@/components/ui/ContentSkeleton.vue';
 import BackgroundSyncBar from '@/components/common/BackgroundSyncBar.vue';
@@ -416,6 +416,12 @@ async function loadFamilyData() {
 }
 /* eslint-enable no-console */
 
+// Sentinel for the init catch's chunk-recovery branch. Module-scoped (not
+// a ref) because it gates the finally block's loading-state dismissal,
+// not anything reactive. Reset only by full-page reload — which is the
+// next thing `hardReload()` does.
+let chunkReloadInProgress = false;
+
 onMounted(async () => {
   try {
     // Ensure initial route is resolved before checking route names
@@ -721,6 +727,32 @@ onMounted(async () => {
         .catch(console.error);
     }
   } catch (err) {
+    // Stale-chunk symptom — a dynamic `await import()` during init either
+    // rejected with one of the standard chunk-load shapes OR resolved to
+    // `null`, which then made the destructure throw a TypeError. Both are
+    // covered by `isChunkLoadError`. Route through `hardReload()` instead
+    // of rendering the scary error overlay; the once-guard prevents an
+    // infinite recovery loop when the new HTML is also still broken.
+    //
+    // Suppresses the "modal flashed several times during PWA update"
+    // experience reported by greg on 2026-05-10 (iPhone, mid-update).
+    if (isChunkLoadError(err)) {
+      try {
+        if (sessionStorage.getItem(CHUNK_RELOAD_FLAG) !== '1') {
+          sessionStorage.setItem(CHUNK_RELOAD_FLAG, '1');
+          console.warn(
+            '[App] init detected chunk-load symptom — hardReload to fresh version:',
+            err
+          );
+          chunkReloadInProgress = true;
+          void hardReload();
+          return;
+        }
+      } catch {
+        // sessionStorage unavailable (Safari private mode etc.) — fall
+        // through to the overlay so the user has at least a Reload button.
+      }
+    }
     const message = err instanceof Error ? err.message : String(err);
     initError.value = message;
     const stack = err instanceof Error ? (err.stack ?? '') : '';
@@ -728,9 +760,15 @@ onMounted(async () => {
     initErrorDetail.value = `${stack}\n\n--- Breadcrumbs ---\n${breadcrumbLog}`;
     console.error('[App] Initialization failed:', err, '\nBreadcrumbs:', breadcrumbLog);
   } finally {
-    // Always dismiss loading states, even on early return or error
-    isInitializing.value = false;
-    isLoadingData.value = false;
+    // Always dismiss loading states, even on early return or error —
+    // EXCEPT when a chunk-load `hardReload()` is in flight. Keep the
+    // initial spinner visible until `location.replace()` swaps the page,
+    // so the user sees a steady "counting beans..." instead of a brief
+    // blank screen between init failure and the reload landing.
+    if (!chunkReloadInProgress) {
+      isInitializing.value = false;
+      isLoadingData.value = false;
+    }
   }
 });
 
