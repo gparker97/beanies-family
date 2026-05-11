@@ -154,6 +154,15 @@ jobs:
           # the rule in tasks/lessons.md — it sits in the client bundle anyway
           # and being a variable makes it auditable + rotatable from the UI.
           VITE_BEANIES_ERROR_WEBHOOK_URL: ${{ vars.BEANIES_ERROR_WEBHOOK_URL }}
+          # Plausible site script ID for app.beanies.family (the Vue PWA).
+          # `src/services/analytics/plausible.ts` is gated on this var so a
+          # vanilla self-host stays fully offline by default — only the
+          # official deploy (this workflow) opts the app into analytics.
+          # The value is NOT a secret: it appears verbatim in the
+          # `https://plausible.io/js/pa-<id>.js` <script src> on every page.
+          # The marketing site (beanies.family) has its own ID hardcoded in
+          # web/src/layouts/BaseLayout.astro — that's a separate Plausible site.
+          VITE_PLAUSIBLE_DOMAIN: jvjpzIr6FM9tDKaS1gZaK
           # Build SHA — every error report includes this so we can correlate
           # bugs to specific deploys. Falls back to 'dev' for local builds.
           VITE_BUILD_SHA: ${{ github.sha }}
