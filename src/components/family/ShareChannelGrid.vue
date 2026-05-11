@@ -103,17 +103,29 @@ function handleChannel(channel: (typeof channels.value)[0]) {
   }
   if (!channel.url) return;
   try {
-    const opened = window.open(channel.url, '_blank', 'noopener');
-    if (opened === null) {
-      // Popup blocker
-      throw new Error('window.open returned null (popup blocker)');
+    if (channel.url.startsWith('https://')) {
+      // Web share page (WhatsApp / Telegram) — open in a new tab. With the
+      // `noopener` feature `window.open` returns null by spec even on success,
+      // so there's nothing to inspect; a blocked popup throws, caught below.
+      window.open(channel.url, '_blank', 'noopener');
+    } else {
+      // Protocol handoff (mailto: / sms: / fb-messenger:// app deep link) —
+      // the browser hands the URL to the OS handler; no browser window opens.
+      // If no handler is registered the browser shows its own native dialog,
+      // and the "Copy Link" row above is always available as the fallback.
+      window.location.href = channel.url;
     }
     emit('shared', channel.id);
   } catch (e) {
-    console.error('[ShareChannelGrid] channel open failed', { channel: channel.id, error: e });
+    console.error('[ShareChannelGrid] channel open failed (transient)', {
+      channel: channel.id,
+      error: e,
+    });
     showToast(
       'error',
-      t('inviteWizard.error.channelOpenFailed').replace('{channel}', channel.label)
+      t('inviteWizard.error.channelOpenFailed').replace('{channel}', channel.label),
+      undefined,
+      { silent: true }
     );
   }
 }
