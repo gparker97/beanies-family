@@ -8,6 +8,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-11
+
+### Added
+
+- **Photos on activities.** Any family activity can now hold up to four photos — a birthday-invite screenshot, the "items to bring" list, a map of the venue, instructions from school, whatever's worth keeping pinned to the calendar entry instead of scattered across your screenshots app. Photos attach from the activity create/edit form (a dashed "Add photos" tile that appears once the activity has a title, date, and an assignee — tapping it saves the activity so the photo has somewhere to land, then opens the picker) and from the activity view drawer (a Photos section right below Notes). Same drag-drop / camera / file-picker / tap-to-zoom lightbox you already know from milestones, medications, and recipes. Activity cards across the calendar (monthly all-day chips, weekly band, daily timeline, the upcoming-activities sidebar, the Nook's recent-activity card) get a small 📷 next to the title when an activity has photos — no thumbnails on the cards, just the signal; tap in to see them.
+
+### Fixed
+
+- **Photo lightbox no longer shows two close buttons.** When an activity / milestone / recipe / medication had two or more photos, opening one in the lightbox showed two "×" buttons in the top-right corner — the modal frame's built-in one and the floating one the viewer adds for its chromeless look. Removed the redundant one (the position info it carried — "2 of 3" — is already shown by the dot indicator at the bottom).
+- **Restart Onboarding moved out of Appearance.** It was a big bordered card sitting awkwardly among the Theme / Text-size / Week-start selects in Settings → Appearance. It now lives at the bottom of Settings → Family Data as a compact action row, matching the other buttons there. (Family Data is owner/admin-only, so non-admin members no longer see this rarely-used action — they can re-trigger onboarding by signing out and back in.)
+- **Analytics on the app (app.beanies.family) is tracking again.** A refactor a couple weeks back moved the Plausible script from a static tag into an env-var-gated loader (so self-hosters stay offline by default), but the production deploy was never updated to set that var — so the app stopped reporting visitors. Wired it back up; the app now registers page views again. (The marketing site, beanies.family, was unaffected.)
+- **Photo attachments could silently fail to save on milestones / medications / recipes.** If a photo uploaded successfully but the follow-up write that pins it to the entry failed (rare — a connection blip mid-save), the photo would silently become an orphan and disappear on the next reload, with no indication anything went wrong. Now any such failure rolls back the optimistic update and shows a "couldn't save your photo, try again" toast — and the unlinked file gets cleaned up automatically. (Fixed while extracting the shared photo-attachment plumbing into reusable composables.)
+
+### Changed
+
+- **Blog post subtitle.** "aloe vera" on the beanstalk now carries the subtitle "a story about my mom."
+
+---
+
 ## 2026-05-10
 
 ### Added
