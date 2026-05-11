@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-11",
-    "translationCount": 2758
+    "translationCount": 2763
   },
   "translations": {
     "app.name": {
@@ -13794,6 +13794,31 @@
     "onboarding.restartButton": {
       "translation": "重启",
       "hash": "pcldzl",
+      "lastUpdated": "2026-05-11"
+    },
+    "photos.label": {
+      "translation": "照片",
+      "hash": "viacf3",
+      "lastUpdated": "2026-05-11"
+    },
+    "photos.indicator.one": {
+      "translation": "已附加1张照片",
+      "hash": "zauau7",
+      "lastUpdated": "2026-05-11"
+    },
+    "photos.indicator.many": {
+      "translation": "已附加{n}张照片",
+      "hash": "epy04z",
+      "lastUpdated": "2026-05-11"
+    },
+    "photos.linkFailed.title": {
+      "translation": "保存到APP本地相册失败",
+      "hash": "hmc65e",
+      "lastUpdated": "2026-05-11"
+    },
+    "photos.linkFailed.body": {
+      "translation": "照片已上传，但我们无法将其链接到此条目。请重试—如果未链接的文件保持孤立状态，我们将自动清理该文件。",
+      "hash": "xmtxuv",
       "lastUpdated": "2026-05-11"
     }
   }

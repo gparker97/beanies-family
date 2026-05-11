@@ -41,6 +41,8 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
+import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
+import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { toDateInputValue } from '@/utils/date';
 import { MILESTONE_CATEGORIES, MILESTONE_CATEGORY_GROUPS } from '@/constants/milestoneCategories';
 import type { Milestone, MilestoneCategory, UUID } from '@/types/models';
@@ -81,12 +83,8 @@ const category = ref<MilestoneCategory | ''>('');
 const title = ref('');
 const occurredOn = ref('');
 const description = ref('');
-const photoIds = ref<UUID[]>([]);
 const dateError = ref<string | null>(null);
 
-// Once we have an id (after eager-create returns, or on the edit path),
-// PhotoAttachments needs it to scope uploads.
-const milestoneId = ref<UUID | null>(null);
 const photoAttachmentsRef = ref<{ openPicker: () => void } | null>(null);
 
 // Single chip group containing the "Firsts" auto-expanded set + the rest
@@ -130,8 +128,6 @@ const { isEditing, isSubmitting } = useFormModal(
       title.value = m.title;
       occurredOn.value = m.occurredOn;
       description.value = m.description ?? '';
-      photoIds.value = [...(m.photoIds ?? [])];
-      milestoneId.value = m.id;
       dateError.value = null;
     },
     onNew: () => {
@@ -143,8 +139,6 @@ const { isEditing, isSubmitting } = useFormModal(
       title.value = '';
       occurredOn.value = toDateInputValue(new Date());
       description.value = '';
-      photoIds.value = [];
-      milestoneId.value = null;
       dateError.value = null;
     },
   }
@@ -208,53 +202,55 @@ function buildPayload() {
     title: title.value.trim() || t('milestone.cat.custom'),
     occurredOn: occurredOn.value || toDateInputValue(new Date()),
     ...(description.value.trim() ? { description: description.value.trim() } : {}),
-    ...(photoIds.value.length ? { photoIds: [...photoIds.value] } : {}),
+    ...(binding.photoIds.value.length ? { photoIds: [...binding.photoIds.value] } : {}),
   };
 }
 
 /**
- * Eager-create the milestone so we have an entityId for `<PhotoAttachments>`
- * to bind to. The only hard requirement is a chosen bean (or "Family") —
- * everything else falls back to a sane default in `buildPayload` so the
- * user can attach a photo BEFORE filling in title / category / date.
+ * Eager-create + photo-binding wiring.
+ *
+ * Eager-create gates on "bean or Family picked" — date defaults to today
+ * on form mount so it's effectively always valid; if a paste-corrupted
+ * value lands in the date field, `canSave` blocks the final Save anyway.
  *
  * If the user attaches a photo and then closes the modal without saving,
  * an orphan record stays in the doc with the default title — same trade-
- * off accepted by `MedicationFormModal` and `RecipeFormModal`. The
- * orphan photo itself is GC'd after 24h via the photoStore tombstone
- * sweep; the bare entity remains until explicitly deleted.
+ * off accepted by every other entity using this composable. The orphan
+ * photo itself is GC'd after 24h via the photoStore tombstone sweep;
+ * the bare entity remains until explicitly deleted.
  */
-async function ensureMilestoneId(): Promise<UUID | null> {
-  if (milestoneId.value) return milestoneId.value;
-  // Only hard gate: the user must have picked a bean or "Family". The
-  // chip rail is the first field in the form; this gate keeps the
-  // orphan record attributable.
-  if (selectedMemberId.value === undefined) return null;
-  // Date defaults to today on form mount, so this should never fail —
-  // but guard anyway in case of a paste-corrupted value.
-  if (!validateDate()) return null;
-  const created = await milestonesStore.createMilestone(buildPayload());
-  if (!created) return null;
-  milestoneId.value = created.id;
-  return created.id;
-}
+const eager = useEagerEntityCreate<Milestone, ReturnType<typeof buildPayload>>({
+  resolveExistingId: () => props.milestone?.id ?? null,
+  firstMissingField: () => (selectedMemberId.value === undefined ? 'member' : null),
+  buildPayload,
+  create: (payload) => milestonesStore.createMilestone(payload),
+  update: (id, payload) => milestonesStore.updateMilestone(id, payload),
+});
+
+const binding = usePhotoEntityBinding({
+  entityId: eager.entityId,
+  initialPhotoIds: () => props.milestone?.photoIds,
+  watchSource: () => props.milestone?.id,
+  update: (id, patch) => milestonesStore.updateMilestone(id, patch),
+  surface: 'MilestoneFormModal',
+});
+
+// Reset the eager-create cache when the modal opens for a new milestone,
+// so a closed-then-reopened modal doesn't keep targeting the previous
+// eager-created record. Watching `props.open` after the composable is
+// declared keeps the order constraint clean.
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen && !props.milestone) eager.reset();
+  }
+);
 
 async function handleAddFirstPhoto(): Promise<void> {
-  const id = await ensureMilestoneId();
+  const id = await eager.ensureId();
   if (!id) return;
   await nextTick();
   photoAttachmentsRef.value?.openPicker();
-}
-
-function updatePhotoIds(ids: UUID[]): void {
-  photoIds.value = ids;
-  const id = milestoneId.value ?? props.milestone?.id;
-  if (id) {
-    // Persist the photoIds change immediately so the Automerge record
-    // stays in sync with what photoStore has wired up. Other form edits
-    // still commit only on Save.
-    void milestonesStore.updateMilestone(id, { photoIds: ids });
-  }
 }
 
 async function handleSave(): Promise<void> {
@@ -262,20 +258,11 @@ async function handleSave(): Promise<void> {
   if (!validateDate()) return;
   isSubmitting.value = true;
   try {
-    const payload = buildPayload();
-    let result: Milestone | null;
-    if (isEditing.value && props.milestone) {
-      result = await milestonesStore.updateMilestone(props.milestone.id, payload);
-    } else if (milestoneId.value) {
-      // Record was eager-created mid-flow to attach a photo. Update it
-      // with the final form values.
-      result = await milestonesStore.updateMilestone(milestoneId.value, payload);
-    } else {
-      result = await milestonesStore.createMilestone(payload);
-    }
+    const result = await eager.commit();
     if (!result) {
-      // Store action failed — wrapAsync already toasted + reported.
-      // Keep the modal open so the user can retry without losing input.
+      // Store action failed — wrapAsync already reported. Keep the modal
+      // open so the user can retry without losing input. The store also
+      // surfaces its own toast via the wrapAsync path.
       return;
     }
     emit('close');
@@ -396,22 +383,21 @@ async function handleDelete(): Promise<void> {
       <!-- Once we have a milestoneId (eager-create or edit path), bind
            PhotoAttachments. Otherwise show the placeholder add-photo
            button — tapping eager-creates and opens the picker. -->
-      <div v-if="milestoneId || milestone">
-        <PhotoAttachments
-          ref="photoAttachmentsRef"
-          :entity-id="(milestoneId ?? milestone!.id) as UUID"
-          collection="milestones"
-          :photo-ids="photoIds"
-          @update:photo-ids="updatePhotoIds"
-        />
-      </div>
+      <PhotoAttachments
+        v-if="eager.entityId.value"
+        ref="photoAttachmentsRef"
+        :entity-id="eager.entityId.value"
+        collection="milestones"
+        :photo-ids="binding.photoIds.value"
+        @update:photo-ids="binding.updatePhotoIds"
+      />
       <!-- Pre-save: tap to eager-create + open the photo picker. The only
            gate is "bean or family picked" — everything else defaults so
            the user can attach a photo first and fill in details later. -->
       <button
         v-else
         type="button"
-        :disabled="selectedMemberId === undefined"
+        :disabled="selectedMemberId === undefined || eager.isCreating.value"
         class="font-outfit text-secondary-500 hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200"
         @click="handleAddFirstPhoto"
       >
