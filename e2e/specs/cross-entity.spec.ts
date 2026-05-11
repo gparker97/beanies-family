@@ -3,6 +3,7 @@ import { AccountsPage } from '../page-objects/AccountsPage';
 import { AssetsPage } from '../page-objects/AssetsPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
+import { gotoRoot } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
 import { dismissActivityCreatedConfirm } from '../helpers/activity-modal';
 import { selectBeanieDate } from '../helpers/date-picker';
@@ -13,10 +14,10 @@ import { selectBeanieDate } from '../helpers/date-picker';
 
 test.describe('Account Institution Combobox', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await gotoRoot(page);
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
-    await page.goto('/');
+    await gotoRoot(page);
     await bypassLoginIfNeeded(page);
   });
 
@@ -141,10 +142,10 @@ test.describe('Onboarding Wizard', () => {
    * so the wizard is visible (bypassing the e2e_auto_auth auto-skip).
    */
   async function setupWithOnboarding(page: import('@playwright/test').Page) {
-    await page.goto('/');
+    await gotoRoot(page);
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
-    await page.goto('/');
+    await gotoRoot(page);
     await bypassLoginIfNeeded(page);
 
     // bypassLoginIfNeeded sets e2e_auto_auth which auto-skips onboarding.
@@ -230,10 +231,10 @@ test.describe('Loan & Activity Linking', () => {
 
   /** Common setup: clear state, bypass login. */
   async function setup(page: import('@playwright/test').Page) {
-    await page.goto('/');
+    await gotoRoot(page);
     dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
-    await page.goto('/');
+    await gotoRoot(page);
     await bypassLoginIfNeeded(page);
   }
 

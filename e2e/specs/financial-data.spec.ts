@@ -5,15 +5,16 @@ import { TransactionsPage } from '../page-objects/TransactionsPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { TestDataFactory } from '../fixtures/data';
 import { bypassLoginIfNeeded } from '../helpers/auth';
+import { gotoRoot } from '../helpers/navigation';
 
 test.describe('Financial Data', () => {
   test('Create account and verify dashboard net worth', async ({ page }) => {
     // Navigate first so we have a page context for IndexedDB operations
-    await page.goto('/');
+    await gotoRoot(page);
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
     // Reload after clearing so the app re-initializes with empty state
-    await page.goto('/');
+    await gotoRoot(page);
     await bypassLoginIfNeeded(page);
 
     const accountsPage = new AccountsPage(page);
@@ -35,11 +36,11 @@ test.describe('Financial Data', () => {
 
   test('Create income and expense, verify dashboard summary', async ({ page }) => {
     // Navigate first so we have a page context for IndexedDB operations
-    await page.goto('/');
+    await gotoRoot(page);
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
     // Reload after clearing so the app re-initializes with empty state
-    await page.goto('/');
+    await gotoRoot(page);
     await bypassLoginIfNeeded(page);
 
     // Seed test data into the family DB (created by app during initialization)
