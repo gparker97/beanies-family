@@ -7,6 +7,7 @@ import { chooseScope } from '@/composables/useRecurringEditScope';
 import { useSounds } from '@/composables/useSounds';
 import { useInlineEdit } from '@/composables/useInlineEdit';
 import { useMemberInfo } from '@/composables/useMemberInfo';
+import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
@@ -14,6 +15,7 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { getActivityCategoryName } from '@/constants/activityCategories';
+import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import {
   formatDate,
   addHourToTime,
@@ -116,6 +118,19 @@ const activity = computed(() =>
     ? (activityStore.activities.find((a) => a.id === props.activity!.id) ?? props.activity)
     : null
 );
+
+// Photo attachments — uses the live `activity` computed so prop swaps
+// (open the drawer for a different activity without remounting) re-sync
+// the photoIds list. Persists optimistically + rolls back with a toast
+// on store failure (no silent orphan-on-Drive scenario).
+const activityIdRef = computed(() => activity.value?.id ?? null);
+const photoBinding = usePhotoEntityBinding({
+  entityId: activityIdRef,
+  initialPhotoIds: () => activity.value?.photoIds,
+  watchSource: () => activity.value?.id,
+  update: (id, patch) => activityStore.updateActivity(id, patch),
+  surface: 'ActivityViewEditModal',
+});
 
 // Draft refs
 const draftTitle = ref('');
@@ -1292,6 +1307,17 @@ async function confirmReschedule() {
               </div>
             </template>
           </InlineEditField>
+        </FormFieldGroup>
+
+        <!-- Photos — same shared component as milestone / medication / recipe. -->
+        <FormFieldGroup :label="t('photos.label')" optional>
+          <PhotoAttachments
+            collection="activities"
+            :entity-id="activity.id"
+            :photo-ids="photoBinding.photoIds.value"
+            :max="4"
+            @update:photo-ids="photoBinding.updatePhotoIds"
+          />
         </FormFieldGroup>
 
         <!-- Linked Recurring Payment -->

@@ -22,6 +22,7 @@ import { normalizeAssignees } from '@/utils/assignees';
 import { formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
+import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 import type { FamilyActivity, FamilyMember, FamilyVacation, TodoItem } from '@/types/models';
 
 type Occurrence = { activity: FamilyActivity; date: string };
@@ -225,8 +226,10 @@ function handleSlotClick(hour: number): void {
         @click="emit('view-activity', occ.activity.id, occ.date)"
       >
         <span class="min-w-0 flex-1 truncate">
-          {{ occ.activity.title
-          }}<span v-if="occ.activity.location" class="opacity-70">
+          {{ occ.activity.title }}<PhotoIndicator :photo-ids="occ.activity.photoIds" /><span
+            v-if="occ.activity.location"
+            class="opacity-70"
+          >
             · 📍 {{ occ.activity.location }}</span
           >
         </span>
@@ -327,9 +330,10 @@ function handleSlotClick(hour: number): void {
           <div class="flex items-start gap-1">
             <div class="min-w-0 flex-1">
               <div
-                class="font-outfit truncate text-xs font-semibold text-gray-900 dark:text-gray-100"
+                class="font-outfit flex items-center truncate text-xs font-semibold text-gray-900 dark:text-gray-100"
               >
-                {{ ev.occurrence.activity.title }}
+                <span class="truncate">{{ ev.occurrence.activity.title }}</span>
+                <PhotoIndicator :photo-ids="ev.occurrence.activity.photoIds" />
               </div>
               <div class="text-secondary-500/60 truncate text-[0.625rem] dark:text-gray-400">
                 {{ eventTimeLabel(ev.occurrence.activity)

@@ -1398,6 +1398,66 @@ describe('activityStore', () => {
     });
   });
 
+  // ── Photos ──
+
+  describe('photoIds field', () => {
+    it('should round-trip photoIds through createActivity', async () => {
+      const store = useActivityStore();
+      const created = makeActivity({
+        id: 'activity-photos-1',
+        photoIds: ['photo-a', 'photo-b'],
+      });
+      vi.mocked(activityRepo.createActivity).mockResolvedValue(created);
+
+      // Strip the entity-only fields that aren't part of CreateFamilyActivityInput.
+      const { id: _id, createdAt: _ca, updatedAt: _ua, ...createInput } = created;
+      void _id;
+      void _ca;
+      void _ua;
+      const result = await store.createActivity(createInput);
+
+      expect(result?.photoIds).toEqual(['photo-a', 'photo-b']);
+      expect(store.activities[0]?.photoIds).toEqual(['photo-a', 'photo-b']);
+    });
+
+    it('should round-trip photoIds through updateActivity', async () => {
+      const store = useActivityStore();
+      const initial = makeActivity({ id: 'activity-photos-2', photoIds: ['photo-a'] });
+      vi.mocked(activityRepo.getAllActivities).mockResolvedValue([initial]);
+      await store.loadActivities();
+
+      const updated = { ...initial, photoIds: ['photo-a', 'photo-b'] };
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(updated);
+
+      const result = await store.updateActivity('activity-photos-2', {
+        photoIds: ['photo-a', 'photo-b'],
+      });
+
+      expect(result?.photoIds).toEqual(['photo-a', 'photo-b']);
+      expect(store.activities[0]?.photoIds).toEqual(['photo-a', 'photo-b']);
+      expect(activityRepo.updateActivity).toHaveBeenCalledWith('activity-photos-2', {
+        photoIds: ['photo-a', 'photo-b'],
+      });
+    });
+
+    it('should preserve undefined photoIds when not in the update patch', async () => {
+      const store = useActivityStore();
+      const initial = makeActivity({ id: 'activity-photos-3' }); // no photoIds
+      vi.mocked(activityRepo.getAllActivities).mockResolvedValue([initial]);
+      await store.loadActivities();
+
+      // Update only the title — photoIds should remain undefined.
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue({
+        ...initial,
+        title: 'Renamed',
+      });
+
+      const result = await store.updateActivity('activity-photos-3', { title: 'Renamed' });
+
+      expect(result?.photoIds).toBeUndefined();
+    });
+  });
+
   // ── activitiesForDate ──
 
   describe('activitiesForDate', () => {

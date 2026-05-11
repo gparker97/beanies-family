@@ -5,6 +5,7 @@ import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { normalizeAssignees } from '@/utils/assignees';
 import { toDateInputValue, formatNookDate, formatTime12 } from '@/utils/date';
 import MemberChip from '@/components/ui/MemberChip.vue';
+import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 import type { FamilyActivity } from '@/types/models';
 
 const { t } = useTranslation();
@@ -44,12 +45,13 @@ function formatDisplayDate(dateStr: string): string {
     </span>
 
     <div class="min-w-0 flex-1">
-      <!-- Line 1: Title + optional date -->
+      <!-- Line 1: Title + photo indicator + optional date -->
       <div class="flex items-center justify-between gap-2">
         <h4
-          class="font-outfit text-secondary-500 truncate text-sm font-semibold dark:text-gray-100"
+          class="font-outfit text-secondary-500 flex min-w-0 items-center truncate text-sm font-semibold dark:text-gray-100"
         >
-          {{ activity.title }}
+          <span class="truncate">{{ activity.title }}</span>
+          <PhotoIndicator :photo-ids="activity.photoIds" />
         </h4>
         <span
           v-if="showDate"

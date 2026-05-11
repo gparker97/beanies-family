@@ -4590,6 +4590,13 @@ const STRING_DEFS = {
   'planner.field.color': { en: 'Highlight Color', beanie: 'highlight color' },
   'planner.field.active': { en: 'Active', beanie: 'active' },
 
+  // Activity photos — placeholder button + inline gate hint.
+  'activities.addPhotos': { en: 'Add Photos', beanie: 'add photos' },
+  'activities.photoGate.fillFirst': {
+    en: 'Fill in the activity details to attach photos.',
+    beanie: 'fill in the activity details to attach photos.',
+  },
+
   // Planner — Day Agenda Sidebar
   'planner.dayAgenda': { en: 'Day Agenda', beanie: 'day agenda' },
   'planner.noActivitiesForDay': {
