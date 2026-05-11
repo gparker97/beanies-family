@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-09",
-    "translationCount": 2757
+    "lastUpdated": "2026-05-11",
+    "translationCount": 2758
   },
   "translations": {
     "app.name": {
@@ -13790,6 +13790,11 @@
       "translation": "重试",
       "hash": "1ay360",
       "lastUpdated": "2026-05-09"
+    },
+    "onboarding.restartButton": {
+      "translation": "重启",
+      "hash": "pcldzl",
+      "lastUpdated": "2026-05-11"
     }
   }
 }

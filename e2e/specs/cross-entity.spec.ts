@@ -153,9 +153,9 @@ test.describe('Onboarding Wizard', () => {
       sessionStorage.setItem('e2e_force_onboarding', 'true');
     });
 
-    // Restart onboarding via Settings → Appearance modal
+    // Restart onboarding via Settings → Family Data modal
     await page.goto('/settings');
-    await page.getByText(ui('settings.card.appearance')).first().click();
+    await page.getByText(ui('settings.card.familyData')).first().click();
     await page.getByTestId('restart-onboarding').waitFor({ state: 'visible', timeout: 5000 });
     await page.getByTestId('restart-onboarding').click();
 

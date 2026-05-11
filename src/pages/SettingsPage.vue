@@ -763,31 +763,6 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         :hint="t('settings.weekStartHint')"
         @update:model-value="settingsStore.setWeekStartDay(Number($event) as 0 | 1)"
       />
-
-      <!-- Restart Onboarding -->
-      <div
-        class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
-      >
-        <div>
-          <p class="font-medium text-gray-900 dark:text-gray-100">
-            {{ t('onboarding.restartOnboarding') }}
-          </p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ t('onboarding.restartOnboardingDescription') }}
-          </p>
-        </div>
-        <BaseButton
-          data-testid="restart-onboarding"
-          @click="
-            settingsStore.setOnboardingCompleted(false).then(() => {
-              showAppearance = false;
-              router.push('/nook');
-            })
-          "
-        >
-          {{ t('onboarding.restartOnboarding') }}
-        </BaseButton>
-      </div>
     </BeanieFormModal>
 
     <!-- ── Currency & Rates Modal ──────────────────────────────────────── -->
@@ -1306,6 +1281,37 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             @click="showTransferOwnership = true"
           >
             {{ t('settings.transferOwnershipAction') }}
+          </BaseButton>
+        </div>
+      </div>
+
+      <!-- ── Restart Onboarding ──────────────────────────────────────────
+           Lives in Family Data so it doesn't crowd the Appearance drawer
+           with a one-off action. Visible to anyone who can manage the pod
+           (the drawer's own v-if). -->
+      <div class="mt-6 border-t border-gray-200 pt-4 dark:border-slate-700">
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-gray-900 dark:text-gray-100">
+              {{ t('onboarding.restartOnboarding') }}
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t('onboarding.restartOnboardingDescription') }}
+            </p>
+          </div>
+          <BaseButton
+            variant="secondary"
+            size="sm"
+            class="flex-shrink-0"
+            data-testid="restart-onboarding"
+            @click="
+              settingsStore.setOnboardingCompleted(false).then(() => {
+                showFamilyData = false;
+                router.push('/nook');
+              })
+            "
+          >
+            {{ t('onboarding.restartButton') }}
           </BaseButton>
         </div>
       </div>

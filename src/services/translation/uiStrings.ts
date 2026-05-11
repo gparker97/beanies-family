@@ -5131,6 +5131,7 @@ const STRING_DEFS = {
     en: 'Walk through the setup wizard again to add accounts, transactions, and activities.',
     beanie: 'walk through the setup wizard again to add accounts, transactions, and activities.',
   },
+  'onboarding.restartButton': { en: 'Restart', beanie: 'restart' },
   // Beanie tip of the day
   'tips.label': { en: 'Beanie Tip of the Day', beanie: 'beanie tip of the day' },
   'tips.gotIt': { en: 'Got It', beanie: 'got it' },
