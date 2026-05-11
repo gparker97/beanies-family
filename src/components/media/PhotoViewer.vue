@@ -162,7 +162,6 @@ async function handleRemoveMissing(): Promise<void> {
     fullscreen-mobile
     flush-body
     layer="overlay"
-    :title="positionLabel"
     @close="emit('close')"
   >
     <!--
@@ -177,11 +176,13 @@ async function handleRemoveMissing(): Promise<void> {
       style="background: rgb(20 15 15 / 96%)"
     >
       <!--
-        Floating close button. BaseModal's built-in X only renders when
-        the header is shown, but the read-only lightbox has no title and
-        no footer, so we own our close affordance here. Slight scale-up
-        on hover gives a tactile cue without introducing brand color
-        (which would compete with the photo).
+        Floating close button. BaseModal is mounted without a title or
+        header slot here — that suppresses its built-in X entirely so
+        the chrome stays clean against the photo. Position info is
+        carried by the pip dots at the bottom + the sr-only aria-live
+        announcement, not a header. Slight scale-up on hover gives a
+        tactile cue without introducing brand color (which would
+        compete with the photo).
       -->
       <button
         type="button"
