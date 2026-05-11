@@ -21,6 +21,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { confirm } from '@/composables/useConfirm';
+import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
+import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { toDateInputValue } from '@/utils/date';
 import { frequencyDisplayFor, isValidDosesPerDay } from '@/utils/medicationFrequency';
 import type { Medication, UUID } from '@/types/models';
@@ -47,7 +49,6 @@ const startDate = ref('');
 const endDate = ref('');
 const ongoing = ref(true);
 const notes = ref('');
-const photoIds = ref<UUID[]>([]);
 
 // FrequencyChips uses string values; bridge via a computed-with-setter so
 // the chip surface stays simple while the model carries `number | null`.
@@ -90,11 +91,6 @@ watch(ongoing, (val) => {
   if (val) endDate.value = '';
 });
 
-// Once we have an id (after create returns), PhotoAttachments needs it
-// to scope uploads. For a brand-new medication we eagerly create the
-// record on first photo attach — see `attachFirstPhoto` below.
-const medicationId = ref<UUID | null>(null);
-
 const { isEditing, isSubmitting } = useFormModal(
   () => props.medication,
   () => props.open,
@@ -125,8 +121,6 @@ const { isEditing, isSubmitting } = useFormModal(
       endDate.value = m.endDate ?? '';
       ongoing.value = m.ongoing ?? false;
       notes.value = m.notes ?? '';
-      photoIds.value = [...(m.photoIds ?? [])];
-      medicationId.value = m.id;
     },
     onNew: () => {
       name.value = '';
@@ -137,8 +131,6 @@ const { isEditing, isSubmitting } = useFormModal(
       endDate.value = '';
       ongoing.value = true;
       notes.value = '';
-      photoIds.value = [];
-      medicationId.value = null;
     },
   }
 );
@@ -168,24 +160,55 @@ function buildPayload() {
     ...(endDate.value ? { endDate: endDate.value } : {}),
     ...(ongoing.value ? { ongoing: true as const } : {}),
     ...(notes.value.trim() ? { notes: notes.value.trim() } : {}),
-    ...(photoIds.value.length ? { photoIds: [...photoIds.value] } : {}),
+    ...(binding.photoIds.value.length ? { photoIds: [...binding.photoIds.value] } : {}),
   };
 }
+
+/**
+ * Eager-create + photo-binding wiring.
+ *
+ * Eager-create gates on the same name / dose / frequency triple as
+ * `canSave` — the user can attach a photo as soon as the medication
+ * record is well-formed enough to save, but not before (the placeholder
+ * label flips between "Add photo" and the "save first" hint based on
+ * the same predicate).
+ */
+const photoAttachmentsRef = ref<{ openPicker: () => void } | null>(null);
+
+const eager = useEagerEntityCreate<Medication, ReturnType<typeof buildPayload>>({
+  resolveExistingId: () => props.medication?.id ?? null,
+  firstMissingField: () => {
+    if (!name.value.trim()) return 'name';
+    if (!dose.value.trim()) return 'dose';
+    if (!frequency.value.trim()) return 'frequency';
+    return null;
+  },
+  buildPayload,
+  create: (payload) => medicationsStore.createMedication(payload),
+  update: (id, payload) => medicationsStore.updateMedication(id, payload),
+});
+
+const binding = usePhotoEntityBinding({
+  entityId: eager.entityId,
+  initialPhotoIds: () => props.medication?.photoIds,
+  watchSource: () => props.medication?.id,
+  update: (id, patch) => medicationsStore.updateMedication(id, patch),
+  surface: 'MedicationFormModal',
+});
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen && !props.medication) eager.reset();
+  }
+);
 
 async function handleSave(): Promise<void> {
   if (!canSave.value) return;
   isSubmitting.value = true;
   try {
-    const payload = buildPayload();
-    if (isEditing.value && props.medication) {
-      await medicationsStore.updateMedication(props.medication.id, payload);
-    } else if (medicationId.value) {
-      // Record was created mid-flow to attach a photo — update it with
-      // the final form values.
-      await medicationsStore.updateMedication(medicationId.value, payload);
-    } else {
-      await medicationsStore.createMedication(payload);
-    }
+    const result = await eager.commit();
+    if (!result) return; // store reported via wrapAsync; keep modal open for retry
     emit('close');
   } finally {
     isSubmitting.value = false;
@@ -204,43 +227,11 @@ async function handleDelete(): Promise<void> {
   emit('close');
 }
 
-/**
- * PhotoAttachments needs a concrete entityId. For a new medication we
- * don't have one until save — so the first time the user tries to
- * attach a photo we eagerly create the record with whatever's in the
- * form so far. Subsequent saves update it. If the user cancels before
- * saving, the orphan record sticks around; the photo GC will sweep
- * its bottle photo after 24h but the medication itself stays unless
- * the user deletes it manually. (Acceptable tradeoff for v1 —
- * photo-on-new is rare; photo-on-edit is the common case.)
- */
-const photoAttachmentsRef = ref<{ openPicker: () => void } | null>(null);
-
-async function ensureMedicationId(): Promise<UUID | null> {
-  if (medicationId.value) return medicationId.value;
-  if (!canSave.value) return null;
-  const created = await medicationsStore.createMedication(buildPayload());
-  if (!created) return null;
-  medicationId.value = created.id;
-  return created.id;
-}
-
 async function handleAddFirstPhoto(): Promise<void> {
-  const id = await ensureMedicationId();
+  const id = await eager.ensureId();
   if (!id) return;
   await nextTick();
   photoAttachmentsRef.value?.openPicker();
-}
-
-function updatePhotoIds(ids: UUID[]): void {
-  photoIds.value = ids;
-  const id = medicationId.value ?? props.medication?.id;
-  if (id) {
-    // Persist the photoIds change immediately so the Automerge record
-    // matches what usePhotos has wired up. Other form edits still
-    // commit only on Save.
-    void medicationsStore.updateMedication(id, { photoIds: ids });
-  }
 }
 
 const currentMemberId = computed(() => familyStore.currentMember?.id);
@@ -316,22 +307,22 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
     </FormFieldGroup>
 
     <FormFieldGroup :label="t('medications.field.photo')" optional>
-      <div v-if="medicationId || medication" class="photo-wrapper">
+      <div v-if="eager.entityId.value" class="photo-wrapper">
         <PhotoAttachments
           ref="photoAttachmentsRef"
           collection="medications"
-          :entity-id="(medicationId ?? medication?.id) as UUID"
-          :photo-ids="photoIds"
+          :entity-id="eager.entityId.value"
+          :photo-ids="binding.photoIds.value"
           :current-member-id="currentMemberId"
           :max="1"
-          @update:photo-ids="updatePhotoIds"
+          @update:photo-ids="binding.updatePhotoIds"
         />
       </div>
       <button
         v-else
         type="button"
         class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
-        :disabled="!canSave"
+        :disabled="!canSave || eager.isCreating.value"
         @click="handleAddFirstPhoto"
       >
         <BeanieIcon name="camera" size="md" />

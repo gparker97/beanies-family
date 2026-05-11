@@ -5756,6 +5756,23 @@ const STRING_DEFS = {
   'photos.viewer.of': { en: 'of', beanie: 'of' },
   'photos.viewer.open': { en: 'Open photo', beanie: 'open photo' },
 
+  // Photo-attachment shared infrastructure (used by every entity that owns photos).
+  // The link-failed pair is surfaced when an upload succeeds but the entity
+  // update that pins the photoId rejects — without this the photo silently
+  // becomes a Drive orphan that the user can't see.
+  'photos.label': { en: 'Photos', beanie: 'photos' },
+  'photos.indicator.one': { en: '1 photo attached', beanie: '1 photo attached' },
+  'photos.indicator.many': { en: '{n} photos attached', beanie: '{n} photos attached' },
+  'photos.linkFailed.title': {
+    en: "Couldn't Save Your Photo",
+    beanie: "couldn't save your photo",
+  },
+  'photos.linkFailed.body': {
+    en: "The photo uploaded but we couldn't link it to this entry. Try again — we'll clean up the unlinked file automatically if it stays orphaned.",
+    beanie:
+      "the photo uploaded but we couldn't link it to this entry. try again — we'll clean up the unlinked file automatically if it stays orphaned.",
+  },
+
   // Quick-add FAB — chrome
   'quickAdd.fab.label': { en: 'Quick add', beanie: 'quick add' },
   'quickAdd.title': {
