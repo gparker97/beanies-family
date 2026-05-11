@@ -19,6 +19,7 @@ import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import { clearFolderCache } from '@/services/google/driveService';
 import { slackNotify } from '@/utils/slackNotify';
+import { reportError } from '@/utils/errorReporter';
 import { formatBirthdayShort } from '@/utils/date';
 import type { FamilyMember, Gender, AgeGroup, DateOfBirth } from '@/types/models';
 
@@ -55,6 +56,9 @@ const storageType = ref<'local' | 'google_drive' | null>(null);
 const showDriveResultModal = ref(false);
 const driveResultError = ref<string | null>(null);
 const showLocalFileWarning = ref(false);
+// Guards the "pod created" Slack ping so back/forward navigation through the
+// wizard can't fire it twice.
+const podCreatedPinged = ref(false);
 
 // Step 3 state
 const addedMembers = ref<FamilyMember[]>([]);
@@ -175,7 +179,17 @@ async function handleStep1Next() {
     currentStep.value = 2;
     formError.value = null;
   } else {
-    formError.value = result.error ?? t('auth.signUpFailed');
+    const msg = result.error ?? t('auth.signUpFailed');
+    formError.value = msg;
+    // Severity 'warning': some signup failures are expected (email already
+    // in a pod) — but a failed signup is still a dropped onboarding, and we
+    // want them visible. The reporter's 60s dedup keeps duplicates quiet.
+    reportError({
+      surface: 'createPod.signUp',
+      message: msg,
+      severity: 'warning',
+      context: { family_email: email.value },
+    });
   }
 }
 
@@ -196,10 +210,19 @@ async function handleChooseLocalStorage() {
       storageSaved.value = true;
       storageType.value = 'local';
     } else {
+      // Returned false = user cancelled the file picker (a normal abort), so
+      // no error report here — just re-prompt.
       formError.value = t('setup.fileCreateFailed');
     }
-  } catch {
+  } catch (e) {
     formError.value = t('setup.fileCreateFailed');
+    reportError({
+      surface: 'createPod.selectLocalFile',
+      message: (e as Error)?.message || 'Local file selection threw',
+      error: e,
+      severity: 'error',
+      context: { provider_type: 'local' },
+    });
   } finally {
     isSavingStorage.value = false;
   }
@@ -240,6 +263,16 @@ async function handleChooseGoogleDriveStorage() {
     driveResultError.value = (e as Error).message || t('googleDrive.authFailed');
     // Clear stale folder cache so retry starts fresh (prevents cross-account 404)
     clearFolderCache();
+    // Severity 'warning': Drive connect failures are often benign (popup
+    // closed, permission declined) and the user gets a retry modal — but we
+    // still want every one of them visible during onboarding.
+    reportError({
+      surface: 'createPod.connectDrive',
+      message: driveResultError.value || 'Google Drive connect failed',
+      error: e,
+      severity: 'warning',
+      context: { provider_type: 'google_drive' },
+    });
   } finally {
     isSavingStorage.value = false;
     showDriveResultModal.value = true;
@@ -272,9 +305,37 @@ async function handleStep2Next() {
       familyName.value
     );
     if (!success) {
-      formError.value = syncStore.error ?? t('setup.fileCreateFailed');
+      const msg = syncStore.error ?? t('setup.fileCreateFailed');
+      formError.value = msg;
+      reportError({
+        surface: 'createPod.createNewFile',
+        message: msg,
+        severity: 'error',
+        context: { provider_type: storageType.value },
+      });
       return;
     }
+    // The pod now physically exists — Automerge doc initialized, family key
+    // generated and wrapped, V4 envelope written to the provider, cache
+    // primed. This — not the confetti screen the user may never click
+    // through — is the moment a family is created.
+    if (!podCreatedPinged.value) {
+      podCreatedPinged.value = true;
+      const storage = storageType.value === 'google_drive' ? 'Google Drive' : 'Local File';
+      slackNotify(
+        `🎉 *Family pod created!*\n*Family:* ${familyName.value}\n*Owner:* ${name.value}\n*Storage:* ${storage}`
+      );
+    }
+  } else {
+    // Shouldn't happen: storageSaved is true (guarded above) but the sync
+    // store doesn't consider itself configured. Surface it so the regression
+    // is visible — the user would otherwise reach Step 3 with no pod file.
+    reportError({
+      surface: 'createPod.createNewFile',
+      message: 'Reached the storage step with storageSaved=true but syncStore is not configured',
+      severity: 'warning',
+      context: { provider_type: storageType.value },
+    });
   }
 
   currentStep.value = 3;
@@ -354,13 +415,10 @@ function handleFinish() {
 }
 
 function handleSetupComplete() {
+  // The "pod created" Slack ping already fired in handleStep2Next, the moment
+  // the pod was actually written. This handler just closes the wizard and
+  // routes into the app.
   showSetupModal.value = false;
-  const memberNames = addedMembers.value.map((m) => m.name);
-  const allMembers = [name.value, ...memberNames];
-  const storage = storageType.value === 'google_drive' ? 'Google Drive' : 'Local File';
-  slackNotify(
-    `🎉 *Family pod created!*\n*Family:* ${familyName.value}\n*Members (${allMembers.length}):* ${allMembers.join(', ')}\n*Storage:* ${storage}`
-  );
   emit('signed-in', '/nook');
 }
 
