@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
+import { gotoRoot } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
 import { dismissActivityCreatedConfirm } from '../helpers/activity-modal';
 import { selectBeanieDate } from '../helpers/date-picker';
@@ -17,10 +18,10 @@ test.describe('Family Planner', () => {
 
   /** Common setup: clear state, bypass login, seed a family member. */
   async function setupPlanner(page: import('@playwright/test').Page) {
-    await page.goto('/');
+    await gotoRoot(page);
     dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
-    await page.goto('/');
+    await gotoRoot(page);
     await bypassLoginIfNeeded(page);
 
     // Navigate to planner (defaults to month view)

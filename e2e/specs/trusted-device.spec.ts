@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
+import { gotoRoot } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
 
 /**
@@ -91,10 +92,10 @@ test.describe('Trusted Device Password Cache', () => {
   test.setTimeout(60000);
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await gotoRoot(page);
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
-    await page.goto('/');
+    await gotoRoot(page);
     await bypassLoginIfNeeded(page);
   });
 

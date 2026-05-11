@@ -1,15 +1,16 @@
 import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { navigateToSetupStep3 } from '../helpers/auth';
+import { gotoRoot } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
 
 test.describe('Setup Flow', () => {
   test('Fresh setup creates pod with family member and persists to IndexedDB', async ({ page }) => {
     // Navigate first so we have a page context for IndexedDB operations
-    await page.goto('/');
+    await gotoRoot(page);
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
-    await page.goto('/');
+    await gotoRoot(page);
 
     // Walk through the full setup wizard: homepage → welcome → create pod steps 1-3
     await navigateToSetupStep3(page);

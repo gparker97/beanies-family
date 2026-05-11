@@ -1,13 +1,14 @@
 import { test, expect } from '../fixtures/test';
 import type { Route } from '@playwright/test';
 import { bypassLoginIfNeeded } from '../helpers/auth';
+import { gotoRoot } from '../helpers/navigation';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 test.describe('Magic Link Invite System', () => {
   test('Invite wizard: picker → add-bean → Step 1 → Step 2 with QR', async ({ page }) => {
-    await page.goto('/');
+    await gotoRoot(page);
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
-    await page.goto('/');
+    await gotoRoot(page);
     await bypassLoginIfNeeded(page);
 
     // Navigate to The Pod (/family auto-redirects to /pod as of 2026-04).
