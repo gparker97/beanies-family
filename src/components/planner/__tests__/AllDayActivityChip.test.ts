@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { setActivePinia, createPinia } from 'pinia';
 import AllDayActivityChip from '../AllDayActivityChip.vue';
 import type { FamilyActivity } from '@/types/models';
 
@@ -22,6 +23,9 @@ describe('AllDayActivityChip', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    // PhotoIndicator (now embedded in the chip) reaches into the
+    // translation store, so the test environment needs an active Pinia.
+    setActivePinia(createPinia());
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
@@ -99,6 +103,40 @@ describe('AllDayActivityChip', () => {
     expect(wrapper.find('[data-testid="all-day-activity-chip"]').exists()).toBe(true);
     // Use the unused 'corrupted' variable to satisfy lint.
     void corrupted;
+  });
+
+  it('renders the photo indicator on the title cell when activity has photos', () => {
+    const wrapper = mount(AllDayActivityChip, {
+      props: {
+        activity: activity({ title: 'Trip', photoIds: ['p-1', 'p-2'] }),
+        isStart: true,
+        isEnd: false,
+      },
+    });
+    expect(wrapper.text()).toContain('📷');
+  });
+
+  it('does not render the photo indicator when activity has no photos', () => {
+    const wrapper = mount(AllDayActivityChip, {
+      props: {
+        activity: activity({ title: 'No-photos', photoIds: [] }),
+        isStart: true,
+        isEnd: true,
+      },
+    });
+    expect(wrapper.text()).not.toContain('📷');
+  });
+
+  it('does not render the photo indicator on multi-day middle/end cells (no title cell)', () => {
+    const wrapper = mount(AllDayActivityChip, {
+      props: {
+        activity: activity({ title: 'Spans', photoIds: ['p-1'] }),
+        isStart: false,
+        isEnd: true,
+      },
+    });
+    expect(wrapper.text()).not.toContain('📷');
+    expect(wrapper.text()).not.toContain('Spans');
   });
 
   it('keeps the chip clickable on the title attribute (full title even when truncated)', () => {

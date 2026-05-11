@@ -15,12 +15,16 @@ import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import RecurringPaymentPrompt from '@/components/ui/RecurringPaymentPrompt.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { calculateMonthlyFee } from '@/utils/finance';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
+import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
+import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { getActivityCategoryColor, getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { addHourToTime, formatNookDate } from '@/utils/date';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
@@ -54,6 +58,7 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
+const activityStore = useActivityStore();
 
 // Form state
 const icon = ref('');
@@ -348,17 +353,17 @@ const saveLabel = computed(() =>
   isEditing.value ? t('modal.saveActivity') : t('modal.addActivity')
 );
 
-function handleSave() {
-  if (!canSave.value) {
-    showErrors.value = true;
-    return;
-  }
-  showErrors.value = false;
-
+/**
+ * Build the activity payload from current form state. Used by both
+ * the eager-create path (photos require an entity id before save) and
+ * the final emit('save') handler. Includes `photoIds` from the binding
+ * composable so eager-uploaded photos persist on first save.
+ */
+function buildPayload(): CreateFamilyActivityInput {
   const currentMember = familyStore.currentMember ?? familyStore.owner;
   const assigneePayload = toAssigneePayload(assigneeIds.value);
 
-  const baseData = {
+  return {
     title: title.value.trim(),
     icon: icon.value || undefined,
     description: description.value.trim() || undefined,
@@ -394,17 +399,99 @@ function handleSave() {
     instructorContact: instructorContact.value.trim() || undefined,
     reminderMinutes: reminderMinutes.value,
     notes: notes.value.trim() || undefined,
+    ...(binding.photoIds.value.length ? { photoIds: [...binding.photoIds.value] } : {}),
     isActive: isActive.value,
     color: color.value || undefined,
+    createdBy: currentMember?.id ?? '',
   };
+}
 
-  if (isEditing.value && props.activity) {
-    emit('save', { id: props.activity.id, data: baseData as UpdateFamilyActivityInput });
+/**
+ * Eager-create + photo-binding wiring.
+ *
+ * Eager-create gates on the same `canSave` predicate as the final Save
+ * (title + date + at least one assignee). The "Add photos" placeholder
+ * stays disabled until those minimums are met so the user can't end up
+ * with an orphan, ill-formed activity record.
+ *
+ * The composable's `commit()` is intentionally NOT used here — the
+ * parent `FamilyPlannerPage` owns the create-vs-update branching for
+ * the final Save (recurring-occurrence scoped save, "Activity Created"
+ * confirmation, fee-cascade to recurring transactions). We only use
+ * `ensureId()` to mint the entity on first photo tap; the final Save
+ * path is unchanged below — it just emits, with `eager.entityId`
+ * choosing the update vs create emit shape.
+ */
+const photoAttachmentsRef = ref<{ openPicker: () => void } | null>(null);
+
+/**
+ * Reactive gate predicate. Same fields as `canSave` — keeps the photo
+ * placeholder's disabled state and the inline hint visibility in lock-
+ * step with the form-level Save button.
+ */
+const firstMissingFieldKey = computed<string | null>(() => {
+  if (!title.value.trim()) return 'title';
+  if (!date.value) return 'date';
+  if (assigneeIds.value.length === 0) return 'assignees';
+  return null;
+});
+
+const addPhotosHint = computed(() =>
+  firstMissingFieldKey.value !== null ? t('activities.photoGate.fillFirst') : null
+);
+
+const eager = useEagerEntityCreate<FamilyActivity, CreateFamilyActivityInput>({
+  resolveExistingId: () => props.activity?.id ?? null,
+  firstMissingField: () => firstMissingFieldKey.value,
+  buildPayload,
+  create: (payload) => activityStore.createActivity(payload),
+  update: (id, payload) => activityStore.updateActivity(id, payload),
+});
+
+const binding = usePhotoEntityBinding({
+  entityId: eager.entityId,
+  initialPhotoIds: () => props.activity?.photoIds,
+  watchSource: () => props.activity?.id,
+  update: (id, patch) => activityStore.updateActivity(id, patch),
+  surface: 'ActivityModal',
+});
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen && !props.activity) eager.reset();
+  }
+);
+
+async function handleAddFirstPhoto(): Promise<void> {
+  const id = await eager.ensureId();
+  if (!id) return;
+  await nextTick();
+  photoAttachmentsRef.value?.openPicker();
+}
+
+function handleSave() {
+  if (!canSave.value) {
+    showErrors.value = true;
+    return;
+  }
+  showErrors.value = false;
+
+  const payload = buildPayload();
+  const existingId = eager.entityId.value;
+
+  if (existingId) {
+    // Edit-mode OR we eager-created the activity to attach a photo.
+    // Either way, the entity already exists — emit as an update so the
+    // parent's update path (scoped save for recurring, fee cascade)
+    // runs normally. This skips the "Activity Created" confirmation
+    // even on the eager-created path; the user already has visible
+    // feedback (the photo tile they attached) so the modal is fine.
+    const { createdBy: _omit, ...updateData } = payload;
+    void _omit;
+    emit('save', { id: existingId, data: updateData as UpdateFamilyActivityInput });
   } else {
-    emit('save', {
-      ...baseData,
-      createdBy: currentMember?.id ?? '',
-    } as CreateFamilyActivityInput);
+    emit('save', payload);
   }
 }
 </script>
@@ -742,6 +829,39 @@ function handleSave() {
         :frequency="recurrenceMode === 'one-off' || isAllSchedule ? 'one-time' : 'monthly'"
         @update:pay-from-account-id="feePayFromAccountId = $event"
       />
+
+      <!-- Photos — birthday invites, items-to-bring screenshots, location maps,
+           anything visual the user wants pinned to this activity. Eager-creates
+           the activity on first photo tap once the gate (title + date + at least
+           one assignee) is met; otherwise the placeholder button stays disabled
+           and the inline hint names the missing field. -->
+      <FormFieldGroup :label="t('photos.label')" optional>
+        <PhotoAttachments
+          v-if="eager.entityId.value"
+          ref="photoAttachmentsRef"
+          collection="activities"
+          :entity-id="eager.entityId.value"
+          :photo-ids="binding.photoIds.value"
+          :max="4"
+          @update:photo-ids="binding.updatePhotoIds"
+        />
+        <button
+          v-else
+          type="button"
+          :disabled="firstMissingFieldKey !== null || eager.isCreating.value"
+          class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
+          @click="handleAddFirstPhoto"
+        >
+          <span class="text-2xl" aria-hidden="true">📷</span>
+          <span class="font-outfit text-xs font-semibold">{{ t('activities.addPhotos') }}</span>
+        </button>
+        <p
+          v-if="addPhotosHint"
+          class="font-outfit mt-1 text-[0.6875rem] text-[var(--color-text-muted)] italic dark:text-gray-400"
+        >
+          {{ addPhotosHint }}
+        </p>
+      </FormFieldGroup>
 
       <!-- 10. "Add more details" collapsible -->
       <div>
