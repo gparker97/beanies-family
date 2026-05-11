@@ -9,6 +9,7 @@ import { playFanfare } from '@/composables/useSounds';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { delay } from '@/utils/timing';
+import { reportError } from '@/utils/errorReporter';
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ complete: []; back: [] }>();
@@ -96,6 +97,28 @@ function setStep(idx: number, status: StepStatus) {
   stepStatuses.value[idx] = status;
 }
 
+/**
+ * Enter the error phase from anywhere in the flow and report it. The pod
+ * itself was already written back in CreatePodView's step 2, so reaching
+ * here means "pod exists but a follow-up step failed" — exactly the
+ * signal we want surfaced rather than silently swallowed.
+ */
+function enterErrorPhase(stepIdx: number, msg: string, err?: unknown): void {
+  errorMessage.value = msg || t('setupProgress.error.title');
+  setStep(stepIdx, 'error');
+  phase.value = 'error';
+  reportError({
+    surface: 'setupProgress.firstSync',
+    message: errorMessage.value,
+    error: err,
+    severity: 'error',
+    context: {
+      provider_type: syncStore.storageProviderType ?? null,
+      save_failure_level: syncStore.saveFailureLevel ?? null,
+    },
+  });
+}
+
 /** Run real async work (sync + auto-sync) without UI delays. */
 async function runRealWork() {
   if (syncStore.isConfigured) {
@@ -116,57 +139,83 @@ async function runFromStep(startIdx: number) {
     return;
   }
 
-  for (let i = startIdx; i < 5; i++) {
-    currentStep.value = i;
-    setStep(i, 'active');
+  try {
+    for (let i = startIdx; i < 5; i++) {
+      currentStep.value = i;
+      setStep(i, 'active');
 
-    if (i <= 2) {
-      // Perceived steps — timer only
-      const durations = [800, 1000, 800];
-      await delay(durations[i]);
-    } else if (i === 3) {
-      // Real: syncStore.syncNow
-      if (syncStore.isConfigured) {
-        try {
-          let saved = await syncStore.syncNow(true);
-          if (!saved) {
-            saved = await syncStore.syncNow(true); // retry once
-          }
-          if (!saved) {
-            errorMessage.value =
-              syncStore.lastSaveError || syncStore.error || t('setupProgress.error.title');
-            setStep(i, 'error');
-            phase.value = 'error';
+      if (i <= 2) {
+        // Perceived steps — timer only
+        const durations = [800, 1000, 800];
+        await delay(durations[i]);
+      } else if (i === 3) {
+        // Real: syncStore.syncNow
+        if (syncStore.isConfigured) {
+          try {
+            let saved = await syncStore.syncNow(true);
+            if (!saved) {
+              saved = await syncStore.syncNow(true); // retry once
+            }
+            if (!saved) {
+              enterErrorPhase(i, syncStore.lastSaveError || syncStore.error || '');
+              return;
+            }
+          } catch (e) {
+            enterErrorPhase(i, (e as Error).message || '', e);
             return;
           }
-        } catch (e) {
-          errorMessage.value = (e as Error).message || t('setupProgress.error.title');
-          setStep(i, 'error');
-          phase.value = 'error';
-          return;
+        } else {
+          await delay(500); // No sync configured — brief pause
         }
-      } else {
-        await delay(500); // No sync configured — brief pause
+      } else if (i === 4) {
+        // Real: setupAutoSync + ensureRegistered. The pod is already
+        // created and saved by now — if arming auto-sync throws, it
+        // re-arms on next launch, so report it but don't trap the user.
+        const start = Date.now();
+        try {
+          syncStore.setupAutoSync();
+          syncStore.ensureRegistered();
+        } catch (e) {
+          reportError({
+            surface: 'setupProgress.finalize',
+            message: (e as Error)?.message || 'setupAutoSync/ensureRegistered threw',
+            error: e,
+            severity: 'error',
+            context: { provider_type: syncStore.storageProviderType ?? null },
+          });
+        }
+        const elapsed = Date.now() - start;
+        if (elapsed < 500) await delay(500 - elapsed); // minimum visibility
       }
-    } else if (i === 4) {
-      // Real: setupAutoSync + ensureRegistered
-      const start = Date.now();
-      syncStore.setupAutoSync();
-      syncStore.ensureRegistered();
-      const elapsed = Date.now() - start;
-      if (elapsed < 500) await delay(500 - elapsed); // minimum visibility
+
+      setStep(i, 'done');
     }
 
-    setStep(i, 'done');
+    // All done — transition to success
+    await delay(400);
+    phase.value = 'success';
+    // Brief delay then show success content (for crossfade)
+    await delay(300);
+    showSuccess.value = true;
+    try {
+      playFanfare();
+    } catch {
+      // Sound is best-effort — never let it knock the user off the success screen.
+    }
+  } catch (e) {
+    // Unexpected throw mid-flow — never leave the modal frozen on a spinner.
+    // Drop to the error phase (retry / continue / back) and report.
+    reportError({
+      surface: 'setupProgress.unexpected',
+      message: (e as Error)?.message || 'Unexpected error during pod setup',
+      error: e,
+      severity: 'error',
+      context: { provider_type: syncStore.storageProviderType ?? null },
+    });
+    errorMessage.value = (e as Error)?.message || t('setupProgress.error.title');
+    setStep(Math.min(Math.max(currentStep.value, 0), 4), 'error');
+    phase.value = 'error';
   }
-
-  // All done — transition to success
-  await delay(400);
-  phase.value = 'success';
-  // Brief delay then show success content (for crossfade)
-  await delay(300);
-  showSuccess.value = true;
-  playFanfare();
 }
 
 // ── Error actions ──
