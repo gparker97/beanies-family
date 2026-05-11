@@ -22,6 +22,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { confirm } from '@/composables/useConfirm';
+import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
+import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import type { Recipe, UUID } from '@/types/models';
 
 const props = defineProps<{
@@ -50,8 +52,6 @@ const servings = ref('');
 const ingredientsText = ref('');
 const stepsText = ref('');
 const notes = ref('');
-const photoIds = ref<UUID[]>([]);
-const recipeId = ref<UUID | null>(null);
 
 const { isEditing, isSubmitting } = useFormModal(
   () => props.recipe,
@@ -65,8 +65,6 @@ const { isEditing, isSubmitting } = useFormModal(
       ingredientsText.value = (r.ingredients ?? []).join('\n');
       stepsText.value = (r.steps ?? []).join('\n');
       notes.value = r.notes ?? '';
-      photoIds.value = [...(r.photoIds ?? [])];
-      recipeId.value = r.id;
     },
     onNew: () => {
       name.value = '';
@@ -76,19 +74,7 @@ const { isEditing, isSubmitting } = useFormModal(
       ingredientsText.value = '';
       stepsText.value = '';
       notes.value = '';
-      photoIds.value = [];
-      recipeId.value = null;
     },
-  }
-);
-
-// Keep a ref to the last-seen recipe prop so the photo panel stays
-// bound to the right entityId when the parent swaps recipes between
-// opens (e.g. from the cookbook grid).
-watch(
-  () => props.recipe?.id,
-  (id) => {
-    if (id && recipeId.value !== id) recipeId.value = id;
   }
 );
 
@@ -114,62 +100,56 @@ function buildPayload() {
     ingredients: splitLines(ingredientsText.value),
     steps: splitLines(stepsText.value),
     ...(notes.value.trim() ? { notes: notes.value.trim() } : {}),
-    ...(photoIds.value.length ? { photoIds: [...photoIds.value] } : {}),
+    ...(binding.photoIds.value.length ? { photoIds: [...binding.photoIds.value] } : {}),
   };
 }
 
+/**
+ * Eager-create + photo-binding wiring.
+ *
+ * Eager-create gates on `canSave` (recipe name is the only required
+ * field). The placeholder label flips between "Add photo" and the
+ * "save first" hint based on the same predicate.
+ */
 const photoAttachmentsRef = ref<{ openPicker: () => void } | null>(null);
 
-async function ensureRecipeId(): Promise<UUID | null> {
-  if (recipeId.value) return recipeId.value;
-  if (!canSave.value) return null;
-  const created = await recipesStore.createRecipe(buildPayload());
-  if (!created) return null;
-  recipeId.value = created.id;
-  return created.id;
-}
+const eager = useEagerEntityCreate<Recipe, ReturnType<typeof buildPayload>>({
+  resolveExistingId: () => props.recipe?.id ?? null,
+  firstMissingField: () => (name.value.trim() ? null : 'name'),
+  buildPayload,
+  create: (payload) => recipesStore.createRecipe(payload),
+  update: (id, payload) => recipesStore.updateRecipe(id, payload),
+});
 
-/**
- * Pre-save "Add Photo" handler — creates the recipe record if needed,
- * then opens the file picker in the freshly-mounted PhotoAttachments.
- * Single-click flow for users who want to attach a photo right away
- * rather than clicking "Add Photo" and then hunting for the picker.
- */
+const binding = usePhotoEntityBinding({
+  entityId: eager.entityId,
+  initialPhotoIds: () => props.recipe?.photoIds,
+  watchSource: () => props.recipe?.id,
+  update: (id, patch) => recipesStore.updateRecipe(id, patch),
+  surface: 'RecipeFormModal',
+});
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen && !props.recipe) eager.reset();
+  }
+);
+
 async function handleAddFirstPhoto(): Promise<void> {
-  const id = await ensureRecipeId();
+  const id = await eager.ensureId();
   if (!id) return;
   await nextTick();
   photoAttachmentsRef.value?.openPicker();
-}
-
-function updatePhotoIds(ids: UUID[]): void {
-  photoIds.value = ids;
-  const id = recipeId.value ?? props.recipe?.id;
-  if (id) {
-    // Persist the new photoIds eagerly so the Automerge record matches
-    // what usePhotos has wired up. Other form fields still commit only
-    // on explicit Save.
-    void recipesStore.updateRecipe(id, { photoIds: ids });
-  }
 }
 
 async function handleSave(): Promise<void> {
   if (!canSave.value) return;
   isSubmitting.value = true;
   try {
-    const payload = buildPayload();
-    let savedId: UUID | null = null;
-    if (isEditing.value && props.recipe) {
-      await recipesStore.updateRecipe(props.recipe.id, payload);
-      savedId = props.recipe.id;
-    } else if (recipeId.value) {
-      await recipesStore.updateRecipe(recipeId.value, payload);
-      savedId = recipeId.value;
-    } else {
-      const created = await recipesStore.createRecipe(payload);
-      savedId = created?.id ?? null;
-    }
-    if (savedId) emit('saved', savedId);
+    const result = await eager.commit();
+    if (!result) return; // store reported via wrapAsync; keep modal open for retry
+    emit('saved', result.id);
     emit('close');
   } finally {
     isSubmitting.value = false;
@@ -267,22 +247,22 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
     </FormFieldGroup>
 
     <FormFieldGroup :label="t('recipes.field.photos')" optional>
-      <div v-if="recipeId || recipe">
+      <div v-if="eager.entityId.value">
         <PhotoAttachments
           ref="photoAttachmentsRef"
           collection="recipes"
-          :entity-id="(recipeId ?? recipe?.id) as UUID"
-          :photo-ids="photoIds"
+          :entity-id="eager.entityId.value"
+          :photo-ids="binding.photoIds.value"
           :current-member-id="currentMemberId"
           :max="4"
-          @update:photo-ids="updatePhotoIds"
+          @update:photo-ids="binding.updatePhotoIds"
         />
       </div>
       <button
         v-else
         type="button"
         class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
-        :disabled="!canSave"
+        :disabled="!canSave || eager.isCreating.value"
         @click="handleAddFirstPhoto"
       >
         <BeanieIcon name="camera" size="md" />
