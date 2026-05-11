@@ -22,6 +22,7 @@ import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
+import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 import type { FamilyActivity, TodoItem } from '@/types/models';
 
 defineProps<{ selectedDate?: string }>();
@@ -573,10 +574,11 @@ defineExpose({ weekLabel, activityCount });
                 @click.stop="emit('view-activity', activity.id, day.dateStr)"
               >
                 <div
-                  class="font-outfit truncate text-xs font-semibold"
+                  class="font-outfit flex items-center truncate text-xs font-semibold"
                   style="color: var(--color-text)"
                 >
-                  {{ activity.title }}
+                  <span class="truncate">{{ activity.title }}</span>
+                  <PhotoIndicator :photo-ids="activity.photoIds" />
                 </div>
                 <div class="flex min-w-0 items-center gap-1">
                   <span class="text-primary-500 truncate text-[0.6875rem] leading-tight opacity-70">

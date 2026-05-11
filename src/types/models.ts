@@ -532,6 +532,13 @@ export interface FamilyActivity {
   // Notes
   notes?: string;
 
+  // Photos — birthday invites, items-to-bring screenshots, location maps,
+  // anything visual the user wants pinned to this calendar entry. Same
+  // shape as Milestone / Medication / Recipe / CookLogEntry photoIds;
+  // photoStore GC sweeps unreferenced photos via the 'activities'
+  // collection registration in App.vue.
+  photoIds?: UUID[];
+
   // Metadata
   isActive: boolean;
   createdBy: UUID;

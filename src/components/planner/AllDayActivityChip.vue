@@ -19,6 +19,7 @@
 import { computed } from 'vue';
 import type { FamilyActivity } from '@/types/models';
 import { getActivityColor } from '@/stores/activityStore';
+import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 
 interface Props {
   activity: FamilyActivity;
@@ -76,7 +77,9 @@ const bgColor = computed(() => `${color.value}15`);
     data-testid="all-day-activity-chip"
     @click="(e: MouseEvent) => $emit('click', e)"
   >
-    <span v-if="showTitle">{{ activity.title }}</span>
+    <span v-if="showTitle"
+      >{{ activity.title }}<PhotoIndicator :photo-ids="activity.photoIds"
+    /></span>
     <!-- Middle/end cells of a multi-day run keep their height but no text,
          so the chip reads as one continuous bar visually. The non-breaking
          space ensures the cell maintains the same vertical rhythm as a

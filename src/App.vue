@@ -76,6 +76,7 @@ photoStoreInternals.registerPhotoCollection('medications');
 photoStoreInternals.registerPhotoCollection('recipes');
 photoStoreInternals.registerPhotoCollection('cookLogs');
 photoStoreInternals.registerPhotoCollection('milestones');
+photoStoreInternals.registerPhotoCollection('activities');
 
 const route = useRoute();
 const router = useRouter();
