@@ -3,11 +3,13 @@
  * Top banner for a single bean's detail page. Large avatar on the left,
  * name + role + birthday on the right, plus two action buttons on the
  * far right: ✏️ Edit (opens the admin drawer) and ＋ Add Something
- * (dropdown menu of all five per-bean content types).
+ * (dropdown menu of all six per-bean content types).
  *
- * The Add menu navigates to `/pod/:memberId/<type>?add=1` — each tab
- * component reads the query param on mount and auto-opens its form
- * modal, keeping the add flow co-located with the tab that owns it.
+ * The Add menu navigates to `/pod/:memberId/<tab>?action=add-<entity>`
+ * (the standard Quick-add intent shape) — the destination tab's
+ * `useQuickAddIntent` consumer picks it up on mount/route-change and
+ * auto-opens its form modal, keeping the add flow co-located with the
+ * tab that owns it.
  */
 import { computed, ref, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
@@ -17,6 +19,7 @@ import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { useTranslation } from '@/composables/useTranslation';
+import type { QuickAddAction } from '@/constants/quickAddItems';
 import type { AgeGroup, FamilyMember, Gender, UUID } from '@/types/models';
 
 const props = defineProps<{
@@ -87,14 +90,22 @@ const roleLabel = computed(() => {
 
 const addMenuOpen = ref(false);
 
-type AddType = 'favorites' | 'sayings' | 'notes' | 'allergies' | 'medications';
+/** Per-bean tab segments that own an "add" form. */
+type AddTab = 'favorites' | 'sayings' | 'milestones' | 'notes' | 'allergies' | 'medications';
+interface AddOption {
+  tab: AddTab;
+  /** Quick-add intent the destination tab listens for (see `quickAddItems.ts`). */
+  action: QuickAddAction;
+  label: string;
+}
 
-const addOptions = computed(() => [
-  { type: 'favorites' as AddType, label: t('bean.hero.add.favorite') },
-  { type: 'sayings' as AddType, label: t('bean.hero.add.saying') },
-  { type: 'notes' as AddType, label: t('bean.hero.add.note') },
-  { type: 'allergies' as AddType, label: t('bean.hero.add.allergy') },
-  { type: 'medications' as AddType, label: t('bean.hero.add.medication') },
+const addOptions = computed<AddOption[]>(() => [
+  { tab: 'favorites', action: 'add-favorite', label: t('bean.hero.add.favorite') },
+  { tab: 'sayings', action: 'add-saying', label: t('bean.hero.add.saying') },
+  { tab: 'milestones', action: 'add-milestone', label: t('bean.hero.add.milestone') },
+  { tab: 'notes', action: 'add-note', label: t('bean.hero.add.note') },
+  { tab: 'allergies', action: 'add-allergy', label: t('bean.hero.add.allergy') },
+  { tab: 'medications', action: 'add-medication', label: t('bean.hero.add.medication') },
 ]);
 
 function toggleAddMenu(): void {
@@ -105,9 +116,14 @@ function closeAddMenu(): void {
   addMenuOpen.value = false;
 }
 
-function addFor(type: AddType): void {
+function addFor(opt: AddOption): void {
   closeAddMenu();
-  router.push(`/pod/${props.member.id}/${type}?add=1`);
+  // Standard Quick-add intent shape: the destination tab's `useQuickAddIntent`
+  // consumes `?action` (+ the `memberId` context key) and opens its form.
+  router.push({
+    path: `/pod/${props.member.id}/${opt.tab}`,
+    query: { action: opt.action, memberId: props.member.id },
+  });
 }
 
 // Outside-click + Escape to close the menu. Listeners only attach while
@@ -221,11 +237,11 @@ function onAddButtonClick(): void {
           >
             <button
               v-for="opt in addOptions"
-              :key="opt.type"
+              :key="opt.tab"
               type="button"
               role="menuitem"
               class="font-outfit text-secondary-500 hover:text-primary-500 block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-[var(--tint-orange-4)] dark:text-gray-100 dark:hover:bg-slate-700"
-              @click="addFor(opt.type)"
+              @click="addFor(opt)"
             >
               {{ opt.label }}
             </button>
