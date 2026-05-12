@@ -1,0 +1,378 @@
+{
+  "meta": {
+    "country": "AM",
+    "name": "Armenia",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "hy",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ամանոր"
+    },
+    {
+      "date": "2025-01-03",
+      "name": "Pre-Christmas holidays",
+      "type": "public",
+      "name_local": "Նախածննդյան տոներ"
+    },
+    {
+      "date": "2025-01-06",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Սուրբ Ծնունդ"
+    },
+    {
+      "date": "2025-01-28",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "Բանակի օր"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Կանանց տոն"
+    },
+    {
+      "date": "2025-04-24",
+      "name": "Mother's Day",
+      "type": "public",
+      "name_local": "Ցեղասպանության զոհերի հիշատակի օր"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Աշխատանքի օր"
+    },
+    {
+      "date": "2025-05-09",
+      "name": "Victory and Peace Day",
+      "type": "public",
+      "name_local": "Հաղթանակի եւ Խաղաղության տոն"
+    },
+    {
+      "date": "2025-05-28",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Հանրապետության օր"
+    },
+    {
+      "date": "2025-07-05",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Սահմանադրության օր"
+    },
+    {
+      "date": "2025-09-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Անկախության օր"
+    },
+    {
+      "date": "2025-12-31",
+      "name": "New Year's Eve",
+      "type": "public",
+      "name_local": "Նոր տարվա գիշեր"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ամանոր"
+    },
+    {
+      "date": "2026-01-03",
+      "name": "Pre-Christmas holidays",
+      "type": "public",
+      "name_local": "Նախածննդյան տոներ"
+    },
+    {
+      "date": "2026-01-06",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Սուրբ Ծնունդ"
+    },
+    {
+      "date": "2026-01-28",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "Բանակի օր"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Կանանց տոն"
+    },
+    {
+      "date": "2026-04-24",
+      "name": "Mother's Day",
+      "type": "public",
+      "name_local": "Ցեղասպանության զոհերի հիշատակի օր"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Աշխատանքի օր"
+    },
+    {
+      "date": "2026-05-09",
+      "name": "Victory and Peace Day",
+      "type": "public",
+      "name_local": "Հաղթանակի եւ Խաղաղության տոն"
+    },
+    {
+      "date": "2026-05-28",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Հանրապետության օր"
+    },
+    {
+      "date": "2026-07-05",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Սահմանադրության օր"
+    },
+    {
+      "date": "2026-09-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Անկախության օր"
+    },
+    {
+      "date": "2026-12-31",
+      "name": "New Year's Eve",
+      "type": "public",
+      "name_local": "Նոր տարվա գիշեր"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ամանոր"
+    },
+    {
+      "date": "2027-01-03",
+      "name": "Pre-Christmas holidays",
+      "type": "public",
+      "name_local": "Նախածննդյան տոներ"
+    },
+    {
+      "date": "2027-01-06",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Սուրբ Ծնունդ"
+    },
+    {
+      "date": "2027-01-28",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "Բանակի օր"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Կանանց տոն"
+    },
+    {
+      "date": "2027-04-24",
+      "name": "Mother's Day",
+      "type": "public",
+      "name_local": "Ցեղասպանության զոհերի հիշատակի օր"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Աշխատանքի օր"
+    },
+    {
+      "date": "2027-05-09",
+      "name": "Victory and Peace Day",
+      "type": "public",
+      "name_local": "Հաղթանակի եւ Խաղաղության տոն"
+    },
+    {
+      "date": "2027-05-28",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Հանրապետության օր"
+    },
+    {
+      "date": "2027-07-05",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Սահմանադրության օր"
+    },
+    {
+      "date": "2027-09-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Անկախության օր"
+    },
+    {
+      "date": "2027-12-31",
+      "name": "New Year's Eve",
+      "type": "public",
+      "name_local": "Նոր տարվա գիշեր"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ամանոր"
+    },
+    {
+      "date": "2028-01-03",
+      "name": "Pre-Christmas holidays",
+      "type": "public",
+      "name_local": "Նախածննդյան տոներ"
+    },
+    {
+      "date": "2028-01-06",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Սուրբ Ծնունդ"
+    },
+    {
+      "date": "2028-01-28",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "Բանակի օր"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Կանանց տոն"
+    },
+    {
+      "date": "2028-04-24",
+      "name": "Mother's Day",
+      "type": "public",
+      "name_local": "Ցեղասպանության զոհերի հիշատակի օր"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Աշխատանքի օր"
+    },
+    {
+      "date": "2028-05-09",
+      "name": "Victory and Peace Day",
+      "type": "public",
+      "name_local": "Հաղթանակի եւ Խաղաղության տոն"
+    },
+    {
+      "date": "2028-05-28",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Հանրապետության օր"
+    },
+    {
+      "date": "2028-07-05",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Սահմանադրության օր"
+    },
+    {
+      "date": "2028-09-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Անկախության օր"
+    },
+    {
+      "date": "2028-12-31",
+      "name": "New Year's Eve",
+      "type": "public",
+      "name_local": "Նոր տարվա գիշեր"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ամանոր"
+    },
+    {
+      "date": "2029-01-03",
+      "name": "Pre-Christmas holidays",
+      "type": "public",
+      "name_local": "Նախածննդյան տոներ"
+    },
+    {
+      "date": "2029-01-06",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Սուրբ Ծնունդ"
+    },
+    {
+      "date": "2029-01-28",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "Բանակի օր"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Կանանց տոն"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Mother's Day",
+      "type": "public",
+      "name_local": "Ցեղասպանության զոհերի հիշատակի օր"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Աշխատանքի օր"
+    },
+    {
+      "date": "2029-05-09",
+      "name": "Victory and Peace Day",
+      "type": "public",
+      "name_local": "Հաղթանակի եւ Խաղաղության տոն"
+    },
+    {
+      "date": "2029-05-28",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Հանրապետության օր"
+    },
+    {
+      "date": "2029-07-05",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Սահմանադրության օր"
+    },
+    {
+      "date": "2029-09-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Անկախության օր"
+    },
+    {
+      "date": "2029-12-31",
+      "name": "New Year's Eve",
+      "type": "public",
+      "name_local": "Նոր տարվա գիշեր"
+    }
+  ]
+}

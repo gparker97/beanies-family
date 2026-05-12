@@ -1,0 +1,378 @@
+{
+  "meta": {
+    "country": "GT",
+    "name": "Guatemala",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "es",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2025-04-17",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2025-04-19",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "Sabado Santo"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2025-06-30",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "Día de las Fuerzas Armadas"
+    },
+    {
+      "date": "2025-09-15",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2025-10-20",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Día de la Revolución"
+    },
+    {
+      "date": "2025-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Todos los Santos"
+    },
+    {
+      "date": "2025-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Nochebuena"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2025-12-31",
+      "name": "New Year's Eve",
+      "type": "public",
+      "name_local": "Fin del Año"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2026-04-02",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2026-04-04",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "Sabado Santo"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2026-06-29",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "Día de las Fuerzas Armadas"
+    },
+    {
+      "date": "2026-09-15",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2026-10-20",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Día de la Revolución"
+    },
+    {
+      "date": "2026-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Todos los Santos"
+    },
+    {
+      "date": "2026-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Nochebuena"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2026-12-31",
+      "name": "New Year's Eve",
+      "type": "public",
+      "name_local": "Fin del Año"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2027-03-25",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2027-03-27",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "Sabado Santo"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2027-07-02",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "Día de las Fuerzas Armadas"
+    },
+    {
+      "date": "2027-09-15",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2027-10-20",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Día de la Revolución"
+    },
+    {
+      "date": "2027-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Todos los Santos"
+    },
+    {
+      "date": "2027-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Nochebuena"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2027-12-31",
+      "name": "New Year's Eve",
+      "type": "public",
+      "name_local": "Fin del Año"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2028-04-13",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2028-04-15",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "Sabado Santo"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2028-06-30",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "Día de las Fuerzas Armadas"
+    },
+    {
+      "date": "2028-09-15",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2028-10-20",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Día de la Revolución"
+    },
+    {
+      "date": "2028-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Todos los Santos"
+    },
+    {
+      "date": "2028-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Nochebuena"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2028-12-31",
+      "name": "New Year's Eve",
+      "type": "public",
+      "name_local": "Fin del Año"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2029-03-29",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2029-03-31",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "Sabado Santo"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2029-06-30",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "Día de las Fuerzas Armadas"
+    },
+    {
+      "date": "2029-09-15",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2029-10-20",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Día de la Revolución"
+    },
+    {
+      "date": "2029-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Todos los Santos"
+    },
+    {
+      "date": "2029-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Nochebuena"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2029-12-31",
+      "name": "New Year's Eve",
+      "type": "public",
+      "name_local": "Fin del Año"
+    }
+  ]
+}

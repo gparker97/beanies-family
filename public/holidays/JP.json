@@ -1,0 +1,552 @@
+{
+  "meta": {
+    "country": "JP",
+    "name": "Japan",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "jp",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "元日"
+    },
+    {
+      "date": "2025-01-13",
+      "name": "Coming of Age Day",
+      "type": "public",
+      "name_local": "成人の日"
+    },
+    {
+      "date": "2025-02-11",
+      "name": "Foundation Day",
+      "type": "public",
+      "name_local": "建国記念の日"
+    },
+    {
+      "date": "2025-02-23",
+      "name": "Emperor's Birthday",
+      "type": "public",
+      "name_local": "天皇誕生日"
+    },
+    {
+      "date": "2025-02-24",
+      "name": "Emperor's Birthday (substitute day)",
+      "type": "public",
+      "name_local": "天皇誕生日"
+    },
+    {
+      "date": "2025-03-20",
+      "name": "Spring Equinox Day",
+      "type": "public",
+      "name_local": "春分の日"
+    },
+    {
+      "date": "2025-04-29",
+      "name": "Showa Day",
+      "type": "public",
+      "name_local": "昭和の日"
+    },
+    {
+      "date": "2025-05-03",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "憲法記念日"
+    },
+    {
+      "date": "2025-05-04",
+      "name": "Greenery Day",
+      "type": "public",
+      "name_local": "みどりの日"
+    },
+    {
+      "date": "2025-05-05",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "こどもの日"
+    },
+    {
+      "date": "2025-05-06",
+      "name": "Greenery Day (substitute day)",
+      "type": "public",
+      "name_local": "みどりの日"
+    },
+    {
+      "date": "2025-07-21",
+      "name": "Marine Day",
+      "type": "public",
+      "name_local": "海の日"
+    },
+    {
+      "date": "2025-08-11",
+      "name": "Mountain Day",
+      "type": "public",
+      "name_local": "山の日"
+    },
+    {
+      "date": "2025-09-15",
+      "name": "Respect-for-the-Aged Day",
+      "type": "public",
+      "name_local": "敬老の日"
+    },
+    {
+      "date": "2025-09-23",
+      "name": "Autumnal Equinox Day",
+      "type": "public",
+      "name_local": "秋分の日"
+    },
+    {
+      "date": "2025-10-13",
+      "name": "Sports Day",
+      "type": "public",
+      "name_local": "スポーツの日"
+    },
+    {
+      "date": "2025-11-03",
+      "name": "Culture Day",
+      "type": "public",
+      "name_local": "文化の日"
+    },
+    {
+      "date": "2025-11-23",
+      "name": "Labor Thanksgiving Day",
+      "type": "public",
+      "name_local": "勤労感謝の日"
+    },
+    {
+      "date": "2025-11-24",
+      "name": "Labor Thanksgiving Day (substitute day)",
+      "type": "public",
+      "name_local": "勤労感謝の日 (振替休日)"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "元日"
+    },
+    {
+      "date": "2026-01-12",
+      "name": "Coming of Age Day",
+      "type": "public",
+      "name_local": "成人の日"
+    },
+    {
+      "date": "2026-02-11",
+      "name": "Foundation Day",
+      "type": "public",
+      "name_local": "建国記念の日"
+    },
+    {
+      "date": "2026-02-23",
+      "name": "Emperor's Birthday",
+      "type": "public",
+      "name_local": "天皇誕生日"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "Spring Equinox Day",
+      "type": "public",
+      "name_local": "春分の日"
+    },
+    {
+      "date": "2026-04-29",
+      "name": "Showa Day",
+      "type": "public",
+      "name_local": "昭和の日"
+    },
+    {
+      "date": "2026-05-03",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "憲法記念日"
+    },
+    {
+      "date": "2026-05-04",
+      "name": "Greenery Day",
+      "type": "public",
+      "name_local": "みどりの日"
+    },
+    {
+      "date": "2026-05-05",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "こどもの日"
+    },
+    {
+      "date": "2026-05-06",
+      "name": "Constitution Day (substitute day)",
+      "type": "public",
+      "name_local": "憲法記念日 (振替休日)"
+    },
+    {
+      "date": "2026-07-20",
+      "name": "Marine Day",
+      "type": "public",
+      "name_local": "海の日"
+    },
+    {
+      "date": "2026-08-11",
+      "name": "Mountain Day",
+      "type": "public",
+      "name_local": "山の日"
+    },
+    {
+      "date": "2026-09-21",
+      "name": "Respect-for-the-Aged Day",
+      "type": "public",
+      "name_local": "敬老の日"
+    },
+    {
+      "date": "2026-09-22",
+      "name": "Citizens' Holiday",
+      "type": "public",
+      "name_local": "国民の休日"
+    },
+    {
+      "date": "2026-09-23",
+      "name": "Autumnal Equinox Day",
+      "type": "public",
+      "name_local": "秋分の日"
+    },
+    {
+      "date": "2026-10-12",
+      "name": "Sports Day",
+      "type": "public",
+      "name_local": "スポーツの日"
+    },
+    {
+      "date": "2026-11-03",
+      "name": "Culture Day",
+      "type": "public",
+      "name_local": "文化の日"
+    },
+    {
+      "date": "2026-11-23",
+      "name": "Labor Thanksgiving Day",
+      "type": "public",
+      "name_local": "勤労感謝の日"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "元日"
+    },
+    {
+      "date": "2027-01-11",
+      "name": "Coming of Age Day",
+      "type": "public",
+      "name_local": "成人の日"
+    },
+    {
+      "date": "2027-02-11",
+      "name": "Foundation Day",
+      "type": "public",
+      "name_local": "建国記念の日"
+    },
+    {
+      "date": "2027-02-23",
+      "name": "Emperor's Birthday",
+      "type": "public",
+      "name_local": "天皇誕生日"
+    },
+    {
+      "date": "2027-03-21",
+      "name": "Spring Equinox Day",
+      "type": "public",
+      "name_local": "春分の日"
+    },
+    {
+      "date": "2027-03-22",
+      "name": "Spring Equinox Day (substitute day)",
+      "type": "public",
+      "name_local": "春分の日 (振替休日)"
+    },
+    {
+      "date": "2027-04-29",
+      "name": "Showa Day",
+      "type": "public",
+      "name_local": "昭和の日"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "憲法記念日"
+    },
+    {
+      "date": "2027-05-04",
+      "name": "Greenery Day",
+      "type": "public",
+      "name_local": "みどりの日"
+    },
+    {
+      "date": "2027-05-05",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "こどもの日"
+    },
+    {
+      "date": "2027-07-19",
+      "name": "Marine Day",
+      "type": "public",
+      "name_local": "海の日"
+    },
+    {
+      "date": "2027-08-11",
+      "name": "Mountain Day",
+      "type": "public",
+      "name_local": "山の日"
+    },
+    {
+      "date": "2027-09-20",
+      "name": "Respect-for-the-Aged Day",
+      "type": "public",
+      "name_local": "敬老の日"
+    },
+    {
+      "date": "2027-09-23",
+      "name": "Autumnal Equinox Day",
+      "type": "public",
+      "name_local": "秋分の日"
+    },
+    {
+      "date": "2027-10-11",
+      "name": "Sports Day",
+      "type": "public",
+      "name_local": "スポーツの日"
+    },
+    {
+      "date": "2027-11-03",
+      "name": "Culture Day",
+      "type": "public",
+      "name_local": "文化の日"
+    },
+    {
+      "date": "2027-11-23",
+      "name": "Labor Thanksgiving Day",
+      "type": "public",
+      "name_local": "勤労感謝の日"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "元日"
+    },
+    {
+      "date": "2028-01-10",
+      "name": "Coming of Age Day",
+      "type": "public",
+      "name_local": "成人の日"
+    },
+    {
+      "date": "2028-02-11",
+      "name": "Foundation Day",
+      "type": "public",
+      "name_local": "建国記念の日"
+    },
+    {
+      "date": "2028-02-23",
+      "name": "Emperor's Birthday",
+      "type": "public",
+      "name_local": "天皇誕生日"
+    },
+    {
+      "date": "2028-03-20",
+      "name": "Spring Equinox Day",
+      "type": "public",
+      "name_local": "春分の日"
+    },
+    {
+      "date": "2028-04-29",
+      "name": "Showa Day",
+      "type": "public",
+      "name_local": "昭和の日"
+    },
+    {
+      "date": "2028-05-03",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "憲法記念日"
+    },
+    {
+      "date": "2028-05-04",
+      "name": "Greenery Day",
+      "type": "public",
+      "name_local": "みどりの日"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "こどもの日"
+    },
+    {
+      "date": "2028-07-17",
+      "name": "Marine Day",
+      "type": "public",
+      "name_local": "海の日"
+    },
+    {
+      "date": "2028-08-11",
+      "name": "Mountain Day",
+      "type": "public",
+      "name_local": "山の日"
+    },
+    {
+      "date": "2028-09-18",
+      "name": "Respect-for-the-Aged Day",
+      "type": "public",
+      "name_local": "敬老の日"
+    },
+    {
+      "date": "2028-09-22",
+      "name": "Autumnal Equinox Day",
+      "type": "public",
+      "name_local": "秋分の日"
+    },
+    {
+      "date": "2028-10-09",
+      "name": "Sports Day",
+      "type": "public",
+      "name_local": "スポーツの日"
+    },
+    {
+      "date": "2028-11-03",
+      "name": "Culture Day",
+      "type": "public",
+      "name_local": "文化の日"
+    },
+    {
+      "date": "2028-11-23",
+      "name": "Labor Thanksgiving Day",
+      "type": "public",
+      "name_local": "勤労感謝の日"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "元日"
+    },
+    {
+      "date": "2029-01-08",
+      "name": "Coming of Age Day",
+      "type": "public",
+      "name_local": "成人の日"
+    },
+    {
+      "date": "2029-02-11",
+      "name": "Foundation Day",
+      "type": "public",
+      "name_local": "建国記念の日"
+    },
+    {
+      "date": "2029-02-12",
+      "name": "Foundation Day (substitute day)",
+      "type": "public",
+      "name_local": "建国記念の日 (振替休日)"
+    },
+    {
+      "date": "2029-02-23",
+      "name": "Emperor's Birthday",
+      "type": "public",
+      "name_local": "天皇誕生日"
+    },
+    {
+      "date": "2029-03-20",
+      "name": "Spring Equinox Day",
+      "type": "public",
+      "name_local": "春分の日"
+    },
+    {
+      "date": "2029-04-29",
+      "name": "Showa Day",
+      "type": "public",
+      "name_local": "昭和の日"
+    },
+    {
+      "date": "2029-04-30",
+      "name": "Showa Day (substitute day)",
+      "type": "public",
+      "name_local": "昭和の日"
+    },
+    {
+      "date": "2029-05-03",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "憲法記念日"
+    },
+    {
+      "date": "2029-05-04",
+      "name": "Greenery Day",
+      "type": "public",
+      "name_local": "みどりの日"
+    },
+    {
+      "date": "2029-05-05",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "こどもの日"
+    },
+    {
+      "date": "2029-07-16",
+      "name": "Marine Day",
+      "type": "public",
+      "name_local": "海の日"
+    },
+    {
+      "date": "2029-08-11",
+      "name": "Mountain Day",
+      "type": "public",
+      "name_local": "山の日"
+    },
+    {
+      "date": "2029-09-17",
+      "name": "Respect-for-the-Aged Day",
+      "type": "public",
+      "name_local": "敬老の日"
+    },
+    {
+      "date": "2029-09-23",
+      "name": "Autumnal Equinox Day",
+      "type": "public",
+      "name_local": "秋分の日"
+    },
+    {
+      "date": "2029-09-24",
+      "name": "Autumnal Equinox Day (substitute day)",
+      "type": "public",
+      "name_local": "秋分の日 (振替休日)"
+    },
+    {
+      "date": "2029-10-08",
+      "name": "Sports Day",
+      "type": "public",
+      "name_local": "スポーツの日"
+    },
+    {
+      "date": "2029-11-03",
+      "name": "Culture Day",
+      "type": "public",
+      "name_local": "文化の日"
+    },
+    {
+      "date": "2029-11-23",
+      "name": "Labor Thanksgiving Day",
+      "type": "public",
+      "name_local": "勤労感謝の日"
+    }
+  ]
+}

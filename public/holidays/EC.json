@@ -1,0 +1,378 @@
+{
+  "meta": {
+    "country": "EC",
+    "name": "Ecuador",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "es",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2025-03-03",
+      "name": "Carnival",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2025-03-04",
+      "name": "Shrove Tuesday",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2025-04-17",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2025-05-24",
+      "name": "The Battle of Pichincha",
+      "type": "public",
+      "name_local": "Batalla del Pichincha"
+    },
+    {
+      "date": "2025-08-10",
+      "name": "Declaration of Independence of Quito",
+      "type": "public",
+      "name_local": "Día del Primer Grito de Independencia de Quito"
+    },
+    {
+      "date": "2025-09-10",
+      "name": "Independence of Guayaquil",
+      "type": "public",
+      "name_local": "Independencia de Guayaquil"
+    },
+    {
+      "date": "2025-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Día de los Difuntos"
+    },
+    {
+      "date": "2025-11-03",
+      "name": "Independence of Cuenca",
+      "type": "public",
+      "name_local": "Independencia de Cuenca"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2026-02-16",
+      "name": "Carnival",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Shrove Tuesday",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2026-04-02",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2026-05-24",
+      "name": "The Battle of Pichincha",
+      "type": "public",
+      "name_local": "Batalla del Pichincha"
+    },
+    {
+      "date": "2026-08-10",
+      "name": "Declaration of Independence of Quito",
+      "type": "public",
+      "name_local": "Día del Primer Grito de Independencia de Quito"
+    },
+    {
+      "date": "2026-09-10",
+      "name": "Independence of Guayaquil",
+      "type": "public",
+      "name_local": "Independencia de Guayaquil"
+    },
+    {
+      "date": "2026-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Día de los Difuntos"
+    },
+    {
+      "date": "2026-11-03",
+      "name": "Independence of Cuenca",
+      "type": "public",
+      "name_local": "Independencia de Cuenca"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2027-02-08",
+      "name": "Carnival",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2027-02-09",
+      "name": "Shrove Tuesday",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2027-03-25",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2027-05-24",
+      "name": "The Battle of Pichincha",
+      "type": "public",
+      "name_local": "Batalla del Pichincha"
+    },
+    {
+      "date": "2027-08-10",
+      "name": "Declaration of Independence of Quito",
+      "type": "public",
+      "name_local": "Día del Primer Grito de Independencia de Quito"
+    },
+    {
+      "date": "2027-09-10",
+      "name": "Independence of Guayaquil",
+      "type": "public",
+      "name_local": "Independencia de Guayaquil"
+    },
+    {
+      "date": "2027-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Día de los Difuntos"
+    },
+    {
+      "date": "2027-11-03",
+      "name": "Independence of Cuenca",
+      "type": "public",
+      "name_local": "Independencia de Cuenca"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2028-02-28",
+      "name": "Carnival",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2028-02-29",
+      "name": "Shrove Tuesday",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2028-04-13",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2028-05-24",
+      "name": "The Battle of Pichincha",
+      "type": "public",
+      "name_local": "Batalla del Pichincha"
+    },
+    {
+      "date": "2028-08-10",
+      "name": "Declaration of Independence of Quito",
+      "type": "public",
+      "name_local": "Día del Primer Grito de Independencia de Quito"
+    },
+    {
+      "date": "2028-09-10",
+      "name": "Independence of Guayaquil",
+      "type": "public",
+      "name_local": "Independencia de Guayaquil"
+    },
+    {
+      "date": "2028-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Día de los Difuntos"
+    },
+    {
+      "date": "2028-11-03",
+      "name": "Independence of Cuenca",
+      "type": "public",
+      "name_local": "Independencia de Cuenca"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2029-02-12",
+      "name": "Carnival",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2029-02-13",
+      "name": "Shrove Tuesday",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2029-03-29",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2029-05-24",
+      "name": "The Battle of Pichincha",
+      "type": "public",
+      "name_local": "Batalla del Pichincha"
+    },
+    {
+      "date": "2029-08-10",
+      "name": "Declaration of Independence of Quito",
+      "type": "public",
+      "name_local": "Día del Primer Grito de Independencia de Quito"
+    },
+    {
+      "date": "2029-09-10",
+      "name": "Independence of Guayaquil",
+      "type": "public",
+      "name_local": "Independencia de Guayaquil"
+    },
+    {
+      "date": "2029-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Día de los Difuntos"
+    },
+    {
+      "date": "2029-11-03",
+      "name": "Independence of Cuenca",
+      "type": "public",
+      "name_local": "Independencia de Cuenca"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    }
+  ]
+}

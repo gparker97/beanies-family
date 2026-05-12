@@ -1,0 +1,318 @@
+{
+  "meta": {
+    "country": "DK",
+    "name": "Denmark",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "da",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nytår"
+    },
+    {
+      "date": "2025-04-17",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Skærtorsdag"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Langfredag"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Påskesøndag"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Anden påskedag"
+    },
+    {
+      "date": "2025-05-29",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Kristi Himmelfartsdag"
+    },
+    {
+      "date": "2025-06-08",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Pinsedag"
+    },
+    {
+      "date": "2025-06-09",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Anden Pinsedag"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Juledag"
+    },
+    {
+      "date": "2025-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Anden Juledag"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nytår"
+    },
+    {
+      "date": "2026-04-02",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Skærtorsdag"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Langfredag"
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Påskesøndag"
+    },
+    {
+      "date": "2026-04-06",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Anden påskedag"
+    },
+    {
+      "date": "2026-05-14",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Kristi Himmelfartsdag"
+    },
+    {
+      "date": "2026-05-24",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Pinsedag"
+    },
+    {
+      "date": "2026-05-25",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Anden Pinsedag"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Juledag"
+    },
+    {
+      "date": "2026-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Anden Juledag"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nytår"
+    },
+    {
+      "date": "2027-03-25",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Skærtorsdag"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Langfredag"
+    },
+    {
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Påskesøndag"
+    },
+    {
+      "date": "2027-03-29",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Anden påskedag"
+    },
+    {
+      "date": "2027-05-06",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Kristi Himmelfartsdag"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Pinsedag"
+    },
+    {
+      "date": "2027-05-17",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Anden Pinsedag"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Juledag"
+    },
+    {
+      "date": "2027-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Anden Juledag"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nytår"
+    },
+    {
+      "date": "2028-04-13",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Skærtorsdag"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Langfredag"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Påskesøndag"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Anden påskedag"
+    },
+    {
+      "date": "2028-05-25",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Kristi Himmelfartsdag"
+    },
+    {
+      "date": "2028-06-04",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Pinsedag"
+    },
+    {
+      "date": "2028-06-05",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Anden Pinsedag"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Juledag"
+    },
+    {
+      "date": "2028-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Anden Juledag"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nytår"
+    },
+    {
+      "date": "2029-03-29",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Skærtorsdag"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Langfredag"
+    },
+    {
+      "date": "2029-04-01",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Påskesøndag"
+    },
+    {
+      "date": "2029-04-02",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Anden påskedag"
+    },
+    {
+      "date": "2029-05-10",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Kristi Himmelfartsdag"
+    },
+    {
+      "date": "2029-05-20",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Pinsedag"
+    },
+    {
+      "date": "2029-05-21",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Anden Pinsedag"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Juledag"
+    },
+    {
+      "date": "2029-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Anden Juledag"
+    }
+  ]
+}

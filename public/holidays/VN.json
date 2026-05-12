@@ -1,0 +1,228 @@
+{
+  "meta": {
+    "country": "VN",
+    "name": "Viet Nam",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "vi",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Tết Dương lịch"
+    },
+    {
+      "date": "2025-01-28",
+      "name": "Vietnamese New Year Holidays",
+      "type": "public",
+      "name_local": "Giao thừa Tết Nguyên Đán"
+    },
+    {
+      "date": "2025-01-29",
+      "name": "Vietnamese New Year",
+      "type": "public",
+      "name_local": "Tết Nguyên Đán"
+    },
+    {
+      "date": "2025-04-07",
+      "name": "Hung Kings Commemorations",
+      "type": "public",
+      "name_local": "Giỗ tổ Hùng Vương"
+    },
+    {
+      "date": "2025-04-30",
+      "name": "Day of liberating the South for national reunification",
+      "type": "public",
+      "name_local": "Ngày Giải phóng miền Nam"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Quốc tế Lao động"
+    },
+    {
+      "date": "2025-09-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "Quốc khánh"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Tết Dương lịch"
+    },
+    {
+      "date": "2026-02-16",
+      "name": "Vietnamese New Year Holidays",
+      "type": "public",
+      "name_local": "Giao thừa Tết Nguyên Đán"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Vietnamese New Year",
+      "type": "public",
+      "name_local": "Tết Nguyên Đán"
+    },
+    {
+      "date": "2026-04-26",
+      "name": "Hung Kings Commemorations",
+      "type": "public",
+      "name_local": "Giỗ tổ Hùng Vương"
+    },
+    {
+      "date": "2026-04-30",
+      "name": "Day of liberating the South for national reunification",
+      "type": "public",
+      "name_local": "Ngày Giải phóng miền Nam"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Quốc tế Lao động"
+    },
+    {
+      "date": "2026-09-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "Quốc khánh"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Tết Dương lịch"
+    },
+    {
+      "date": "2027-02-05",
+      "name": "Vietnamese New Year Holidays",
+      "type": "public",
+      "name_local": "Giao thừa Tết Nguyên Đán"
+    },
+    {
+      "date": "2027-02-06",
+      "name": "Vietnamese New Year",
+      "type": "public",
+      "name_local": "Tết Nguyên Đán"
+    },
+    {
+      "date": "2027-04-16",
+      "name": "Hung Kings Commemorations",
+      "type": "public",
+      "name_local": "Giỗ tổ Hùng Vương"
+    },
+    {
+      "date": "2027-04-30",
+      "name": "Day of liberating the South for national reunification",
+      "type": "public",
+      "name_local": "Ngày Giải phóng miền Nam"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Quốc tế Lao động"
+    },
+    {
+      "date": "2027-09-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "Quốc khánh"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Tết Dương lịch"
+    },
+    {
+      "date": "2028-01-25",
+      "name": "Vietnamese New Year Holidays",
+      "type": "public",
+      "name_local": "Giao thừa Tết Nguyên Đán"
+    },
+    {
+      "date": "2028-01-26",
+      "name": "Vietnamese New Year",
+      "type": "public",
+      "name_local": "Tết Nguyên Đán"
+    },
+    {
+      "date": "2028-04-04",
+      "name": "Hung Kings Commemorations",
+      "type": "public",
+      "name_local": "Giỗ tổ Hùng Vương"
+    },
+    {
+      "date": "2028-04-30",
+      "name": "Day of liberating the South for national reunification",
+      "type": "public",
+      "name_local": "Ngày Giải phóng miền Nam"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Quốc tế Lao động"
+    },
+    {
+      "date": "2028-09-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "Quốc khánh"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Tết Dương lịch"
+    },
+    {
+      "date": "2029-02-12",
+      "name": "Vietnamese New Year Holidays",
+      "type": "public",
+      "name_local": "Giao thừa Tết Nguyên Đán"
+    },
+    {
+      "date": "2029-02-13",
+      "name": "Vietnamese New Year",
+      "type": "public",
+      "name_local": "Tết Nguyên Đán"
+    },
+    {
+      "date": "2029-04-23",
+      "name": "Hung Kings Commemorations",
+      "type": "public",
+      "name_local": "Giỗ tổ Hùng Vương"
+    },
+    {
+      "date": "2029-04-30",
+      "name": "Day of liberating the South for national reunification",
+      "type": "public",
+      "name_local": "Ngày Giải phóng miền Nam"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Quốc tế Lao động"
+    },
+    {
+      "date": "2029-09-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "Quốc khánh"
+    }
+  ]
+}

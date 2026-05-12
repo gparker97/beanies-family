@@ -1888,6 +1888,11 @@ const STRING_DEFS = {
   'settings.card.familyDataDesc': { en: 'Cloud storage & sync', beanie: 'your bean vault' },
   'settings.card.dataManagement': { en: 'Data Management', beanie: 'data management' },
   'settings.card.dataManagementDesc': { en: 'Export & clear data', beanie: 'export & clear beans' },
+  'settings.card.countryHolidays': { en: 'Country & Holidays', beanie: 'country & holidays' },
+  'settings.card.countryHolidaysDesc': {
+    en: 'Where your family lives & public-holiday display',
+    beanie: 'where your family lives & public-holiday display',
+  },
   'settings.quickToggles': { en: 'Quick Settings', beanie: 'quick settings' },
   'settings.darkMode': { en: 'Dark Mode', beanie: 'dark mode' },
   'settings.darkModeDescription': {
@@ -1926,6 +1931,35 @@ const STRING_DEFS = {
   'settings.weekStartHint': {
     en: 'Choose which day the calendar week starts on',
     beanie: 'choose which day the calendar week starts on',
+  },
+  'settings.country': { en: 'Country', beanie: 'country' },
+  'settings.countryNotSet': { en: 'Not set', beanie: 'not set' },
+  'settings.countryHelp': {
+    en: "We'll show your country's public holidays on the Family Planner. Nothing about your location ever leaves your device.",
+    beanie:
+      "we'll show your country's public holidays on the family planner. nothing about your location ever leaves your device.",
+  },
+  'settings.showPublicHolidays': {
+    en: 'Show public holidays on the planner',
+    beanie: 'show public holidays on the planner',
+  },
+  'settings.showPublicHolidaysNeedsCountry': {
+    en: 'Pick your country first',
+    beanie: 'pick your country first',
+  },
+  'holiday.publicHolidaySuffix': { en: 'public holiday', beanie: 'public holiday' },
+  'holiday.observanceNote': {
+    en: 'Work and school are probably off — please check!',
+    beanie: 'work and school are probably off — please check!',
+  },
+  'holiday.referenceNote': {
+    en: "This is just reference info — it doesn't add anything to your calendar.",
+    beanie: "this is just reference info — it doesn't add anything to your calendar.",
+  },
+  'holiday.upcomingHeading': { en: 'Upcoming holidays', beanie: 'upcoming holidays' },
+  'holiday.loadFailedRetryHint': {
+    en: "Couldn't load holidays right now — they'll appear once you're back online.",
+    beanie: "couldn't load holidays right now — they'll show up once you're back online.",
   },
   'settings.language': { en: 'Language', beanie: 'language' },
   'settings.beanieMode': { en: 'Beanie Mode', beanie: 'get me out of beanie mode' },
@@ -5078,6 +5112,14 @@ const STRING_DEFS = {
   'onboarding.currencyQuestion': {
     en: "What's your family's base currency?",
     beanie: "what's your family's base currency?",
+  },
+  'onboarding.countryQuestion': {
+    en: 'Where does your family live?',
+    beanie: 'where does your family live?',
+  },
+  'onboarding.countryPlaceholder': {
+    en: 'Select your country (optional)',
+    beanie: 'select your country (optional)',
   },
   'onboarding.welcomeTagline': {
     en: "let's set up your bean pod",

@@ -1,0 +1,408 @@
+{
+  "meta": {
+    "country": "CZ",
+    "name": "Czechia",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "cz",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nový rok a Den obnovy samostatného českého státu"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Velký pátek"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Velikonoční pondělí"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Svátek práce"
+    },
+    {
+      "date": "2025-05-08",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Den vítězství"
+    },
+    {
+      "date": "2025-07-05",
+      "name": "Saints Cyril and Methodius Day",
+      "type": "public",
+      "name_local": "Den slovanských věrozvěstů Cyrila a Metoděje"
+    },
+    {
+      "date": "2025-07-06",
+      "name": "Jan Hus Day",
+      "type": "public",
+      "name_local": "Den upálení mistra Jana Husa"
+    },
+    {
+      "date": "2025-09-28",
+      "name": "St. Wenceslas Day (Czech Statehood Day)",
+      "type": "public",
+      "name_local": "Den české státnosti"
+    },
+    {
+      "date": "2025-10-28",
+      "name": "Independent Czechoslovak State Day",
+      "type": "public",
+      "name_local": "Den vzniku samostatného československého státu"
+    },
+    {
+      "date": "2025-11-17",
+      "name": "Struggle for Freedom and Democracy Day",
+      "type": "public",
+      "name_local": "Den boje za svobodu a demokracii"
+    },
+    {
+      "date": "2025-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Štědrý den"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "1. svátek vánoční"
+    },
+    {
+      "date": "2025-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "2. svátek vánoční"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nový rok a Den obnovy samostatného českého státu"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Velký pátek"
+    },
+    {
+      "date": "2026-04-06",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Velikonoční pondělí"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Svátek práce"
+    },
+    {
+      "date": "2026-05-08",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Den vítězství"
+    },
+    {
+      "date": "2026-07-05",
+      "name": "Saints Cyril and Methodius Day",
+      "type": "public",
+      "name_local": "Den slovanských věrozvěstů Cyrila a Metoděje"
+    },
+    {
+      "date": "2026-07-06",
+      "name": "Jan Hus Day",
+      "type": "public",
+      "name_local": "Den upálení mistra Jana Husa"
+    },
+    {
+      "date": "2026-09-28",
+      "name": "St. Wenceslas Day (Czech Statehood Day)",
+      "type": "public",
+      "name_local": "Den české státnosti"
+    },
+    {
+      "date": "2026-10-28",
+      "name": "Independent Czechoslovak State Day",
+      "type": "public",
+      "name_local": "Den vzniku samostatného československého státu"
+    },
+    {
+      "date": "2026-11-17",
+      "name": "Struggle for Freedom and Democracy Day",
+      "type": "public",
+      "name_local": "Den boje za svobodu a demokracii"
+    },
+    {
+      "date": "2026-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Štědrý den"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "1. svátek vánoční"
+    },
+    {
+      "date": "2026-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "2. svátek vánoční"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nový rok a Den obnovy samostatného českého státu"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Velký pátek"
+    },
+    {
+      "date": "2027-03-29",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Velikonoční pondělí"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Svátek práce"
+    },
+    {
+      "date": "2027-05-08",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Den vítězství"
+    },
+    {
+      "date": "2027-07-05",
+      "name": "Saints Cyril and Methodius Day",
+      "type": "public",
+      "name_local": "Den slovanských věrozvěstů Cyrila a Metoděje"
+    },
+    {
+      "date": "2027-07-06",
+      "name": "Jan Hus Day",
+      "type": "public",
+      "name_local": "Den upálení mistra Jana Husa"
+    },
+    {
+      "date": "2027-09-28",
+      "name": "St. Wenceslas Day (Czech Statehood Day)",
+      "type": "public",
+      "name_local": "Den české státnosti"
+    },
+    {
+      "date": "2027-10-28",
+      "name": "Independent Czechoslovak State Day",
+      "type": "public",
+      "name_local": "Den vzniku samostatného československého státu"
+    },
+    {
+      "date": "2027-11-17",
+      "name": "Struggle for Freedom and Democracy Day",
+      "type": "public",
+      "name_local": "Den boje za svobodu a demokracii"
+    },
+    {
+      "date": "2027-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Štědrý den"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "1. svátek vánoční"
+    },
+    {
+      "date": "2027-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "2. svátek vánoční"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nový rok a Den obnovy samostatného českého státu"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Velký pátek"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Velikonoční pondělí"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Svátek práce"
+    },
+    {
+      "date": "2028-05-08",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Den vítězství"
+    },
+    {
+      "date": "2028-07-05",
+      "name": "Saints Cyril and Methodius Day",
+      "type": "public",
+      "name_local": "Den slovanských věrozvěstů Cyrila a Metoděje"
+    },
+    {
+      "date": "2028-07-06",
+      "name": "Jan Hus Day",
+      "type": "public",
+      "name_local": "Den upálení mistra Jana Husa"
+    },
+    {
+      "date": "2028-09-28",
+      "name": "St. Wenceslas Day (Czech Statehood Day)",
+      "type": "public",
+      "name_local": "Den české státnosti"
+    },
+    {
+      "date": "2028-10-28",
+      "name": "Independent Czechoslovak State Day",
+      "type": "public",
+      "name_local": "Den vzniku samostatného československého státu"
+    },
+    {
+      "date": "2028-11-17",
+      "name": "Struggle for Freedom and Democracy Day",
+      "type": "public",
+      "name_local": "Den boje za svobodu a demokracii"
+    },
+    {
+      "date": "2028-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Štědrý den"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "1. svátek vánoční"
+    },
+    {
+      "date": "2028-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "2. svátek vánoční"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nový rok a Den obnovy samostatného českého státu"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Velký pátek"
+    },
+    {
+      "date": "2029-04-02",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Velikonoční pondělí"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Svátek práce"
+    },
+    {
+      "date": "2029-05-08",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Den vítězství"
+    },
+    {
+      "date": "2029-07-05",
+      "name": "Saints Cyril and Methodius Day",
+      "type": "public",
+      "name_local": "Den slovanských věrozvěstů Cyrila a Metoděje"
+    },
+    {
+      "date": "2029-07-06",
+      "name": "Jan Hus Day",
+      "type": "public",
+      "name_local": "Den upálení mistra Jana Husa"
+    },
+    {
+      "date": "2029-09-28",
+      "name": "St. Wenceslas Day (Czech Statehood Day)",
+      "type": "public",
+      "name_local": "Den české státnosti"
+    },
+    {
+      "date": "2029-10-28",
+      "name": "Independent Czechoslovak State Day",
+      "type": "public",
+      "name_local": "Den vzniku samostatného československého státu"
+    },
+    {
+      "date": "2029-11-17",
+      "name": "Struggle for Freedom and Democracy Day",
+      "type": "public",
+      "name_local": "Den boje za svobodu a demokracii"
+    },
+    {
+      "date": "2029-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Štědrý den"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "1. svátek vánoční"
+    },
+    {
+      "date": "2029-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "2. svátek vánoční"
+    }
+  ]
+}

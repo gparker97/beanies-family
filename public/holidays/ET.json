@@ -1,0 +1,408 @@
+{
+  "meta": {
+    "country": "ET",
+    "name": "Ethiopia",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "am",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-06",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "ልደተ-ለእግዚእነ/ ገና"
+    },
+    {
+      "date": "2025-01-19",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "ብርሐነ ጥምቀት"
+    },
+    {
+      "date": "2025-03-01",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "ረመዳን"
+    },
+    {
+      "date": "2025-03-02",
+      "name": "Victory at Adwa Day",
+      "type": "public",
+      "name_local": "የዓድዋ ድል በዓል"
+    },
+    {
+      "date": "2025-03-28",
+      "name": "Day of Lament",
+      "type": "public",
+      "name_local": "የቀይ ሽብር መታሰቢያ ቀን"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "ዒድ አል ፈጥር"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "ስቅለት"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "ፋሲካ"
+    },
+    {
+      "date": "2025-05-28",
+      "name": "Derg Downfall Day",
+      "type": "public",
+      "name_local": "ደርግ የወደቀበት ቀን"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "ዒድ አል አድሐ"
+    },
+    {
+      "date": "2025-09-04",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "መውሊድ"
+    },
+    {
+      "date": "2025-09-11",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "እንቁጣጣሽ"
+    },
+    {
+      "date": "2025-09-27",
+      "name": "Finding of the True Cross",
+      "type": "public",
+      "name_local": "ብርሐነ-መስቀል"
+    },
+    {
+      "date": "2026-01-06",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "ልደተ-ለእግዚእነ/ ገና"
+    },
+    {
+      "date": "2026-01-19",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "ብርሐነ ጥምቀት"
+    },
+    {
+      "date": "2026-02-18",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "ረመዳን"
+    },
+    {
+      "date": "2026-03-02",
+      "name": "Victory at Adwa Day",
+      "type": "public",
+      "name_local": "የዓድዋ ድል በዓል"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "ዒድ አል ፈጥር"
+    },
+    {
+      "date": "2026-03-28",
+      "name": "Day of Lament",
+      "type": "public",
+      "name_local": "የቀይ ሽብር መታሰቢያ ቀን"
+    },
+    {
+      "date": "2026-04-10",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "ስቅለት"
+    },
+    {
+      "date": "2026-04-12",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "ፋሲካ"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "ዒድ አል አድሐ"
+    },
+    {
+      "date": "2026-05-28",
+      "name": "Derg Downfall Day",
+      "type": "public",
+      "name_local": "ደርግ የወደቀበት ቀን"
+    },
+    {
+      "date": "2026-08-25",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "መውሊድ"
+    },
+    {
+      "date": "2026-09-11",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "እንቁጣጣሽ"
+    },
+    {
+      "date": "2026-09-27",
+      "name": "Finding of the True Cross",
+      "type": "public",
+      "name_local": "ብርሐነ-መስቀል"
+    },
+    {
+      "date": "2027-01-06",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "ልደተ-ለእግዚእነ/ ገና"
+    },
+    {
+      "date": "2027-01-19",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "ብርሐነ ጥምቀት"
+    },
+    {
+      "date": "2027-02-08",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "ረመዳን"
+    },
+    {
+      "date": "2027-03-02",
+      "name": "Victory at Adwa Day",
+      "type": "public",
+      "name_local": "የዓድዋ ድል በዓል"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "ዒድ አል ፈጥር"
+    },
+    {
+      "date": "2027-03-28",
+      "name": "Day of Lament",
+      "type": "public",
+      "name_local": "የቀይ ሽብር መታሰቢያ ቀን"
+    },
+    {
+      "date": "2027-04-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "ስቅለት"
+    },
+    {
+      "date": "2027-05-02",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "ፋሲካ"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "ዒድ አል አድሐ"
+    },
+    {
+      "date": "2027-05-28",
+      "name": "Derg Downfall Day",
+      "type": "public",
+      "name_local": "ደርግ የወደቀበት ቀን"
+    },
+    {
+      "date": "2027-08-14",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "መውሊድ"
+    },
+    {
+      "date": "2027-09-11",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "እንቁጣጣሽ"
+    },
+    {
+      "date": "2027-09-27",
+      "name": "Finding of the True Cross",
+      "type": "public",
+      "name_local": "ብርሐነ-መስቀል"
+    },
+    {
+      "date": "2028-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "ልደተ-ለእግዚእነ/ ገና"
+    },
+    {
+      "date": "2028-01-19",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "ብርሐነ ጥምቀት"
+    },
+    {
+      "date": "2028-01-28",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "ረመዳን"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "ዒድ አል ፈጥር"
+    },
+    {
+      "date": "2028-03-02",
+      "name": "Victory at Adwa Day",
+      "type": "public",
+      "name_local": "የዓድዋ ድል በዓል"
+    },
+    {
+      "date": "2028-03-28",
+      "name": "Day of Lament",
+      "type": "public",
+      "name_local": "የቀይ ሽብር መታሰቢያ ቀን"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "ስቅለት"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "ፋሲካ"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "ዒድ አል አድሐ"
+    },
+    {
+      "date": "2028-05-28",
+      "name": "Derg Downfall Day",
+      "type": "public",
+      "name_local": "ደርግ የወደቀበት ቀን"
+    },
+    {
+      "date": "2028-08-03",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "መውሊድ"
+    },
+    {
+      "date": "2028-09-12",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "እንቁጣጣሽ"
+    },
+    {
+      "date": "2028-09-28",
+      "name": "Finding of the True Cross",
+      "type": "public",
+      "name_local": "ብርሐነ-መስቀል"
+    },
+    {
+      "date": "2029-01-06",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "ልደተ-ለእግዚእነ/ ገና"
+    },
+    {
+      "date": "2029-01-16",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "ረመዳን"
+    },
+    {
+      "date": "2029-01-19",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "ብርሐነ ጥምቀት"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "ዒድ አል ፈጥር"
+    },
+    {
+      "date": "2029-03-02",
+      "name": "Victory at Adwa Day",
+      "type": "public",
+      "name_local": "የዓድዋ ድል በዓል"
+    },
+    {
+      "date": "2029-03-28",
+      "name": "Day of Lament",
+      "type": "public",
+      "name_local": "የቀይ ሽብር መታሰቢያ ቀን"
+    },
+    {
+      "date": "2029-04-06",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "ስቅለት"
+    },
+    {
+      "date": "2029-04-08",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "ፋሲካ"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "ዒድ አል አድሐ"
+    },
+    {
+      "date": "2029-05-28",
+      "name": "Derg Downfall Day",
+      "type": "public",
+      "name_local": "ደርግ የወደቀበት ቀን"
+    },
+    {
+      "date": "2029-07-24",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "መውሊድ"
+    },
+    {
+      "date": "2029-09-11",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "እንቁጣጣሽ"
+    },
+    {
+      "date": "2029-09-27",
+      "name": "Finding of the True Cross",
+      "type": "public",
+      "name_local": "ብርሐነ-መስቀል"
+    }
+  ]
+}

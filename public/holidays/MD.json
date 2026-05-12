@@ -1,0 +1,348 @@
+{
+  "meta": {
+    "country": "MD",
+    "name": "Moldova",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "ro",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Anul nou"
+    },
+    {
+      "date": "2025-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Craciun pe Rit Vechi"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Ziua Internationala a Femeii"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Paștele"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "A doua zi de Pasti"
+    },
+    {
+      "date": "2025-04-28",
+      "name": "Memorial Day",
+      "type": "public",
+      "name_local": "Paştele Blăjinilor"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ziua muncii"
+    },
+    {
+      "date": "2025-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Ziua Victoriei"
+    },
+    {
+      "date": "2025-08-27",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ziua Independentei"
+    },
+    {
+      "date": "2025-08-31",
+      "name": "National Language Day",
+      "type": "public",
+      "name_local": "Limba noastră"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Craciun pe stil Nou"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Anul nou"
+    },
+    {
+      "date": "2026-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Craciun pe Rit Vechi"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Ziua Internationala a Femeii"
+    },
+    {
+      "date": "2026-04-12",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Paștele"
+    },
+    {
+      "date": "2026-04-13",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "A doua zi de Pasti"
+    },
+    {
+      "date": "2026-04-20",
+      "name": "Memorial Day",
+      "type": "public",
+      "name_local": "Paştele Blăjinilor"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ziua muncii"
+    },
+    {
+      "date": "2026-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Ziua Victoriei"
+    },
+    {
+      "date": "2026-08-27",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ziua Independentei"
+    },
+    {
+      "date": "2026-08-31",
+      "name": "National Language Day",
+      "type": "public",
+      "name_local": "Limba noastră"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Craciun pe stil Nou"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Anul nou"
+    },
+    {
+      "date": "2027-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Craciun pe Rit Vechi"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Ziua Internationala a Femeii"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ziua muncii"
+    },
+    {
+      "date": "2027-05-02",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Paștele"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "A doua zi de Pasti"
+    },
+    {
+      "date": "2027-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Ziua Victoriei"
+    },
+    {
+      "date": "2027-05-10",
+      "name": "Memorial Day",
+      "type": "public",
+      "name_local": "Paştele Blăjinilor"
+    },
+    {
+      "date": "2027-08-27",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ziua Independentei"
+    },
+    {
+      "date": "2027-08-31",
+      "name": "National Language Day",
+      "type": "public",
+      "name_local": "Limba noastră"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Craciun pe stil Nou"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Anul nou"
+    },
+    {
+      "date": "2028-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Craciun pe Rit Vechi"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Ziua Internationala a Femeii"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Paștele"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "A doua zi de Pasti"
+    },
+    {
+      "date": "2028-04-24",
+      "name": "Memorial Day",
+      "type": "public",
+      "name_local": "Paştele Blăjinilor"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ziua muncii"
+    },
+    {
+      "date": "2028-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Ziua Victoriei"
+    },
+    {
+      "date": "2028-08-27",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ziua Independentei"
+    },
+    {
+      "date": "2028-08-31",
+      "name": "National Language Day",
+      "type": "public",
+      "name_local": "Limba noastră"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Craciun pe stil Nou"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Anul nou"
+    },
+    {
+      "date": "2029-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Craciun pe Rit Vechi"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Ziua Internationala a Femeii"
+    },
+    {
+      "date": "2029-04-08",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Paștele"
+    },
+    {
+      "date": "2029-04-09",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "A doua zi de Pasti"
+    },
+    {
+      "date": "2029-04-16",
+      "name": "Memorial Day",
+      "type": "public",
+      "name_local": "Paştele Blăjinilor"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ziua muncii"
+    },
+    {
+      "date": "2029-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Ziua Victoriei"
+    },
+    {
+      "date": "2029-08-27",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ziua Independentei"
+    },
+    {
+      "date": "2029-08-31",
+      "name": "National Language Day",
+      "type": "public",
+      "name_local": "Limba noastră"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Craciun pe stil Nou"
+    }
+  ]
+}

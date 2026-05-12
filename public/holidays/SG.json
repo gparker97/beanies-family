@@ -1,0 +1,298 @@
+{
+  "meta": {
+    "country": "SG",
+    "name": "Singapore",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "en",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-01-29",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2025-01-30",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2025-03-31",
+      "name": "Hari Raya Puasa",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-05-12",
+      "name": "Vesak Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-06-07",
+      "name": "Hari Raya Haji",
+      "type": "public"
+    },
+    {
+      "date": "2025-08-09",
+      "name": "National Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-10-20",
+      "name": "Deepavali",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2026-02-18",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2026-03-21",
+      "name": "Hari Raya Puasa",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Hari Raya Haji",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-31",
+      "name": "Vesak Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-06-01",
+      "name": "Vesak Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-08-09",
+      "name": "National Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-08-10",
+      "name": "National Day (substitute day)",
+      "type": "public"
+    },
+    {
+      "date": "2026-11-08",
+      "name": "Deepavali",
+      "type": "public"
+    },
+    {
+      "date": "2026-11-09",
+      "name": "Deepavali",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-02-06",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2027-02-07",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2027-02-08",
+      "name": "Chinese New Year (substitute day)",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "Hari Raya Puasa",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Hari Raya Haji",
+      "type": "public"
+    },
+    {
+      "date": "2027-08-09",
+      "name": "National Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-10-28",
+      "name": "Deepavali",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-26",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-27",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "Hari Raya Puasa",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Hari Raya Haji",
+      "type": "public"
+    },
+    {
+      "date": "2028-08-09",
+      "name": "National Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-11-15",
+      "name": "Deepavali",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-13",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "Hari Raya Puasa",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Hari Raya Haji",
+      "type": "public"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-08-09",
+      "name": "National Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-11-05",
+      "name": "Deepavali",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    }
+  ]
+}

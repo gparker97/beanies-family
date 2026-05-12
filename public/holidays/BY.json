@@ -1,0 +1,288 @@
+{
+  "meta": {
+    "country": "BY",
+    "name": "Belarus",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "be",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Новы год"
+    },
+    {
+      "date": "2025-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Каляды праваслаўныя"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Мiжнародны жаночы дзень"
+    },
+    {
+      "date": "2025-04-29",
+      "name": "Commemoration Day",
+      "type": "public",
+      "name_local": "Радунiца"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Дзень працы"
+    },
+    {
+      "date": "2025-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Дзень Перамогi"
+    },
+    {
+      "date": "2025-07-03",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Дзень Незалежнасцi"
+    },
+    {
+      "date": "2025-11-07",
+      "name": "October Revolution Day",
+      "type": "public",
+      "name_local": "Дзень Кастрычніцкай рэвалюцыі"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Каляды каталiцкiя"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Новы год"
+    },
+    {
+      "date": "2026-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Каляды праваслаўныя"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Мiжнародны жаночы дзень"
+    },
+    {
+      "date": "2026-04-21",
+      "name": "Commemoration Day",
+      "type": "public",
+      "name_local": "Радунiца"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Дзень працы"
+    },
+    {
+      "date": "2026-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Дзень Перамогi"
+    },
+    {
+      "date": "2026-07-03",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Дзень Незалежнасцi"
+    },
+    {
+      "date": "2026-11-07",
+      "name": "October Revolution Day",
+      "type": "public",
+      "name_local": "Дзень Кастрычніцкай рэвалюцыі"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Каляды каталiцкiя"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Новы год"
+    },
+    {
+      "date": "2027-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Каляды праваслаўныя"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Мiжнародны жаночы дзень"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Дзень працы"
+    },
+    {
+      "date": "2027-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Дзень Перамогi"
+    },
+    {
+      "date": "2027-05-11",
+      "name": "Commemoration Day",
+      "type": "public",
+      "name_local": "Радунiца"
+    },
+    {
+      "date": "2027-07-03",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Дзень Незалежнасцi"
+    },
+    {
+      "date": "2027-11-07",
+      "name": "October Revolution Day",
+      "type": "public",
+      "name_local": "Дзень Кастрычніцкай рэвалюцыі"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Каляды каталiцкiя"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Новы год"
+    },
+    {
+      "date": "2028-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Каляды праваслаўныя"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Мiжнародны жаночы дзень"
+    },
+    {
+      "date": "2028-04-25",
+      "name": "Commemoration Day",
+      "type": "public",
+      "name_local": "Радунiца"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Дзень працы"
+    },
+    {
+      "date": "2028-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Дзень Перамогi"
+    },
+    {
+      "date": "2028-07-03",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Дзень Незалежнасцi"
+    },
+    {
+      "date": "2028-11-07",
+      "name": "October Revolution Day",
+      "type": "public",
+      "name_local": "Дзень Кастрычніцкай рэвалюцыі"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Каляды каталiцкiя"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Новы год"
+    },
+    {
+      "date": "2029-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Каляды праваслаўныя"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Мiжнародны жаночы дзень"
+    },
+    {
+      "date": "2029-04-17",
+      "name": "Commemoration Day",
+      "type": "public",
+      "name_local": "Радунiца"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Дзень працы"
+    },
+    {
+      "date": "2029-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Дзень Перамогi"
+    },
+    {
+      "date": "2029-07-03",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Дзень Незалежнасцi"
+    },
+    {
+      "date": "2029-11-07",
+      "name": "October Revolution Day",
+      "type": "public",
+      "name_local": "Дзень Кастрычніцкай рэвалюцыі"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Каляды каталiцкiя"
+    }
+  ]
+}

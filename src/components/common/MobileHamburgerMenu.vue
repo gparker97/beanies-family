@@ -20,19 +20,13 @@ import {
   type NavItemDef,
 } from '@/constants/navigation';
 import { usePermissions } from '@/composables/usePermissions';
-import { useAccountsStore } from '@/stores/accountsStore';
-import { useAssetsStore } from '@/stores/assetsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useGoalsStore } from '@/stores/goalsStore';
-import { useMemberFilterStore } from '@/stores/memberFilterStore';
-import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { useTodoStore } from '@/stores/todoStore';
-import { useActivityStore } from '@/stores/activityStore';
-import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
+import { resetAllAppStores } from '@/utils/resetStores';
 import { useLanguageSwitcher } from '@/composables/useLanguageSwitcher';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
@@ -124,26 +118,12 @@ function handlePrivacyToggle() {
   playBlink();
 }
 
-function resetAllStores() {
-  useSyncStore().resetState();
-  useFamilyStore().resetState();
-  useAccountsStore().resetState();
-  useTransactionsStore().resetState();
-  useAssetsStore().resetState();
-  useGoalsStore().resetState();
-  useRecurringStore().resetState();
-  useSettingsStore().resetState();
-  useMemberFilterStore().resetState();
-  useTodoStore().resetState();
-  useActivityStore().resetState();
-}
-
 async function handleSignOut() {
   close();
   // Sign out first — flushes pending saves while sync service still has the
   // file handle and session password, preventing plaintext writes
   await authStore.signOut();
-  resetAllStores();
+  resetAllAppStores();
   router.replace('/login');
 }
 
@@ -151,7 +131,7 @@ async function handleSignOutAndClearData() {
   close();
   // Sign out first — flushes pending saves while session password is still available
   await authStore.signOutAndClearData();
-  resetAllStores();
+  resetAllAppStores();
   router.replace('/login');
 }
 

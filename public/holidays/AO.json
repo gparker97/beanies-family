@@ -1,0 +1,348 @@
+{
+  "meta": {
+    "country": "AO",
+    "name": "Angola",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "pt",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2025-02-04",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Dia do Início da Luta Armada de Libertação Nacional"
+    },
+    {
+      "date": "2025-03-04",
+      "name": "Shrove Tuesday",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Woman's Day",
+      "type": "public",
+      "name_local": "Dia Internacional da Mulher"
+    },
+    {
+      "date": "2025-04-04",
+      "name": "Peace Day",
+      "type": "public",
+      "name_local": "Dia da Paz"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Sexta-Feira Santa"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2025-09-17",
+      "name": "National Hero Day",
+      "type": "public",
+      "name_local": "Fundador da Nação e Dia dos Heróis Nacionais"
+    },
+    {
+      "date": "2025-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Dia de Finados"
+    },
+    {
+      "date": "2025-11-11",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2026-02-04",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Dia do Início da Luta Armada de Libertação Nacional"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Shrove Tuesday",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Woman's Day",
+      "type": "public",
+      "name_local": "Dia Internacional da Mulher"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Sexta-Feira Santa"
+    },
+    {
+      "date": "2026-04-04",
+      "name": "Peace Day",
+      "type": "public",
+      "name_local": "Dia da Paz"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2026-09-17",
+      "name": "National Hero Day",
+      "type": "public",
+      "name_local": "Fundador da Nação e Dia dos Heróis Nacionais"
+    },
+    {
+      "date": "2026-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Dia de Finados"
+    },
+    {
+      "date": "2026-11-11",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2027-02-04",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Dia do Início da Luta Armada de Libertação Nacional"
+    },
+    {
+      "date": "2027-02-09",
+      "name": "Shrove Tuesday",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Woman's Day",
+      "type": "public",
+      "name_local": "Dia Internacional da Mulher"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Sexta-Feira Santa"
+    },
+    {
+      "date": "2027-04-04",
+      "name": "Peace Day",
+      "type": "public",
+      "name_local": "Dia da Paz"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2027-09-17",
+      "name": "National Hero Day",
+      "type": "public",
+      "name_local": "Fundador da Nação e Dia dos Heróis Nacionais"
+    },
+    {
+      "date": "2027-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Dia de Finados"
+    },
+    {
+      "date": "2027-11-11",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2028-02-04",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Dia do Início da Luta Armada de Libertação Nacional"
+    },
+    {
+      "date": "2028-02-29",
+      "name": "Shrove Tuesday",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Woman's Day",
+      "type": "public",
+      "name_local": "Dia Internacional da Mulher"
+    },
+    {
+      "date": "2028-04-04",
+      "name": "Peace Day",
+      "type": "public",
+      "name_local": "Dia da Paz"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Sexta-Feira Santa"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2028-09-17",
+      "name": "National Hero Day",
+      "type": "public",
+      "name_local": "Fundador da Nação e Dia dos Heróis Nacionais"
+    },
+    {
+      "date": "2028-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Dia de Finados"
+    },
+    {
+      "date": "2028-11-11",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2029-02-04",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Dia do Início da Luta Armada de Libertação Nacional"
+    },
+    {
+      "date": "2029-02-13",
+      "name": "Shrove Tuesday",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Woman's Day",
+      "type": "public",
+      "name_local": "Dia Internacional da Mulher"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Sexta-Feira Santa"
+    },
+    {
+      "date": "2029-04-04",
+      "name": "Peace Day",
+      "type": "public",
+      "name_local": "Dia da Paz"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2029-09-17",
+      "name": "National Hero Day",
+      "type": "public",
+      "name_local": "Fundador da Nação e Dia dos Heróis Nacionais"
+    },
+    {
+      "date": "2029-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Dia de Finados"
+    },
+    {
+      "date": "2029-11-11",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    }
+  ]
+}

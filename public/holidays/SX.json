@@ -1,0 +1,433 @@
+{
+  "meta": {
+    "country": "SX",
+    "name": "Sint Maarten",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "nl",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nieuwjaar"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Goede Vrijdag"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pasen"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Tweede paasdag"
+    },
+    {
+      "date": "2025-04-27",
+      "name": "King's Day",
+      "type": "public",
+      "name_local": "Koningsdag"
+    },
+    {
+      "date": "2025-04-30",
+      "name": "Carnival",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dag van de Arbeid"
+    },
+    {
+      "date": "2025-05-29",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "O.L.H. Hemelvaart"
+    },
+    {
+      "date": "2025-06-08",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Pinksteren"
+    },
+    {
+      "date": "2025-07-01",
+      "name": "Emancipation Day",
+      "type": "public",
+      "name_local": "Emancipatiedag"
+    },
+    {
+      "date": "2025-10-09",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Dag van de Grondwet"
+    },
+    {
+      "date": "2025-11-11",
+      "name": "Sint Maarten Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Kerstmis"
+    },
+    {
+      "date": "2025-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Tweede kerstdag"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nieuwjaar"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Goede Vrijdag"
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pasen"
+    },
+    {
+      "date": "2026-04-06",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Tweede paasdag"
+    },
+    {
+      "date": "2026-04-27",
+      "name": "King's Day",
+      "type": "public",
+      "name_local": "Koningsdag"
+    },
+    {
+      "date": "2026-04-30",
+      "name": "Carnival",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dag van de Arbeid"
+    },
+    {
+      "date": "2026-05-14",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "O.L.H. Hemelvaart"
+    },
+    {
+      "date": "2026-05-24",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Pinksteren"
+    },
+    {
+      "date": "2026-07-01",
+      "name": "Emancipation Day",
+      "type": "public",
+      "name_local": "Emancipatiedag"
+    },
+    {
+      "date": "2026-10-09",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Dag van de Grondwet"
+    },
+    {
+      "date": "2026-11-11",
+      "name": "Sint Maarten Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Kerstmis"
+    },
+    {
+      "date": "2026-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Tweede kerstdag"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nieuwjaar"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Goede Vrijdag"
+    },
+    {
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pasen"
+    },
+    {
+      "date": "2027-03-29",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Tweede paasdag"
+    },
+    {
+      "date": "2027-04-27",
+      "name": "King's Day",
+      "type": "public",
+      "name_local": "Koningsdag"
+    },
+    {
+      "date": "2027-04-30",
+      "name": "Carnival",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dag van de Arbeid"
+    },
+    {
+      "date": "2027-05-06",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "O.L.H. Hemelvaart"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Pinksteren"
+    },
+    {
+      "date": "2027-07-01",
+      "name": "Emancipation Day",
+      "type": "public",
+      "name_local": "Emancipatiedag"
+    },
+    {
+      "date": "2027-10-09",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Dag van de Grondwet"
+    },
+    {
+      "date": "2027-11-11",
+      "name": "Sint Maarten Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Kerstmis"
+    },
+    {
+      "date": "2027-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Tweede kerstdag"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nieuwjaar"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Goede Vrijdag"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pasen"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Tweede paasdag"
+    },
+    {
+      "date": "2028-04-27",
+      "name": "King's Day",
+      "type": "public",
+      "name_local": "Koningsdag"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dag van de Arbeid"
+    },
+    {
+      "date": "2028-05-02",
+      "name": "Carnival",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2028-05-25",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "O.L.H. Hemelvaart"
+    },
+    {
+      "date": "2028-06-04",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Pinksteren"
+    },
+    {
+      "date": "2028-07-01",
+      "name": "Emancipation Day",
+      "type": "public",
+      "name_local": "Emancipatiedag"
+    },
+    {
+      "date": "2028-10-09",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Dag van de Grondwet"
+    },
+    {
+      "date": "2028-11-11",
+      "name": "Sint Maarten Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Kerstmis"
+    },
+    {
+      "date": "2028-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Tweede kerstdag"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nieuwjaar"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Goede Vrijdag"
+    },
+    {
+      "date": "2029-04-01",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pasen"
+    },
+    {
+      "date": "2029-04-02",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Tweede paasdag"
+    },
+    {
+      "date": "2029-04-27",
+      "name": "King's Day",
+      "type": "public",
+      "name_local": "Koningsdag"
+    },
+    {
+      "date": "2029-04-30",
+      "name": "Carnival",
+      "type": "public",
+      "name_local": "Carnaval"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dag van de Arbeid"
+    },
+    {
+      "date": "2029-05-10",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "O.L.H. Hemelvaart"
+    },
+    {
+      "date": "2029-05-20",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Pinksteren"
+    },
+    {
+      "date": "2029-07-01",
+      "name": "Emancipation Day",
+      "type": "public",
+      "name_local": "Emancipatiedag"
+    },
+    {
+      "date": "2029-10-09",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Dag van de Grondwet"
+    },
+    {
+      "date": "2029-11-11",
+      "name": "Sint Maarten Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Kerstmis"
+    },
+    {
+      "date": "2029-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Tweede kerstdag"
+    }
+  ]
+}

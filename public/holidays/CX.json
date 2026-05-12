@@ -1,0 +1,293 @@
+{
+  "meta": {
+    "country": "CX",
+    "name": "Christmas Island",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "en",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-01-26",
+      "name": "Australia Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-01-29",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2025-03-24",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-25",
+      "name": "Anzac Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2025-10-06",
+      "name": "Territory Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-26",
+      "name": "Boxing Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-01-26",
+      "name": "Australia Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2026-03-23",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-25",
+      "name": "Anzac Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2026-10-06",
+      "name": "Territory Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-26",
+      "name": "Boxing Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-26",
+      "name": "Australia Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-02-06",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-22",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2027-04-25",
+      "name": "Anzac Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2027-10-06",
+      "name": "Territory Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-26",
+      "name": "Boxing Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-26",
+      "name": "Australia Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-26",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2028-03-27",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-25",
+      "name": "Anzac Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2028-10-06",
+      "name": "Territory Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-26",
+      "name": "Boxing Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-26",
+      "name": "Australia Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-13",
+      "name": "Chinese New Year",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-26",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2029-04-25",
+      "name": "Anzac Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-10-06",
+      "name": "Territory Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-26",
+      "name": "Boxing Day",
+      "type": "public"
+    }
+  ]
+}

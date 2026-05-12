@@ -1,0 +1,496 @@
+{
+  "meta": {
+    "country": "MY",
+    "name": "Malaysia",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "ms",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Hari Tahun Baru"
+    },
+    {
+      "date": "2025-01-29",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2025-01-30",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2025-03-17",
+      "name": "Day of Nuzul Al-Quran",
+      "type": "public",
+      "name_local": "Hari Nuzul Al-Quran"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2025-03-31",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Hari Pekerja"
+    },
+    {
+      "date": "2025-05-12",
+      "name": "Vesak Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-06-02",
+      "name": "Yang di-Pertuan Agong's Birthday",
+      "type": "public",
+      "name_local": "Hari Keputeraan Yang di-Pertuan Agong"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Hari Raya Haji"
+    },
+    {
+      "date": "2025-06-26",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Awal Muharram"
+    },
+    {
+      "date": "2025-08-31",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Hari Kebangsaan"
+    },
+    {
+      "date": "2025-09-01",
+      "name": "Independence Day (substitute day)",
+      "type": "public",
+      "name_local": "Hari Kebangsaan (substitute day)"
+    },
+    {
+      "date": "2025-09-04",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Hari Keputeraan Nabi Muhammad S.A.W."
+    },
+    {
+      "date": "2025-09-16",
+      "name": "Malaysia Day",
+      "type": "public",
+      "name_local": "Hari Malaysia"
+    },
+    {
+      "date": "2025-10-20",
+      "name": "Deepavali",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Hari Krismas"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Hari Tahun Baru"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2026-02-18",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2026-03-07",
+      "name": "Day of Nuzul Al-Quran",
+      "type": "public",
+      "name_local": "Hari Nuzul Al-Quran"
+    },
+    {
+      "date": "2026-03-21",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2026-03-22",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Hari Pekerja"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Hari Raya Haji"
+    },
+    {
+      "date": "2026-05-31",
+      "name": "Vesak Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-06-01",
+      "name": "Yang di-Pertuan Agong's Birthday",
+      "type": "public",
+      "name_local": "Hari Keputeraan Yang di-Pertuan Agong"
+    },
+    {
+      "date": "2026-06-17",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Awal Muharram"
+    },
+    {
+      "date": "2026-08-25",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Hari Keputeraan Nabi Muhammad S.A.W."
+    },
+    {
+      "date": "2026-08-31",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Hari Kebangsaan"
+    },
+    {
+      "date": "2026-09-16",
+      "name": "Malaysia Day",
+      "type": "public",
+      "name_local": "Hari Malaysia"
+    },
+    {
+      "date": "2026-11-08",
+      "name": "Deepavali",
+      "type": "public"
+    },
+    {
+      "date": "2026-11-09",
+      "name": "Deepavali",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Hari Krismas"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Hari Tahun Baru"
+    },
+    {
+      "date": "2027-02-06",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2027-02-07",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2027-02-08",
+      "name": "Chinese New Year (substitute day)",
+      "type": "public",
+      "name_local": "Tahun Baru Cina (substitute day)"
+    },
+    {
+      "date": "2027-02-24",
+      "name": "Day of Nuzul Al-Quran",
+      "type": "public",
+      "name_local": "Hari Nuzul Al-Quran"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2027-03-10",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Hari Pekerja"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Hari Raya Haji"
+    },
+    {
+      "date": "2027-06-06",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Awal Muharram"
+    },
+    {
+      "date": "2027-06-07",
+      "name": "Yang di-Pertuan Agong's Birthday",
+      "type": "public",
+      "name_local": "Hari Keputeraan Yang di-Pertuan Agong"
+    },
+    {
+      "date": "2027-08-14",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Hari Keputeraan Nabi Muhammad S.A.W."
+    },
+    {
+      "date": "2027-08-31",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Hari Kebangsaan"
+    },
+    {
+      "date": "2027-09-16",
+      "name": "Malaysia Day",
+      "type": "public",
+      "name_local": "Hari Malaysia"
+    },
+    {
+      "date": "2027-10-28",
+      "name": "Deepavali",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Hari Krismas"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Hari Tahun Baru"
+    },
+    {
+      "date": "2028-01-26",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2028-01-27",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2028-02-13",
+      "name": "Day of Nuzul Al-Quran",
+      "type": "public",
+      "name_local": "Hari Nuzul Al-Quran"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2028-02-27",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Hari Pekerja"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Hari Raya Haji"
+    },
+    {
+      "date": "2028-05-25",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Awal Muharram"
+    },
+    {
+      "date": "2028-06-05",
+      "name": "Yang di-Pertuan Agong's Birthday",
+      "type": "public",
+      "name_local": "Hari Keputeraan Yang di-Pertuan Agong"
+    },
+    {
+      "date": "2028-08-03",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Hari Keputeraan Nabi Muhammad S.A.W."
+    },
+    {
+      "date": "2028-08-31",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Hari Kebangsaan"
+    },
+    {
+      "date": "2028-09-16",
+      "name": "Malaysia Day",
+      "type": "public",
+      "name_local": "Hari Malaysia"
+    },
+    {
+      "date": "2028-11-15",
+      "name": "Deepavali",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Hari Krismas"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Hari Tahun Baru"
+    },
+    {
+      "date": "2029-02-01",
+      "name": "Day of Nuzul Al-Quran",
+      "type": "public",
+      "name_local": "Hari Nuzul Al-Quran"
+    },
+    {
+      "date": "2029-02-13",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2029-02-15",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Hari Raya Haji"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Hari Pekerja"
+    },
+    {
+      "date": "2029-05-14",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Awal Muharram"
+    },
+    {
+      "date": "2029-06-04",
+      "name": "Yang di-Pertuan Agong's Birthday",
+      "type": "public",
+      "name_local": "Hari Keputeraan Yang di-Pertuan Agong"
+    },
+    {
+      "date": "2029-07-24",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Hari Keputeraan Nabi Muhammad S.A.W."
+    },
+    {
+      "date": "2029-08-31",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Hari Kebangsaan"
+    },
+    {
+      "date": "2029-09-16",
+      "name": "Malaysia Day",
+      "type": "public",
+      "name_local": "Hari Malaysia"
+    },
+    {
+      "date": "2029-09-17",
+      "name": "Malaysia Day (substitute day)",
+      "type": "public",
+      "name_local": "Hari Malaysia (substitute day)"
+    },
+    {
+      "date": "2029-11-05",
+      "name": "Deepavali",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Hari Krismas"
+    }
+  ]
+}

@@ -1,0 +1,373 @@
+{
+  "meta": {
+    "country": "DO",
+    "name": "Dominican Republic",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "es",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2025-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Día de los Reyes Magos"
+    },
+    {
+      "date": "2025-01-21",
+      "name": "Our Lady of Altagracia",
+      "type": "public",
+      "name_local": "Nuestra Señora de la Altagracia"
+    },
+    {
+      "date": "2025-01-26",
+      "name": "Duarte's Birthday",
+      "type": "public",
+      "name_local": "Día de Duarte"
+    },
+    {
+      "date": "2025-02-27",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2025-05-05",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2025-06-19",
+      "name": "Corpus Christi",
+      "type": "public"
+    },
+    {
+      "date": "2025-08-16",
+      "name": "Restoration Day",
+      "type": "public",
+      "name_local": "Día de la Restauración"
+    },
+    {
+      "date": "2025-09-24",
+      "name": "Our Lady of las Mercedes",
+      "type": "public",
+      "name_local": "Nuestra Señora de las Mercedes"
+    },
+    {
+      "date": "2025-11-10",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Día de la Constitución"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2026-01-05",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Día de los Reyes Magos"
+    },
+    {
+      "date": "2026-01-21",
+      "name": "Our Lady of Altagracia",
+      "type": "public",
+      "name_local": "Nuestra Señora de la Altagracia"
+    },
+    {
+      "date": "2026-01-26",
+      "name": "Duarte's Birthday",
+      "type": "public",
+      "name_local": "Día de Duarte"
+    },
+    {
+      "date": "2026-02-27",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2026-05-04",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2026-06-04",
+      "name": "Corpus Christi",
+      "type": "public"
+    },
+    {
+      "date": "2026-08-16",
+      "name": "Restoration Day",
+      "type": "public",
+      "name_local": "Día de la Restauración"
+    },
+    {
+      "date": "2026-09-24",
+      "name": "Our Lady of las Mercedes",
+      "type": "public",
+      "name_local": "Nuestra Señora de las Mercedes"
+    },
+    {
+      "date": "2026-11-09",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Día de la Constitución"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2027-01-04",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Día de los Reyes Magos"
+    },
+    {
+      "date": "2027-01-21",
+      "name": "Our Lady of Altagracia",
+      "type": "public",
+      "name_local": "Nuestra Señora de la Altagracia"
+    },
+    {
+      "date": "2027-01-25",
+      "name": "Duarte's Birthday",
+      "type": "public",
+      "name_local": "Día de Duarte"
+    },
+    {
+      "date": "2027-02-27",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2027-05-27",
+      "name": "Corpus Christi",
+      "type": "public"
+    },
+    {
+      "date": "2027-08-16",
+      "name": "Restoration Day",
+      "type": "public",
+      "name_local": "Día de la Restauración"
+    },
+    {
+      "date": "2027-09-24",
+      "name": "Our Lady of las Mercedes",
+      "type": "public",
+      "name_local": "Nuestra Señora de las Mercedes"
+    },
+    {
+      "date": "2027-11-08",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Día de la Constitución"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2028-01-10",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Día de los Reyes Magos"
+    },
+    {
+      "date": "2028-01-21",
+      "name": "Our Lady of Altagracia",
+      "type": "public",
+      "name_local": "Nuestra Señora de la Altagracia"
+    },
+    {
+      "date": "2028-01-24",
+      "name": "Duarte's Birthday",
+      "type": "public",
+      "name_local": "Día de Duarte"
+    },
+    {
+      "date": "2028-02-27",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2028-06-15",
+      "name": "Corpus Christi",
+      "type": "public"
+    },
+    {
+      "date": "2028-08-16",
+      "name": "Restoration Day",
+      "type": "public",
+      "name_local": "Día de la Restauración"
+    },
+    {
+      "date": "2028-09-24",
+      "name": "Our Lady of las Mercedes",
+      "type": "public",
+      "name_local": "Nuestra Señora de las Mercedes"
+    },
+    {
+      "date": "2028-11-06",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Día de la Constitución"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2029-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Día de los Reyes Magos"
+    },
+    {
+      "date": "2029-01-21",
+      "name": "Our Lady of Altagracia",
+      "type": "public",
+      "name_local": "Nuestra Señora de la Altagracia"
+    },
+    {
+      "date": "2029-01-29",
+      "name": "Duarte's Birthday",
+      "type": "public",
+      "name_local": "Día de Duarte"
+    },
+    {
+      "date": "2029-02-27",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2029-04-30",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2029-05-31",
+      "name": "Corpus Christi",
+      "type": "public"
+    },
+    {
+      "date": "2029-08-16",
+      "name": "Restoration Day",
+      "type": "public",
+      "name_local": "Día de la Restauración"
+    },
+    {
+      "date": "2029-09-24",
+      "name": "Our Lady of las Mercedes",
+      "type": "public",
+      "name_local": "Nuestra Señora de las Mercedes"
+    },
+    {
+      "date": "2029-11-12",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Día de la Constitución"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    }
+  ]
+}

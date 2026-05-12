@@ -1,0 +1,373 @@
+{
+  "meta": {
+    "country": "NE",
+    "name": "Niger",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "fr",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2025-03-27",
+      "name": "Laylat al-Qadr",
+      "type": "public"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fête de fin du Ramadan"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2025-04-24",
+      "name": "Concord Day",
+      "type": "public",
+      "name_local": "Journée Nationale de la Concorde"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Fête du mouton"
+    },
+    {
+      "date": "2025-06-26",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Nouvel an islamique"
+    },
+    {
+      "date": "2025-08-03",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Proclamation de l'indépendance"
+    },
+    {
+      "date": "2025-09-04",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Mawlid"
+    },
+    {
+      "date": "2025-12-18",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Proclamation de la République"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2026-03-16",
+      "name": "Laylat al-Qadr",
+      "type": "public"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fête de fin du Ramadan"
+    },
+    {
+      "date": "2026-04-06",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2026-04-24",
+      "name": "Concord Day",
+      "type": "public",
+      "name_local": "Journée Nationale de la Concorde"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Fête du mouton"
+    },
+    {
+      "date": "2026-06-16",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Nouvel an islamique"
+    },
+    {
+      "date": "2026-08-03",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Proclamation de l'indépendance"
+    },
+    {
+      "date": "2026-08-25",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Mawlid"
+    },
+    {
+      "date": "2026-12-18",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Proclamation de la République"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2027-03-06",
+      "name": "Laylat al-Qadr",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fête de fin du Ramadan"
+    },
+    {
+      "date": "2027-03-29",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2027-04-24",
+      "name": "Concord Day",
+      "type": "public",
+      "name_local": "Journée Nationale de la Concorde"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Fête du mouton"
+    },
+    {
+      "date": "2027-06-06",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Nouvel an islamique"
+    },
+    {
+      "date": "2027-08-03",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Proclamation de l'indépendance"
+    },
+    {
+      "date": "2027-08-14",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Mawlid"
+    },
+    {
+      "date": "2027-12-18",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Proclamation de la République"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2028-02-23",
+      "name": "Laylat al-Qadr",
+      "type": "public"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fête de fin du Ramadan"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2028-04-24",
+      "name": "Concord Day",
+      "type": "public",
+      "name_local": "Journée Nationale de la Concorde"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Fête du mouton"
+    },
+    {
+      "date": "2028-05-25",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Nouvel an islamique"
+    },
+    {
+      "date": "2028-08-03",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Mawlid"
+    },
+    {
+      "date": "2028-08-03",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Proclamation de l'indépendance"
+    },
+    {
+      "date": "2028-12-18",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Proclamation de la République"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2029-02-11",
+      "name": "Laylat al-Qadr",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fête de fin du Ramadan"
+    },
+    {
+      "date": "2029-04-02",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Concord Day",
+      "type": "public",
+      "name_local": "Journée Nationale de la Concorde"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Fête du mouton"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2029-05-14",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Nouvel an islamique"
+    },
+    {
+      "date": "2029-07-24",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Mawlid"
+    },
+    {
+      "date": "2029-08-03",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Proclamation de l'indépendance"
+    },
+    {
+      "date": "2029-12-18",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Proclamation de la République"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    }
+  ]
+}

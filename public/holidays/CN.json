@@ -1,0 +1,468 @@
+{
+  "meta": {
+    "country": "CN",
+    "name": "China",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "zh",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "元旦"
+    },
+    {
+      "date": "2025-01-28",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2025-01-29",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2025-01-30",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "国际妇女节"
+    },
+    {
+      "date": "2025-04-04",
+      "name": "Qingming Festival",
+      "type": "public",
+      "name_local": "清明节 清明節"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "劳动节"
+    },
+    {
+      "date": "2025-05-04",
+      "name": "Youth Day",
+      "type": "public",
+      "name_local": "青年节"
+    },
+    {
+      "date": "2025-05-31",
+      "name": "Dragon Boat Festival",
+      "type": "public",
+      "name_local": "端午节"
+    },
+    {
+      "date": "2025-06-01",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "六一儿童节"
+    },
+    {
+      "date": "2025-08-01",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "建军节"
+    },
+    {
+      "date": "2025-10-01",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2025-10-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2025-10-03",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2025-10-06",
+      "name": "Mid-Autumn Festival",
+      "type": "public",
+      "name_local": "中秋节"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "元旦"
+    },
+    {
+      "date": "2026-02-16",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2026-02-18",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "国际妇女节"
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Qingming Festival",
+      "type": "public",
+      "name_local": "清明节 清明節"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "劳动节"
+    },
+    {
+      "date": "2026-05-04",
+      "name": "Youth Day",
+      "type": "public",
+      "name_local": "青年节"
+    },
+    {
+      "date": "2026-06-01",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "六一儿童节"
+    },
+    {
+      "date": "2026-06-19",
+      "name": "Dragon Boat Festival",
+      "type": "public",
+      "name_local": "端午节"
+    },
+    {
+      "date": "2026-08-01",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "建军节"
+    },
+    {
+      "date": "2026-09-25",
+      "name": "Mid-Autumn Festival",
+      "type": "public",
+      "name_local": "中秋节"
+    },
+    {
+      "date": "2026-10-01",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2026-10-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2026-10-03",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "元旦"
+    },
+    {
+      "date": "2027-02-05",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2027-02-06",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2027-02-07",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "国际妇女节"
+    },
+    {
+      "date": "2027-04-05",
+      "name": "Qingming Festival",
+      "type": "public",
+      "name_local": "清明节 清明節"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "劳动节"
+    },
+    {
+      "date": "2027-05-04",
+      "name": "Youth Day",
+      "type": "public",
+      "name_local": "青年节"
+    },
+    {
+      "date": "2027-06-01",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "六一儿童节"
+    },
+    {
+      "date": "2027-06-09",
+      "name": "Dragon Boat Festival",
+      "type": "public",
+      "name_local": "端午节"
+    },
+    {
+      "date": "2027-08-01",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "建军节"
+    },
+    {
+      "date": "2027-09-15",
+      "name": "Mid-Autumn Festival",
+      "type": "public",
+      "name_local": "中秋节"
+    },
+    {
+      "date": "2027-10-01",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2027-10-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2027-10-03",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "元旦"
+    },
+    {
+      "date": "2028-01-25",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2028-01-26",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2028-01-27",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "国际妇女节"
+    },
+    {
+      "date": "2028-04-04",
+      "name": "Qingming Festival",
+      "type": "public",
+      "name_local": "清明节 清明節"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "劳动节"
+    },
+    {
+      "date": "2028-05-04",
+      "name": "Youth Day",
+      "type": "public",
+      "name_local": "青年节"
+    },
+    {
+      "date": "2028-05-28",
+      "name": "Dragon Boat Festival",
+      "type": "public",
+      "name_local": "端午节"
+    },
+    {
+      "date": "2028-06-01",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "六一儿童节"
+    },
+    {
+      "date": "2028-08-01",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "建军节"
+    },
+    {
+      "date": "2028-10-01",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2028-10-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2028-10-03",
+      "name": "Mid-Autumn Festival",
+      "type": "public",
+      "name_local": "中秋节"
+    },
+    {
+      "date": "2028-10-03",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "元旦"
+    },
+    {
+      "date": "2029-02-12",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2029-02-13",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "春节"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "国际妇女节"
+    },
+    {
+      "date": "2029-04-04",
+      "name": "Qingming Festival",
+      "type": "public",
+      "name_local": "清明节 清明節"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "劳动节"
+    },
+    {
+      "date": "2029-05-04",
+      "name": "Youth Day",
+      "type": "public",
+      "name_local": "青年节"
+    },
+    {
+      "date": "2029-06-01",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "六一儿童节"
+    },
+    {
+      "date": "2029-06-16",
+      "name": "Dragon Boat Festival",
+      "type": "public",
+      "name_local": "端午节"
+    },
+    {
+      "date": "2029-08-01",
+      "name": "Army Day",
+      "type": "public",
+      "name_local": "建军节"
+    },
+    {
+      "date": "2029-09-22",
+      "name": "Mid-Autumn Festival",
+      "type": "public",
+      "name_local": "中秋节"
+    },
+    {
+      "date": "2029-10-01",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2029-10-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    },
+    {
+      "date": "2029-10-03",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "国庆节"
+    }
+  ]
+}

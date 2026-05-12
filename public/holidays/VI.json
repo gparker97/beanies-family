@@ -1,0 +1,493 @@
+{
+  "meta": {
+    "country": "VI",
+    "name": "Virgin Islands, U.S.",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "en",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-01-06",
+      "name": "Three Kings Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-01-20",
+      "name": "Martin Luther King Jr. Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-02-17",
+      "name": "President's Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-03-31",
+      "name": "Transfer Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-17",
+      "name": "Maundy Thursday",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public"
+    },
+    {
+      "date": "2025-05-26",
+      "name": "Memorial Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-06-19",
+      "name": "Juneteenth",
+      "type": "public"
+    },
+    {
+      "date": "2025-07-03",
+      "name": "Emancipation Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-07-04",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-07-28",
+      "name": "Hurricane Supplication Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-09-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-10-13",
+      "name": "Virgin Islands–Puerto Rico Friendship Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-11-11",
+      "name": "Veterans Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-11-27",
+      "name": "Thanksgiving Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-01-06",
+      "name": "Three Kings Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-01-19",
+      "name": "Martin Luther King Jr. Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-02-16",
+      "name": "President's Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-03-31",
+      "name": "Transfer Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-02",
+      "name": "Maundy Thursday",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-06",
+      "name": "Easter Monday",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-25",
+      "name": "Memorial Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-06-19",
+      "name": "Juneteenth",
+      "type": "public"
+    },
+    {
+      "date": "2026-07-03",
+      "name": "Emancipation Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-07-03",
+      "name": "Independence Day (substitute day)",
+      "type": "public"
+    },
+    {
+      "date": "2026-07-04",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-07-27",
+      "name": "Hurricane Supplication Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-09-07",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-10-12",
+      "name": "Virgin Islands–Puerto Rico Friendship Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-11-11",
+      "name": "Veterans Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-11-26",
+      "name": "Thanksgiving Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-06",
+      "name": "Three Kings Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-18",
+      "name": "Martin Luther King Jr. Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-02-15",
+      "name": "President's Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-25",
+      "name": "Maundy Thursday",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-29",
+      "name": "Easter Monday",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-31",
+      "name": "Transfer Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-05-31",
+      "name": "Memorial Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-06-18",
+      "name": "Juneteenth (substitute day)",
+      "type": "public"
+    },
+    {
+      "date": "2027-06-19",
+      "name": "Juneteenth",
+      "type": "public"
+    },
+    {
+      "date": "2027-07-03",
+      "name": "Emancipation Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-07-04",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-07-05",
+      "name": "Independence Day (substitute day)",
+      "type": "public"
+    },
+    {
+      "date": "2027-07-26",
+      "name": "Hurricane Supplication Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-09-06",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-10-11",
+      "name": "Virgin Islands–Puerto Rico Friendship Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-11-11",
+      "name": "Veterans Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-11-25",
+      "name": "Thanksgiving Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-24",
+      "name": "Christmas Day (substitute day)",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-31",
+      "name": "New Year's Day (substitute day)",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-06",
+      "name": "Three Kings Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-17",
+      "name": "Martin Luther King Jr. Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-02-21",
+      "name": "President's Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-03-31",
+      "name": "Transfer Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-13",
+      "name": "Maundy Thursday",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public"
+    },
+    {
+      "date": "2028-05-29",
+      "name": "Memorial Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-06-19",
+      "name": "Juneteenth",
+      "type": "public"
+    },
+    {
+      "date": "2028-07-03",
+      "name": "Emancipation Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-07-04",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-07-24",
+      "name": "Hurricane Supplication Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-09-04",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-10-09",
+      "name": "Virgin Islands–Puerto Rico Friendship Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-11-11",
+      "name": "Veterans Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-11-23",
+      "name": "Thanksgiving Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-06",
+      "name": "Three Kings Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-15",
+      "name": "Martin Luther King Jr. Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-19",
+      "name": "President's Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-29",
+      "name": "Maundy Thursday",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-31",
+      "name": "Transfer Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-04-02",
+      "name": "Easter Monday",
+      "type": "public"
+    },
+    {
+      "date": "2029-05-28",
+      "name": "Memorial Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-06-19",
+      "name": "Juneteenth",
+      "type": "public"
+    },
+    {
+      "date": "2029-07-03",
+      "name": "Emancipation Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-07-04",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-07-23",
+      "name": "Hurricane Supplication Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-09-03",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-10-08",
+      "name": "Virgin Islands–Puerto Rico Friendship Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-11-11",
+      "name": "Veterans Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-11-22",
+      "name": "Thanksgiving Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    }
+  ]
+}

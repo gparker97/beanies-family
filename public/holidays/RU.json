@@ -1,0 +1,324 @@
+{
+  "meta": {
+    "country": "RU",
+    "name": "Russian Federation",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "ru",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Новый год"
+    },
+    {
+      "date": "2025-01-02",
+      "name": "New Year Holiday",
+      "type": "public",
+      "name_local": "Новогодние каникулы"
+    },
+    {
+      "date": "2025-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Рождество Христово"
+    },
+    {
+      "date": "2025-01-08",
+      "name": "New Year Holiday",
+      "type": "public",
+      "name_local": "Новогодние каникулы"
+    },
+    {
+      "date": "2025-02-23",
+      "name": "Defender of the Fatherland Day",
+      "type": "public",
+      "name_local": "День защитника Отечества"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Международный женский день"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Spring and Labour Day",
+      "type": "public",
+      "name_local": "День весны и труда"
+    },
+    {
+      "date": "2025-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "День Победы"
+    },
+    {
+      "date": "2025-06-12",
+      "name": "Russia Day",
+      "type": "public",
+      "name_local": "День России"
+    },
+    {
+      "date": "2025-11-04",
+      "name": "Unity Day",
+      "type": "public",
+      "name_local": "День народного единства"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Новый год"
+    },
+    {
+      "date": "2026-01-02",
+      "name": "New Year Holiday",
+      "type": "public",
+      "name_local": "Новогодние каникулы"
+    },
+    {
+      "date": "2026-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Рождество Христово"
+    },
+    {
+      "date": "2026-01-08",
+      "name": "New Year Holiday",
+      "type": "public",
+      "name_local": "Новогодние каникулы"
+    },
+    {
+      "date": "2026-02-23",
+      "name": "Defender of the Fatherland Day",
+      "type": "public",
+      "name_local": "День защитника Отечества"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Международный женский день"
+    },
+    {
+      "date": "2026-03-09",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Международный женский день"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Spring and Labour Day",
+      "type": "public",
+      "name_local": "День весны и труда"
+    },
+    {
+      "date": "2026-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "День Победы"
+    },
+    {
+      "date": "2026-06-12",
+      "name": "Russia Day",
+      "type": "public",
+      "name_local": "День России"
+    },
+    {
+      "date": "2026-11-04",
+      "name": "Unity Day",
+      "type": "public",
+      "name_local": "День народного единства"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Новый год"
+    },
+    {
+      "date": "2027-01-02",
+      "name": "New Year Holiday",
+      "type": "public",
+      "name_local": "Новогодние каникулы"
+    },
+    {
+      "date": "2027-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Рождество Христово"
+    },
+    {
+      "date": "2027-01-08",
+      "name": "New Year Holiday",
+      "type": "public",
+      "name_local": "Новогодние каникулы"
+    },
+    {
+      "date": "2027-02-23",
+      "name": "Defender of the Fatherland Day",
+      "type": "public",
+      "name_local": "День защитника Отечества"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Международный женский день"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Spring and Labour Day",
+      "type": "public",
+      "name_local": "День весны и труда"
+    },
+    {
+      "date": "2027-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "День Победы"
+    },
+    {
+      "date": "2027-06-12",
+      "name": "Russia Day",
+      "type": "public",
+      "name_local": "День России"
+    },
+    {
+      "date": "2027-11-04",
+      "name": "Unity Day",
+      "type": "public",
+      "name_local": "День народного единства"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Новый год"
+    },
+    {
+      "date": "2028-01-02",
+      "name": "New Year Holiday",
+      "type": "public",
+      "name_local": "Новогодние каникулы"
+    },
+    {
+      "date": "2028-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Рождество Христово"
+    },
+    {
+      "date": "2028-01-08",
+      "name": "New Year Holiday",
+      "type": "public",
+      "name_local": "Новогодние каникулы"
+    },
+    {
+      "date": "2028-02-23",
+      "name": "Defender of the Fatherland Day",
+      "type": "public",
+      "name_local": "День защитника Отечества"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Международный женский день"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Spring and Labour Day",
+      "type": "public",
+      "name_local": "День весны и труда"
+    },
+    {
+      "date": "2028-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "День Победы"
+    },
+    {
+      "date": "2028-06-12",
+      "name": "Russia Day",
+      "type": "public",
+      "name_local": "День России"
+    },
+    {
+      "date": "2028-11-04",
+      "name": "Unity Day",
+      "type": "public",
+      "name_local": "День народного единства"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Новый год"
+    },
+    {
+      "date": "2029-01-02",
+      "name": "New Year Holiday",
+      "type": "public",
+      "name_local": "Новогодние каникулы"
+    },
+    {
+      "date": "2029-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Рождество Христово"
+    },
+    {
+      "date": "2029-01-08",
+      "name": "New Year Holiday",
+      "type": "public",
+      "name_local": "Новогодние каникулы"
+    },
+    {
+      "date": "2029-02-23",
+      "name": "Defender of the Fatherland Day",
+      "type": "public",
+      "name_local": "День защитника Отечества"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Международный женский день"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Spring and Labour Day",
+      "type": "public",
+      "name_local": "День весны и труда"
+    },
+    {
+      "date": "2029-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "День Победы"
+    },
+    {
+      "date": "2029-06-12",
+      "name": "Russia Day",
+      "type": "public",
+      "name_local": "День России"
+    },
+    {
+      "date": "2029-11-04",
+      "name": "Unity Day",
+      "type": "public",
+      "name_local": "День народного единства"
+    }
+  ]
+}

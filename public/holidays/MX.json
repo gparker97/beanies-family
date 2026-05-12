@@ -1,0 +1,228 @@
+{
+  "meta": {
+    "country": "MX",
+    "name": "Mexico",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "es",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2025-02-03",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Día de la Constitución"
+    },
+    {
+      "date": "2025-03-17",
+      "name": "Benito Juárez's birthday",
+      "type": "public",
+      "name_local": "Natalicio de Benito Juárez"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2025-09-16",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2025-11-17",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Día de la Revolución"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2026-02-02",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Día de la Constitución"
+    },
+    {
+      "date": "2026-03-16",
+      "name": "Benito Juárez's birthday",
+      "type": "public",
+      "name_local": "Natalicio de Benito Juárez"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2026-09-16",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2026-11-16",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Día de la Revolución"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2027-02-01",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Día de la Constitución"
+    },
+    {
+      "date": "2027-03-15",
+      "name": "Benito Juárez's birthday",
+      "type": "public",
+      "name_local": "Natalicio de Benito Juárez"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2027-09-16",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2027-11-15",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Día de la Revolución"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2028-02-07",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Día de la Constitución"
+    },
+    {
+      "date": "2028-03-20",
+      "name": "Benito Juárez's birthday",
+      "type": "public",
+      "name_local": "Natalicio de Benito Juárez"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2028-09-16",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2028-11-20",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Día de la Revolución"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Año Nuevo"
+    },
+    {
+      "date": "2029-02-05",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Día de la Constitución"
+    },
+    {
+      "date": "2029-03-19",
+      "name": "Benito Juárez's birthday",
+      "type": "public",
+      "name_local": "Natalicio de Benito Juárez"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2029-09-16",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2029-11-19",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Día de la Revolución"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    }
+  ]
+}

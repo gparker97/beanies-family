@@ -1,0 +1,528 @@
+{
+  "meta": {
+    "country": "UA",
+    "name": "Ukraine",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "uk",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2025-01-02",
+      "name": "New Year",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Міжнародний жіночий день"
+    },
+    {
+      "date": "2025-03-10",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Міжнародний жіночий день"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Великдень"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Великдень"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "День міжнародної солідарності трудящих"
+    },
+    {
+      "date": "2025-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "День перемоги над нацизмом у Другій світовій війні"
+    },
+    {
+      "date": "2025-06-08",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Трійця"
+    },
+    {
+      "date": "2025-06-09",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Трійця"
+    },
+    {
+      "date": "2025-06-28",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "День Конституції"
+    },
+    {
+      "date": "2025-06-30",
+      "name": "Constitution Day (substitute day)",
+      "type": "public",
+      "name_local": "День Конституції"
+    },
+    {
+      "date": "2025-07-15",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "День Української Державності"
+    },
+    {
+      "date": "2025-08-24",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "День Незалежності"
+    },
+    {
+      "date": "2025-08-25",
+      "name": "Independence Day (substitute day)",
+      "type": "public",
+      "name_local": "День Незалежності"
+    },
+    {
+      "date": "2025-10-01",
+      "name": "Defenders of Ukraine Day",
+      "type": "public",
+      "name_local": "День захисників і захисниць України"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Різдво Христове"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2026-01-02",
+      "name": "New Year",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Міжнародний жіночий день"
+    },
+    {
+      "date": "2026-03-09",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Міжнародний жіночий день"
+    },
+    {
+      "date": "2026-04-12",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Великдень"
+    },
+    {
+      "date": "2026-04-13",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Великдень"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "День міжнародної солідарності трудящих"
+    },
+    {
+      "date": "2026-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "День перемоги над нацизмом у Другій світовій війні"
+    },
+    {
+      "date": "2026-05-11",
+      "name": "Victory Day (substitute day)",
+      "type": "public",
+      "name_local": "День перемоги над нацизмом у Другій світовій війні"
+    },
+    {
+      "date": "2026-05-31",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Трійця"
+    },
+    {
+      "date": "2026-06-01",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Трійця"
+    },
+    {
+      "date": "2026-06-28",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "День Конституції"
+    },
+    {
+      "date": "2026-06-29",
+      "name": "Constitution Day (substitute day)",
+      "type": "public",
+      "name_local": "День Конституції"
+    },
+    {
+      "date": "2026-07-15",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "День Української Державності"
+    },
+    {
+      "date": "2026-08-24",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "День Незалежності"
+    },
+    {
+      "date": "2026-10-01",
+      "name": "Defenders of Ukraine Day",
+      "type": "public",
+      "name_local": "День захисників і захисниць України"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Різдво Христове"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2027-01-02",
+      "name": "New Year",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2027-01-04",
+      "name": "New Year (substitute day)",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Міжнародний жіночий день"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "День міжнародної солідарності трудящих"
+    },
+    {
+      "date": "2027-05-02",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Великдень"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Великдень"
+    },
+    {
+      "date": "2027-05-04",
+      "name": "Labour Day (substitute day)",
+      "type": "public",
+      "name_local": "День міжнародної солідарності трудящих"
+    },
+    {
+      "date": "2027-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "День перемоги над нацизмом у Другій світовій війні"
+    },
+    {
+      "date": "2027-05-10",
+      "name": "Victory Day (substitute day)",
+      "type": "public",
+      "name_local": "День перемоги над нацизмом у Другій світовій війні"
+    },
+    {
+      "date": "2027-06-20",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Трійця"
+    },
+    {
+      "date": "2027-06-21",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Трійця"
+    },
+    {
+      "date": "2027-06-28",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "День Конституції"
+    },
+    {
+      "date": "2027-07-15",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "День Української Державності"
+    },
+    {
+      "date": "2027-08-24",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "День Незалежності"
+    },
+    {
+      "date": "2027-10-01",
+      "name": "Defenders of Ukraine Day",
+      "type": "public",
+      "name_local": "День захисників і захисниць України"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Різдво Христове"
+    },
+    {
+      "date": "2027-12-27",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Різдво Христове"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2028-01-02",
+      "name": "New Year",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2028-01-03",
+      "name": "New Year (substitute day)",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2028-01-04",
+      "name": "New Year (substitute day)",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Міжнародний жіночий день"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Великдень"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Великдень"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "День міжнародної солідарності трудящих"
+    },
+    {
+      "date": "2028-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "День перемоги над нацизмом у Другій світовій війні"
+    },
+    {
+      "date": "2028-06-04",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Трійця"
+    },
+    {
+      "date": "2028-06-05",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Трійця"
+    },
+    {
+      "date": "2028-06-28",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "День Конституції"
+    },
+    {
+      "date": "2028-07-15",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "День Української Державності"
+    },
+    {
+      "date": "2028-07-17",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "День Української Державності"
+    },
+    {
+      "date": "2028-08-24",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "День Незалежності"
+    },
+    {
+      "date": "2028-10-01",
+      "name": "Defenders of Ukraine Day",
+      "type": "public",
+      "name_local": "День захисників і захисниць України"
+    },
+    {
+      "date": "2028-10-02",
+      "name": "Defenders of Ukraine Day (substitute day)",
+      "type": "public",
+      "name_local": "День захисників і захисниць України"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Різдво Христове"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2029-01-02",
+      "name": "New Year",
+      "type": "public",
+      "name_local": "Новий Рік"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Міжнародний жіночий день"
+    },
+    {
+      "date": "2029-04-08",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Великдень"
+    },
+    {
+      "date": "2029-04-09",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Великдень"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "День міжнародної солідарності трудящих"
+    },
+    {
+      "date": "2029-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "День перемоги над нацизмом у Другій світовій війні"
+    },
+    {
+      "date": "2029-05-27",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Трійця"
+    },
+    {
+      "date": "2029-05-28",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Трійця"
+    },
+    {
+      "date": "2029-06-28",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "День Конституції"
+    },
+    {
+      "date": "2029-07-15",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "День Української Державності"
+    },
+    {
+      "date": "2029-07-16",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "День Української Державності"
+    },
+    {
+      "date": "2029-08-24",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "День Незалежності"
+    },
+    {
+      "date": "2029-10-01",
+      "name": "Defenders of Ukraine Day",
+      "type": "public",
+      "name_local": "День захисників і захисниць України"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Різдво Христове"
+    }
+  ]
+}

@@ -1,0 +1,528 @@
+{
+  "meta": {
+    "country": "GE",
+    "name": "Georgia",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "ge",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "ახალი წელი"
+    },
+    {
+      "date": "2025-01-02",
+      "name": "Bedoba",
+      "type": "public",
+      "name_local": "ბედობა"
+    },
+    {
+      "date": "2025-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "შობა"
+    },
+    {
+      "date": "2025-01-19",
+      "name": "Orthodox Epiphany",
+      "type": "public",
+      "name_local": "ნათლისღება"
+    },
+    {
+      "date": "2025-03-03",
+      "name": "Mother's Day",
+      "type": "public",
+      "name_local": "დედის დღე"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "ქალთა საერთაშორისო დღე"
+    },
+    {
+      "date": "2025-04-09",
+      "name": "National Unity Day",
+      "type": "public",
+      "name_local": "ეროვნული ერთიანობის დღე"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "წითელი პარასკევი"
+    },
+    {
+      "date": "2025-04-19",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "დიდი შაბათი"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "აღდგომა"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "აღდგომის ორშაბათი"
+    },
+    {
+      "date": "2025-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "ფაშიზმზე გამარჯვების დღე"
+    },
+    {
+      "date": "2025-05-12",
+      "name": "Saint Andrew the First-Called Day",
+      "type": "public",
+      "name_local": "წმინდა ანდრია პირველწოდებულის ხსენების დღე"
+    },
+    {
+      "date": "2025-05-26",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "დამოუკიდებლობის დღე"
+    },
+    {
+      "date": "2025-08-28",
+      "name": "Saint Mary's Day",
+      "type": "public",
+      "name_local": "მარიამობა"
+    },
+    {
+      "date": "2025-10-14",
+      "name": "Svetitskhovloba",
+      "type": "public",
+      "name_local": "სვეტიცხოვლობა"
+    },
+    {
+      "date": "2025-11-23",
+      "name": "Saint George's Day",
+      "type": "public",
+      "name_local": "გიორგობა"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "ახალი წელი"
+    },
+    {
+      "date": "2026-01-02",
+      "name": "Bedoba",
+      "type": "public",
+      "name_local": "ბედობა"
+    },
+    {
+      "date": "2026-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "შობა"
+    },
+    {
+      "date": "2026-01-19",
+      "name": "Orthodox Epiphany",
+      "type": "public",
+      "name_local": "ნათლისღება"
+    },
+    {
+      "date": "2026-03-03",
+      "name": "Mother's Day",
+      "type": "public",
+      "name_local": "დედის დღე"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "ქალთა საერთაშორისო დღე"
+    },
+    {
+      "date": "2026-04-09",
+      "name": "National Unity Day",
+      "type": "public",
+      "name_local": "ეროვნული ერთიანობის დღე"
+    },
+    {
+      "date": "2026-04-10",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "წითელი პარასკევი"
+    },
+    {
+      "date": "2026-04-11",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "დიდი შაბათი"
+    },
+    {
+      "date": "2026-04-12",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "აღდგომა"
+    },
+    {
+      "date": "2026-04-13",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "აღდგომის ორშაბათი"
+    },
+    {
+      "date": "2026-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "ფაშიზმზე გამარჯვების დღე"
+    },
+    {
+      "date": "2026-05-12",
+      "name": "Saint Andrew the First-Called Day",
+      "type": "public",
+      "name_local": "წმინდა ანდრია პირველწოდებულის ხსენების დღე"
+    },
+    {
+      "date": "2026-05-26",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "დამოუკიდებლობის დღე"
+    },
+    {
+      "date": "2026-08-28",
+      "name": "Saint Mary's Day",
+      "type": "public",
+      "name_local": "მარიამობა"
+    },
+    {
+      "date": "2026-10-14",
+      "name": "Svetitskhovloba",
+      "type": "public",
+      "name_local": "სვეტიცხოვლობა"
+    },
+    {
+      "date": "2026-11-23",
+      "name": "Saint George's Day",
+      "type": "public",
+      "name_local": "გიორგობა"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "ახალი წელი"
+    },
+    {
+      "date": "2027-01-02",
+      "name": "Bedoba",
+      "type": "public",
+      "name_local": "ბედობა"
+    },
+    {
+      "date": "2027-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "შობა"
+    },
+    {
+      "date": "2027-01-19",
+      "name": "Orthodox Epiphany",
+      "type": "public",
+      "name_local": "ნათლისღება"
+    },
+    {
+      "date": "2027-03-03",
+      "name": "Mother's Day",
+      "type": "public",
+      "name_local": "დედის დღე"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "ქალთა საერთაშორისო დღე"
+    },
+    {
+      "date": "2027-04-09",
+      "name": "National Unity Day",
+      "type": "public",
+      "name_local": "ეროვნული ერთიანობის დღე"
+    },
+    {
+      "date": "2027-04-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "წითელი პარასკევი"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "დიდი შაბათი"
+    },
+    {
+      "date": "2027-05-02",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "აღდგომა"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "აღდგომის ორშაბათი"
+    },
+    {
+      "date": "2027-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "ფაშიზმზე გამარჯვების დღე"
+    },
+    {
+      "date": "2027-05-12",
+      "name": "Saint Andrew the First-Called Day",
+      "type": "public",
+      "name_local": "წმინდა ანდრია პირველწოდებულის ხსენების დღე"
+    },
+    {
+      "date": "2027-05-26",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "დამოუკიდებლობის დღე"
+    },
+    {
+      "date": "2027-08-28",
+      "name": "Saint Mary's Day",
+      "type": "public",
+      "name_local": "მარიამობა"
+    },
+    {
+      "date": "2027-10-14",
+      "name": "Svetitskhovloba",
+      "type": "public",
+      "name_local": "სვეტიცხოვლობა"
+    },
+    {
+      "date": "2027-11-23",
+      "name": "Saint George's Day",
+      "type": "public",
+      "name_local": "გიორგობა"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "ახალი წელი"
+    },
+    {
+      "date": "2028-01-02",
+      "name": "Bedoba",
+      "type": "public",
+      "name_local": "ბედობა"
+    },
+    {
+      "date": "2028-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "შობა"
+    },
+    {
+      "date": "2028-01-19",
+      "name": "Orthodox Epiphany",
+      "type": "public",
+      "name_local": "ნათლისღება"
+    },
+    {
+      "date": "2028-03-03",
+      "name": "Mother's Day",
+      "type": "public",
+      "name_local": "დედის დღე"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "ქალთა საერთაშორისო დღე"
+    },
+    {
+      "date": "2028-04-09",
+      "name": "National Unity Day",
+      "type": "public",
+      "name_local": "ეროვნული ერთიანობის დღე"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "წითელი პარასკევი"
+    },
+    {
+      "date": "2028-04-15",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "დიდი შაბათი"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "აღდგომა"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "აღდგომის ორშაბათი"
+    },
+    {
+      "date": "2028-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "ფაშიზმზე გამარჯვების დღე"
+    },
+    {
+      "date": "2028-05-12",
+      "name": "Saint Andrew the First-Called Day",
+      "type": "public",
+      "name_local": "წმინდა ანდრია პირველწოდებულის ხსენების დღე"
+    },
+    {
+      "date": "2028-05-26",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "დამოუკიდებლობის დღე"
+    },
+    {
+      "date": "2028-08-28",
+      "name": "Saint Mary's Day",
+      "type": "public",
+      "name_local": "მარიამობა"
+    },
+    {
+      "date": "2028-10-14",
+      "name": "Svetitskhovloba",
+      "type": "public",
+      "name_local": "სვეტიცხოვლობა"
+    },
+    {
+      "date": "2028-11-23",
+      "name": "Saint George's Day",
+      "type": "public",
+      "name_local": "გიორგობა"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "ახალი წელი"
+    },
+    {
+      "date": "2029-01-02",
+      "name": "Bedoba",
+      "type": "public",
+      "name_local": "ბედობა"
+    },
+    {
+      "date": "2029-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "შობა"
+    },
+    {
+      "date": "2029-01-19",
+      "name": "Orthodox Epiphany",
+      "type": "public",
+      "name_local": "ნათლისღება"
+    },
+    {
+      "date": "2029-03-03",
+      "name": "Mother's Day",
+      "type": "public",
+      "name_local": "დედის დღე"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "ქალთა საერთაშორისო დღე"
+    },
+    {
+      "date": "2029-04-06",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "წითელი პარასკევი"
+    },
+    {
+      "date": "2029-04-07",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "დიდი შაბათი"
+    },
+    {
+      "date": "2029-04-08",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "აღდგომა"
+    },
+    {
+      "date": "2029-04-09",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "აღდგომის ორშაბათი"
+    },
+    {
+      "date": "2029-04-09",
+      "name": "National Unity Day",
+      "type": "public",
+      "name_local": "ეროვნული ერთიანობის დღე"
+    },
+    {
+      "date": "2029-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "ფაშიზმზე გამარჯვების დღე"
+    },
+    {
+      "date": "2029-05-12",
+      "name": "Saint Andrew the First-Called Day",
+      "type": "public",
+      "name_local": "წმინდა ანდრია პირველწოდებულის ხსენების დღე"
+    },
+    {
+      "date": "2029-05-26",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "დამოუკიდებლობის დღე"
+    },
+    {
+      "date": "2029-08-28",
+      "name": "Saint Mary's Day",
+      "type": "public",
+      "name_local": "მარიამობა"
+    },
+    {
+      "date": "2029-10-14",
+      "name": "Svetitskhovloba",
+      "type": "public",
+      "name_local": "სვეტიცხოვლობა"
+    },
+    {
+      "date": "2029-11-23",
+      "name": "Saint George's Day",
+      "type": "public",
+      "name_local": "გიორგობა"
+    }
+  ]
+}

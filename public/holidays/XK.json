@@ -1,0 +1,348 @@
+{
+  "meta": {
+    "country": "XK",
+    "name": "Kosovo",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "sq",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Viti i Ri"
+    },
+    {
+      "date": "2025-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Krishtlindjet Ortodokse"
+    },
+    {
+      "date": "2025-02-17",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dita e Pavarësisë"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fitër Bajrami"
+    },
+    {
+      "date": "2025-04-09",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Dita e Kushtetutës"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pashkët Katolike"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Pashkët Ortodokse"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dita Ndërkombëtare e Punonjësve"
+    },
+    {
+      "date": "2025-05-09",
+      "name": "Europe Day",
+      "type": "public",
+      "name_local": "Dita e Evropës"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Kurban Bajrami"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Krishtlindja"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Viti i Ri"
+    },
+    {
+      "date": "2026-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Krishtlindjet Ortodokse"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dita e Pavarësisë"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fitër Bajrami"
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pashkët Katolike"
+    },
+    {
+      "date": "2026-04-09",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Dita e Kushtetutës"
+    },
+    {
+      "date": "2026-04-12",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Pashkët Ortodokse"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dita Ndërkombëtare e Punonjësve"
+    },
+    {
+      "date": "2026-05-09",
+      "name": "Europe Day",
+      "type": "public",
+      "name_local": "Dita e Evropës"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Kurban Bajrami"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Krishtlindja"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Viti i Ri"
+    },
+    {
+      "date": "2027-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Krishtlindjet Ortodokse"
+    },
+    {
+      "date": "2027-02-17",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dita e Pavarësisë"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fitër Bajrami"
+    },
+    {
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pashkët Katolike"
+    },
+    {
+      "date": "2027-04-09",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Dita e Kushtetutës"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dita Ndërkombëtare e Punonjësve"
+    },
+    {
+      "date": "2027-05-02",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Pashkët Ortodokse"
+    },
+    {
+      "date": "2027-05-09",
+      "name": "Europe Day",
+      "type": "public",
+      "name_local": "Dita e Evropës"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Kurban Bajrami"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Krishtlindja"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Viti i Ri"
+    },
+    {
+      "date": "2028-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Krishtlindjet Ortodokse"
+    },
+    {
+      "date": "2028-02-17",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dita e Pavarësisë"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fitër Bajrami"
+    },
+    {
+      "date": "2028-04-09",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Dita e Kushtetutës"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pashkët Katolike"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Pashkët Ortodokse"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dita Ndërkombëtare e Punonjësve"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Kurban Bajrami"
+    },
+    {
+      "date": "2028-05-09",
+      "name": "Europe Day",
+      "type": "public",
+      "name_local": "Dita e Evropës"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Krishtlindja"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Viti i Ri"
+    },
+    {
+      "date": "2029-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Krishtlindjet Ortodokse"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fitër Bajrami"
+    },
+    {
+      "date": "2029-02-17",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dita e Pavarësisë"
+    },
+    {
+      "date": "2029-04-01",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pashkët Katolike"
+    },
+    {
+      "date": "2029-04-08",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Pashkët Ortodokse"
+    },
+    {
+      "date": "2029-04-09",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Dita e Kushtetutës"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Kurban Bajrami"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dita Ndërkombëtare e Punonjësve"
+    },
+    {
+      "date": "2029-05-09",
+      "name": "Europe Day",
+      "type": "public",
+      "name_local": "Dita e Evropës"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Krishtlindja"
+    }
+  ]
+}

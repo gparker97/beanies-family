@@ -1,0 +1,438 @@
+{
+  "meta": {
+    "country": "PF",
+    "name": "French Polynesia",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "fr",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2025-03-05",
+      "name": "Missionary Day",
+      "type": "public",
+      "name_local": "Arrivée de l'Évangile"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2025-05-08",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Fête de la Victoire 1945"
+    },
+    {
+      "date": "2025-05-29",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2025-06-09",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Lundi de Pentecôte"
+    },
+    {
+      "date": "2025-06-29",
+      "name": "Internal Autonomy Day",
+      "type": "public",
+      "name_local": "Fête de l'Autonomie"
+    },
+    {
+      "date": "2025-07-14",
+      "name": "Bastille Day",
+      "type": "public",
+      "name_local": "Fête Nationale de la France"
+    },
+    {
+      "date": "2025-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2025-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Toussaint"
+    },
+    {
+      "date": "2025-11-11",
+      "name": "Armistice Day",
+      "type": "public",
+      "name_local": "Armistice 1918"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2026-03-05",
+      "name": "Missionary Day",
+      "type": "public",
+      "name_local": "Arrivée de l'Évangile"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2026-04-06",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2026-05-08",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Fête de la Victoire 1945"
+    },
+    {
+      "date": "2026-05-14",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2026-05-25",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Lundi de Pentecôte"
+    },
+    {
+      "date": "2026-07-14",
+      "name": "Bastille Day",
+      "type": "public",
+      "name_local": "Fête Nationale de la France"
+    },
+    {
+      "date": "2026-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2026-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Toussaint"
+    },
+    {
+      "date": "2026-11-11",
+      "name": "Armistice Day",
+      "type": "public",
+      "name_local": "Armistice 1918"
+    },
+    {
+      "date": "2026-11-20",
+      "name": "Maori New Year",
+      "type": "public",
+      "name_local": "Matari'i"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2027-03-05",
+      "name": "Missionary Day",
+      "type": "public",
+      "name_local": "Arrivée de l'Évangile"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2027-03-29",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2027-05-06",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2027-05-08",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Fête de la Victoire 1945"
+    },
+    {
+      "date": "2027-05-17",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Lundi de Pentecôte"
+    },
+    {
+      "date": "2027-07-14",
+      "name": "Bastille Day",
+      "type": "public",
+      "name_local": "Fête Nationale de la France"
+    },
+    {
+      "date": "2027-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2027-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Toussaint"
+    },
+    {
+      "date": "2027-11-11",
+      "name": "Armistice Day",
+      "type": "public",
+      "name_local": "Armistice 1918"
+    },
+    {
+      "date": "2027-11-20",
+      "name": "Maori New Year",
+      "type": "public",
+      "name_local": "Matari'i"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2028-03-05",
+      "name": "Missionary Day",
+      "type": "public",
+      "name_local": "Arrivée de l'Évangile"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2028-05-08",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Fête de la Victoire 1945"
+    },
+    {
+      "date": "2028-05-25",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2028-06-05",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Lundi de Pentecôte"
+    },
+    {
+      "date": "2028-07-14",
+      "name": "Bastille Day",
+      "type": "public",
+      "name_local": "Fête Nationale de la France"
+    },
+    {
+      "date": "2028-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2028-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Toussaint"
+    },
+    {
+      "date": "2028-11-11",
+      "name": "Armistice Day",
+      "type": "public",
+      "name_local": "Armistice 1918"
+    },
+    {
+      "date": "2028-11-20",
+      "name": "Maori New Year",
+      "type": "public",
+      "name_local": "Matari'i"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2029-03-05",
+      "name": "Missionary Day",
+      "type": "public",
+      "name_local": "Arrivée de l'Évangile"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2029-04-02",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2029-05-08",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Fête de la Victoire 1945"
+    },
+    {
+      "date": "2029-05-10",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2029-05-21",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Lundi de Pentecôte"
+    },
+    {
+      "date": "2029-07-14",
+      "name": "Bastille Day",
+      "type": "public",
+      "name_local": "Fête Nationale de la France"
+    },
+    {
+      "date": "2029-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2029-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Toussaint"
+    },
+    {
+      "date": "2029-11-11",
+      "name": "Armistice Day",
+      "type": "public",
+      "name_local": "Armistice 1918"
+    },
+    {
+      "date": "2029-11-20",
+      "name": "Maori New Year",
+      "type": "public",
+      "name_local": "Matari'i"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    }
+  ]
+}

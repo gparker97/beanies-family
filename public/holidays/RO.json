@@ -1,0 +1,498 @@
+{
+  "meta": {
+    "country": "RO",
+    "name": "Romania",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "ro",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Anul nou"
+    },
+    {
+      "date": "2025-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Bobotează"
+    },
+    {
+      "date": "2025-01-07",
+      "name": "Saint John the Baptist",
+      "type": "public",
+      "name_local": "Sfântul Ion"
+    },
+    {
+      "date": "2025-01-24",
+      "name": "Day of the Unification of the Romanian Principalities",
+      "type": "public",
+      "name_local": "Ziua Unirii Principatelor Române"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vinerea Mare"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Paștele"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "A doua zi de Pasti"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ziua muncii"
+    },
+    {
+      "date": "2025-06-01",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "Ziua Copilului"
+    },
+    {
+      "date": "2025-06-08",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Rusaliile"
+    },
+    {
+      "date": "2025-06-09",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "A doua zi de Rusalii"
+    },
+    {
+      "date": "2025-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Adormirea Maicii Domnului"
+    },
+    {
+      "date": "2025-11-30",
+      "name": "St Andrew's Day",
+      "type": "public",
+      "name_local": "Sfântul Andrei"
+    },
+    {
+      "date": "2025-12-01",
+      "name": "National holiday",
+      "type": "public",
+      "name_local": "Ziua națională, Ziua Marii Uniri"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Crăciunul"
+    },
+    {
+      "date": "2025-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "A doua zi de Crăciun"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Anul nou"
+    },
+    {
+      "date": "2026-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Bobotează"
+    },
+    {
+      "date": "2026-01-07",
+      "name": "Saint John the Baptist",
+      "type": "public",
+      "name_local": "Sfântul Ion"
+    },
+    {
+      "date": "2026-01-24",
+      "name": "Day of the Unification of the Romanian Principalities",
+      "type": "public",
+      "name_local": "Ziua Unirii Principatelor Române"
+    },
+    {
+      "date": "2026-04-10",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vinerea Mare"
+    },
+    {
+      "date": "2026-04-12",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Paștele"
+    },
+    {
+      "date": "2026-04-13",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "A doua zi de Pasti"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ziua muncii"
+    },
+    {
+      "date": "2026-05-31",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Rusaliile"
+    },
+    {
+      "date": "2026-06-01",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "Ziua Copilului"
+    },
+    {
+      "date": "2026-06-01",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "A doua zi de Rusalii"
+    },
+    {
+      "date": "2026-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Adormirea Maicii Domnului"
+    },
+    {
+      "date": "2026-11-30",
+      "name": "St Andrew's Day",
+      "type": "public",
+      "name_local": "Sfântul Andrei"
+    },
+    {
+      "date": "2026-12-01",
+      "name": "National holiday",
+      "type": "public",
+      "name_local": "Ziua națională, Ziua Marii Uniri"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Crăciunul"
+    },
+    {
+      "date": "2026-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "A doua zi de Crăciun"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Anul nou"
+    },
+    {
+      "date": "2027-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Bobotează"
+    },
+    {
+      "date": "2027-01-07",
+      "name": "Saint John the Baptist",
+      "type": "public",
+      "name_local": "Sfântul Ion"
+    },
+    {
+      "date": "2027-01-24",
+      "name": "Day of the Unification of the Romanian Principalities",
+      "type": "public",
+      "name_local": "Ziua Unirii Principatelor Române"
+    },
+    {
+      "date": "2027-04-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vinerea Mare"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ziua muncii"
+    },
+    {
+      "date": "2027-05-02",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Paștele"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "A doua zi de Pasti"
+    },
+    {
+      "date": "2027-06-01",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "Ziua Copilului"
+    },
+    {
+      "date": "2027-06-20",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Rusaliile"
+    },
+    {
+      "date": "2027-06-21",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "A doua zi de Rusalii"
+    },
+    {
+      "date": "2027-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Adormirea Maicii Domnului"
+    },
+    {
+      "date": "2027-11-30",
+      "name": "St Andrew's Day",
+      "type": "public",
+      "name_local": "Sfântul Andrei"
+    },
+    {
+      "date": "2027-12-01",
+      "name": "National holiday",
+      "type": "public",
+      "name_local": "Ziua națională, Ziua Marii Uniri"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Crăciunul"
+    },
+    {
+      "date": "2027-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "A doua zi de Crăciun"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Anul nou"
+    },
+    {
+      "date": "2028-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Bobotează"
+    },
+    {
+      "date": "2028-01-07",
+      "name": "Saint John the Baptist",
+      "type": "public",
+      "name_local": "Sfântul Ion"
+    },
+    {
+      "date": "2028-01-24",
+      "name": "Day of the Unification of the Romanian Principalities",
+      "type": "public",
+      "name_local": "Ziua Unirii Principatelor Române"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vinerea Mare"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Paștele"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "A doua zi de Pasti"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ziua muncii"
+    },
+    {
+      "date": "2028-06-01",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "Ziua Copilului"
+    },
+    {
+      "date": "2028-06-04",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Rusaliile"
+    },
+    {
+      "date": "2028-06-05",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "A doua zi de Rusalii"
+    },
+    {
+      "date": "2028-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Adormirea Maicii Domnului"
+    },
+    {
+      "date": "2028-11-30",
+      "name": "St Andrew's Day",
+      "type": "public",
+      "name_local": "Sfântul Andrei"
+    },
+    {
+      "date": "2028-12-01",
+      "name": "National holiday",
+      "type": "public",
+      "name_local": "Ziua națională, Ziua Marii Uniri"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Crăciunul"
+    },
+    {
+      "date": "2028-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "A doua zi de Crăciun"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Anul nou"
+    },
+    {
+      "date": "2029-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Bobotează"
+    },
+    {
+      "date": "2029-01-07",
+      "name": "Saint John the Baptist",
+      "type": "public",
+      "name_local": "Sfântul Ion"
+    },
+    {
+      "date": "2029-01-24",
+      "name": "Day of the Unification of the Romanian Principalities",
+      "type": "public",
+      "name_local": "Ziua Unirii Principatelor Române"
+    },
+    {
+      "date": "2029-04-06",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vinerea Mare"
+    },
+    {
+      "date": "2029-04-08",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Paștele"
+    },
+    {
+      "date": "2029-04-09",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "A doua zi de Pasti"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ziua muncii"
+    },
+    {
+      "date": "2029-05-27",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Rusaliile"
+    },
+    {
+      "date": "2029-05-28",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "A doua zi de Rusalii"
+    },
+    {
+      "date": "2029-06-01",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "Ziua Copilului"
+    },
+    {
+      "date": "2029-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Adormirea Maicii Domnului"
+    },
+    {
+      "date": "2029-11-30",
+      "name": "St Andrew's Day",
+      "type": "public",
+      "name_local": "Sfântul Andrei"
+    },
+    {
+      "date": "2029-12-01",
+      "name": "National holiday",
+      "type": "public",
+      "name_local": "Ziua națională, Ziua Marii Uniri"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Crăciunul"
+    },
+    {
+      "date": "2029-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "A doua zi de Crăciun"
+    }
+  ]
+}

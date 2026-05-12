@@ -1,0 +1,444 @@
+{
+  "meta": {
+    "country": "TW",
+    "name": "Taiwan",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "zh",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "Founding of the Republic of China",
+      "type": "public",
+      "name_local": "中華民國開國紀念日 / 元旦"
+    },
+    {
+      "date": "2025-01-28",
+      "name": "Chinese New Year's Eve",
+      "type": "public",
+      "name_local": "農曆除夕"
+    },
+    {
+      "date": "2025-01-29",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初一"
+    },
+    {
+      "date": "2025-01-30",
+      "name": "The second day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初二"
+    },
+    {
+      "date": "2025-01-31",
+      "name": "The third day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初三"
+    },
+    {
+      "date": "2025-02-01",
+      "name": "The forth day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初四"
+    },
+    {
+      "date": "2025-02-02",
+      "name": "Chinese New Year Holiday",
+      "type": "public",
+      "name_local": "农历新年假期"
+    },
+    {
+      "date": "2025-02-28",
+      "name": "Peace Memorial Day",
+      "type": "public",
+      "name_local": "228和平紀念日"
+    },
+    {
+      "date": "2025-04-04",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "兒童節"
+    },
+    {
+      "date": "2025-04-04",
+      "name": "Tomb Sweeping Day",
+      "type": "public",
+      "name_local": "淸明節"
+    },
+    {
+      "date": "2025-05-31",
+      "name": "Dragon Boat Festival",
+      "type": "public",
+      "name_local": "端午節"
+    },
+    {
+      "date": "2025-10-06",
+      "name": "Mid-Autumn Festival",
+      "type": "public",
+      "name_local": "中秋節"
+    },
+    {
+      "date": "2025-10-10",
+      "name": "National Day / Double Tenth Day",
+      "type": "public",
+      "name_local": "國慶日 / 雙十節"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "Founding of the Republic of China",
+      "type": "public",
+      "name_local": "中華民國開國紀念日 / 元旦"
+    },
+    {
+      "date": "2026-02-16",
+      "name": "Chinese New Year's Eve",
+      "type": "public",
+      "name_local": "農曆除夕"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初一"
+    },
+    {
+      "date": "2026-02-18",
+      "name": "The second day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初二"
+    },
+    {
+      "date": "2026-02-19",
+      "name": "The third day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初三"
+    },
+    {
+      "date": "2026-02-20",
+      "name": "The forth day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初四"
+    },
+    {
+      "date": "2026-02-21",
+      "name": "Chinese New Year Holiday",
+      "type": "public",
+      "name_local": "农历新年假期"
+    },
+    {
+      "date": "2026-02-28",
+      "name": "Peace Memorial Day",
+      "type": "public",
+      "name_local": "228和平紀念日"
+    },
+    {
+      "date": "2026-04-04",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "兒童節"
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Tomb Sweeping Day",
+      "type": "public",
+      "name_local": "淸明節"
+    },
+    {
+      "date": "2026-04-06",
+      "name": "Tomb Sweeping Day (substitute day)",
+      "type": "public",
+      "name_local": "淸明節"
+    },
+    {
+      "date": "2026-06-19",
+      "name": "Dragon Boat Festival",
+      "type": "public",
+      "name_local": "端午節"
+    },
+    {
+      "date": "2026-09-25",
+      "name": "Mid-Autumn Festival",
+      "type": "public",
+      "name_local": "中秋節"
+    },
+    {
+      "date": "2026-10-10",
+      "name": "National Day / Double Tenth Day",
+      "type": "public",
+      "name_local": "國慶日 / 雙十節"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "Founding of the Republic of China",
+      "type": "public",
+      "name_local": "中華民國開國紀念日 / 元旦"
+    },
+    {
+      "date": "2027-02-05",
+      "name": "Chinese New Year's Eve",
+      "type": "public",
+      "name_local": "農曆除夕"
+    },
+    {
+      "date": "2027-02-06",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初一"
+    },
+    {
+      "date": "2027-02-07",
+      "name": "The second day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初二"
+    },
+    {
+      "date": "2027-02-08",
+      "name": "The third day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初三"
+    },
+    {
+      "date": "2027-02-09",
+      "name": "The forth day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初四"
+    },
+    {
+      "date": "2027-02-10",
+      "name": "Chinese New Year Holiday",
+      "type": "public",
+      "name_local": "农历新年假期"
+    },
+    {
+      "date": "2027-02-28",
+      "name": "Peace Memorial Day",
+      "type": "public",
+      "name_local": "228和平紀念日"
+    },
+    {
+      "date": "2027-03-01",
+      "name": "Peace Memorial Day (substitute day)",
+      "type": "public",
+      "name_local": "228和平紀念日"
+    },
+    {
+      "date": "2027-04-04",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "兒童節"
+    },
+    {
+      "date": "2027-04-05",
+      "name": "Children's Day (substitute day)",
+      "type": "public",
+      "name_local": "兒童節"
+    },
+    {
+      "date": "2027-04-05",
+      "name": "Tomb Sweeping Day",
+      "type": "public",
+      "name_local": "淸明節"
+    },
+    {
+      "date": "2027-06-09",
+      "name": "Dragon Boat Festival",
+      "type": "public",
+      "name_local": "端午節"
+    },
+    {
+      "date": "2027-09-15",
+      "name": "Mid-Autumn Festival",
+      "type": "public",
+      "name_local": "中秋節"
+    },
+    {
+      "date": "2027-10-10",
+      "name": "National Day / Double Tenth Day",
+      "type": "public",
+      "name_local": "國慶日 / 雙十節"
+    },
+    {
+      "date": "2027-10-11",
+      "name": "National Day / Double Tenth Day (substitute day)",
+      "type": "public",
+      "name_local": "國慶日 / 雙十節"
+    },
+    {
+      "date": "2027-12-31",
+      "name": "Founding of the Republic of China (substitute day)",
+      "type": "public",
+      "name_local": "中華民國開國紀念日 / 元旦"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "Founding of the Republic of China",
+      "type": "public",
+      "name_local": "中華民國開國紀念日 / 元旦"
+    },
+    {
+      "date": "2028-01-25",
+      "name": "Chinese New Year's Eve",
+      "type": "public",
+      "name_local": "農曆除夕"
+    },
+    {
+      "date": "2028-01-26",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初一"
+    },
+    {
+      "date": "2028-01-27",
+      "name": "The second day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初二"
+    },
+    {
+      "date": "2028-01-28",
+      "name": "The third day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初三"
+    },
+    {
+      "date": "2028-01-29",
+      "name": "The forth day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初四"
+    },
+    {
+      "date": "2028-01-30",
+      "name": "Chinese New Year Holiday",
+      "type": "public",
+      "name_local": "农历新年假期"
+    },
+    {
+      "date": "2028-02-28",
+      "name": "Peace Memorial Day",
+      "type": "public",
+      "name_local": "228和平紀念日"
+    },
+    {
+      "date": "2028-04-04",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "兒童節"
+    },
+    {
+      "date": "2028-04-04",
+      "name": "Tomb Sweeping Day",
+      "type": "public",
+      "name_local": "淸明節"
+    },
+    {
+      "date": "2028-05-28",
+      "name": "Dragon Boat Festival",
+      "type": "public",
+      "name_local": "端午節"
+    },
+    {
+      "date": "2028-05-29",
+      "name": "Dragon Boat Festival (substitute day)",
+      "type": "public",
+      "name_local": "端午節"
+    },
+    {
+      "date": "2028-10-03",
+      "name": "Mid-Autumn Festival",
+      "type": "public",
+      "name_local": "中秋節"
+    },
+    {
+      "date": "2028-10-10",
+      "name": "National Day / Double Tenth Day",
+      "type": "public",
+      "name_local": "國慶日 / 雙十節"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "Founding of the Republic of China",
+      "type": "public",
+      "name_local": "中華民國開國紀念日 / 元旦"
+    },
+    {
+      "date": "2029-02-12",
+      "name": "Chinese New Year's Eve",
+      "type": "public",
+      "name_local": "農曆除夕"
+    },
+    {
+      "date": "2029-02-13",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初一"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "The second day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初二"
+    },
+    {
+      "date": "2029-02-15",
+      "name": "The third day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初三"
+    },
+    {
+      "date": "2029-02-16",
+      "name": "The forth day of the Chinese New Year",
+      "type": "public",
+      "name_local": "農曆年初四"
+    },
+    {
+      "date": "2029-02-17",
+      "name": "Chinese New Year Holiday",
+      "type": "public",
+      "name_local": "农历新年假期"
+    },
+    {
+      "date": "2029-02-28",
+      "name": "Peace Memorial Day",
+      "type": "public",
+      "name_local": "228和平紀念日"
+    },
+    {
+      "date": "2029-04-04",
+      "name": "Children's Day",
+      "type": "public",
+      "name_local": "兒童節"
+    },
+    {
+      "date": "2029-04-04",
+      "name": "Tomb Sweeping Day",
+      "type": "public",
+      "name_local": "淸明節"
+    },
+    {
+      "date": "2029-06-16",
+      "name": "Dragon Boat Festival",
+      "type": "public",
+      "name_local": "端午節"
+    },
+    {
+      "date": "2029-09-22",
+      "name": "Mid-Autumn Festival",
+      "type": "public",
+      "name_local": "中秋節"
+    },
+    {
+      "date": "2029-10-10",
+      "name": "National Day / Double Tenth Day",
+      "type": "public",
+      "name_local": "國慶日 / 雙十節"
+    }
+  ]
+}

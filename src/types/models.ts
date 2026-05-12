@@ -9,6 +9,7 @@ export type ISODateString = string;
 export type ISODateTimeString = string;
 export type CurrencyCode = string; // ISO 4217 codes (e.g., 'USD', 'EUR', 'GBP')
 export type LanguageCode = 'en' | 'zh'; // Supported UI languages
+export type CountryCode = string; // ISO 3166-1 alpha-2, uppercase (e.g., 'SG', 'US', 'GB')
 
 // Family - Top-level tenant entity (one per family)
 export interface Family {
@@ -43,6 +44,7 @@ export interface GlobalSettings {
   trustedDevicePromptShown?: boolean;
   cachedFamilyKeys?: Record<string, string>;
   passkeyPromptShown?: boolean;
+  country?: CountryCode; // device mirror of Settings.country (dual-persisted, like language) — drives public-holiday display
 }
 
 // PasskeyRegistration - Stored in registry DB (survives sign-out)
@@ -1088,6 +1090,8 @@ export interface Settings {
   customInstitutions?: string[];
   onboardingCompleted?: boolean;
   weekStartDay?: 0 | 1; // 0=Sunday, 1=Monday (default: 1)
+  country?: CountryCode; // family's country of residence — drives public-holiday display on the planner
+  showPublicHolidays?: boolean; // default true once `country` is set; lets the family hide holidays
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
@@ -1100,6 +1104,50 @@ export interface TranslationCacheEntry {
   translation: string;
   version: number; // Legacy: no longer used, kept for backward compatibility
   hash?: string; // Hash of source text, used to detect when translation is outdated
+}
+
+// --- Public holidays (read-only reference data, bundled in public/holidays/<ISO2>.json) ---
+
+// One holiday record as shipped in the per-country JSON file. `endDate` is
+// reserved for multi-day holidays (v1 emits single-day records only); the
+// runtime expansion handles it defensively if a future generator emits one.
+export interface HolidayRecord {
+  date: ISODateString; // YYYY-MM-DD (local date of the holiday)
+  endDate?: ISODateString; // YYYY-MM-DD, inclusive — for multi-day holidays (reserved)
+  name: string; // English name
+  name_local?: string; // localized name in the country's primary language, when it differs
+  type: 'public'; // v1 ships only public holidays; field kept so adding more types later is non-breaking
+}
+
+// Shape of public/holidays/<ISO2>.json.
+export interface HolidayFile {
+  meta: {
+    country: CountryCode;
+    name: string; // English country name
+    generatedAt: ISODateString; // YYYY-MM-DD the data was last regenerated
+    yearRange: [number, number]; // inclusive [firstYear, lastYear] the file covers
+    source: string; // e.g. 'date-holidays@3.28.0'
+    primaryLanguage: string; // ISO 639-1 lowercase
+    types: ['public'];
+  };
+  holidays: HolidayRecord[];
+}
+
+// IndexedDB cache row for a country's holiday file (beanies-reference-data DB).
+export interface HolidayCacheEntry {
+  country: CountryCode; // keyPath
+  generatedAt: ISODateString; // copied from the file's meta
+  yearRange: [number, number];
+  cachedAt: number; // Date.now() when written — drives the TTL
+  holidays: HolidayRecord[];
+}
+
+// A holiday expanded to a single calendar date — what the planner views render.
+export interface HolidayOccurrence {
+  date: ISODateString; // YYYY-MM-DD
+  name: string; // English name
+  nameLocal?: string; // localized name, when present
+  countryCode: CountryCode;
 }
 
 // Google Auth state

@@ -1,0 +1,318 @@
+{
+  "meta": {
+    "country": "CD",
+    "name": "Congo, Democratic Republic of the",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "fr",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2025-01-04",
+      "name": "Day of the Martyrs",
+      "type": "public",
+      "name_local": "Martyrs de l'Indépendance"
+    },
+    {
+      "date": "2025-01-16",
+      "name": "Anniversary of President Laurent Kabila",
+      "type": "public",
+      "name_local": "Journée du Héro National Laurent Désiré Kabila"
+    },
+    {
+      "date": "2025-01-17",
+      "name": "Anniversary of Prime Minister Patrice Emery Lumumba",
+      "type": "public",
+      "name_local": "Journée du Héro National Patrice Emery Lumumba"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2025-05-17",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Journée de la Révolution et des Forces Armées"
+    },
+    {
+      "date": "2025-06-30",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Anniversaire de Indépendance"
+    },
+    {
+      "date": "2025-08-01",
+      "name": "Parents' Day",
+      "type": "public",
+      "name_local": "Fête des parents"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2026-01-04",
+      "name": "Day of the Martyrs",
+      "type": "public",
+      "name_local": "Martyrs de l'Indépendance"
+    },
+    {
+      "date": "2026-01-05",
+      "name": "Day of the Martyrs (substitute day)",
+      "type": "public",
+      "name_local": "Martyrs de l'Indépendance"
+    },
+    {
+      "date": "2026-01-16",
+      "name": "Anniversary of President Laurent Kabila",
+      "type": "public",
+      "name_local": "Journée du Héro National Laurent Désiré Kabila"
+    },
+    {
+      "date": "2026-01-17",
+      "name": "Anniversary of Prime Minister Patrice Emery Lumumba",
+      "type": "public",
+      "name_local": "Journée du Héro National Patrice Emery Lumumba"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2026-05-17",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Journée de la Révolution et des Forces Armées"
+    },
+    {
+      "date": "2026-05-18",
+      "name": "Liberation Day (substitute day)",
+      "type": "public",
+      "name_local": "Journée de la Révolution et des Forces Armées"
+    },
+    {
+      "date": "2026-06-30",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Anniversaire de Indépendance"
+    },
+    {
+      "date": "2026-08-01",
+      "name": "Parents' Day",
+      "type": "public",
+      "name_local": "Fête des parents"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2027-01-04",
+      "name": "Day of the Martyrs",
+      "type": "public",
+      "name_local": "Martyrs de l'Indépendance"
+    },
+    {
+      "date": "2027-01-16",
+      "name": "Anniversary of President Laurent Kabila",
+      "type": "public",
+      "name_local": "Journée du Héro National Laurent Désiré Kabila"
+    },
+    {
+      "date": "2027-01-17",
+      "name": "Anniversary of Prime Minister Patrice Emery Lumumba",
+      "type": "public",
+      "name_local": "Journée du Héro National Patrice Emery Lumumba"
+    },
+    {
+      "date": "2027-01-18",
+      "name": "Anniversary of Prime Minister Patrice Emery Lumumba (substitute day)",
+      "type": "public",
+      "name_local": "Journée du Héro National Patrice Emery Lumumba"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2027-05-17",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Journée de la Révolution et des Forces Armées"
+    },
+    {
+      "date": "2027-06-30",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Anniversaire de Indépendance"
+    },
+    {
+      "date": "2027-08-01",
+      "name": "Parents' Day",
+      "type": "public",
+      "name_local": "Fête des parents"
+    },
+    {
+      "date": "2027-08-02",
+      "name": "Parents' Day (substitute day)",
+      "type": "public",
+      "name_local": "Fête des parents"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2028-01-04",
+      "name": "Day of the Martyrs",
+      "type": "public",
+      "name_local": "Martyrs de l'Indépendance"
+    },
+    {
+      "date": "2028-01-16",
+      "name": "Anniversary of President Laurent Kabila",
+      "type": "public",
+      "name_local": "Journée du Héro National Laurent Désiré Kabila"
+    },
+    {
+      "date": "2028-01-17",
+      "name": "Anniversary of Prime Minister Patrice Emery Lumumba",
+      "type": "public",
+      "name_local": "Journée du Héro National Patrice Emery Lumumba"
+    },
+    {
+      "date": "2028-01-18",
+      "name": "Anniversary of President Laurent Kabila (substitute day)",
+      "type": "public",
+      "name_local": "Journée du Héro National Laurent Désiré Kabila"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2028-05-17",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Journée de la Révolution et des Forces Armées"
+    },
+    {
+      "date": "2028-06-30",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Anniversaire de Indépendance"
+    },
+    {
+      "date": "2028-08-01",
+      "name": "Parents' Day",
+      "type": "public",
+      "name_local": "Fête des parents"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2029-01-04",
+      "name": "Day of the Martyrs",
+      "type": "public",
+      "name_local": "Martyrs de l'Indépendance"
+    },
+    {
+      "date": "2029-01-16",
+      "name": "Anniversary of President Laurent Kabila",
+      "type": "public",
+      "name_local": "Journée du Héro National Laurent Désiré Kabila"
+    },
+    {
+      "date": "2029-01-17",
+      "name": "Anniversary of Prime Minister Patrice Emery Lumumba",
+      "type": "public",
+      "name_local": "Journée du Héro National Patrice Emery Lumumba"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2029-05-17",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Journée de la Révolution et des Forces Armées"
+    },
+    {
+      "date": "2029-06-30",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Anniversaire de Indépendance"
+    },
+    {
+      "date": "2029-08-01",
+      "name": "Parents' Day",
+      "type": "public",
+      "name_local": "Fête des parents"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    }
+  ]
+}
