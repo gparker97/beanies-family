@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-12
+
+### Added
+
+- **Move your pod between local file and Google Drive — any time, from Settings.** When you first set up beanies.family you chose where your pod lives: a file on your device, or a file on your Google Drive. That choice is no longer permanent. Open **Settings → Family Data Options** and you'll see a **Move to Google Drive** row (if you're on a local file) or a **Move to a local file** row (if you're on Drive) — one tap, a quick confirmation, and your pod is saved to the new spot. Your data isn't decrypted, re-uploaded in the clear, or exposed at any point — same password, same encryption, only the location changes. The file you were using stays exactly where it is (we don't delete it), so keep it as a backup until you're happy with the move. If you use beanies.family on more than one device, the others just need to load the pod again from the new location. Owner-only — if you're a family member, ask whoever set up the pod. If a move can't finish (a network blip while creating the Drive file, say), the app puts you back on your original storage automatically and tells you what happened — your data is never in limbo. New help article: **Moving your pod between local file and Google Drive** (in the help center under Getting Started).
+
 ## 2026-05-11
 
 ### Added
