@@ -290,4 +290,217 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'family-milestones',
+    category: 'features',
+    title: 'Family Milestones',
+    excerpt:
+      'Catch the firsts and the big moments — first word, lost tooth, new job, new puppy — and keep them in one family timeline, with dates and photos.',
+    icon: '🌟',
+    readTime: 5,
+    updatedDate: '2026-05-12',
+    sections: [
+      {
+        type: 'heading',
+        content: 'Why milestones',
+        level: 2,
+        id: 'why',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The first word. The lost tooth. The first day of school, the big test, the new job, the new puppy. These moments go by fast, and a year later it’s hard to remember exactly when. <strong>Family Milestones</strong> is the place to catch them — a date, a few words, maybe a photo — so your family’s story is written down as it happens, all in one timeline.',
+      },
+      {
+        type: 'heading',
+        content: 'Two ways to see them',
+        level: 2,
+        id: 'views',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>The Family Milestones page</strong> — open <strong>The Pod 🌱 → Family Milestones</strong> for one timeline of everyone’s moments, in order (oldest first), like turning the pages of a family album',
+          '<strong>A bean’s Milestones tab</strong> — open a bean’s profile (<strong>Meet the Beans →</strong> tap the bean) and go to the <strong>Milestones</strong> tab to see just that person’s moments',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Adding a milestone',
+        level: 2,
+        id: 'adding',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'On the <strong>Family Milestones</strong> page, tap <strong>Add a milestone</strong>',
+          'Choose who it’s <strong>For</strong> — a family member, or <strong>Family</strong> for moments the whole family shares',
+          'Pick the <strong>Milestone</strong> — there’s a tidy list grouped into <strong>Firsts</strong>, <strong>Achievements</strong>, <strong>Family Events</strong>, and <strong>Celebrations</strong> (Lost a Tooth, First Day of School, Graduation, New Home, Wedding Day…), or choose <strong>Custom Milestone</strong> and name it yourself',
+          'Give it a short <strong>Title</strong> (e.g. <em>“Said ‘doggo’ for the first time”</em>) and set the <strong>Date</strong>',
+          'Optionally add a <strong>Description</strong> and <strong>Photos</strong>',
+          'Tap <strong>Save</strong>',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'To add photos, save the milestone first — then open it again and add the photos. You can also add a milestone straight from a bean’s profile (the <strong>Milestones</strong> tab, or <strong>＋ Add Something → 🌟 Milestone</strong>) — it’s the same form, just already set to that bean.',
+        title: 'A note on photos',
+        icon: '💡',
+      },
+      {
+        type: 'heading',
+        content: 'Family-wide milestones',
+        level: 2,
+        id: 'family-wide',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Not every moment belongs to one person. Moving into a new home, welcoming a new little bean, a big trip, a wedding day, an anniversary — choose <strong>Family</strong> as the “For” when you add these. They show up on the timeline with a <strong>Family</strong> tag and aren’t tied to a single bean.',
+      },
+      {
+        type: 'heading',
+        content: 'Filtering the timeline',
+        level: 2,
+        id: 'filtering',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Once the timeline gets long, use the filters at the top of the Family Milestones page: narrow by <strong>Beans</strong>, narrow by <strong>Categories</strong>, and toggle whether <strong>family-wide</strong> milestones are shown. On the timeline, tapping one of a bean’s milestones jumps you to that bean’s <strong>Milestones</strong> tab.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'To change a milestone, tap it to open it, edit any field, and save. To remove it, use the <strong>delete</strong> option and confirm — deleting can’t be undone.',
+      },
+      {
+        type: 'callout',
+        content:
+          'Photos you attach to a milestone are stored encrypted inside your pod, just like everything else — they never leave your family’s control. See <strong>Adding Photos</strong> and <strong>How Your Data Is Encrypted</strong>.',
+        title: 'Your photos stay private',
+        icon: '🔒',
+      },
+      {
+        type: 'heading',
+        content: 'Related help',
+        level: 2,
+        id: 'related',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Meet the Beans</strong> — each family member’s profile',
+          '<strong>The Family Scrapbook</strong> — flip through your family’s memories',
+          '<strong>Adding Photos</strong> — attach pictures to milestones, recipes, and more',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'the-family-scrapbook',
+    category: 'features',
+    title: 'The Family Scrapbook',
+    excerpt:
+      'A digital memory-book you can flip through — a page for each family member, plus an “Everyone” page — filled in automatically from the things you add to your beans.',
+    icon: '📖',
+    readTime: 4,
+    updatedDate: '2026-05-12',
+    sections: [
+      {
+        type: 'heading',
+        content: 'What the scrapbook is',
+        level: 2,
+        id: 'what',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The <strong>Family Scrapbook</strong> is a little book you can flip through — a page (a “spread”) for each family member, plus an <strong>Everyone</strong> page for the family as a whole. It doesn’t ask you to do anything new: it’s simply the lovely way to look back at the favourites, sayings, big moments, and notes you’ve already added to your beans. Think of it as the photo album on the shelf — except it fills itself in as you go.',
+      },
+      {
+        type: 'heading',
+        content: 'Opening the scrapbook',
+        level: 2,
+        id: 'opening',
+      },
+      {
+        type: 'paragraph',
+        content: 'In the sidebar, open <strong>The Pod 🌱 → Family Scrapbook</strong>.',
+      },
+      {
+        type: 'heading',
+        content: 'Flipping through it',
+        level: 2,
+        id: 'flipping',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'There’s a spine down the side with everyone’s names. Tap a name to flip to that bean’s page, or tap <strong>Everyone</strong> for the family page — the pages turn with a little animation, just like a real book. On a phone, the spine and page-turns work the same way; you’ll just see one page at a time.',
+      },
+      {
+        type: 'heading',
+        content: 'What’s on each page',
+        level: 2,
+        id: 'pages',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'A <strong>bean’s page</strong> shows <strong>Things they say</strong> (their sayings), <strong>Favorites</strong>, <strong>Big moments</strong> (their milestones), and <strong>About them</strong> (notes). Each section has a <strong>see all →</strong> that hops to the matching tab on their profile',
+          'The <strong>Everyone</strong> page gathers the family’s shared moments and what’s been added across the pod lately',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Adding to the scrapbook',
+        level: 2,
+        id: 'adding',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Tap <strong>Add to scrapbook</strong> at the top of the page',
+          'Pick what you want to add — a <strong>saying</strong>, a <strong>favourite</strong>, a <strong>note</strong>, or a <strong>milestone</strong>',
+          'Fill in the quick form and save — it lands on the right page automatically',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'The scrapbook doesn’t have its own separate “stuff” — everything in it lives on your beans’ profiles (and in Family Milestones). To edit or delete an entry, open it from there — or tap the <strong>see all →</strong> link in the scrapbook to get straight to it. The scrapbook just reflects what’s there.',
+        title: 'It’s a view, not a store',
+        icon: 'ℹ️',
+      },
+      {
+        type: 'callout',
+        content:
+          'A page looking a bit bare just means there’s nothing on that bean’s profile yet — add a saying or a favourite and it’ll appear. Every family member gets a page, pet beans included.',
+        title: 'Empty pages aren’t a bug',
+        icon: '💡',
+      },
+      {
+        type: 'heading',
+        content: 'Related help',
+        level: 2,
+        id: 'related',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Meet the Beans</strong> — fill in a bean’s profile',
+          '<strong>Family Milestones</strong> — the firsts and the big moments',
+          '<strong>Adding Photos</strong> — pictures across the Pod',
+        ],
+      },
+    ],
+  },
 ];
