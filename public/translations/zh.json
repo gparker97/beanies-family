@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-12",
-    "translationCount": 2790
+    "translationCount": 2804
   },
   "translations": {
     "app.name": {
@@ -13954,6 +13954,76 @@
     "bean.hero.add.milestone": {
       "translation": "节点",
       "hash": "lpysz1",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.card.countryHolidays": {
+      "translation": "国家和节假日",
+      "hash": "qwfgv5",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.card.countryHolidaysDesc": {
+      "translation": "您家人居住的地方和公共假日展示",
+      "hash": "y7wsvj",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.country": {
+      "translation": "国籍",
+      "hash": "rnr43u",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.countryNotSet": {
+      "translation": "未设置",
+      "hash": "8bjq8b",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.countryHelp": {
+      "translation": "我们会在家庭计划工具中显示您所在国家/地区的公共假期。关于您所在位置的任何信息都不会离开您的设备。",
+      "hash": "fpxc5w",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.showPublicHolidays": {
+      "translation": "在规划器上显示公共假日",
+      "hash": "nzxqr7",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.showPublicHolidaysNeedsCountry": {
+      "translation": "请先选择您的国家/地区",
+      "hash": "hvna9k",
+      "lastUpdated": "2026-05-12"
+    },
+    "holiday.publicHolidaySuffix": {
+      "translation": "公共假期",
+      "hash": "pb5p5t",
+      "lastUpdated": "2026-05-12"
+    },
+    "holiday.observanceNote": {
+      "translation": "工作场所和学校可能都关门了，请检查！",
+      "hash": "4o8abv",
+      "lastUpdated": "2026-05-12"
+    },
+    "holiday.referenceNote": {
+      "translation": "这只是参考信息，不会在日历中添加任何内容。",
+      "hash": "a106fn",
+      "lastUpdated": "2026-05-12"
+    },
+    "holiday.upcomingHeading": {
+      "translation": "即将到来的假期",
+      "hash": "wih56p",
+      "lastUpdated": "2026-05-12"
+    },
+    "holiday.loadFailedRetryHint": {
+      "translation": "当前无法加载节假日，当您重新上线后，这些节假日就会显示出来。",
+      "hash": "dpvtyf",
+      "lastUpdated": "2026-05-12"
+    },
+    "onboarding.countryQuestion": {
+      "translation": "您的家人住在哪里？",
+      "hash": "wljzbe",
+      "lastUpdated": "2026-05-12"
+    },
+    "onboarding.countryPlaceholder": {
+      "translation": "选择您的国家/地区（选填）",
+      "hash": "3i2hzg",
       "lastUpdated": "2026-05-12"
     }
   }
