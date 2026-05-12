@@ -25,11 +25,12 @@ describe('TodoItemRow', () => {
     setActivePinia(createPinia()); // useTranslation reaches into stores
   });
 
-  it('renders an active row plainly; the hover action parks it as Someday', () => {
+  it('renders an active row plainly (white, no Sky-Silk wash); the hover action parks it as Someday', () => {
     const wrapper = mount(TodoItemRow, { props: { todo: todo() } });
 
     expect(titleText(wrapper)).toBe('Repaint the fence'); // no 💭 prefix
-    expect(wrapper.classes()).not.toContain('border-dashed');
+    expect(wrapper.classes()).toContain('bg-white');
+    expect(wrapper.classes()).not.toContain('bg-gradient-to-br'); // no Sky-Silk daydream wash
 
     const btn = hoverButton(wrapper, 'someday'); // "move to someday" (test runs in beanie/lowercase mode)
     expect(btn?.text()).toContain('💭');
@@ -37,11 +38,14 @@ describe('TodoItemRow', () => {
     expect(wrapper.emitted('set-someday')).toEqual([['t-1', true]]);
   });
 
-  it('renders a someday row de-emphasised (dashed border, 💭 marker, no date pill); the hover action reactivates it', () => {
+  it('renders a someday row with the calm Sky-Silk wash (💭 marker, no date pill, still active); the hover action reactivates it', () => {
     const wrapper = mount(TodoItemRow, { props: { todo: todo({ someday: true }) } });
 
     expect(titleText(wrapper)).toContain('💭'); // marker prefix on the title
-    expect(wrapper.classes()).toContain('border-dashed');
+    // muted Sky-Silk daydream gradient, not the greyed "disabled" look
+    expect(wrapper.classes()).toContain('bg-gradient-to-br');
+    expect(wrapper.classes()).toContain('from-[var(--tint-silk-10)]');
+    expect(wrapper.classes()).not.toContain('bg-white');
     expect(wrapper.text()).not.toContain('No date set'); // someday rows drop the "no date" filler
 
     const btn = hoverButton(wrapper, 'active');

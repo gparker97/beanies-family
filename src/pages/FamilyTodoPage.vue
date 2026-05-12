@@ -252,7 +252,7 @@ async function handleDelete(id: string) {
         v-if="displayedSomedayTodos.length > 0"
         :label="t('todo.someday')"
         emoji="💭"
-        label-class="text-[var(--color-text-muted)]"
+        label-class="text-sky-600 dark:text-sky-400"
         :todos="displayedSomedayTodos"
         @toggle="handleToggle"
         @view="openModal"
