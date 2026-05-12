@@ -270,9 +270,9 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     excerpt:
       'Create tasks, assign them to family members, set due dates, and track what gets done. Your shared family task board.',
     icon: '\u2705',
-    readTime: 4,
+    readTime: 5,
     popular: true,
-    updatedDate: '2026-03-27',
+    updatedDate: '2026-05-12',
     sections: [
       {
         type: 'heading',
@@ -362,6 +362,46 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'Either way, you\u2019ll get a little celebration and the task moves to the <strong>Completed</strong> section at the bottom of the page. Changed your mind? You can reopen a completed task from its detail panel or by tapping the undo button.',
+      },
+      {
+        type: 'heading',
+        content: 'Someday \u00b7 Maybe to-dos',
+        level: 2,
+        id: 'someday-maybe',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Not everything on your mind is a real commitment. <strong>Someday \u00b7 Maybe</strong> is for the loose ideas \u2014 \u201ctake the kids camping\u201d, \u201cre-do the garden\u201d, \u201clearn to bake sourdough\u201d \u2014 things you\u2019d <em>like</em> to get to one day but aren\u2019t scheduling and might never do. They stay visible so you don\u2019t lose the idea, without cluttering your real task list.',
+      },
+      {
+        type: 'paragraph',
+        content: 'There are two ways to park a task as Someday \u00b7 Maybe:',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'Open the task and switch <strong>Track as</strong> from <strong>\u{1F4CB} To-do</strong> to <strong>\u{1F4AD} Someday \u00b7 Maybe</strong>',
+          'On desktop, hover over a task in the list and click the <strong>\u{1F4AD}</strong> button to move it to Someday \u00b7 Maybe',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Someday \u00b7 Maybe tasks collect in their own <strong>\u{1F4AD} Someday \u00b7 Maybe</strong> section on the To-Do page, just below your open tasks. The section is always visible (it doesn\u2019t collapse) so the ideas stay in sight \u2014 but these tasks are deliberately kept <em>out of the way</em> everywhere you\u2019re meant to be focused: they don\u2019t appear in your <strong>daily briefing</strong>, the <strong>To-Do widget</strong> on the Family Nook, the planner sidebar, or the calendar.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Marking a task as Someday \u00b7 Maybe clears its due date and time \u2014 a someday item is, by definition, not scheduled. If you later switch it back to <strong>\u{1F4CB} To-do</strong>, it becomes a normal undated task and you can give it a due date again.',
+        title: 'No due dates on someday tasks',
+        icon: '\u{1F4A1}',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'You can still tick off a Someday \u00b7 Maybe task \u2014 it moves to <strong>Completed</strong> like any other. Reopen it and it returns to the Someday \u00b7 Maybe section, not your active list.',
       },
       {
         type: 'heading',

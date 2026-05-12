@@ -368,6 +368,8 @@ export interface TodoItem {
   assigneeIds?: UUID[]; // FK to FamilyMember(s) — who should do it
   dueDate?: ISODateString; // ISO date (no time = untimed task)
   dueTime?: string; // HH:mm
+  /** "Someday / maybe" — an open, deliberately unscheduled, no-commitment item. When true, dueDate/dueTime are cleared. */
+  someday?: boolean;
   completed: boolean;
   completedBy?: UUID; // FK to FamilyMember
   completedAt?: ISODateString;

@@ -33,7 +33,7 @@ const todayActivitiesCount = computed(() => {
   return activityStore.upcomingActivities.filter(({ date }) => date === today.value).length;
 });
 
-const openTodosCount = computed(() => todoStore.filteredOpenTodos.length);
+const openTodosCount = computed(() => todoStore.filteredActiveTodos.length);
 
 const subtitle = computed(() => {
   return t('nook.statusSummary')

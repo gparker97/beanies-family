@@ -37,7 +37,7 @@ const todayItems = computed<ScheduleItem[]>(() => {
   const items: ScheduleItem[] = [];
 
   // Todos due today
-  for (const todo of todoStore.filteredOpenTodos) {
+  for (const todo of todoStore.filteredActiveTodos) {
     const dateStr = todo.dueDate?.split('T')[0] ?? '';
     if (dateStr === todayStr.value) {
       items.push({
@@ -88,7 +88,7 @@ const weekItems = computed<ScheduleItem[]>(() => {
   const endStr = toDateInputValue(endDate);
 
   // Todos this week
-  for (const todo of todoStore.filteredOpenTodos) {
+  for (const todo of todoStore.filteredActiveTodos) {
     if (!todo.dueDate) continue;
     const dateStr = todo.dueDate.split('T')[0] ?? '';
     if (dateStr >= start && dateStr <= endStr) {

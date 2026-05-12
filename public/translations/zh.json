@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-12",
-    "translationCount": 2783
+    "translationCount": 2789
   },
   "translations": {
     "app.name": {
@@ -13919,6 +13919,36 @@
     "settings.familyData.migrate.recoveryNeededBody": {
       "translation": "移动失败，我们无法完全切换回您以前的存储空间。注销并重新登录以恢复—您的数据在文件中是安全的。",
       "hash": "tkpv25",
+      "lastUpdated": "2026-05-12"
+    },
+    "todo.someday": {
+      "translation": "有朝一日·也许",
+      "hash": "ysynwn",
+      "lastUpdated": "2026-05-12"
+    },
+    "todo.somedayHint": {
+      "translation": "您可能会做的事情—没有压力，没有截止日期。",
+      "hash": "zcvc3z",
+      "lastUpdated": "2026-05-12"
+    },
+    "todo.kind": {
+      "translation": "追踪为",
+      "hash": "m2v0p3",
+      "lastUpdated": "2026-05-12"
+    },
+    "todo.kind.todo": {
+      "translation": "任务",
+      "hash": "1c6l8d",
+      "lastUpdated": "2026-05-12"
+    },
+    "todo.moveToSomeday": {
+      "translation": "移动到某一天",
+      "hash": "uehkoi",
+      "lastUpdated": "2026-05-12"
+    },
+    "todo.makeActive": {
+      "translation": "激活",
+      "hash": "tokn8o",
       "lastUpdated": "2026-05-12"
     }
   }

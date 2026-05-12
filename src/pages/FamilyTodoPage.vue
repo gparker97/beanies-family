@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
@@ -14,7 +13,7 @@ import { useAuthStore } from '@/stores/authStore';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import QuickAddBar from '@/components/todo/QuickAddBar.vue';
-import TodoItemCard from '@/components/todo/TodoItemCard.vue';
+import TodoSection from '@/components/todo/TodoSection.vue';
 import type { TodoSort } from '@/components/todo/FilterBar.vue';
 import type { TodoItem } from '@/types/models';
 import { useBreakpoint } from '@/composables/useBreakpoint';
@@ -23,7 +22,6 @@ const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
 const { canEditActivities } = usePermissions();
-const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 const todoStore = useTodoStore();
 const familyStore = useFamilyStore();
@@ -34,7 +32,7 @@ const currentMemberId = computed(() => authStore.currentUser?.memberId ?? '');
 // Local filter state
 const sortBy = ref<TodoSort>('newest');
 const memberFilter = ref('all');
-const showCompletedSection = ref(false);
+const completedCollapsed = ref(true);
 
 const { isDesktop } = useBreakpoint();
 
@@ -50,18 +48,21 @@ const selectedTodo = computed(() =>
 // Todo member filter — humans only (pets can't be assignees).
 const sortedMembers = computed(() => familyStore.sortedHumans);
 
-// Computed: filtered + sorted todos
-const displayedOpenTodos = computed(() => {
-  let items = todoStore.filteredOpenTodos;
+// Apply the page-local member filter (by assignee) + the chosen sort. Shared
+// by the Open and Someday sections — the Completed list has its own filter
+// (it also matches `completedBy`).
+function withMemberFilterAndSort(items: TodoItem[]): TodoItem[] {
+  const filtered =
+    memberFilter.value === 'all'
+      ? items
+      : items.filter((t) => normalizeAssignees(t).includes(memberFilter.value));
+  return applySorting(filtered);
+}
 
-  // Apply page-local member filter
-  if (memberFilter.value !== 'all') {
-    items = items.filter((t) => normalizeAssignees(t).includes(memberFilter.value));
-  }
-
-  // Apply sort
-  return applySorting(items);
-});
+const displayedOpenTodos = computed(() => withMemberFilterAndSort(todoStore.filteredActiveTodos));
+const displayedSomedayTodos = computed(() =>
+  withMemberFilterAndSort(todoStore.filteredSomedayTodos)
+);
 
 const displayedCompletedTodos = computed(() => {
   let items = todoStore.filteredCompletedTodos;
@@ -115,6 +116,10 @@ async function handleQuickAdd(payload: {
 
 async function handleToggle(id: string) {
   await todoStore.toggleComplete(id, currentMemberId.value);
+}
+
+async function handleSetSomeday(id: string, value: boolean) {
+  await todoStore.setSomeday(id, value);
 }
 
 function openModal(todo: { id: string }) {
@@ -229,61 +234,48 @@ async function handleDelete(id: string) {
         </button>
       </div>
 
-      <!-- Open Tasks Section -->
-      <div>
-        <p class="nook-section-label mb-2 text-purple-500">
-          {{ t('todo.section.open') }} ({{ displayedOpenTodos.length }})
-        </p>
+      <!-- Open Tasks -->
+      <TodoSection
+        :label="t('todo.section.open')"
+        label-class="text-purple-500"
+        :todos="displayedOpenTodos"
+        :empty-text="t('todo.noTodos')"
+        @toggle="handleToggle"
+        @view="openModal"
+        @edit="openModal"
+        @delete="handleDelete"
+        @set-someday="handleSetSomeday"
+      />
 
-        <div v-if="displayedOpenTodos.length === 0" class="py-6 text-center">
-          <p class="text-sm text-[var(--color-text-muted)]">{{ t('todo.noTodos') }}</p>
-        </div>
+      <!-- Someday · Maybe — always visible (these aren't completed), hidden only when empty -->
+      <TodoSection
+        v-if="displayedSomedayTodos.length > 0"
+        :label="t('todo.someday')"
+        emoji="💭"
+        label-class="text-[var(--color-text-muted)]"
+        :todos="displayedSomedayTodos"
+        @toggle="handleToggle"
+        @view="openModal"
+        @edit="openModal"
+        @delete="handleDelete"
+        @set-someday="handleSetSomeday"
+      >
+        <template #hint>{{ t('todo.somedayHint') }}</template>
+      </TodoSection>
 
-        <div class="space-y-2">
-          <div
-            v-for="todo in displayedOpenTodos"
-            :key="todo.id"
-            :class="syncHighlightClass(todo.id)"
-          >
-            <TodoItemCard
-              :todo="todo"
-              @toggle="handleToggle"
-              @view="openModal"
-              @edit="openModal"
-              @delete="handleDelete"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Completed Section -->
-      <div v-if="displayedCompletedTodos.length > 0">
-        <button
-          class="flex items-center gap-2 text-sm text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
-          @click="showCompletedSection = !showCompletedSection"
-        >
-          <span class="text-xs opacity-50">{{ showCompletedSection ? '▲' : '▼' }}</span>
-          <span class="nook-section-label text-green-600 dark:text-green-400">
-            {{ t('todo.section.completed') }} ({{ displayedCompletedTodos.length }})
-          </span>
-        </button>
-
-        <div v-if="showCompletedSection" class="mt-2 space-y-2">
-          <div
-            v-for="todo in displayedCompletedTodos"
-            :key="todo.id"
-            :class="syncHighlightClass(todo.id)"
-          >
-            <TodoItemCard
-              :todo="todo"
-              @toggle="handleToggle"
-              @view="openModal"
-              @edit="openModal"
-              @delete="handleDelete"
-            />
-          </div>
-        </div>
-      </div>
+      <!-- Completed (collapsible) -->
+      <TodoSection
+        v-if="displayedCompletedTodos.length > 0"
+        v-model:collapsed="completedCollapsed"
+        :label="t('todo.section.completed')"
+        label-class="text-green-600 dark:text-green-400"
+        :todos="displayedCompletedTodos"
+        collapsible
+        @toggle="handleToggle"
+        @view="openModal"
+        @edit="openModal"
+        @delete="handleDelete"
+      />
     </template>
 
     <TodoViewEditModal :todo="selectedTodo" @close="selectedTodoId = null" />

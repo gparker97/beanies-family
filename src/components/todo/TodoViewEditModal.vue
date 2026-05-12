@@ -8,6 +8,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
+import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -219,6 +220,17 @@ function handleAssigneeChange(value: string | string[]) {
   draftAssigneeIds.value = Array.isArray(value) ? value : value ? [value] : [];
 }
 
+// "Track as" — to-do vs. someday/maybe. Going someday clears the due date/time
+// (handled in `todoStore.setSomeday`); the live `todo` re-renders. Errors
+// surface via `updateTodo`'s toast path; this never rejects.
+const kindOptions = computed(() => [
+  { value: 'todo', label: t('todo.kind.todo'), icon: '📋' },
+  { value: 'someday', label: t('todo.someday'), icon: '💭' },
+]);
+function handleKindChange(value: string) {
+  if (todo.value) void todoStore.setSomeday(todo.value.id, value === 'someday');
+}
+
 // Toggle complete/reopen
 async function handleToggleComplete() {
   if (!todo.value) return;
@@ -322,6 +334,15 @@ async function handleDelete() {
         </template>
       </InlineEditField>
 
+      <!-- Track as: To-do vs. Someday · Maybe (hidden once completed) -->
+      <FormFieldGroup v-if="!todo.completed" :label="t('todo.kind')">
+        <FrequencyChips
+          :model-value="todo.someday ? 'someday' : 'todo'"
+          :options="kindOptions"
+          @update:model-value="handleKindChange"
+        />
+      </FormFieldGroup>
+
       <!-- Status badge -->
       <FormFieldGroup :label="t('todo.status')">
         <span
@@ -332,6 +353,13 @@ async function handleDelete() {
           ✓ {{ t('todo.status.completed') }}
         </span>
         <span
+          v-else-if="todo.someday"
+          class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-[var(--color-text-muted)]"
+          style="background: var(--tint-slate-10)"
+        >
+          💭 {{ t('todo.someday') }}
+        </span>
+        <span
           v-else
           class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-purple-700"
           style="background: var(--tint-purple-15)"
@@ -340,8 +368,8 @@ async function handleDelete() {
         </span>
       </FormFieldGroup>
 
-      <!-- Due date — inline editable -->
-      <FormFieldGroup :label="t('todo.dueDate')">
+      <!-- Due date — inline editable (hidden for someday · maybe items) -->
+      <FormFieldGroup v-if="!todo.someday" :label="t('todo.dueDate')">
         <InlineEditField
           :editing="editingField === 'dueDate'"
           tint-color="purple"
@@ -393,9 +421,9 @@ async function handleDelete() {
         </InlineEditField>
       </FormFieldGroup>
 
-      <!-- Due time — only shown when date exists, inline editable -->
+      <!-- Due time — only shown when a date exists (never for someday · maybe), inline editable -->
       <FormFieldGroup
-        v-if="todo.dueDate || editingField === 'dueDate'"
+        v-if="!todo.someday && (todo.dueDate || editingField === 'dueDate')"
         :label="t('modal.startTime')"
       >
         <InlineEditField
