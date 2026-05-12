@@ -22,9 +22,37 @@ const emit = defineEmits<{
   view: [todo: TodoItem];
   edit: [todo: TodoItem];
   delete: [id: string];
+  /** Move into ("someday · maybe", value=true) / out of (value=false) the parked lane. */
+  'set-someday': [id: string, value: boolean];
 }>();
 
+const isSomeday = computed(() => !!props.todo.someday);
 const isOverdue = computed(() => isTodoOverdue(props.todo));
+
+// Container styling — early returns rather than a deep nested ternary in the
+// template. A someday row gets a de-emphasised "parked" look (the soft slate
+// idiom the completed-card uses, plus a dashed border) and never the
+// overdue-red path (a someday item has no date, so it's never overdue).
+const containerClass = computed(() => {
+  const pad = props.compact ? 'cursor-pointer p-3.5' : 'p-3 md:gap-4 md:p-4';
+  if (isSomeday.value) {
+    return `${pad} border-dashed border-[var(--tint-slate-10)] bg-[var(--tint-slate-5)] hover:bg-[var(--tint-slate-10)] dark:border-slate-600/40 dark:bg-slate-700/40 dark:hover:bg-slate-700/60`;
+  }
+  if (isOverdue.value) {
+    return `${pad} border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:hover:bg-red-950/50`;
+  }
+  if (props.compact) {
+    return `${pad} border-[var(--tint-slate-10)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-slate-700 dark:hover:bg-slate-600`;
+  }
+  return `${pad} border-[var(--tint-slate-5)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-slate-800`;
+});
+
+const checkboxClass = computed(() => {
+  if (isSomeday.value)
+    return 'border-[var(--tint-slate-10)] hover:bg-[var(--tint-slate-10)] dark:border-slate-600';
+  if (isOverdue.value) return 'border-red-400 hover:bg-red-100 dark:border-red-500';
+  return 'border-[var(--color-primary-500)] hover:bg-[var(--tint-orange-8)]';
+});
 
 const formattedDate = computed(() => {
   if (!props.todo.dueDate) return null;
@@ -46,26 +74,14 @@ const timeAgo = computed(() => {
 <template>
   <div
     class="group flex items-center gap-3 rounded-2xl border transition-all"
-    :class="[
-      compact ? 'cursor-pointer p-3.5' : 'p-3 md:gap-4 md:p-4',
-      isOverdue
-        ? 'border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:hover:bg-red-950/50'
-        : compact
-          ? 'border-[var(--tint-slate-10)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-slate-700 dark:hover:bg-slate-600'
-          : 'border-[var(--tint-slate-5)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-slate-800',
-    ]"
+    :class="containerClass"
     @click="emit('view', todo)"
   >
     <!-- Checkbox -->
     <button
       type="button"
       class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-[2.5px] transition-colors"
-      :class="[
-        compact ? '' : 'md:h-7 md:w-7',
-        isOverdue
-          ? 'border-red-400 hover:bg-red-100 dark:border-red-500'
-          : 'border-[var(--color-primary-500)] hover:bg-[var(--tint-orange-8)]',
-      ]"
+      :class="[compact ? '' : 'md:h-7 md:w-7', checkboxClass]"
       @click.stop="emit('toggle', todo.id)"
     />
 
@@ -75,7 +91,7 @@ const timeAgo = computed(() => {
         class="font-outfit text-sm font-semibold text-[var(--color-text)]"
         :class="compact ? 'truncate' : 'md:text-base'"
       >
-        {{ todo.title }}
+        <span v-if="isSomeday" aria-hidden="true">💭&nbsp;</span>{{ todo.title }}
       </p>
 
       <p
@@ -116,8 +132,8 @@ const timeAgo = computed(() => {
           📅 {{ formattedDate }}<template v-if="todo.dueTime">, {{ todo.dueTime }}</template>
         </span>
 
-        <!-- No date (full mode only) -->
-        <span v-else-if="!compact" class="text-[0.625rem] opacity-35 md:text-xs">
+        <!-- No date (full mode only; a someday row's 💭 prefix already conveys "no date") -->
+        <span v-else-if="!compact && !isSomeday" class="text-[0.625rem] opacity-35 md:text-xs">
           {{ t('todo.noDateSet') }}
         </span>
 
@@ -129,11 +145,19 @@ const timeAgo = computed(() => {
       </div>
     </div>
 
-    <!-- Action buttons (full mode, desktop only) -->
+    <!-- Action buttons (full mode, desktop only; hover-revealed) -->
     <div
       v-if="!compact"
       class="hidden shrink-0 gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 md:flex"
     >
+      <button
+        class="flex h-8 w-8 items-center justify-center rounded-[10px] text-sm opacity-40 transition-opacity hover:opacity-70"
+        style="background: var(--tint-slate-5)"
+        :title="isSomeday ? t('todo.makeActive') : t('todo.moveToSomeday')"
+        @click.stop="emit('set-someday', todo.id, !isSomeday)"
+      >
+        {{ isSomeday ? '📋' : '💭' }}
+      </button>
       <button
         class="flex h-8 w-8 items-center justify-center rounded-[10px] text-sm opacity-40 transition-opacity hover:opacity-70"
         style="background: var(--tint-slate-5)"

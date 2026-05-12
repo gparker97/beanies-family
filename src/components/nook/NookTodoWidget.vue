@@ -21,9 +21,9 @@ const newTaskAssignees = ref<string[]>([]);
 
 // ── Display ─────────────────────────────────────────────────────────────────
 const MAX_VISIBLE = 8;
-const openCount = computed(() => todoStore.filteredOpenTodos.length);
+const openCount = computed(() => todoStore.filteredActiveTodos.length);
 const displayTodos = computed(() => {
-  const todos = [...todoStore.filteredOpenTodos];
+  const todos = [...todoStore.filteredActiveTodos];
   // Sort: overdue first, then by due date (soonest first), undated last
   todos.sort((a, b) => {
     const aDate = a.dueDate?.split('T')[0] ?? '';
@@ -37,8 +37,8 @@ const displayTodos = computed(() => {
   });
   return todos.slice(0, MAX_VISIBLE);
 });
-const hasMore = computed(() => todoStore.filteredOpenTodos.length > MAX_VISIBLE);
-const remainingCount = computed(() => todoStore.filteredOpenTodos.length - MAX_VISIBLE);
+const hasMore = computed(() => todoStore.filteredActiveTodos.length > MAX_VISIBLE);
+const remainingCount = computed(() => todoStore.filteredActiveTodos.length - MAX_VISIBLE);
 
 // ── View/edit modal ─────────────────────────────────────────────────────────
 const selectedTodoId = ref<string | null>(null);
