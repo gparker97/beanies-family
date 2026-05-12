@@ -1,0 +1,402 @@
+{
+  "meta": {
+    "country": "IT",
+    "name": "Italy",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "it",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Capodanno"
+    },
+    {
+      "date": "2025-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Befana"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Domenica di Pasqua"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lunedì dell’Angelo"
+    },
+    {
+      "date": "2025-04-25",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Anniversario della Liberazione"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Festa del Lavoro"
+    },
+    {
+      "date": "2025-06-02",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Festa della Repubblica"
+    },
+    {
+      "date": "2025-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Ferragosto"
+    },
+    {
+      "date": "2025-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Ognissanti"
+    },
+    {
+      "date": "2025-12-08",
+      "name": "Immaculate Conception",
+      "type": "public",
+      "name_local": "Immacolata Concezione"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natale"
+    },
+    {
+      "date": "2025-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Santo Stefano"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Capodanno"
+    },
+    {
+      "date": "2026-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Befana"
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Domenica di Pasqua"
+    },
+    {
+      "date": "2026-04-06",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lunedì dell’Angelo"
+    },
+    {
+      "date": "2026-04-25",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Anniversario della Liberazione"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Festa del Lavoro"
+    },
+    {
+      "date": "2026-06-02",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Festa della Repubblica"
+    },
+    {
+      "date": "2026-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Ferragosto"
+    },
+    {
+      "date": "2026-10-04",
+      "name": "Francis of Assisi",
+      "type": "public",
+      "name_local": "San Francesco d'Assisi"
+    },
+    {
+      "date": "2026-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Ognissanti"
+    },
+    {
+      "date": "2026-12-08",
+      "name": "Immaculate Conception",
+      "type": "public",
+      "name_local": "Immacolata Concezione"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natale"
+    },
+    {
+      "date": "2026-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Santo Stefano"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Capodanno"
+    },
+    {
+      "date": "2027-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Befana"
+    },
+    {
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Domenica di Pasqua"
+    },
+    {
+      "date": "2027-03-29",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lunedì dell’Angelo"
+    },
+    {
+      "date": "2027-04-25",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Anniversario della Liberazione"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Festa del Lavoro"
+    },
+    {
+      "date": "2027-06-02",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Festa della Repubblica"
+    },
+    {
+      "date": "2027-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Ferragosto"
+    },
+    {
+      "date": "2027-10-04",
+      "name": "Francis of Assisi",
+      "type": "public",
+      "name_local": "San Francesco d'Assisi"
+    },
+    {
+      "date": "2027-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Ognissanti"
+    },
+    {
+      "date": "2027-12-08",
+      "name": "Immaculate Conception",
+      "type": "public",
+      "name_local": "Immacolata Concezione"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natale"
+    },
+    {
+      "date": "2027-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Santo Stefano"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Capodanno"
+    },
+    {
+      "date": "2028-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Befana"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Domenica di Pasqua"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lunedì dell’Angelo"
+    },
+    {
+      "date": "2028-04-25",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Anniversario della Liberazione"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Festa del Lavoro"
+    },
+    {
+      "date": "2028-06-02",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Festa della Repubblica"
+    },
+    {
+      "date": "2028-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Ferragosto"
+    },
+    {
+      "date": "2028-10-04",
+      "name": "Francis of Assisi",
+      "type": "public",
+      "name_local": "San Francesco d'Assisi"
+    },
+    {
+      "date": "2028-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Ognissanti"
+    },
+    {
+      "date": "2028-12-08",
+      "name": "Immaculate Conception",
+      "type": "public",
+      "name_local": "Immacolata Concezione"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natale"
+    },
+    {
+      "date": "2028-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Santo Stefano"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Capodanno"
+    },
+    {
+      "date": "2029-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Befana"
+    },
+    {
+      "date": "2029-04-01",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Domenica di Pasqua"
+    },
+    {
+      "date": "2029-04-02",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lunedì dell’Angelo"
+    },
+    {
+      "date": "2029-04-25",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Anniversario della Liberazione"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Festa del Lavoro"
+    },
+    {
+      "date": "2029-06-02",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Festa della Repubblica"
+    },
+    {
+      "date": "2029-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Ferragosto"
+    },
+    {
+      "date": "2029-10-04",
+      "name": "Francis of Assisi",
+      "type": "public",
+      "name_local": "San Francesco d'Assisi"
+    },
+    {
+      "date": "2029-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Ognissanti"
+    },
+    {
+      "date": "2029-12-08",
+      "name": "Immaculate Conception",
+      "type": "public",
+      "name_local": "Immacolata Concezione"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natale"
+    },
+    {
+      "date": "2029-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Santo Stefano"
+    }
+  ]
+}

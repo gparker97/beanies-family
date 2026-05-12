@@ -3,14 +3,16 @@ import { ref, computed } from 'vue';
 import { useActivityStore, CATEGORY_COLORS } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { extractDatePart, formatMonthYear, formatTime12 } from '@/utils/date';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { tripTypeEmoji, transportEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
 import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
+import HolidayChip from '@/components/planner/HolidayChip.vue';
 import { useHorizontalSwipe } from '@/composables/useHorizontalSwipe';
-import type { ActivityCategory, FamilyActivity } from '@/types/models';
+import type { ActivityCategory, FamilyActivity, HolidayOccurrence } from '@/types/models';
 
 /**
  * Per-cell all-day item — either a slice of a multi-day run or a single-day
@@ -34,12 +36,16 @@ const emit = defineEmits<{
   'vacation-click': [vacationId: string];
   'view-segment': [vacationId: string, segmentIndex: number];
   'view-activity': [activityId: string, date: string];
+  'holiday-click': [holiday: HolidayOccurrence];
+  /** Fired when the displayed month changes (prev / next / today / swipe). */
+  navigated: [];
 }>();
 
 const { t } = useTranslation();
 const activityStore = useActivityStore();
 const vacationStore = useVacationStore();
 const settingsStore = useSettingsStore();
+const holidayStore = useHolidayStore();
 
 const today = new Date();
 const currentYear = ref(today.getFullYear());
@@ -96,6 +102,12 @@ const calendarDays = computed(() => {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
   const startOffset = (firstDay.getDay() - settingsStore.weekStartDay + 7) % 7;
+  // Full grid date span (including the prev/next-month padding cells) — used
+  // to query derived overlays (public holidays) that should show on padding
+  // days too, not just within the calendar month.
+  const totalGridCells = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7;
+  const gridStartStr = formatDate(new Date(year, month, 1 - startOffset));
+  const gridEndStr = formatDate(new Date(year, month, 1 - startOffset + totalGridCells - 1));
 
   const days: Array<{
     date: string;
@@ -107,6 +119,7 @@ const calendarDays = computed(() => {
     vacations: Array<{ id: string; name: string; emoji: string; isStart: boolean }>;
     segments: TravelSegmentOccurrence[];
     allDayItems: CellAllDayItem[];
+    holidays: HolidayOccurrence[];
   }> = [];
 
   // Get activity occurrences for this month
@@ -172,6 +185,15 @@ const calendarDays = computed(() => {
     }
   }
 
+  // Build a map of date -> public holidays (read-only reference data; empty
+  // when the family has no country set or has hidden holidays). Almost always
+  // 0 or 1 per date; the array tolerates the rare two-holidays-one-day case.
+  const dateHolidays = new Map<string, HolidayOccurrence[]>();
+  for (const h of holidayStore.holidaysInRange(gridStartStr, gridEndStr)) {
+    if (!dateHolidays.has(h.date)) dateHolidays.set(h.date, []);
+    dateHolidays.get(h.date)!.push(h);
+  }
+
   // Previous month padding
   const prevMonth = new Date(year, month, 0);
   for (let i = startOffset - 1; i >= 0; i--) {
@@ -187,6 +209,7 @@ const calendarDays = computed(() => {
       vacations: dateVacations.get(dateStr) ?? [],
       segments: dateSegments.get(dateStr) ?? [],
       allDayItems: [], // populated below, per week-row
+      holidays: dateHolidays.get(dateStr) ?? [],
     });
   }
 
@@ -203,6 +226,7 @@ const calendarDays = computed(() => {
       vacations: dateVacations.get(dateStr) ?? [],
       segments: dateSegments.get(dateStr) ?? [],
       allDayItems: [], // populated below, per week-row
+      holidays: dateHolidays.get(dateStr) ?? [],
     });
   }
 
@@ -221,6 +245,7 @@ const calendarDays = computed(() => {
         vacations: dateVacations.get(dateStr) ?? [],
         segments: dateSegments.get(dateStr) ?? [],
         allDayItems: [], // populated below, per week-row
+        holidays: dateHolidays.get(dateStr) ?? [],
       });
     }
   }
@@ -287,6 +312,30 @@ const vacationDateSet = computed(() => {
   return set;
 });
 
+// Set of date strings that are a public holiday (for the clay cell tint).
+const holidayDateSet = computed(() => {
+  const set = new Set<string>();
+  for (const cell of calendarDays.value) {
+    if (cell.holidays.length) set.add(cell.date);
+  }
+  return set;
+});
+
+/**
+ * Background class for a day cell. Precedence (highest first): a vacation day
+ * keeps the established teal tint; otherwise a public holiday gets the clay
+ * tint; otherwise today's week-row gets the faint orange tint; otherwise the
+ * normal hover state. (A holiday during a trip still surfaces — via the corner
+ * flag + the holiday chip — just not via the cell background.)
+ */
+function cellBgClass(cell: { date: string; weekRow: number; isCurrentMonth: boolean }): string {
+  if (vacationDateSet.value.has(cell.date)) return 'bg-[var(--vacation-teal-tint)]';
+  if (holidayDateSet.value.has(cell.date)) return 'bg-[var(--holiday-clay-tint)]';
+  if (cell.weekRow === todayWeekRow.value && cell.isCurrentMonth)
+    return 'bg-[rgba(241,93,34,0.04)]';
+  return 'hover:bg-gray-50 dark:hover:bg-slate-700/50';
+}
+
 // Vacation span bars for each week row
 const activityCount = computed(() => {
   return activityStore.monthActivities(currentYear.value, currentMonth.value).length;
@@ -299,6 +348,7 @@ function prevMonth() {
   } else {
     currentMonth.value--;
   }
+  emit('navigated');
 }
 
 function nextMonth() {
@@ -308,11 +358,13 @@ function nextMonth() {
   } else {
     currentMonth.value++;
   }
+  emit('navigated');
 }
 
 function goToToday() {
   currentYear.value = today.getFullYear();
   currentMonth.value = today.getMonth();
+  emit('navigated');
 }
 
 function handleDayClick(date: string) {
@@ -361,11 +413,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
             cell.isCurrentMonth
               ? 'text-secondary-500 dark:text-gray-200'
               : 'text-secondary-500/20 dark:text-gray-600',
-            vacationDateSet.has(cell.date)
-              ? 'bg-[var(--vacation-teal-tint)]'
-              : cell.weekRow === todayWeekRow && cell.isCurrentMonth
-                ? 'bg-[rgba(241,93,34,0.04)]'
-                : 'hover:bg-gray-50 dark:hover:bg-slate-700/50',
+            cellBgClass(cell),
             props.selectedDate === cell.date ? 'ring-primary-500 ring-2 ring-inset' : '',
           ]"
           @click="handleDayClick(cell.date)"
@@ -382,14 +430,30 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
             {{ cell.day }}
           </span>
 
-          <!-- All-day lane: multi-day slices + single-day chips, capped at
-               2 visible with `+N` overflow (overflow falls back to the
-               existing day-click handler that opens the day-detail surface).
-               Per-cell slices form a continuous bar across adjacent cells
-               via rounded-corner CSS conditional on isStart/isEnd. -->
-          <div v-if="cell.allDayItems.length > 0" class="mt-0.5 flex w-full flex-col gap-px px-px">
+          <!-- All-day lane: public-holiday chip(s) pinned to the top, then
+               multi-day activity slices + single-day chips, capped at 2
+               visible total with `+N` overflow (overflow falls back to the
+               day-click handler that opens the day-detail surface). Per-cell
+               slices form a continuous bar via rounded-corner CSS on
+               isStart/isEnd. -->
+          <div
+            v-if="cell.holidays.length > 0 || cell.allDayItems.length > 0"
+            class="mt-0.5 flex w-full flex-col gap-px"
+          >
+            <HolidayChip
+              v-for="(h, hi) in cell.holidays"
+              :key="'h:' + hi"
+              :holiday="h"
+              :is-start="true"
+              :is-end="true"
+              class="block w-full"
+              @click.stop="emit('holiday-click', h)"
+            />
             <AllDayActivityChip
-              v-for="(item, i) in cell.allDayItems.slice(0, ALL_DAY_VISIBLE_CAP)"
+              v-for="(item, i) in cell.allDayItems.slice(
+                0,
+                Math.max(0, ALL_DAY_VISIBLE_CAP - cell.holidays.length)
+              )"
               :key="item.activity.id + ':' + i"
               :activity="item.activity"
               :is-start="item.isStart"
@@ -398,10 +462,10 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
               @click.stop="emit('view-activity', item.activity.id, cell.date)"
             />
             <span
-              v-if="cell.allDayItems.length > ALL_DAY_VISIBLE_CAP"
+              v-if="cell.holidays.length + cell.allDayItems.length > ALL_DAY_VISIBLE_CAP"
               class="text-secondary-500/40 px-0.5 text-[0.5625rem] leading-tight dark:text-gray-500"
             >
-              +{{ cell.allDayItems.length - ALL_DAY_VISIBLE_CAP }}
+              +{{ cell.holidays.length + cell.allDayItems.length - ALL_DAY_VISIBLE_CAP }}
             </span>
           </div>
 

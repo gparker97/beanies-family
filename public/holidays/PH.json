@@ -1,0 +1,343 @@
+{
+  "meta": {
+    "country": "PH",
+    "name": "Philippines",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "en",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-09",
+      "name": "Day of Valor",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-17",
+      "name": "Maundy Thursday",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2025-06-12",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-08-25",
+      "name": "National Heroes' Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-11-30",
+      "name": "Bonifacio Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-30",
+      "name": "Rizal Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-02",
+      "name": "Maundy Thursday",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-09",
+      "name": "Day of Valor",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2026-06-12",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-08-31",
+      "name": "National Heroes' Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-11-30",
+      "name": "Bonifacio Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-30",
+      "name": "Rizal Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-25",
+      "name": "Maundy Thursday",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "type": "public"
+    },
+    {
+      "date": "2027-04-09",
+      "name": "Day of Valor",
+      "type": "public"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2027-06-12",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-08-30",
+      "name": "National Heroes' Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-11-30",
+      "name": "Bonifacio Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-30",
+      "name": "Rizal Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-09",
+      "name": "Day of Valor",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-13",
+      "name": "Maundy Thursday",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2028-06-12",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-08-28",
+      "name": "National Heroes' Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-11-30",
+      "name": "Bonifacio Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-30",
+      "name": "Rizal Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-29",
+      "name": "Maundy Thursday",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2029-04-01",
+      "name": "Easter Sunday",
+      "type": "public"
+    },
+    {
+      "date": "2029-04-09",
+      "name": "Day of Valor",
+      "type": "public"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-06-12",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-08-27",
+      "name": "National Heroes' Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-11-30",
+      "name": "Bonifacio Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-30",
+      "name": "Rizal Day",
+      "type": "public"
+    }
+  ]
+}

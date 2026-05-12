@@ -1,0 +1,738 @@
+{
+  "meta": {
+    "country": "ME",
+    "name": "Montenegro",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "hr",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nova godina"
+    },
+    {
+      "date": "2025-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nova godina"
+    },
+    {
+      "date": "2025-01-06",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Badnji dan"
+    },
+    {
+      "date": "2025-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2025-01-08",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Svetog Stjepana"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazanski bajram"
+    },
+    {
+      "date": "2025-04-13",
+      "name": "Pesach",
+      "type": "public",
+      "name_local": "Pesač"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Veliki petak"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Praznik rada"
+    },
+    {
+      "date": "2025-05-02",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Praznik rada"
+    },
+    {
+      "date": "2025-05-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dan neovisnosti"
+    },
+    {
+      "date": "2025-05-22",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dan neovisnosti"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Kurban-bajram"
+    },
+    {
+      "date": "2025-07-13",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Dan državnosti"
+    },
+    {
+      "date": "2025-07-14",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Dan državnosti"
+    },
+    {
+      "date": "2025-07-15",
+      "name": "Statehood Day (substitute day)",
+      "type": "public",
+      "name_local": "Dan državnosti"
+    },
+    {
+      "date": "2025-10-02",
+      "name": "Yom Kippur",
+      "type": "public",
+      "name_local": "Jom Kipur"
+    },
+    {
+      "date": "2025-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Svi sveti"
+    },
+    {
+      "date": "2025-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Badnji dan"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2025-12-26",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nova godina"
+    },
+    {
+      "date": "2026-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nova godina"
+    },
+    {
+      "date": "2026-01-06",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Badnji dan"
+    },
+    {
+      "date": "2026-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2026-01-08",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Svetog Stjepana"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazanski bajram"
+    },
+    {
+      "date": "2026-04-02",
+      "name": "Pesach",
+      "type": "public",
+      "name_local": "Pesač"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Veliki petak"
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2026-04-06",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2026-04-10",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Veliki petak"
+    },
+    {
+      "date": "2026-04-12",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Praznik rada"
+    },
+    {
+      "date": "2026-05-02",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Praznik rada"
+    },
+    {
+      "date": "2026-05-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dan neovisnosti"
+    },
+    {
+      "date": "2026-05-22",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dan neovisnosti"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Kurban-bajram"
+    },
+    {
+      "date": "2026-07-13",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Dan državnosti"
+    },
+    {
+      "date": "2026-07-14",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Dan državnosti"
+    },
+    {
+      "date": "2026-09-21",
+      "name": "Yom Kippur",
+      "type": "public",
+      "name_local": "Jom Kipur"
+    },
+    {
+      "date": "2026-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Svi sveti"
+    },
+    {
+      "date": "2026-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Badnji dan"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2026-12-26",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nova godina"
+    },
+    {
+      "date": "2027-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nova godina"
+    },
+    {
+      "date": "2027-01-06",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Badnji dan"
+    },
+    {
+      "date": "2027-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2027-01-08",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Svetog Stjepana"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazanski bajram"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Veliki petak"
+    },
+    {
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2027-03-29",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2027-04-22",
+      "name": "Pesach",
+      "type": "public",
+      "name_local": "Pesač"
+    },
+    {
+      "date": "2027-04-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Veliki petak"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Praznik rada"
+    },
+    {
+      "date": "2027-05-02",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2027-05-02",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Praznik rada"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "Labour Day (substitute day)",
+      "type": "public",
+      "name_local": "Praznik rada"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Kurban-bajram"
+    },
+    {
+      "date": "2027-05-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dan neovisnosti"
+    },
+    {
+      "date": "2027-05-22",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dan neovisnosti"
+    },
+    {
+      "date": "2027-07-13",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Dan državnosti"
+    },
+    {
+      "date": "2027-07-14",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Dan državnosti"
+    },
+    {
+      "date": "2027-10-11",
+      "name": "Yom Kippur",
+      "type": "public",
+      "name_local": "Jom Kipur"
+    },
+    {
+      "date": "2027-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Svi sveti"
+    },
+    {
+      "date": "2027-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Badnji dan"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2027-12-26",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nova godina"
+    },
+    {
+      "date": "2028-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nova godina"
+    },
+    {
+      "date": "2028-01-03",
+      "name": "New Year's Day (substitute day)",
+      "type": "public",
+      "name_local": "Nova godina"
+    },
+    {
+      "date": "2028-01-06",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Badnji dan"
+    },
+    {
+      "date": "2028-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2028-01-08",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Svetog Stjepana"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazanski bajram"
+    },
+    {
+      "date": "2028-04-11",
+      "name": "Pesach",
+      "type": "public",
+      "name_local": "Pesač"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Veliki petak"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Praznik rada"
+    },
+    {
+      "date": "2028-05-02",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Praznik rada"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Kurban-bajram"
+    },
+    {
+      "date": "2028-05-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dan neovisnosti"
+    },
+    {
+      "date": "2028-05-22",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dan neovisnosti"
+    },
+    {
+      "date": "2028-05-23",
+      "name": "Independence Day (substitute day)",
+      "type": "public",
+      "name_local": "Dan neovisnosti"
+    },
+    {
+      "date": "2028-07-13",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Dan državnosti"
+    },
+    {
+      "date": "2028-07-14",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Dan državnosti"
+    },
+    {
+      "date": "2028-09-30",
+      "name": "Yom Kippur",
+      "type": "public",
+      "name_local": "Jom Kipur"
+    },
+    {
+      "date": "2028-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Svi sveti"
+    },
+    {
+      "date": "2028-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Badnji dan"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2028-12-26",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nova godina"
+    },
+    {
+      "date": "2029-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nova godina"
+    },
+    {
+      "date": "2029-01-06",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Badnji dan"
+    },
+    {
+      "date": "2029-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2029-01-08",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Svetog Stjepana"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazanski bajram"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Veliki petak"
+    },
+    {
+      "date": "2029-03-31",
+      "name": "Pesach",
+      "type": "public",
+      "name_local": "Pesač"
+    },
+    {
+      "date": "2029-04-01",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2029-04-02",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2029-04-06",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Veliki petak"
+    },
+    {
+      "date": "2029-04-08",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Uskrs"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Kurban-bajram"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Praznik rada"
+    },
+    {
+      "date": "2029-05-02",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Praznik rada"
+    },
+    {
+      "date": "2029-05-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dan neovisnosti"
+    },
+    {
+      "date": "2029-05-22",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dan neovisnosti"
+    },
+    {
+      "date": "2029-07-13",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Dan državnosti"
+    },
+    {
+      "date": "2029-07-14",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Dan državnosti"
+    },
+    {
+      "date": "2029-09-19",
+      "name": "Yom Kippur",
+      "type": "public",
+      "name_local": "Jom Kipur"
+    },
+    {
+      "date": "2029-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Svi sveti"
+    },
+    {
+      "date": "2029-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Badnji dan"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    },
+    {
+      "date": "2029-12-26",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Božić"
+    }
+  ]
+}

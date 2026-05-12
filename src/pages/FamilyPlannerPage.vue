@@ -17,8 +17,10 @@ import { showToast } from '@/composables/useToast';
 import { validateSegmentTarget } from '@/utils/vacation';
 import DayAgendaSidebar from '@/components/planner/DayAgendaSidebar.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
+import HolidayDetailsModal from '@/components/planner/HolidayDetailsModal.vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
+import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePermissions } from '@/composables/usePermissions';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
@@ -41,6 +43,7 @@ import type {
   UpdateFamilyActivityInput,
   CurrencyCode,
   TodoItem,
+  HolidayOccurrence,
 } from '@/types/models';
 
 const { t } = useTranslation();
@@ -53,6 +56,9 @@ const recurringStore = useRecurringStore();
 const transactionsStore = useTransactionsStore();
 const familyStore = useFamilyStore();
 const vacationStore = useVacationStore();
+// Instantiating the holiday store wires its self-loading watchers (country +
+// online) — the calendar views just call holidaysInRange / holidayForDate.
+useHolidayStore();
 const { isAllActive, isMemberActive, onSelectAll, onSelectMember, activeMemberNames } =
   useMemberFilterChips();
 const {
@@ -93,6 +99,12 @@ const selectedDate = ref<string | undefined>(undefined);
 const focusedDate = ref<string | null>(null);
 const sidebarDate = ref<string | null>(null);
 const defaultStartTime = ref<string | undefined>(undefined);
+
+// Read-only public-holiday details popup (opened from a holiday chip/banner).
+const selectedHoliday = ref<HolidayOccurrence | null>(null);
+function handleHolidayClick(holiday: HolidayOccurrence) {
+  selectedHoliday.value = holiday;
+}
 
 // Activity created confirmation modal. `lastCreatedDate` holds the date the
 // just-created activity was scheduled on, so the "+ add another" link in the
@@ -565,6 +577,8 @@ function handleActivitySwapped(newId: string) {
       @vacation-click="handleVacationClick"
       @view-segment="handleViewSegment"
       @view-activity="(id: string, date: string) => openViewModal(id, date)"
+      @holiday-click="handleHolidayClick"
+      @navigated="focusedDate = null"
     />
 
     <WeeklyCalendarView
@@ -577,6 +591,7 @@ function handleActivitySwapped(newId: string) {
       @view-todo="openTodoViewModal"
       @vacation-click="handleVacationClick"
       @view-segment="handleViewSegment"
+      @holiday-click="handleHolidayClick"
     />
 
     <DailyCalendarView
@@ -592,11 +607,15 @@ function handleActivitySwapped(newId: string) {
       @view-todo="openTodoViewModal"
       @vacation-click="handleVacationClick"
       @view-segment="handleViewSegment"
+      @holiday-click="handleHolidayClick"
     />
 
     <!-- Two-column layout: Upcoming + Todo preview -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <UpcomingActivities @edit="(id: string, date: string) => openViewModal(id, date)" />
+      <UpcomingActivities
+        @edit="(id: string, date: string) => openViewModal(id, date)"
+        @holiday-click="handleHolidayClick"
+      />
       <TodoPreview @view="openTodoViewModal" />
     </div>
 
@@ -647,6 +666,14 @@ function handleActivitySwapped(newId: string) {
       @edit-activity="handleSidebarEdit"
       @view-todo="openTodoViewModal"
       @vacation-click="handleVacationClick"
+      @holiday-click="handleHolidayClick"
+    />
+
+    <!-- Public-holiday details popup (read-only) -->
+    <HolidayDetailsModal
+      :holiday="selectedHoliday"
+      :open="selectedHoliday !== null"
+      @close="selectedHoliday = null"
     />
 
     <!-- Activity modal -->

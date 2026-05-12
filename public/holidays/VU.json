@@ -1,0 +1,498 @@
+{
+  "meta": {
+    "country": "VU",
+    "name": "Vanuatu",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "fr",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2025-02-21",
+      "name": "Mémoire du père de l'indépendance Rév. Dr. W.H. Lini",
+      "type": "public"
+    },
+    {
+      "date": "2025-02-22",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2025-03-05",
+      "name": "Fête des chefs coutumiers",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2025-05-29",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2025-07-24",
+      "name": "Journée Mondiale des Enfants",
+      "type": "public"
+    },
+    {
+      "date": "2025-07-30",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jour de l'Indépendance"
+    },
+    {
+      "date": "2025-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2025-08-16",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2025-10-05",
+      "name": "Constitution Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-10-29",
+      "name": "Jour de l'Unité",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2025-12-26",
+      "name": "Fête de Famille",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-27",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2026-02-21",
+      "name": "Mémoire du père de l'indépendance Rév. Dr. W.H. Lini",
+      "type": "public"
+    },
+    {
+      "date": "2026-02-22",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2026-03-05",
+      "name": "Fête des chefs coutumiers",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2026-04-06",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2026-05-14",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2026-07-24",
+      "name": "Journée Mondiale des Enfants",
+      "type": "public"
+    },
+    {
+      "date": "2026-07-30",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jour de l'Indépendance"
+    },
+    {
+      "date": "2026-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2026-08-16",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2026-10-05",
+      "name": "Constitution Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-10-29",
+      "name": "Jour de l'Unité",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2026-12-26",
+      "name": "Fête de Famille",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-27",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2027-02-21",
+      "name": "Mémoire du père de l'indépendance Rév. Dr. W.H. Lini",
+      "type": "public"
+    },
+    {
+      "date": "2027-02-22",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2027-03-05",
+      "name": "Fête des chefs coutumiers",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2027-03-29",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2027-05-06",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2027-07-24",
+      "name": "Journée Mondiale des Enfants",
+      "type": "public"
+    },
+    {
+      "date": "2027-07-30",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jour de l'Indépendance"
+    },
+    {
+      "date": "2027-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2027-08-16",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2027-10-05",
+      "name": "Constitution Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-10-29",
+      "name": "Jour de l'Unité",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2027-12-26",
+      "name": "Fête de Famille",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-27",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2028-02-21",
+      "name": "Mémoire du père de l'indépendance Rév. Dr. W.H. Lini",
+      "type": "public"
+    },
+    {
+      "date": "2028-02-22",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2028-03-05",
+      "name": "Fête des chefs coutumiers",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2028-05-25",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2028-07-24",
+      "name": "Journée Mondiale des Enfants",
+      "type": "public"
+    },
+    {
+      "date": "2028-07-30",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jour de l'Indépendance"
+    },
+    {
+      "date": "2028-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2028-08-16",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2028-10-05",
+      "name": "Constitution Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-10-29",
+      "name": "Jour de l'Unité",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2028-12-26",
+      "name": "Fête de Famille",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-27",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Nouvel An"
+    },
+    {
+      "date": "2029-02-21",
+      "name": "Mémoire du père de l'indépendance Rév. Dr. W.H. Lini",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-22",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2029-03-05",
+      "name": "Fête des chefs coutumiers",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2029-04-02",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Lundi de Pâques"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2029-05-10",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2029-07-24",
+      "name": "Journée Mondiale des Enfants",
+      "type": "public"
+    },
+    {
+      "date": "2029-07-30",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jour de l'Indépendance"
+    },
+    {
+      "date": "2029-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2029-08-16",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    },
+    {
+      "date": "2029-10-05",
+      "name": "Constitution Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-10-29",
+      "name": "Jour de l'Unité",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2029-12-26",
+      "name": "Fête de Famille",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-27",
+      "name": "Public Holiday",
+      "type": "public",
+      "name_local": "Jour férié légaux"
+    }
+  ]
+}

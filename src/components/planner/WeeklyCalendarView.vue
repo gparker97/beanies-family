@@ -16,14 +16,16 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { useHolidayStore } from '@/stores/holidayStore';
 import { normalizeAssignees } from '@/utils/assignees';
 import { toDateInputValue, extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
+import HolidayChip from '@/components/planner/HolidayChip.vue';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
-import type { FamilyActivity, TodoItem } from '@/types/models';
+import type { FamilyActivity, TodoItem, HolidayOccurrence } from '@/types/models';
 
 defineProps<{ selectedDate?: string }>();
 const emit = defineEmits<{
@@ -33,6 +35,7 @@ const emit = defineEmits<{
   'view-todo': [todo: TodoItem];
   'vacation-click': [vacationId: string];
   'view-segment': [vacationId: string, segmentIndex: number];
+  'holiday-click': [holiday: HolidayOccurrence];
 }>();
 
 const { t } = useTranslation();
@@ -42,6 +45,7 @@ const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
 const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
+const holidayStore = useHolidayStore();
 
 const referenceDate = ref(new Date());
 const { weekDays, weekLabel, prevWeek, nextWeek, goToToday } = useWeekNavigation(referenceDate);
@@ -56,6 +60,21 @@ useHorizontalSwipe(swipeRef, {
 
 // Mobile: selected day within the week
 const selectedMobileDay = ref(toDateInputValue(new Date()));
+
+// Public holidays in the visible week, keyed by date (read-only reference data;
+// empty when no country is set or holidays are hidden). Almost always ≤1/day.
+const holidaysByDate = computed(() => {
+  const days = weekDays.value;
+  const map = new Map<string, HolidayOccurrence>();
+  if (days.length === 0) return map;
+  for (const h of holidayStore.holidaysInRange(days[0]!.dateStr, days[days.length - 1]!.dateStr)) {
+    if (!map.has(h.date)) map.set(h.date, h);
+  }
+  return map;
+});
+function holidayForDay(dateStr: string): HolidayOccurrence | undefined {
+  return holidaysByDate.value.get(dateStr);
+}
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
@@ -279,6 +298,7 @@ function getUntimedForDay(dateStr: string): Occurrence[] {
 
 function hasUntimedContent(dateStr: string): boolean {
   return (
+    holidaysByDate.value.has(dateStr) ||
     getUntimedForDay(dateStr).length > 0 ||
     (weekTodos.value.get(dateStr)?.length ?? 0) > 0 ||
     getUntimedSegmentsForDay(dateStr).length > 0 ||
@@ -296,6 +316,7 @@ const hasAnyUntimedContent = computed(
     spanningActivities.value.length > 0 ||
     vacationSpans.value.length > 0 ||
     weekSegmentBuckets.value.untimed.length > 0 ||
+    holidaysByDate.value.size > 0 ||
     weekDays.value.some((d) => hasUntimedContent(d.dateStr))
 );
 
@@ -403,8 +424,14 @@ defineExpose({ weekLabel, activityCount });
           v-for="day in weekDays"
           :key="day.dateStr"
           type="button"
-          class="cursor-pointer rounded-xl py-2 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
-          :class="selectedDate === day.dateStr ? 'ring-primary-500 ring-2 ring-inset' : ''"
+          class="cursor-pointer rounded-xl py-2 text-center transition-colors"
+          :class="[
+            holidayForDay(day.dateStr)
+              ? 'bg-[var(--holiday-clay-tint)]'
+              : 'hover:bg-gray-50 dark:hover:bg-slate-700/50',
+            selectedDate === day.dateStr ? 'ring-primary-500 ring-2 ring-inset' : '',
+          ]"
+          :title="holidayForDay(day.dateStr)?.name"
           @click="emit('select-date', day.dateStr)"
         >
           <span
@@ -472,10 +499,11 @@ defineExpose({ weekLabel, activityCount });
           />
         </div>
 
-        <!-- Per-day single-day untimed activities + todos + untimed travel segments -->
+        <!-- Per-day public holiday + single-day untimed activities + todos + untimed travel segments -->
         <template v-for="(day, di) in weekDays" :key="'untimed-' + day.dateStr">
           <div
             v-if="
+              holidayForDay(day.dateStr) ||
               getUntimedForDay(day.dateStr).length > 0 ||
               (weekTodos.get(day.dateStr)?.length ?? 0) > 0 ||
               getUntimedSegmentsForDay(day.dateStr).length > 0
@@ -483,6 +511,14 @@ defineExpose({ weekLabel, activityCount });
             class="min-w-0 overflow-hidden px-0.5"
             :style="{ gridColumn: `${di + 2}` }"
           >
+            <HolidayChip
+              v-if="holidayForDay(day.dateStr)"
+              :holiday="holidayForDay(day.dateStr)!"
+              :is-start="true"
+              :is-end="true"
+              class="mb-0.5 block w-full"
+              @click="emit('holiday-click', holidayForDay(day.dateStr)!)"
+            />
             <AllDayActivityChip
               v-for="occ in getUntimedForDay(day.dateStr)"
               :key="occ.activity.id"
@@ -722,11 +758,13 @@ defineExpose({ weekLabel, activityCount });
         :todos="weekTodos.get(selectedMobileDay) ?? []"
         :members="familyStore.sortedHumans"
         :is-today="selectedMobileDay === toDateInputValue(new Date())"
+        :holiday="holidayForDay(selectedMobileDay) ?? null"
         @view-activity="(id, date) => emit('view-activity', id, date)"
         @view-todo="(todo) => emit('view-todo', todo)"
         @vacation-click="(vid) => emit('vacation-click', vid)"
         @view-segment="(vid: string, idx: number) => emit('view-segment', vid, idx)"
         @add-activity="(date, time) => emit('add-activity', date, time)"
+        @holiday-click="(h) => emit('holiday-click', h)"
       />
     </template>
   </div>

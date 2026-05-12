@@ -1,0 +1,488 @@
+{
+  "meta": {
+    "country": "HT",
+    "name": "Haiti",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "fr",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jour de l'Indépendance"
+    },
+    {
+      "date": "2025-01-02",
+      "name": "Ancestry Day",
+      "type": "public",
+      "name_local": "Jour des Aieux"
+    },
+    {
+      "date": "2025-03-03",
+      "name": "Lundi Gras",
+      "type": "public"
+    },
+    {
+      "date": "2025-03-04",
+      "name": "Mardi Gras",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pâques"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2025-05-18",
+      "name": "Flag and Universities' Day",
+      "type": "public",
+      "name_local": "Jour du Drapeau et de l'Université"
+    },
+    {
+      "date": "2025-05-29",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2025-06-19",
+      "name": "Corpus Christi",
+      "type": "public",
+      "name_local": "la Fête-Dieu"
+    },
+    {
+      "date": "2025-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2025-10-17",
+      "name": "Anniversary of the death of Dessalines",
+      "type": "public",
+      "name_local": "Anniversaire de la mort de Dessalines"
+    },
+    {
+      "date": "2025-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Toussaint"
+    },
+    {
+      "date": "2025-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Fête des morts"
+    },
+    {
+      "date": "2025-11-18",
+      "name": "Battle of Vertières Day",
+      "type": "public",
+      "name_local": "Vertières"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jour de l'Indépendance"
+    },
+    {
+      "date": "2026-01-02",
+      "name": "Ancestry Day",
+      "type": "public",
+      "name_local": "Jour des Aieux"
+    },
+    {
+      "date": "2026-02-16",
+      "name": "Lundi Gras",
+      "type": "public"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Mardi Gras",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pâques"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2026-05-14",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2026-05-18",
+      "name": "Flag and Universities' Day",
+      "type": "public",
+      "name_local": "Jour du Drapeau et de l'Université"
+    },
+    {
+      "date": "2026-06-04",
+      "name": "Corpus Christi",
+      "type": "public",
+      "name_local": "la Fête-Dieu"
+    },
+    {
+      "date": "2026-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2026-10-17",
+      "name": "Anniversary of the death of Dessalines",
+      "type": "public",
+      "name_local": "Anniversaire de la mort de Dessalines"
+    },
+    {
+      "date": "2026-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Toussaint"
+    },
+    {
+      "date": "2026-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Fête des morts"
+    },
+    {
+      "date": "2026-11-18",
+      "name": "Battle of Vertières Day",
+      "type": "public",
+      "name_local": "Vertières"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jour de l'Indépendance"
+    },
+    {
+      "date": "2027-01-02",
+      "name": "Ancestry Day",
+      "type": "public",
+      "name_local": "Jour des Aieux"
+    },
+    {
+      "date": "2027-02-08",
+      "name": "Lundi Gras",
+      "type": "public"
+    },
+    {
+      "date": "2027-02-09",
+      "name": "Mardi Gras",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pâques"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2027-05-06",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2027-05-18",
+      "name": "Flag and Universities' Day",
+      "type": "public",
+      "name_local": "Jour du Drapeau et de l'Université"
+    },
+    {
+      "date": "2027-05-27",
+      "name": "Corpus Christi",
+      "type": "public",
+      "name_local": "la Fête-Dieu"
+    },
+    {
+      "date": "2027-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2027-10-17",
+      "name": "Anniversary of the death of Dessalines",
+      "type": "public",
+      "name_local": "Anniversaire de la mort de Dessalines"
+    },
+    {
+      "date": "2027-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Toussaint"
+    },
+    {
+      "date": "2027-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Fête des morts"
+    },
+    {
+      "date": "2027-11-18",
+      "name": "Battle of Vertières Day",
+      "type": "public",
+      "name_local": "Vertières"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jour de l'Indépendance"
+    },
+    {
+      "date": "2028-01-02",
+      "name": "Ancestry Day",
+      "type": "public",
+      "name_local": "Jour des Aieux"
+    },
+    {
+      "date": "2028-02-28",
+      "name": "Lundi Gras",
+      "type": "public"
+    },
+    {
+      "date": "2028-02-29",
+      "name": "Mardi Gras",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pâques"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2028-05-18",
+      "name": "Flag and Universities' Day",
+      "type": "public",
+      "name_local": "Jour du Drapeau et de l'Université"
+    },
+    {
+      "date": "2028-05-25",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2028-06-15",
+      "name": "Corpus Christi",
+      "type": "public",
+      "name_local": "la Fête-Dieu"
+    },
+    {
+      "date": "2028-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2028-10-17",
+      "name": "Anniversary of the death of Dessalines",
+      "type": "public",
+      "name_local": "Anniversaire de la mort de Dessalines"
+    },
+    {
+      "date": "2028-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Toussaint"
+    },
+    {
+      "date": "2028-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Fête des morts"
+    },
+    {
+      "date": "2028-11-18",
+      "name": "Battle of Vertières Day",
+      "type": "public",
+      "name_local": "Vertières"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jour de l'Indépendance"
+    },
+    {
+      "date": "2029-01-02",
+      "name": "Ancestry Day",
+      "type": "public",
+      "name_local": "Jour des Aieux"
+    },
+    {
+      "date": "2029-02-12",
+      "name": "Lundi Gras",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-13",
+      "name": "Mardi Gras",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Vendredi saint"
+    },
+    {
+      "date": "2029-04-01",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pâques"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fête du travail"
+    },
+    {
+      "date": "2029-05-10",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Ascension"
+    },
+    {
+      "date": "2029-05-18",
+      "name": "Flag and Universities' Day",
+      "type": "public",
+      "name_local": "Jour du Drapeau et de l'Université"
+    },
+    {
+      "date": "2029-05-31",
+      "name": "Corpus Christi",
+      "type": "public",
+      "name_local": "la Fête-Dieu"
+    },
+    {
+      "date": "2029-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Assomption"
+    },
+    {
+      "date": "2029-10-17",
+      "name": "Anniversary of the death of Dessalines",
+      "type": "public",
+      "name_local": "Anniversaire de la mort de Dessalines"
+    },
+    {
+      "date": "2029-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Toussaint"
+    },
+    {
+      "date": "2029-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Fête des morts"
+    },
+    {
+      "date": "2029-11-18",
+      "name": "Battle of Vertières Day",
+      "type": "public",
+      "name_local": "Vertières"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Noël"
+    }
+  ]
+}

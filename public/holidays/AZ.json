@@ -1,0 +1,654 @@
+{
+  "meta": {
+    "country": "AZ",
+    "name": "Azerbaijan",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "az",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2025-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Qadınlar günü"
+    },
+    {
+      "date": "2025-03-10",
+      "name": "International Women's Day (substitute day)",
+      "type": "public",
+      "name_local": "Qadınlar günü"
+    },
+    {
+      "date": "2025-03-20",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "Novruz"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2025-03-31",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2025-04-01",
+      "name": "End of Ramadan (Eid al-Fitr) (substitute day)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2025-05-09",
+      "name": "Day of Victory over Fascism",
+      "type": "public",
+      "name_local": "Faşizm üzərində qələbə günü"
+    },
+    {
+      "date": "2025-05-28",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Respublika günü"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2025-06-07",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2025-06-09",
+      "name": "Feast of the Sacrifice (Eid al-Adha) (substitute day)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2025-06-15",
+      "name": "National Salvation Day",
+      "type": "public",
+      "name_local": "Azərbaycan xalqının Milli Qurtuluş günü"
+    },
+    {
+      "date": "2025-06-16",
+      "name": "National Salvation Day (substitute day)",
+      "type": "public",
+      "name_local": "Azərbaycan xalqının Milli Qurtuluş günü"
+    },
+    {
+      "date": "2025-06-26",
+      "name": "Azerbaijan Armed Forces Day",
+      "type": "public",
+      "name_local": "Azərbaycan Respublikasının Silahlı Qüvvələri günü"
+    },
+    {
+      "date": "2025-10-18",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dövlət Müstəqilliyi günü"
+    },
+    {
+      "date": "2025-10-20",
+      "name": "Independence Day (substitute day)",
+      "type": "public",
+      "name_local": "Dövlət Müstəqilliyi günü"
+    },
+    {
+      "date": "2025-11-09",
+      "name": "Flag Day",
+      "type": "public",
+      "name_local": "Dövlət Bayrağı günü"
+    },
+    {
+      "date": "2025-11-10",
+      "name": "Flag Day (substitute day)",
+      "type": "public",
+      "name_local": "Dövlət Bayrağı günü"
+    },
+    {
+      "date": "2025-11-12",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Konstitusiya günü"
+    },
+    {
+      "date": "2025-11-17",
+      "name": "National Revival Day",
+      "type": "public",
+      "name_local": "Milli Dirçəliş günü"
+    },
+    {
+      "date": "2025-12-31",
+      "name": "International Solidarity Day of Azerbaijanis",
+      "type": "public",
+      "name_local": "Dünya azərbaycanlıların həmrəyliyi günü"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2026-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Qadınlar günü"
+    },
+    {
+      "date": "2026-03-09",
+      "name": "International Women's Day (substitute day)",
+      "type": "public",
+      "name_local": "Qadınlar günü"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "Novruz"
+    },
+    {
+      "date": "2026-03-21",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2026-03-23",
+      "name": "End of Ramadan (Eid al-Fitr) (substitute day)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2026-05-09",
+      "name": "Day of Victory over Fascism",
+      "type": "public",
+      "name_local": "Faşizm üzərində qələbə günü"
+    },
+    {
+      "date": "2026-05-11",
+      "name": "Day of Victory over Fascism (substitute day)",
+      "type": "public",
+      "name_local": "Faşizm üzərində qələbə günü"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2026-05-28",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2026-05-28",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Respublika günü"
+    },
+    {
+      "date": "2026-06-15",
+      "name": "National Salvation Day",
+      "type": "public",
+      "name_local": "Azərbaycan xalqının Milli Qurtuluş günü"
+    },
+    {
+      "date": "2026-06-26",
+      "name": "Azerbaijan Armed Forces Day",
+      "type": "public",
+      "name_local": "Azərbaycan Respublikasının Silahlı Qüvvələri günü"
+    },
+    {
+      "date": "2026-10-18",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dövlət Müstəqilliyi günü"
+    },
+    {
+      "date": "2026-10-19",
+      "name": "Independence Day (substitute day)",
+      "type": "public",
+      "name_local": "Dövlət Müstəqilliyi günü"
+    },
+    {
+      "date": "2026-11-09",
+      "name": "Flag Day",
+      "type": "public",
+      "name_local": "Dövlət Bayrağı günü"
+    },
+    {
+      "date": "2026-11-12",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Konstitusiya günü"
+    },
+    {
+      "date": "2026-11-17",
+      "name": "National Revival Day",
+      "type": "public",
+      "name_local": "Milli Dirçəliş günü"
+    },
+    {
+      "date": "2026-12-31",
+      "name": "International Solidarity Day of Azerbaijanis",
+      "type": "public",
+      "name_local": "Dünya azərbaycanlıların həmrəyliyi günü"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2027-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2027-01-04",
+      "name": "New Year's Day (substitute day)",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Qadınlar günü"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2027-03-10",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2027-03-20",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "Novruz"
+    },
+    {
+      "date": "2027-05-09",
+      "name": "Day of Victory over Fascism",
+      "type": "public",
+      "name_local": "Faşizm üzərində qələbə günü"
+    },
+    {
+      "date": "2027-05-10",
+      "name": "Day of Victory over Fascism (substitute day)",
+      "type": "public",
+      "name_local": "Faşizm üzərində qələbə günü"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2027-05-17",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2027-05-18",
+      "name": "Feast of the Sacrifice (Eid al-Adha) (substitute day)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2027-05-28",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Respublika günü"
+    },
+    {
+      "date": "2027-06-15",
+      "name": "National Salvation Day",
+      "type": "public",
+      "name_local": "Azərbaycan xalqının Milli Qurtuluş günü"
+    },
+    {
+      "date": "2027-06-26",
+      "name": "Azerbaijan Armed Forces Day",
+      "type": "public",
+      "name_local": "Azərbaycan Respublikasının Silahlı Qüvvələri günü"
+    },
+    {
+      "date": "2027-06-28",
+      "name": "Azerbaijan Armed Forces Day (substitute day)",
+      "type": "public",
+      "name_local": "Azərbaycan Respublikasının Silahlı Qüvvələri günü"
+    },
+    {
+      "date": "2027-10-18",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dövlət Müstəqilliyi günü"
+    },
+    {
+      "date": "2027-11-09",
+      "name": "Flag Day",
+      "type": "public",
+      "name_local": "Dövlət Bayrağı günü"
+    },
+    {
+      "date": "2027-11-12",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Konstitusiya günü"
+    },
+    {
+      "date": "2027-11-17",
+      "name": "National Revival Day",
+      "type": "public",
+      "name_local": "Milli Dirçəliş günü"
+    },
+    {
+      "date": "2027-12-31",
+      "name": "International Solidarity Day of Azerbaijanis",
+      "type": "public",
+      "name_local": "Dünya azərbaycanlıların həmrəyliyi günü"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2028-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2028-01-03",
+      "name": "New Year's Day (substitute day)",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2028-01-04",
+      "name": "New Year's Day (substitute day)",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2028-02-27",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2028-02-28",
+      "name": "End of Ramadan (Eid al-Fitr) (substitute day)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2028-02-29",
+      "name": "End of Ramadan (Eid al-Fitr) (substitute day)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Qadınlar günü"
+    },
+    {
+      "date": "2028-03-20",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "Novruz"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2028-05-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2028-05-08",
+      "name": "Feast of the Sacrifice (Eid al-Adha) (substitute day)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2028-05-09",
+      "name": "Day of Victory over Fascism",
+      "type": "public",
+      "name_local": "Faşizm üzərində qələbə günü"
+    },
+    {
+      "date": "2028-05-28",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Respublika günü"
+    },
+    {
+      "date": "2028-05-29",
+      "name": "Republic Day (substitute day)",
+      "type": "public",
+      "name_local": "Respublika günü"
+    },
+    {
+      "date": "2028-06-15",
+      "name": "National Salvation Day",
+      "type": "public",
+      "name_local": "Azərbaycan xalqının Milli Qurtuluş günü"
+    },
+    {
+      "date": "2028-06-26",
+      "name": "Azerbaijan Armed Forces Day",
+      "type": "public",
+      "name_local": "Azərbaycan Respublikasının Silahlı Qüvvələri günü"
+    },
+    {
+      "date": "2028-10-18",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dövlət Müstəqilliyi günü"
+    },
+    {
+      "date": "2028-11-09",
+      "name": "Flag Day",
+      "type": "public",
+      "name_local": "Dövlət Bayrağı günü"
+    },
+    {
+      "date": "2028-11-12",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Konstitusiya günü"
+    },
+    {
+      "date": "2028-11-17",
+      "name": "National Revival Day",
+      "type": "public",
+      "name_local": "Milli Dirçəliş günü"
+    },
+    {
+      "date": "2028-12-31",
+      "name": "International Solidarity Day of Azerbaijanis",
+      "type": "public",
+      "name_local": "Dünya azərbaycanlıların həmrəyliyi günü"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "International Solidarity Day of Azerbaijanis (substitute day)",
+      "type": "public",
+      "name_local": "Dünya azərbaycanlıların həmrəyliyi günü"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2029-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Yeni il"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2029-02-15",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Ramazan Bayramı"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Qadınlar günü"
+    },
+    {
+      "date": "2029-03-20",
+      "name": "Spring Festival",
+      "type": "public",
+      "name_local": "Novruz"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2029-04-25",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Qurban Bayramı"
+    },
+    {
+      "date": "2029-05-09",
+      "name": "Day of Victory over Fascism",
+      "type": "public",
+      "name_local": "Faşizm üzərində qələbə günü"
+    },
+    {
+      "date": "2029-05-28",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Respublika günü"
+    },
+    {
+      "date": "2029-06-15",
+      "name": "National Salvation Day",
+      "type": "public",
+      "name_local": "Azərbaycan xalqının Milli Qurtuluş günü"
+    },
+    {
+      "date": "2029-06-26",
+      "name": "Azerbaijan Armed Forces Day",
+      "type": "public",
+      "name_local": "Azərbaycan Respublikasının Silahlı Qüvvələri günü"
+    },
+    {
+      "date": "2029-10-18",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dövlət Müstəqilliyi günü"
+    },
+    {
+      "date": "2029-11-09",
+      "name": "Flag Day",
+      "type": "public",
+      "name_local": "Dövlət Bayrağı günü"
+    },
+    {
+      "date": "2029-11-12",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Konstitusiya günü"
+    },
+    {
+      "date": "2029-11-17",
+      "name": "National Revival Day",
+      "type": "public",
+      "name_local": "Milli Dirçəliş günü"
+    },
+    {
+      "date": "2029-12-31",
+      "name": "International Solidarity Day of Azerbaijanis",
+      "type": "public",
+      "name_local": "Dünya azərbaycanlıların həmrəyliyi günü"
+    }
+  ]
+}

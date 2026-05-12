@@ -1,0 +1,258 @@
+{
+  "meta": {
+    "country": "SO",
+    "name": "Somalia",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "so",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "عيد رأس السنة"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "يوم العمال"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2025-06-26",
+      "name": "Independence of British Somaliland",
+      "type": "public",
+      "name_local": "استقلال الصومال البريطاني"
+    },
+    {
+      "date": "2025-07-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "عيد الاستقلال"
+    },
+    {
+      "date": "2025-07-05",
+      "name": "Day of Ashura",
+      "type": "public",
+      "name_local": "عاشوراء"
+    },
+    {
+      "date": "2025-09-04",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "عيد رأس السنة"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "يوم العمال"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2026-06-25",
+      "name": "Day of Ashura",
+      "type": "public",
+      "name_local": "عاشوراء"
+    },
+    {
+      "date": "2026-06-26",
+      "name": "Independence of British Somaliland",
+      "type": "public",
+      "name_local": "استقلال الصومال البريطاني"
+    },
+    {
+      "date": "2026-07-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "عيد الاستقلال"
+    },
+    {
+      "date": "2026-08-25",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "عيد رأس السنة"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "يوم العمال"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2027-06-15",
+      "name": "Day of Ashura",
+      "type": "public",
+      "name_local": "عاشوراء"
+    },
+    {
+      "date": "2027-06-26",
+      "name": "Independence of British Somaliland",
+      "type": "public",
+      "name_local": "استقلال الصومال البريطاني"
+    },
+    {
+      "date": "2027-07-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "عيد الاستقلال"
+    },
+    {
+      "date": "2027-08-14",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "عيد رأس السنة"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "يوم العمال"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2028-06-03",
+      "name": "Day of Ashura",
+      "type": "public",
+      "name_local": "عاشوراء"
+    },
+    {
+      "date": "2028-06-26",
+      "name": "Independence of British Somaliland",
+      "type": "public",
+      "name_local": "استقلال الصومال البريطاني"
+    },
+    {
+      "date": "2028-07-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "عيد الاستقلال"
+    },
+    {
+      "date": "2028-08-03",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "عيد رأس السنة"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "يوم العمال"
+    },
+    {
+      "date": "2029-05-23",
+      "name": "Day of Ashura",
+      "type": "public",
+      "name_local": "عاشوراء"
+    },
+    {
+      "date": "2029-06-26",
+      "name": "Independence of British Somaliland",
+      "type": "public",
+      "name_local": "استقلال الصومال البريطاني"
+    },
+    {
+      "date": "2029-07-01",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "عيد الاستقلال"
+    },
+    {
+      "date": "2029-07-24",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    }
+  ]
+}

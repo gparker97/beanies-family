@@ -1,0 +1,253 @@
+{
+  "meta": {
+    "country": "SV",
+    "name": "El Salvador",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "es",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-04-17",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2025-04-19",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "Sabado Santo"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2025-08-06",
+      "name": "Celebración del Divino Salvador del Mundo",
+      "type": "public"
+    },
+    {
+      "date": "2025-09-15",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2025-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Día de los Difuntos"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2026-04-02",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2026-04-04",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "Sabado Santo"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2026-08-06",
+      "name": "Celebración del Divino Salvador del Mundo",
+      "type": "public"
+    },
+    {
+      "date": "2026-09-15",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2026-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Día de los Difuntos"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2027-03-25",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2027-03-27",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "Sabado Santo"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2027-08-06",
+      "name": "Celebración del Divino Salvador del Mundo",
+      "type": "public"
+    },
+    {
+      "date": "2027-09-15",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2027-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Día de los Difuntos"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2028-04-13",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2028-04-15",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "Sabado Santo"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2028-08-06",
+      "name": "Celebración del Divino Salvador del Mundo",
+      "type": "public"
+    },
+    {
+      "date": "2028-09-15",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2028-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Día de los Difuntos"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    },
+    {
+      "date": "2029-03-29",
+      "name": "Maundy Thursday",
+      "type": "public",
+      "name_local": "Jueves Santo"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Viernes Santo"
+    },
+    {
+      "date": "2029-03-31",
+      "name": "Easter Saturday",
+      "type": "public",
+      "name_local": "Sabado Santo"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Día del Trabajador"
+    },
+    {
+      "date": "2029-08-06",
+      "name": "Celebración del Divino Salvador del Mundo",
+      "type": "public"
+    },
+    {
+      "date": "2029-09-15",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2029-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Día de los Difuntos"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Navidad"
+    }
+  ]
+}

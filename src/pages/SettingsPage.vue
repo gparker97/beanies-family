@@ -9,6 +9,7 @@ import SettingsCard from '@/components/settings/SettingsCard.vue';
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
 import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
 import BaseModal from '@/components/ui/BaseModal.vue';
+import BaseCombobox from '@/components/ui/BaseCombobox.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
@@ -23,6 +24,7 @@ import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePWA } from '@/composables/usePWA';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
+import { useCountryOptions } from '@/composables/useCountryOptions';
 import { CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
 import { getDoc } from '@/services/automerge/docService';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
@@ -34,17 +36,12 @@ import { getDeploymentBadge } from '@/config/features';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { useAccountsStore } from '@/stores/accountsStore';
-import { useTransactionsStore } from '@/stores/transactionsStore';
-import { useAssetsStore } from '@/stores/assetsStore';
-import { useGoalsStore } from '@/stores/goalsStore';
-import { useRecurringStore } from '@/stores/recurringStore';
-import { useMemberFilterStore } from '@/stores/memberFilterStore';
-import { useTodoStore } from '@/stores/todoStore';
-import { useActivityStore } from '@/stores/activityStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
+import { useHolidayStore } from '@/stores/holidayStore';
+import { resetAllAppStores } from '@/utils/resetStores';
+import type { CountryCode } from '@/types/models';
 
 const router = useRouter();
 const route = useRoute();
@@ -53,6 +50,7 @@ const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
 const familyStore = useFamilyStore();
+const holidayStore = useHolidayStore();
 const { t } = useTranslation();
 const deploymentBadge = computed(() => getDeploymentBadge());
 const { canInstall, isInstalled, installApp } = usePWA();
@@ -68,6 +66,7 @@ const { isReconnecting, reconnectError, reconnect } = useGoogleReconnect();
 // ── Modal state ──────────────────────────────────────────────────────────────
 const showAppearance = ref(false);
 const showCurrency = ref(false);
+const showCountryHolidays = ref(false);
 const showSecurity = ref(false);
 const showFamilyData = ref(false);
 const showDataManagement = ref(false);
@@ -84,6 +83,9 @@ const cardOpenMap: Record<string, () => void> = {
   },
   currency: () => {
     showCurrency.value = true;
+  },
+  'country-holidays': () => {
+    showCountryHolidays.value = true;
   },
   security: () => {
     showSecurity.value = true;
@@ -123,6 +125,22 @@ const wantExport = ref(false);
 const wantDeleteDrive = ref(false);
 const isDeleting = ref(false);
 const deletePasswordError = ref<string | null>(null);
+
+// ── Country & holidays ───────────────────────────────────────────────────────
+const { countryOptions } = useCountryOptions();
+// Shown inside the Country & Holidays drawer when a holiday fetch has failed
+// (transient network error with no cached fallback) — informative, with
+// recovery direction. The store's online watcher retries automatically.
+const showHolidayRetryHint = computed(() => !!settingsStore.country && holidayStore.loadFailed);
+
+async function onPickCountry(value: string) {
+  try {
+    await settingsStore.setCountry((value || null) as CountryCode | null);
+  } catch {
+    // persistDualSetting already surfaced this (toast + console.error) and
+    // re-threw so the picker can revert its visual state — nothing more to do.
+  }
+}
 
 // ── Currency ─────────────────────────────────────────────────────────────────
 const { currencyOptions } = useCurrencyOptions();
@@ -527,17 +545,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     await authStore.signOutAndClearData();
 
     // 5. Reset all Pinia stores
-    useSyncStore().resetState();
-    useFamilyStore().resetState();
-    useAccountsStore().resetState();
-    useTransactionsStore().resetState();
-    useAssetsStore().resetState();
-    useGoalsStore().resetState();
-    useRecurringStore().resetState();
-    useSettingsStore().resetState();
-    useMemberFilterStore().resetState();
-    useTodoStore().resetState();
-    useActivityStore().resetState();
+    resetAllAppStores();
 
     // 6. Track deletion
     window.plausible?.('family_deleted');
@@ -577,6 +585,13 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         :description="t('settings.card.currencyDesc')"
         icon-bg="var(--tint-silk-20)"
         @click="showCurrency = true"
+      />
+      <SettingsCard
+        icon="🌍"
+        :title="t('settings.card.countryHolidays')"
+        :description="t('settings.card.countryHolidaysDesc')"
+        icon-bg="var(--tint-silk-20)"
+        @click="showCountryHolidays = true"
       />
       <SettingsCard
         v-if="canManagePod"
@@ -939,6 +954,51 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       <!-- Exchange Rates (inline, no BaseCard wrapper) -->
       <div class="border-t border-gray-200 pt-4 dark:border-slate-700">
         <ExchangeRateSettings :standalone="false" />
+      </div>
+    </BeanieFormModal>
+
+    <!-- ── Country & Holidays Modal ────────────────────────────────────── -->
+    <BeanieFormModal
+      variant="drawer"
+      :open="showCountryHolidays"
+      :title="t('settings.card.countryHolidays')"
+      icon="🌍"
+      icon-bg="var(--tint-silk-20)"
+      :save-label="t('action.close')"
+      @close="showCountryHolidays = false"
+      @save="showCountryHolidays = false"
+    >
+      <BaseCombobox
+        :model-value="settingsStore.country ?? ''"
+        :options="countryOptions"
+        :label="t('settings.country')"
+        :hint="t('settings.countryHelp')"
+        :placeholder="t('settings.countryNotSet')"
+        :search-placeholder="t('settings.country')"
+        @update:model-value="onPickCountry"
+      />
+
+      <p v-if="showHolidayRetryHint" class="text-secondary-500/70 text-xs dark:text-gray-400">
+        {{ t('holiday.loadFailedRetryHint') }}
+      </p>
+
+      <!-- Show / hide public holidays on the planner -->
+      <div
+        class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
+      >
+        <div>
+          <p class="font-medium text-gray-900 dark:text-gray-100">
+            {{ t('settings.showPublicHolidays') }}
+          </p>
+          <p v-if="!settingsStore.country" class="text-sm text-gray-500 dark:text-gray-400">
+            {{ t('settings.showPublicHolidaysNeedsCountry') }}
+          </p>
+        </div>
+        <ToggleSwitch
+          :model-value="settingsStore.showPublicHolidays"
+          :disabled="!settingsStore.country"
+          @update:model-value="settingsStore.setShowPublicHolidays($event)"
+        />
       </div>
     </BeanieFormModal>
 

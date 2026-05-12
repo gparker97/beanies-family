@@ -22,8 +22,15 @@ import { normalizeAssignees } from '@/utils/assignees';
 import { formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
+import HolidayBanner from '@/components/planner/HolidayBanner.vue';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
-import type { FamilyActivity, FamilyMember, FamilyVacation, TodoItem } from '@/types/models';
+import type {
+  FamilyActivity,
+  FamilyMember,
+  FamilyVacation,
+  TodoItem,
+  HolidayOccurrence,
+} from '@/types/models';
 
 type Occurrence = { activity: FamilyActivity; date: string };
 
@@ -43,11 +50,14 @@ interface Props {
   members: FamilyMember[];
   /** Show a "now" indicator line if the date matches today. */
   isToday?: boolean;
+  /** Public holiday on this day, if any (rendered as a compact banner up top). */
+  holiday?: HolidayOccurrence | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isToday: false,
   segments: () => [],
+  holiday: null,
 });
 
 const emit = defineEmits<{
@@ -56,6 +66,7 @@ const emit = defineEmits<{
   'vacation-click': [vacationId: string];
   'view-segment': [vacationId: string, segmentIndex: number];
   'add-activity': [date: string, time?: string];
+  'holiday-click': [holiday: HolidayOccurrence];
 }>();
 
 const { t } = useTranslation();
@@ -192,6 +203,15 @@ function handleSlotClick(hour: number): void {
 
 <template>
   <div class="day-timeline">
+    <!-- Public holiday banner (read-only) -->
+    <HolidayBanner
+      v-if="holiday"
+      :holiday="holiday"
+      compact
+      class="mb-2"
+      @click="emit('holiday-click', holiday)"
+    />
+
     <!-- Untimed / all-day row -->
     <div
       v-if="hasUntimedRow"

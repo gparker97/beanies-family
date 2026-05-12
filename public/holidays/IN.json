@@ -1,0 +1,168 @@
+{
+  "meta": {
+    "country": "IN",
+    "name": "India",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "en",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-26",
+      "name": "Republic Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-14",
+      "name": "Ambedkar Jayanti",
+      "type": "public"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2025-08-15",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-10-02",
+      "name": "Gandhi Jayanti",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-01-26",
+      "name": "Republic Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Ambedkar Jayanti",
+      "type": "public"
+    },
+    {
+      "date": "2026-08-15",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-10-02",
+      "name": "Gandhi Jayanti",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-26",
+      "name": "Republic Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2027-04-14",
+      "name": "Ambedkar Jayanti",
+      "type": "public"
+    },
+    {
+      "date": "2027-08-15",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-10-02",
+      "name": "Gandhi Jayanti",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-26",
+      "name": "Republic Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Ambedkar Jayanti",
+      "type": "public"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2028-08-15",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-10-02",
+      "name": "Gandhi Jayanti",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-26",
+      "name": "Republic Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public"
+    },
+    {
+      "date": "2029-04-14",
+      "name": "Ambedkar Jayanti",
+      "type": "public"
+    },
+    {
+      "date": "2029-08-15",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-10-02",
+      "name": "Gandhi Jayanti",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    }
+  ]
+}

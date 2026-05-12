@@ -40,6 +40,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json,wasm}'],
+        // The per-country public-holiday dataset (~200 files, ~2 MB total) is
+        // fetched on demand for the family's country only and cached in
+        // IndexedDB (see referenceDataCacheRepository) — never precache it, or
+        // the service-worker install would balloon by the whole dataset.
+        globIgnores: ['**/holidays/*.json'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MiB — Automerge WASM is ~2.65 MB
         runtimeCaching: [
           {

@@ -4,7 +4,8 @@ import OnboardingProgressPips from './OnboardingProgressPips.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { useTranslation } from '@/composables/useTranslation';
-import type { CurrencyCode } from '@/types/models';
+import { COUNTRIES } from '@/constants/countries';
+import type { CurrencyCode, CountryCode } from '@/types/models';
 
 const emit = defineEmits<{
   next: [];
@@ -16,8 +17,29 @@ const { currencyOptions } = useCurrencyOptions();
 
 const selectedCurrency = ref<string>(settingsStore.baseCurrency);
 
+// Best-guess the country from a previously-set value or the browser locale's
+// region subtag (e.g. 'en-SG' → 'SG'); blank if neither yields a known code.
+// The picker is optional — leaving it blank just keeps the holidays feature
+// dormant, which the family can turn on later in Settings.
+function guessCountry(): string {
+  if (settingsStore.country) return settingsStore.country;
+  const lang = typeof navigator !== 'undefined' ? navigator.language : '';
+  const region = /-([A-Za-z]{2})$/.exec(lang || '')?.[1]?.toUpperCase();
+  if (region && COUNTRIES.some((c) => c.code === region)) return region;
+  return '';
+}
+const selectedCountry = ref<string>(guessCountry());
+
 async function handleStart() {
   await settingsStore.setBaseCurrency(selectedCurrency.value as CurrencyCode);
+  if (selectedCountry.value) {
+    try {
+      await settingsStore.setCountry(selectedCountry.value as CountryCode);
+    } catch {
+      // persistDualSetting already surfaced this (toast + console.error) and
+      // re-threw — don't block onboarding on it; the family can set it later.
+    }
+  }
   emit('next');
 }
 </script>
@@ -63,6 +85,31 @@ async function handleStart() {
           >
             {{ opt.label }}
           </option>
+        </select>
+        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
+          <svg class="h-3.5 w-3.5 opacity-35" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Country question (optional — drives public-holiday display) -->
+    <div class="ob-currency-question">
+      <div class="ob-currency-label">{{ t('onboarding.countryQuestion') }}</div>
+      <div class="relative inline-block">
+        <select
+          v-model="selectedCountry"
+          class="ob-currency-select"
+          data-testid="onboarding-country-select"
+        >
+          <option value="">{{ t('onboarding.countryPlaceholder') }}</option>
+          <option v-for="c in COUNTRIES" :key="c.code" :value="c.code">{{ c.name }}</option>
         </select>
         <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
           <svg class="h-3.5 w-3.5 opacity-35" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -3,9 +3,11 @@ import { computed } from 'vue';
 import BaseSidePanel from '@/components/ui/BaseSidePanel.vue';
 import ActivityListCard from '@/components/planner/ActivityListCard.vue';
 import TodoItemRow from '@/components/todo/TodoItemRow.vue';
+import HolidayBanner from '@/components/planner/HolidayBanner.vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
 import {
   toDateInputValue,
@@ -15,7 +17,7 @@ import {
   formatNookDate,
 } from '@/utils/date';
 import { tripTypeEmoji, tripDurationDays } from '@/utils/vacation';
-import type { FamilyActivity, TodoItem } from '@/types/models';
+import type { FamilyActivity, TodoItem, HolidayOccurrence } from '@/types/models';
 
 const props = defineProps<{
   date: string;
@@ -28,12 +30,17 @@ const emit = defineEmits<{
   'edit-activity': [id: string, date: string];
   'view-todo': [todo: TodoItem];
   'vacation-click': [vacationId: string];
+  'holiday-click': [holiday: HolidayOccurrence];
 }>();
 
 const { t } = useTranslation();
 const activityStore = useActivityStore();
 const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
+const holidayStore = useHolidayStore();
+
+/** Public holiday on the selected day, if any. */
+const holidayForDay = computed(() => holidayStore.holidayForDate(props.date));
 
 /** Format the selected date as a readable header (e.g. "Wed, 6 Mar") */
 const dateHeader = computed(() => {
@@ -159,6 +166,15 @@ function formatGroupDate(dateStr: string): string {
         {{ dateHeader }}
       </h3>
     </div>
+
+    <!-- Public holiday banner (read-only) -->
+    <HolidayBanner
+      v-if="holidayForDay"
+      :holiday="holidayForDay"
+      show-subline
+      class="mb-4"
+      @click="emit('holiday-click', holidayForDay)"
+    />
 
     <!-- Vacation context banner -->
     <div
