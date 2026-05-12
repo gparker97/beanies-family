@@ -354,8 +354,8 @@ async function handleDelete() {
         </span>
         <span
           v-else-if="todo.someday"
-          class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-[var(--color-text-muted)]"
-          style="background: var(--tint-slate-10)"
+          class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-sky-700 dark:text-sky-300"
+          style="background: var(--tint-silk-20)"
         >
           💭 {{ t('todo.someday') }}
         </span>
