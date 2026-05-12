@@ -503,4 +503,298 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'the-family-cookbook',
+    category: 'features',
+    title: 'The Family Cookbook',
+    excerpt:
+      'Keep the recipes that get passed down — the story behind them, the photos, and a log of every time someone makes them.',
+    icon: '🍜',
+    readTime: 4,
+    updatedDate: '2026-05-12',
+    sections: [
+      {
+        type: 'heading',
+        content: 'Why a family cookbook',
+        level: 2,
+        id: 'why',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The recipes that get handed down — Grandma’s bolognese, the birthday cake everyone asks for — usually live on a stained index card or in someone’s head. The <strong>Family Cookbook</strong> keeps them safe in one place: the ingredients and steps, the little story behind them, photos, and a running log of every time someone in the family cooks one.',
+      },
+      {
+        type: 'heading',
+        content: 'Opening the cookbook',
+        level: 2,
+        id: 'opening',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'In the sidebar, open <strong>The Pod 🌱 → Family Cookbook</strong> (you’ll see it titled <em>“Secret Family Recipes”</em> — shhh 🤫). There’s also a shortcut on the <strong>Meet the Beans</strong> page.',
+      },
+      {
+        type: 'heading',
+        content: 'Adding a recipe',
+        level: 2,
+        id: 'adding',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Tap <strong>Add a recipe</strong>',
+          'Give it a <strong>Recipe name</strong> (e.g. <em>“Grandma’s Bolognese”</em>) and, if you like, a <strong>Subtitle</strong> for the story behind it (<em>“passed down from Mary, ~1972”</em>)',
+          'Add the <strong>Prep time</strong> and <strong>Servings</strong>',
+          'List the <strong>Ingredients</strong> — one per line — and the <strong>Preparation steps</strong>, also one step per line',
+          'Add any <strong>Family notes</strong> (the little things — <em>“Neil asks for this every Sunday”</em>) and <strong>Photos</strong>',
+          'Tap <strong>Save</strong>',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Add the recipe’s name first — then you can attach photos. (Photos also need Google Drive turned on; see <strong>Adding Photos</strong>.)',
+        title: 'A note on photos',
+        icon: '💡',
+      },
+      {
+        type: 'heading',
+        content: 'Inside a recipe',
+        level: 2,
+        id: 'detail',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Tap a recipe card to open its page. You’ll find the <strong>Ingredients</strong>, <strong>How to make it</strong> (the steps), the <strong>Family notes</strong>, and the <strong>Cook Log</strong>.',
+      },
+      {
+        type: 'heading',
+        content: 'The Cook Log',
+        level: 2,
+        id: 'cook-log',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Every time you make a recipe, tap <strong>I cooked this today</strong> — give it a rating, and (if you want) add a photo of how it turned out. Over time the recipe builds its own little history: how many times it’s been cooked and its average rating. It’s a quiet way to see which recipes the family actually loves.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'If a family member has a favourite <em>food</em>, you can link it to a recipe in the cookbook — open their <strong>Favorites</strong> tab and choose (or add) the recipe. Then you can hop from the bean to the recipe and back.',
+        title: 'Linked to a bean’s favourites',
+        icon: 'ℹ️',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'To change a recipe, open it, edit any field, and save. To remove it, use the <strong>delete</strong> option and confirm — deleting can’t be undone, and the cook log goes with it.',
+      },
+      {
+        type: 'heading',
+        content: 'Related help',
+        level: 2,
+        id: 'related',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Meet the Beans</strong> — link a recipe to a bean’s favourite food',
+          '<strong>Adding Photos</strong> — attach pictures to recipes and cook-log entries',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'emergency-contacts',
+    category: 'features',
+    title: 'Emergency Contacts',
+    excerpt:
+      'Your family phonebook — doctors, school, dentists, sitters — kept where anyone looking after your family can find it.',
+    icon: '🆘',
+    readTime: 3,
+    updatedDate: '2026-05-12',
+    sections: [
+      {
+        type: 'heading',
+        content: 'Why keep a contacts list here',
+        level: 2,
+        id: 'why',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When something comes up and you’re not the one at home — a grandparent is babysitting, a friend is doing the school run — whoever <em>is</em> there needs the doctor’s number, the school’s, the dentist’s, fast. <strong>Emergency Contacts</strong> is your family phonebook: the people you’d want a sitter or a grandparent to be able to reach in a pinch, all in one place.',
+      },
+      {
+        type: 'heading',
+        content: 'Opening it',
+        level: 2,
+        id: 'opening',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'In the sidebar, open <strong>The Pod 🌱 → Emergency Contacts</strong>. A peek at your key contacts also appears on the <strong>Care &amp; Safety</strong> page, with a link through to the full list.',
+      },
+      {
+        type: 'heading',
+        content: 'Adding a contact',
+        level: 2,
+        id: 'adding',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Tap <strong>Add contact</strong>',
+          'Pick a <strong>Category</strong> — Doctor, Dentist, Nurse, Teacher, School, or Other (you can type your own)',
+          'Enter the <strong>Name</strong> and a <strong>Role or relationship</strong> (e.g. <em>“Pediatrician at Bayside Clinic”</em>)',
+          'Add whatever you have — <strong>Phone</strong>, <strong>Email</strong>, <strong>Address</strong> — and any <strong>Notes</strong>',
+          'Tap <strong>Save</strong>',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Finding and using a contact',
+        level: 2,
+        id: 'using',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Each contact has a <strong>Call</strong> and an <strong>Email</strong> button — on a phone they dial the number or open a new email straight away. There’s a search box (search by name, role, or phone) and a category filter at the top, which come in handy once the list grows.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'To change a contact, tap it to open it, edit, and save. To remove it, use the <strong>delete</strong> option and confirm.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'This is exactly the page to point a babysitter or a visiting grandparent to. Everyone in your pod can see the contacts list; only family members with edit access can change it.',
+        title: 'Keep it where everyone can find it',
+        icon: '🤝',
+      },
+      {
+        type: 'heading',
+        content: 'Related help',
+        level: 2,
+        id: 'related',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Allergies &amp; Medications</strong> — the rest of the Care &amp; Safety page',
+          '<strong>The Family Nook</strong> — your family’s home base',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'adding-photos',
+    category: 'features',
+    title: 'Adding Photos',
+    excerpt:
+      'Attach photos to milestones, recipes, medications, activities, and your beans’ profile pictures — and understand how they’re stored.',
+    icon: '📷',
+    readTime: 4,
+    updatedDate: '2026-05-12',
+    sections: [
+      {
+        type: 'heading',
+        content: 'Where photos show up',
+        level: 2,
+        id: 'where',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A picture says a lot. In beanies.family you can attach photos to several things: a <strong>milestone</strong> (the first-day-of-school shot), a <strong>recipe</strong> and its cook-log entries (how it turned out), a <strong>medication</strong> (a photo of the bottle or label), an <strong>activity or event</strong> in the Family Planner, and a family member’s <strong>profile photo</strong> (their avatar). Anything with photos shows them in the <strong>Family Scrapbook</strong> too.',
+      },
+      {
+        type: 'heading',
+        content: 'How photos are stored — and why Google Drive matters',
+        level: 2,
+        id: 'storage',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Like everything in beanies.family, your photos are <strong>encrypted</strong> — they live as encrypted files that only your family can open, never on anyone’s server. But photos are much bigger than the rest of your family data, so instead of being packed into your pod file, they’re kept as separate encrypted files on your <strong>Google Drive</strong>.',
+      },
+      {
+        type: 'callout',
+        content:
+          'Because of that, <strong>photos need Google Drive turned on</strong>. If your pod currently lives in a local file, beanies.family will point you to <strong>Settings</strong> to connect Google Drive before you can add photos. See <strong>Connecting Google Drive</strong> and <strong>Moving your pod between local file and Google Drive</strong>.',
+        title: 'Photos need Google Drive',
+        icon: '☁️',
+      },
+      {
+        type: 'heading',
+        content: 'Adding a photo',
+        level: 2,
+        id: 'adding',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open the thing you want a photo on — a milestone, a recipe, a medication, an activity, or a bean’s profile',
+          'If it’s brand new, <strong>save it first</strong> — you’ll see a hint like <em>“Save first, then add photos when editing.”</em> Then open it again',
+          'Tap <strong>Add Photos</strong> (or <strong>Add Photo</strong>), then choose <strong>Take Photo</strong> (on a phone) or <strong>From Library</strong> — or just drag a photo onto the spot',
+          'It uploads and attaches. Repeat to add more',
+        ],
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'You can attach <strong>up to 4 photos</strong> to most items. A few — a profile photo, a medication’s bottle photo — take just one',
+          '<strong>HEIC</strong> photos (the iPhone default) can’t always be read in the browser. If one won’t go, save or export it as a <strong>JPEG</strong> first',
+          'If you’re <strong>offline</strong> when you add a photo, it waits in a queue and uploads automatically once you’re back online',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Viewing & removing photos',
+        level: 2,
+        id: 'viewing',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Tap a photo to open it full-size — you can flip between photos and download one if you want. To take a photo off, use <strong>Remove</strong> on it (or <strong>Replace</strong> to swap it for another) — you’ll be asked to confirm first.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Items that have photos show a little badge (e.g. <em>“2 photos attached”</em>), so you can spot them at a glance — handy on the Family Planner and in the Scrapbook.',
+        title: 'A small photo badge',
+        icon: 'ℹ️',
+      },
+      {
+        type: 'heading',
+        content: 'Related help',
+        level: 2,
+        id: 'related',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Connecting Google Drive</strong> — required before you can add photos',
+          '<strong>Moving your pod between local file and Google Drive</strong> — switch your pod over',
+          '<strong>How Your Data Is Encrypted</strong> — your photos are private too',
+        ],
+      },
+    ],
+  },
 ];

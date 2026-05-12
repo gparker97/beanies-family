@@ -275,7 +275,7 @@ For reference, the current help center contains these articles:
 - Moving your pod between local file and Google Drive
 - Installing beanies.family as an app
 
-**Features (12):**
+**Features (15):**
 - Managing Accounts
 - Recording Transactions
 - Setting & Tracking Goals
@@ -288,8 +288,11 @@ For reference, the current help center contains these articles:
 - Allergies & Medications (Care & Safety) *(in `the-pod.ts`)*
 - Family Milestones *(in `the-pod.ts`)*
 - The Family Scrapbook *(in `the-pod.ts`)*
+- The Family Cookbook *(in `the-pod.ts`)*
+- Emergency Contacts *(in `the-pod.ts`)*
+- Adding Photos *(in `the-pod.ts`)*
 
-> *Planned (not yet written) — The Family Cookbook, Emergency Contacts, Adding Photos. Also unwritten on the finance side: Tracking Assets, Reports & Charts.*
+> *Still unwritten (finance side) — Tracking Assets, Reports & Charts.*
 
 **Security (4):**
 - How Your Data Is Encrypted
