@@ -376,6 +376,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'paragraph',
+        content:
+          'It\u2019s the difference between \u201cbuy a birthday present\u201d \u2014 a real to-do, even if it doesn\u2019t have a date yet \u2014 and \u201clearn to bake sourdough\u201d, which is a lovely idea with no pressure attached. Both belong on the To-Do page; only one of them should be nagging you in your daily briefing.',
+      },
+      {
+        type: 'paragraph',
         content: 'There are two ways to park a task as Someday \u00b7 Maybe:',
       },
       {
@@ -383,7 +388,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           'Open the task and switch <strong>Track as</strong> from <strong>\u{1F4CB} To-do</strong> to <strong>\u{1F4AD} Someday \u00b7 Maybe</strong>',
-          'On desktop, hover over a task in the list and click the <strong>\u{1F4AD}</strong> button to move it to Someday \u00b7 Maybe',
+          'On a computer, hover over a task in the list and tap the <strong>\u{1F4AD}</strong> button to park it \u2014 or the <strong>\u{1F4CB}</strong> button on a parked task to make it active again',
         ],
       },
       {
