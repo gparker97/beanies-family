@@ -2,6 +2,7 @@ import type { HelpArticle, HelpCategory } from './types';
 import { WHATS_NEW_ARTICLES } from './whats-new';
 import { GETTING_STARTED_ARTICLES } from './getting-started';
 import { FEATURES_ARTICLES } from './features';
+import { THE_POD_ARTICLES } from './the-pod';
 import { SECURITY_ARTICLES } from './security';
 import { HOW_IT_WORKS_ARTICLES } from './how-it-works';
 
@@ -19,6 +20,7 @@ export const ALL_ARTICLES: HelpArticle[] = [
   ...WHATS_NEW_ARTICLES,
   ...GETTING_STARTED_ARTICLES,
   ...FEATURES_ARTICLES,
+  ...THE_POD_ARTICLES,
   ...SECURITY_ARTICLES,
   ...HOW_IT_WORKS_ARTICLES,
 ];

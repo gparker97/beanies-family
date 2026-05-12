@@ -172,9 +172,9 @@ interface HelpArticle {
 
 ### File Organisation
 
-- Articles live in category files: `getting-started.ts`, `features.ts`, `security.ts`, `how-it-works.ts`
+- Articles live in category files: `getting-started.ts`, `features.ts`, `the-pod.ts` (also `category: 'features'` — split out so `features.ts` stays manageable), `security.ts`, `how-it-works.ts`
 - All articles are re-exported through `src/content/help/index.ts`
-- New categories require updates to `types.ts`, `categories.ts`, `index.ts`, and i18n strings
+- New categories require updates to `types.ts`, `categories.ts`, `index.ts`, and i18n strings. Adding a new *file* within an existing category just needs an import + spread in `index.ts`
 
 ### i18n
 
@@ -275,15 +275,19 @@ For reference, the current help center contains these articles:
 - Moving your pod between local file and Google Drive
 - Installing beanies.family as an app
 
-**Features (8):**
+**Features (10):**
 - Managing Accounts
 - Recording Transactions
 - Setting & Tracking Goals
 - Budgets & Category Limits
-- Family To-Do Lists
+- Family To-Do Lists *(includes the "Someday · Maybe" section)*
 - Travel Plans & Vacations
 - The Family Nook — Your Home Base
 - Family Planner & Activities
+- Meet the Beans — Each Family Member's Profile *(in `the-pod.ts`)*
+- Allergies & Medications (Care & Safety) *(in `the-pod.ts`)*
+
+> *Planned (not yet written) — Family Milestones, The Family Scrapbook, The Family Cookbook, Emergency Contacts, Adding Photos. Also unwritten on the finance side: Tracking Assets, Reports & Charts.*
 
 **Security (4):**
 - How Your Data Is Encrypted
