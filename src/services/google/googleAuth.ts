@@ -149,6 +149,21 @@ export function isGoogleAuthConfigured(): boolean {
 }
 
 /**
+ * Whether a thrown error represents the user backing out of an auth/picker
+ * flow (closing the Google account chooser, dismissing the OS file picker,
+ * a blocked popup, etc.) rather than a real failure. Callers use this to
+ * treat the situation as a quiet "never mind" instead of an error to report.
+ *
+ * Covers the `AbortError` shape (`showSaveFilePicker` cancellation) by name
+ * and the GIS / popup-blocked message shapes by substring.
+ */
+export function isUserCancellation(e: unknown): boolean {
+  if ((e as { name?: string } | null)?.name === 'AbortError') return true;
+  const msg = e instanceof Error ? e.message : String(e);
+  return /cancel|dismiss|popup_closed|user_cancel/i.test(msg);
+}
+
+/**
  * Whether the current browser should skip popup-based OAuth and use full-page
  * redirect auth instead. Only one case triggers this:
  *

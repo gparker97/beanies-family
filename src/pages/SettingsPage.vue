@@ -16,7 +16,9 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 
 import { useRoute, useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
-import { alert as showAlert } from '@/composables/useConfirm';
+import { alert as showAlert, confirm } from '@/composables/useConfirm';
+import { showToast } from '@/composables/useToast';
+import type { StorageProviderType } from '@/services/sync/storageProvider';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePWA } from '@/composables/usePWA';
@@ -27,7 +29,7 @@ import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { downloadAsFile, tryUnwrapFamilyKey } from '@/services/sync/fileSync';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import { deleteFile } from '@/services/google/driveService';
-import { getValidToken } from '@/services/google/googleAuth';
+import { getValidToken, isUserCancellation } from '@/services/google/googleAuth';
 import { getDeploymentBadge } from '@/config/features';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -266,8 +268,7 @@ async function handleSwitchGoogleAccount() {
     // so the next token acquisition isn't poisoned, then quietly return
     // without an error alert.
     disarmAccountSwitch();
-    const message = e instanceof Error ? e.message : String(e);
-    if (/cancel|dismiss|popup_closed|user_cancel/i.test(message)) {
+    if (isUserCancellation(e)) {
       console.warn('[SettingsPage] switch-account cancelled by user');
       return;
     }
@@ -291,6 +292,67 @@ async function handleConfigureSync() {
 
 async function handleRequestPermission() {
   await syncStore.requestPermission();
+}
+
+// Move the pod's storage between local file and Google Drive. Owner-only
+// (the action row is gated on `isOwner`). The store does the work + the
+// failure telemetry; we render the user-facing toast here.
+async function handleMigrateStorage() {
+  const toDrive = syncStore.storageProviderType === 'local';
+  const target: StorageProviderType = toDrive ? 'google_drive' : 'local';
+  const ok = await confirm({
+    variant: 'info', // Heritage Orange — routine action, not destructive
+    title: toDrive
+      ? 'settings.familyData.migrate.confirmTitleToDrive'
+      : 'settings.familyData.migrate.confirmTitleToLocal',
+    message: toDrive
+      ? 'settings.familyData.migrate.confirmBodyToDrive'
+      : 'settings.familyData.migrate.confirmBodyToLocal',
+    confirmLabel: 'settings.familyData.migrate.confirmAction',
+  });
+  if (!ok) return;
+
+  const source = syncStore.fileName ?? '';
+  const result = await syncStore.migrateStorage(target);
+  switch (result.outcome) {
+    case 'success':
+      showToast(
+        'success',
+        t('settings.familyData.migrate.successTitle'),
+        t('settings.familyData.migrate.successBody')
+          .replace('{source}', source)
+          .replace('{dest}', result.dest)
+      );
+      break;
+    case 'cancelled':
+      showToast(
+        'info',
+        t('settings.familyData.migrate.cancelledTitle'),
+        t('settings.familyData.migrate.cancelledBody').replace('{source}', source)
+      );
+      break;
+    case 'failed':
+      // `silent` — migrateStorage already reported this to #beanies-errors
+      // with full from/to/step context; let the toast double-ping and you
+      // get two alerts for one failure.
+      showToast(
+        'error',
+        t('settings.familyData.migrate.failedTitle'),
+        t('settings.familyData.migrate.failedBody')
+          .replace('{reason}', result.reason)
+          .replace('{source}', source),
+        { silent: true }
+      );
+      break;
+    case 'recovery-needed':
+      showToast(
+        'error',
+        t('settings.familyData.migrate.recoveryNeededTitle'),
+        t('settings.familyData.migrate.recoveryNeededBody'),
+        { silent: true }
+      );
+      break;
+  }
 }
 
 function handleLoadFromFileClick() {
@@ -1101,6 +1163,37 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
                   {{ formatLastSync(syncStore.lastSync) }}
                 </p>
               </div>
+            </div>
+
+            <!-- Move storage (owner only) -->
+            <div
+              v-if="isOwner"
+              class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+            >
+              <div>
+                <p class="font-medium text-gray-900 dark:text-gray-100">
+                  {{
+                    syncStore.storageProviderType === 'local'
+                      ? t('settings.familyData.migrate.moveToGoogleDrive')
+                      : t('settings.familyData.migrate.moveToLocalFile')
+                  }}
+                </p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{
+                    syncStore.storageProviderType === 'local'
+                      ? t('settings.familyData.migrate.moveToGoogleDriveDesc')
+                      : t('settings.familyData.migrate.moveToLocalFileDesc')
+                  }}
+                </p>
+              </div>
+              <BaseButton
+                variant="secondary"
+                size="sm"
+                :loading="syncStore.isMigratingStorage"
+                @click="handleMigrateStorage"
+              >
+                {{ t('action.move') }}
+              </BaseButton>
             </div>
 
             <!-- Load another file -->

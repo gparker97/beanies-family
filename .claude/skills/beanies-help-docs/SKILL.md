@@ -267,11 +267,13 @@ If a new category is needed (e.g., "Troubleshooting", "FAQs"), propose it with:
 
 For reference, the current help center contains these articles:
 
-**Getting Started (4):**
+**Getting Started (6):**
 - Creating Your First Pod
 - Adding Family Members
 - Language & Currency
 - Connecting Google Drive
+- Moving your pod between local file and Google Drive
+- Installing beanies.family as an app
 
 **Features (8):**
 - Managing Accounts

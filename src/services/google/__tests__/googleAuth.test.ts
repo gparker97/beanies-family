@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+// Pure helper — safe to import statically (no module state, unaffected by the
+// resetModules dance the suite below uses).
+import { isUserCancellation } from '../googleAuth';
 
 // Mock dependencies before importing the module
 vi.mock('../pkce', () => ({
@@ -1318,5 +1321,27 @@ describe('googleAuth (PKCE)', () => {
       googleAuth.setGoogleAccountEmail('test@example.com');
       expect(googleAuth.getGoogleAccountEmail()).toBe('test@example.com');
     });
+  });
+});
+
+describe('isUserCancellation', () => {
+  it('treats an AbortError (file-picker cancel) as a cancellation', () => {
+    const e = new Error('The user aborted a request.');
+    e.name = 'AbortError';
+    expect(isUserCancellation(e)).toBe(true);
+  });
+
+  it('treats popup-closed / dismiss / user_cancel messages as cancellations', () => {
+    expect(isUserCancellation(new Error('popup_closed_by_user'))).toBe(true);
+    expect(isUserCancellation(new Error('User cancelled the flow'))).toBe(true);
+    expect(isUserCancellation(new Error('Account chooser dismissed'))).toBe(true);
+    expect(isUserCancellation('user_cancel')).toBe(true);
+  });
+
+  it('does not treat genuine failures as cancellations', () => {
+    expect(isUserCancellation(new Error('Network request failed'))).toBe(false);
+    expect(isUserCancellation(new Error('403 Forbidden'))).toBe(false);
+    expect(isUserCancellation(null)).toBe(false);
+    expect(isUserCancellation(undefined)).toBe(false);
   });
 });

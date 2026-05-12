@@ -1029,6 +1029,7 @@ const STRING_DEFS = {
   'action.collapseAll': { en: 'Collapse All', beanie: 'collapse all' },
   'action.export': { en: 'Export', beanie: 'export' },
   'action.import': { en: 'Import', beanie: 'import' },
+  'action.move': { en: 'Move', beanie: 'move' },
 
   // Dashboard
   'dashboard.netWorth': { en: 'Family Net Worth', beanie: 'alllllll your beans' },
@@ -2719,6 +2720,79 @@ const STRING_DEFS = {
   'settings.familyData.switchAccountFailed': {
     en: "Couldn't switch accounts. Try again.",
     beanie: "couldn't switch accounts. try again",
+  },
+  // Move pod storage between local file and Google Drive
+  'settings.familyData.migrate.moveToGoogleDrive': {
+    en: 'Move to Google Drive',
+    beanie: 'move to google drive',
+  },
+  'settings.familyData.migrate.moveToGoogleDriveDesc': {
+    en: 'Save your pod to Google Drive for cross-device access.',
+    beanie: 'save your pod to google drive for cross-device access',
+  },
+  'settings.familyData.migrate.moveToLocalFile': {
+    en: 'Move to a local file',
+    beanie: 'move to a local file',
+  },
+  'settings.familyData.migrate.moveToLocalFileDesc': {
+    en: 'Save your pod to a file on this device.',
+    beanie: 'save your pod to a file on this device',
+  },
+  'settings.familyData.migrate.confirmTitleToDrive': {
+    en: 'Move your pod to Google Drive?',
+    beanie: 'move your pod to google drive?',
+  },
+  'settings.familyData.migrate.confirmTitleToLocal': {
+    en: 'Move your pod to a local file?',
+    beanie: 'move your pod to a local file?',
+  },
+  'settings.familyData.migrate.confirmBodyToDrive': {
+    en: "We'll create a new encrypted .beanpod file on your Google Drive and start saving there. The file you're using now stays where it is — it just stops updating, so keep it as a backup until you're happy with the move. Other devices signed in to this pod will need to load it again from Drive. Your password doesn't change.",
+    beanie:
+      "we'll create a new encrypted .beanpod file on your google drive and start saving there. the file you're using now stays where it is — it just stops updating, so keep it as a backup until you're happy with the move. other devices signed in to this pod will need to load it again from drive. your password doesn't change.",
+  },
+  'settings.familyData.migrate.confirmBodyToLocal': {
+    en: "You'll pick a spot on this device for a new encrypted .beanpod file, and we'll start saving there. The Drive file you're using now stays where it is — it just stops updating, so keep it as a backup until you're happy with the move. Other devices signed in to this pod will need to load the new file. Your password doesn't change.",
+    beanie:
+      "you'll pick a spot on this device for a new encrypted .beanpod file, and we'll start saving there. the drive file you're using now stays where it is — it just stops updating, so keep it as a backup until you're happy with the move. other devices signed in to this pod will need to load the new file. your password doesn't change.",
+  },
+  'settings.familyData.migrate.confirmAction': {
+    en: 'Move my pod',
+    beanie: 'move my pod',
+  },
+  'settings.familyData.migrate.cancelledTitle': {
+    en: 'Move cancelled',
+    beanie: 'move cancelled',
+  },
+  'settings.familyData.migrate.cancelledBody': {
+    en: 'Your pod is still saved to {source}.',
+    beanie: 'your pod is still saved to {source}',
+  },
+  'settings.familyData.migrate.successTitle': {
+    en: 'Your pod moved',
+    beanie: 'your pod moved',
+  },
+  'settings.familyData.migrate.successBody': {
+    en: 'Now saving to {dest}. {source} is still where it was — keep it as a backup if you like.',
+    beanie:
+      'now saving to {dest}. {source} is still where it was — keep it as a backup if you like',
+  },
+  'settings.familyData.migrate.failedTitle': {
+    en: "Couldn't move your pod",
+    beanie: "couldn't move your pod",
+  },
+  'settings.familyData.migrate.failedBody': {
+    en: '{reason} Your pod is still saved to {source}.',
+    beanie: '{reason} your pod is still saved to {source}',
+  },
+  'settings.familyData.migrate.recoveryNeededTitle': {
+    en: 'Storage needs attention',
+    beanie: 'storage needs attention',
+  },
+  'settings.familyData.migrate.recoveryNeededBody': {
+    en: "The move failed and we couldn't fully switch back to your previous storage. Sign out and sign back in to recover — your data is safe in your file.",
+    beanie:
+      "the move failed and we couldn't fully switch back to your previous storage. sign out and sign back in to recover — your data is safe in your file.",
   },
   'auth.fillAllFields': { en: 'Please fill in all fields', beanie: 'please fill in all fields' },
   'auth.passwordsDoNotMatch': { en: 'Passwords do not match', beanie: 'passwords do not match' },

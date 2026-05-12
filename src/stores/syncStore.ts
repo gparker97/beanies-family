@@ -32,6 +32,7 @@ import * as registry from '@/services/registry/registryService';
 import type { RegistryEntry } from '@/types/models';
 import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
+import { LocalStorageProvider } from '@/services/sync/providers/localProvider';
 import {
   initializeAuth,
   migratePendingRefreshToken,
@@ -41,6 +42,7 @@ import {
   fetchGoogleUserEmail,
   isSilentRefreshPending,
   isTokenValid,
+  isUserCancellation,
 } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
 import type { SaveFailureLevel } from '@/services/sync/syncService';
@@ -74,9 +76,21 @@ import {
 } from '@/services/automerge/persistenceService';
 import { bufferToBase64 } from '@/utils/encoding';
 import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
-import type { StorageProviderType } from '@/services/sync/storageProvider';
+import type { StorageProvider, StorageProviderType } from '@/services/sync/storageProvider';
 import { toISODateString } from '@/utils/date';
 import { deduplicateRecurringTransactions } from '@/services/recurring/recurringProcessor';
+
+/**
+ * Outcome of `migrateStorage`. `failed` means the move was rolled back and
+ * the pod is still on its original storage; `recovery-needed` means the
+ * rollback itself failed (rare — the original and destination both broke in
+ * the same window) and the user should sign out and back in to recover.
+ */
+export type MigrateStorageResult =
+  | { outcome: 'success'; dest: string }
+  | { outcome: 'cancelled' }
+  | { outcome: 'failed'; reason: string }
+  | { outcome: 'recovery-needed'; reason: string };
 
 export const useSyncStore = defineStore('sync', () => {
   // State
@@ -87,6 +101,7 @@ export const useSyncStore = defineStore('sync', () => {
   const error = ref<string | null>(null);
   const lastSync = ref<string | null>(null);
   const needsPermission = ref(false);
+  const isMigratingStorage = ref(false);
 
   // Family key state — the unwrapped AES-GCM key for the active .beanpod envelope
   const familyKey = shallowRef<CryptoKey | null>(null);
@@ -346,23 +361,78 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Make `provider` the active storage backend: persist its config (which
+   * also clears the opposite provider type's persisted config), install it
+   * in the sync service, write the current encrypted envelope through it,
+   * persist the UI-visible sync state, register the family, and wire up
+   * auto-sync / token-expiry handling.
+   *
+   * Pure forward operation — throws on the first failing step and does NOT
+   * roll back. The create-pod flows have nothing to roll back to; the
+   * migration flow (`migrateStorage`) captures the previous provider and
+   * re-installs it on failure.
+   *
+   * Shared by `configureSyncFile`, `configureSyncFileGoogleDrive`, and
+   * `migrateStorage` — keeps the "install this provider" sequence in one place.
+   */
+  async function installProvider(
+    provider: StorageProvider,
+    type: StorageProviderType
+  ): Promise<void> {
+    needsPermission.value = false;
+
+    const ctx = useFamilyContextStore();
+    if (ctx.activeFamilyId) {
+      await provider.persist(ctx.activeFamilyId);
+    }
+    syncService.setProvider(provider);
+    // `setProvider` fires `onStateChange` synchronously, which updates
+    // `storageProviderType` / `fileName` — no need to set them here.
+
+    isReloading = true;
+    try {
+      const ok = await syncNow();
+      if (!ok) {
+        throw new Error(error.value || 'Could not write to the new storage location');
+      }
+      await settingsRepo.saveSettings({
+        syncEnabled: true,
+        syncFilePath: provider.getDisplayName(),
+        lastSyncTimestamp: toISODateString(new Date()),
+      });
+    } finally {
+      isReloading = false;
+    }
+
+    registerCurrentFamily({
+      provider: type,
+      fileId: provider.getFileId(),
+      displayPath: provider.getDisplayName(),
+    });
+
+    if (type === 'google_drive') {
+      setupTokenExpiryHandler();
+    } else {
+      setupAutoSync();
+    }
+  }
+
+  /**
    * Configure a sync file (opens file picker).
    * Creates a new V4 file with the current family key.
    */
   async function configureSyncFile(): Promise<boolean> {
-    const success = await syncService.selectSyncFile();
-    if (success) {
-      needsPermission.value = false;
-      await syncNow();
-      await settingsRepo.saveSettings({
-        syncEnabled: true,
-        syncFilePath: fileName.value ?? undefined,
-        lastSyncTimestamp: toISODateString(new Date()),
-      });
-      setupAutoSync();
-      registerCurrentFamily({ provider: 'local', displayPath: fileName.value });
+    try {
+      const success = await syncService.selectSyncFile();
+      if (!success) return false;
+      const provider = syncService.getProvider();
+      if (!provider) return false;
+      await installProvider(provider, 'local');
+      return true;
+    } catch (e) {
+      error.value = (e as Error).message;
+      return false;
     }
-    return success;
   }
 
   /**
@@ -1613,40 +1683,134 @@ export const useSyncStore = defineStore('sync', () => {
   async function configureSyncFileGoogleDrive(podFileName: string): Promise<boolean> {
     try {
       const provider = await GoogleDriveProvider.createNew(podFileName);
-      syncService.setProvider(provider);
-
-      const ctx = useFamilyContextStore();
-      if (ctx.activeFamilyId) {
-        await provider.persist(ctx.activeFamilyId);
-      }
-
-      needsPermission.value = false;
-      storageProviderType.value = 'google_drive';
-
-      await syncNow();
-
-      isReloading = true;
-      try {
-        await settingsRepo.saveSettings({
-          syncEnabled: true,
-          syncFilePath: provider.getDisplayName(),
-          lastSyncTimestamp: toISODateString(new Date()),
-        });
-      } finally {
-        isReloading = false;
-      }
-
-      registerCurrentFamily({
-        provider: 'google_drive',
-        fileId: provider.getFileId(),
-        displayPath: provider.getDisplayName(),
-      });
-
-      setupTokenExpiryHandler();
+      await installProvider(provider, 'google_drive');
       return true;
     } catch (e) {
       error.value = (e as Error).message;
       return false;
+    }
+  }
+
+  // --- Storage migration: move the active pod between local file and Google Drive ---
+
+  /**
+   * Build the destination provider for a migration. Returns `null` when the
+   * user backs out of the picker / Google account chooser (a quiet
+   * "never mind", not an error). Throws on a genuine failure.
+   *
+   * For Drive we pass `forceConsent: false` so a cached token is reused — on a
+   * standalone PWA with no cached token this triggers redirect-auth from
+   * inside `createNew` (the page navigates away; the user retries on return),
+   * which avoids the redirect loop that `prompt=consent` would cause.
+   */
+  async function buildProviderForTarget(
+    target: StorageProviderType
+  ): Promise<StorageProvider | null> {
+    if (target === 'local') {
+      return LocalStorageProvider.fromSavePicker('my-family.beanpod');
+    }
+    try {
+      return await GoogleDriveProvider.createNew(fileName.value ?? 'my-family.beanpod', {
+        forceConsent: false,
+      });
+    } catch (e) {
+      if (isUserCancellation(e)) return null;
+      throw e;
+    }
+  }
+
+  /**
+   * Re-install the previous provider after a failed migration. Returns `true`
+   * if recovery succeeded, `false` if the rollback itself failed (the caller
+   * surfaces a "sign out and back in" message in that case). Telemetry for
+   * the failure is left to the caller, which has the full from/to context.
+   */
+  async function restorePreviousProvider(
+    provider: StorageProvider,
+    type: StorageProviderType
+  ): Promise<boolean> {
+    try {
+      await installProvider(provider, type);
+      return true;
+    } catch (e) {
+      console.error('[syncStore.migrateStorage] rollback failed', e);
+      return false;
+    }
+  }
+
+  /**
+   * Move the active pod's storage from local file to Google Drive (or vice
+   * versa). The encrypted bytes are unchanged — same family key, same
+   * envelope, no password prompt; only the storage location moves. The
+   * source file is left intact as a backup.
+   *
+   * Owner-gating lives in the UI (the action row is owner-only); the guard
+   * rails here just assert sane state. On any failure after the provider
+   * swap begins, the previous provider is re-installed (`restorePreviousProvider`).
+   * Returns a discriminated result; the caller renders the user-facing toast.
+   */
+  async function migrateStorage(target: StorageProviderType): Promise<MigrateStorageResult> {
+    if (isMigratingStorage.value) return { outcome: 'cancelled' };
+    isMigratingStorage.value = true;
+
+    const from = storageProviderType.value;
+    let needsRollback = false;
+    let previous: StorageProvider | null = null;
+
+    try {
+      if (!isConfigured.value) throw new Error('No pod is configured to move');
+      if (!from) throw new Error('No active storage provider to move from');
+      if (target === from) {
+        throw new Error(
+          `Pod is already saved to ${target === 'google_drive' ? 'Google Drive' : 'a local file'}`
+        );
+      }
+
+      // Flush the source one last time so the file you're leaving stays a
+      // valid, up-to-date backup. Non-forced: a real cross-device conflict
+      // here means "don't migrate mid-write" — surface it and let the user retry.
+      const flushed = await syncNow();
+      if (!flushed) {
+        throw new Error(
+          'Could not save your pod to its current location before moving. If another device is syncing, wait a moment and try again.'
+        );
+      }
+
+      // Build the destination. null = the user cancelled a picker/chooser.
+      const newProvider = await buildProviderForTarget(target);
+      if (!newProvider) return { outcome: 'cancelled' };
+
+      // Swap. Capture the previous provider first so we can put it back.
+      previous = syncService.getProvider();
+      needsRollback = true;
+      await installProvider(newProvider, target);
+      needsRollback = false;
+
+      reportError({
+        surface: 'storage-migration-ok',
+        severity: 'warning',
+        message: `moved ${from} -> ${target}`,
+        context: { from, to: target },
+      });
+      return { outcome: 'success', dest: newProvider.getDisplayName() };
+    } catch (e) {
+      let restored = true;
+      if (needsRollback && previous && from) {
+        restored = await restorePreviousProvider(previous, from);
+      }
+      const step = !needsRollback ? 'pre-swap' : restored ? 'install' : 'rollback';
+      const reason = e instanceof Error ? e.message : String(e);
+      reportError({
+        surface: 'storage-migration-failed',
+        severity: 'error',
+        message: reason,
+        error: e,
+        context: { from, to: target, step },
+      });
+      console.error('[syncStore.migrateStorage] failed', { from, to: target, step, error: e });
+      return restored ? { outcome: 'failed', reason } : { outcome: 'recovery-needed', reason };
+    } finally {
+      isMigratingStorage.value = false;
     }
   }
 
@@ -1983,6 +2147,7 @@ export const useSyncStore = defineStore('sync', () => {
     isConfigured,
     fileName,
     isSyncing,
+    isMigratingStorage,
     error,
     lastSync,
     needsPermission,
@@ -2016,6 +2181,7 @@ export const useSyncStore = defineStore('sync', () => {
     requestPermission,
     configureSyncFile,
     configureSyncFileGoogleDrive,
+    migrateStorage,
     syncNow,
     forceSyncNow,
     checkForConflicts,

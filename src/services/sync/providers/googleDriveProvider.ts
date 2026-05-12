@@ -315,13 +315,22 @@ export class GoogleDriveProvider implements StorageProvider {
   /**
    * Create a new .beanpod file on Google Drive.
    * Authenticates, creates/finds the app folder, and creates the file.
+   *
+   * `forceConsent` (default `true`) re-prompts the Google account chooser so
+   * a brand-new family is created under an explicitly-picked account. Pass
+   * `false` when an account is already established this session (e.g. moving
+   * an existing pod to Drive) — that reuses the cached token, which avoids a
+   * redirect-auth loop on standalone PWAs (`prompt=consent` forces the
+   * redirect path even when a token is cached).
    */
-  static async createNew(fileName: string): Promise<GoogleDriveProvider> {
+  static async createNew(
+    fileName: string,
+    opts: { forceConsent?: boolean } = {}
+  ): Promise<GoogleDriveProvider> {
     // Clear cached folder ID — prevents cross-account folder leak when switching Google accounts
     clearFolderCache();
 
-    // Always force fresh consent for new family creation to ensure all scopes are granted
-    const token = await requestAccessToken({ forceConsent: true });
+    const token = await requestAccessToken({ forceConsent: opts.forceConsent ?? true });
 
     // Capture account email (best-effort, non-blocking for provider creation)
     const email = await fetchGoogleUserEmail(token);
