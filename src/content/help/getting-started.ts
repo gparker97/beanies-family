@@ -182,7 +182,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       'Save your encrypted pod file to Google Drive for cross-device access and automatic backups.',
     icon: '\u2601\uFE0F',
     readTime: 3,
-    updatedDate: '2026-03-09',
+    updatedDate: '2026-05-12',
     sections: [
       {
         type: 'heading',
@@ -201,6 +201,11 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
           "Your data is encrypted <strong>before</strong> it leaves your device. Google can't read your pod file \u2014 it's just encrypted bytes to them.",
         title: 'Your data stays private',
         icon: '\u{1F512}',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Already saving your pod to a local file? You don\u2019t have to start over \u2014 you can move it to Google Drive (or back to a local file) any time. See the <strong>Moving your pod between local file and Google Drive</strong> guide.',
       },
       {
         type: 'heading',
@@ -229,6 +234,87 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           "On a new device, click <strong>Load Existing Family</strong> on the login page, connect your Google account, and select your pod file. Enter your password to decrypt and you're back in.",
+      },
+    ],
+  },
+  {
+    slug: 'moving-your-pod-storage',
+    category: 'getting-started',
+    title: 'Moving your pod between local file and Google Drive',
+    excerpt:
+      'Started on a local file but want cross-device access — or the other way round? Move your pod between storage types from Settings, without losing anything.',
+    icon: '\u{1F69A}',
+    readTime: 4,
+    updatedDate: '2026-05-12',
+    sections: [
+      {
+        type: 'heading',
+        content: 'Why you might move your pod',
+        level: 2,
+        id: 'why-move',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When you first set up your pod, you chose where it lives: a <strong>local file</strong> on your device, or a <strong>file on your Google Drive</strong>. That choice isn’t permanent. Maybe you started with a local file to keep things simple, and now you want to open your pod on your phone too — that means moving it to Google Drive. Or maybe the opposite: you’re on Drive and you’d rather keep everything on your own device. Either move takes a few seconds and doesn’t touch your data.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Your pod stays encrypted the whole time — same password, same family key. Moving it just copies the encrypted <code>.beanpod</code> file to the new spot and starts saving there. Nothing is decrypted, re-uploaded in the clear, or exposed.',
+      },
+      {
+        type: 'callout',
+        content:
+          'Only the pod <strong>owner</strong> can move storage. If you’re a family member, ask whoever set up the pod to do it.',
+        title: 'Owner only',
+        icon: '\u{1F511}',
+      },
+      {
+        type: 'heading',
+        content: 'How to move your pod',
+        level: 2,
+        id: 'how-to-move',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>Settings</strong> and go to <strong>Family Data Options</strong>.',
+          'Find the <strong>Move to Google Drive</strong> row (if you’re currently on a local file) or <strong>Move to a local file</strong> row (if you’re currently on Drive), and click the <strong>Move</strong> button next to it.',
+          'Read the confirmation — it tells you what happens to your current file — then confirm.',
+          'If you’re moving <em>to</em> Google Drive: sign in with your Google account if you haven’t already this session. If you’re moving <em>to</em> a local file: pick where to save the new <code>.beanpod</code> file on your device.',
+          'That’s it — your pod is now saved to the new spot, and it’ll keep auto-saving there from now on.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'What happens to the file you were using',
+        level: 2,
+        id: 'old-file',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'It stays exactly where it is — we don’t delete it. It just stops updating once you’ve moved. We recommend keeping it for a little while as a backup, until you’re happy everything’s working in the new spot. After that, you’re welcome to delete it yourself.',
+      },
+      {
+        type: 'callout',
+        content:
+          'If you use beanies.family on more than one device, the others are still pointed at the <em>old</em> location and will show an error the next time they try to save. On each of those devices, sign out and load the pod again from the new location (Drive file or local file). They’ll pick up right where they left off.',
+        title: 'Using more than one device?',
+        icon: '\u{1F4F1}',
+      },
+      {
+        type: 'heading',
+        content: 'If something goes wrong mid-move',
+        level: 2,
+        id: 'troubleshoot',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If the move can’t finish — say your network drops while creating the Drive file — beanies.family puts you back on your original storage automatically and shows you what happened. Your data is never in limbo: it’s always saved in at least one place. Just try the move again when you’re ready. In the very rare case it tells you to <strong>sign out and sign back in to recover</strong>, do that — your pod is safe in your file, and signing back in re-attaches the app to it.',
       },
     ],
   },

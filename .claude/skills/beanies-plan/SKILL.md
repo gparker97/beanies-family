@@ -23,8 +23,7 @@ This skill creates comprehensive, implementation-ready plans and optionally GitH
 
 1. **Capture the initial prompt verbatim.** Store the user's exact words — this is the primary source of truth for intent.
 2. **Ask clarifying questions** if requirements are ambiguous. Do not assume — ask.
-3. **Ask the user**: _"Should I create a GitHub issue for this, or will this be implemented directly without an issue?"_
-   - This must ALWAYS be asked. Never skip it.
+3. **Default to direct implementation — no GitHub issue.** This is a one-dev project; tickets are overhead unless the user explicitly says "create an issue" / "file a ticket" / "open a ticket for this". If the user does ask for an issue, create one per Phase 5; otherwise the plan stands alone in `docs/plans/` with the full prompt history embedded.
 4. Record all follow-up prompts, redirections, and refinements. Every user message that shapes the plan is part of the record.
 
 ### Phase 2: Draft the Plan
@@ -35,6 +34,13 @@ Key principles:
 - **No context loss**: If the user said it, it's in the plan
 - **Self-contained**: A developer reading only this plan should be able to implement the feature without asking any questions
 - **Assumptions explicit**: Every assumption is documented so it can be validated before implementation (especially if time has passed)
+
+**Help Center coverage assessment.** While drafting, decide whether this work deserves Help Center documentation:
+
+- **Yes if**: the plan introduces a distinct new user-facing feature, a meaningfully new way to accomplish an existing task, a security/privacy-relevant flow the user should understand, or a behavior change that contradicts what an existing help article currently says.
+- **No if**: the work is a bug fix, refactor, internal cleanup, performance pass, dependency bump, brand/typography tweak, or a UI polish that doesn't change *what* the user can do.
+
+If yes, the plan **must** include a `## Help Center Coverage` section (see format below) that specifies which article(s) are affected and follows the `/beanies-help-docs` skill's article-type conventions. The corresponding article work is part of the implementation acceptance criteria — not a follow-up.
 
 ### Phase 3: Iterate Until Approved
 
@@ -51,19 +57,16 @@ Once the plan is fully approved:
 2. The plan must follow the complete [Plan Document Format](#plan-document-format) below.
 3. If no GitHub issue is being created, the plan must note this explicitly and include all information that would otherwise go in the issue (see format below).
 
-### Phase 5: Create GitHub Issue (if requested)
+### Phase 5: Create GitHub Issue (only if the user explicitly asked for one)
 
-If the user requested a GitHub issue:
+**Default path — no issue.** The plan file alone is the record. Note in the plan: `> **No GitHub issue created.** This plan was approved for direct implementation.` and include ALL prompt history directly in the plan under a `## Prompt Log` section.
+
+**Only if the user explicitly asked for an issue** (e.g. "create a ticket", "file an issue", "open a GitHub ticket"):
 
 1. Create the issue using `gh issue create` with the format in [GitHub Issue Format](#github-issue-format) below.
 2. Apply labels per the project's [Issue Labeling](#issue-labeling) conventions.
 3. Add a **comment** on the issue containing ALL prompts from the conversation (initial + follow-ups + redirections). Use the format in [Prompt Log Comment](#prompt-log-comment-format) below.
 4. Update the plan file to include the issue number and link.
-
-If the user requested NO GitHub issue:
-
-1. Note in the plan: `> **No GitHub issue created.** This plan was approved for direct implementation.`
-2. Include ALL prompt history directly in the plan under a `## Prompt Log` section.
 
 ---
 
@@ -108,12 +111,29 @@ As a [role], I want [goal] so that [benefit].
 
 ## Files Affected
 
-<List of files to be created or modified.>
+<List of files to be created or modified — include any `src/content/help/*.ts` files that need new or updated articles per the Help Center Coverage section below.>
+
+## Help Center Coverage
+
+> Include this section only if the work deserves Help Center documentation per Phase 2's assessment. Omit entirely (do not write "N/A") when it doesn't apply — bug fixes, refactors, polish, and similar work usually won't have this section.
+
+For each affected article:
+
+- **Action**: `new article` | `update existing` | `deprecate / replace`
+- **Category**: `getting-started` | `features` | `security` | `how-it-works`
+- **Article type** (for new articles): `how-to` | `explainer` | `reference` | `troubleshooting`
+- **Slug**: `<kebab-case-slug>` (for new) or pointer to the existing article being updated
+- **Title**: <user-facing title>
+- **Scope**: 1–3 sentence summary of what the article will cover, framed from the user's point of view (the *why* and *what they'll get*, not the implementation)
+- **Notes**: any gotchas the article must call out (irreversible actions, security implications, defaults that aren't obvious)
+
+The article work is written following `.claude/skills/beanies-help-docs/SKILL.md` and lands **in the same change** as the feature — not as a follow-up. Treat it as a first-class acceptance criterion.
 
 ## Acceptance Criteria
 
 - [ ] ...
 - [ ] ...
+- [ ] Help Center article(s) listed in **Help Center Coverage** added/updated and verified to match the shipped behavior (omit this row if the section was omitted)
 
 ## Testing Plan
 
@@ -221,10 +241,11 @@ Follow the project's labeling conventions from `CLAUDE.md`:
 ## Rules
 
 - **NEVER summarize or truncate the plan.** Save exactly what was approved.
-- **NEVER skip the "issue or direct?" question.** Always ask.
+- **DEFAULT to direct implementation.** Do not ask "issue or direct?" — only create a GitHub issue when the user explicitly requests one.
 - **NEVER lose prompts.** Every user message that shaped the plan is recorded.
 - **ALWAYS include assumptions.** These are critical for deferred implementation.
 - **ALWAYS include acceptance criteria and testing plan.** These define "done".
-- **ALWAYS create 2-way links** between the plan file and the GitHub issue (if created).
-- **ALWAYS add labels** to GitHub issues per the project conventions.
+- **ALWAYS assess Help Center coverage.** If the work introduces a distinct user-facing feature (or meaningfully changes behavior an existing article documents), include the `## Help Center Coverage` section in the plan AND treat the article as part of the same change — not a follow-up. Skip the section entirely for bug fixes, refactors, polish, and similar work.
+- **ALWAYS create 2-way links** between the plan file and the GitHub issue (if one was created).
+- **ALWAYS add labels** to GitHub issues per the project conventions (when one is created).
 - Plans are saved to `docs/plans/YYYY-MM-DD-<short-slug>.md` — this is a permanent historical record.

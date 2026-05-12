@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-11",
-    "translationCount": 2765
+    "lastUpdated": "2026-05-12",
+    "translationCount": 2783
   },
   "translations": {
     "app.name": {
@@ -13830,6 +13830,96 @@
       "translation": "填写活动详情以附上照片。",
       "hash": "43rhh1",
       "lastUpdated": "2026-05-11"
+    },
+    "action.move": {
+      "translation": "移动",
+      "hash": "1fj75",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.moveToGoogleDrive": {
+      "translation": "移至Google云端硬碟",
+      "hash": "97qce1",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.moveToGoogleDriveDesc": {
+      "translation": "将您的Pod保存到Google云端硬盘，以便跨设备访问。",
+      "hash": "km0cf5",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.moveToLocalFile": {
+      "translation": "移动到本地文件",
+      "hash": "hg0fi2",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.moveToLocalFileDesc": {
+      "translation": "将您的pod保存到此设备上的文件中。",
+      "hash": "vash0u",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.confirmTitleToDrive": {
+      "translation": "将您的Pod移动到Google云端硬盘？",
+      "hash": "b53hw0",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.confirmTitleToLocal": {
+      "translation": "将您的pod移动到本地文件？",
+      "hash": "es756r",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.confirmBodyToDrive": {
+      "translation": "我们将在您的Google云端硬盘上创建一个新的加密.beanpod文件，并开始在那里保存。您现在使用的文件将保持不变--它只会停止更新，因此请将其作为备份保留，直到您对移动感到满意为止。登录到此Pod的其他设备将需要从云端硬盘重新加载它。您的密码不会更改。",
+      "hash": "7bu0a1",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.confirmBodyToLocal": {
+      "translation": "您将在此设备上选择一个新的加密.beanpod文件的位置，我们将开始在那里保存。您现在使用的云端硬盘文件将保持不变--它只会停止更新，因此请将其作为备份保留，直到您对移动满意为止。登录到此Pod的其他设备将需要加载新文件。您的密码不会更改。",
+      "hash": "anfy2k",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.confirmAction": {
+      "translation": "移动我的吊舱",
+      "hash": "s61crk",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.cancelledTitle": {
+      "translation": "移动已取消",
+      "hash": "kldc6a",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.cancelledBody": {
+      "translation": "您的pod仍保存到{source}。",
+      "hash": "ahphvj",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.successTitle": {
+      "translation": "您的Pod已移动",
+      "hash": "7m66q3",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.successBody": {
+      "translation": "现在保存到{dest}。{source}仍然保持原样—如果您愿意，请将其作为备份保留。",
+      "hash": "zaynjh",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.failedTitle": {
+      "translation": "无法移动您的Pod",
+      "hash": "ng7tdt",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.failedBody": {
+      "translation": "{reason}您的pod仍保存到{source}。",
+      "hash": "ytw37n",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.recoveryNeededTitle": {
+      "translation": "存放需要注意",
+      "hash": "cewep6",
+      "lastUpdated": "2026-05-12"
+    },
+    "settings.familyData.migrate.recoveryNeededBody": {
+      "translation": "移动失败，我们无法完全切换回您以前的存储空间。注销并重新登录以恢复—您的数据在文件中是安全的。",
+      "hash": "tkpv25",
+      "lastUpdated": "2026-05-12"
     }
   }
 }
