@@ -254,6 +254,7 @@ const STRING_DEFS = {
   'bean.hero.addSomething': { en: 'Add Something', beanie: 'add something' },
   'bean.hero.add.favorite': { en: '💝 Favorite', beanie: '💝 favorite' },
   'bean.hero.add.saying': { en: '💬 Saying', beanie: '💬 saying' },
+  'bean.hero.add.milestone': { en: '🌟 Milestone', beanie: '🌟 milestone' },
   'bean.hero.add.note': { en: '📝 Note', beanie: '📝 note' },
   'bean.hero.add.allergy': { en: '⚠️ Allergy', beanie: '⚠️ allergy' },
   'bean.hero.add.medication': { en: '💊 Medication', beanie: '💊 medication' },

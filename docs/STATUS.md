@@ -439,6 +439,13 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Completed Work
 
+### Bean "Add Something" menu — added Milestones + fixed the deep-link (2026-05-12)
+
+> On branch `feat/someday-todos` — **not yet committed** at the time of this entry.
+
+- `BeanHero.vue`'s ＋ Add Something dropdown (on each bean's detail page) gained a **🌟 Milestone** option — the 6th item, inserted after "Saying" to mirror the BeanTabs "memory cluster" ordering (sayings + milestones kept together). New `bean.hero.add.milestone` i18n key (en/beanie); `npm run translate` synced zh.
+- While there, fixed the menu's deep-link: it pushed `/pod/:id/<tab>?add=1`, but the per-bean tabs listen for the standard Quick-add intent `?action=add-<entity>` (via `useQuickAddIntent`) — so picking a menu item only navigated to the tab, the add form never auto-opened. `addOptions` now carries the `action` per entry (typed `QuickAddAction`), and `addFor` pushes `{ path: '/pod/:id/<tab>', query: { action: 'add-<entity>', memberId } }`. All six menu items now open their form. (No `BeanHero` test exists; `npm run validate` green.)
+
 ### "Someday · Maybe" to-dos — a third lane for the To-Do system (2026-05-12)
 
 > Implemented on branch `feat/someday-todos` (branched from `main` at `2246eca`) — **not yet committed/merged** at the time of this entry. Plan: `docs/plans/2026-05-12-someday-maybe-todos.md`.
