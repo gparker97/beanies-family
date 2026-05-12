@@ -439,6 +439,21 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Completed Work
 
+### Help-center fill-in pass — the Pod section + photos (2026-05-12)
+
+> On branch `feat/someday-todos`. Commits `e2c52a0` (batch 1), `8c1e152` (batch 2), `0646b94` (batch 3).
+
+- `/beanies-help-docs` audit found the whole **🌱 The Pod** side of the app had zero documentation (the help center had grown around the finance + To-Do/Travel/Nook/PWA work, then stalled). Wrote **7 new `features`-category articles**, all in a new file `src/content/help/the-pod.ts` (`features.ts` was already 900+ lines; the new file is `category: 'features'` too, just split for maintainability — wired into `index.ts` via `THE_POD_ARTICLES`):
+  - **Meet the Beans — Each Family Member's Profile** — the `/pod` member pages, the six tabs, the ＋ Add Something menu, the Pod-vs-Family-page distinction (member management/roles is documented separately under "Adding Family Members"), who can edit, and where bean content surfaces elsewhere.
+  - **Allergies & Medications (Care & Safety)** — recording an allergy / a medication on a bean's profile, the whole-family Care & Safety roll-up page, with a "this is a family organiser, not a medical record" callout.
+  - **Family Milestones** — the two views (the chronological Family Milestones page vs. a bean's Milestones tab), adding one (For: a bean or Family; the grouped category picker + Custom), family-wide milestones, filtering the timeline.
+  - **The Family Scrapbook** — the flip-through memory-book (a page per bean + an Everyone page, filled in automatically from bean profiles), how to flip through it, what's on each page, "Add to scrapbook", and the key point that it's a _view_ over bean profiles + milestones, not a separate store.
+  - **The Family Cookbook** — adding a recipe (name, story subtitle, prep/servings, ingredients & steps one-per-line, family notes, photos), the recipe detail page, the Cook Log ("I cooked this today" → rating + photo + running history), linking a recipe to a bean's favourite food.
+  - **Emergency Contacts** — the family phonebook: categories (+ custom), name/role/phone/email/address/notes, the Call & Email quick actions, search + category filter, and that key contacts surface on the Care & Safety page.
+  - **Adding Photos** (cross-cutting explainer) — where photos appear (milestones, recipes + cook logs, medications, activities, avatars, scrapbook); **how they're stored** (encrypted, as separate files on Google Drive — so photos **require Drive turned on**; a local-file pod gets pointed to Settings); the save-first-then-attach flow; up-to-4-per-item, the HEIC caveat, the offline queue; viewing/removing; the photo badge.
+- Also: a light polish on the existing **Family To-Do Lists** article's "Someday · Maybe" section (added a concrete to-do-vs-someday distinction; made the hover affordance cover both directions).
+- `SKILL.md` inventory bumped (Features 8 → 15), `the-pod.ts` documented in File Organisation, remaining gaps narrowed to the finance-side **Tracking Assets** / **Reports & Charts** (Tier 3, not picked for this pass). Each batch: `npm run validate` green.
+
 ### Bean "Add Something" menu — added Milestones + fixed the deep-link (2026-05-12)
 
 > On branch `feat/someday-todos` — **not yet committed** at the time of this entry.
