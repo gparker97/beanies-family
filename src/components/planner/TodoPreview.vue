@@ -20,8 +20,8 @@ const currentMemberId = computed(() => authStore.currentUser?.memberId ?? '');
 const PAGE_SIZE = 6;
 const visibleCount = ref(PAGE_SIZE);
 
-const previewTodos = computed(() => todoStore.filteredOpenTodos.slice(0, visibleCount.value));
-const hasMore = computed(() => todoStore.filteredOpenTodos.length > visibleCount.value);
+const previewTodos = computed(() => todoStore.filteredActiveTodos.slice(0, visibleCount.value));
+const hasMore = computed(() => todoStore.filteredActiveTodos.length > visibleCount.value);
 
 function showMore() {
   visibleCount.value += PAGE_SIZE;

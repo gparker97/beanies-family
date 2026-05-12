@@ -173,7 +173,7 @@ export function useCriticalItems() {
     }
 
     // ── Todos assigned to current member ──────────────────────────────
-    for (const todo of todoStore.openTodos) {
+    for (const todo of todoStore.activeTodos) {
       if (!normalizeAssignees(todo).includes(memberId)) continue;
 
       const dueDate = todo.dueDate?.split('T')[0] ?? '';
@@ -259,7 +259,7 @@ export function useCriticalItems() {
         if (isAssignee && !isPickup && !isDropoff) n++;
         return n;
       }, 0);
-    const totalTodos = todoStore.openTodos.filter((todo) => {
+    const totalTodos = todoStore.activeTodos.filter((todo) => {
       if (!normalizeAssignees(todo).includes(memberId)) return false;
       const dd = todo.dueDate?.split('T')[0] ?? '';
       return dd === '' || dd <= todayStr.value;

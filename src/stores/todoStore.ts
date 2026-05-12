@@ -8,48 +8,54 @@ import { normalizeAssignees } from '@/utils/assignees';
 import type { TodoItem, CreateTodoInput, UpdateTodoInput } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 
+// Sort comparators — newest-created first / most-recently-completed first.
+const byCreatedDesc = (a: TodoItem, b: TodoItem) => b.createdAt.localeCompare(a.createdAt);
+const byCompletedDesc = (a: TodoItem, b: TodoItem) =>
+  (b.completedAt ?? b.updatedAt).localeCompare(a.completedAt ?? a.updatedAt);
+
 export const useTodoStore = defineStore('todos', () => {
   // State
   const todos = ref<TodoItem[]>([]);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
-  // Getters
-  const openTodos = computed(() => {
-    return todos.value
-      .filter((t) => !t.completed)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  });
+  // Getters — to-dos live in one of three lanes: active (open, committed) /
+  // someday (open, parked — "someday / maybe") / completed.
+  const activeTodos = computed(() =>
+    todos.value.filter((t) => !t.completed && !t.someday).sort(byCreatedDesc)
+  );
 
-  const completedTodos = computed(() => {
-    return todos.value
-      .filter((t) => t.completed)
-      .sort((a, b) => (b.completedAt ?? b.updatedAt).localeCompare(a.completedAt ?? a.updatedAt));
-  });
+  const somedayTodos = computed(() =>
+    todos.value.filter((t) => !t.completed && t.someday).sort(byCreatedDesc)
+  );
 
-  const scheduledTodos = computed(() => openTodos.value.filter((t) => t.dueDate));
+  const completedTodos = computed(() =>
+    todos.value.filter((t) => t.completed).sort(byCompletedDesc)
+  );
 
-  const undatedTodos = computed(() => openTodos.value.filter((t) => !t.dueDate));
+  const scheduledTodos = computed(() => activeTodos.value.filter((t) => t.dueDate));
+
+  const undatedTodos = computed(() => activeTodos.value.filter((t) => !t.dueDate));
 
   // ========== FILTERED GETTERS (by global member filter) ==========
 
   const filteredTodos = createMemberFiltered(todos, (t) => normalizeAssignees(t));
 
-  const filteredOpenTodos = computed(() => {
-    return filteredTodos.value
-      .filter((t) => !t.completed)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  });
+  const filteredActiveTodos = computed(() =>
+    filteredTodos.value.filter((t) => !t.completed && !t.someday).sort(byCreatedDesc)
+  );
 
-  const filteredCompletedTodos = computed(() => {
-    return filteredTodos.value
-      .filter((t) => t.completed)
-      .sort((a, b) => (b.completedAt ?? b.updatedAt).localeCompare(a.completedAt ?? a.updatedAt));
-  });
+  const filteredSomedayTodos = computed(() =>
+    filteredTodos.value.filter((t) => !t.completed && t.someday).sort(byCreatedDesc)
+  );
 
-  const filteredScheduledTodos = computed(() => filteredOpenTodos.value.filter((t) => t.dueDate));
+  const filteredCompletedTodos = computed(() =>
+    filteredTodos.value.filter((t) => t.completed).sort(byCompletedDesc)
+  );
 
-  const filteredUndatedTodos = computed(() => filteredOpenTodos.value.filter((t) => !t.dueDate));
+  const filteredScheduledTodos = computed(() => filteredActiveTodos.value.filter((t) => t.dueDate));
+
+  const filteredUndatedTodos = computed(() => filteredActiveTodos.value.filter((t) => !t.dueDate));
 
   // Actions
   async function loadTodos() {
@@ -146,6 +152,18 @@ export const useTodoStore = defineStore('todos', () => {
     }
   }
 
+  /**
+   * Move a to-do into / out of the "someday · maybe" lane. Going someday also
+   * clears the due date/time (a someday item is deliberately unscheduled) —
+   * this invariant lives only here. Reuses `updateTodo`'s error handling
+   * (toast + telemetry via `wrapAsync`); not a silent-failure path.
+   */
+  async function setSomeday(id: string, someday: boolean): Promise<TodoItem | null> {
+    return someday
+      ? updateTodo(id, { someday: true, dueDate: undefined, dueTime: undefined })
+      : updateTodo(id, { someday: false });
+  }
+
   function resetState() {
     todos.value = [];
     isLoading.value = false;
@@ -157,14 +175,16 @@ export const useTodoStore = defineStore('todos', () => {
     todos,
     isLoading,
     error,
-    // Getters
-    openTodos,
+    // Getters — the three lanes: active / someday / completed
+    activeTodos,
+    somedayTodos,
     completedTodos,
     scheduledTodos,
     undatedTodos,
     // Filtered getters (by global member filter)
     filteredTodos,
-    filteredOpenTodos,
+    filteredActiveTodos,
+    filteredSomedayTodos,
     filteredCompletedTodos,
     filteredScheduledTodos,
     filteredUndatedTodos,
@@ -174,6 +194,7 @@ export const useTodoStore = defineStore('todos', () => {
     updateTodo,
     deleteTodo,
     toggleComplete,
+    setSomeday,
     resetState,
   };
 });

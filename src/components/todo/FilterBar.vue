@@ -45,7 +45,7 @@ const emit = defineEmits<{
       "
       @click="emit('update:activeFilter', 'open')"
     >
-      {{ t('todo.filter.open') }} ({{ todoStore.openTodos.length }})
+      {{ t('todo.filter.open') }} ({{ todoStore.activeTodos.length }})
     </button>
     <button
       class="font-outfit rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all"

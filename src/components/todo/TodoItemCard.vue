@@ -17,6 +17,7 @@ const emit = defineEmits<{
   view: [todo: TodoItem];
   edit: [todo: TodoItem];
   delete: [id: string];
+  'set-someday': [id: string, value: boolean];
 }>();
 
 const completedByMember = computed(() => {
@@ -79,5 +80,6 @@ const completedByMember = computed(() => {
     @view="emit('view', $event)"
     @edit="emit('edit', $event)"
     @delete="emit('delete', $event)"
+    @set-someday="(id, value) => emit('set-someday', id, value)"
   />
 </template>
