@@ -346,8 +346,8 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'To add photos, save the milestone first — then open it again and add the photos. You can also add a milestone straight from a bean’s profile (the <strong>Milestones</strong> tab, or <strong>＋ Add Something → 🌟 Milestone</strong>) — it’s the same form, just already set to that bean.',
-        title: 'A note on photos',
+          'You can add a photo to a milestone right away — you just need to have picked who it’s <strong>For</strong> first (a bean, or Family). beanies.family quietly creates the milestone behind the scenes so you can attach the photo, then you fill in the title, date, and the rest. You can also add a milestone straight from a bean’s profile (the <strong>Milestones</strong> tab, or <strong>＋ Add Something → 🌟 Milestone</strong>) — same form, already set to that bean.',
+        title: 'Adding a photo to a milestone',
         icon: '💡',
       },
       {
@@ -378,11 +378,11 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
           'To change a milestone, tap it to open it, edit any field, and save. To remove it, use the <strong>delete</strong> option and confirm — deleting can’t be undone.',
       },
       {
-        type: 'callout',
+        type: 'infoBox',
         content:
-          'Photos you attach to a milestone are stored encrypted inside your pod, just like everything else — they never leave your family’s control. See <strong>Adding Photos</strong> and <strong>How Your Data Is Encrypted</strong>.',
-        title: 'Your photos stay private',
-        icon: '🔒',
+          'Photos you add to a milestone are saved to your <strong>Google Drive</strong> (not packed into your pod file), in the same private folder your pod lives in, and shared with everyone in your family. A link to each photo is kept inside your encrypted pod. See <strong>Adding Photos</strong> for the full picture — and note you’ll need Google Drive turned on to add them.',
+        title: 'Where milestone photos go',
+        icon: '📷',
       },
       {
         type: 'heading',
@@ -721,21 +721,33 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
-        content: 'How photos are stored — and why Google Drive matters',
+        content: 'Where your photos are kept',
         level: 2,
         id: 'storage',
       },
       {
         type: 'paragraph',
         content:
-          'Like everything in beanies.family, your photos are <strong>encrypted</strong> — they live as encrypted files that only your family can open, never on anyone’s server. But photos are much bigger than the rest of your family data, so instead of being packed into your pod file, they’re kept as separate encrypted files on your <strong>Google Drive</strong>.',
+          'Photos work a little differently from the rest of your family data. Your pod — accounts, to-dos, milestones, all of it — is <strong>encrypted</strong>. Photos aren’t: each one is saved as an ordinary image file in <strong>your own Google Drive</strong>, in the same private <code>beanies.family</code> folder your pod lives in, and a link to it is stored inside your encrypted pod. Photos are simply too big to pack into the pod file — so this keeps your pod small and fast, and your pictures sit in <em>your</em> Drive, alongside the rest of your photos and files.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When you add a photo, beanies.family resizes it to a sensible size and saves it as a JPEG before uploading — so it loads quickly, though it won’t be the exact original file. Everyone in your pod can see each other’s photos, because that Drive folder is shared with all your family members.',
       },
       {
         type: 'callout',
         content:
-          'Because of that, <strong>photos need Google Drive turned on</strong>. If your pod currently lives in a local file, beanies.family will point you to <strong>Settings</strong> to connect Google Drive before you can add photos. See <strong>Connecting Google Drive</strong> and <strong>Moving your pod between local file and Google Drive</strong>.',
+          'Because photos live on Google Drive, <strong>you need Google Drive turned on</strong> to add them. If your pod currently lives in a local file, beanies.family will point you to <strong>Settings</strong> to connect Google Drive first. See <strong>Connecting Google Drive</strong> and <strong>Moving your pod between local file and Google Drive</strong>.',
         title: 'Photos need Google Drive',
         icon: '☁️',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'A bit of detail for the curious: each photo’s link is a long, unguessable Google address, and those links live only inside your encrypted pod — which only your family can open. So in everyday terms your photos are visible to your family, just like everything else here. They’re not <em>separately</em> encrypted the way your pod is, though — worth knowing if you’re ever attaching something especially private.',
+        title: 'A note on photo privacy',
+        icon: 'ℹ️',
       },
       {
         type: 'heading',
@@ -748,15 +760,16 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           'Open the thing you want a photo on — a milestone, a recipe, a medication, an activity, or a bean’s profile',
-          'If it’s brand new, <strong>save it first</strong> — you’ll see a hint like <em>“Save first, then add photos when editing.”</em> Then open it again',
-          'Tap <strong>Add Photos</strong> (or <strong>Add Photo</strong>), then choose <strong>Take Photo</strong> (on a phone) or <strong>From Library</strong> — or just drag a photo onto the spot',
-          'It uploads and attaches. Repeat to add more',
+          'Tap <strong>Add Photos</strong> (or <strong>Add Photo</strong>) where the photos go',
+          'Choose <strong>Take Photo</strong> (on a phone) or <strong>From Library</strong> — or just drag a photo onto the spot',
+          'It uploads and attaches. Repeat to add more (up to the limit below)',
         ],
       },
       {
         type: 'list',
         content: '',
         items: [
+          'Most forms let you attach a photo straight away. A few want a detail or two first — a recipe needs a name, a medication needs its name, dose, and frequency, a milestone needs you to have picked who it’s for — and will show a small hint if something’s missing',
           'You can attach <strong>up to 4 photos</strong> to most items. A few — a profile photo, a medication’s bottle photo — take just one',
           '<strong>HEIC</strong> photos (the iPhone default) can’t always be read in the browser. If one won’t go, save or export it as a <strong>JPEG</strong> first',
           'If you’re <strong>offline</strong> when you add a photo, it waits in a queue and uploads automatically once you’re back online',
@@ -792,7 +805,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         items: [
           '<strong>Connecting Google Drive</strong> — required before you can add photos',
           '<strong>Moving your pod between local file and Google Drive</strong> — switch your pod over',
-          '<strong>How Your Data Is Encrypted</strong> — your photos are private too',
+          '<strong>How Your Data Is Encrypted</strong> — what’s inside the encrypted pod (including the links to your photos)',
         ],
       },
     ],
