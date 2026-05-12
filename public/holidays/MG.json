@@ -1,0 +1,468 @@
+{
+  "meta": {
+    "country": "MG",
+    "name": "Madagascar",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "mg",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Taom-baovao"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Andro iraisam-pirenena ho an'ny vehivavy"
+    },
+    {
+      "date": "2025-03-29",
+      "name": "Martyrs' Day",
+      "type": "public",
+      "name_local": "Martioran'ny tolona tamin'ny 1947"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fête de fin du Ramadan"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pâques"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Alatsinain'ny Paska"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fetin'ny asa"
+    },
+    {
+      "date": "2025-05-25",
+      "name": "Africa Day",
+      "type": "public",
+      "name_local": "Andron'i Afrika"
+    },
+    {
+      "date": "2025-05-29",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Andro niakarana"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Fête du mouton"
+    },
+    {
+      "date": "2025-06-09",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Alatsinain'ny Pentekosta"
+    },
+    {
+      "date": "2025-06-26",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Fetim-pirenena"
+    },
+    {
+      "date": "2025-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Asompsiona"
+    },
+    {
+      "date": "2025-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Fetin'ny olo-masina"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Krismasy"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Taom-baovao"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Andro iraisam-pirenena ho an'ny vehivavy"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fête de fin du Ramadan"
+    },
+    {
+      "date": "2026-03-29",
+      "name": "Martyrs' Day",
+      "type": "public",
+      "name_local": "Martioran'ny tolona tamin'ny 1947"
+    },
+    {
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pâques"
+    },
+    {
+      "date": "2026-04-06",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Alatsinain'ny Paska"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fetin'ny asa"
+    },
+    {
+      "date": "2026-05-14",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Andro niakarana"
+    },
+    {
+      "date": "2026-05-25",
+      "name": "Africa Day",
+      "type": "public",
+      "name_local": "Andron'i Afrika"
+    },
+    {
+      "date": "2026-05-25",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Alatsinain'ny Pentekosta"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Fête du mouton"
+    },
+    {
+      "date": "2026-06-26",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Fetim-pirenena"
+    },
+    {
+      "date": "2026-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Asompsiona"
+    },
+    {
+      "date": "2026-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Fetin'ny olo-masina"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Krismasy"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Taom-baovao"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Andro iraisam-pirenena ho an'ny vehivavy"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fête de fin du Ramadan"
+    },
+    {
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pâques"
+    },
+    {
+      "date": "2027-03-29",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Alatsinain'ny Paska"
+    },
+    {
+      "date": "2027-03-29",
+      "name": "Martyrs' Day",
+      "type": "public",
+      "name_local": "Martioran'ny tolona tamin'ny 1947"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fetin'ny asa"
+    },
+    {
+      "date": "2027-05-06",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Andro niakarana"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Fête du mouton"
+    },
+    {
+      "date": "2027-05-17",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Alatsinain'ny Pentekosta"
+    },
+    {
+      "date": "2027-05-25",
+      "name": "Africa Day",
+      "type": "public",
+      "name_local": "Andron'i Afrika"
+    },
+    {
+      "date": "2027-06-26",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Fetim-pirenena"
+    },
+    {
+      "date": "2027-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Asompsiona"
+    },
+    {
+      "date": "2027-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Fetin'ny olo-masina"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Krismasy"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Taom-baovao"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fête de fin du Ramadan"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Andro iraisam-pirenena ho an'ny vehivavy"
+    },
+    {
+      "date": "2028-03-29",
+      "name": "Martyrs' Day",
+      "type": "public",
+      "name_local": "Martioran'ny tolona tamin'ny 1947"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pâques"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Alatsinain'ny Paska"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fetin'ny asa"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Fête du mouton"
+    },
+    {
+      "date": "2028-05-25",
+      "name": "Africa Day",
+      "type": "public",
+      "name_local": "Andron'i Afrika"
+    },
+    {
+      "date": "2028-05-25",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Andro niakarana"
+    },
+    {
+      "date": "2028-06-05",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Alatsinain'ny Pentekosta"
+    },
+    {
+      "date": "2028-06-26",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Fetim-pirenena"
+    },
+    {
+      "date": "2028-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Asompsiona"
+    },
+    {
+      "date": "2028-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Fetin'ny olo-masina"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Krismasy"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Taom-baovao"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Fête de fin du Ramadan"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Andro iraisam-pirenena ho an'ny vehivavy"
+    },
+    {
+      "date": "2029-03-29",
+      "name": "Martyrs' Day",
+      "type": "public",
+      "name_local": "Martioran'ny tolona tamin'ny 1947"
+    },
+    {
+      "date": "2029-04-01",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Pâques"
+    },
+    {
+      "date": "2029-04-02",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Alatsinain'ny Paska"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Fête du mouton"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Fetin'ny asa"
+    },
+    {
+      "date": "2029-05-10",
+      "name": "Ascension Day",
+      "type": "public",
+      "name_local": "Andro niakarana"
+    },
+    {
+      "date": "2029-05-21",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Alatsinain'ny Pentekosta"
+    },
+    {
+      "date": "2029-05-25",
+      "name": "Africa Day",
+      "type": "public",
+      "name_local": "Andron'i Afrika"
+    },
+    {
+      "date": "2029-06-26",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Fetim-pirenena"
+    },
+    {
+      "date": "2029-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Asompsiona"
+    },
+    {
+      "date": "2029-11-01",
+      "name": "All Saints' Day",
+      "type": "public",
+      "name_local": "Fetin'ny olo-masina"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Krismasy"
+    }
+  ]
+}

@@ -1,0 +1,438 @@
+{
+  "meta": {
+    "country": "MT",
+    "name": "Malta",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "mt",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "L-Ewwel tas-Sena"
+    },
+    {
+      "date": "2025-02-10",
+      "name": "Feast of Saint Paul's Shipwreck in Malta",
+      "type": "public",
+      "name_local": "Nawfraġju ta' San Pawl"
+    },
+    {
+      "date": "2025-03-19",
+      "name": "Saint Joseph",
+      "type": "public",
+      "name_local": "San Ġużepp"
+    },
+    {
+      "date": "2025-03-31",
+      "name": "Freedom Day",
+      "type": "public",
+      "name_local": "Jum il-Ħelsien"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Il-Ġimgħa l-Kbira"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Jum il-Ħaddiem"
+    },
+    {
+      "date": "2025-06-07",
+      "name": "June 7th",
+      "type": "public",
+      "name_local": "Sette Giugno"
+    },
+    {
+      "date": "2025-06-29",
+      "name": "Saints Peter and Paul",
+      "type": "public",
+      "name_local": "L-Imnarja"
+    },
+    {
+      "date": "2025-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Santa Marija"
+    },
+    {
+      "date": "2025-09-08",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Jum il-Vitorja"
+    },
+    {
+      "date": "2025-09-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jum l-Indipendenza"
+    },
+    {
+      "date": "2025-12-08",
+      "name": "Immaculate Conception",
+      "type": "public",
+      "name_local": "Il-Kunċizzjoni"
+    },
+    {
+      "date": "2025-12-13",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Jum ir-Repubblika"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Il-Milied"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "L-Ewwel tas-Sena"
+    },
+    {
+      "date": "2026-02-10",
+      "name": "Feast of Saint Paul's Shipwreck in Malta",
+      "type": "public",
+      "name_local": "Nawfraġju ta' San Pawl"
+    },
+    {
+      "date": "2026-03-19",
+      "name": "Saint Joseph",
+      "type": "public",
+      "name_local": "San Ġużepp"
+    },
+    {
+      "date": "2026-03-31",
+      "name": "Freedom Day",
+      "type": "public",
+      "name_local": "Jum il-Ħelsien"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Il-Ġimgħa l-Kbira"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Jum il-Ħaddiem"
+    },
+    {
+      "date": "2026-06-07",
+      "name": "June 7th",
+      "type": "public",
+      "name_local": "Sette Giugno"
+    },
+    {
+      "date": "2026-06-29",
+      "name": "Saints Peter and Paul",
+      "type": "public",
+      "name_local": "L-Imnarja"
+    },
+    {
+      "date": "2026-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Santa Marija"
+    },
+    {
+      "date": "2026-09-08",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Jum il-Vitorja"
+    },
+    {
+      "date": "2026-09-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jum l-Indipendenza"
+    },
+    {
+      "date": "2026-12-08",
+      "name": "Immaculate Conception",
+      "type": "public",
+      "name_local": "Il-Kunċizzjoni"
+    },
+    {
+      "date": "2026-12-13",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Jum ir-Repubblika"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Il-Milied"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "L-Ewwel tas-Sena"
+    },
+    {
+      "date": "2027-02-10",
+      "name": "Feast of Saint Paul's Shipwreck in Malta",
+      "type": "public",
+      "name_local": "Nawfraġju ta' San Pawl"
+    },
+    {
+      "date": "2027-03-19",
+      "name": "Saint Joseph",
+      "type": "public",
+      "name_local": "San Ġużepp"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Il-Ġimgħa l-Kbira"
+    },
+    {
+      "date": "2027-03-31",
+      "name": "Freedom Day",
+      "type": "public",
+      "name_local": "Jum il-Ħelsien"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Jum il-Ħaddiem"
+    },
+    {
+      "date": "2027-06-07",
+      "name": "June 7th",
+      "type": "public",
+      "name_local": "Sette Giugno"
+    },
+    {
+      "date": "2027-06-29",
+      "name": "Saints Peter and Paul",
+      "type": "public",
+      "name_local": "L-Imnarja"
+    },
+    {
+      "date": "2027-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Santa Marija"
+    },
+    {
+      "date": "2027-09-08",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Jum il-Vitorja"
+    },
+    {
+      "date": "2027-09-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jum l-Indipendenza"
+    },
+    {
+      "date": "2027-12-08",
+      "name": "Immaculate Conception",
+      "type": "public",
+      "name_local": "Il-Kunċizzjoni"
+    },
+    {
+      "date": "2027-12-13",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Jum ir-Repubblika"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Il-Milied"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "L-Ewwel tas-Sena"
+    },
+    {
+      "date": "2028-02-10",
+      "name": "Feast of Saint Paul's Shipwreck in Malta",
+      "type": "public",
+      "name_local": "Nawfraġju ta' San Pawl"
+    },
+    {
+      "date": "2028-03-19",
+      "name": "Saint Joseph",
+      "type": "public",
+      "name_local": "San Ġużepp"
+    },
+    {
+      "date": "2028-03-31",
+      "name": "Freedom Day",
+      "type": "public",
+      "name_local": "Jum il-Ħelsien"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Il-Ġimgħa l-Kbira"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Jum il-Ħaddiem"
+    },
+    {
+      "date": "2028-06-07",
+      "name": "June 7th",
+      "type": "public",
+      "name_local": "Sette Giugno"
+    },
+    {
+      "date": "2028-06-29",
+      "name": "Saints Peter and Paul",
+      "type": "public",
+      "name_local": "L-Imnarja"
+    },
+    {
+      "date": "2028-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Santa Marija"
+    },
+    {
+      "date": "2028-09-08",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Jum il-Vitorja"
+    },
+    {
+      "date": "2028-09-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jum l-Indipendenza"
+    },
+    {
+      "date": "2028-12-08",
+      "name": "Immaculate Conception",
+      "type": "public",
+      "name_local": "Il-Kunċizzjoni"
+    },
+    {
+      "date": "2028-12-13",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Jum ir-Repubblika"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Il-Milied"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "L-Ewwel tas-Sena"
+    },
+    {
+      "date": "2029-02-10",
+      "name": "Feast of Saint Paul's Shipwreck in Malta",
+      "type": "public",
+      "name_local": "Nawfraġju ta' San Pawl"
+    },
+    {
+      "date": "2029-03-19",
+      "name": "Saint Joseph",
+      "type": "public",
+      "name_local": "San Ġużepp"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Il-Ġimgħa l-Kbira"
+    },
+    {
+      "date": "2029-03-31",
+      "name": "Freedom Day",
+      "type": "public",
+      "name_local": "Jum il-Ħelsien"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Jum il-Ħaddiem"
+    },
+    {
+      "date": "2029-06-07",
+      "name": "June 7th",
+      "type": "public",
+      "name_local": "Sette Giugno"
+    },
+    {
+      "date": "2029-06-29",
+      "name": "Saints Peter and Paul",
+      "type": "public",
+      "name_local": "L-Imnarja"
+    },
+    {
+      "date": "2029-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Santa Marija"
+    },
+    {
+      "date": "2029-09-08",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Jum il-Vitorja"
+    },
+    {
+      "date": "2029-09-21",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Jum l-Indipendenza"
+    },
+    {
+      "date": "2029-12-08",
+      "name": "Immaculate Conception",
+      "type": "public",
+      "name_local": "Il-Kunċizzjoni"
+    },
+    {
+      "date": "2029-12-13",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Jum ir-Repubblika"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Il-Milied"
+    }
+  ]
+}

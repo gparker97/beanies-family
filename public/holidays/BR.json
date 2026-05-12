@@ -1,0 +1,342 @@
+{
+  "meta": {
+    "country": "BR",
+    "name": "Brazil",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "pt",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Sexta-Feira Santa"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Tiradentes' Day",
+      "type": "public",
+      "name_local": "Dia de Tiradentes"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2025-09-07",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2025-10-12",
+      "name": "Our Lady of Aparecida",
+      "type": "public",
+      "name_local": "Nossa Senhora Aparecida"
+    },
+    {
+      "date": "2025-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Dia de Finados"
+    },
+    {
+      "date": "2025-11-15",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Proclamação da República"
+    },
+    {
+      "date": "2025-11-20",
+      "name": "Black Awareness Day",
+      "type": "public",
+      "name_local": "Dia da Consciência Negra"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Sexta-Feira Santa"
+    },
+    {
+      "date": "2026-04-21",
+      "name": "Tiradentes' Day",
+      "type": "public",
+      "name_local": "Dia de Tiradentes"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2026-09-07",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2026-10-04",
+      "name": "Election Day",
+      "type": "public",
+      "name_local": "Dia de Eleição"
+    },
+    {
+      "date": "2026-10-12",
+      "name": "Our Lady of Aparecida",
+      "type": "public",
+      "name_local": "Nossa Senhora Aparecida"
+    },
+    {
+      "date": "2026-10-25",
+      "name": "Election Day",
+      "type": "public",
+      "name_local": "Dia de Eleição"
+    },
+    {
+      "date": "2026-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Dia de Finados"
+    },
+    {
+      "date": "2026-11-15",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Proclamação da República"
+    },
+    {
+      "date": "2026-11-20",
+      "name": "Black Awareness Day",
+      "type": "public",
+      "name_local": "Dia da Consciência Negra"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Sexta-Feira Santa"
+    },
+    {
+      "date": "2027-04-21",
+      "name": "Tiradentes' Day",
+      "type": "public",
+      "name_local": "Dia de Tiradentes"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2027-09-07",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2027-10-12",
+      "name": "Our Lady of Aparecida",
+      "type": "public",
+      "name_local": "Nossa Senhora Aparecida"
+    },
+    {
+      "date": "2027-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Dia de Finados"
+    },
+    {
+      "date": "2027-11-15",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Proclamação da República"
+    },
+    {
+      "date": "2027-11-20",
+      "name": "Black Awareness Day",
+      "type": "public",
+      "name_local": "Dia da Consciência Negra"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Sexta-Feira Santa"
+    },
+    {
+      "date": "2028-04-21",
+      "name": "Tiradentes' Day",
+      "type": "public",
+      "name_local": "Dia de Tiradentes"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2028-09-07",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2028-10-01",
+      "name": "Election Day",
+      "type": "public",
+      "name_local": "Dia de Eleição"
+    },
+    {
+      "date": "2028-10-12",
+      "name": "Our Lady of Aparecida",
+      "type": "public",
+      "name_local": "Nossa Senhora Aparecida"
+    },
+    {
+      "date": "2028-10-29",
+      "name": "Election Day",
+      "type": "public",
+      "name_local": "Dia de Eleição"
+    },
+    {
+      "date": "2028-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Dia de Finados"
+    },
+    {
+      "date": "2028-11-15",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Proclamação da República"
+    },
+    {
+      "date": "2028-11-20",
+      "name": "Black Awareness Day",
+      "type": "public",
+      "name_local": "Dia da Consciência Negra"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2029-03-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Sexta-Feira Santa"
+    },
+    {
+      "date": "2029-04-21",
+      "name": "Tiradentes' Day",
+      "type": "public",
+      "name_local": "Dia de Tiradentes"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2029-09-07",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2029-10-12",
+      "name": "Our Lady of Aparecida",
+      "type": "public",
+      "name_local": "Nossa Senhora Aparecida"
+    },
+    {
+      "date": "2029-11-02",
+      "name": "All Souls' Day",
+      "type": "public",
+      "name_local": "Dia de Finados"
+    },
+    {
+      "date": "2029-11-15",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Proclamação da República"
+    },
+    {
+      "date": "2029-11-20",
+      "name": "Black Awareness Day",
+      "type": "public",
+      "name_local": "Dia da Consciência Negra"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    }
+  ]
+}

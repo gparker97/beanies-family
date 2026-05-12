@@ -1,0 +1,348 @@
+{
+  "meta": {
+    "country": "RS",
+    "name": "Serbia",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "sr",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова година"
+    },
+    {
+      "date": "2025-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова година"
+    },
+    {
+      "date": "2025-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Божић"
+    },
+    {
+      "date": "2025-02-15",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Дан државности Србије"
+    },
+    {
+      "date": "2025-02-17",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Дан државности Србије"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Orthodox Good Friday",
+      "type": "public",
+      "name_local": "Велики петак"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Васкрс"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Orthodox Easter Monday",
+      "type": "public",
+      "name_local": "Васкрсни понедељак"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Празник рада"
+    },
+    {
+      "date": "2025-05-02",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Празник рада"
+    },
+    {
+      "date": "2025-11-11",
+      "name": "Armistice Day",
+      "type": "public",
+      "name_local": "Дан примирја"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова година"
+    },
+    {
+      "date": "2026-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова година"
+    },
+    {
+      "date": "2026-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Божић"
+    },
+    {
+      "date": "2026-02-16",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Дан државности Србије"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Дан државности Србије"
+    },
+    {
+      "date": "2026-04-10",
+      "name": "Orthodox Good Friday",
+      "type": "public",
+      "name_local": "Велики петак"
+    },
+    {
+      "date": "2026-04-12",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Васкрс"
+    },
+    {
+      "date": "2026-04-13",
+      "name": "Orthodox Easter Monday",
+      "type": "public",
+      "name_local": "Васкрсни понедељак"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Празник рада"
+    },
+    {
+      "date": "2026-05-02",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Празник рада"
+    },
+    {
+      "date": "2026-11-11",
+      "name": "Armistice Day",
+      "type": "public",
+      "name_local": "Дан примирја"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова година"
+    },
+    {
+      "date": "2027-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова година"
+    },
+    {
+      "date": "2027-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Божић"
+    },
+    {
+      "date": "2027-02-15",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Дан државности Србије"
+    },
+    {
+      "date": "2027-02-16",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Дан државности Србије"
+    },
+    {
+      "date": "2027-04-30",
+      "name": "Orthodox Good Friday",
+      "type": "public",
+      "name_local": "Велики петак"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Празник рада"
+    },
+    {
+      "date": "2027-05-02",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Васкрс"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Празник рада"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "Orthodox Easter Monday",
+      "type": "public",
+      "name_local": "Васкрсни понедељак"
+    },
+    {
+      "date": "2027-11-11",
+      "name": "Armistice Day",
+      "type": "public",
+      "name_local": "Дан примирја"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова година"
+    },
+    {
+      "date": "2028-01-03",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова година"
+    },
+    {
+      "date": "2028-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Божић"
+    },
+    {
+      "date": "2028-02-15",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Дан државности Србије"
+    },
+    {
+      "date": "2028-02-16",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Дан државности Србије"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Orthodox Good Friday",
+      "type": "public",
+      "name_local": "Велики петак"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Васкрс"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Orthodox Easter Monday",
+      "type": "public",
+      "name_local": "Васкрсни понедељак"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Празник рада"
+    },
+    {
+      "date": "2028-05-02",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Празник рада"
+    },
+    {
+      "date": "2028-11-11",
+      "name": "Armistice Day",
+      "type": "public",
+      "name_local": "Дан примирја"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова година"
+    },
+    {
+      "date": "2029-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова година"
+    },
+    {
+      "date": "2029-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Божић"
+    },
+    {
+      "date": "2029-02-15",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Дан државности Србије"
+    },
+    {
+      "date": "2029-02-16",
+      "name": "Statehood Day",
+      "type": "public",
+      "name_local": "Дан државности Србије"
+    },
+    {
+      "date": "2029-04-06",
+      "name": "Orthodox Good Friday",
+      "type": "public",
+      "name_local": "Велики петак"
+    },
+    {
+      "date": "2029-04-08",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Васкрс"
+    },
+    {
+      "date": "2029-04-09",
+      "name": "Orthodox Easter Monday",
+      "type": "public",
+      "name_local": "Васкрсни понедељак"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Празник рада"
+    },
+    {
+      "date": "2029-05-02",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Празник рада"
+    },
+    {
+      "date": "2029-11-12",
+      "name": "Armistice Day",
+      "type": "public",
+      "name_local": "Дан примирја"
+    }
+  ]
+}

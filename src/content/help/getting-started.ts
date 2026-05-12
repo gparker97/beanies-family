@@ -668,4 +668,96 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'family-holidays-on-the-planner',
+    category: 'getting-started',
+    title: 'See your family\u2019s public holidays on the planner',
+    excerpt:
+      'Tell beanies.family where your family lives and the Family Planner will mark your country\u2019s public holidays \u2014 the days when school is usually out.',
+    icon: '\u{1F30D}',
+    readTime: 2,
+    updatedDate: '2026-05-12',
+    sections: [
+      {
+        type: 'heading',
+        content: 'Why this matters',
+        level: 2,
+        id: 'why-holidays',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Public holidays are the days school is usually closed and many workplaces shut. Having them right there on the planner makes it easy to see when the term is interrupted, line up childcare, or plan a trip around a long weekend.',
+      },
+      {
+        type: 'heading',
+        content: 'Turning it on',
+        level: 2,
+        id: 'turning-on',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'You can pick your country during the first-run setup (step 1, next to the currency picker), or any time afterwards in <strong>Settings \u2192 Country &amp; Holidays</strong>. Choose your country from the list and that\u2019s it \u2014 holidays appear on the planner straight away.',
+      },
+      {
+        type: 'heading',
+        content: 'What you\u2019ll see',
+        level: 2,
+        id: 'what-you-see',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'On the <strong>month view</strong>: the holiday\u2019s day cell gets a soft clay-coloured background and a little italic label \u2014 e.g. \u201cMemorial Day (US)\u201d, \u201cVesak Day (SG)\u201d.',
+          'On the <strong>week view</strong>: the day\u2019s header is tinted, with the holiday name in the all-day row.',
+          'On the <strong>day view</strong> and the day agenda: a small banner at the top \u2014 \u201cVesak Day (SG) \u2014 public holiday\u201d.',
+          'Upcoming holidays in the next 30 days also show in the planner\u2019s sidebar.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Tap a holiday anywhere it appears to see a short detail card with the date, the country, and a note about what it usually means.',
+      },
+      {
+        type: 'heading',
+        content: 'Changing or turning it off',
+        level: 2,
+        id: 'changing',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'In <strong>Settings \u2192 Country &amp; Holidays</strong> you can pick a different country, or choose <strong>Not set</strong> to turn the feature off entirely. There\u2019s also a <strong>Show public holidays on the planner</strong> toggle so you can hide them without forgetting which country you picked.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'The country list and holiday data are bundled with the app \u2014 nothing about where your family lives ever leaves your device.',
+        title: 'Private, like everything else',
+        icon: '\u{1F512}',
+      },
+      {
+        type: 'heading',
+        content: 'Good to know',
+        level: 2,
+        id: 'good-to-know',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'It\u2019s <strong>display-only</strong> \u2014 holidays never get added to your calendar, and you can\u2019t edit or delete one. Deleting a real activity that happens to fall on a holiday doesn\u2019t touch the holiday marker.',
+          '<strong>Observance varies.</strong> \u201cWork and school are probably off\u201d is the typical case, not a guarantee \u2014 it depends on your region, sector, and employer. Please check.',
+          '<strong>National holidays only, for now.</strong> State, province, and other regional holidays aren\u2019t included yet.',
+          '<strong>Public holidays only.</strong> Bank-only days and purely ceremonial \u201cobservance\u201d days aren\u2019t shown.',
+          'Holiday names are shown in <strong>English</strong> (a local-language name appears in the detail card where we have one).',
+          'If no holidays appear for your country, the dataset doesn\u2019t cover it yet \u2014 nothing breaks, you just won\u2019t see any.',
+          'A holiday during a trip keeps the trip\u2019s colour on the calendar, but the holiday label still appears.',
+        ],
+      },
+    ],
+  },
 ];

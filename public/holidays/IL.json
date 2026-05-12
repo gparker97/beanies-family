@@ -1,0 +1,288 @@
+{
+  "meta": {
+    "country": "IL",
+    "name": "Israel",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "he",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-04-13",
+      "name": "Passover (Pesach)",
+      "type": "public",
+      "name_local": "פסח"
+    },
+    {
+      "date": "2025-04-19",
+      "name": "Mimouna, Seventh day of Passover",
+      "type": "public",
+      "name_local": "מימונה, שביעי של פסח"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Independence Day (Yom HaAtzmaut)",
+      "type": "public",
+      "name_local": "יום העצמאות"
+    },
+    {
+      "date": "2025-06-02",
+      "name": "Shavuot (Feast of Weeks)",
+      "type": "public",
+      "name_local": "שבועות"
+    },
+    {
+      "date": "2025-09-23",
+      "name": "Rosh Hashanah (Yom Teruah)",
+      "type": "public",
+      "name_local": "ראש השנה"
+    },
+    {
+      "date": "2025-09-24",
+      "name": "Rosh Hashanah (Day 2)",
+      "type": "public",
+      "name_local": "ראש השנה יום 2"
+    },
+    {
+      "date": "2025-10-02",
+      "name": "Day of Atonement (Yom Kippur)",
+      "type": "public",
+      "name_local": "יום כיפור"
+    },
+    {
+      "date": "2025-10-07",
+      "name": "Feast of Tabernacles (Sukkot)",
+      "type": "public",
+      "name_local": "סוכות"
+    },
+    {
+      "date": "2025-10-14",
+      "name": "Simchat Torah/ Shmini Atzeret",
+      "type": "public",
+      "name_local": "שמחת תורה/שמיני עצרת"
+    },
+    {
+      "date": "2026-04-02",
+      "name": "Passover (Pesach)",
+      "type": "public",
+      "name_local": "פסח"
+    },
+    {
+      "date": "2026-04-08",
+      "name": "Mimouna, Seventh day of Passover",
+      "type": "public",
+      "name_local": "מימונה, שביעי של פסח"
+    },
+    {
+      "date": "2026-04-22",
+      "name": "Independence Day (Yom HaAtzmaut)",
+      "type": "public",
+      "name_local": "יום העצמאות"
+    },
+    {
+      "date": "2026-05-22",
+      "name": "Shavuot (Feast of Weeks)",
+      "type": "public",
+      "name_local": "שבועות"
+    },
+    {
+      "date": "2026-09-12",
+      "name": "Rosh Hashanah (Yom Teruah)",
+      "type": "public",
+      "name_local": "ראש השנה"
+    },
+    {
+      "date": "2026-09-13",
+      "name": "Rosh Hashanah (Day 2)",
+      "type": "public",
+      "name_local": "ראש השנה יום 2"
+    },
+    {
+      "date": "2026-09-21",
+      "name": "Day of Atonement (Yom Kippur)",
+      "type": "public",
+      "name_local": "יום כיפור"
+    },
+    {
+      "date": "2026-09-26",
+      "name": "Feast of Tabernacles (Sukkot)",
+      "type": "public",
+      "name_local": "סוכות"
+    },
+    {
+      "date": "2026-10-03",
+      "name": "Simchat Torah/ Shmini Atzeret",
+      "type": "public",
+      "name_local": "שמחת תורה/שמיני עצרת"
+    },
+    {
+      "date": "2027-04-22",
+      "name": "Passover (Pesach)",
+      "type": "public",
+      "name_local": "פסח"
+    },
+    {
+      "date": "2027-04-28",
+      "name": "Mimouna, Seventh day of Passover",
+      "type": "public",
+      "name_local": "מימונה, שביעי של פסח"
+    },
+    {
+      "date": "2027-05-12",
+      "name": "Independence Day (Yom HaAtzmaut)",
+      "type": "public",
+      "name_local": "יום העצמאות"
+    },
+    {
+      "date": "2027-06-11",
+      "name": "Shavuot (Feast of Weeks)",
+      "type": "public",
+      "name_local": "שבועות"
+    },
+    {
+      "date": "2027-10-02",
+      "name": "Rosh Hashanah (Yom Teruah)",
+      "type": "public",
+      "name_local": "ראש השנה"
+    },
+    {
+      "date": "2027-10-03",
+      "name": "Rosh Hashanah (Day 2)",
+      "type": "public",
+      "name_local": "ראש השנה יום 2"
+    },
+    {
+      "date": "2027-10-11",
+      "name": "Day of Atonement (Yom Kippur)",
+      "type": "public",
+      "name_local": "יום כיפור"
+    },
+    {
+      "date": "2027-10-16",
+      "name": "Feast of Tabernacles (Sukkot)",
+      "type": "public",
+      "name_local": "סוכות"
+    },
+    {
+      "date": "2027-10-23",
+      "name": "Simchat Torah/ Shmini Atzeret",
+      "type": "public",
+      "name_local": "שמחת תורה/שמיני עצרת"
+    },
+    {
+      "date": "2028-04-11",
+      "name": "Passover (Pesach)",
+      "type": "public",
+      "name_local": "פסח"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Mimouna, Seventh day of Passover",
+      "type": "public",
+      "name_local": "מימונה, שביעי של פסח"
+    },
+    {
+      "date": "2028-05-02",
+      "name": "Independence Day (Yom HaAtzmaut)",
+      "type": "public",
+      "name_local": "יום העצמאות"
+    },
+    {
+      "date": "2028-05-31",
+      "name": "Shavuot (Feast of Weeks)",
+      "type": "public",
+      "name_local": "שבועות"
+    },
+    {
+      "date": "2028-09-21",
+      "name": "Rosh Hashanah (Yom Teruah)",
+      "type": "public",
+      "name_local": "ראש השנה"
+    },
+    {
+      "date": "2028-09-22",
+      "name": "Rosh Hashanah (Day 2)",
+      "type": "public",
+      "name_local": "ראש השנה יום 2"
+    },
+    {
+      "date": "2028-09-30",
+      "name": "Day of Atonement (Yom Kippur)",
+      "type": "public",
+      "name_local": "יום כיפור"
+    },
+    {
+      "date": "2028-10-05",
+      "name": "Feast of Tabernacles (Sukkot)",
+      "type": "public",
+      "name_local": "סוכות"
+    },
+    {
+      "date": "2028-10-12",
+      "name": "Simchat Torah/ Shmini Atzeret",
+      "type": "public",
+      "name_local": "שמחת תורה/שמיני עצרת"
+    },
+    {
+      "date": "2029-03-31",
+      "name": "Passover (Pesach)",
+      "type": "public",
+      "name_local": "פסח"
+    },
+    {
+      "date": "2029-04-06",
+      "name": "Mimouna, Seventh day of Passover",
+      "type": "public",
+      "name_local": "מימונה, שביעי של פסח"
+    },
+    {
+      "date": "2029-04-19",
+      "name": "Independence Day (Yom HaAtzmaut)",
+      "type": "public",
+      "name_local": "יום העצמאות"
+    },
+    {
+      "date": "2029-05-20",
+      "name": "Shavuot (Feast of Weeks)",
+      "type": "public",
+      "name_local": "שבועות"
+    },
+    {
+      "date": "2029-09-10",
+      "name": "Rosh Hashanah (Yom Teruah)",
+      "type": "public",
+      "name_local": "ראש השנה"
+    },
+    {
+      "date": "2029-09-11",
+      "name": "Rosh Hashanah (Day 2)",
+      "type": "public",
+      "name_local": "ראש השנה יום 2"
+    },
+    {
+      "date": "2029-09-19",
+      "name": "Day of Atonement (Yom Kippur)",
+      "type": "public",
+      "name_local": "יום כיפור"
+    },
+    {
+      "date": "2029-09-24",
+      "name": "Feast of Tabernacles (Sukkot)",
+      "type": "public",
+      "name_local": "סוכות"
+    },
+    {
+      "date": "2029-10-01",
+      "name": "Simchat Torah/ Shmini Atzeret",
+      "type": "public",
+      "name_local": "שמחת תורה/שמיני עצרת"
+    }
+  ]
+}

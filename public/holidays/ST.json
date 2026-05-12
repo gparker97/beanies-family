@@ -1,0 +1,324 @@
+{
+  "meta": {
+    "country": "ST",
+    "name": "Sao Tome and Principe",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "pt",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2025-02-03",
+      "name": "Martyrs' Day",
+      "type": "public",
+      "name_local": "Dia dos Mártires"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2025-07-11",
+      "name": "Independence Day (substitute day)",
+      "type": "public",
+      "name_local": "Dia da Independência (substitute day)"
+    },
+    {
+      "date": "2025-07-12",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência (substitute day)"
+    },
+    {
+      "date": "2025-09-05",
+      "name": "Armed Forces Day (substitute day)",
+      "type": "public",
+      "name_local": "Dia das Forças Armadas (substitute day)"
+    },
+    {
+      "date": "2025-09-06",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "Dia das Forças Armadas (substitute day)"
+    },
+    {
+      "date": "2025-09-30",
+      "name": "Agricultural Reform Day",
+      "type": "public",
+      "name_local": "Dia da Reforma Agrária"
+    },
+    {
+      "date": "2025-12-21",
+      "name": "São Tomé Day",
+      "type": "public",
+      "name_local": "Dia de São Tomé"
+    },
+    {
+      "date": "2025-12-22",
+      "name": "São Tomé Day (substitute day)",
+      "type": "public",
+      "name_local": "Dia de São Tomé"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2026-02-03",
+      "name": "Martyrs' Day",
+      "type": "public",
+      "name_local": "Dia dos Mártires"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2026-07-12",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência (substitute day)"
+    },
+    {
+      "date": "2026-07-13",
+      "name": "Independence Day (substitute day)",
+      "type": "public",
+      "name_local": "Dia da Independência (substitute day)"
+    },
+    {
+      "date": "2026-09-06",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "Dia das Forças Armadas (substitute day)"
+    },
+    {
+      "date": "2026-09-07",
+      "name": "Armed Forces Day (substitute day)",
+      "type": "public",
+      "name_local": "Dia das Forças Armadas (substitute day)"
+    },
+    {
+      "date": "2026-09-30",
+      "name": "Agricultural Reform Day",
+      "type": "public",
+      "name_local": "Dia da Reforma Agrária"
+    },
+    {
+      "date": "2026-12-21",
+      "name": "São Tomé Day",
+      "type": "public",
+      "name_local": "Dia de São Tomé"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2027-02-03",
+      "name": "Martyrs' Day",
+      "type": "public",
+      "name_local": "Dia dos Mártires"
+    },
+    {
+      "date": "2027-04-30",
+      "name": "Labour Day (substitute day)",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2027-07-12",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência (substitute day)"
+    },
+    {
+      "date": "2027-09-06",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "Dia das Forças Armadas (substitute day)"
+    },
+    {
+      "date": "2027-09-30",
+      "name": "Agricultural Reform Day",
+      "type": "public",
+      "name_local": "Dia da Reforma Agrária"
+    },
+    {
+      "date": "2027-12-21",
+      "name": "São Tomé Day",
+      "type": "public",
+      "name_local": "Dia de São Tomé"
+    },
+    {
+      "date": "2027-12-24",
+      "name": "Christmas Day (substitute day)",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2027-12-31",
+      "name": "New Year's Day (substitute day)",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2028-02-03",
+      "name": "Martyrs' Day",
+      "type": "public",
+      "name_local": "Dia dos Mártires"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2028-07-12",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência (substitute day)"
+    },
+    {
+      "date": "2028-09-06",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "Dia das Forças Armadas (substitute day)"
+    },
+    {
+      "date": "2028-09-29",
+      "name": "Agricultural Reform Day (substitute day)",
+      "type": "public",
+      "name_local": "Dia da Reforma Agrária"
+    },
+    {
+      "date": "2028-09-30",
+      "name": "Agricultural Reform Day",
+      "type": "public",
+      "name_local": "Dia da Reforma Agrária"
+    },
+    {
+      "date": "2028-12-21",
+      "name": "São Tomé Day",
+      "type": "public",
+      "name_local": "Dia de São Tomé"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2029-02-02",
+      "name": "Martyrs' Day (substitute day)",
+      "type": "public",
+      "name_local": "Dia dos Mártires"
+    },
+    {
+      "date": "2029-02-03",
+      "name": "Martyrs' Day",
+      "type": "public",
+      "name_local": "Dia dos Mártires"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2029-07-12",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência (substitute day)"
+    },
+    {
+      "date": "2029-09-06",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "Dia das Forças Armadas (substitute day)"
+    },
+    {
+      "date": "2029-09-30",
+      "name": "Agricultural Reform Day",
+      "type": "public",
+      "name_local": "Dia da Reforma Agrária"
+    },
+    {
+      "date": "2029-10-01",
+      "name": "Agricultural Reform Day (substitute day)",
+      "type": "public",
+      "name_local": "Dia da Reforma Agrária"
+    },
+    {
+      "date": "2029-12-21",
+      "name": "São Tomé Day",
+      "type": "public",
+      "name_local": "Dia de São Tomé"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    }
+  ]
+}

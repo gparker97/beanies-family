@@ -14,20 +14,13 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
-import { useAccountsStore } from '@/stores/accountsStore';
-import { useAssetsStore } from '@/stores/assetsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
-import { useGoalsStore } from '@/stores/goalsStore';
-import { useMemberFilterStore } from '@/stores/memberFilterStore';
-import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { useTodoStore } from '@/stores/todoStore';
-import { useActivityStore } from '@/stores/activityStore';
-import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
+import { resetAllAppStores } from '@/utils/resetStores';
 import { useToday } from '@/composables/useToday';
 import { useTranslation } from '@/composables/useTranslation';
 import { useLanguageSwitcher } from '@/composables/useLanguageSwitcher';
@@ -148,20 +141,6 @@ function closeProfileDropdown() {
   showProfileDropdown.value = false;
 }
 
-function resetAllStores() {
-  useSyncStore().resetState();
-  useFamilyStore().resetState();
-  useAccountsStore().resetState();
-  useTransactionsStore().resetState();
-  useAssetsStore().resetState();
-  useGoalsStore().resetState();
-  useRecurringStore().resetState();
-  useSettingsStore().resetState();
-  useMemberFilterStore().resetState();
-  useTodoStore().resetState();
-  useActivityStore().resetState();
-}
-
 function handleEditProfile() {
   showProfileDropdown.value = false;
   if (currentMember.value) {
@@ -233,14 +212,14 @@ function promptSignOut() {
 async function confirmSignOut() {
   showSignOutModal.value = false;
   await authStore.signOut();
-  resetAllStores();
+  resetAllAppStores();
   router.replace('/login');
 }
 
 async function confirmSignOutAndClearData() {
   showSignOutModal.value = false;
   await authStore.signOutAndClearData();
-  resetAllStores();
+  resetAllAppStores();
   router.replace('/login');
 }
 </script>

@@ -1,0 +1,264 @@
+{
+  "meta": {
+    "country": "AE",
+    "name": "United Arab Emirates",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "ar",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "رأس السنة الميلادية"
+    },
+    {
+      "date": "2025-01-27",
+      "name": "Laylat al-Mi'raj",
+      "type": "public",
+      "name_local": "الإسراء والمعراج"
+    },
+    {
+      "date": "2025-03-01",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "اليوم الأول من رمضان"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2025-06-26",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "رأس السنة الهجرية"
+    },
+    {
+      "date": "2025-09-04",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2025-12-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "اليوم الوطني"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "رأس السنة الميلادية"
+    },
+    {
+      "date": "2026-01-16",
+      "name": "Laylat al-Mi'raj",
+      "type": "public",
+      "name_local": "الإسراء والمعراج"
+    },
+    {
+      "date": "2026-02-18",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "اليوم الأول من رمضان"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2026-06-16",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "رأس السنة الهجرية"
+    },
+    {
+      "date": "2026-08-25",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2026-12-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "اليوم الوطني"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "رأس السنة الميلادية"
+    },
+    {
+      "date": "2027-01-05",
+      "name": "Laylat al-Mi'raj",
+      "type": "public",
+      "name_local": "الإسراء والمعراج"
+    },
+    {
+      "date": "2027-02-08",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "اليوم الأول من رمضان"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2027-06-06",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "رأس السنة الهجرية"
+    },
+    {
+      "date": "2027-08-14",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2027-12-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "اليوم الوطني"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Laylat al-Mi'raj",
+      "type": "public",
+      "name_local": "الإسراء والمعراج"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "رأس السنة الميلادية"
+    },
+    {
+      "date": "2028-01-28",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "اليوم الأول من رمضان"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2028-05-25",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "رأس السنة الهجرية"
+    },
+    {
+      "date": "2028-08-03",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2028-12-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "اليوم الوطني"
+    },
+    {
+      "date": "2028-12-14",
+      "name": "Laylat al-Mi'raj",
+      "type": "public",
+      "name_local": "الإسراء والمعراج"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "رأس السنة الميلادية"
+    },
+    {
+      "date": "2029-01-16",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "اليوم الأول من رمضان"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2029-05-14",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "رأس السنة الهجرية"
+    },
+    {
+      "date": "2029-07-24",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2029-12-02",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "اليوم الوطني"
+    },
+    {
+      "date": "2029-12-03",
+      "name": "Laylat al-Mi'raj",
+      "type": "public",
+      "name_local": "الإسراء والمعراج"
+    }
+  ]
+}

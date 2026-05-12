@@ -1,0 +1,378 @@
+{
+  "meta": {
+    "country": "BG",
+    "name": "Bulgaria",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "bg",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова Година"
+    },
+    {
+      "date": "2025-03-03",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Ден на Освобождението на България от Османската Империя"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Разпети петък"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Великден"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Велики понеделник"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ден на труда"
+    },
+    {
+      "date": "2025-05-06",
+      "name": "St. George's Day",
+      "type": "public",
+      "name_local": "Гергьовден"
+    },
+    {
+      "date": "2025-05-24",
+      "name": "Bulgarian Education and Culture, and Slavonic Literature Day",
+      "type": "public",
+      "name_local": "Ден на азбуката, културата и просветата"
+    },
+    {
+      "date": "2025-09-06",
+      "name": "Unification Day",
+      "type": "public",
+      "name_local": "Ден на съединението"
+    },
+    {
+      "date": "2025-09-22",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ден на независимостта"
+    },
+    {
+      "date": "2025-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Бъдни вечер"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Коледа"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова Година"
+    },
+    {
+      "date": "2026-03-03",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Ден на Освобождението на България от Османската Империя"
+    },
+    {
+      "date": "2026-04-10",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Разпети петък"
+    },
+    {
+      "date": "2026-04-12",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Великден"
+    },
+    {
+      "date": "2026-04-13",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Велики понеделник"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ден на труда"
+    },
+    {
+      "date": "2026-05-06",
+      "name": "St. George's Day",
+      "type": "public",
+      "name_local": "Гергьовден"
+    },
+    {
+      "date": "2026-05-24",
+      "name": "Bulgarian Education and Culture, and Slavonic Literature Day",
+      "type": "public",
+      "name_local": "Ден на азбуката, културата и просветата"
+    },
+    {
+      "date": "2026-09-06",
+      "name": "Unification Day",
+      "type": "public",
+      "name_local": "Ден на съединението"
+    },
+    {
+      "date": "2026-09-22",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ден на независимостта"
+    },
+    {
+      "date": "2026-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Бъдни вечер"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Коледа"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова Година"
+    },
+    {
+      "date": "2027-03-03",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Ден на Освобождението на България от Османската Империя"
+    },
+    {
+      "date": "2027-04-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Разпети петък"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ден на труда"
+    },
+    {
+      "date": "2027-05-02",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Великден"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Велики понеделник"
+    },
+    {
+      "date": "2027-05-06",
+      "name": "St. George's Day",
+      "type": "public",
+      "name_local": "Гергьовден"
+    },
+    {
+      "date": "2027-05-24",
+      "name": "Bulgarian Education and Culture, and Slavonic Literature Day",
+      "type": "public",
+      "name_local": "Ден на азбуката, културата и просветата"
+    },
+    {
+      "date": "2027-09-06",
+      "name": "Unification Day",
+      "type": "public",
+      "name_local": "Ден на съединението"
+    },
+    {
+      "date": "2027-09-22",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ден на независимостта"
+    },
+    {
+      "date": "2027-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Бъдни вечер"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Коледа"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова Година"
+    },
+    {
+      "date": "2028-03-03",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Ден на Освобождението на България от Османската Империя"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Разпети петък"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Великден"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Велики понеделник"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ден на труда"
+    },
+    {
+      "date": "2028-05-06",
+      "name": "St. George's Day",
+      "type": "public",
+      "name_local": "Гергьовден"
+    },
+    {
+      "date": "2028-05-24",
+      "name": "Bulgarian Education and Culture, and Slavonic Literature Day",
+      "type": "public",
+      "name_local": "Ден на азбуката, културата и просветата"
+    },
+    {
+      "date": "2028-09-06",
+      "name": "Unification Day",
+      "type": "public",
+      "name_local": "Ден на съединението"
+    },
+    {
+      "date": "2028-09-22",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ден на независимостта"
+    },
+    {
+      "date": "2028-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Бъдни вечер"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Коледа"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова Година"
+    },
+    {
+      "date": "2029-03-03",
+      "name": "Liberation Day",
+      "type": "public",
+      "name_local": "Ден на Освобождението на България от Османската Империя"
+    },
+    {
+      "date": "2029-04-06",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Разпети петък"
+    },
+    {
+      "date": "2029-04-08",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Великден"
+    },
+    {
+      "date": "2029-04-09",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Велики понеделник"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ден на труда"
+    },
+    {
+      "date": "2029-05-06",
+      "name": "St. George's Day",
+      "type": "public",
+      "name_local": "Гергьовден"
+    },
+    {
+      "date": "2029-05-24",
+      "name": "Bulgarian Education and Culture, and Slavonic Literature Day",
+      "type": "public",
+      "name_local": "Ден на азбуката, културата и просветата"
+    },
+    {
+      "date": "2029-09-06",
+      "name": "Unification Day",
+      "type": "public",
+      "name_local": "Ден на съединението"
+    },
+    {
+      "date": "2029-09-22",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ден на независимостта"
+    },
+    {
+      "date": "2029-12-24",
+      "name": "Christmas Eve",
+      "type": "public",
+      "name_local": "Бъдни вечер"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Коледа"
+    }
+  ]
+}

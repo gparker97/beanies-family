@@ -1,0 +1,438 @@
+{
+  "meta": {
+    "country": "GR",
+    "name": "Greece",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "el",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Πρωτοχρονιά"
+    },
+    {
+      "date": "2025-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Θεοφάνεια"
+    },
+    {
+      "date": "2025-03-03",
+      "name": "Ash Sunday",
+      "type": "public",
+      "name_local": "Καθαρά Δευτέρα"
+    },
+    {
+      "date": "2025-03-25",
+      "name": "Annunciation, Anniversary of 1821 Revolution",
+      "type": "public",
+      "name_local": "Ευαγγελισμός, Εθνική Εορτή"
+    },
+    {
+      "date": "2025-04-18",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Μεγάλη Παρασκευή"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Πάσχα"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Δευτέρα του Πάσχα"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Εργατική Πρωτομαγιά"
+    },
+    {
+      "date": "2025-06-08",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Πεντηκοστή"
+    },
+    {
+      "date": "2025-06-09",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Αγίου Πνεύματος"
+    },
+    {
+      "date": "2025-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Κοίμηση της Θεοτόκου"
+    },
+    {
+      "date": "2025-10-28",
+      "name": "National Holiday",
+      "type": "public",
+      "name_local": "Επέτειος του Όχι"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Χριστούγεννα"
+    },
+    {
+      "date": "2025-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Δεύτερη μέρα των Χριστουγέννων"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Πρωτοχρονιά"
+    },
+    {
+      "date": "2026-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Θεοφάνεια"
+    },
+    {
+      "date": "2026-02-23",
+      "name": "Ash Sunday",
+      "type": "public",
+      "name_local": "Καθαρά Δευτέρα"
+    },
+    {
+      "date": "2026-03-25",
+      "name": "Annunciation, Anniversary of 1821 Revolution",
+      "type": "public",
+      "name_local": "Ευαγγελισμός, Εθνική Εορτή"
+    },
+    {
+      "date": "2026-04-10",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Μεγάλη Παρασκευή"
+    },
+    {
+      "date": "2026-04-12",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Πάσχα"
+    },
+    {
+      "date": "2026-04-13",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Δευτέρα του Πάσχα"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Εργατική Πρωτομαγιά"
+    },
+    {
+      "date": "2026-05-31",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Πεντηκοστή"
+    },
+    {
+      "date": "2026-06-01",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Αγίου Πνεύματος"
+    },
+    {
+      "date": "2026-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Κοίμηση της Θεοτόκου"
+    },
+    {
+      "date": "2026-10-28",
+      "name": "National Holiday",
+      "type": "public",
+      "name_local": "Επέτειος του Όχι"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Χριστούγεννα"
+    },
+    {
+      "date": "2026-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Δεύτερη μέρα των Χριστουγέννων"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Πρωτοχρονιά"
+    },
+    {
+      "date": "2027-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Θεοφάνεια"
+    },
+    {
+      "date": "2027-03-15",
+      "name": "Ash Sunday",
+      "type": "public",
+      "name_local": "Καθαρά Δευτέρα"
+    },
+    {
+      "date": "2027-03-25",
+      "name": "Annunciation, Anniversary of 1821 Revolution",
+      "type": "public",
+      "name_local": "Ευαγγελισμός, Εθνική Εορτή"
+    },
+    {
+      "date": "2027-04-30",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Μεγάλη Παρασκευή"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Εργατική Πρωτομαγιά"
+    },
+    {
+      "date": "2027-05-02",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Πάσχα"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Δευτέρα του Πάσχα"
+    },
+    {
+      "date": "2027-06-20",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Πεντηκοστή"
+    },
+    {
+      "date": "2027-06-21",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Αγίου Πνεύματος"
+    },
+    {
+      "date": "2027-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Κοίμηση της Θεοτόκου"
+    },
+    {
+      "date": "2027-10-28",
+      "name": "National Holiday",
+      "type": "public",
+      "name_local": "Επέτειος του Όχι"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Χριστούγεννα"
+    },
+    {
+      "date": "2027-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Δεύτερη μέρα των Χριστουγέννων"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Πρωτοχρονιά"
+    },
+    {
+      "date": "2028-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Θεοφάνεια"
+    },
+    {
+      "date": "2028-02-28",
+      "name": "Ash Sunday",
+      "type": "public",
+      "name_local": "Καθαρά Δευτέρα"
+    },
+    {
+      "date": "2028-03-25",
+      "name": "Annunciation, Anniversary of 1821 Revolution",
+      "type": "public",
+      "name_local": "Ευαγγελισμός, Εθνική Εορτή"
+    },
+    {
+      "date": "2028-04-14",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Μεγάλη Παρασκευή"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Πάσχα"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Δευτέρα του Πάσχα"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Εργατική Πρωτομαγιά"
+    },
+    {
+      "date": "2028-06-04",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Πεντηκοστή"
+    },
+    {
+      "date": "2028-06-05",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Αγίου Πνεύματος"
+    },
+    {
+      "date": "2028-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Κοίμηση της Θεοτόκου"
+    },
+    {
+      "date": "2028-10-28",
+      "name": "National Holiday",
+      "type": "public",
+      "name_local": "Επέτειος του Όχι"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Χριστούγεννα"
+    },
+    {
+      "date": "2028-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Δεύτερη μέρα των Χριστουγέννων"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Πρωτοχρονιά"
+    },
+    {
+      "date": "2029-01-06",
+      "name": "Epiphany",
+      "type": "public",
+      "name_local": "Θεοφάνεια"
+    },
+    {
+      "date": "2029-02-19",
+      "name": "Ash Sunday",
+      "type": "public",
+      "name_local": "Καθαρά Δευτέρα"
+    },
+    {
+      "date": "2029-03-25",
+      "name": "Annunciation, Anniversary of 1821 Revolution",
+      "type": "public",
+      "name_local": "Ευαγγελισμός, Εθνική Εορτή"
+    },
+    {
+      "date": "2029-04-06",
+      "name": "Good Friday",
+      "type": "public",
+      "name_local": "Μεγάλη Παρασκευή"
+    },
+    {
+      "date": "2029-04-08",
+      "name": "Easter Sunday",
+      "type": "public",
+      "name_local": "Πάσχα"
+    },
+    {
+      "date": "2029-04-09",
+      "name": "Easter Monday",
+      "type": "public",
+      "name_local": "Δευτέρα του Πάσχα"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Εργατική Πρωτομαγιά"
+    },
+    {
+      "date": "2029-05-27",
+      "name": "Pentecost",
+      "type": "public",
+      "name_local": "Πεντηκοστή"
+    },
+    {
+      "date": "2029-05-28",
+      "name": "Whit Monday",
+      "type": "public",
+      "name_local": "Αγίου Πνεύματος"
+    },
+    {
+      "date": "2029-08-15",
+      "name": "Assumption",
+      "type": "public",
+      "name_local": "Κοίμηση της Θεοτόκου"
+    },
+    {
+      "date": "2029-10-28",
+      "name": "National Holiday",
+      "type": "public",
+      "name_local": "Επέτειος του Όχι"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Χριστούγεννα"
+    },
+    {
+      "date": "2029-12-26",
+      "name": "Boxing Day",
+      "type": "public",
+      "name_local": "Δεύτερη μέρα των Χριστουγέννων"
+    }
+  ]
+}

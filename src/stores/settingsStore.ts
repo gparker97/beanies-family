@@ -12,6 +12,7 @@ import type {
   AIProvider,
   ExchangeRate,
   LanguageCode,
+  CountryCode,
 } from '@/types/models';
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -84,6 +85,18 @@ export const useSettingsStore = defineStore('settings', () => {
   const customInstitutions = computed(() => settings.value.customInstitutions ?? []);
   const onboardingCompleted = computed(() => settings.value.onboardingCompleted ?? true);
   const weekStartDay = computed(() => settings.value.weekStartDay ?? 1); // default Monday
+  // Country of residence — drives public-holiday display. Dual-tracked: the
+  // per-family value (synced via .beanpod) wins; the device mirror is the
+  // fallback for a brand-new device that hasn't synced the family doc yet
+  // (same precedence philosophy as exchangeRates).
+  const country = computed<CountryCode | null>(
+    () => settings.value.country ?? globalSettings.value.country ?? null
+  );
+  // Public holidays are dormant until a country is picked; once it is, they
+  // default to visible (the family can opt out via setShowPublicHolidays).
+  const showPublicHolidays = computed<boolean>(() =>
+    country.value ? (settings.value.showPublicHolidays ?? true) : false
+  );
   const isTrustedDevice = computed(() => globalSettings.value.isTrustedDevice ?? false);
   const trustedDevicePromptShown = computed(
     () => globalSettings.value.trustedDevicePromptShown ?? false
@@ -264,6 +277,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const setTheme = (v: Settings['theme']) => persistDualSetting('theme', v);
   const setLanguage = (v: LanguageCode) => persistDualSetting('language', v);
   const setTextSize = (v: 'normal' | 'large') => persistDualSetting('textSize', v);
+  // Country is dual-persisted (device + family) like language — a new device
+  // can resolve it and pre-fetch holidays before the family doc syncs.
+  // Passing `undefined` clears it on both layers (treated as "not set").
+  const setCountry = (v: CountryCode | null) => persistDualSetting('country', v ?? undefined);
 
   async function setSyncEnabled(enabled: boolean): Promise<void> {
     isLoading.value = true;
@@ -386,6 +403,16 @@ export const useSettingsStore = defineStore('settings', () => {
       settings.value = await settingsRepo.saveSettings({ weekStartDay: day });
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update week start day';
+    }
+  }
+
+  // Family-only preference (no device mirror): whether to show public holidays
+  // on the planner. Only meaningful once a country is set.
+  async function setShowPublicHolidays(show: boolean): Promise<void> {
+    try {
+      settings.value = await settingsRepo.setShowPublicHolidays(show);
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update holiday display setting';
     }
   }
 
@@ -554,6 +581,8 @@ export const useSettingsStore = defineStore('settings', () => {
     customInstitutions,
     onboardingCompleted,
     weekStartDay,
+    country,
+    showPublicHolidays,
     isTrustedDevice,
     trustedDevicePromptShown,
     passkeyPromptShown,
@@ -574,6 +603,8 @@ export const useSettingsStore = defineStore('settings', () => {
     setPreferredCurrencies,
     setOnboardingCompleted,
     setWeekStartDay,
+    setCountry,
+    setShowPublicHolidays,
     addCustomInstitution,
     removeCustomInstitution,
     setExchangeRateAutoUpdate,

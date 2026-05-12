@@ -1,0 +1,293 @@
+{
+  "meta": {
+    "country": "SS",
+    "name": "South Sudan",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "en",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-01-09",
+      "name": "Peace Agreement Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-03-31",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2025-05-16",
+      "name": "SPLA Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-06-08",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2025-07-09",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-07-30",
+      "name": "Martyrs Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-28",
+      "name": "Republic Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-31",
+      "name": "New Year's Eve",
+      "type": "public"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-01-09",
+      "name": "Peace Agreement Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-03-21",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-16",
+      "name": "SPLA Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-29",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2026-07-09",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-07-30",
+      "name": "Martyrs Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-28",
+      "name": "Republic Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-31",
+      "name": "New Year's Eve",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-09",
+      "name": "Peace Agreement Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-10",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "SPLA Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-05-18",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2027-07-09",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-07-30",
+      "name": "Martyrs Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-28",
+      "name": "Republic Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-31",
+      "name": "New Year's Eve",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-09",
+      "name": "Peace Agreement Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-02-27",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-05-07",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2028-05-16",
+      "name": "SPLA Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-07-09",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-07-30",
+      "name": "Martyrs Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-28",
+      "name": "Republic Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-31",
+      "name": "New Year's Eve",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-09",
+      "name": "Peace Agreement Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-15",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-04-26",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2029-05-16",
+      "name": "SPLA Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-07-09",
+      "name": "Independence Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-07-30",
+      "name": "Martyrs Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-28",
+      "name": "Republic Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-31",
+      "name": "New Year's Eve",
+      "type": "public"
+    }
+  ]
+}

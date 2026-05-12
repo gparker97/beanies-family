@@ -1,0 +1,414 @@
+{
+  "meta": {
+    "country": "BN",
+    "name": "Brunei Darussalam",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "ms",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Awal Tahun Masihi"
+    },
+    {
+      "date": "2025-01-27",
+      "name": "Laylat al-Mi'raj",
+      "type": "public",
+      "name_local": "Israk dan Mikraj"
+    },
+    {
+      "date": "2025-01-29",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2025-02-23",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "Hari Kebangsaan"
+    },
+    {
+      "date": "2025-03-01",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "Awal Ramadan"
+    },
+    {
+      "date": "2025-03-17",
+      "name": "Nuzul Al-Quran",
+      "type": "public",
+      "name_local": "Hari Nuzul Al-Quran"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2025-03-31",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "Hari Angkatan Bersenjata Diraja Brunei"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Hari Raya Haji"
+    },
+    {
+      "date": "2025-06-26",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Awal Muharram"
+    },
+    {
+      "date": "2025-07-15",
+      "name": "Sultan's Birthday",
+      "type": "public",
+      "name_local": "Hari Keputeraan KDYMM Sultan Brunei"
+    },
+    {
+      "date": "2025-09-04",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Hari Keputeraan Nabi Muhammad S.A.W."
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Hari Krismas"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Awal Tahun Masihi"
+    },
+    {
+      "date": "2026-01-16",
+      "name": "Laylat al-Mi'raj",
+      "type": "public",
+      "name_local": "Israk dan Mikraj"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2026-02-18",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "Awal Ramadan"
+    },
+    {
+      "date": "2026-02-23",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "Hari Kebangsaan"
+    },
+    {
+      "date": "2026-03-06",
+      "name": "Nuzul Al-Quran",
+      "type": "public",
+      "name_local": "Hari Nuzul Al-Quran"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2026-03-31",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "Hari Angkatan Bersenjata Diraja Brunei"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Hari Raya Haji"
+    },
+    {
+      "date": "2026-06-16",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Awal Muharram"
+    },
+    {
+      "date": "2026-07-15",
+      "name": "Sultan's Birthday",
+      "type": "public",
+      "name_local": "Hari Keputeraan KDYMM Sultan Brunei"
+    },
+    {
+      "date": "2026-08-25",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Hari Keputeraan Nabi Muhammad S.A.W."
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Hari Krismas"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Awal Tahun Masihi"
+    },
+    {
+      "date": "2027-01-05",
+      "name": "Laylat al-Mi'raj",
+      "type": "public",
+      "name_local": "Israk dan Mikraj"
+    },
+    {
+      "date": "2027-02-06",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2027-02-08",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "Awal Ramadan"
+    },
+    {
+      "date": "2027-02-23",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "Hari Kebangsaan"
+    },
+    {
+      "date": "2027-02-24",
+      "name": "Nuzul Al-Quran",
+      "type": "public",
+      "name_local": "Hari Nuzul Al-Quran"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2027-03-31",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "Hari Angkatan Bersenjata Diraja Brunei"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Hari Raya Haji"
+    },
+    {
+      "date": "2027-06-06",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Awal Muharram"
+    },
+    {
+      "date": "2027-07-15",
+      "name": "Sultan's Birthday",
+      "type": "public",
+      "name_local": "Hari Keputeraan KDYMM Sultan Brunei"
+    },
+    {
+      "date": "2027-08-14",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Hari Keputeraan Nabi Muhammad S.A.W."
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Hari Krismas"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Laylat al-Mi'raj",
+      "type": "public",
+      "name_local": "Israk dan Mikraj"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Awal Tahun Masihi"
+    },
+    {
+      "date": "2028-01-26",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2028-01-28",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "Awal Ramadan"
+    },
+    {
+      "date": "2028-02-13",
+      "name": "Nuzul Al-Quran",
+      "type": "public",
+      "name_local": "Hari Nuzul Al-Quran"
+    },
+    {
+      "date": "2028-02-23",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "Hari Kebangsaan"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2028-03-31",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "Hari Angkatan Bersenjata Diraja Brunei"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Hari Raya Haji"
+    },
+    {
+      "date": "2028-05-25",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Awal Muharram"
+    },
+    {
+      "date": "2028-07-15",
+      "name": "Sultan's Birthday",
+      "type": "public",
+      "name_local": "Hari Keputeraan KDYMM Sultan Brunei"
+    },
+    {
+      "date": "2028-08-03",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Hari Keputeraan Nabi Muhammad S.A.W."
+    },
+    {
+      "date": "2028-12-14",
+      "name": "Laylat al-Mi'raj",
+      "type": "public",
+      "name_local": "Israk dan Mikraj"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Hari Krismas"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Awal Tahun Masihi"
+    },
+    {
+      "date": "2029-01-16",
+      "name": "First day of Ramadan",
+      "type": "public",
+      "name_local": "Awal Ramadan"
+    },
+    {
+      "date": "2029-02-01",
+      "name": "Nuzul Al-Quran",
+      "type": "public",
+      "name_local": "Hari Nuzul Al-Quran"
+    },
+    {
+      "date": "2029-02-13",
+      "name": "Chinese New Year",
+      "type": "public",
+      "name_local": "Tahun Baru Cina"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Hari Raya Aidil Fitri"
+    },
+    {
+      "date": "2029-02-23",
+      "name": "National Day",
+      "type": "public",
+      "name_local": "Hari Kebangsaan"
+    },
+    {
+      "date": "2029-03-31",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "Hari Angkatan Bersenjata Diraja Brunei"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "Hari Raya Haji"
+    },
+    {
+      "date": "2029-05-14",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "Awal Muharram"
+    },
+    {
+      "date": "2029-07-15",
+      "name": "Sultan's Birthday",
+      "type": "public",
+      "name_local": "Hari Keputeraan KDYMM Sultan Brunei"
+    },
+    {
+      "date": "2029-07-24",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "Hari Keputeraan Nabi Muhammad S.A.W."
+    },
+    {
+      "date": "2029-12-03",
+      "name": "Laylat al-Mi'raj",
+      "type": "public",
+      "name_local": "Israk dan Mikraj"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Hari Krismas"
+    }
+  ]
+}

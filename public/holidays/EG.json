@@ -1,0 +1,408 @@
+{
+  "meta": {
+    "country": "EG",
+    "name": "Egypt",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "ar",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "عيد الميلاد المجيد"
+    },
+    {
+      "date": "2025-01-25",
+      "name": "National Police Day",
+      "type": "public",
+      "name_local": "عيد الشرطة"
+    },
+    {
+      "date": "2025-01-25",
+      "name": "Revolution Day 2011",
+      "type": "public",
+      "name_local": "عيد ثورة 25 يناير"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Sham El Nessim",
+      "type": "public",
+      "name_local": "شم النسيم"
+    },
+    {
+      "date": "2025-04-25",
+      "name": "Sinai Liberation Day",
+      "type": "public",
+      "name_local": "عيد تحرير سيناء"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "يوم العمال"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2025-06-26",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "رأس السنة الهجرية"
+    },
+    {
+      "date": "2025-06-30",
+      "name": "30 June Day",
+      "type": "public",
+      "name_local": "عيد ثورة 30 يونيو"
+    },
+    {
+      "date": "2025-07-23",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "يوم الثورة"
+    },
+    {
+      "date": "2025-09-04",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2025-10-06",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "عيد القوات المسلحة"
+    },
+    {
+      "date": "2026-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "عيد الميلاد المجيد"
+    },
+    {
+      "date": "2026-01-25",
+      "name": "National Police Day",
+      "type": "public",
+      "name_local": "عيد الشرطة"
+    },
+    {
+      "date": "2026-01-25",
+      "name": "Revolution Day 2011",
+      "type": "public",
+      "name_local": "عيد ثورة 25 يناير"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2026-04-13",
+      "name": "Sham El Nessim",
+      "type": "public",
+      "name_local": "شم النسيم"
+    },
+    {
+      "date": "2026-04-25",
+      "name": "Sinai Liberation Day",
+      "type": "public",
+      "name_local": "عيد تحرير سيناء"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "يوم العمال"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2026-06-16",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "رأس السنة الهجرية"
+    },
+    {
+      "date": "2026-06-30",
+      "name": "30 June Day",
+      "type": "public",
+      "name_local": "عيد ثورة 30 يونيو"
+    },
+    {
+      "date": "2026-07-23",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "يوم الثورة"
+    },
+    {
+      "date": "2026-08-25",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2026-10-06",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "عيد القوات المسلحة"
+    },
+    {
+      "date": "2027-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "عيد الميلاد المجيد"
+    },
+    {
+      "date": "2027-01-25",
+      "name": "National Police Day",
+      "type": "public",
+      "name_local": "عيد الشرطة"
+    },
+    {
+      "date": "2027-01-25",
+      "name": "Revolution Day 2011",
+      "type": "public",
+      "name_local": "عيد ثورة 25 يناير"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2027-04-25",
+      "name": "Sinai Liberation Day",
+      "type": "public",
+      "name_local": "عيد تحرير سيناء"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "يوم العمال"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "Sham El Nessim",
+      "type": "public",
+      "name_local": "شم النسيم"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2027-06-06",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "رأس السنة الهجرية"
+    },
+    {
+      "date": "2027-06-30",
+      "name": "30 June Day",
+      "type": "public",
+      "name_local": "عيد ثورة 30 يونيو"
+    },
+    {
+      "date": "2027-07-23",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "يوم الثورة"
+    },
+    {
+      "date": "2027-08-14",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2027-10-06",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "عيد القوات المسلحة"
+    },
+    {
+      "date": "2028-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "عيد الميلاد المجيد"
+    },
+    {
+      "date": "2028-01-25",
+      "name": "National Police Day",
+      "type": "public",
+      "name_local": "عيد الشرطة"
+    },
+    {
+      "date": "2028-01-25",
+      "name": "Revolution Day 2011",
+      "type": "public",
+      "name_local": "عيد ثورة 25 يناير"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Sham El Nessim",
+      "type": "public",
+      "name_local": "شم النسيم"
+    },
+    {
+      "date": "2028-04-25",
+      "name": "Sinai Liberation Day",
+      "type": "public",
+      "name_local": "عيد تحرير سيناء"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "يوم العمال"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2028-05-25",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "رأس السنة الهجرية"
+    },
+    {
+      "date": "2028-06-30",
+      "name": "30 June Day",
+      "type": "public",
+      "name_local": "عيد ثورة 30 يونيو"
+    },
+    {
+      "date": "2028-07-23",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "يوم الثورة"
+    },
+    {
+      "date": "2028-08-03",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2028-10-06",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "عيد القوات المسلحة"
+    },
+    {
+      "date": "2029-01-07",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "عيد الميلاد المجيد"
+    },
+    {
+      "date": "2029-01-25",
+      "name": "National Police Day",
+      "type": "public",
+      "name_local": "عيد الشرطة"
+    },
+    {
+      "date": "2029-01-25",
+      "name": "Revolution Day 2011",
+      "type": "public",
+      "name_local": "عيد ثورة 25 يناير"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "عيد الفطر"
+    },
+    {
+      "date": "2029-04-09",
+      "name": "Sham El Nessim",
+      "type": "public",
+      "name_local": "شم النسيم"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public",
+      "name_local": "عيد الأضحى"
+    },
+    {
+      "date": "2029-04-25",
+      "name": "Sinai Liberation Day",
+      "type": "public",
+      "name_local": "عيد تحرير سيناء"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "يوم العمال"
+    },
+    {
+      "date": "2029-05-14",
+      "name": "Islamic New Year",
+      "type": "public",
+      "name_local": "رأس السنة الهجرية"
+    },
+    {
+      "date": "2029-06-30",
+      "name": "30 June Day",
+      "type": "public",
+      "name_local": "عيد ثورة 30 يونيو"
+    },
+    {
+      "date": "2029-07-23",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "يوم الثورة"
+    },
+    {
+      "date": "2029-07-24",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public",
+      "name_local": "المولد النبويّ"
+    },
+    {
+      "date": "2029-10-06",
+      "name": "Armed Forces Day",
+      "type": "public",
+      "name_local": "عيد القوات المسلحة"
+    }
+  ]
+}

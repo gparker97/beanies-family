@@ -1,0 +1,303 @@
+{
+  "meta": {
+    "country": "GW",
+    "name": "Guinea-Bissau",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "pt",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2025-01-20",
+      "name": "Heroes Day",
+      "type": "public",
+      "name_local": "Dia dos heróis"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Dia Internacional da Mulher"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2025-08-03",
+      "name": "Pidjiguiti Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-09-24",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2025-11-14",
+      "name": "Readjustment Movement Day",
+      "type": "public",
+      "name_local": "Dia do Movimento de Reajustamento"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2026-01-20",
+      "name": "Heroes Day",
+      "type": "public",
+      "name_local": "Dia dos heróis"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Dia Internacional da Mulher"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2026-08-03",
+      "name": "Pidjiguiti Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-09-24",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2026-11-14",
+      "name": "Readjustment Movement Day",
+      "type": "public",
+      "name_local": "Dia do Movimento de Reajustamento"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2027-01-20",
+      "name": "Heroes Day",
+      "type": "public",
+      "name_local": "Dia dos heróis"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Dia Internacional da Mulher"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2027-08-03",
+      "name": "Pidjiguiti Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-09-24",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2027-11-14",
+      "name": "Readjustment Movement Day",
+      "type": "public",
+      "name_local": "Dia do Movimento de Reajustamento"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2028-01-20",
+      "name": "Heroes Day",
+      "type": "public",
+      "name_local": "Dia dos heróis"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Dia Internacional da Mulher"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2028-08-03",
+      "name": "Pidjiguiti Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-09-24",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2028-11-14",
+      "name": "Readjustment Movement Day",
+      "type": "public",
+      "name_local": "Dia do Movimento de Reajustamento"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Ano Novo"
+    },
+    {
+      "date": "2029-01-20",
+      "name": "Heroes Day",
+      "type": "public",
+      "name_local": "Dia dos heróis"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Dia Internacional da Mulher"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Dia do trabalhador"
+    },
+    {
+      "date": "2029-08-03",
+      "name": "Pidjiguiti Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-09-24",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Dia da Independência"
+    },
+    {
+      "date": "2029-11-14",
+      "name": "Readjustment Movement Day",
+      "type": "public",
+      "name_local": "Dia do Movimento de Reajustamento"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public",
+      "name_local": "Natal"
+    }
+  ]
+}

@@ -1,0 +1,393 @@
+{
+  "meta": {
+    "country": "MU",
+    "name": "Mauritius",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "en",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-01-02",
+      "name": "New Year Holiday",
+      "type": "public"
+    },
+    {
+      "date": "2025-01-29",
+      "name": "Chinese Spring Festival",
+      "type": "public"
+    },
+    {
+      "date": "2025-02-01",
+      "name": "Abolition of Slavery",
+      "type": "public"
+    },
+    {
+      "date": "2025-02-11",
+      "name": "Thaipoosam Cavadee",
+      "type": "public"
+    },
+    {
+      "date": "2025-02-26",
+      "name": "Maha Shivaratree",
+      "type": "public"
+    },
+    {
+      "date": "2025-03-12",
+      "name": "National Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "Ugadi",
+      "type": "public"
+    },
+    {
+      "date": "2025-03-31",
+      "name": "Eid-Ul-Fitr",
+      "type": "public"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-08-28",
+      "name": "Ganesh Chaturthi",
+      "type": "public"
+    },
+    {
+      "date": "2025-10-20",
+      "name": "Divali",
+      "type": "public"
+    },
+    {
+      "date": "2025-11-01",
+      "name": "All Saints' Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-11-02",
+      "name": "Arrival of Indentured Labourers",
+      "type": "public"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-01-02",
+      "name": "New Year Holiday",
+      "type": "public"
+    },
+    {
+      "date": "2026-02-01",
+      "name": "Abolition of Slavery",
+      "type": "public"
+    },
+    {
+      "date": "2026-02-01",
+      "name": "Thaipoosam Cavadee",
+      "type": "public"
+    },
+    {
+      "date": "2026-02-15",
+      "name": "Maha Shivaratree",
+      "type": "public"
+    },
+    {
+      "date": "2026-02-17",
+      "name": "Chinese Spring Festival",
+      "type": "public"
+    },
+    {
+      "date": "2026-03-12",
+      "name": "National Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-03-19",
+      "name": "Ugadi",
+      "type": "public"
+    },
+    {
+      "date": "2026-03-21",
+      "name": "Eid-Ul-Fitr",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-09-16",
+      "name": "Ganesh Chaturthi",
+      "type": "public"
+    },
+    {
+      "date": "2026-11-01",
+      "name": "All Saints' Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-11-02",
+      "name": "Arrival of Indentured Labourers",
+      "type": "public"
+    },
+    {
+      "date": "2026-11-08",
+      "name": "Divali",
+      "type": "public"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-02",
+      "name": "New Year Holiday",
+      "type": "public"
+    },
+    {
+      "date": "2027-01-20",
+      "name": "Thaipoosam Cavadee",
+      "type": "public"
+    },
+    {
+      "date": "2027-02-01",
+      "name": "Abolition of Slavery",
+      "type": "public"
+    },
+    {
+      "date": "2027-02-06",
+      "name": "Chinese Spring Festival",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-07",
+      "name": "Maha Shivaratree",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "Eid-Ul-Fitr",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-12",
+      "name": "National Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-04-07",
+      "name": "Ugadi",
+      "type": "public"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-09-05",
+      "name": "Ganesh Chaturthi",
+      "type": "public"
+    },
+    {
+      "date": "2027-10-29",
+      "name": "Divali",
+      "type": "public"
+    },
+    {
+      "date": "2027-11-01",
+      "name": "All Saints' Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-11-02",
+      "name": "Arrival of Indentured Labourers",
+      "type": "public"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-02",
+      "name": "New Year Holiday",
+      "type": "public"
+    },
+    {
+      "date": "2028-01-26",
+      "name": "Chinese Spring Festival",
+      "type": "public"
+    },
+    {
+      "date": "2028-02-01",
+      "name": "Abolition of Slavery",
+      "type": "public"
+    },
+    {
+      "date": "2028-02-08",
+      "name": "Thaipoosam Cavadee",
+      "type": "public"
+    },
+    {
+      "date": "2028-02-25",
+      "name": "Maha Shivaratree",
+      "type": "public"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "Eid-Ul-Fitr",
+      "type": "public"
+    },
+    {
+      "date": "2028-03-12",
+      "name": "National Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-03-26",
+      "name": "Ugadi",
+      "type": "public"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-08-24",
+      "name": "Ganesh Chaturthi",
+      "type": "public"
+    },
+    {
+      "date": "2028-10-17",
+      "name": "Divali",
+      "type": "public"
+    },
+    {
+      "date": "2028-11-01",
+      "name": "All Saints' Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-11-02",
+      "name": "Arrival of Indentured Labourers",
+      "type": "public"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-02",
+      "name": "New Year Holiday",
+      "type": "public"
+    },
+    {
+      "date": "2029-01-28",
+      "name": "Thaipoosam Cavadee",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-01",
+      "name": "Abolition of Slavery",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-13",
+      "name": "Chinese Spring Festival",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "Eid-Ul-Fitr",
+      "type": "public"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "Maha Shivaratree",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-12",
+      "name": "National Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-04-14",
+      "name": "Ugadi",
+      "type": "public"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-09-12",
+      "name": "Ganesh Chaturthi",
+      "type": "public"
+    },
+    {
+      "date": "2029-11-01",
+      "name": "All Saints' Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-11-02",
+      "name": "Arrival of Indentured Labourers",
+      "type": "public"
+    },
+    {
+      "date": "2029-11-05",
+      "name": "Divali",
+      "type": "public"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Christmas Day",
+      "type": "public"
+    }
+  ]
+}

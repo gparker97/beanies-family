@@ -1,0 +1,408 @@
+{
+  "meta": {
+    "country": "MK",
+    "name": "North Macedonia",
+    "generatedAt": "2026-05-12",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.28.0",
+    "primaryLanguage": "mk",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова Година"
+    },
+    {
+      "date": "2025-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Прв ден Божик"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Рамазан Бајрам"
+    },
+    {
+      "date": "2025-03-31",
+      "name": "End of Ramadan (Eid al-Fitr) (substitute day)",
+      "type": "public",
+      "name_local": "Рамазан Бајрам"
+    },
+    {
+      "date": "2025-04-20",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Прв ден Велигден"
+    },
+    {
+      "date": "2025-04-21",
+      "name": "Orthodox Easter Monday",
+      "type": "public",
+      "name_local": "Втор ден Велигден"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ден на трудот"
+    },
+    {
+      "date": "2025-05-24",
+      "name": "Saints Cyril and Methodius Day",
+      "type": "public",
+      "name_local": "Св. Кирил и Методиј"
+    },
+    {
+      "date": "2025-08-02",
+      "name": "Day of the Republic",
+      "type": "public",
+      "name_local": "Ден на Републиката"
+    },
+    {
+      "date": "2025-09-08",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ден на независноста"
+    },
+    {
+      "date": "2025-10-11",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Ден на востанието"
+    },
+    {
+      "date": "2025-10-23",
+      "name": "Day of the Macedonian Revolutionary Struggle",
+      "type": "public",
+      "name_local": "Ден на македонската револуционерна борба"
+    },
+    {
+      "date": "2025-12-08",
+      "name": "Saint Clement of Ohrid Day",
+      "type": "public",
+      "name_local": "Св. Климент Охридски"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова Година"
+    },
+    {
+      "date": "2026-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Прв ден Божик"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Рамазан Бајрам"
+    },
+    {
+      "date": "2026-04-12",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Прв ден Велигден"
+    },
+    {
+      "date": "2026-04-13",
+      "name": "Orthodox Easter Monday",
+      "type": "public",
+      "name_local": "Втор ден Велигден"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ден на трудот"
+    },
+    {
+      "date": "2026-05-24",
+      "name": "Saints Cyril and Methodius Day",
+      "type": "public",
+      "name_local": "Св. Кирил и Методиј"
+    },
+    {
+      "date": "2026-05-25",
+      "name": "Saints Cyril and Methodius Day (substitute day)",
+      "type": "public",
+      "name_local": "Св. Кирил и Методиј"
+    },
+    {
+      "date": "2026-08-02",
+      "name": "Day of the Republic",
+      "type": "public",
+      "name_local": "Ден на Републиката"
+    },
+    {
+      "date": "2026-08-03",
+      "name": "Day of the Republic (substitute day)",
+      "type": "public",
+      "name_local": "Ден на Републиката"
+    },
+    {
+      "date": "2026-09-08",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ден на независноста"
+    },
+    {
+      "date": "2026-10-11",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Ден на востанието"
+    },
+    {
+      "date": "2026-10-12",
+      "name": "Revolution Day (substitute day)",
+      "type": "public",
+      "name_local": "Ден на востанието"
+    },
+    {
+      "date": "2026-10-23",
+      "name": "Day of the Macedonian Revolutionary Struggle",
+      "type": "public",
+      "name_local": "Ден на македонската револуционерна борба"
+    },
+    {
+      "date": "2026-12-08",
+      "name": "Saint Clement of Ohrid Day",
+      "type": "public",
+      "name_local": "Св. Климент Охридски"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова Година"
+    },
+    {
+      "date": "2027-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Прв ден Божик"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Рамазан Бајрам"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ден на трудот"
+    },
+    {
+      "date": "2027-05-02",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Прв ден Велигден"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "Orthodox Easter Monday",
+      "type": "public",
+      "name_local": "Втор ден Велигден"
+    },
+    {
+      "date": "2027-05-24",
+      "name": "Saints Cyril and Methodius Day",
+      "type": "public",
+      "name_local": "Св. Кирил и Методиј"
+    },
+    {
+      "date": "2027-08-02",
+      "name": "Day of the Republic",
+      "type": "public",
+      "name_local": "Ден на Републиката"
+    },
+    {
+      "date": "2027-09-08",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ден на независноста"
+    },
+    {
+      "date": "2027-10-11",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Ден на востанието"
+    },
+    {
+      "date": "2027-10-23",
+      "name": "Day of the Macedonian Revolutionary Struggle",
+      "type": "public",
+      "name_local": "Ден на македонската револуционерна борба"
+    },
+    {
+      "date": "2027-12-08",
+      "name": "Saint Clement of Ohrid Day",
+      "type": "public",
+      "name_local": "Св. Климент Охридски"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова Година"
+    },
+    {
+      "date": "2028-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Прв ден Божик"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Рамазан Бајрам"
+    },
+    {
+      "date": "2028-04-16",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Прв ден Велигден"
+    },
+    {
+      "date": "2028-04-17",
+      "name": "Orthodox Easter Monday",
+      "type": "public",
+      "name_local": "Втор ден Велигден"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ден на трудот"
+    },
+    {
+      "date": "2028-05-24",
+      "name": "Saints Cyril and Methodius Day",
+      "type": "public",
+      "name_local": "Св. Кирил и Методиј"
+    },
+    {
+      "date": "2028-08-02",
+      "name": "Day of the Republic",
+      "type": "public",
+      "name_local": "Ден на Републиката"
+    },
+    {
+      "date": "2028-09-08",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ден на независноста"
+    },
+    {
+      "date": "2028-10-11",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Ден на востанието"
+    },
+    {
+      "date": "2028-10-23",
+      "name": "Day of the Macedonian Revolutionary Struggle",
+      "type": "public",
+      "name_local": "Ден на македонската револуционерна борба"
+    },
+    {
+      "date": "2028-12-08",
+      "name": "Saint Clement of Ohrid Day",
+      "type": "public",
+      "name_local": "Св. Климент Охридски"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Нова Година"
+    },
+    {
+      "date": "2029-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Прв ден Божик"
+    },
+    {
+      "date": "2029-01-08",
+      "name": "Orthodox Christmas (substitute day)",
+      "type": "public",
+      "name_local": "Прв ден Божик"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public",
+      "name_local": "Рамазан Бајрам"
+    },
+    {
+      "date": "2029-04-08",
+      "name": "Orthodox Easter",
+      "type": "public",
+      "name_local": "Прв ден Велигден"
+    },
+    {
+      "date": "2029-04-09",
+      "name": "Orthodox Easter Monday",
+      "type": "public",
+      "name_local": "Втор ден Велигден"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public",
+      "name_local": "Ден на трудот"
+    },
+    {
+      "date": "2029-05-24",
+      "name": "Saints Cyril and Methodius Day",
+      "type": "public",
+      "name_local": "Св. Кирил и Методиј"
+    },
+    {
+      "date": "2029-08-02",
+      "name": "Day of the Republic",
+      "type": "public",
+      "name_local": "Ден на Републиката"
+    },
+    {
+      "date": "2029-09-08",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Ден на независноста"
+    },
+    {
+      "date": "2029-10-11",
+      "name": "Revolution Day",
+      "type": "public",
+      "name_local": "Ден на востанието"
+    },
+    {
+      "date": "2029-10-23",
+      "name": "Day of the Macedonian Revolutionary Struggle",
+      "type": "public",
+      "name_local": "Ден на македонската револуционерна борба"
+    },
+    {
+      "date": "2029-12-08",
+      "name": "Saint Clement of Ohrid Day",
+      "type": "public",
+      "name_local": "Св. Климент Охридски"
+    }
+  ]
+}

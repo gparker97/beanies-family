@@ -16,11 +16,13 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { useHolidayStore } from '@/stores/holidayStore';
 import { normalizeAssignees } from '@/utils/assignees';
 import { extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
-import type { FamilyActivity, FamilyMember, TodoItem } from '@/types/models';
+import HolidayBanner from '@/components/planner/HolidayBanner.vue';
+import type { FamilyActivity, FamilyMember, TodoItem, HolidayOccurrence } from '@/types/models';
 
 /**
  * `selectedDate` lets the parent jump the daily view to a specific day —
@@ -40,6 +42,7 @@ const emit = defineEmits<{
   'vacation-click': [vacationId: string];
   'view-segment': [vacationId: string, segmentIndex: number];
   'open-agenda': [date: string];
+  'holiday-click': [holiday: HolidayOccurrence];
 }>();
 
 const { t } = useTranslation();
@@ -49,6 +52,7 @@ const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
 const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
+const holidayStore = useHolidayStore();
 
 const referenceDate = ref(
   props.selectedDate ? new Date(props.selectedDate + 'T00:00:00') : new Date()
@@ -152,6 +156,10 @@ const activeVacations = computed(() =>
     return day >= start && day <= end;
   })
 );
+
+// Public holiday on this day (if any) — drives the desktop banner + the
+// `holiday` prop passed to the mobile DayTimeline.
+const holidayForCurrentDay = computed(() => holidayStore.holidayForDate(currentDay.value.dateStr));
 
 const hasAnyUntimedContent = computed(
   () =>
@@ -260,6 +268,15 @@ defineExpose({ dayLabel, activityCount });
         </button>
       </template>
     </CalendarNavBar>
+
+    <!-- Public holiday banner (desktop — mobile gets it via DayTimeline) -->
+    <HolidayBanner
+      v-if="!isMobile && holidayForCurrentDay"
+      :holiday="holidayForCurrentDay"
+      show-subline
+      class="mb-3"
+      @click="emit('holiday-click', holidayForCurrentDay!)"
+    />
 
     <!-- ── Desktop: Member Column Grid ──────────────────────────────────── -->
     <template v-if="!isMobile">
@@ -511,11 +528,13 @@ defineExpose({ dayLabel, activityCount });
         :todos="dayTodos"
         :members="visibleMembers"
         :is-today="currentDay.isToday"
+        :holiday="holidayForCurrentDay"
         @view-activity="(id, date) => emit('view-activity', id, date)"
         @view-todo="(todo) => emit('view-todo', todo)"
         @vacation-click="(vid) => emit('vacation-click', vid)"
         @view-segment="(vid: string, idx: number) => emit('view-segment', vid, idx)"
         @add-activity="(date, time) => emit('add-activity', date, time)"
+        @holiday-click="(h) => emit('holiday-click', h)"
       />
     </template>
   </div>
