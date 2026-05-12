@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-12",
-    "translationCount": 2789
+    "translationCount": 2790
   },
   "translations": {
     "app.name": {
@@ -13949,6 +13949,11 @@
     "todo.makeActive": {
       "translation": "激活",
       "hash": "tokn8o",
+      "lastUpdated": "2026-05-12"
+    },
+    "bean.hero.add.milestone": {
+      "translation": "节点",
+      "hash": "lpysz1",
       "lastUpdated": "2026-05-12"
     }
   }
