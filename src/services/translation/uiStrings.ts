@@ -3139,6 +3139,30 @@ const STRING_DEFS = {
   'loginV6.createStep3': { en: 'Family', beanie: 'family' },
   'loginV6.createNext': { en: 'Next', beanie: 'next' },
   'loginV6.createButton': { en: 'Create Pod', beanie: 'create pod' },
+  // Resume-setup recovery screen — shown when an authenticated session exists
+  // but no `.beanpod` file was ever written (a half-finished onboarding, or
+  // an iOS Drive redirect mid-flight).
+  'resumeSetup.title': {
+    en: 'Finish setting up your pod',
+    beanie: 'finish setting up your pod',
+  },
+  'resumeSetup.subtitle': {
+    en: "Your last setup didn't quite finish. Pop your password back in and pick where your pod lives — we'll wrap it up.",
+    beanie:
+      "your last setup didn't quite finish. pop your password back in and pick where your pod lives — we'll wrap it up.",
+  },
+  'resumeSetup.storagePrompt': {
+    en: 'Where should your pod live?',
+    beanie: 'where should your pod live?',
+  },
+  'resumeSetup.finishing': {
+    en: 'Finishing up your pod…',
+    beanie: 'finishing up your pod…',
+  },
+  'resumeSetup.startOver': {
+    en: 'Start over instead',
+    beanie: 'start over instead',
+  },
   'loginV6.alreadyHavePod': { en: 'Already have a pod?', beanie: 'already have a pod?' },
   'loginV6.loadItLink': { en: 'Load it', beanie: 'load it' },
   'loginV6.storageTitle': {
@@ -3929,16 +3953,16 @@ const STRING_DEFS = {
     beanie: 'just a moment — putting the finishing touches on your nook',
   },
   'setupProgress.error.title': {
-    en: 'something went wrong',
-    beanie: 'oh no, a bean got stuck',
+    en: 'almost there — one last step hiccuped',
+    beanie: 'almost there — one last bean tripped',
   },
   'setupProgress.error.description': {
-    en: "Don't worry — your data is safely cached on this device. You can try again, continue without saving to your file, or go back.",
+    en: "Your pod is created and your data is safe — we just couldn't finish a background step (a final save / arming auto-sync). Try again, continue (it'll retry next time you open the app), or go back.",
     beanie:
-      "don't worry — your beans are safely cached on this device. you can try again, continue without saving to your beanpod, or go back.",
+      "your pod is created and your beans are safe — we just couldn't finish a background step (a final save / arming auto-sync). try again, continue (it'll retry next time you open the app), or go back.",
   },
   'setupProgress.error.retry': { en: 'Try Again', beanie: 'try again' },
-  'setupProgress.error.continue': { en: 'Continue Anyway', beanie: 'continue anyway' },
+  'setupProgress.error.continue': { en: 'Continue', beanie: 'continue' },
   'setupProgress.error.back': { en: 'Go Back', beanie: 'go back' },
   'setupProgress.success.title': { en: 'welcome home!', beanie: 'welcome to the nook!' },
   'setupProgress.success.subtitle': {
@@ -4514,6 +4538,10 @@ const STRING_DEFS = {
   'storage.preferLocal': {
     en: 'Prefer to store your data locally on this device?',
     beanie: 'prefer to store your data locally on this device?',
+  },
+  'storage.useLocalInstead': {
+    en: 'Use a local file instead',
+    beanie: 'use a local file instead',
   },
   'storage.savingToLocalFile': {
     en: 'Saving to a local file on this device',

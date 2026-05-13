@@ -15,9 +15,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
-import * as syncService from '@/services/sync/syncService';
-import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
-import { clearFolderCache } from '@/services/google/driveService';
+import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
+import { isUserCancellation } from '@/services/google/googleAuth';
 import { slackNotify } from '@/utils/slackNotify';
 import { reportError } from '@/utils/errorReporter';
 import { formatBirthdayShort } from '@/utils/date';
@@ -56,9 +55,6 @@ const storageType = ref<'local' | 'google_drive' | null>(null);
 const showDriveResultModal = ref(false);
 const driveResultError = ref<string | null>(null);
 const showLocalFileWarning = ref(false);
-// Guards the "pod created" Slack ping so back/forward navigation through the
-// wizard can't fire it twice.
-const podCreatedPinged = ref(false);
 
 /** Visual state of the Google Drive hero card in Step 2. */
 const driveCardState = computed<'idle' | 'connecting' | 'connected'>(() =>
@@ -202,11 +198,7 @@ function handleLocalFileClick() {
   showLocalFileWarning.value = true;
 }
 
-/**
- * "Use Google Drive instead" from the local-file warning modal: close the
- * modal and run the normal Drive-connect flow, which owns its own error
- * handling (the result modal + reportError).
- */
+/** "Use Google Drive instead" from the local-file warning modal. */
 function handleUseDriveFromWarning() {
   showLocalFileWarning.value = false;
   void handleChooseGoogleDriveStorage();
@@ -214,30 +206,30 @@ function handleUseDriveFromWarning() {
 
 async function handleChooseLocalStorage() {
   showLocalFileWarning.value = false;
+  if (isSavingStorage.value) return;
   isSavingStorage.value = true;
   formError.value = null;
 
   try {
-    // Only select the file/set up the provider — don't save yet.
-    // createNewFile() in handleStep2Next will initialize the doc and write the V4 envelope.
-    const success = await syncService.selectSyncFile();
-    if (success) {
+    // Only selects the file + installs the provider — createNewFile() (on
+    // "Next") initializes the doc and writes the V4 envelope.
+    const r = await connectLocalStorage();
+    if (r.status === 'connected') {
       storageSaved.value = true;
       storageType.value = 'local';
-    } else {
-      // Returned false = user cancelled the file picker (a normal abort), so
-      // no error report here — just re-prompt.
+    } else if (r.cancelled) {
+      // Normal abort (user dismissed the OS picker) — re-prompt, no report.
       formError.value = t('setup.fileCreateFailed');
+    } else {
+      formError.value = t('setup.fileCreateFailed');
+      console.error('[CreatePodView] local file selection failed:', r.error);
+      reportError({
+        surface: 'createPod.selectLocalFile',
+        message: r.error || 'Local file selection failed',
+        severity: 'error',
+        context: { provider_type: 'local' },
+      });
     }
-  } catch (e) {
-    formError.value = t('setup.fileCreateFailed');
-    reportError({
-      surface: 'createPod.selectLocalFile',
-      message: (e as Error)?.message || 'Local file selection threw',
-      error: e,
-      severity: 'error',
-      context: { provider_type: 'local' },
-    });
   } finally {
     isSavingStorage.value = false;
   }
@@ -245,11 +237,10 @@ async function handleChooseLocalStorage() {
 
 async function handleChooseGoogleDriveStorage() {
   if (!syncStore.isGoogleDriveAvailable) {
-    // Defense-in-depth: the card is hidden in this state (rendered as the
-    // disabled "Not configured" tile). If this branch fires, log so a dev
-    // can spot the regression.
+    // Defense-in-depth: the card is hidden in this state. If this fires,
+    // log so a dev can spot the regression.
     console.warn(
-      '[CreatePodView] Drive storage handler invoked while isGoogleDriveAvailable is false (features.drive && features.oauthProxy) — check the v-if on the Drive card.'
+      '[CreatePodView] Drive storage handler invoked while isGoogleDriveAvailable is false — check the v-if on the Drive card.'
     );
     return;
   }
@@ -261,100 +252,127 @@ async function handleChooseGoogleDriveStorage() {
   driveResultError.value = null;
 
   try {
-    // Only create the Drive provider — don't save yet.
-    // createNewFile() in handleStep2Next will initialize the doc and write the V4 envelope.
-    const podFileName = `${familyName.value || 'my-family'}.beanpod`;
-    const provider = await GoogleDriveProvider.createNew(podFileName);
-    syncService.setProvider(provider);
-
-    const familyId = familyContextStore.activeFamilyId;
-    if (familyId) {
-      await provider.persist(familyId);
-    }
-
-    storageSaved.value = true;
-    storageType.value = 'google_drive';
-  } catch (e) {
-    driveResultError.value = (e as Error).message || t('googleDrive.authFailed');
-    // Clear stale folder cache so retry starts fresh (prevents cross-account 404)
-    clearFolderCache();
-    // Severity 'warning': Drive connect failures are often benign (popup
-    // closed, permission declined) and the user gets a retry modal — but we
-    // still want every one of them visible during onboarding.
-    reportError({
-      surface: 'createPod.connectDrive',
-      message: driveResultError.value || 'Google Drive connect failed',
-      error: e,
-      severity: 'warning',
-      context: { provider_type: 'google_drive' },
+    const r = await connectDriveStorage(familyName.value || 'my-family', {
+      googleEmail: email.value || undefined,
+      activeFamilyId: familyContextStore.activeFamilyId,
     });
+    // On iOS / installed PWAs this kicks off a full-page redirect to Google —
+    // the page is navigating away; there's nothing more to do here. We resume
+    // on return via `/welcome?resume=setup` → ResumePodSetup.
+    if (r.status === 'redirecting') return;
+
+    if (r.status === 'connected') {
+      storageSaved.value = true;
+      storageType.value = 'google_drive';
+      showDriveResultModal.value = true; // success state
+    } else {
+      driveResultError.value = r.error || t('googleDrive.authFailed');
+      // A genuine cancellation (closed the chooser) is benign; anything else
+      // — a 400, a timeout, a scope denial — is a real onboarding failure.
+      const cancelled = r.cancelled || isUserCancellation(r.error);
+      if (cancelled) console.warn('[CreatePodView] Drive connect cancelled:', r.error);
+      else console.error('[CreatePodView] Drive connect failed:', r.error);
+      reportError({
+        surface: 'createPod.connectDrive',
+        message: r.error || 'Google Drive connect failed',
+        severity: cancelled ? 'warning' : 'error',
+        context: { provider_type: 'google_drive' },
+      });
+      showDriveResultModal.value = true; // failure state — Try again / Use a local file
+    }
   } finally {
     isSavingStorage.value = false;
-    showDriveResultModal.value = true;
   }
 }
 
+/** Drive-result-modal actions (success: Continue; failure: Try again / Use a local file). */
 function handleDriveModalContinue() {
   showDriveResultModal.value = false;
-  handleStep2Next();
+  void handleStep2Next();
+}
+function handleDriveModalRetry() {
+  showDriveResultModal.value = false;
+  void handleChooseGoogleDriveStorage();
+}
+function handleDriveModalUseLocal() {
+  showDriveResultModal.value = false;
+  handleLocalFileClick();
 }
 
 async function handleStep2Next() {
   formError.value = null;
 
-  // Storage location is required
+  // Storage location is required.
   if (!storageSaved.value) {
     formError.value = t('setup.fileCreateFailed');
     return;
   }
 
-  // Initialize the Automerge document, generate keys, and write V4 envelope to the provider.
-  // Uses the member password from Step 1 to derive the wrapping key for the family key.
-  if (syncStore.isConfigured && authStore.currentUser) {
-    const podFileName = `${familyName.value || 'my-family'}.beanpod`;
-    const success = await syncStore.createNewFile(
-      podFileName,
-      password.value,
-      authStore.currentUser.memberId,
-      familyContextStore.activeFamilyId ?? '',
-      familyName.value
-    );
-    if (!success) {
-      const msg = syncStore.error ?? t('setup.fileCreateFailed');
-      formError.value = msg;
-      reportError({
-        surface: 'createPod.createNewFile',
-        message: msg,
-        severity: 'error',
-        context: { provider_type: storageType.value },
-      });
-      return;
-    }
-    // The pod now physically exists — Automerge doc initialized, family key
-    // generated and wrapped, V4 envelope written to the provider, cache
-    // primed. This — not the confetti screen the user may never click
-    // through — is the moment a family is created.
-    if (!podCreatedPinged.value) {
-      podCreatedPinged.value = true;
-      const storage = storageType.value === 'google_drive' ? 'Google Drive' : 'Local File';
-      slackNotify(
-        `🎉 *Family pod created!*\n*Family:* ${familyName.value}\n*Owner:* ${name.value}\n*Storage:* ${storage}`
-      );
-    }
-  } else {
-    // Shouldn't happen: storageSaved is true (guarded above) but the sync
-    // store doesn't consider itself configured. Surface it so the regression
-    // is visible — the user would otherwise reach Step 3 with no pod file.
+  if (!authStore.currentUser) {
+    // Impossible after step 1's signUp — but never fall through to step 3
+    // (and an empty /nook) if it somehow happens.
+    formError.value = t('setup.fileCreateFailed');
+    console.error('[CreatePodView] handleStep2Next: no authenticated owner');
     reportError({
       surface: 'createPod.createNewFile',
-      message: 'Reached the storage step with storageSaved=true but syncStore is not configured',
-      severity: 'warning',
+      message: 'handleStep2Next reached with no authenticated owner',
+      severity: 'error',
       context: { provider_type: storageType.value },
     });
+    return;
+  }
+
+  if (!syncStore.isConfigured) {
+    // storageSaved is true (guarded above) but no provider is wired. Without
+    // a provider createNewFile() can't write the pod file — block here and
+    // surface the regression rather than advancing to step 3 (then a
+    // pod-less /nook).
+    formError.value = t('setup.fileCreateFailed');
+    console.error(
+      '[CreatePodView] storageSaved=true but syncStore.isConfigured=false — refusing to advance'
+    );
+    reportError({
+      surface: 'createPod.createNewFile',
+      message: 'storageSaved=true but syncStore is not configured — refusing to advance to step 3',
+      severity: 'error',
+      context: { provider_type: storageType.value },
+    });
+    return;
+  }
+
+  // Already created (e.g. the user navigated back to step 2 and clicked Next
+  // again) — re-running createNewFile would mint a fresh family key and
+  // orphan the first. Just advance.
+  if (syncStore.hasSessionPassword) {
+    currentStep.value = 3;
+    return;
+  }
+
+  // Initialize the Automerge doc, generate + wrap the family key, write the
+  // V4 envelope. createNewFile() also fires the "🎉 pod created" Slack ping
+  // and sets authStore.podCreated on success.
+  const podFileName = `${familyName.value || 'my-family'}.beanpod`;
+  const success = await syncStore.createNewFile(
+    podFileName,
+    password.value,
+    authStore.currentUser.memberId,
+    familyContextStore.activeFamilyId ?? '',
+    familyName.value
+  );
+  if (!success) {
+    const msg = syncStore.error ?? t('setup.fileCreateFailed');
+    formError.value = msg;
+    console.error('[CreatePodView] createNewFile failed:', msg);
+    reportError({
+      surface: 'createPod.createNewFile',
+      message: msg,
+      severity: 'error',
+      context: { provider_type: storageType.value },
+    });
+    return;
   }
 
   currentStep.value = 3;
-  formError.value = null;
 }
 
 async function handleAddMember() {
@@ -1229,8 +1247,14 @@ function handleBack() {
           </p>
         </div>
 
-        <BaseButton class="mt-4 w-full" @click="showDriveResultModal = false">
-          {{ t('action.ok') }}
+        <!-- The diagnostic is already on its way to #beanies-errors via
+             reportError. Give the user two concrete ways forward — never
+             leave them stuck (the × dismisses back to the picker). -->
+        <BaseButton class="mt-4 w-full" @click="handleDriveModalRetry">
+          {{ t('action.tryAgain') }}
+        </BaseButton>
+        <BaseButton variant="outline" class="mt-2 w-full" @click="handleDriveModalUseLocal">
+          {{ t('storage.useLocalInstead') }}
         </BaseButton>
       </template>
     </BaseModal>

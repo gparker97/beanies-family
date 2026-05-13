@@ -41,6 +41,8 @@ const repo = createAutomergeRepository<
 export const getAllFamilyMembers = repo.getAll;
 export const getFamilyMemberById = repo.getById;
 export const createFamilyMember = repo.create;
+/** Recreate a member with a specific id — used to rebuild the owner after a redirect-during-onboarding wiped the in-memory doc. */
+export const createFamilyMemberWithId = repo.createWithId;
 export const updateFamilyMember = repo.update;
 export const deleteFamilyMember = repo.remove;
 

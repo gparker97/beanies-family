@@ -229,6 +229,24 @@ export const useFamilyStore = defineStore('family', () => {
     return result ?? null;
   }
 
+  /**
+   * Recreate a member with a specific id. Mirrors `createMember`; used only to
+   * rebuild the owner after a full-page redirect during onboarding wiped the
+   * in-memory Automerge doc (the persisted `authStore.currentUser.memberId`
+   * and the `.beanpod` envelope's `wrappedKeys` keyed by it must still match).
+   */
+  async function createMemberWithId(
+    id: string,
+    input: CreateFamilyMemberInput
+  ): Promise<FamilyMember | null> {
+    const result = await wrapAsync(isLoading, error, async () => {
+      const member = await familyRepo.createFamilyMemberWithId(id, input);
+      members.value = [...members.value, member];
+      return member;
+    });
+    return result ?? null;
+  }
+
   async function updateMember(
     id: string,
     input: UpdateFamilyMemberInput
@@ -482,6 +500,7 @@ export const useFamilyStore = defineStore('family', () => {
     // Actions
     loadMembers,
     createMember,
+    createMemberWithId,
     updateMember,
     deleteMember,
     transferOwnership,

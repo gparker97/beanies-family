@@ -29,6 +29,21 @@ export interface AuthUser {
 
 const SESSION_KEY = 'beanies_auth_session';
 
+// Whether the authenticated user's `.beanpod` file actually exists yet.
+// `signUp()` creates the session *before* storage is chosen (step 2 of the
+// create-pod wizard), so "authenticated" alone doesn't mean "has a pod" — a
+// half-finished onboarding (or a failed Drive connect) leaves an authenticated
+// session with no pod file. This flag is the discriminator the router guard +
+// App.vue use to route such users to the resume-setup recovery screen instead
+// of an empty `/nook`. Persisted (per-browser) so it survives reload and the
+// iOS full-page-redirect round-trip.
+//
+// Semantics: `'1'` → pod exists; `'0'` → pod pending (set the moment `signUp`
+// succeeds, cleared once `syncStore.createNewFile` writes the file); ABSENT →
+// treated as "pod exists" (migration: users who created a pod before this flag
+// existed, and the moment of `signIn`/`joinFamily` into an already-built pod).
+const POD_CREATED_KEY = 'beanies_pod_created';
+
 function persistSession(user: AuthUser): void {
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
@@ -40,6 +55,7 @@ function persistSession(user: AuthUser): void {
 function clearSession(): void {
   try {
     localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(POD_CREATED_KEY);
   } catch {
     // silent fail
   }
@@ -51,6 +67,25 @@ function restoreSession(): AuthUser | null {
     return raw ? (JSON.parse(raw) as AuthUser) : null;
   } catch {
     return null;
+  }
+}
+
+/** Read the persisted "pod file exists" flag. Absent ⇒ true (see above). */
+function restorePodCreated(): boolean {
+  try {
+    return localStorage.getItem(POD_CREATED_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+function persistPodCreated(value: boolean): void {
+  try {
+    localStorage.setItem(POD_CREATED_KEY, value ? '1' : '0');
+  } catch {
+    // localStorage unavailable — the in-memory ref still reflects reality for
+    // this tab; only the cross-reload signal is lost (private-mode users hit
+    // every other persistence limitation too).
   }
 }
 
@@ -66,6 +101,16 @@ export const useAuthStore = defineStore('auth', () => {
   // Newsletter opt-in captured during signUp; read by syncStore when
   // registering the family so the choice is forwarded to the registry.
   const newsletterOptIn = ref<boolean | null>(null);
+  // Whether the authenticated user's `.beanpod` file exists yet — see
+  // POD_CREATED_KEY above. Routing guard reads this; `signUp` clears it;
+  // `syncStore.createNewFile` (via `markPodCreated`) sets it.
+  const podCreated = ref(restorePodCreated());
+
+  /** Record that the `.beanpod` file now physically exists (called by syncStore). */
+  function markPodCreated(): void {
+    podCreated.value = true;
+    persistPodCreated(true);
+  }
 
   // Getters
   const needsAuth = computed(() => !isAuthenticated.value);
@@ -97,6 +142,7 @@ export const useAuthStore = defineStore('auth', () => {
         if (saved) {
           currentUser.value = saved;
           isAuthenticated.value = true;
+          podCreated.value = restorePodCreated();
         }
         isInitialized.value = true;
         return;
@@ -172,6 +218,72 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * (Re)build the in-memory Automerge doc with just the owner member.
+   *
+   * Shared by `signUp` (fresh) and `rehydrateOwnerDoc` (recovery — a
+   * full-page redirect during onboarding destroys the in-memory doc). When
+   * `id` is given, the member is created with that exact id (rehydrate must
+   * keep `currentUser.memberId` — and the `.beanpod` envelope's `wrappedKeys`
+   * keyed by it — pointing at the recreated member). `gender: 'male'` and
+   * `ageGroup: 'adult'` match `signUp`'s long-standing behavior (the role
+   * picker in the wizard is cosmetic; the owner is always stored as an adult).
+   */
+  async function buildOwnerDoc(
+    owner: { name: string; email: string; passwordHash: string },
+    id?: string
+  ) {
+    // Must run before any changeDoc() call (createMember writes to the doc).
+    initDoc();
+    const familyStore = useFamilyStore();
+    // Clear stale state from any previous cancelled setup attempt.
+    familyStore.resetState();
+    const memberInput = {
+      name: owner.name,
+      email: owner.email,
+      gender: 'male' as const,
+      ageGroup: 'adult' as const,
+      role: 'owner' as const,
+      color: '#3b82f6',
+      passwordHash: owner.passwordHash,
+      requiresPassword: false,
+    };
+    const member = id
+      ? await familyStore.createMemberWithId(id, memberInput)
+      : await familyStore.createMember(memberInput);
+    if (member) familyStore.setCurrentMember(member.id);
+    return member;
+  }
+
+  /**
+   * Rebuild the owner member after a full-page redirect during onboarding
+   * (the iOS Drive flow) destroyed the in-memory Automerge doc, so the
+   * resume-setup screen can go on to call `syncStore.createNewFile`. Re-uses
+   * the persisted session for the immutable bits (memberId/email) and the
+   * caller-supplied name + password for the rest. No-op if the doc already
+   * has the owner (re-entered on the same session without an intervening
+   * reload). Requires an active session.
+   */
+  async function rehydrateOwnerDoc(
+    name: string,
+    password: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!currentUser.value) return { success: false, error: 'No active session to resume' };
+    const familyStore = useFamilyStore();
+    if (familyStore.owner) return { success: true };
+    try {
+      const passwordHashValue = await hashPassword(password);
+      const member = await buildOwnerDoc(
+        { name, email: currentUser.value.email, passwordHash: passwordHashValue },
+        currentUser.value.memberId
+      );
+      if (!member) return { success: false, error: 'Failed to rebuild owner member' };
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Failed to rebuild owner' };
+    }
+  }
+
+  /**
    * Sign up: create a new family + owner member with password.
    * This is the owner-only "Create Pod" flow.
    */
@@ -196,29 +308,19 @@ export const useAuthStore = defineStore('auth', () => {
         return { success: false, error: 'Failed to create family' };
       }
 
-      // Initialize Automerge document — must happen before any changeDoc() calls
-      // (createMember and setOnboardingCompleted both write to the doc)
-      initDoc();
-
-      // Hash the password
+      // Hash the password + build the owner doc.
       const passwordHashValue = await hashPassword(params.password);
-
-      // Clear stale state from any previous cancelled setup attempt
-      const familyStore = useFamilyStore();
-      familyStore.resetState();
-      const member = await familyStore.createMember({
+      const member = await buildOwnerDoc({
         name: params.memberName,
         email: params.email,
-        gender: 'male',
-        ageGroup: 'adult',
-        role: 'owner',
-        color: '#3b82f6',
         passwordHash: passwordHashValue,
-        requiresPassword: false,
       });
+      if (!member) {
+        return { success: false, error: 'Failed to create owner member' };
+      }
 
       // Create UserFamilyMapping in registry
-      if (member) {
+      {
         const registryDb = await getRegistryDatabase();
         await registryDb.add('userFamilyMappings', {
           id: generateUUID(),
@@ -235,7 +337,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       // Auto sign in
       const user: AuthUser = {
-        memberId: member!.id,
+        memberId: member.id,
         email: params.email,
         familyId: family.id,
         role: 'owner',
@@ -244,7 +346,12 @@ export const useAuthStore = defineStore('auth', () => {
       isAuthenticated.value = true;
       freshSignIn.value = true;
       persistSession(user);
-      familyStore.setCurrentMember(member!.id);
+      // The session now exists but no `.beanpod` file does yet — that's
+      // written later by `syncStore.createNewFile` (step 2 of the wizard).
+      // Until then, the routing guard treats this as "resume setup", not
+      // "ready for /nook".
+      podCreated.value = false;
+      persistPodCreated(false);
       window.plausible?.('signup');
       window.plausible?.('login', { props: { method: 'password' } });
 
@@ -749,10 +856,13 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     freshSignIn,
     newsletterOptIn,
+    podCreated,
     // Getters
     needsAuth,
     displayName,
     // Actions
+    markPodCreated,
+    rehydrateOwnerDoc,
     initializeAuth,
     signIn,
     signInWithPasskey,
