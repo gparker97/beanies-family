@@ -699,6 +699,17 @@ onMounted(async () => {
       getDoc(); // throws if currentDoc is null
       docLoaded = true;
       initBreadcrumbs.push('health: automerge doc OK');
+      // App booted successfully — reset the chunk-load retry counter so
+      // the next deploy gap gets its own full budget. (This used to live
+      // in router.afterEach, but firing-on-every-nav defeated the
+      // counter — the initial nav resolves before App.vue's onMounted
+      // error throws, so every load got a fresh "first attempt" budget
+      // and the loop never escalated. Gated on actual boot success now.)
+      try {
+        sessionStorage.removeItem(CHUNK_RELOAD_FLAG);
+      } catch {
+        // sessionStorage unavailable — counter dies with the tab anyway.
+      }
     } catch {
       // Doc not loaded — initialization completed but data is missing.
       // Two reasons this can happen: (a) genuine init failure (network, file
@@ -777,31 +788,44 @@ onMounted(async () => {
     // experience reported by greg on 2026-05-10 (iPhone, mid-update).
     if (isChunkLoadError(err)) {
       try {
-        if (sessionStorage.getItem(CHUNK_RELOAD_FLAG) !== '1') {
-          sessionStorage.setItem(CHUNK_RELOAD_FLAG, '1');
+        // Bounded retries — the previous "once-guard" version was defeated
+        // by `router.afterEach` clearing the flag on every successful
+        // navigation (which includes the initial nav that fires BEFORE
+        // App.vue's onMounted error). Result: every load was the "first
+        // attempt" → infinite silent hardReloads → page reloads faster
+        // than the user can tap the overlay → no `app.chunkRecoveryFailed`
+        // Slack alert ever fires. Caught 2026-05-13 by greg on iPhone 14
+        // Safari from a freshly-cleared baseline.
+        //
+        // Now: counter persisted in sessionStorage across the location.replace
+        // chain (same tab = same sessionStorage). Up to 3 silent hardReloads
+        // — iOS Safari's SW lifecycle quirks legitimately need 2 sometimes —
+        // then on the 4th we stop, page the Slack alert with the route +
+        // error + attempt count, and show the overlay so the user can tap
+        // "Sign out & clear data" (no longer racing the reload). Cleared
+        // by a successful boot (post-init health check passes).
+        const attempts = parseInt(sessionStorage.getItem(CHUNK_RELOAD_FLAG) ?? '0', 10) || 0;
+        const MAX_ATTEMPTS = 3;
+        if (attempts < MAX_ATTEMPTS) {
+          sessionStorage.setItem(CHUNK_RELOAD_FLAG, String(attempts + 1));
           console.warn(
-            '[App] init detected chunk-load symptom — hardReload to fresh version:',
+            `[App] chunk-load symptom — hardReload attempt ${attempts + 1}/${MAX_ATTEMPTS}:`,
             err
           );
           chunkReloadInProgress = true;
           void hardReload();
           return;
         }
-        // Gentle recovery already ran and the second load is *still* a
-        // chunk-load symptom — that's the signal worth surfacing (the
-        // routine "deploy gap, self-healed" case is suppressed by the
-        // outer convention). Routes a Slack alert with the actual route +
-        // error so we know if a device class is escaping our recovery.
         console.error(
-          '[App] chunk-load recovery already attempted; falling through to error overlay:',
+          `[App] chunk-load recovery exhausted after ${attempts} attempts — surfacing overlay:`,
           err
         );
         reportError({
           surface: 'app.chunkRecoveryFailed',
-          message: `Chunk-load recovery failed on retry: ${err instanceof Error ? err.message : String(err)}`,
+          message: `Chunk-load recovery exhausted after ${attempts} attempts: ${err instanceof Error ? err.message : String(err)}`,
           error: err,
           severity: 'error',
-          context: { route_path: route.path },
+          context: { route_path: route.fullPath },
         });
       } catch {
         // sessionStorage unavailable (Safari private mode etc.) — fall

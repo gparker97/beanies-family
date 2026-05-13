@@ -49,23 +49,15 @@ export default defineConfig({
         // When a new SW activates, clean up previous-deploy precache entries
         // (old hashed chunks nothing references anymore).
         cleanupOutdatedCaches: true,
-        // skipWaiting: new SWs activate AS SOON AS they install — they
-        // don't queue in "waiting" state until every tab closes or the
-        // UpdatePrompt's "Refresh" is clicked. clientsClaim: the new SW
-        // takes over ALREADY-OPEN tabs the moment it activates (no need to
-        // navigate first). Together they close the in-session "old SW
-        // still serving the stale precache" window that produced the 2-3
-        // chunk-load loop iterations greg's iPhone hit on 2026-05-13. The
-        // UpdatePrompt still appears with `registerType: 'prompt'` — it's
-        // just informational now (the new SW is already controlling).
-        //
-        // Trade-off: a user with the app open mid-action gets a silent SW
-        // swap on deploy; their NEXT navigation uses new code. For a SPA
-        // where mid-edit data is in IndexedDB (persistent), the risk is
-        // low. The alternative (the deploy gap leaving people in a chunk-
-        // load loop) is worse for onboarding-critical paths.
-        skipWaiting: true,
-        clientsClaim: true,
+        // NOTE: NOT setting skipWaiting / clientsClaim. They were tried on
+        // 2026-05-13 (e091b47) to close the in-session deploy gap, but
+        // they fight `registerType: 'prompt'` — vite-plugin-pwa's docs
+        // explicitly warn against mixing them. With both on, the new SW
+        // claimed the current page mid-precache-install (asset-fetch
+        // race), and on greg's iPhone Safari the chunk-load recovery
+        // looped silently for 4-5 minutes before settling. Defaults pair
+        // correctly with 'prompt'; the UpdatePrompt is the intended
+        // control surface for activating a new SW.
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
