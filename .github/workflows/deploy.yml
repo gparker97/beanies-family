@@ -195,7 +195,31 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to S3
-        run: aws s3 sync dist/ s3://${{ vars.APP_S3_BUCKET }} --delete
+        # Two-step deploy to close the "post-deploy chunk-load loop" window.
+        #
+        # Step 1: sync everything WITHOUT `--delete`. Old hashed chunks from
+        # the previous deploy survive in S3 for the CloudFront cache-stale
+        # window (~1-15min between this deploy completing and CDN-edge
+        # invalidation propagating). Without this, any user whose CDN edge
+        # still has the OLD `index.html` cached gets a 404 on chunk URLs
+        # this deploy rotated → the "Cannot destructure property X from
+        # null or undefined value" reload loop (greg's iPhone 14, May 2026).
+        # Storage cost is negligible (a few MB per deploy; `/assets/*` are
+        # immutable so the CDN long-caches them anyway). A lifecycle rule
+        # can prune anything older than N days as a follow-up.
+        #
+        # Step 2: overwrite `index.html` with `Cache-Control: no-cache` so
+        # CloudFront always revalidates with S3 instead of holding the stale
+        # copy for up to `default_ttl=86400` (24h, per the app subdomain's
+        # Terraform — `infrastructure/modules/app-subdomain/main.tf`).
+        # Combined with step 1, this means: even when CDN serves a stale
+        # `index.html`, the chunks it references still exist; AND the stale
+        # window shrinks to seconds, not hours.
+        run: |
+          aws s3 sync dist/ s3://${{ vars.APP_S3_BUCKET }}
+          aws s3 cp dist/index.html s3://${{ vars.APP_S3_BUCKET }}/index.html \
+            --cache-control "no-cache, max-age=0, must-revalidate" \
+            --content-type "text/html; charset=utf-8"
 
       - name: Invalidate CloudFront cache
         run: |

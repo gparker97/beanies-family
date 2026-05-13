@@ -25,6 +25,15 @@ export interface AuthUser {
   email: string;
   familyId?: string;
   role?: string;
+  /**
+   * Cached display name, persisted with the session so the resume-setup
+   * recovery screen can pre-fill the owner-name field with what the user
+   * actually typed during signUp — instead of guessing from the email's
+   * local part. Stale once the user renames themselves, so always prefer
+   * `familyStore.members.find(...)?.name` when the doc is loaded; this is
+   * a fallback for the pre-doc-load window.
+   */
+  displayName?: string;
 }
 
 const SESSION_KEY = 'beanies_auth_session';
@@ -118,7 +127,10 @@ export const useAuthStore = defineStore('auth', () => {
     if (!currentUser.value) return '';
     const familyStore = useFamilyStore();
     const member = familyStore.members.find((m) => m.id === currentUser.value?.memberId);
-    return member?.name ?? currentUser.value.email ?? '';
+    // Truth wins (the loaded doc); session-cached `displayName` covers the
+    // pre-doc-load window (e.g. the resume-setup recovery screen, where the
+    // doc hasn't been rehydrated yet); email is the last-ditch fallback.
+    return member?.name ?? currentUser.value.displayName ?? currentUser.value.email ?? '';
   });
 
   /**
@@ -251,6 +263,14 @@ export const useAuthStore = defineStore('auth', () => {
       ? await familyStore.createMemberWithId(id, memberInput)
       : await familyStore.createMember(memberInput);
     if (member) familyStore.setCurrentMember(member.id);
+    // Leave onboarding incomplete so the money/savings onboarding wizard
+    // shows on /nook. Lives in `buildOwnerDoc` (not `signUp` alone) so the
+    // resume-setup path also restores it — the full-page Drive-OAuth redirect
+    // destroys the in-memory doc, including the onboardingCompleted flag
+    // `signUp` had written; without this re-set the wizard silently skips
+    // for any user who finishes pod-creation via the recovery flow.
+    const settingsStore = useSettingsStore();
+    await settingsStore.setOnboardingCompleted(false);
     return member;
   }
 
@@ -331,16 +351,20 @@ export const useAuthStore = defineStore('auth', () => {
         });
       }
 
-      // Leave onboarding incomplete so the onboarding wizard shows on /nook
-      const settingsStore = useSettingsStore();
-      await settingsStore.setOnboardingCompleted(false);
+      // (`setOnboardingCompleted(false)` is now inside `buildOwnerDoc` —
+      // shared with the resume-setup path so the money-wizard shows there
+      // too. signUp itself doesn't need to re-set it.)
 
-      // Auto sign in
+      // Auto sign in. `displayName` is cached on the session for the
+      // pre-doc-load window — the resume-setup recovery screen reads it
+      // to pre-fill the owner-name field with what the user actually
+      // typed here, instead of guessing from the email's local part.
       const user: AuthUser = {
         memberId: member.id,
         email: params.email,
         familyId: family.id,
         role: 'owner',
+        displayName: params.memberName,
       };
       currentUser.value = user;
       isAuthenticated.value = true;
