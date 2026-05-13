@@ -80,10 +80,13 @@ onMounted(async () => {
       });
     }
   }
-  // Reasonable default for the name field — the email's local part. The user
-  // can change it; the real owner name was lost with the in-memory doc.
-  const email = authStore.currentUser?.email ?? '';
-  ownerName.value = email.includes('@') ? email.slice(0, email.indexOf('@')) : '';
+  // Pre-fill the name field. `authStore.displayName` resolves to the cached
+  // `currentUser.displayName` (set by signUp) when the doc isn't loaded yet —
+  // i.e. the user sees whatever name they actually typed during signup, not
+  // a guess at the email's local part. Last-ditch fallbacks are baked into
+  // `displayName` itself (email → empty string), so this is always safe to
+  // assign directly.
+  ownerName.value = authStore.displayName;
 });
 
 function validateIdentity(): boolean {

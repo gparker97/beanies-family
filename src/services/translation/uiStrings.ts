@@ -3147,9 +3147,9 @@ const STRING_DEFS = {
     beanie: 'finish setting up your pod',
   },
   'resumeSetup.subtitle': {
-    en: "Your last setup didn't quite finish. Pop your password back in and pick where your pod lives — we'll wrap it up.",
+    en: "Your last setup didn't quite finish. Re-enter your password to wrap things up — we never store it, so your data stays encrypted end-to-end.",
     beanie:
-      "your last setup didn't quite finish. pop your password back in and pick where your pod lives — we'll wrap it up.",
+      "your last setup didn't quite finish. re-enter your password to wrap things up — we never store it, so your beans stay encrypted end-to-end.",
   },
   'resumeSetup.storagePrompt': {
     en: 'Where should your pod live?',
