@@ -101,10 +101,19 @@ const dayOptions = Array.from({ length: 31 }, (_, i) => ({
 
 const totalSteps = 3;
 
-// Expose step navigation for E2E tests (dev mode only)
+// Expose step navigation for E2E tests (dev mode only).
+//
+// `setStep(3)` is the E2E suite's way of saying "pretend the storage step
+// (step 2) completed and a pod file was written" — `showSaveFilePicker` is a
+// native OS dialog that can't be automated in headless browsers. Mark the
+// `authStore.podCreated` invariant accordingly so the router guard doesn't
+// bounce the test back to the resume-setup recovery screen.
 if (import.meta.env.DEV) {
   (window as unknown as Record<string, unknown>).__e2eCreatePod = {
-    setStep: (s: number) => (currentStep.value = s),
+    setStep: (s: number) => {
+      if (s >= 3) authStore.markPodCreated();
+      currentStep.value = s;
+    },
   };
 }
 
