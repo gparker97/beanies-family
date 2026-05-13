@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import LoginBackground from '@/components/login/LoginBackground.vue';
 import LoginSecurityFooter from '@/components/login/LoginSecurityFooter.vue';
@@ -65,6 +65,31 @@ const isSingleFamilyAutoSelect = ref(false);
 const inviteGateLocked = ref(features.inviteGate);
 
 onMounted(async () => {
+  // Wait for App.vue's `authStore.initializeAuth()` to finish before
+  // reading auth state. Vue fires children's onMounted BEFORE the parent
+  // (App.vue), so our hooks race the parent's async init — without this
+  // wait, every check below sees the pre-init values. The specific case
+  // this broke (caught 2026-05-13 from greg's iPhone 14 Safari on the
+  // Drive-OAuth-return load): the session had been persisted to localStorage
+  // by signUp but `authStore.isAuthenticated` was still its default `false`
+  // when we evaluated `?resume=setup && isAuthenticated`, so the resume-
+  // setup branch was silently skipped and the user got dropped on the
+  // WelcomeGate while `app.onboardingZombieState` correctly fired in Slack.
+  if (!authStore.isInitialized) {
+    await new Promise<void>((resolve) => {
+      const stop = watch(
+        () => authStore.isInitialized,
+        (v) => {
+          if (v) {
+            stop();
+            resolve();
+          }
+        },
+        { immediate: true }
+      );
+    });
+  }
+
   // Resume-setup recovery screen: an authenticated session exists but no
   // `.beanpod` file was ever written (a half-finished onboarding, or an iOS
   // Drive OAuth redirect mid-flight). The router guard / App.vue route us

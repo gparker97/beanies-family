@@ -594,7 +594,10 @@ onMounted(async () => {
         message:
           'App boot found an authenticated session with no pod file — routing to resume-setup',
         severity: 'error',
-        context: { route_path: route.path },
+        // fullPath preserves the query — tells us whether the URL was
+        // already on `?resume=setup` (the post-OAuth-return case) or got
+        // here some other way.
+        context: { route_path: route.fullPath },
       });
       const onResumeScreen = route.path === '/welcome' && route.query.resume === 'setup';
       if (!onResumeScreen) await router.replace('/welcome?resume=setup');
