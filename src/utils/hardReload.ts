@@ -125,10 +125,16 @@ export function isChunkLoadError(err: unknown): boolean {
 }
 
 /**
- * sessionStorage flag the chunk-load recovery paths set before invoking
- * `hardReload()` so a still-broken new HTML doesn't re-trigger an infinite
- * recovery loop. Cleared by `router.beforeEach`/`afterEach` on the next
- * successful navigation. Single source of truth — previously duplicated
- * across `main.ts`, `router/index.ts`, and now `App.vue` init.
+ * sessionStorage *counter* the chunk-load recovery paths increment before
+ * invoking `hardReload()` — bounds the recovery loop to N attempts so a
+ * persistently-broken state can't reload forever. Read + incremented in
+ * `App.vue`'s init catch and `router.onError`; cleared in `App.vue`'s
+ * post-init health check (after a confirmed successful boot, NOT just any
+ * `afterEach` — that fires on the initial nav before App.vue's onMounted
+ * error has a chance to throw, defeating the bound).
+ *
+ * Name kept as "Flag" for backwards-compat with sessionStorage entries
+ * from prior builds (where it was 0/1). Old "1" parses to numeric 1, so
+ * a tab carrying the old value just starts at attempt 1 of N — graceful.
  */
 export const CHUNK_RELOAD_FLAG = 'chunkReloadAttempted';

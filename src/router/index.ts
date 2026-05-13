@@ -407,21 +407,29 @@ router.afterEach((to) => {
 // `import()` rejects with `Failed to fetch dynamically imported module`.
 // `hardReload()` evicts the workbox precache and forces a fresh
 // navigation so the user lands on the new build's chunk URLs.
+//
+// `CHUNK_RELOAD_FLAG` is a counter, not a boolean — see App.vue's init
+// catch for the full retry budget. We just increment-or-reload here.
 router.onError((err) => {
   if (!isChunkLoadError(err)) return;
-  if (sessionStorage.getItem(CHUNK_RELOAD_FLAG) === '1') {
-    // Already attempted recovery this session — let the error surface
-    // through the global handler instead of reload-looping.
+  const attempts = parseInt(sessionStorage.getItem(CHUNK_RELOAD_FLAG) ?? '0', 10) || 0;
+  if (attempts >= 3) {
+    // Budget exhausted — let the error surface through the global handler
+    // (main.ts unhandledrejection / App.vue's overlay path) instead of
+    // looping silently. Slack alert will fire from App.vue's exhausted
+    // branch when the next nav also fails.
     return;
   }
-  sessionStorage.setItem(CHUNK_RELOAD_FLAG, '1');
+  sessionStorage.setItem(CHUNK_RELOAD_FLAG, String(attempts + 1));
   void hardReload();
 });
 
-router.afterEach(() => {
-  // Successful navigation proves the new chunk set is reachable; clear
-  // the guard so a future deploy gap can recover too.
-  sessionStorage.removeItem(CHUNK_RELOAD_FLAG);
-});
+// NOTE: previously cleared `CHUNK_RELOAD_FLAG` here on every successful
+// nav, intending "clean nav ⇒ deploy gap survived, reset for next time".
+// That fired on the INITIAL nav too — which resolves successfully before
+// App.vue's onMounted error throws — so every page load thought it was
+// the "first attempt", silent hardReload looped forever, and the Slack
+// "exhausted" alert never fired (greg's iPhone, 2026-05-13). The reset
+// now lives in App.vue, gated on a successful post-init health check.
 
 export default router;
