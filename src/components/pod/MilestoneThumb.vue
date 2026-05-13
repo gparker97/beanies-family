@@ -31,12 +31,21 @@ const props = withDefaults(
     milestone: Milestone;
     /** 'sm' = 48px (default); 'md' = 56–64px responsive. */
     size?: 'sm' | 'md';
+    /**
+     * When true, the thumb renders as a static `<div>` regardless of
+     * whether photos exist — no click handler, no zoom cursor, click
+     * bubbles to a wrapping element. Used by the Family Scrapbook where
+     * clicking anywhere on the card (including the thumb) should route
+     * to the relevant view rather than open the lightbox in place.
+     */
+    disableLightbox?: boolean;
   }>(),
-  { size: 'sm' }
+  { size: 'sm', disableLightbox: false }
 );
 
 const emit = defineEmits<{
-  /** Emitted only when the milestone actually has photos to show. */
+  /** Emitted only when the milestone actually has photos AND
+   *  `disableLightbox` is false. */
   'open-lightbox': [];
 }>();
 
@@ -46,6 +55,7 @@ const photoStore = usePhotoStore();
 
 const photoCount = computed(() => props.milestone.photoIds?.length ?? 0);
 const hasPhotos = computed(() => photoCount.value > 0);
+const isInteractive = computed(() => hasPhotos.value && !props.disableLightbox);
 
 const photoUrl = computed(() => {
   const id = props.milestone.photoIds?.[0];
@@ -66,7 +76,7 @@ const sizeClasses = computed(() =>
 );
 
 function handleClick(e: MouseEvent): void {
-  if (!hasPhotos.value) return;
+  if (!isInteractive.value) return;
   e.stopPropagation();
   emit('open-lightbox');
 }
@@ -79,11 +89,14 @@ function handleClick(e: MouseEvent): void {
        positioning. The inner wrapper provides the positioning context
        the multi-photo badge needs. -->
   <component
-    :is="hasPhotos ? 'button' : 'div'"
-    :type="hasPhotos ? 'button' : undefined"
-    :aria-label="hasPhotos ? t('photos.viewer.open') : undefined"
+    :is="isInteractive ? 'button' : 'div'"
+    :type="isInteractive ? 'button' : undefined"
+    :aria-label="isInteractive ? t('photos.viewer.open') : undefined"
     class="flex flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-[0_3px_10px_rgba(44,62,80,0.12)]"
-    :class="[sizeClasses, hasPhotos ? 'cursor-zoom-in transition-transform hover:scale-105' : '']"
+    :class="[
+      sizeClasses,
+      isInteractive ? 'cursor-zoom-in transition-transform hover:scale-105' : '',
+    ]"
     @click="handleClick"
   >
     <span class="relative flex h-full w-full items-center justify-center">
