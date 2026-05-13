@@ -217,11 +217,11 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
     category: 'how-it-works',
     title: 'Your Daily Briefing',
     excerpt:
-      'How beanies.family decides what appears in the orange box on your Family Nook — your personal daily briefing of things that need your attention.',
+      'How beanies.family decides what appears in the orange box on your Family Nook — your daily briefing of things that need your attention (and a couple that need any grown-up’s).',
     icon: '\u{1F4CB}',
-    readTime: 4,
+    readTime: 5,
     popular: true,
-    updatedDate: '2026-03-27',
+    updatedDate: '2026-05-13',
     sections: [
       {
         type: 'heading',
@@ -248,8 +248,8 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       {
         type: 'callout',
         content:
-          'The daily briefing is personal \u2014 it only shows items assigned to <em>you</em>. Other family members see their own briefing when they sign in. Family-wide schedules live in the <strong>Family Planner</strong> and <strong>To-Do</strong> pages.',
-        title: 'It\u2019s just for you',
+          'The daily briefing is mostly personal \u2014 it shows the things <em>you</em> need to do today, and every family member sees their own when they sign in. Two kinds of item also surface for the grown-ups even when they aren\u2019t yours: a to-do or activity assigned <em>only to a child</em>, and a to-do <em>nobody</em>\u2019s been assigned to yet (more on both below). Family-wide schedules live in the <strong>Family Planner</strong> and <strong>To-Do</strong> pages.',
+        title: 'Mostly yours \u2014 with a couple of family-wide exceptions',
         icon: '\u{1F464}',
       },
       {
@@ -261,7 +261,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Two types of items can appear: <strong>activities</strong> happening today and <strong>to-dos</strong> that need your attention. Here\u2019s exactly how each one works.',
+          'Three kinds of item can appear: <strong>activities</strong> happening today, <strong>to-dos</strong> that need attention, and <strong>medication reminders</strong> for anyone in the family with doses to take today. Here\u2019s exactly how each one works.',
       },
       {
         type: 'heading',
@@ -289,6 +289,11 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
           'If you\u2019re both the drop-off <em>and</em> pickup person for the same activity, you\u2019ll see the pickup reminder (since that\u2019s the one you\u2019re most likely to forget). You won\u2019t get duplicate messages for the same activity.',
         title: 'No duplicates',
         icon: '\u2728',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'And like to-dos (below): if an activity is assigned <strong>only to a child</strong> — and you’re not the drop-off or pickup person — every grown-up sees it framed by the child’s name: <em>"Emma: Swimming at 4:00 PM today!"</em> So a parent always knows what’s on the kids’ plates.',
       },
       {
         type: 'heading',
@@ -321,6 +326,43 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
           'To-dos with a due date <em>in the future</em> (not today, not overdue) won\u2019t appear in the briefing yet. They\u2019ll show up when the day comes.',
         title: 'Future to-dos',
         icon: '\u{1F4C5}',
+      },
+      {
+        type: 'heading',
+        content: 'To-dos for the kids — and to-dos for no one',
+        level: 3,
+        id: 'todos-shared',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Two kinds of to-do show up in a <em>grown-up’s</em> briefing even when they aren’t assigned to that grown-up:',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Assigned only to a child</strong> 📋 — You’ll see it framed by the child’s name: <em>"Emma: wear AM uniform for school photos today!"</em> The child sees it as her own to-do too. This way the parent who actually has to make it happen doesn’t miss it. Want just <em>one</em> parent on the hook? Add that parent as an assignee alongside the child — then only that parent (and the child) see it, not every grown-up.',
+          '<strong>Assigned to no one</strong> 📋 — An unassigned to-do is treated as "whoever’s free", so it shows up for <em>everyone</em>: <em>"Buy milk (anyone can do this)"</em>. It stays in everyone’s briefing until someone ticks it off — so a loose task doesn’t get lost.',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'The same date rules apply to these — a child’s to-do due next week won’t appear yet — and whoever ticks a shared to-do off gets the credit, assignee or not.',
+        title: 'Same rules, wider audience',
+        icon: '✨',
+      },
+      {
+        type: 'heading',
+        content: 'Medications',
+        level: 3,
+        id: 'medications',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If someone in the family has a medication with a set number of daily doses, a reminder appears — <em>"Don’t forget: Antibiotics for Noah (2 more today)"</em> — and it counts down as doses get logged. Everyone sees these, so whoever’s doing the giving is covered, and the reminder disappears once today’s doses are all logged. Tap it to open the medication and log a dose.',
       },
       {
         type: 'heading',

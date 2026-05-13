@@ -66,6 +66,7 @@ const TODAY = '2026-03-10'; // Tuesday
 function makeMember(overrides: Partial<FamilyMember> & { id: string; name: string }): FamilyMember {
   return {
     role: 'member',
+    ageGroup: 'adult',
     email: `${overrides.name.toLowerCase()}@test.com`,
     color: '#000',
     createdAt: NOW,
@@ -161,9 +162,11 @@ describe('useCriticalItems', () => {
 
     // Set up family members
     familyStore.members.push(
-      makeMember({ id: 'parent-1', name: 'Dad', role: 'owner' }),
-      makeMember({ id: 'parent-2', name: 'Mom' }),
-      makeMember({ id: 'child-1', name: 'Emma' })
+      makeMember({ id: 'parent-1', name: 'Dad', role: 'owner', ageGroup: 'adult' }),
+      makeMember({ id: 'parent-2', name: 'Mom', ageGroup: 'adult' }),
+      makeMember({ id: 'child-1', name: 'Emma', ageGroup: 'child' }),
+      makeMember({ id: 'child-2', name: 'Noah', ageGroup: 'child' }),
+      makeMember({ id: 'pet-1', name: 'Rex', ageGroup: 'child', isPet: true })
     );
   });
 
@@ -416,7 +419,7 @@ describe('useCriticalItems', () => {
     expect(criticalItems.value[1]!.id).toBe('untimed');
   });
 
-  it('caps items at 5 and reports overflow', () => {
+  it('returns every eligible item (capping/expansion is a view concern)', () => {
     familyStore.setCurrentMember('parent-1');
     for (let i = 0; i < 7; i++) {
       todoStore.todos.push(
@@ -430,9 +433,8 @@ describe('useCriticalItems', () => {
       );
     }
 
-    const { criticalItems, overflowCount } = useCriticalItems();
-    expect(criticalItems.value).toHaveLength(5);
-    expect(overflowCount.value).toBe(2);
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(7);
   });
 
   it('uses no-time translation variant when activity has no time', () => {
@@ -528,6 +530,228 @@ describe('useCriticalItems', () => {
 
     const { criticalItems } = useCriticalItems();
     expect(criticalItems.value).toHaveLength(0);
+  });
+
+  // ── Audience: child-only & unassigned to-dos / activities ─────────────
+
+  it('shows an unassigned to-do on every non-pet member, but not on a pet', () => {
+    const unassigned = makeTodo({
+      id: 'u1',
+      title: 'Buy milk',
+      dueDate: TODAY,
+      createdBy: 'parent-1',
+    });
+
+    familyStore.setCurrentMember('parent-1'); // an adult
+    todoStore.todos.push(unassigned);
+    let items = useCriticalItems().criticalItems.value;
+    expect(items).toHaveLength(1);
+    expect(items[0]!.message).toContain('buy milk');
+    expect(items[0]!.message).toContain('anyone can do this');
+
+    // a child sees it too
+    todoStore.todos.length = 0;
+    todoStore.todos.push(unassigned);
+    familyStore.setCurrentMember('child-1');
+    items = useCriticalItems().criticalItems.value;
+    expect(items).toHaveLength(1);
+    expect(items[0]!.message).toContain('anyone can do this');
+
+    // a pet never gets a briefing
+    todoStore.todos.length = 0;
+    todoStore.todos.push(unassigned);
+    familyStore.setCurrentMember('pet-1');
+    expect(useCriticalItems().criticalItems.value).toHaveLength(0);
+  });
+
+  it('shows a child-only to-do on every adult, on the child itself, but not on another child', () => {
+    const childTodo = makeTodo({
+      id: 'c1',
+      title: 'Wear AM uniform',
+      assigneeId: 'child-1',
+      dueDate: TODAY,
+      createdBy: 'parent-1',
+    });
+
+    // adult parent-2 sees it framed by the child's name
+    familyStore.setCurrentMember('parent-2');
+    todoStore.todos.push(childTodo);
+    let items = useCriticalItems().criticalItems.value;
+    expect(items).toHaveLength(1);
+    expect(items[0]!.message).toContain('Emma');
+    expect(items[0]!.message).toContain('wear AM uniform');
+    expect(items[0]!.message).not.toContain('anyone can do this');
+
+    // the assigned child sees it as her own to-do (not the "Emma: …" framing)
+    todoStore.todos.length = 0;
+    todoStore.todos.push(childTodo);
+    familyStore.setCurrentMember('child-1');
+    items = useCriticalItems().criticalItems.value;
+    expect(items).toHaveLength(1);
+    expect(items[0]!.message).toContain('wear AM uniform');
+    expect(items[0]!.message).not.toContain('Emma:');
+
+    // another child does NOT see it
+    todoStore.todos.length = 0;
+    todoStore.todos.push(childTodo);
+    familyStore.setCurrentMember('child-2');
+    expect(useCriticalItems().criticalItems.value).toHaveLength(0);
+  });
+
+  it('joins multiple child names for a to-do assigned to several kids only', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({
+        id: 'kids',
+        title: 'Tidy your rooms',
+        assigneeIds: ['child-1', 'child-2'],
+        dueDate: TODAY,
+        createdBy: 'parent-1',
+      })
+    );
+    const items = useCriticalItems().criticalItems.value;
+    expect(items).toHaveLength(1);
+    expect(items[0]!.message).toContain('Emma & Noah');
+  });
+
+  it('once an adult is also assigned, only that adult and the child see the to-do', () => {
+    const todo = makeTodo({
+      id: 'mix',
+      title: 'Pack swim bag',
+      assigneeIds: ['parent-1', 'child-1'],
+      dueDate: TODAY,
+      createdBy: 'parent-1',
+    });
+
+    familyStore.setCurrentMember('parent-1'); // assigned adult
+    todoStore.todos.push(todo);
+    expect(useCriticalItems().criticalItems.value).toHaveLength(1);
+
+    todoStore.todos.length = 0;
+    todoStore.todos.push(todo);
+    familyStore.setCurrentMember('child-1'); // assigned child
+    expect(useCriticalItems().criticalItems.value).toHaveLength(1);
+
+    todoStore.todos.length = 0;
+    todoStore.todos.push(todo);
+    familyStore.setCurrentMember('parent-2'); // a different adult — should NOT see it
+    expect(useCriticalItems().criticalItems.value).toHaveLength(0);
+  });
+
+  it('shows a child-only activity on adults, but not on another child', () => {
+    const act = makeActivity({
+      id: 'a-child',
+      assigneeId: 'child-1',
+      pickupMemberId: undefined,
+      dropoffMemberId: undefined,
+    });
+
+    familyStore.setCurrentMember('parent-2');
+    activityStore.activities.push(act);
+    const items = useCriticalItems().criticalItems.value;
+    expect(items).toHaveLength(1);
+    expect(items[0]!.message).toContain('Emma');
+    expect(items[0]!.message).toContain('Soccer Practice');
+
+    activityStore.activities.length = 0;
+    activityStore.activities.push(act);
+    familyStore.setCurrentMember('child-2');
+    expect(useCriticalItems().criticalItems.value).toHaveLength(0);
+  });
+
+  it('does not surface an unassigned activity on anyone', () => {
+    familyStore.setCurrentMember('parent-1');
+    activityStore.activities.push(
+      makeActivity({
+        id: 'a-none',
+        assigneeId: undefined,
+        assigneeIds: undefined,
+        pickupMemberId: undefined,
+        dropoffMemberId: undefined,
+      })
+    );
+    expect(useCriticalItems().criticalItems.value).toHaveLength(0);
+  });
+
+  it('uses the overdue / no-due variants for unassigned and child-only to-dos', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({
+        id: 'u-overdue',
+        title: 'Overdue chore',
+        dueDate: '2026-03-08',
+        createdBy: 'parent-1',
+      }),
+      makeTodo({
+        id: 'c-nodue',
+        title: 'School project',
+        assigneeId: 'child-1',
+        createdBy: 'parent-1',
+      })
+    );
+    const items = useCriticalItems().criticalItems.value;
+    const overdue = items.find((i) => i.id === 'u-overdue')!;
+    expect(overdue.icon).toBe('⏰');
+    expect(overdue.message).toContain('8 Mar');
+    expect(overdue.message).toContain('anyone can do this');
+    const childNoDue = items.find((i) => i.id === 'c-nodue')!;
+    expect(childNoDue.message).toContain('Emma');
+    expect(childNoDue.message).toContain('school project');
+  });
+
+  it('degrades a pet-only / stale-assignee to-do to "anyone can do this" (no "Unknown:")', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({
+        id: 'pet-only',
+        title: 'Walk the dog',
+        assigneeId: 'pet-1',
+        dueDate: TODAY,
+        createdBy: 'parent-1',
+      }),
+      makeTodo({
+        id: 'stale',
+        title: 'Mystery task',
+        assigneeId: 'ghost-member',
+        dueDate: TODAY,
+        createdBy: 'parent-1',
+      })
+    );
+    const items = useCriticalItems().criticalItems.value;
+    expect(items).toHaveLength(2);
+    for (const i of items) {
+      expect(i.message).toContain('anyone can do this');
+      expect(i.message).not.toContain('Unknown');
+      expect(i.message).not.toContain('Rex');
+    }
+  });
+
+  it('mixes unassigned and assigned-to-self items in one list for an adult viewer', () => {
+    familyStore.setCurrentMember('parent-1');
+    // 4 unassigned + 2 assigned-to-self = 6 eligible for parent-1
+    for (let i = 0; i < 4; i++) {
+      todoStore.todos.push(
+        makeTodo({ id: `un-${i}`, title: `Loose ${i}`, dueDate: TODAY, createdBy: 'parent-1' })
+      );
+    }
+    todoStore.todos.push(
+      makeTodo({
+        id: 'mine-1',
+        title: 'Mine 1',
+        assigneeId: 'parent-1',
+        dueDate: TODAY,
+        createdBy: 'parent-1',
+      }),
+      makeTodo({
+        id: 'mine-2',
+        title: 'Mine 2',
+        assigneeId: 'parent-1',
+        dueDate: TODAY,
+        createdBy: 'parent-1',
+      })
+    );
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(6);
   });
 
   // ── Vacation start-date filter ──────────────────────────────────────
