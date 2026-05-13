@@ -47,12 +47,25 @@ export default defineConfig({
         globIgnores: ['**/holidays/*.json'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MiB — Automerge WASM is ~2.65 MB
         // When a new SW activates, clean up previous-deploy precache entries
-        // (old hashed chunks nothing references anymore). Doesn't fix the
-        // "old SW still active, serving stale index.html" window (that's
-        // registerType: 'prompt'`s deliberate trade-off), but compounds with
-        // hardReload()'s SW-unregister — once the new SW activates on the
-        // fresh load, leftover old caches go too.
+        // (old hashed chunks nothing references anymore).
         cleanupOutdatedCaches: true,
+        // skipWaiting: new SWs activate AS SOON AS they install — they
+        // don't queue in "waiting" state until every tab closes or the
+        // UpdatePrompt's "Refresh" is clicked. clientsClaim: the new SW
+        // takes over ALREADY-OPEN tabs the moment it activates (no need to
+        // navigate first). Together they close the in-session "old SW
+        // still serving the stale precache" window that produced the 2-3
+        // chunk-load loop iterations greg's iPhone hit on 2026-05-13. The
+        // UpdatePrompt still appears with `registerType: 'prompt'` — it's
+        // just informational now (the new SW is already controlling).
+        //
+        // Trade-off: a user with the app open mid-action gets a silent SW
+        // swap on deploy; their NEXT navigation uses new code. For a SPA
+        // where mid-edit data is in IndexedDB (persistent), the risk is
+        // low. The alternative (the deploy gap leaving people in a chunk-
+        // load loop) is worse for onboarding-critical paths.
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
