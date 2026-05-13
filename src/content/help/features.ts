@@ -272,7 +272,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     icon: '\u2705',
     readTime: 5,
     popular: true,
-    updatedDate: '2026-05-12',
+    updatedDate: '2026-05-13',
     sections: [
       {
         type: 'heading',
@@ -471,6 +471,23 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'Your open tasks also appear on the <strong>Family Nook</strong> homepage in the To-Do widget, with a quick-add bar so you can jot things down without leaving the Nook. Tasks assigned to you that are due today, overdue, or without a due date also show up in your <strong>daily briefing</strong> (the orange box).',
+      },
+      {
+        type: 'paragraph',
+        content: 'Two of those rules go a little wider than "assigned to you":',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>A to-do assigned only to a child</strong> shows up in <em>every</em> grown-up’s daily briefing too — framed by the child’s name (<em>"Emma: wear AM uniform for school photos"</em>) — so the parent who actually has to make it happen sees it. The child still sees it as their own task. Want just one parent on the hook instead of all of them? Add that parent as an assignee alongside the child.',
+          '<strong>A to-do with no assignee</strong> shows up for <em>everyone</em> (<em>"Buy milk (anyone can do this)"</em>) and stays there until someone ticks it off — so a loose task doesn’t fall through the cracks. Whoever does it gets the credit.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The full briefing rules — dates, sorting, the five-item limit, medication reminders — are in the <a href="/help/how-it-works/your-daily-briefing">Your Daily Briefing</a> guide.',
       },
     ],
   },

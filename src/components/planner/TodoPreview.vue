@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTodoStore } from '@/stores/todoStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useExpandableList } from '@/composables/useExpandableList';
 import { normalizeAssignees } from '@/utils/assignees';
 import MemberChip from '@/components/ui/MemberChip.vue';
+import ShowMoreToggle from '@/components/ui/ShowMoreToggle.vue';
+import SmoothHeight from '@/components/ui/SmoothHeight.vue';
 import type { TodoItem } from '@/types/models';
 
 const router = useRouter();
@@ -18,14 +21,13 @@ const emit = defineEmits<{ view: [todo: TodoItem] }>();
 const currentMemberId = computed(() => authStore.currentUser?.memberId ?? '');
 
 const PAGE_SIZE = 6;
-const visibleCount = ref(PAGE_SIZE);
-
-const previewTodos = computed(() => todoStore.filteredActiveTodos.slice(0, visibleCount.value));
-const hasMore = computed(() => todoStore.filteredActiveTodos.length > visibleCount.value);
-
-function showMore() {
-  visibleCount.value += PAGE_SIZE;
-}
+const {
+  visible: previewTodos,
+  canShowMore,
+  canShowLess,
+  showMore,
+  showLess,
+} = useExpandableList(() => todoStore.filteredActiveTodos, { initial: PAGE_SIZE, step: PAGE_SIZE });
 
 async function handleToggle(e: Event, id: string) {
   e.stopPropagation();
@@ -59,7 +61,7 @@ function goToTodos() {
       <p class="text-secondary-500/40 text-sm dark:text-gray-500">{{ t('todo.noTodos') }}</p>
     </div>
 
-    <div v-else class="space-y-1.5">
+    <SmoothHeight v-else :revision="previewTodos.length" class="space-y-1.5">
       <button
         v-for="todo in previewTodos"
         :key="todo.id"
@@ -99,15 +101,14 @@ function goToTodos() {
         </span>
       </button>
 
-      <!-- View more -->
-      <button
-        v-if="hasMore"
-        type="button"
-        class="mt-2 w-full cursor-pointer rounded-2xl py-2 text-center text-sm font-semibold text-[#9B59B6] transition-colors hover:bg-[#9B59B6]/5"
-        @click="showMore"
-      >
-        {{ t('planner.viewMore') }}
-      </button>
-    </div>
+      <ShowMoreToggle
+        tone="on-light-purple"
+        :can-show-more="canShowMore"
+        :can-show-less="canShowLess"
+        :more-label="t('planner.viewMore')"
+        @show-more="showMore"
+        @show-less="showLess"
+      />
+    </SmoothHeight>
   </div>
 </template>
