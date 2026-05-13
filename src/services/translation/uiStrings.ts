@@ -4188,6 +4188,42 @@ const STRING_DEFS = {
     en: 'Drop off & pick up {child} at {activity} today!',
     beanie: 'drop off & pick up {child} at {activity} today!',
   },
+  // A to-do assigned only to a child (no adult assignee): shown to every adult,
+  // framed by the child's name. {children} is one or more names ("Neil" / "Neil & Sam").
+  'nook.criticalTodoForChild': {
+    en: '{children}: {task} today!',
+    beanie: '{children}: {task} today!',
+  },
+  'nook.criticalTodoForChildNoDue': {
+    en: '{children}: {task}',
+    beanie: '{children}: {task}',
+  },
+  'nook.criticalTodoForChildOverdue': {
+    en: '{children}: {task} — it was due {date}',
+    beanie: '{children}: {task} — was due {date}, no rush!',
+  },
+  // A to-do with no assignee: shown to everyone — "whoever's free".
+  'nook.criticalTodoUnassigned': {
+    en: '{task} today (anyone can do this)',
+    beanie: '{task} today (anyone can do this)',
+  },
+  'nook.criticalTodoUnassignedNoDue': {
+    en: '{task} (anyone can do this)',
+    beanie: '{task} (anyone can do this)',
+  },
+  'nook.criticalTodoUnassignedOverdue': {
+    en: 'A gentle reminder: {task} — it was due {date} (anyone can do this)',
+    beanie: 'a gentle nudge: {task} — was due {date} (anyone can do this)',
+  },
+  // An activity assigned only to a child (no adult assignee): shown to every adult.
+  'nook.criticalActivityForChild': {
+    en: '{children}: {activity} at {time} today!',
+    beanie: '{children}: {activity} at {time} today!',
+  },
+  'nook.criticalActivityForChildNoTime': {
+    en: '{children}: {activity} today!',
+    beanie: '{children}: {activity} today!',
+  },
   'nook.dutyDone': {
     en: 'Done',
     beanie: 'done',
@@ -4195,10 +4231,6 @@ const STRING_DEFS = {
   'nook.dutyMarkDone': {
     en: 'Mark done',
     beanie: 'mark done',
-  },
-  'nook.criticalMore': {
-    en: 'more for you today',
-    beanie: 'more beans for you today',
   },
   'nook.yourBeans': { en: 'Your Beans', beanie: 'your bean pod' },
   'nook.addBean': { en: 'Add Beanie', beanie: 'add a beanie' },
@@ -5730,6 +5762,7 @@ const STRING_DEFS = {
   'vacation.tripShape': { en: 'Trip shape', beanie: 'trip shape' },
   'vacation.essentials': { en: 'Essentials', beanie: 'essentials' },
   'action.showMore': { en: 'Show more', beanie: 'show more' },
+  'action.showAllN': { en: 'Show all {count}', beanie: 'show all {count}' },
   'action.showLess': { en: 'Show less', beanie: 'show less' },
   'travel.today.label': { en: 'Today', beanie: 'today' },
   'travel.today.dayPrefix': { en: 'Day', beanie: 'day' },

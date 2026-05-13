@@ -2,7 +2,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { usePhotoStore } from '@/stores/photoStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import type { UUID } from '@/types/models';
+import type { FamilyMember, UUID } from '@/types/models';
 
 const DEFAULT_COLOR = '#6b7280';
 
@@ -34,6 +34,24 @@ export function markMemberAvatarError(member: { avatarPhotoId?: UUID }): void {
 }
 
 /**
+ * Whether a member is a grown-up (a "Parent" bean): a human whose
+ * ageGroup is `adult`, plus the pod owner as a safety belt (the owner
+ * is always an adult even if ageGroup were somehow unset). Pets are
+ * never adults — the isPet flag overrides ageGroup/role.
+ *
+ * Exported standalone so module-level code (e.g. the daily-briefing
+ * visibility rule in useCriticalItems) can use it without instantiating
+ * a composable.
+ */
+export function isAdultMember(member: {
+  role?: string;
+  ageGroup?: string;
+  isPet?: boolean;
+}): boolean {
+  return !member.isPet && (member.role === 'owner' || member.ageGroup === 'adult');
+}
+
+/**
  * Member role label for "Your Beans"-style roster surfaces (Nook + dashboard).
  * Returns the localized "Parent / Little Beanie / Pet Beanie" string. Pet
  * takes precedence over adult/owner classification because an isPet flag
@@ -48,9 +66,7 @@ export function getMemberRoleLabel(
   t: TranslateFn
 ): string {
   if (member.isPet) return t('dashboard.rolePet');
-  if (member.role === 'owner' || member.ageGroup === 'adult') {
-    return t('dashboard.roleParent');
-  }
+  if (isAdultMember(member)) return t('dashboard.roleParent');
   return t('dashboard.roleLittleBean');
 }
 
@@ -61,14 +77,18 @@ export function getMemberRoleLabel(
 export function useMemberInfo() {
   const familyStore = useFamilyStore();
 
+  /** The family member with this ID, or `undefined` (unknown / removed / nullish ID). */
+  function getMemberById(memberId: string | null | undefined): FamilyMember | undefined {
+    if (!memberId) return undefined;
+    return familyStore.members.find((m) => m.id === memberId);
+  }
+
   function getMemberName(memberId: string | null | undefined, fallback = 'Unknown'): string {
-    if (!memberId) return fallback;
-    return familyStore.members.find((m) => m.id === memberId)?.name ?? fallback;
+    return getMemberById(memberId)?.name ?? fallback;
   }
 
   function getMemberColor(memberId: string | null | undefined, fallback = DEFAULT_COLOR): string {
-    if (!memberId) return fallback;
-    return familyStore.members.find((m) => m.id === memberId)?.color ?? fallback;
+    return getMemberById(memberId)?.color ?? fallback;
   }
 
   function getMemberNameByAccountId(accountId: string, fallback = 'Unknown'): string {
@@ -86,6 +106,7 @@ export function useMemberInfo() {
   }
 
   return {
+    getMemberById,
     getMemberName,
     getMemberColor,
     getMemberNameByAccountId,

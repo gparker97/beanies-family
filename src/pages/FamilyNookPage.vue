@@ -117,10 +117,6 @@ async function handleTodoComplete(id: string) {
   await todoStore.toggleComplete(id, memberId);
 }
 
-function scrollToSchedule() {
-  document.getElementById('today-schedule')?.scrollIntoView({ behavior: 'smooth' });
-}
-
 function handleActivityOpenEdit(activity: FamilyActivity) {
   const { activity: target, occurrenceDate } = scopedActivityOpenEdit(activity);
   editingActivity.value = target;
@@ -217,7 +213,6 @@ async function handleTransactionDelete(id: string) {
       @open-medication="viewingMedicationId = $event"
       @complete-duty="handleDutyComplete"
       @complete-todo="handleTodoComplete"
-      @show-full-schedule="scrollToSchedule"
     />
 
     <!-- Beanie tip of the day -->

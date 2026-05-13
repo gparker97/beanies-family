@@ -24,3 +24,17 @@ export function toAssigneePayload(ids: string[]): {
     assigneeId: ids[0] ?? undefined,
   };
 }
+
+/**
+ * Human-friendly conjunction list of names:
+ *   []                     → ""
+ *   ["Neil"]               → "Neil"
+ *   ["Neil", "Sam"]        → "Neil & Sam"
+ *   ["Neil", "Sam", "Max"] → "Neil, Sam & Max"
+ * Falsy entries (empty strings) are dropped. Total — never throws.
+ */
+export function formatNameList(names: string[]): string {
+  const xs = names.filter(Boolean);
+  if (xs.length <= 1) return xs[0] ?? '';
+  return `${xs.slice(0, -1).join(', ')} & ${xs[xs.length - 1]}`;
+}

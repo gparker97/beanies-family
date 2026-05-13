@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-12",
-    "translationCount": 2804
+    "translationCount": 2812
   },
   "translations": {
     "app.name": {
@@ -6610,11 +6610,6 @@
       "translation": "别忘了：今天就{task} ！",
       "hash": "hstn9c",
       "lastUpdated": "2026-03-13"
-    },
-    "nook.criticalMore": {
-      "translation": "今天为您。",
-      "hash": "w01tlu",
-      "lastUpdated": "2026-03-10"
     },
     "planner.editingOccurrence": {
       "translation": "正在编辑{date}的事件",
@@ -14024,6 +14019,51 @@
     "onboarding.countryPlaceholder": {
       "translation": "选择您的国家/地区（选填）",
       "hash": "3i2hzg",
+      "lastUpdated": "2026-05-12"
+    },
+    "nook.criticalTodoForChild": {
+      "translation": "{children} ：今天就{task} ！",
+      "hash": "38vddy",
+      "lastUpdated": "2026-05-12"
+    },
+    "nook.criticalTodoForChildNoDue": {
+      "translation": "{children} ： {task}",
+      "hash": "853q3q",
+      "lastUpdated": "2026-05-12"
+    },
+    "nook.criticalTodoForChildOverdue": {
+      "translation": "{children} ： {task} —截止日期为{date}",
+      "hash": "i2cfie",
+      "lastUpdated": "2026-05-12"
+    },
+    "nook.criticalTodoUnassigned": {
+      "translation": "今天{task} （任何人都可以执行此操作）",
+      "hash": "1h3lve",
+      "lastUpdated": "2026-05-12"
+    },
+    "nook.criticalTodoUnassignedNoDue": {
+      "translation": "{task} （任何人都可以执行此操作）",
+      "hash": "pqmabd",
+      "lastUpdated": "2026-05-12"
+    },
+    "nook.criticalTodoUnassignedOverdue": {
+      "translation": "温馨提醒： {task} —截止日期为{date} （任何人都可以执行此操作）",
+      "hash": "7s9vat",
+      "lastUpdated": "2026-05-12"
+    },
+    "nook.criticalActivityForChild": {
+      "translation": "{children} ： {activity}今天{time} ！",
+      "hash": "kfx6ea",
+      "lastUpdated": "2026-05-12"
+    },
+    "nook.criticalActivityForChildNoTime": {
+      "translation": "{children} ： {activity}今天！",
+      "hash": "lxhypo",
+      "lastUpdated": "2026-05-12"
+    },
+    "action.showAllN": {
+      "translation": "显示所有 %{count}",
+      "hash": "yc606x",
       "lastUpdated": "2026-05-12"
     }
   }

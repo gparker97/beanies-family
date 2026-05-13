@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useExpandableList } from '@/composables/useExpandableList';
 import { toDateInputValue, formatNookDate, addDays } from '@/utils/date';
 import ActivityListCard from '@/components/planner/ActivityListCard.vue';
+import ShowMoreToggle from '@/components/ui/ShowMoreToggle.vue';
+import SmoothHeight from '@/components/ui/SmoothHeight.vue';
 import type { HolidayOccurrence } from '@/types/models';
 
 const activityStore = useActivityStore();
@@ -24,11 +27,14 @@ const upcomingHolidays = computed<HolidayOccurrence[]>(() => {
 });
 
 const PAGE_SIZE = 6;
-const visibleCount = ref(PAGE_SIZE);
-
 const upcoming = computed(() => activityStore.upcomingActivities);
-const visibleUpcoming = computed(() => upcoming.value.slice(0, visibleCount.value));
-const hasMore = computed(() => upcoming.value.length > visibleCount.value);
+const {
+  visible: visibleUpcoming,
+  canShowMore,
+  canShowLess,
+  showMore,
+  showLess,
+} = useExpandableList(upcoming, { initial: PAGE_SIZE, step: PAGE_SIZE });
 
 /** Group visible upcoming activities by date */
 const groupedUpcoming = computed(() => {
@@ -53,10 +59,6 @@ function formatGroupDate(dateStr: string): string {
   tomorrow.setDate(tomorrow.getDate() + 1);
   if (dateStr === toDateInputValue(tomorrow)) return t('date.tomorrow');
   return formatNookDate(dateStr);
-}
-
-function showMore() {
-  visibleCount.value += PAGE_SIZE;
 }
 </script>
 
@@ -94,7 +96,7 @@ function showMore() {
       <p class="text-secondary-500/40 text-sm dark:text-gray-500">{{ t('planner.noUpcoming') }}</p>
     </div>
 
-    <div v-else class="space-y-3">
+    <SmoothHeight v-else :revision="visibleUpcoming.length" class="space-y-3">
       <div v-for="group in groupedUpcoming" :key="group.date">
         <!-- Date header -->
         <p
@@ -114,15 +116,13 @@ function showMore() {
         </div>
       </div>
 
-      <!-- View more -->
-      <button
-        v-if="hasMore"
-        type="button"
-        class="text-primary-500 hover:bg-primary-500/5 mt-2 w-full cursor-pointer rounded-2xl py-2 text-center text-sm font-semibold transition-colors"
-        @click="showMore"
-      >
-        {{ t('planner.viewMore') }}
-      </button>
-    </div>
+      <ShowMoreToggle
+        :can-show-more="canShowMore"
+        :can-show-less="canShowLess"
+        :more-label="t('planner.viewMore')"
+        @show-more="showMore"
+        @show-less="showLess"
+      />
+    </SmoothHeight>
   </div>
 </template>

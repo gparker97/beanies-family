@@ -3,13 +3,28 @@ import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
-import { useCriticalItems, type CriticalItem } from '@/composables/useCriticalItems';
+import {
+  useCriticalItems,
+  CRITICAL_ITEMS_INITIAL_VISIBLE,
+  type CriticalItem,
+} from '@/composables/useCriticalItems';
+import { useExpandableList } from '@/composables/useExpandableList';
 import { useToday } from '@/composables/useToday';
+import ShowMoreToggle from '@/components/ui/ShowMoreToggle.vue';
+import SmoothHeight from '@/components/ui/SmoothHeight.vue';
 
 const { t } = useTranslation();
 const todoStore = useTodoStore();
 const activityStore = useActivityStore();
-const { criticalItems, overflowCount } = useCriticalItems();
+const { criticalItems } = useCriticalItems();
+const {
+  visible: shownItems,
+  total: criticalTotal,
+  canShowMore,
+  canShowLess,
+  showMore,
+  showLess,
+} = useExpandableList(criticalItems, { initial: CRITICAL_ITEMS_INITIAL_VISIBLE });
 
 const emit = defineEmits<{
   'open-todo': [id: string];
@@ -17,7 +32,6 @@ const emit = defineEmits<{
   'open-medication': [id: string];
   'complete-duty': [id: string, dutyType: string, occurrenceDate: string];
   'complete-todo': [id: string];
-  'show-full-schedule': [];
 }>();
 
 function handleComplete(item: CriticalItem) {
@@ -123,13 +137,13 @@ function handleItemClick(item: CriticalItem) {
       <!-- Separator line with warm glow -->
       <div class="toast-separator" />
 
-      <div class="space-y-1.5">
+      <SmoothHeight :revision="shownItems.length" class="space-y-1.5">
         <button
-          v-for="(item, index) in criticalItems"
+          v-for="(item, index) in shownItems"
           :key="item.id + item.type + item.time"
           class="critical-item"
           :class="{ 'opacity-50': item.completed }"
-          :style="{ animationDelay: `${index * 60}ms` }"
+          :style="{ animationDelay: `${(index % CRITICAL_ITEMS_INITIAL_VISIBLE) * 60}ms` }"
           @click="handleItemClick(item)"
         >
           <!-- Completion circle for completable items (todos + duties) -->
@@ -181,16 +195,17 @@ function handleItemClick(item: CriticalItem) {
             />
           </svg>
         </button>
-      </div>
+      </SmoothHeight>
 
-      <!-- Overflow indicator — tappable to scroll to full schedule -->
-      <button
-        v-if="overflowCount > 0"
-        class="mt-2 px-1 text-xs text-white/45 transition-colors hover:text-white/70"
-        @click="emit('show-full-schedule')"
-      >
-        +{{ overflowCount }} {{ t('nook.criticalMore') }} ↓
-      </button>
+      <!-- Expand to show every critical item, or collapse back to the first few -->
+      <ShowMoreToggle
+        tone="on-accent"
+        :can-show-more="canShowMore"
+        :can-show-less="canShowLess"
+        :more-label="t('action.showAllN').replace('{count}', String(criticalTotal))"
+        @show-more="showMore"
+        @show-less="showLess"
+      />
     </div>
   </div>
 </template>

@@ -381,6 +381,16 @@ pulse(targetRef.value);
 - Repeatedly on the same element without user action in between
 - On large wrapper divs or sections — target the specific field instead
 
+### List Disclosure — "Show more / Show less"
+
+When a list shows only the first N items with a way to reveal the rest, use the standard trio — never re-roll a `visibleCount` ref + bespoke button. (See ADR-025.)
+
+- **`useExpandableList(source, { initial, step? })`** (`src/composables/useExpandableList.ts`) — the windowing state. `step` set → incremental ("Show more" reveals `step` more each tap; "Show less" → back to `initial`); `step` omitted → all-or-nothing ("Show all" → everything; "Show less" → back to `initial`). Returns `{ visible, total, canShowMore, canShowLess, showMore, showLess }`.
+- **`<ShowMoreToggle>`** (`src/components/ui/ShowMoreToggle.vue`) — the affordance. Props `canShowMore` / `canShowLess` / `moreLabel` (e.g. `t('action.showAllN').replace('{count}', String(total))` or `t('planner.viewMore')`) / `lessLabel?` (defaults to `t('action.showLess')`) / `tone`. Chevron points down for "more", up for "less"; reduced-motion suppresses the spin. **Tones:** `on-light` (Heritage Orange text on white/light cards — the default), `on-light-purple` (purple text, for to-do surfaces), `on-accent` (white text, for the Heritage Orange briefing card).
+- **`<SmoothHeight :revision="visible.length">`** (`src/components/ui/SmoothHeight.vue`) — wrap the list region so the box grows/shrinks with a transition and the new items are revealed by the opening clip-window, not by snapping. Only `revision`-driven changes animate (reflows leave `height: auto`); reduced-motion skips it. If the rows also have an entrance animation, restart its stagger each "page" (`animationDelay: (index % initial) * 60ms`) so newly-revealed rows cascade in sync with the box opening.
+
+**Disclosure expands in place — it never scrolls or links the user away.** Exceptions: a deliberate "see the full list elsewhere" affordance (e.g. `NookTodoWidget`'s `+N more →` that navigates to the To-Do page) stays a navigate; form-section disclosure ("More details") stays on `ConditionalSection`.
+
 ### Modal System — Three-Tier Architecture
 
 The app uses a three-tier modal system. **Always use the appropriate tier** — never build modals from scratch.
@@ -740,6 +750,8 @@ Dashboard and shared components implementing the Nook UI design system. Use thes
 | `ConfirmModal.vue` | Branded confirmation dialog (danger/info variants) |
 | `CelebrationOverlay.vue` | Toast and modal celebrations |
 | `EmptyStateIllustration.vue` | Beanie character empty state illustrations |
+| `ShowMoreToggle.vue` | Standard "Show all N / Show less" disclosure button (tones: `on-light` / `on-light-purple` / `on-accent`) — pair with `useExpandableList`. See ADR-025 |
+| `SmoothHeight.vue` | Height-transition wrapper for expand/collapse — `:revision="visible.length"`. See ADR-025 |
 
 ### Shared Constants
 
