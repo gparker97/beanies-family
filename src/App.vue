@@ -784,6 +784,22 @@ onMounted(async () => {
           void hardReload();
           return;
         }
+        // Gentle recovery already ran and the second load is *still* a
+        // chunk-load symptom — that's the signal worth surfacing (the
+        // routine "deploy gap, self-healed" case is suppressed by the
+        // outer convention). Routes a Slack alert with the actual route +
+        // error so we know if a device class is escaping our recovery.
+        console.error(
+          '[App] chunk-load recovery already attempted; falling through to error overlay:',
+          err
+        );
+        reportError({
+          surface: 'app.chunkRecoveryFailed',
+          message: `Chunk-load recovery failed on retry: ${err instanceof Error ? err.message : String(err)}`,
+          error: err,
+          severity: 'error',
+          context: { route_path: route.path },
+        });
       } catch {
         // sessionStorage unavailable (Safari private mode etc.) — fall
         // through to the overlay so the user has at least a Reload button.
@@ -812,10 +828,20 @@ onMounted(async () => {
 const getDeviceDiagnostics = formatDeviceInfo;
 
 function handleReload() {
-  // `hardReload()` evicts the SW precache before navigating — without it,
-  // a soft `location.reload()` just hits the same cached `index.html` that
-  // referenced the dead chunk in the first place, putting the user right
-  // back on the error overlay.
+  // `hardReload()` evicts the SW precache + unregisters the SW before
+  // navigating — without it, a soft `location.reload()` just hits the same
+  // cached `index.html` that referenced the dead chunk in the first place,
+  // putting the user right back on the error overlay.
+  //
+  // Also clear the once-guard: the auto-recovery sets it to prevent an
+  // infinite reload loop, but a user-driven click is an explicit "try the
+  // recovery path again" signal — it shouldn't fall through to the overlay
+  // a second time because the gentle attempt was already counted.
+  try {
+    sessionStorage.removeItem(CHUNK_RELOAD_FLAG);
+  } catch {
+    // sessionStorage unavailable (Safari private mode etc.) — proceed anyway.
+  }
   void hardReload();
 }
 

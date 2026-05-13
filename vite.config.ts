@@ -46,6 +46,13 @@ export default defineConfig({
         // the service-worker install would balloon by the whole dataset.
         globIgnores: ['**/holidays/*.json'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MiB — Automerge WASM is ~2.65 MB
+        // When a new SW activates, clean up previous-deploy precache entries
+        // (old hashed chunks nothing references anymore). Doesn't fix the
+        // "old SW still active, serving stale index.html" window (that's
+        // registerType: 'prompt'`s deliberate trade-off), but compounds with
+        // hardReload()'s SW-unregister — once the new SW activates on the
+        // fresh load, leftover old caches go too.
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
