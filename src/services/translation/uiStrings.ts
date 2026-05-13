@@ -244,6 +244,10 @@ const STRING_DEFS = {
     en: 'No medications on file',
     beanie: 'no medications on file',
   },
+  'bean.overview.milestones.empty': {
+    en: 'No milestones yet',
+    beanie: 'no milestones yet',
+  },
   'bean.overview.viewAll': { en: 'View all →', beanie: 'view all →' },
   'bean.overview.about': { en: 'About', beanie: 'about' },
   'bean.stats.favorites': { en: 'favorites', beanie: 'favorites' },

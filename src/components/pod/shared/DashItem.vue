@@ -14,7 +14,8 @@ export type DashItemTone =
   | 'med'
   | 'note'
   | 'allergy'
-  | 'allergy-mild';
+  | 'allergy-mild'
+  | 'milestone';
 
 const props = defineProps<{
   emoji: string;
@@ -40,6 +41,7 @@ const TONE_BG: Record<DashItemTone, string> = {
   note: 'bg-[var(--tint-silk-20)] text-secondary-500',
   allergy: 'bg-[var(--color-primary)] text-white',
   'allergy-mild': 'bg-[rgb(174_214_241_/_35%)] text-secondary-500',
+  milestone: 'bg-[rgb(230_126_34_/_15%)] text-secondary-500',
 };
 
 const toneClass = (): string => TONE_BG[props.tone ?? 'fav'];

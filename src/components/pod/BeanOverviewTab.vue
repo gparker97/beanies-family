@@ -28,8 +28,11 @@ import { useSayingsStore } from '@/stores/sayingsStore';
 import { useMemberNotesStore } from '@/stores/memberNotesStore';
 import { useAllergiesStore } from '@/stores/allergiesStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
+import { useMilestonesStore } from '@/stores/milestonesStore';
+import { MILESTONE_CATEGORIES } from '@/constants/milestoneCategories';
+import { formatDateShort } from '@/utils/date';
 import type { DashItemTone } from '@/components/pod/shared/DashItem.vue';
-import type { AllergySeverity, FamilyMember, FavoriteCategory } from '@/types/models';
+import type { AllergySeverity, FamilyMember, FavoriteCategory, Milestone } from '@/types/models';
 
 const props = defineProps<{
   member: FamilyMember;
@@ -42,6 +45,7 @@ const sayingsStore = useSayingsStore();
 const memberNotesStore = useMemberNotesStore();
 const allergiesStore = useAllergiesStore();
 const medicationsStore = useMedicationsStore();
+const milestonesStore = useMilestonesStore();
 
 // --- About stats ------------------------------------------------------
 
@@ -161,6 +165,21 @@ const sayings = computed(() => sayingsStore.byMember(props.member.id).value);
 const notes = computed(() => memberNotesStore.byMember(props.member.id).value);
 const allergies = computed(() => allergiesStore.byMember(props.member.id).value);
 const medications = computed(() => medicationsStore.byMember(props.member.id).value);
+const milestones = computed(() => milestonesStore.byMember(props.member.id).value);
+
+function milestoneEmoji(m: Milestone): string {
+  const safe = milestonesStore.safeCategoryFor(m);
+  const cat = MILESTONE_CATEGORIES.find((c) => c.id === safe);
+  return cat?.emoji ?? '\u{1F31F}';
+}
+
+function milestoneSub(m: Milestone): string {
+  const safe = milestonesStore.safeCategoryFor(m);
+  const cat = MILESTONE_CATEGORIES.find((c) => c.id === safe);
+  const label = cat ? t(cat.titleKey) : '';
+  const date = formatDateShort(m.occurredOn);
+  return label ? `${date} · ${label}` : date;
+}
 
 const SEVERITY_ORDER: Record<AllergySeverity, number> = { severe: 0, moderate: 1, mild: 2 };
 
@@ -335,6 +354,29 @@ const viewAllLabel = computed(() => t('bean.overview.viewAll'));
           />
         </div>
         <EmptyState v-else emoji="📝" :message="t('bean.overview.notes.empty')" />
+      </OverviewModule>
+
+      <!-- Milestones -->
+      <OverviewModule
+        :title="t('milestone.tab.label')"
+        emoji="🌟"
+        :count="milestones.length"
+        :view-all-label="milestones.length ? viewAllLabel : ''"
+        @view-all="go('milestones')"
+        @activate="go('milestones')"
+      >
+        <div v-if="milestones.length" class="flex flex-col gap-2">
+          <DashItem
+            v-for="m in milestones.slice(0, 3)"
+            :key="m.id"
+            :emoji="milestoneEmoji(m)"
+            tone="milestone"
+            :title="m.title"
+            :sub="milestoneSub(m)"
+            @click="go('milestones')"
+          />
+        </div>
+        <EmptyState v-else emoji="🌟" :message="t('bean.overview.milestones.empty')" />
       </OverviewModule>
     </div>
   </div>
