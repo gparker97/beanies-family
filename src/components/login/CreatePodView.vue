@@ -60,6 +60,11 @@ const showLocalFileWarning = ref(false);
 // wizard can't fire it twice.
 const podCreatedPinged = ref(false);
 
+/** Visual state of the Google Drive hero card in Step 2. */
+const driveCardState = computed<'idle' | 'connecting' | 'connected'>(() =>
+  storageType.value === 'google_drive' ? 'connected' : isSavingStorage.value ? 'connecting' : 'idle'
+);
+
 // Step 3 state
 const addedMembers = ref<FamilyMember[]>([]);
 const isAddingMember = ref(false);
@@ -195,6 +200,16 @@ async function handleStep1Next() {
 
 function handleLocalFileClick() {
   showLocalFileWarning.value = true;
+}
+
+/**
+ * "Use Google Drive instead" from the local-file warning modal: close the
+ * modal and run the normal Drive-connect flow, which owns its own error
+ * handling (the result modal + reportError).
+ */
+function handleUseDriveFromWarning() {
+  showLocalFileWarning.value = false;
+  void handleChooseGoogleDriveStorage();
 }
 
 async function handleChooseLocalStorage() {
@@ -625,93 +640,129 @@ function handleBack() {
       <div
         class="border-primary-500/15 bg-primary-500/[0.02] dark:border-primary-500/10 dark:bg-primary-500/[0.03] rounded-[18px] border-2 p-4"
       >
-        <!-- Available storage options -->
-        <div class="grid grid-cols-2 gap-2">
-          <!-- Google Drive -->
+        <!-- Google Drive is available — lead with it; local file is a quiet detour below. -->
+        <template v-if="syncStore.isGoogleDriveAvailable">
           <button
-            v-if="syncStore.isGoogleDriveAvailable"
-            class="flex h-[88px] flex-col items-center justify-center rounded-[14px] border-2 px-2.5 transition-all"
+            type="button"
+            class="flex w-full items-center gap-3.5 rounded-[16px] border-2 px-4 py-4 text-left transition-all"
             :class="
-              storageType === 'google_drive'
+              driveCardState === 'connected'
                 ? 'border-green-400 bg-green-50 dark:border-green-600 dark:bg-green-900/20'
-                : isSavingStorage
+                : driveCardState === 'connecting'
                   ? 'border-blue-300 bg-blue-50/50 dark:border-blue-600/50 dark:bg-blue-900/15'
-                  : 'border-primary-500/40 bg-primary-500/[0.04] hover:border-primary-500 hover:bg-primary-500/[0.08] dark:border-primary-500/30 dark:bg-primary-500/[0.06] dark:hover:border-primary-500/50'
+                  : 'border-primary-500/40 bg-primary-500/[0.04] hover:border-primary-500 hover:bg-primary-500/[0.08] dark:border-primary-500/30 dark:bg-primary-500/[0.06] dark:hover:border-primary-500/50 hover:shadow-[0_4px_20px_rgba(241,93,34,0.08)]'
             "
             @click="handleChooseGoogleDriveStorage"
           >
-            <BeanieSpinner
-              v-if="isSavingStorage && storageType !== 'google_drive'"
-              size="sm"
-              class="mb-1.5"
-            />
-            <svg
-              v-else-if="storageType === 'google_drive'"
-              class="mb-1.5 h-6 w-6 text-green-600 dark:text-green-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-            <svg
-              v-else
-              class="mb-1.5 h-6 w-6"
-              viewBox="0 0 87.3 78"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
-                fill="#0066da"
-              />
-              <path
-                d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-20.4 35.3c-.8 1.4-1.2 2.95-1.2 4.5h27.5z"
-                fill="#00ac47"
-              />
-              <path
-                d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.5l5.85 13.15z"
-                fill="#ea4335"
-              />
-              <path
-                d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
-                fill="#00832d"
-              />
-              <path
-                d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
-                fill="#2684fc"
-              />
-              <path
-                d="m73.4 26.5-10.1-17.5c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 23.8h27.45c0-1.55-.4-3.1-1.2-4.5z"
-                fill="#ffba00"
-              />
-            </svg>
-            <span
-              class="font-outfit text-xs font-semibold"
+            <div
+              class="flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-[12px]"
               :class="
-                storageType === 'google_drive'
-                  ? 'text-green-700 dark:text-green-400'
-                  : 'text-gray-900 dark:text-gray-100'
+                driveCardState === 'connecting'
+                  ? ''
+                  : 'bg-white shadow-[0_2px_8px_rgba(44,62,80,0.08)] dark:bg-slate-800'
               "
             >
-              {{
-                isSavingStorage && storageType !== 'google_drive'
-                  ? t('googleDrive.connecting')
-                  : t('googleDrive.storageLabel')
-              }}
-            </span>
-            <span
-              v-if="storageType !== 'google_drive'"
-              class="bg-primary-500/15 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-xs font-bold"
-              >{{ t('storage.recommended') }}</span
-            >
+              <BeanieSpinner v-if="driveCardState === 'connecting'" size="sm" />
+              <svg
+                v-else-if="driveCardState === 'connected'"
+                class="h-5 w-5 text-green-600 dark:text-green-400"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <svg v-else class="h-5 w-5" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
+                  fill="#0066da"
+                />
+                <path
+                  d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-20.4 35.3c-.8 1.4-1.2 2.95-1.2 4.5h27.5z"
+                  fill="#00ac47"
+                />
+                <path
+                  d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.5l5.85 13.15z"
+                  fill="#ea4335"
+                />
+                <path
+                  d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
+                  fill="#00832d"
+                />
+                <path
+                  d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
+                  fill="#2684fc"
+                />
+                <path
+                  d="m73.4 26.5-10.1-17.5c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 23.8h27.45c0-1.55-.4-3.1-1.2-4.5z"
+                  fill="#ffba00"
+                />
+              </svg>
+            </div>
+
+            <div v-if="driveCardState === 'connected'" class="min-w-0 flex-1">
+              <p class="font-outfit text-base font-semibold text-green-700 dark:text-green-400">
+                {{ t('googleDrive.fileCreated') }}
+              </p>
+              <p class="text-secondary-500/70 mt-0.5 text-sm leading-snug dark:text-gray-400">
+                {{ t('googleDrive.fileCreatedSubtitle') }}
+              </p>
+            </div>
+            <div v-else-if="driveCardState === 'connecting'" class="min-w-0 flex-1">
+              <p class="font-outfit text-base font-semibold text-gray-900 dark:text-gray-100">
+                {{ t('googleDrive.connecting') }}
+              </p>
+            </div>
+            <div v-else class="min-w-0 flex-1">
+              <p class="font-outfit text-base font-semibold text-gray-900 dark:text-gray-100">
+                {{ t('googleDrive.storageLabel') }}
+                <span
+                  class="bg-primary-500/15 text-primary-500 ml-1.5 rounded-full px-2 py-0.5 align-middle text-xs font-bold"
+                  >{{ t('storage.recommended') }}</span
+                >
+              </p>
+              <p class="text-secondary-500/70 mt-0.5 text-sm leading-snug dark:text-gray-400">
+                {{ t('storage.driveSyncsWithFamily') }}
+              </p>
+              <p class="text-primary-500 font-outfit mt-1.5 text-xs font-semibold">
+                {{ t('storage.connectGoogleDrive') }} →
+              </p>
+            </div>
           </button>
+
+          <div class="mt-3 text-center">
+            <p
+              v-if="storageType === 'local'"
+              class="font-outfit inline-flex items-center gap-1.5 text-sm font-semibold text-green-600 dark:text-green-400"
+            >
+              <svg
+                class="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              {{ t('storage.savingToLocalFile') }}
+            </p>
+            <button
+              v-else
+              type="button"
+              class="font-outfit text-secondary-500/60 hover:text-secondary-500 cursor-pointer text-sm underline decoration-1 underline-offset-4 transition-colors disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-400 dark:hover:text-gray-200"
+              :disabled="isSavingStorage"
+              @click="handleLocalFileClick"
+            >
+              {{ t('storage.preferLocal') }}
+            </button>
+          </div>
+        </template>
+
+        <!-- Google Drive isn't configured on this server (self-host without an OAuth
+             proxy): local file is the only option, shown as a normal card. -->
+        <div v-else class="grid grid-cols-2 gap-2">
           <div
-            v-else
             class="flex h-[88px] cursor-not-allowed flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50 px-2.5 opacity-50 dark:bg-slate-700/40"
             :title="t('selfHost.driveUnavailableTooltip')"
           >
@@ -1068,11 +1119,13 @@ function handleBack() {
       </button>
     </div>
 
-    <!-- Local file warning modal — shared with LoadPodView -->
+    <!-- Local-file confirmation modal for the storage step -->
     <LocalFileSyncWarning
       :open="showLocalFileWarning"
+      :google-drive-available="syncStore.isGoogleDriveAvailable"
       @close="showLocalFileWarning = false"
       @proceed="handleChooseLocalStorage"
+      @use-google-drive="handleUseDriveFromWarning"
     />
 
     <!-- Google Drive result modal (success or failure) -->
