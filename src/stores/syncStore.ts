@@ -45,6 +45,7 @@ import {
   isUserCancellation,
 } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
+import { slackNotify } from '@/utils/slackNotify';
 import type { SaveFailureLevel } from '@/services/sync/syncService';
 import {
   searchBeanpodFilesGlobal,
@@ -963,6 +964,25 @@ export const useSyncStore = defineStore('sync', () => {
       persistEnvelope(env).catch(console.warn);
 
       lastSync.value = toISODateString(new Date());
+
+      // The pod now physically exists — Automerge doc initialized, family key
+      // generated and wrapped, V4 envelope written to the provider, cache
+      // primed. This is the single, definitive "a family was created" moment:
+      // mark the auth invariant (so the routing guard lets the user into the
+      // app) and fire the pod-created Slack ping (one place, every storage
+      // type — `slackNotify` no-ops with a warn if the webhook is unset).
+      useAuthStore().markPodCreated();
+      const ownerName = useFamilyStore().members.find((m) => m.id === memberId)?.name ?? '(owner)';
+      const providerType = syncService.getProviderType();
+      const storageLabel =
+        providerType === 'google_drive'
+          ? 'Google Drive'
+          : providerType === 'local'
+            ? 'Local File'
+            : '(unknown)';
+      slackNotify(
+        `🎉 *Family pod created!*\n*Family:* ${familyName}\n*Owner:* ${ownerName}\n*Storage:* ${storageLabel}`
+      );
 
       return true;
     } catch (e) {

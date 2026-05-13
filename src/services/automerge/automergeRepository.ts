@@ -57,17 +57,28 @@ export function createAutomergeRepository<
   }
 
   async function create(input: CreateInput): Promise<Entity> {
+    return createWithId(generateUUID(), input);
+  }
+
+  /**
+   * Like `create()`, but uses a caller-supplied id instead of a fresh UUID.
+   * Used when an entity must keep a specific id across a rebuild — e.g. the
+   * owner member after a full-page-redirect-during-onboarding wiped the
+   * in-memory Automerge doc, where the persisted `currentUser.memberId`
+   * (and the `.beanpod` envelope's `wrappedKeys` keyed by it) must still
+   * point at the recreated member.
+   */
+  async function createWithId(id: string, input: CreateInput): Promise<Entity> {
     const now = toISODateString(new Date());
     const entity = toPlain(
       stripUndefined({
         ...(input as Record<string, unknown>),
-        id: generateUUID(),
+        id,
         createdAt: now,
         updatedAt: now,
       })
     ) as unknown as Entity;
 
-    const id = (entity as unknown as { id: string }).id;
     changeDoc((d) => {
       const collection = d[collectionName] as Record<string, Entity>;
       collection[id] = entity;
@@ -126,5 +137,5 @@ export function createAutomergeRepository<
     return true;
   }
 
-  return { getAll, getById, create, update, remove };
+  return { getAll, getById, create, createWithId, update, remove };
 }

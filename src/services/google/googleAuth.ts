@@ -165,35 +165,55 @@ export function isUserCancellation(e: unknown): boolean {
 
 /**
  * Whether the current browser should skip popup-based OAuth and use full-page
- * redirect auth instead. Only one case triggers this:
+ * redirect auth instead. Two cases trigger this:
  *
- * **Installed PWA in standalone display-mode** (Chrome on Android, Edge,
- * iOS Safari "Add to Home Screen", etc.). Popups opened from a standalone
- * PWA either fail to open or open in a different browser context —
- * `postMessage` from the OAuth callback can't reach back to the PWA
- * window, so the popup auth flow hangs silently. Redirect auth keeps
- * everything in the PWA's own window.
+ * **1. Any iOS / iPadOS WebKit browser** — Safari, Chrome-on-iOS,
+ * Edge-on-iOS, etc. (they all run WebKit). A `window.open()` on iOS opens a
+ * *new tab*, not a true popup, and `postMessage` from that tab back to the
+ * opener is unreliable — worse, on a fresh tab the OAuth *continuation*
+ * after the account chooser runs into iOS cookie / ITP partitioning and
+ * Google returns a generic `invalid_request` 400 ("The server cannot
+ * process the request because it is malformed"). Standalone-PWA iOS users
+ * already worked because they were on the redirect path (case 2) — that's
+ * the "works on some iPhones, not others" split a real user (Shaun, May
+ * 2026) hit. Full-page redirect keeps everything in the one top-level
+ * window, no cross-tab message, no fresh-tab cookie partition.
  *
- * **Why not iOS regular Safari?** A previous version of this function
- * routed all iOS UAs through redirect because the original `/join` page
- * auto-fired OAuth on mount, with no user gesture in the call stack —
- * iOS Safari's popup blocker rejected it. The fix to that was to defer
- * auth to a user-gesture button tap (already shipped). With a real
- * gesture in place, iOS regular Safari allows popups synchronously, and
- * popups don't introduce the ITP top-level navigation that was breaking
- * the Google Picker iframe's auth context after redirect-auth (the
- * cookie-consent → "API developer key invalid" chain). So iOS regular
- * Safari is back on the popup path; only standalone PWAs need redirect.
+ * **2. Any installed PWA in standalone display-mode** (Android Chrome,
+ * Edge, …) — popups opened from a standalone PWA either fail to open or
+ * open in a different browser context, so the `postMessage` bridge can't
+ * reach back to the PWA window.
+ *
+ * History note: an earlier version routed *all* iOS through redirect, then
+ * was narrowed to standalone-only because redirect-auth's ITP top-level
+ * navigation was suspected of breaking the Google Picker iframe's auth
+ * context (the cookie-consent → "API developer key invalid" chain). That
+ * concern only ever affected the *load-existing-pod* picker, never
+ * create-pod / connect-Drive; and the popup path's failure modes (above)
+ * are worse and more common. If the Picker concern resurfaces on iOS it's
+ * handled at the picker, not by reverting this. See ADR — iOS redirect OAuth.
  *
  * Safe to call at module/SSR time: returns false if `navigator`,
  * `window`, or `matchMedia` is missing.
  */
 export function shouldUseRedirectAuth(): boolean {
   if (typeof window === 'undefined') return false;
+  const nav = window.navigator as
+    | (Navigator & { standalone?: boolean; maxTouchPoints?: number })
+    | undefined;
+  if (!nav) return false;
+  // iOS / iPadOS WebKit — popup/new-tab OAuth is fragile (see above).
+  // iPadOS 13+ Safari reports a desktop UA, so also detect "Mac with a
+  // touchscreen" (no real Mac has `maxTouchPoints > 1`).
+  const ua = nav.userAgent ?? '';
+  const isIOS =
+    /iP(hone|od|ad)/.test(ua) || (nav.platform === 'MacIntel' && (nav.maxTouchPoints ?? 0) > 1);
+  if (isIOS) return true;
   // Installed PWA in standalone mode — popup→postMessage bridge is broken.
   if (window.matchMedia?.('(display-mode: standalone)').matches) return true;
-  // iOS Safari "Add to Home Screen" PWAs use this older flag.
-  if ((window.navigator as Navigator & { standalone?: boolean }).standalone === true) return true;
+  // iOS Safari "Add to Home Screen" PWAs use this older flag (kept for
+  // belt-and-suspenders; the iOS check above already covers them).
+  if (nav.standalone === true) return true;
   return false;
 }
 
@@ -1091,9 +1111,20 @@ function openBlankPopup(): Window {
   return popup;
 }
 
+// Hard cap on how long we wait for the OAuth popup to post its code back.
+// Popups can navigate to Google, fail, and never post a message — and on
+// some browsers `popup.closed` never flips for a popup-blocked-then-orphaned
+// window — so without this the promise (and the caller's "connecting…"
+// state) would hang forever. 2 minutes is generous for a real user typing
+// their Google password.
+const POPUP_AUTH_TIMEOUT_MS = 120_000;
+
 /**
  * Navigate an already-open popup to the auth URL and wait for the auth code.
- * Returns the authorization code received via postMessage from the callback page.
+ * Returns the authorization code received via postMessage from the callback
+ * page. Rejects if the user closes the popup (`Authentication cancelled`) or
+ * if no message arrives within `POPUP_AUTH_TIMEOUT_MS` — the caller surfaces
+ * + reports that, rather than wedging.
  */
 function waitForAuthCode(popup: Window, url: string): Promise<string> {
   // Navigate the pre-opened blank popup to Google's auth URL
@@ -1128,9 +1159,20 @@ function waitForAuthCode(popup: Window, url: string): Promise<string> {
       }
     }, 500);
 
+    // Hard timeout — never let a stuck/orphaned popup hang the flow.
+    const timeoutTimer = setTimeout(() => {
+      cleanup();
+      reject(
+        new Error(
+          `Google sign-in didn't return after ${POPUP_AUTH_TIMEOUT_MS / 1000}s — the sign-in window may have been closed or blocked. Try again, or use a local file instead.`
+        )
+      );
+    }, POPUP_AUTH_TIMEOUT_MS);
+
     function cleanup() {
       window.removeEventListener('message', onMessage);
       clearInterval(pollTimer);
+      clearTimeout(timeoutTimer);
       if (!popup.closed) popup.close();
     }
 

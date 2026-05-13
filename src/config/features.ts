@@ -40,6 +40,18 @@ export const features = {
 
 export type FeatureKey = keyof typeof features;
 
+// A cloud-ish build (Drive and/or the family registry wired) with no error
+// webhook means `reportError()` silently no-ops — exactly the failure mode
+// that hid a real iPhone onboarding break (May 2026). Make it loud at boot so
+// a missing `VITE_BEANIES_ERROR_WEBHOOK_URL` (e.g. an unset GitHub repo
+// variable) can't masquerade as working error reporting. Production builds
+// only — dev/test don't ship that env var and that's fine.
+if (env.PROD && !features.errorReporter && (features.drive || features.registry)) {
+  console.warn(
+    '[features] errorReporter is OFF (VITE_BEANIES_ERROR_WEBHOOK_URL is unset) but this looks like a cloud build (drive/registry are configured). Errors will NOT reach #beanies-errors. Set the BEANIES_ERROR_WEBHOOK_URL repo variable.'
+  );
+}
+
 /**
  * Inviting family members requires Drive — the invite link points at a
  * Drive-shared `.beanpod` file. Drive sign-in itself requires the OAuth proxy
