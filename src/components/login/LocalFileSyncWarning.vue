@@ -4,21 +4,24 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import { useTranslation } from '@/composables/useTranslation';
 
 /**
- * Reusable warning modal shown before a user commits to "Local File" as
- * their storage provider. Surfaces the trade-offs honestly: cloud-storage-
- * folder sync works on desktop Chromium browsers; iOS/Android/Safari fall
- * back to manual export-import; encryption applies in all cases.
+ * Confirmation modal shown when the user picks "local file" on the create-pod
+ * storage step. Frames the real trade-off (a local file doesn't sync with the
+ * family and has to be shared manually), nudges back toward Google Drive, and
+ * is never a trap — the modal's × returns to the storage picker.
  *
- * Used by both `CreatePodView` (first-run wizard) and `LoadPodView`
- * (returning-user file picker). Single source of truth for the copy.
+ * Used by `CreatePodView`'s "Save & Secure" step. The primary "Use Google
+ * Drive instead" action is hidden when Drive isn't available (a self-host
+ * without an OAuth proxy), so there's never a no-op button.
  */
 defineProps<{
   open: boolean;
+  googleDriveAvailable: boolean;
 }>();
 
 const emit = defineEmits<{
   close: [];
   proceed: [];
+  'use-google-drive': [];
 }>();
 
 const { t } = useTranslation();
@@ -27,38 +30,36 @@ const { t } = useTranslation();
 <template>
   <BaseModal :open="open" size="sm" @close="emit('close')">
     <div class="p-5">
-      <div class="mb-3 flex items-center gap-2">
-        <svg
-          class="h-5 w-5 flex-shrink-0 text-amber-500"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+      <div class="mb-3 flex items-center gap-3">
+        <div
+          class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[13px] text-xl"
+          style="background: var(--tint-orange-8)"
         >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
-          />
-        </svg>
-        <h3 class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
-          {{ t('storage.localFile') }}
+          💾
+        </div>
+        <h3 class="font-outfit text-base leading-snug font-bold text-gray-900 dark:text-gray-100">
+          {{ t('storage.localFileWarningTitle') }}
         </h3>
       </div>
-      <p class="mb-3 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+      <p class="mb-2.5 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
         {{ t('storage.localFileWarning') }}
       </p>
-      <p class="mb-3 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-        🔒 {{ t('storage.localFileWarningEncryption') }}
-      </p>
-      <p class="mb-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+      <p class="mb-2.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
         💻 {{ t('storage.localFileBestOnDesktop') }}
       </p>
-      <div class="flex gap-2">
-        <BaseButton variant="secondary" size="sm" class="flex-1" @click="emit('close')">
-          {{ t('action.back') }}
+      <p class="mb-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+        🔒 {{ t('storage.localFileWarningEncryption') }}
+      </p>
+      <div class="space-y-2">
+        <BaseButton v-if="googleDriveAvailable" class="w-full" @click="emit('use-google-drive')">
+          {{ t('storage.useGoogleDriveInstead') }}
         </BaseButton>
-        <BaseButton size="sm" class="flex-1" @click="emit('proceed')">
+        <BaseButton
+          :variant="googleDriveAvailable ? 'ghost' : 'primary'"
+          :size="googleDriveAvailable ? 'sm' : 'md'"
+          class="w-full"
+          @click="emit('proceed')"
+        >
           {{ t('storage.localFileContinue') }}
         </BaseButton>
       </div>

@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-12",
-    "translationCount": 2812
+    "lastUpdated": "2026-05-13",
+    "translationCount": 2818
   },
   "translations": {
     "app.name": {
@@ -6182,19 +6182,19 @@
       "lastUpdated": "2026-03-08"
     },
     "storage.localFileWarning": {
-      "translation": "本地文件非常安全，但不会与其他家庭成员同步。如果您计划与家人一起使用此应用程序，我们建议您为加密数据文件提供存储服务（例如Google云端硬盘）。",
-      "hash": "xhrlzt",
-      "lastUpdated": "2026-03-08"
+      "translation": "您的数据会保留在此设备上。要与其他家庭成员共享，您需要手动共享数据文件。",
+      "hash": "877dge",
+      "lastUpdated": "2026-05-13"
     },
     "storage.localFileWarningEncryption": {
-      "translation": "别担心，您的数据是完全加密的，只有与您共享文件的人才能访问。",
-      "hash": "3zhg6i",
-      "lastUpdated": "2026-03-08"
+      "translation": "无论是哪种方式，您的数据都会被加密--只有与您共享文件的人才能打开它。",
+      "hash": "h881nj",
+      "lastUpdated": "2026-05-13"
     },
     "storage.localFileContinue": {
-      "translation": "使用本地文件继续",
-      "hash": "aqx372",
-      "lastUpdated": "2026-03-08"
+      "translation": "使用本地文件",
+      "hash": "9wdah",
+      "lastUpdated": "2026-05-13"
     },
     "storage.comingSoon": {
       "translation": "不日上映",
@@ -12887,9 +12887,9 @@
       "lastUpdated": "2026-04-30"
     },
     "storage.localFileBestOnDesktop": {
-      "translation": "通过云存储文件夹进行的多设备同步在桌面Chrome或Edge上效果最佳。iOS、Android、Safari和Firefox回退到手动导出/导入。",
-      "hash": "ezqdu5",
-      "lastUpdated": "2026-04-30"
+      "translation": "在手机上，或在Safari和Firefox中，每次打开应用程序时，您都会重新选择文件。",
+      "hash": "i2yuuv",
+      "lastUpdated": "2026-05-13"
     },
     "error.travelSegmentNotFound": {
       "translation": "我们无法打开该行程",
@@ -14065,6 +14065,36 @@
       "translation": "显示所有 %{count}",
       "hash": "yc606x",
       "lastUpdated": "2026-05-12"
+    },
+    "storage.localFileWarningTitle": {
+      "translation": "注意—本地文件不会同步",
+      "hash": "h4p36b",
+      "lastUpdated": "2026-05-13"
+    },
+    "storage.useGoogleDriveInstead": {
+      "translation": "改用Google云端硬盘",
+      "hash": "re4ma",
+      "lastUpdated": "2026-05-13"
+    },
+    "storage.driveSyncsWithFamily": {
+      "translation": "与您的全家同步—在每台设备上自动同步。与本地文件相同的加密。",
+      "hash": "vom1j0",
+      "lastUpdated": "2026-05-13"
+    },
+    "storage.connectGoogleDrive": {
+      "translation": "连接到Google云盘",
+      "hash": "17ql4p",
+      "lastUpdated": "2026-05-13"
+    },
+    "storage.preferLocal": {
+      "translation": "希望将您的数据存储在此设备的本地？",
+      "hash": "t7qbyb",
+      "lastUpdated": "2026-05-13"
+    },
+    "storage.savingToLocalFile": {
+      "translation": "正在保存到此设备上的本地文件",
+      "hash": "lwxzoo",
+      "lastUpdated": "2026-05-13"
     }
   }
 }
