@@ -1,12 +1,12 @@
 ---
-name: deploy-prod-auto-skip-ci
-description: Auto-approved commit, push, and deploy to production — skips CI gate for fast deploys
+name: deploy-prod-skip-ci
+description: Auto-approved commit, push, and deploy to production — skips the CI/Security gate for fast, locally-verified deploys. Classifies what changed and deploys the Vue app and/or the Astro marketing site as needed (same target-classification as deploy-prod-auto, minus the remote-CI wait).
 disable-model-invocation: true
 ---
 
 # Deploy to Production (Skip CI)
 
-Commits all pending changes, pushes to `main`, and deploys to production immediately — skipping the CI/Security gate. Use this for small, verified changes (config tweaks, copy updates, hotfixes) that have already been tested locally.
+Commits all pending changes, pushes to `main`, and deploys to production immediately — skipping the CI/Security gate. Use this for small, verified changes (config tweaks, copy updates, hotfixes) that have already been tested locally. Like `deploy-prod-auto`, this deploys **whichever of the Vue app (`deploy.yml`) and the Astro marketing site (`deploy-web.yml`) the committed changes actually affect** (`scripts/deploy/classify-changes.sh` decides) — the only difference from `deploy-prod-auto` is that this one passes `skip_gate=true` to `deploy.yml` to bypass the CI/Security wait.
 
 **All actions are pre-approved:** commit, push, and deploy will proceed automatically. The only reason to stop is an unrecoverable failure after 3 fix attempts.
 
