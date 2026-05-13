@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-13
 
+### Added
+
+- **A Milestones card on every family member's profile.** The Overview tab now has six summary cards instead of five — Milestones joins Allergies, Favorites, Sayings, Medications, and Notes. It shows the most recent three with category emoji, title, and "date · category", and tapping it (or "View all →") jumps straight to the member's Milestones tab. Fills out the previously-empty grid slot.
+
+### Changed
+
+- **Scrapbook cards: tapping anywhere on a card now opens the relevant view.** Previously, tapping the photo on a milestone card opened a fullscreen lightbox in place, while tapping the caption navigated to the bean's milestones. That split made the photo feel like a different kind of tap than the rest of the card. Now the whole card behaves the same — one tap takes you to the milestone in its proper view, where the photo can still be expanded fullscreen. Family-wide milestones (not tied to a single bean) keep the in-place lightbox since they have no per-bean destination.
+
 ### Fixed
 
 - **The "oh no, the beans spilled" reload loop on iPhone Safari is fixed.** A small group of returning users on iOS Safari could hit a reload loop after a deploy — the page would show "counting beans…", flash a scary "we couldn't load the app" overlay, reload itself, and start over. Sometimes for minutes. Root cause was a triple-whammy: our previous deploys removed old code files from S3 as soon as a new build went up, and CloudFront held onto the old shell page for up to a day, so a stale CDN edge would hand a returning user a page pointing at code files we'd just deleted. The browser would 404, our recovery code would try to reload to a fresh copy, the CDN would serve the SAME stale page, and the loop would run until the CDN finally invalidated. Three fixes shipped together: (1) **old code files now stay on S3** for a grace period so even a stale page has working code to load; (2) **the main shell page now tells the CDN not to cache it long** so the freshest version is served almost instantly after deploy; (3) **the recovery logic is now bounded to 3 silent attempts** with a tappable "Reload / Sign out & clear data" overlay on the 4th — no more locked-out-mid-loop. The error-detection regex was also broadened to catch iOS Safari's specific wording for the underlying browser error (previously it only matched Chrome's wording, which is why iOS users got the scary overlay and Android users didn't).

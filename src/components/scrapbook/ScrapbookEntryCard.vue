@@ -16,7 +16,6 @@
 import { computed } from 'vue';
 import StickyNote from '@/components/pod/shared/StickyNote.vue';
 import MilestoneThumb from '@/components/pod/MilestoneThumb.vue';
-import { useMilestoneLightbox } from '@/composables/useMilestoneLightbox';
 import { usePhotoStore } from '@/stores/photoStore';
 import { reportError } from '@/utils/errorReporter';
 import { formatDateShort } from '@/utils/date';
@@ -47,7 +46,6 @@ const emit = defineEmits<{
   click: [entry: ScrapbookEntry];
 }>();
 
-const lightbox = useMilestoneLightbox();
 const photoStore = usePhotoStore();
 
 /**
@@ -93,10 +91,6 @@ const note = computed<MemberNote | null>(() =>
 
 function handleCardClick(): void {
   emit('click', props.entry);
-}
-
-function handleMilestoneThumbLightbox(): void {
-  if (milestone.value) lightbox.openFor(milestone.value);
 }
 
 // Defensive default: surfaces an unknown entry type once per session
@@ -167,19 +161,17 @@ function sayingFooter(s: SayingItem): string {
 
   <!-- Milestone with emphasized photo — polaroid hero treatment. The
        photo dominates the card; title + date are a Caveat caption
-       underneath. Tap the photo opens the lightbox; tap the caption
-       routes to the bean's pod. Falls back to the standard taped-card
-       branch below when no photo is resolvable. -->
-  <div
+       underneath. The whole card (photo + caption) navigates to the
+       relevant view — the lightbox is reached from there. Falls back
+       to the standard taped-card branch below when no photo is
+       resolvable. -->
+  <button
     v-else-if="milestone && emphasizedPhotoUrl"
-    class="emphasized-photo-card scrap-taped block w-full overflow-hidden p-0"
+    type="button"
+    class="emphasized-photo-card scrap-taped block w-full overflow-hidden p-0 text-left"
+    @click="handleCardClick"
   >
-    <button
-      type="button"
-      class="emphasized-photo-img-button block w-full cursor-zoom-in overflow-hidden"
-      :aria-label="`Open photo for ${milestone.title}`"
-      @click.stop="handleMilestoneThumbLightbox"
-    >
+    <span class="emphasized-photo-img-button block w-full overflow-hidden">
       <img
         :src="emphasizedPhotoUrl"
         referrerpolicy="no-referrer"
@@ -194,28 +186,26 @@ function sayingFooter(s: SayingItem): string {
       >
         +{{ (milestone.photoIds?.length ?? 0) - 1 }}
       </span>
-    </button>
-    <button
-      type="button"
-      class="emphasized-photo-caption block w-full text-left"
-      @click="handleCardClick"
-    >
-      <p
-        class="font-outfit text-primary-600 text-[0.625rem] font-semibold tracking-wide uppercase dark:text-orange-300"
+    </span>
+    <span class="emphasized-photo-caption block w-full text-left">
+      <span
+        class="font-outfit text-primary-600 block text-[0.625rem] font-semibold tracking-wide uppercase dark:text-orange-300"
       >
         {{ formatDateShort(milestone.occurredOn) }}
-      </p>
-      <p
-        class="font-caveat text-secondary-500 mt-0.5 text-xl leading-tight font-bold dark:text-gray-100"
+      </span>
+      <span
+        class="font-caveat text-secondary-500 mt-0.5 block text-xl leading-tight font-bold dark:text-gray-100"
       >
         {{ milestone.title }}
-      </p>
-    </button>
-  </div>
+      </span>
+    </span>
+  </button>
 
-  <!-- Milestone — taped kraft card with thumb (lightbox-on-photo-click)
-       + title + date stamp. The milestone thumb's own click opens the
-       lightbox; clicking elsewhere on the card emits @click for routing. -->
+  <!-- Milestone — taped kraft card with thumb + title + date stamp.
+       Clicking anywhere (including the thumb) navigates to the bean's
+       milestones tab; `disableLightbox` keeps the thumb from
+       intercepting the click. The lightbox is reachable from the
+       detail view. -->
   <button
     v-else-if="milestone"
     type="button"
@@ -223,11 +213,7 @@ function sayingFooter(s: SayingItem): string {
     @click="handleCardClick"
   >
     <div class="flex items-start gap-3">
-      <MilestoneThumb
-        :milestone="milestone"
-        size="sm"
-        @open-lightbox="handleMilestoneThumbLightbox"
-      />
+      <MilestoneThumb :milestone="milestone" size="sm" disable-lightbox />
       <div class="min-w-0 flex-1">
         <p
           class="font-outfit text-primary-600 text-[0.625rem] font-semibold tracking-wide uppercase dark:text-orange-300"
@@ -283,8 +269,6 @@ function sayingFooter(s: SayingItem): string {
   /* Photo gets a 4:3 aspect by default — generous for landscape, fine
      for portrait (object-cover handles aspect mismatch gracefully). */
   aspect-ratio: 4 / 3;
-  background: transparent;
-  border: 0;
   position: relative;
 }
 
@@ -301,9 +285,6 @@ function sayingFooter(s: SayingItem): string {
 }
 
 .emphasized-photo-caption {
-  background: transparent;
-  border: 0;
-  cursor: pointer;
   padding: 0.875rem 1rem 1.25rem;
 }
 
