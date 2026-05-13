@@ -31,7 +31,11 @@ import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { downloadAsFile, tryUnwrapFamilyKey } from '@/services/sync/fileSync';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import { deleteFile } from '@/services/google/driveService';
-import { getValidToken, isUserCancellation } from '@/services/google/googleAuth';
+import {
+  getValidToken,
+  isUserCancellation,
+  shouldUseRedirectAuth,
+} from '@/services/google/googleAuth';
 import { getDeploymentBadge } from '@/config/features';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -55,6 +59,13 @@ const { t } = useTranslation();
 const deploymentBadge = computed(() => getDeploymentBadge());
 const { canInstall, isInstalled, installApp } = usePWA();
 const { canManagePod, isOwner } = usePermissions();
+
+// On iOS / installed PWAs, "Move to Google Drive" would route through the
+// fragile popup OAuth path (the resume-via-redirect dance isn't wired for the
+// migration flow yet — see STATUS pending block). Hide that direction there so
+// users don't hit a broken popup. "Move to a local file" (Drive → local) is
+// fine — no OAuth — so the row still shows when already on Drive.
+const isRedirectAuthBrowser = shouldUseRedirectAuth();
 
 // Current pod owner — surfaced inside the Family Data modal's Pod Ownership
 // section so members can see who holds the super-admin role at a glance.
@@ -1225,9 +1236,12 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
               </div>
             </div>
 
-            <!-- Move storage (owner only) -->
+            <!-- Move storage (owner only; "Move to Google Drive" is hidden on
+                 iOS / PWAs where the OAuth would hit the fragile popup path) -->
             <div
-              v-if="isOwner"
+              v-if="
+                isOwner && !(syncStore.storageProviderType === 'local' && isRedirectAuthBrowser)
+              "
               class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
             >
               <div>

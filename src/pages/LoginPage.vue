@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import LoginBackground from '@/components/login/LoginBackground.vue';
 import LoginSecurityFooter from '@/components/login/LoginSecurityFooter.vue';
 import WelcomeGate from '@/components/login/WelcomeGate.vue';
@@ -8,6 +8,7 @@ import FamilyPickerView from '@/components/login/FamilyPickerView.vue';
 import LoadPodView from '@/components/login/LoadPodView.vue';
 import PickBeanView from '@/components/login/PickBeanView.vue';
 import CreatePodView from '@/components/login/CreatePodView.vue';
+import ResumePodSetup from '@/components/login/ResumePodSetup.vue';
 import JoinPodView from '@/components/login/JoinPodView.vue';
 import BiometricLoginView from '@/components/login/BiometricLoginView.vue';
 import InviteGateOverlay from '@/components/login/InviteGateOverlay.vue';
@@ -22,6 +23,7 @@ import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
 
 const router = useRouter();
+const route = useRoute();
 const { t } = useTranslation();
 const syncStore = useSyncStore();
 const settingsStore = useSettingsStore();
@@ -35,6 +37,7 @@ type LoginView =
   | 'load-pod'
   | 'pick-bean'
   | 'create'
+  | 'resume-setup'
   | 'join'
   | 'biometric'
   | 'family-picker';
@@ -62,6 +65,17 @@ const isSingleFamilyAutoSelect = ref(false);
 const inviteGateLocked = ref(features.inviteGate);
 
 onMounted(async () => {
+  // Resume-setup recovery screen: an authenticated session exists but no
+  // `.beanpod` file was ever written (a half-finished onboarding, or an iOS
+  // Drive OAuth redirect mid-flight). The router guard / App.vue route us
+  // here with `?resume=setup`. ResumePodSetup owns its own family-context
+  // setup, so skip the rest of the welcome-gate / family-picker logic.
+  if (route.query.resume === 'setup' && authStore.isAuthenticated) {
+    activeView.value = 'resume-setup';
+    isInitializing.value = false;
+    return;
+  }
+
   if (familyStore.members.length === 0) {
     await familyContextStore.initialize();
     await syncStore.initialize();
@@ -370,6 +384,13 @@ function handleSignedIn(destination: string) {
   syncStore.ensureRegistered();
   router.replace(destination);
 }
+
+/** "Start over instead" from the resume-setup screen — abandon the half-finished onboarding. */
+async function handleStartOver() {
+  await authStore.signOut();
+  activeView.value = 'welcome';
+  await router.replace('/welcome');
+}
 </script>
 
 <template>
@@ -454,6 +475,12 @@ function handleSignedIn(destination: string) {
           @cancel="activeView = 'welcome'"
         />
       </div>
+
+      <ResumePodSetup
+        v-else-if="activeView === 'resume-setup'"
+        @signed-in="handleSignedIn"
+        @start-over="handleStartOver"
+      />
 
       <JoinPodView
         v-else-if="activeView === 'join'"

@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/authStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { MARKETING_URL } from '@/utils/marketing';
 import { showToast } from '@/composables/useToast';
+import { reportError } from '@/utils/errorReporter';
 import { QUICK_ADD_CONTEXT_KEYS } from '@/constants/quickAddItems';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
 
@@ -273,6 +274,11 @@ const router = createRouter({
 // the confusing "sign in again / create a new family" screen for users
 // who are already in.
 //
+// Exception: an authenticated user whose pod file doesn't exist yet (a
+// half-finished onboarding — see `authStore.podCreated`) belongs on the
+// resume-setup recovery screen, which lives at `/welcome?resume=setup`.
+// We send them there rather than bouncing them to an empty `/nook`.
+//
 // /join and /oauth/callback are intentionally excluded — an authenticated
 // user may legitimately be accepting an invite to a different pod, and the
 // OAuth callback must always execute its handler regardless of state.
@@ -281,9 +287,13 @@ const ALREADY_AUTH_REDIRECT_FROM = new Set(['/welcome', '/login']);
 router.beforeEach((to) => {
   if (!ALREADY_AUTH_REDIRECT_FROM.has(to.path)) return;
   const authStore = useAuthStore();
-  if (authStore.isAuthenticated) {
-    return { name: 'Nook' };
+  if (!authStore.isAuthenticated) return;
+  if (!authStore.podCreated) {
+    // Already on the recovery screen — let them stay.
+    if (to.query.resume === 'setup') return;
+    return { name: 'Welcome', query: { resume: 'setup' } };
   }
+  return { name: 'Nook' };
 });
 
 /**
@@ -305,16 +315,36 @@ router.beforeEach((to) => {
  * (currently the login flow defaults to /nook on success; the param is
  * available for future use without changing this guard).
  */
+// Fired at most once per session — `authStore.podCreated` being false on a
+// `requiresAuth` route means a half-finished onboarding is reachable, which
+// should not happen; surface it so we see how often (and from where) it does.
+let zombieStateReported = false;
+
 router.beforeEach((to) => {
   if (!to.meta.requiresAuth) return;
   const authStore = useAuthStore();
   if (!authStore.isInitialized) return;
-  if (authStore.isAuthenticated) return;
-  return {
-    name: 'Welcome',
-    query: { next: to.fullPath },
-    replace: true,
-  };
+  if (!authStore.isAuthenticated) {
+    return {
+      name: 'Welcome',
+      query: { next: to.fullPath },
+      replace: true,
+    };
+  }
+  // Authenticated, but the `.beanpod` file doesn't exist yet — route to the
+  // resume-setup recovery screen instead of letting an empty `/nook` render.
+  if (!authStore.podCreated) {
+    if (!zombieStateReported) {
+      zombieStateReported = true;
+      reportError({
+        surface: 'app.onboardingZombieState',
+        message: `Authenticated session with no pod file reached a requiresAuth route (${to.path}) — routing to resume-setup`,
+        severity: 'error',
+        context: { route_path: to.path },
+      });
+    }
+    return { name: 'Welcome', query: { resume: 'setup' }, replace: true };
+  }
 });
 
 // Permission guard: redirect to /no-access if finance permission is missing

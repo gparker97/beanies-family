@@ -23,6 +23,8 @@ import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
 import { formatDeviceInfo } from '@/utils/diagnostics';
+import { reportError } from '@/utils/errorReporter';
+import { withTimeout } from '@/utils/timing';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
 import ContentSkeleton from '@/components/ui/ContentSkeleton.vue';
@@ -520,21 +522,11 @@ onMounted(async () => {
       // outer race ensures app init never wedges at `isInitializing=true` if
       // a future code path adds another awaited fetch here. 20s is generous
       // (the inner fetch already times out at 15s).
-      const REDIRECT_AUTH_TIMEOUT_MS = 20_000;
-      const redirectToken = await Promise.race([
+      const redirectToken = await withTimeout(
         completeRedirectAuth(),
-        new Promise<null>((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  `completeRedirectAuth() timed out after ${REDIRECT_AUTH_TIMEOUT_MS}ms — silent refresh failed`
-                )
-              ),
-            REDIRECT_AUTH_TIMEOUT_MS
-          )
-        ),
-      ]);
+        20_000,
+        'completeRedirectAuth() timed out after 20000ms — silent refresh failed'
+      );
       if (redirectToken) {
         initBreadcrumbs.push('auth: consumed pending redirect-auth token');
       } else {
@@ -548,8 +540,20 @@ onMounted(async () => {
         disarmAccountSwitch();
       }
     } catch (e) {
-      console.warn('[App] completeRedirectAuth failed during init:', (e as Error).message);
-      initBreadcrumbs.push(`auth: redirect-auth completion failed: ${(e as Error).message}`);
+      // A pending redirect-auth code that fails to exchange is a real
+      // onboarding/reconnect failure — surface it (not just a console.warn).
+      // App boot still continues; the user lands on the welcome/recovery
+      // surface and can retry.
+      const msg = (e as Error).message;
+      console.warn('[App] completeRedirectAuth failed during init:', msg);
+      initBreadcrumbs.push(`auth: redirect-auth completion failed: ${msg}`);
+      reportError({
+        surface: 'app.redirectAuthCompletion',
+        message: `Redirect-auth code exchange failed during app init: ${msg}`,
+        error: e,
+        severity: 'error',
+        context: { route_path: route.path },
+      });
     }
 
     // If not authenticated, redirect to the welcome/login gate (unless already on an auth page).
@@ -575,6 +579,27 @@ onMounted(async () => {
         }
         return;
       }
+    }
+
+    // Authenticated, but the `.beanpod` file doesn't exist yet — a
+    // half-finished onboarding (signup done, storage not chosen / failed; or
+    // an iOS Drive redirect mid-flight). Route to the resume-setup recovery
+    // screen rather than letting an empty `/nook` render. (The router-level
+    // guard handles this for SPA navigations; this is the fresh-page-load
+    // path, after async auth hydration completes.)
+    if (!authStore.needsAuth && !authStore.podCreated) {
+      initBreadcrumbs.push('auth: authenticated but no pod file — routing to resume-setup');
+      reportError({
+        surface: 'app.onboardingZombieState',
+        message:
+          'App boot found an authenticated session with no pod file — routing to resume-setup',
+        severity: 'error',
+        context: { route_path: route.path },
+      });
+      const onResumeScreen = route.path === '/welcome' && route.query.resume === 'setup';
+      if (!onResumeScreen) await router.replace('/welcome?resume=setup');
+      isInitializing.value = false;
+      return;
     }
 
     // If the user is authenticated but landed on a pre-auth page (/welcome
@@ -686,6 +711,16 @@ onMounted(async () => {
         initError.value = 'Initialization completed but no data was loaded';
         initErrorDetail.value = breadcrumbLog;
         console.error('[App] Post-init health check failed — no Automerge doc\n' + breadcrumbLog);
+        // Surface it — a `podCreated` user reaching `/nook` with no decrypted
+        // doc is a real init failure (a half-finished onboarding would have
+        // been routed to resume-setup above). The full breadcrumb trail is in
+        // the console and the recovery overlay; Slack just needs the signal.
+        reportError({
+          surface: 'app.postInitNoData',
+          message: 'App init completed but no Automerge doc loaded — recovery overlay shown',
+          severity: 'error',
+          context: { route_path: route.path },
+        });
       } else {
         console.warn(
           '[App] Post-init health check: no doc, but redirected to login — suppressing recovery UI\n' +

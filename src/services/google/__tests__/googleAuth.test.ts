@@ -111,12 +111,20 @@ describe('googleAuth (PKCE)', () => {
     // jsdom default doesn't sneak in.
     function stubEnv(opts: {
       ua?: string;
+      platform?: string;
       maxTouchPoints?: number;
       standaloneMq?: boolean;
       iosStandalone?: boolean;
     }) {
-      const { ua = '', maxTouchPoints = 0, standaloneMq = false, iosStandalone = false } = opts;
+      const {
+        ua = '',
+        platform = '',
+        maxTouchPoints = 0,
+        standaloneMq = false,
+        iosStandalone = false,
+      } = opts;
       Object.defineProperty(window.navigator, 'userAgent', { value: ua, configurable: true });
+      Object.defineProperty(window.navigator, 'platform', { value: platform, configurable: true });
       Object.defineProperty(window.navigator, 'maxTouchPoints', {
         value: maxTouchPoints,
         configurable: true,
@@ -141,12 +149,20 @@ describe('googleAuth (PKCE)', () => {
       });
     }
 
-    it('returns false for iOS regular Safari (non-standalone)', () => {
+    it('returns true for iOS regular Safari (popup/new-tab OAuth is fragile there)', () => {
       stubEnv({
         ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
         maxTouchPoints: 5,
       });
-      expect(googleAuth.shouldUseRedirectAuth()).toBe(false);
+      expect(googleAuth.shouldUseRedirectAuth()).toBe(true);
+    });
+
+    it('returns true for Chrome on iOS (CriOS UA — still WebKit under the hood)', () => {
+      stubEnv({
+        ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0.0.0 Mobile/15E148 Safari/604.1',
+        maxTouchPoints: 5,
+      });
+      expect(googleAuth.shouldUseRedirectAuth()).toBe(true);
     });
 
     it('returns true for iOS standalone PWA (legacy navigator.standalone flag)', () => {
@@ -166,19 +182,22 @@ describe('googleAuth (PKCE)', () => {
       expect(googleAuth.shouldUseRedirectAuth()).toBe(true);
     });
 
-    it('returns false for desktop Chrome (no standalone signal)', () => {
+    it('returns false for desktop Chrome on a real Mac (no touch, no standalone signal)', () => {
       stubEnv({
         ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        platform: 'MacIntel',
+        maxTouchPoints: 0,
       });
       expect(googleAuth.shouldUseRedirectAuth()).toBe(false);
     });
 
-    it('returns false for iPad regular Safari (non-standalone)', () => {
+    it('returns true for iPadOS 13+ Safari (reports as Mac, but has a touchscreen)', () => {
       stubEnv({
         ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+        platform: 'MacIntel',
         maxTouchPoints: 5, // iPadOS 13+ reports as Mac with touch points
       });
-      expect(googleAuth.shouldUseRedirectAuth()).toBe(false);
+      expect(googleAuth.shouldUseRedirectAuth()).toBe(true);
     });
   });
 
