@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, watchEffect } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import LoginBackground from '@/components/login/LoginBackground.vue';
 import LoginSecurityFooter from '@/components/login/LoginSecurityFooter.vue';
@@ -64,6 +64,28 @@ const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
 const isSingleFamilyAutoSelect = ref(false);
 const inviteGateLocked = ref(features.inviteGate);
 
+// Reactive resume-setup detection. Runs synchronously on setup and re-fires
+// whenever auth state or `?resume=setup` changes, so we catch BOTH cases:
+//
+//   1. Initial page load already at `/welcome?resume=setup` (post-OAuth-
+//      return — OAuthCallbackPage's `state.returnPath` lands us there).
+//   2. Initial page load at `/welcome` (no query) while in the zombie state
+//      (authenticated session, no pod file). App.vue's onMounted detects
+//      this and `router.replace`s to `/welcome?resume=setup` AFTER our
+//      onMounted has already decided activeView — without this reactive
+//      watch the user would be stuck on whatever onMounted picked (the
+//      WelcomeGate / family-picker / etc.) instead of ResumePodSetup.
+//
+// Stops itself once we've taken the resume-setup branch.
+const stopResumeWatch = watchEffect(() => {
+  if (!authStore.isInitialized) return;
+  if (!authStore.isAuthenticated) return;
+  if (route.query.resume !== 'setup') return;
+  activeView.value = 'resume-setup';
+  isInitializing.value = false;
+  stopResumeWatch();
+});
+
 onMounted(async () => {
   // Wait for App.vue's `authStore.initializeAuth()` to finish before
   // reading auth state. Vue fires children's onMounted BEFORE the parent
@@ -94,10 +116,25 @@ onMounted(async () => {
   // `.beanpod` file was ever written (a half-finished onboarding, or an iOS
   // Drive OAuth redirect mid-flight). The router guard / App.vue route us
   // here with `?resume=setup`. ResumePodSetup owns its own family-context
-  // setup, so skip the rest of the welcome-gate / family-picker logic.
+  // setup, so skip the rest of the welcome-gate / family-picker logic. The
+  // watchEffect above also catches this reactively; this synchronous check
+  // wins the common case (URL already on `?resume=setup` at first paint)
+  // without a brief flicker of the welcome gate while the watch fires.
   if (route.query.resume === 'setup' && authStore.isAuthenticated) {
     activeView.value = 'resume-setup';
     isInitializing.value = false;
+    return;
+  }
+
+  // Zombie state without `?resume=setup` in the URL — App.vue's onMounted
+  // is about to `router.replace` us there. Keep the loading spinner up and
+  // bail out of the family-init / single-family-auto-select logic; the
+  // reactive watchEffect above will flip activeView to 'resume-setup' once
+  // the redirect lands. Without this, onMounted would press on, possibly
+  // call `handleFamilySelected(singleFamily)` on a pod that doesn't exist,
+  // and either error out or land the user on the wrong view before the
+  // watch could rescue them.
+  if (authStore.isAuthenticated && !authStore.podCreated) {
     return;
   }
 
