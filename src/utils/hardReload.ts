@@ -40,6 +40,22 @@ export async function hardReload(): Promise<void> {
         if (reg.waiting) {
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });
         }
+        // Aggressive: unregister so the next nav bypasses the SW intercept
+        // entirely. The SW re-registers on the fresh load via `registerSW`
+        // in main.ts (offline support comes back within ~1 second). This is
+        // the only thing that reliably breaks iOS Safari's stale-precache
+        // loop when registerType: 'prompt' has held a new SW in waiting
+        // limbo — `update()` + `SKIP_WAITING` are no-ops there, and
+        // workbox's NavigationRoute can still serve stale `index.html`
+        // even after `caches.delete(all)`. `hardReload()` is only ever
+        // called from recovery paths (router.onError, vite:preloadError,
+        // App.vue init catch, the user-Reload button) — never on a healthy
+        // path — so the brief offline gap is always an acceptable trade.
+        try {
+          await reg.unregister();
+        } catch (e) {
+          console.warn('[hardReload] SW unregister failed (continuing):', e);
+        }
       }
     }
     if ('caches' in window) {
@@ -80,6 +96,17 @@ export async function hardReload(): Promise<void> {
  *     site (`App.vue:499` for `registerGoogleAccountAssertion`) named the
  *     property in the message — distinctive enough to recognize without
  *     swallowing real null-deref bugs.
+ *
+ *     iOS Safari uses a different preposition for the same symptom — its
+ *     wording is "Cannot destructure property 'X' from null or undefined
+ *     value" (greg's iPhone 14, 2026-05-13). The previous regex only
+ *     matched the "as it is null|undefined" V8/Firefox shape, so the
+ *     recovery never fired for iOS-Safari users and they got stuck in a
+ *     reload loop. The single permissive pattern below now matches any
+ *     phrasing of "Cannot destructure … (null|undefined)" — current and
+ *     future — without swallowing unrelated null-derefs (those say
+ *     "Cannot read properties of null", "null is not an object
+ *     (evaluating …)", "X is null", etc.).
  */
 export function isChunkLoadError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? '');
@@ -88,9 +115,12 @@ export function isChunkLoadError(err: unknown): boolean {
     /error loading dynamically imported module/i.test(msg) ||
     /Importing a module script failed/i.test(msg) ||
     /Couldn't resolve component .+ at /i.test(msg) ||
-    // V8/Firefox/modern WebKit shape when a dynamic import resolves to
-    // null/undefined and the result is destructured.
-    /Cannot destructure property .+ as it is (?:null|undefined)/i.test(msg)
+    // Any destructure-of-(null|undefined) shape — V8/Node/Firefox/modern
+    // WebKit ("as it is null"), iOS Safari ("from null or undefined
+    // value"), and future browser phrasings. The "Cannot destructure"
+    // prefix + bounded `[^.]*` (one sentence) keep this from matching
+    // legit non-chunk null-derefs.
+    /Cannot destructure[^.]*\b(?:null|undefined)\b/i.test(msg)
   );
 }
 
