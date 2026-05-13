@@ -61,6 +61,28 @@ describe('isChunkLoadError', () => {
     ).toBe(true);
   });
 
+  it('matches iOS Safari destructure-of-null phrasing', () => {
+    // Caught 2026-05-13 from greg's iPhone 14 Safari (browser, not PWA)
+    // after the Google Drive OAuth redirect-back. Safari uses a different
+    // preposition for the same symptom ("from null or undefined value"
+    // vs V8's "as it is null"), so the previous regex missed it and the
+    // user got stuck in a "beans spilled" reload loop with no way out
+    // except killing the browser. The broader regex matches both.
+    expect(
+      isChunkLoadError(
+        new TypeError(
+          "Cannot destructure property 'registerGoogleAccountAssertion' from null or undefined value"
+        )
+      )
+    ).toBe(true);
+    expect(isChunkLoadError(new TypeError("Cannot destructure property 'foo' from null"))).toBe(
+      true
+    );
+    expect(
+      isChunkLoadError(new TypeError("Cannot destructure property 'bar' from undefined"))
+    ).toBe(true);
+  });
+
   it('does not match unrelated errors', () => {
     expect(isChunkLoadError(new Error('TypeError: Cannot read property of undefined'))).toBe(false);
     expect(isChunkLoadError(new Error('NetworkError: Failed to fetch'))).toBe(false);
