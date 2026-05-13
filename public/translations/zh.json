@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-13",
-    "translationCount": 2818
+    "translationCount": 2824
   },
   "translations": {
     "app.name": {
@@ -9192,14 +9192,14 @@
       "lastUpdated": "2026-04-09"
     },
     "setupProgress.error.title": {
-      "translation": "出了些问题！",
-      "hash": "dtz7rb",
-      "lastUpdated": "2026-04-09"
+      "translation": "差不多了—最后一步打嗝",
+      "hash": "pmm6g7",
+      "lastUpdated": "2026-05-13"
     },
     "setupProgress.error.description": {
-      "translation": "别担心，您的数据会安全缓存在此设备上。您可以重试，继续而不保存到您的文件，或者返回。",
-      "hash": "mkavw4",
-      "lastUpdated": "2026-04-09"
+      "translation": "您的Pod已创建，您的数据是安全的—我们无法完成后台步骤（最终保存/备妥自动同步）。请重试、继续（下次打开应用时会重试）或返回。",
+      "hash": "r5mqam",
+      "lastUpdated": "2026-05-13"
     },
     "setupProgress.error.retry": {
       "translation": "再試一次",
@@ -9207,9 +9207,9 @@
       "lastUpdated": "2026-04-09"
     },
     "setupProgress.error.continue": {
-      "translation": "仍然继续",
-      "hash": "jnjn6k",
-      "lastUpdated": "2026-04-09"
+      "translation": "继续",
+      "hash": "8b7kmx",
+      "lastUpdated": "2026-05-13"
     },
     "setupProgress.error.back": {
       "translation": "返回",
@@ -14094,6 +14094,36 @@
     "storage.savingToLocalFile": {
       "translation": "正在保存到此设备上的本地文件",
       "hash": "lwxzoo",
+      "lastUpdated": "2026-05-13"
+    },
+    "resumeSetup.title": {
+      "translation": "完成Pod设置",
+      "hash": "fy3pxc",
+      "lastUpdated": "2026-05-13"
+    },
+    "resumeSetup.subtitle": {
+      "translation": "您上次的设置没有完全完成。请重新输入您的密码，然后选择您的密码舱所在的位置，我们将为您打包。",
+      "hash": "nq7ip9",
+      "lastUpdated": "2026-05-13"
+    },
+    "resumeSetup.storagePrompt": {
+      "translation": "您的Pod应该住在哪里？",
+      "hash": "cs13b3",
+      "lastUpdated": "2026-05-13"
+    },
+    "resumeSetup.finishing": {
+      "translation": "正在完成您的吊舱…",
+      "hash": "12rrnq",
+      "lastUpdated": "2026-05-13"
+    },
+    "resumeSetup.startOver": {
+      "translation": "改为重新开始",
+      "hash": "imtrzg",
+      "lastUpdated": "2026-05-13"
+    },
+    "storage.useLocalInstead": {
+      "translation": "改用本地文件",
+      "hash": "wmvlp1",
       "lastUpdated": "2026-05-13"
     }
   }
