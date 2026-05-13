@@ -4480,19 +4480,44 @@ const STRING_DEFS = {
   'storage.localFile': { en: 'Local File', beanie: 'local file' },
   'storage.dropbox': { en: 'Dropbox', beanie: 'dropbox' },
   'storage.iCloud': { en: 'iCloud', beanie: 'icloud' },
+  'storage.localFileWarningTitle': {
+    en: "Heads up — local files don't sync",
+    beanie: "heads up — local files don't sync",
+  },
   'storage.localFileWarning': {
-    en: "Local files are great for security but don't sync with other family members. If you plan to use this app with your family, we recommend a storage provider (e.g. Google Drive) for your encrypted data file.",
+    en: 'Your data stays on this device. To share with other family members, you will need to manually share the data file.',
     beanie:
-      "local files are great for security but don't sync with other family members. if you plan to use this app with your family, we recommend a storage provider (e.g. google drive) for your encrypted data file.",
+      'your data stays on this device. to share with other family members, you will need to manually share the data file.',
   },
   'storage.localFileWarningEncryption': {
-    en: "Don't worry — your data is fully encrypted and only accessible to those you share the file with.",
+    en: 'Your data is encrypted either way — only the people you share the file with can open it.',
     beanie:
-      "don't worry — your data is fully encrypted and only accessible to those you share the file with.",
+      'your data is encrypted either way — only the people you share the file with can open it.',
   },
   'storage.localFileContinue': {
-    en: 'Continue with Local File',
-    beanie: 'continue with local file',
+    en: 'Use a local file',
+    beanie: 'use a local file',
+  },
+  'storage.useGoogleDriveInstead': {
+    en: 'Use Google Drive instead',
+    beanie: 'use google drive instead',
+  },
+  'storage.driveSyncsWithFamily': {
+    en: 'Syncs with your whole family — on every device, automatically. Same encryption as a local file.',
+    beanie:
+      'syncs with your whole family — on every device, automatically. same encryption as a local file.',
+  },
+  'storage.connectGoogleDrive': {
+    en: 'Connect Google Drive',
+    beanie: 'connect google drive',
+  },
+  'storage.preferLocal': {
+    en: 'Prefer to store your data locally on this device?',
+    beanie: 'prefer to store your data locally on this device?',
+  },
+  'storage.savingToLocalFile': {
+    en: 'Saving to a local file on this device',
+    beanie: 'saving to a local file on this device',
   },
   // Classified errors from LocalStorageProvider (see classifyFileError).
   // Kept generic so they apply equally to read and write paths.
@@ -4518,9 +4543,9 @@ const STRING_DEFS = {
       'this file looks like a conflict copy from your cloud-storage provider. beanies will merge it on load — you can delete the duplicate after.',
   },
   'storage.localFileBestOnDesktop': {
-    en: 'Multi-device sync via your cloud-storage folder works best on desktop Chrome or Edge. iOS, Android, Safari, and Firefox fall back to manual export/import.',
+    en: "On phones, or in Safari and Firefox, you'll re-pick the file every time you open the app.",
     beanie:
-      'multi-device sync via your cloud-storage folder works best on desktop chrome or edge. ios, android, safari, and firefox fall back to manual export/import.',
+      "on phones, or in safari and firefox, you'll re-pick the file every time you open the app.",
   },
   'storage.comingSoon': { en: 'Coming Soon', beanie: 'coming soon' },
   'storage.recommended': { en: 'Recommended', beanie: 'recommended' },
