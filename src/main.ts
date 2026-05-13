@@ -67,10 +67,19 @@ window.addEventListener('unhandledrejection', (event) => {
 // different code path that doesn't go through the router. `event.preventDefault()`
 // tells Vite we're handling the recovery; `hardReload()` evicts the SW
 // precache and replaces the URL.
+//
+// MUST use the same counter-style logic as App.vue + router.onError —
+// previously this used `=== '1'` / `set '1'`, which actively RESET the
+// shared retry counter on every fire. With the dynamic import's rejection
+// also routing through App.vue's catch (which increments), the counter
+// cycled 1→2→reset to 1→2 indefinitely and never tripped the "exhausted"
+// branch — so the loop ran for minutes with no `app.chunkRecoveryFailed`
+// alert (greg's iPhone, 2026-05-13).
 window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault();
-  if (sessionStorage.getItem(CHUNK_RELOAD_FLAG) === '1') return;
-  sessionStorage.setItem(CHUNK_RELOAD_FLAG, '1');
+  const attempts = parseInt(sessionStorage.getItem(CHUNK_RELOAD_FLAG) ?? '0', 10) || 0;
+  if (attempts >= 3) return;
+  sessionStorage.setItem(CHUNK_RELOAD_FLAG, String(attempts + 1));
   void hardReload();
 });
 
