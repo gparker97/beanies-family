@@ -1211,5 +1211,6 @@ export interface RegistryEntry {
   createdAt?: ISODateString; // write-once, set server-side on first PUT
   ownerEmail?: string | null;
   subscribeNewsletter?: boolean | null;
+  country?: CountryCode | null; // mirror of family Settings.country — denormalized for ops introspection
   updatedAt: ISODateString;
 }
