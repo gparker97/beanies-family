@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-13",
-    "translationCount": 2824
+    "lastUpdated": "2026-05-14",
+    "translationCount": 2825
   },
   "translations": {
     "app.name": {
@@ -14102,9 +14102,9 @@
       "lastUpdated": "2026-05-13"
     },
     "resumeSetup.subtitle": {
-      "translation": "您上次的设置没有完全完成。请重新输入您的密码，然后选择您的密码舱所在的位置，我们将为您打包。",
-      "hash": "nq7ip9",
-      "lastUpdated": "2026-05-13"
+      "translation": "您上次的设置没有完全完成。请重新输入密码，我们绝不会存储密码，因此您的数据将始终保持端到端加密状态。",
+      "hash": "o55a9m",
+      "lastUpdated": "2026-05-14"
     },
     "resumeSetup.storagePrompt": {
       "translation": "您的Pod应该住在哪里？",
@@ -14125,6 +14125,11 @@
       "translation": "改用本地文件",
       "hash": "wmvlp1",
       "lastUpdated": "2026-05-13"
+    },
+    "bean.overview.milestones.empty": {
+      "translation": "尚无里程碑",
+      "hash": "j56za",
+      "lastUpdated": "2026-05-14"
     }
   }
 }
