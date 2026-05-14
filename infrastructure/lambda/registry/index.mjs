@@ -102,6 +102,12 @@ export async function handler(event) {
           typeof body.subscribeNewsletter === 'boolean'
             ? body.subscribeNewsletter
             : (existing.subscribeNewsletter ?? null),
+        // Same preserved-merge semantics as subscribeNewsletter: a write that
+        // omits `country` (older client, member device without the local
+        // setting) preserves the existing value. A `null` body.country also
+        // preserves — clearing country is a deliberate ops action, not a side
+        // effect of registering.
+        country: typeof body.country === 'string' ? body.country : (existing.country ?? null),
         updatedAt: now,
       };
       await client.send(

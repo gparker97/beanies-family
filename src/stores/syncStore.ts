@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed, shallowRef, nextTick } from 'vue';
+import { ref, computed, shallowRef, nextTick, watch } from 'vue';
 
 // Import stores for auto-sync and reload
 import { useAccountsStore } from './accountsStore';
@@ -2149,6 +2149,7 @@ export const useSyncStore = defineStore('sync', () => {
         familyName: ctx.activeFamilyName,
         ownerEmail: authStore.currentUser?.email ?? null,
         subscribeNewsletter: authStore.newsletterOptIn ?? null,
+        country: useSettingsStore().country ?? null,
       })
       .catch((e: unknown) => {
         // Non-critical: registry is optional smoothness; saves proceed
@@ -2160,6 +2161,19 @@ export const useSyncStore = defineStore('sync', () => {
   function ensureRegistered(): void {
     registerCurrentFamily();
   }
+
+  // Keep the registry's `country` field in sync with the family doc. Fires on
+  // every Settings.country change (own edits + Automerge-synced changes from
+  // other members). Fire-and-forget via the same non-critical path as every
+  // other registry write — the `activeFamilyId` guard inside registerCurrentFamily
+  // makes pre-pod-create firings a no-op.
+  const settingsStoreForCountry = useSettingsStore();
+  watch(
+    () => settingsStoreForCountry.country,
+    (next, prev) => {
+      if (next !== prev) ensureRegistered();
+    }
+  );
 
   return {
     // State
