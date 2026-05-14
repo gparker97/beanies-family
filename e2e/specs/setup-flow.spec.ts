@@ -15,6 +15,12 @@ test.describe('Setup Flow', () => {
     // Walk through the full setup wizard: homepage → welcome → create pod steps 1-3
     await navigateToSetupStep3(page);
 
+    // Open the add-member form by clicking the "Add an adult" chip. The
+    // form is no longer pre-opened — per the 2026-05-14 step-3 simplification,
+    // the empty state shows two chip buttons (Add an adult / Add a little bean)
+    // and the form only appears once the user explicitly opts in.
+    await page.getByRole('button', { name: ui('loginV6.addAnAdult') }).click();
+
     // Add a family member with birthday during step 3
     // Add Member button should be disabled when name/birthday not filled
     const addButton = page.getByRole('button', { name: ui('loginV6.addMember') });
