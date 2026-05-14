@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+import { useTranslation } from '@/composables/useTranslation';
 
 export interface ComboboxOption {
   value: string;
@@ -40,6 +41,16 @@ interface Props {
   otherLabel?: string;
   otherPlaceholder?: string;
   searchPlaceholder?: string;
+  /**
+   * Max number of options actually rendered in the dropdown after filtering.
+   * The filter still considers the full options list — this only caps DOM
+   * node creation, which is the bottleneck on older / cheaper Android
+   * devices when a callsite passes thousands of options (e.g. airports).
+   * If the filtered count exceeds this cap, a "Showing N of M — keep typing"
+   * footer hint is rendered. Set to a large number (or Infinity) for the
+   * legacy "render everything" behaviour. Default 50.
+   */
+  maxVisibleResults?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -49,7 +60,10 @@ const props = withDefaults(defineProps<Props>(), {
   otherLabel: 'Other',
   otherPlaceholder: 'Enter name...',
   searchPlaceholder: 'Search...',
+  maxVisibleResults: 50,
 });
+
+const { t } = useTranslation();
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
@@ -119,16 +133,64 @@ const hasSelection = computed(() => {
   return isOtherMode.value ? !!customText.value : !!props.modelValue;
 });
 
-// Filter options by search query (excluding the "Other" sentinel)
-const filteredOptions = computed(() => {
-  const q = searchQuery.value.toLowerCase().trim();
-  const regularOptions = props.otherValue
+// Pre-built search index — caches lowercased label and uppercased rich.badge
+// per option, rebuilt only when props.options reference changes. For static
+// lists (e.g. AIRPORTS, 4046 entries) this is a one-shot cost on mount; per
+// keystroke we then reuse the cached strings instead of re-lowercasing
+// 4046 labels on every key event.
+interface IndexedOption {
+  option: ComboboxOption;
+  searchKey: string;
+  badgeUpper: string | null;
+}
+const searchIndex = computed<IndexedOption[]>(() => {
+  const source = props.otherValue
     ? props.options.filter((o) => o.value !== props.otherValue)
     : props.options;
+  return source.map((o) => ({
+    option: o,
+    searchKey: o.label.toLowerCase(),
+    badgeUpper: o.rich?.badge?.toUpperCase() ?? null,
+  }));
+});
 
-  if (!q) return regularOptions;
+/**
+ * Filter result: the full filtered set + the capped slice actually rendered.
+ *
+ * - Substring match on the pre-lowercased searchKey (cheap).
+ * - Exact-`rich.badge` promotion (case-insensitive): if the trimmed,
+ *   uppercased query exactly equals any indexed option's badgeUpper, that
+ *   option is moved to position 0. So `SIN` and `sin` both surface
+ *   Singapore Changi as the top match, even when many other labels contain
+ *   the substring "sin" (Singen, Sincelejo, etc.).
+ * - Cap: only `maxVisibleResults` items are returned in `items` (the v-for
+ *   target). `totalCount` is the full match count, used by the hint footer.
+ */
+const filteredOptions = computed<{ items: ComboboxOption[]; totalCount: number }>(() => {
+  const q = searchQuery.value.toLowerCase().trim();
+  const upperQ = searchQuery.value.toUpperCase().trim();
 
-  return regularOptions.filter((o) => o.label.toLowerCase().includes(q));
+  const matches = q
+    ? searchIndex.value.filter((idx) => idx.searchKey.includes(q))
+    : searchIndex.value.slice();
+
+  if (upperQ) {
+    const exactIdx = matches.findIndex((m) => m.badgeUpper === upperQ);
+    if (exactIdx > 0) {
+      matches.unshift(matches.splice(exactIdx, 1)[0]);
+    }
+  }
+
+  const capped = matches.slice(0, props.maxVisibleResults).map((m) => m.option);
+  return { items: capped, totalCount: matches.length };
+});
+
+const hintText = computed(() => {
+  const { items, totalCount } = filteredOptions.value;
+  if (totalCount <= items.length) return '';
+  return t('combobox.showingHint')
+    .replace('{visible}', String(items.length))
+    .replace('{total}', String(totalCount));
 });
 
 // On mount, check backward compat: if modelValue doesn't match any option, enter other mode
@@ -372,9 +434,10 @@ function clearSelection() {
         :style="popoverStyle"
         class="z-[9999] overflow-y-auto rounded-[16px] border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
       >
-        <!-- Search input -->
+        <!-- Search input. z-10 keeps the sticky header above scrolled options
+             (without it, options scroll on top of the bg-white search wrapper). -->
         <div
-          class="sticky top-0 border-b border-gray-100 bg-white p-2 dark:border-slate-700 dark:bg-slate-800"
+          class="sticky top-0 z-10 border-b border-gray-100 bg-white p-2 dark:border-slate-700 dark:bg-slate-800"
         >
           <input
             ref="searchInputRef"
@@ -390,7 +453,7 @@ function clearSelection() {
         <!-- Options list -->
         <div class="py-1">
           <button
-            v-for="option in filteredOptions"
+            v-for="option in filteredOptions.items"
             :key="option.value"
             type="button"
             :data-testid="`combobox-option-${option.value}`"
@@ -465,10 +528,21 @@ function clearSelection() {
 
           <!-- Empty state -->
           <div
-            v-if="filteredOptions.length === 0"
+            v-if="filteredOptions.items.length === 0"
             class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400"
           >
             No results found
+          </div>
+
+          <!-- Cap hint — shown when the filtered match count exceeds the
+               rendered cap, telling the user to keep typing to narrow.
+               Sized small + muted so it doesn't compete with options. -->
+          <div
+            v-if="hintText"
+            class="font-outfit border-t border-gray-100 px-3 py-2 text-center text-xs text-gray-500 italic dark:border-slate-700 dark:text-gray-400"
+            data-testid="combobox-cap-hint"
+          >
+            {{ hintText }}
           </div>
 
           <!-- "Other" option -->
