@@ -2270,6 +2270,8 @@ const STRING_DEFS = {
   'date.tomorrow': { en: 'Tomorrow', beanie: 'tomorrow' },
   'date.pick': { en: 'Pick a Date', beanie: 'pick a date' },
   'date.jumpToToday': { en: 'Jump to Today', beanie: 'jump to today' },
+  'date.clear': { en: 'Clear', beanie: 'clear' },
+  'date.clearAriaLabel': { en: 'Clear date', beanie: 'clear date' },
   'time.hour': { en: 'Hour', beanie: 'hour' },
   'time.minute': { en: 'Min', beanie: 'min' },
   'time.period': { en: 'AM/PM', beanie: 'am/pm' },
