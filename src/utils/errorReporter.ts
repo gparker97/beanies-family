@@ -105,6 +105,15 @@ const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'context_build_error',
   'vue_info',
   'component',
+  // Silent-refresh diagnostic capture (added 2026-05-14 for the
+  // cold-start-reconnect-escalation surface — see `googleAuth.performSilentRefresh`).
+  // These ship as JSON-serialized arrays/primitives, no user-typed content:
+  // attempt timings, error names/messages from the OAuth proxy, network classifications.
+  'silent_refresh_attempts',
+  'silent_refresh_had_refresh_token',
+  'silent_refresh_consecutive_failures',
+  'page_hidden_for_ms',
+  'visibility_state',
 ]);
 
 const MAX_STRING_LEN = 200;

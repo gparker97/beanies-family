@@ -672,6 +672,61 @@ export function getAccessToken(): string | null {
 // Deduplication: only one silent refresh runs at a time.
 let pendingSilentRefresh: Promise<string | null> | null = null;
 
+// ─── Silent refresh diagnostic capture ───────────────────────────────────────
+//
+// The cold-start-reconnect-escalation surface only knows that silent refresh
+// "failed" — not which failure mode (Lambda cold start, iOS wake-network race,
+// refresh-token revocation that isn't classifying as invalid_grant, etc.).
+// `performSilentRefresh` records each attempt's duration + error classification
+// here so the escalation alert can attach the diagnostic context.
+//
+// Lifecycle: set on every full failure of `performSilentRefresh` (so the most
+// recent attempt is what the next escalation reports). Cleared on success so
+// stale diagnostics never get attached to a fresh failure.
+
+export interface SilentRefreshAttemptDiagnostic {
+  attempt: number;
+  durationMs: number;
+  classification: 'permanent' | 'timeout' | 'network' | 'http' | 'unknown';
+  errorName: string;
+  errorMessage: string;
+}
+
+export interface SilentRefreshDiagnostics {
+  attempts: SilentRefreshAttemptDiagnostic[];
+  hadRefreshToken: boolean;
+  consecutiveFailures: number;
+}
+
+let lastSilentRefreshDiagnostics: SilentRefreshDiagnostics | null = null;
+
+/** Returns diagnostics for the most recent failed silent refresh, or null
+ *  if the most recent attempt succeeded (or none has happened this session). */
+export function getLastSilentRefreshDiagnostics(): SilentRefreshDiagnostics | null {
+  return lastSilentRefreshDiagnostics;
+}
+
+/** Classify a refresh-attempt failure for the diagnostic alert. The labels
+ *  guide the structural fix: 'timeout' → Lambda cold start / network too
+ *  slow; 'network' → wake-time stack race; 'http' → proxy returned non-2xx
+ *  (often invalid_grant or 5xx); 'permanent' → refresh token revoked. */
+function classifySilentRefreshError(e: unknown): SilentRefreshAttemptDiagnostic['classification'] {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes('invalid_grant') || msg.includes('Token has been expired or revoked')) {
+    return 'permanent';
+  }
+  if (msg.includes('timed out after') || msg.includes('AbortError')) return 'timeout';
+  if (
+    msg.includes('Failed to fetch') ||
+    msg.includes('Load failed') ||
+    msg.includes('NetworkError')
+  ) {
+    return 'network';
+  }
+  if (/HTTP [45]\d\d/.test(msg) || msg.includes('OAuth refresh failed')) return 'http';
+  return 'unknown';
+}
+
 /**
  * Whether a silent token refresh is currently in flight. Read by callers
  * that want to coalesce or defer their own UI signals while recovery is
@@ -733,7 +788,17 @@ async function performSilentRefresh(): Promise<string | null> {
     }
   }
 
-  if (!clientId || !refreshToken) return null;
+  if (!clientId || !refreshToken) {
+    // Capture this failure mode too — "no refresh token" means IDB read
+    // returned nothing OR session is uninitialised. Useful diagnostic in
+    // its own right (it would otherwise show up as a silent null).
+    lastSilentRefreshDiagnostics = {
+      attempts: [],
+      hadRefreshToken: !!refreshToken,
+      consecutiveFailures: consecutiveSilentRefreshFailures,
+    };
+    return null;
+  }
 
   // Retry up to 3× on transient failures (network blip during SW
   // activation, brief 5xx from the proxy, mobile-network jitter) with
@@ -741,7 +806,10 @@ async function performSilentRefresh(): Promise<string | null> {
   // the refresh token has been revoked at Google's end.
   const RETRY_BACKOFF_MS = [1500, 3000] as const;
   const MAX_ATTEMPTS = RETRY_BACKOFF_MS.length + 1;
+  const diagnosticAttempts: SilentRefreshAttemptDiagnostic[] = [];
+
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const startMs = performance.now();
     try {
       console.warn(
         `[googleAuth] Attempting silent token refresh (attempt ${attempt}/${MAX_ATTEMPTS})...`
@@ -762,21 +830,40 @@ async function performSilentRefresh(): Promise<string | null> {
       notifyTokenAcquired(tokens.access_token, false).catch(() => {});
 
       console.warn('[googleAuth] Silent refresh succeeded');
+      // Clear stale diagnostics so a later failure doesn't surface old data.
+      lastSilentRefreshDiagnostics = null;
       return tokens.access_token;
     } catch (e) {
-      const message = (e as Error).message;
-      const isPermanent =
-        message.includes('invalid_grant') || message.includes('Token has been expired or revoked');
+      const durationMs = Math.round(performance.now() - startMs);
+      const errorName = e instanceof Error ? e.name : 'UnknownError';
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      const classification = classifySilentRefreshError(e);
+      // Truncate message to keep the Slack payload compact — full message
+      // is still in the console log above.
+      diagnosticAttempts.push({
+        attempt,
+        durationMs,
+        classification,
+        errorName,
+        errorMessage: errorMessage.length > 120 ? errorMessage.slice(0, 120) + '…' : errorMessage,
+      });
+
+      const isPermanent = classification === 'permanent';
 
       if (isPermanent) {
         console.warn(
           '[googleAuth] Silent refresh failed (permanent — refresh token revoked):',
-          message
+          errorMessage
         );
         refreshToken = null;
         if (currentFamilyId) {
           await clearGoogleRefreshToken(currentFamilyId);
         }
+        lastSilentRefreshDiagnostics = {
+          attempts: diagnosticAttempts,
+          hadRefreshToken: true,
+          consecutiveFailures: consecutiveSilentRefreshFailures,
+        };
         firePermanentFailureCallbacks();
         return null;
       }
@@ -785,7 +872,7 @@ async function performSilentRefresh(): Promise<string | null> {
       if (attempt < MAX_ATTEMPTS) {
         const backoffMs = RETRY_BACKOFF_MS[attempt - 1] ?? 3000;
         console.warn(
-          `[googleAuth] Silent refresh failed (transient, retrying in ${backoffMs}ms): ${message}`
+          `[googleAuth] Silent refresh failed (transient, retrying in ${backoffMs}ms): ${errorMessage}`
         );
         await new Promise((r) => setTimeout(r, backoffMs));
         continue;
@@ -804,8 +891,13 @@ async function performSilentRefresh(): Promise<string | null> {
       persistFailureCounter(consecutiveSilentRefreshFailures);
       console.warn(
         `[googleAuth] Silent refresh failed after ${MAX_ATTEMPTS} attempts ` +
-          `(consecutive: ${consecutiveSilentRefreshFailures}/${SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD}): ${message}`
+          `(consecutive: ${consecutiveSilentRefreshFailures}/${SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD}): ${errorMessage}`
       );
+      lastSilentRefreshDiagnostics = {
+        attempts: diagnosticAttempts,
+        hadRefreshToken: true,
+        consecutiveFailures: consecutiveSilentRefreshFailures,
+      };
       if (consecutiveSilentRefreshFailures >= SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD) {
         console.warn(
           '[googleAuth] Escalating to permanent failure — silent refresh has not recovered'
