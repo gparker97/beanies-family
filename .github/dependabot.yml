@@ -27,9 +27,25 @@ updates:
         update-types:
           - 'patch'
     # Ignore specific dependencies if needed
-    # ignore:
-    #   - dependency-name: "package-name"
-    #     versions: ["1.x"]
+    ignore:
+      # Major bumps blocked indefinitely on peer-dep ERESOLVE — re-enable when ecosystem catches up
+      - dependency-name: 'eslint'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'stylelint'
+        update-types: ['version-update:semver-major']
+      # Major bumps needing a focused migration with QA — re-enable when scheduled
+      - dependency-name: 'astro'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@astrojs/mdx'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'vite'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'astro-seo'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'astro-og-canvas'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'canvaskit-wasm'
+        update-types: ['version-update:semver-major']
 
     # Security updates configuration
     versioning-strategy: increase
