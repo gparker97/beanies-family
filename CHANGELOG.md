@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-14
+
+### Changed
+
+- **Swiping between days, weeks, and months on the Planner now slides — no more flash.** The horizontal swipe gesture on the day / week / month calendar surfaces previously snapped to the next date instantly, which felt more like an accidental tap than a real swipe. Now the card follows your finger as you drag (with a gentle resistance once you pull past the commit threshold so it doesn't fly off), and on release the current view slides off in the direction your finger went while the new view slides in from the opposite edge — the iOS Calendar pattern. Releasing a short, undecided drag springs the card back to centre. Same easing and timings (~220 ms out, ~320 ms in) feel responsive and quiet, not flashy. Honours `prefers-reduced-motion`: if the OS asks for less motion, the swipe just swaps content instantly like before. Tapping the < / > / today buttons stays instant — they're a direct affordance, not a gesture. New `useCalendarSlide` composable layered on top of the existing `useHorizontalSwipe` (which keeps owning gesture detection); the lower composable's 13-test contract is untouched. 10 new unit tests cover direction, drag preview, rubber-band damping, re-entrancy lockout, and the reduced-motion path.
+
+---
+
 ## 2026-05-13
 
 ### Added
