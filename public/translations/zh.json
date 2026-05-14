@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-14",
-    "translationCount": 2825
+    "translationCount": 2827
   },
   "translations": {
     "app.name": {
@@ -1527,9 +1527,9 @@
       "lastUpdated": "2026-03-03"
     },
     "forecast.comingSoonDescription": {
-      "translation": "我们正在种植一些特别的东西。财务预测将帮助您了解您的Beanies的发展方向。",
-      "hash": "4z6nff",
-      "lastUpdated": "2026-02-26"
+      "translation": "我们正在种植一些特别的东西。财务预测将帮助您了解家庭的发展方向。",
+      "hash": "2brzkg",
+      "lastUpdated": "2026-05-14"
     },
     "forecast.feature.projections": {
       "translation": "经常性交易预测",
@@ -1607,14 +1607,14 @@
       "lastUpdated": "2026-03-03"
     },
     "notFound.heading": {
-      "translation": "哎呀！这个豆子丢了……",
-      "hash": "er7gvu",
-      "lastUpdated": "2026-02-24"
+      "translation": "哎呀！此页面丢失了...",
+      "hash": "q3camz",
+      "lastUpdated": "2026-05-14"
     },
     "notFound.description": {
-      "translation": "您要查找的页面已失效。让我们带你回到你的帽子上。",
-      "hash": "xk3gcm",
-      "lastUpdated": "2026-02-26"
+      "translation": "您要查找的页面已失效。让我们带您回到家人身边。",
+      "hash": "xg2ch5",
+      "lastUpdated": "2026-05-14"
     },
     "notFound.goHome": {
       "translation": "返回到仪表盘",
@@ -2707,14 +2707,14 @@
       "lastUpdated": "2026-03-03"
     },
     "loginV6.pickBeanSubtitle": {
-      "translation": "挑选你的豆子",
-      "hash": "flbfxa",
-      "lastUpdated": "2026-03-03"
+      "translation": "你的個人資料",
+      "hash": "xrr7zv",
+      "lastUpdated": "2026-05-14"
     },
     "loginV6.parentBean": {
-      "translation": "家长/成人",
-      "hash": "ebu2vn",
-      "lastUpdated": "2026-03-03"
+      "translation": "成人",
+      "hash": "11kyoq",
+      "lastUpdated": "2026-05-14"
     },
     "loginV6.littleBean": {
       "translation": "子",
@@ -2787,9 +2787,9 @@
       "lastUpdated": "2026-04-28"
     },
     "loginV6.addMember": {
-      "translation": "添加Bean",
-      "hash": "kc934h",
-      "lastUpdated": "2026-04-28"
+      "translation": "添加成员",
+      "hash": "8cvzdz",
+      "lastUpdated": "2026-05-14"
     },
     "loginV6.finish": {
       "translation": "完成·带我去角落 🏡",
@@ -2837,9 +2837,9 @@
       "lastUpdated": "2026-02-24"
     },
     "loginV6.pickBeanInfoText": {
-      "translation": "Onboarded Bean可以使用其密码登录。新Bean需要先创建密码。",
-      "hash": "f0463e",
-      "lastUpdated": "2026-02-24"
+      "translation": "注册会员可以使用密码登录。新成员需要先创建密码。",
+      "hash": "xhb0ka",
+      "lastUpdated": "2026-05-14"
     },
     "loginV6.growPodTitle": {
       "translation": "启动pod\\ ud83c\\ udf31",
@@ -2852,9 +2852,9 @@
       "lastUpdated": "2026-03-03"
     },
     "loginV6.signInPasswordHint": {
-      "translation": "8个以上的字符。用于登录到您的Bean配置文件。",
-      "hash": "shlcg",
-      "lastUpdated": "2026-04-28"
+      "translation": "8个以上字符。用于登录您的个人资料。",
+      "hash": "hiapt6",
+      "lastUpdated": "2026-05-14"
     },
     "loginV6.storageSectionLabel": {
       "translation": "我们应该把它保存在哪里？",
@@ -5337,9 +5337,9 @@
       "lastUpdated": "2026-03-04"
     },
     "noAccess.heading": {
-      "translation": "这个区域是禁止进入的，小豆子",
-      "hash": "jvnia3",
-      "lastUpdated": "2026-03-04"
+      "translation": "此区域禁止入内",
+      "hash": "5g2kzp",
+      "lastUpdated": "2026-05-14"
     },
     "noAccess.description": {
       "translation": "您没有查看此页面的权限。请Pod管理员更新您的访问权限。",
@@ -6872,9 +6872,9 @@
       "lastUpdated": "2026-03-14"
     },
     "hints.nookFiguresHidden": {
-      "translation": "隐藏数字以保护隐私。您也可以随时通过轻触标题中的豆豆图标来切换它们。",
-      "hash": "wekn8w",
-      "lastUpdated": "2026-03-14"
+      "translation": "隐藏数字以保护隐私。您也可以随时通过轻触标题中的Bean图标来切换它们。",
+      "hash": "s2qb8",
+      "lastUpdated": "2026-05-14"
     },
     "planner.field.dateOnly": {
       "translation": "更改日期",
@@ -9567,29 +9567,29 @@
       "lastUpdated": "2026-04-19"
     },
     "bean.hero.role.parent": {
-      "translation": "Parent Bean",
-      "hash": "rn7fru",
-      "lastUpdated": "2026-04-19"
+      "translation": "成人",
+      "hash": "11kyoq",
+      "lastUpdated": "2026-05-14"
     },
     "bean.hero.role.child": {
-      "translation": "Little Bean",
-      "hash": "ourpt2",
-      "lastUpdated": "2026-04-19"
+      "translation": "子",
+      "hash": "12quws",
+      "lastUpdated": "2026-05-14"
     },
     "bean.notFound.title": {
-      "translation": "我们找不到这个bean",
-      "hash": "h7iaps",
-      "lastUpdated": "2026-04-19"
+      "translation": "我们找不到此成员",
+      "hash": "7k3ec6",
+      "lastUpdated": "2026-05-14"
     },
     "bean.notFound.body": {
-      "translation": "此bean不在您的pod中（或已被删除）。",
-      "hash": "3wkwqe",
-      "lastUpdated": "2026-04-19"
+      "translation": "此成员不在您的Pod中（或已被删除）。",
+      "hash": "b1nxqk",
+      "lastUpdated": "2026-05-14"
     },
     "bean.overview.comingSoon": {
-      "translation": "关于这片豆田的更多细节很快就会在这里。",
-      "hash": "hnizy",
-      "lastUpdated": "2026-04-19"
+      "translation": "有关此会员的更多详细信息即将在此登陆。",
+      "hash": "rdswq0",
+      "lastUpdated": "2026-05-14"
     },
     "bean.overview.favorites.empty": {
       "translation": "还没有收藏",
@@ -9717,9 +9717,9 @@
       "lastUpdated": "2026-04-19"
     },
     "favorites.empty": {
-      "translation": "此Bean尚无收藏夹",
-      "hash": "j2t1ln",
-      "lastUpdated": "2026-04-19"
+      "translation": "此会员还没有收藏夹",
+      "hash": "wetll1",
+      "lastUpdated": "2026-05-14"
     },
     "favorites.emptyCTA": {
       "translation": "已是第一张",
@@ -9787,9 +9787,9 @@
       "lastUpdated": "2026-04-19"
     },
     "sayings.empty": {
-      "translation": "尚未为此Bean保存任何谚语",
-      "hash": "a0bc2h",
-      "lastUpdated": "2026-04-19"
+      "translation": "尚未为此会员保存任何留言",
+      "hash": "4rtqr3",
+      "lastUpdated": "2026-05-14"
     },
     "sayings.emptyCTA": {
       "translation": "已是第一张",
@@ -9842,9 +9842,9 @@
       "lastUpdated": "2026-04-19"
     },
     "memberNotes.empty": {
-      "translation": "此Bean尚无备注",
-      "hash": "mc0ugr",
-      "lastUpdated": "2026-04-19"
+      "translation": "此会员尚无备注",
+      "hash": "ctzbzj",
+      "lastUpdated": "2026-05-14"
     },
     "memberNotes.emptyCTA": {
       "translation": "已是第一张",
@@ -9982,9 +9982,9 @@
       "lastUpdated": "2026-04-19"
     },
     "allergies.empty": {
-      "translation": "此豆类没有过敏记录",
-      "hash": "543lex",
-      "lastUpdated": "2026-04-19"
+      "translation": "此会员没有过敏记录",
+      "hash": "83hj3z",
+      "lastUpdated": "2026-05-14"
     },
     "allergies.emptyCTA": {
       "translation": "已是第一张",
@@ -10077,9 +10077,9 @@
       "lastUpdated": "2026-04-19"
     },
     "medications.empty": {
-      "translation": "此豆类没有存档的药物",
-      "hash": "8rcz25",
-      "lastUpdated": "2026-04-19"
+      "translation": "此成员没有存档的药物",
+      "hash": "t3db6h",
+      "lastUpdated": "2026-05-14"
     },
     "medications.emptyCTA": {
       "translation": "已是第一张",
@@ -10172,9 +10172,9 @@
       "lastUpdated": "2026-04-19"
     },
     "family.discardChanges.body": {
-      "translation": "您已编辑此Bean ，但尚未保存。是否关闭而不保存？",
-      "hash": "5ycjbg",
-      "lastUpdated": "2026-04-19"
+      "translation": "您已编辑此成员，但尚未保存。是否关闭而不保存？",
+      "hash": "rylwfq",
+      "lastUpdated": "2026-05-14"
     },
     "bean.hero.edit": {
       "translation": "修改",
@@ -10867,9 +10867,9 @@
       "lastUpdated": "2026-04-19"
     },
     "scrapbook.subtitle": {
-      "translation": "关于你的豆子的一切，在一个地方",
-      "hash": "twdpp8",
-      "lastUpdated": "2026-04-19"
+      "translation": "您家庭的一切，集中在一个地方",
+      "hash": "mbz2lz",
+      "lastUpdated": "2026-05-14"
     },
     "scrapbook.filter.types": {
       "translation": "顯示",
@@ -10877,9 +10877,9 @@
       "lastUpdated": "2026-04-19"
     },
     "scrapbook.filter.members": {
-      "translation": "豆荚",
-      "hash": "124zhf",
-      "lastUpdated": "2026-04-19"
+      "translation": "成员",
+      "hash": "rt2xhj",
+      "lastUpdated": "2026-05-14"
     },
     "scrapbook.filter.all": {
       "translation": "所有食谱",
@@ -11337,9 +11337,9 @@
       "lastUpdated": "2026-04-20"
     },
     "medicationLog.errors.noCurrentMember": {
-      "translation": "选择一个bean以继续",
-      "hash": "44n5ie",
-      "lastUpdated": "2026-04-20"
+      "translation": "选择一个成员以继续",
+      "hash": "n0i8fw",
+      "lastUpdated": "2026-05-14"
     },
     "medicationLog.errors.noCurrentMember.detail": {
       "translation": "以家庭成员身份登录，给出剂量，以便我们知道应计入谁的账号。",
@@ -11787,9 +11787,9 @@
       "lastUpdated": "2026-04-23"
     },
     "quickAdd.saying.hint": {
-      "translation": "quote a beanie",
-      "hash": "504osv",
-      "lastUpdated": "2026-04-23"
+      "translation": "引用家庭成员的话",
+      "hash": "3srazx",
+      "lastUpdated": "2026-05-14"
     },
     "quickAdd.favorite.label": {
       "translation": "我的最愛",
@@ -11807,9 +11807,9 @@
       "lastUpdated": "2026-04-23"
     },
     "quickAdd.note.hint": {
-      "translation": "per-Bean journal",
-      "hash": "id429j",
-      "lastUpdated": "2026-04-23"
+      "translation": "每会员日记账",
+      "hash": "7228ox",
+      "lastUpdated": "2026-05-14"
     },
     "quickAdd.recipe.label": {
       "translation": "配方",
@@ -11952,9 +11952,9 @@
       "lastUpdated": "2026-04-23"
     },
     "quickAdd.error.notHere.message": {
-      "translation": "此页面上隐藏了快速添加菜单以获得焦点。返回主应用后，轻触小便帽。",
-      "hash": "qommyj",
-      "lastUpdated": "2026-04-23"
+      "translation": "此页面上隐藏了快速添加菜单以获得焦点。返回主应用后，轻触Bean图标。",
+      "hash": "48k2q",
+      "lastUpdated": "2026-05-14"
     },
     "quickAdd.picker.back": {
       "translation": "回到",
@@ -11962,9 +11962,9 @@
       "lastUpdated": "2026-04-23"
     },
     "quickAdd.picker.bean.title": {
-      "translation": "挑选便帽",
-      "hash": "vh1biu",
-      "lastUpdated": "2026-04-23"
+      "translation": "挑选成员",
+      "hash": "q9c2bs",
+      "lastUpdated": "2026-05-14"
     },
     "quickAdd.picker.bean.empty": {
       "translation": "您还没有添加任何beanies —从Pod中添加一个。",
@@ -11987,9 +11987,9 @@
       "lastUpdated": "2026-04-23"
     },
     "quickAdd.picker.medication.empty": {
-      "translation": "无有效药物—从Beanie的“护理”选项卡中添加。",
-      "hash": "ydmo1k",
-      "lastUpdated": "2026-04-23"
+      "translation": "无有效药物—从成员的“护理”选项卡中添加药物。",
+      "hash": "as010n",
+      "lastUpdated": "2026-05-14"
     },
     "quickAdd.picker.vacation.title": {
       "translation": "选择一趟行程",
@@ -12122,9 +12122,9 @@
       "lastUpdated": "2026-04-26"
     },
     "join.error.noUnclaimed": {
-      "translation": "这个家族中的每一颗豆子都已经被认领了。请家庭管理员添加您。",
-      "hash": "ho1eqr",
-      "lastUpdated": "2026-04-26"
+      "translation": "这个家族的每个成员都已经被领取了。请家庭管理员添加您。",
+      "hash": "x184e1",
+      "lastUpdated": "2026-05-14"
     },
     "join.recovery.retry": {
       "translation": "再试一次",
@@ -12142,9 +12142,9 @@
       "lastUpdated": "2026-04-26"
     },
     "join.recovery.pickDifferentBean": {
-      "translation": "选择不同的豆类",
-      "hash": "gjrtij",
-      "lastUpdated": "2026-04-26"
+      "translation": "选择其他成员",
+      "hash": "cbaqnz",
+      "lastUpdated": "2026-05-14"
     },
     "googleDrive.thisAccount": {
       "translation": "使用此账号",
@@ -12262,14 +12262,14 @@
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.step1.faq.a1": {
-      "translation": "是的。家庭数据文件使用只有您和您的beanies拥有的密钥进行加密。Google无法读取里面的内容，他们只是为您存储锁定的文件。",
-      "hash": "fc3yox",
-      "lastUpdated": "2026-04-26"
+      "translation": "是的。家庭数据文件使用只有您和您的家人拥有的密钥进行加密。Google无法读取里面的内容，他们只是为您存储锁定的文件。",
+      "hash": "skgbyx",
+      "lastUpdated": "2026-05-14"
     },
     "inviteWizard.step1.faq.q2": {
-      "translation": "那小帽子呢？",
-      "hash": "w4c36k",
-      "lastUpdated": "2026-04-26"
+      "translation": "孩子呢",
+      "hash": "50o3aa",
+      "lastUpdated": "2026-05-14"
     },
     "inviteWizard.step1.faq.a2": {
       "translation": "如果他们还没有自己的Google账号，请使用您自己的电子邮箱进行分享。您可以使用该账号在他们的设备上登录，他们就会看到家庭账号。当他们准备好自己使用时，您可以通过<a href=\"https://families.google/familylink/\" target=\"_blank\" rel=\"noopener\" class=\"wizard-faq-link\">Google家庭链接</a>设置免费的家长监督Gmail。",
@@ -12307,9 +12307,9 @@
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.step2.qr.help": {
-      "translation": "将豆豆的摄像头对准这个—它们将在几秒钟内进入豆荚。",
-      "hash": "cwub9e",
-      "lastUpdated": "2026-04-26"
+      "translation": "将家庭成员的摄像头对准此位置，他们将在几秒钟内进入舱内。",
+      "hash": "6179n2",
+      "lastUpdated": "2026-05-14"
     },
     "inviteWizard.step2.qr.unavailable": {
       "translation": "二维码不可用，请通过链接分享。",
@@ -12367,9 +12367,9 @@
       "lastUpdated": "2026-04-26"
     },
     "family.addMemberFailed": {
-      "translation": "无法添加该便帽—请重试。",
-      "hash": "9zb7i5",
-      "lastUpdated": "2026-04-26"
+      "translation": "无法添加该成员，请重试。",
+      "hash": "6l3aff",
+      "lastUpdated": "2026-05-14"
     },
     "inviteWizard.picker.title": {
       "translation": "谁将加入吊舱？",
@@ -12377,9 +12377,9 @@
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.picker.subhead": {
-      "translation": "选择要邀请的便帽，或添加新人。",
-      "hash": "yrica4",
-      "lastUpdated": "2026-04-26"
+      "translation": "选择要邀请的家庭成员，或添加新成员。",
+      "hash": "f7pvj2",
+      "lastUpdated": "2026-05-14"
     },
     "inviteWizard.picker.statusOwner": {
       "translation": "★ pod所有者",
@@ -12397,14 +12397,14 @@
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.picker.addBean": {
-      "translation": "添加一个新的豆豆",
-      "hash": "cq58qy",
-      "lastUpdated": "2026-04-26"
+      "translation": "添加新成员",
+      "hash": "402w6w",
+      "lastUpdated": "2026-05-14"
     },
     "inviteWizard.picker.empty": {
-      "translation": "没有正在等待的beanies —添加一个以发送您的第一个邀请。",
-      "hash": "mobxy5",
-      "lastUpdated": "2026-04-26"
+      "translation": "没有会员正在等待—添加会员即可发送您的第一个邀请。",
+      "hash": "3k4bzl",
+      "lastUpdated": "2026-05-14"
     },
     "inviteWizard.invitee.label": {
       "translation": "对于",
@@ -12687,9 +12687,9 @@
       "lastUpdated": "2026-04-28"
     },
     "onboarding.invite.lede": {
-      "translation": "每个豆豆都有自己的个性化邀请链接。轻点发送，我们将引导您通过二维码、短信或电子邮件分享。",
-      "hash": "kaohb",
-      "lastUpdated": "2026-04-29"
+      "translation": "每位会员都会收到自己的个性化邀请链接。轻点发送，我们将引导您通过二维码、短信或电子邮件分享。",
+      "hash": "qe6avz",
+      "lastUpdated": "2026-05-14"
     },
     "onboarding.invite.send": {
       "translation": "发送\\ u2192",
@@ -13437,9 +13437,9 @@
       "lastUpdated": "2026-05-07"
     },
     "milestone.unknownBean": {
-      "translation": "未知bean",
-      "hash": "k2l9ne",
-      "lastUpdated": "2026-05-07"
+      "translation": "未知成员",
+      "hash": "ykie9c",
+      "lastUpdated": "2026-05-14"
     },
     "milestone.invalidDate": {
       "translation": "请选择一个有效的日期",
@@ -13662,9 +13662,9 @@
       "lastUpdated": "2026-05-07"
     },
     "milestone.addPhotosHint": {
-      "translation": "先挑一颗豆子，然后随时添加照片。",
-      "hash": "2odd5u",
-      "lastUpdated": "2026-05-07"
+      "translation": "先挑选成员，然后随时添加照片。",
+      "hash": "99cowc",
+      "lastUpdated": "2026-05-14"
     },
     "milestone.group.firsts": {
       "translation": "Firsts",
@@ -14129,6 +14129,16 @@
     "bean.overview.milestones.empty": {
       "translation": "尚无里程碑",
       "hash": "j56za",
+      "lastUpdated": "2026-05-14"
+    },
+    "loginV6.addAnAdult": {
+      "translation": "添加成年人",
+      "hash": "sbgfd2",
+      "lastUpdated": "2026-05-14"
+    },
+    "loginV6.addALittleBean": {
+      "translation": "添加一个孩子",
+      "hash": "t5zjsu",
       "lastUpdated": "2026-05-14"
     }
   }

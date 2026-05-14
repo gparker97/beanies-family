@@ -70,7 +70,7 @@ const newMemberRole = ref<'parent' | 'child'>('parent');
 const dobMonth = ref('');
 const dobDay = ref('');
 const dobYear = ref('');
-const showMemberForm = ref(true); // Pre-opened for first member
+const showMemberForm = ref(false);
 
 const MONTH_KEYS = [
   'month.january',
@@ -1007,12 +1007,20 @@ function handleBack() {
         </div>
       </div>
 
-      <!-- Add another beanie prompt (shown after first member added, form collapsed) -->
+      <!-- Add-a-beanie prompt — the single source for opening the member form.
+           Shown whenever the form is closed (empty state OR after at least
+           one member has been added and the form collapsed). The heading is
+           omitted on the empty state — the chips ("Add an adult" / "Add a
+           little bean") carry the verb themselves, and the screen state
+           (owner card + chips + Finish CTA) is self-evident. -->
       <div
-        v-if="!showMemberForm && addedMembers.length > 0"
+        v-if="!showMemberForm"
         class="rounded-2xl border-2 border-dashed border-gray-200 p-4 text-center dark:border-slate-600"
       >
-        <p class="font-outfit mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">
+        <p
+          v-if="addedMembers.length > 0"
+          class="font-outfit mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400"
+        >
           {{ t('loginV6.addAnotherBeanie') }}
         </p>
         <div class="flex justify-center gap-2">
@@ -1021,55 +1029,27 @@ function handleBack() {
             class="font-outfit flex items-center gap-1.5 rounded-full border-2 border-transparent bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:border-[var(--color-secondary-500)] hover:bg-gray-50 dark:bg-slate-700 dark:text-gray-300 dark:hover:border-slate-400 dark:hover:bg-slate-600"
             @click="openAddMemberForm('parent')"
           >
-            🫘 {{ t('loginV6.parentBean') }}
+            🫘 {{ t('loginV6.addAnAdult') }}
           </button>
           <button
             type="button"
             class="font-outfit flex items-center gap-1.5 rounded-full border-2 border-transparent bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:border-[var(--color-secondary-500)] hover:bg-gray-50 dark:bg-slate-700 dark:text-gray-300 dark:hover:border-slate-400 dark:hover:bg-slate-600"
             @click="openAddMemberForm('child')"
           >
-            🌱 {{ t('loginV6.littleBean') }}
+            🌱 {{ t('loginV6.addALittleBean') }}
           </button>
         </div>
       </div>
 
-      <!-- Add member form. Field order is intentional: Name → Birthday → Role.
-           Easiest/least committal field first (name), narrowing fact next
-           (birthday), categorize last (role). The role chips are
-           self-describing via their emoji + word labels — no "Type" prompt
-           label is needed above. -->
+      <!-- Add member form. Field order: Role → Name → Birthday. Role is
+           pre-selected from the chip click that opened the form; the chips at
+           the top act as a confirm/override affordance. Name and birthday
+           follow in committal order. -->
       <div
         v-if="showMemberForm"
         class="space-y-3 rounded-2xl border border-gray-200 p-4 dark:border-slate-600"
       >
-        <BaseInput
-          v-model="newMemberName"
-          :label="'👤 ' + t('form.name')"
-          :placeholder="t('family.enterName')"
-        />
-
-        <!-- Birthday (month & day required, year optional) -->
-        <div>
-          <span
-            class="font-outfit text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
-            >🎂 {{ t('modal.birthday') }}</span
-          >
-          <div class="mt-1 grid grid-cols-[1fr_0.6fr_0.7fr] gap-1.5">
-            <BaseSelect
-              v-model="dobMonth"
-              :options="monthOptions"
-              :placeholder="t('family.dateOfBirth.month')"
-            />
-            <BaseSelect
-              v-model="dobDay"
-              :options="dayOptions"
-              :placeholder="t('family.dateOfBirth.day')"
-            />
-            <BaseInput v-model="dobYear" type="number" placeholder="Year" />
-          </div>
-        </div>
-
-        <!-- Role chips — self-describing via emoji + labels, no prompt above. -->
+        <!-- Role chips — pre-selected from the opening chip click; user can flip. -->
         <div class="flex gap-2">
           <button
             type="button"
@@ -1097,13 +1077,35 @@ function handleBack() {
           </button>
         </div>
 
-        <div class="flex gap-2">
-          <BaseButton
-            v-if="addedMembers.length > 0"
-            class="flex-1"
-            variant="outline"
-            @click="showMemberForm = false"
+        <BaseInput
+          v-model="newMemberName"
+          :label="'👤 ' + t('form.name')"
+          :placeholder="t('family.enterName')"
+        />
+
+        <!-- Birthday (month & day required, year optional) -->
+        <div>
+          <span
+            class="font-outfit text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
+            >🎂 {{ t('modal.birthday') }}</span
           >
+          <div class="mt-1 grid grid-cols-[1fr_0.6fr_0.7fr] gap-1.5">
+            <BaseSelect
+              v-model="dobMonth"
+              :options="monthOptions"
+              :placeholder="t('family.dateOfBirth.month')"
+            />
+            <BaseSelect
+              v-model="dobDay"
+              :options="dayOptions"
+              :placeholder="t('family.dateOfBirth.day')"
+            />
+            <BaseInput v-model="dobYear" type="number" placeholder="Year" />
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <BaseButton class="flex-1" variant="outline" @click="showMemberForm = false">
             {{ t('action.cancel') }}
           </BaseButton>
           <BaseButton
@@ -1118,17 +1120,14 @@ function handleBack() {
         </div>
       </div>
 
-      <BaseButton class="mt-6 w-full" @click="handleFinish">
+      <!-- Finish CTA — only visible while the form is closed. When the form
+           is open the form's own Cancel / Add member row drives the next
+           action, so a competing orange CTA at the bottom would be visual
+           noise. With no separate "Skip" link: Finish IS the skip path when
+           no members have been added. -->
+      <BaseButton v-if="!showMemberForm" class="mt-6 w-full" @click="handleFinish">
         {{ t('loginV6.finish') }}
       </BaseButton>
-      <button
-        v-if="addedMembers.length === 0"
-        type="button"
-        class="mt-2 w-full text-center text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-        @click="handleFinish"
-      >
-        {{ t('loginV6.skip') }}
-      </button>
     </div>
 
     <!-- Footer link -->
