@@ -213,15 +213,15 @@ const STRING_DEFS = {
   'bean.tab.medications': { en: 'Medications', beanie: 'medications' },
   'bean.tab.notes': { en: 'Notes', beanie: 'notes' },
   'bean.hero.birthday': { en: 'Birthday', beanie: 'birthday' },
-  'bean.hero.role.parent': { en: 'Parent Bean', beanie: 'parent bean' },
-  'bean.hero.role.child': { en: 'Little Bean', beanie: 'little bean' },
-  'bean.notFound.title': { en: "We can't find this bean", beanie: "can't find this bean" },
+  'bean.hero.role.parent': { en: 'Adult', beanie: 'parent bean' },
+  'bean.hero.role.child': { en: 'Child', beanie: 'little bean' },
+  'bean.notFound.title': { en: "We can't find this member", beanie: "can't find this bean" },
   'bean.notFound.body': {
-    en: "This bean isn't in your pod (or has been removed).",
+    en: "This member isn't in your pod (or has been removed).",
     beanie: "this bean isn't in your pod",
   },
   'bean.overview.comingSoon': {
-    en: 'More details about this bean land here soon.',
+    en: 'More details about this member land here soon.',
     beanie: 'more details about this bean land here soon',
   },
   'bean.overview.favorites.empty': {
@@ -296,7 +296,7 @@ const STRING_DEFS = {
   'favorites.category.toy': { en: 'Toy', beanie: 'toy' },
   'favorites.category.other': { en: 'Other', beanie: 'other' },
   'favorites.empty': {
-    en: 'No favorites for this bean yet',
+    en: 'No favorites for this member yet',
     beanie: 'no favorites for this bean yet',
   },
   'favorites.emptyCTA': { en: 'Add the first one', beanie: 'add the first one' },
@@ -326,7 +326,7 @@ const STRING_DEFS = {
     beanie: 'what led up to it — optional',
   },
   'sayings.empty': {
-    en: 'No sayings saved for this bean yet',
+    en: 'No sayings saved for this member yet',
     beanie: 'no sayings saved for this bean yet',
   },
   'sayings.emptyCTA': { en: 'Add the first one', beanie: 'add the first one' },
@@ -350,7 +350,7 @@ const STRING_DEFS = {
     beanie: 'anything worth remembering',
   },
   'memberNotes.empty': {
-    en: 'No notes for this bean yet',
+    en: 'No notes for this member yet',
     beanie: 'no notes for this bean yet',
   },
   'memberNotes.emptyCTA': { en: 'Add the first one', beanie: 'add the first one' },
@@ -400,7 +400,7 @@ const STRING_DEFS = {
   'allergies.severity.moderate': { en: 'Moderate', beanie: 'moderate' },
   'allergies.severity.mild': { en: 'Mild', beanie: 'mild' },
   'allergies.empty': {
-    en: 'No allergies on file for this bean',
+    en: 'No allergies on file for this member',
     beanie: 'no allergies on file for this bean',
   },
   'allergies.emptyCTA': { en: 'Add the first one', beanie: 'add the first one' },
@@ -456,7 +456,7 @@ const STRING_DEFS = {
     beanie: 'take with food, etc.',
   },
   'medications.empty': {
-    en: 'No medications on file for this bean',
+    en: 'No medications on file for this member',
     beanie: 'no medications on file for this bean',
   },
   'medications.emptyCTA': { en: 'Add the first one', beanie: 'add the first one' },
@@ -504,10 +504,10 @@ const STRING_DEFS = {
   },
   'milestone.familyPill': { en: 'Family', beanie: 'family' },
   'milestone.familyChip': { en: 'Family', beanie: 'family' },
-  'milestone.unknownBean': { en: 'Unknown bean', beanie: 'unknown bean' },
+  'milestone.unknownBean': { en: 'Unknown member', beanie: 'unknown bean' },
   'milestone.addPhotos': { en: 'Add photos', beanie: 'add photos' },
   'milestone.addPhotosHint': {
-    en: 'Pick a bean first, then add photos any time.',
+    en: 'Pick a member first, then add photos any time.',
     beanie: 'pick a bean first, then add photos any time.',
   },
   'milestone.group.firsts': { en: 'Firsts', beanie: 'firsts' },
@@ -703,7 +703,7 @@ const STRING_DEFS = {
     beanie: 'this medication was removed.',
   },
   'medicationLog.errors.noCurrentMember': {
-    en: 'Pick a bean to continue',
+    en: 'Pick a member to continue',
     beanie: 'pick a bean to continue',
   },
   'medicationLog.errors.noCurrentMember.detail': {
@@ -716,7 +716,7 @@ const STRING_DEFS = {
     beanie: 'discard your changes?',
   },
   'family.discardChanges.body': {
-    en: "You've edited this bean but haven't saved. Close without saving?",
+    en: "You've edited this member but haven't saved. Close without saving?",
     beanie: "you've edited this bean but haven't saved — close without saving?",
   },
   // Care & Safety page
@@ -908,11 +908,11 @@ const STRING_DEFS = {
   // Family Scrapbook
   'scrapbook.title': { en: 'Family Scrapbook', beanie: 'family scrapbook' },
   'scrapbook.subtitle': {
-    en: 'everything about your beans, in one place',
+    en: 'everything about your family, in one place',
     beanie: 'everything about your beans, in one place',
   },
   'scrapbook.filter.types': { en: 'Show', beanie: 'show' },
-  'scrapbook.filter.members': { en: 'Beans', beanie: 'beans' },
+  'scrapbook.filter.members': { en: 'Members', beanie: 'beans' },
   'scrapbook.filter.all': { en: 'All', beanie: 'all' },
   'scrapbook.filter.favorites': { en: 'Favorites', beanie: 'favorites' },
   'scrapbook.filter.sayings': { en: 'Sayings', beanie: 'sayings' },
@@ -1851,7 +1851,7 @@ const STRING_DEFS = {
     beanie: 'coming soon to your bean patch',
   },
   'forecast.comingSoonDescription': {
-    en: "We're growing something special. Financial forecasting will help you see where your beanies are headed.",
+    en: "We're growing something special. Financial forecasting will help you see where your family is headed.",
     beanie:
       "we're growing something special. financial forecasting will help you see where your beanies are headed.",
   },
@@ -2227,9 +2227,9 @@ const STRING_DEFS = {
 
   // Not Found (404)
   'notFound.title': { en: 'Not Found', beanie: 'not found' },
-  'notFound.heading': { en: 'Oops! This bean got lost...', beanie: 'oops! this bean got lost...' },
+  'notFound.heading': { en: 'Oops! This page got lost...', beanie: 'oops! this bean got lost...' },
   'notFound.description': {
-    en: "The page you're looking for has wandered off. Let's get you back to your beanies.",
+    en: "The page you're looking for has wandered off. Let's get you back to your family.",
     beanie: "the page you're looking for has wandered off. let's get you back to your beanies.",
   },
   'notFound.goHome': { en: 'Back to Dashboard', beanie: 'back to dashboard' },
@@ -2237,7 +2237,7 @@ const STRING_DEFS = {
   // No Access (permission denied)
   'noAccess.title': { en: 'No Access', beanie: 'no access' },
   'noAccess.heading': {
-    en: 'This area is off-limits, little bean',
+    en: 'This area is off-limits',
     beanie: 'this area is off-limits, little bean',
   },
   'noAccess.description': {
@@ -2487,7 +2487,7 @@ const STRING_DEFS = {
   },
   'family.memberAdded': { en: 'Member Added!', beanie: 'new beanie added!' },
   'family.addMemberFailed': {
-    en: "Couldn't add that beanie — please try again.",
+    en: "Couldn't add that member — please try again.",
     beanie: "couldn't add that beanie — please try again",
   },
   'family.scanOrShare': {
@@ -3133,8 +3133,8 @@ const STRING_DEFS = {
     beanie: 'your google drive credentials may have expired — please sign in again',
   },
   'loginV6.pickBeanTitle': { en: "Who's signing in?", beanie: 'which beanie are you?' },
-  'loginV6.pickBeanSubtitle': { en: 'Pick your bean', beanie: 'pick your bean' },
-  'loginV6.parentBean': { en: 'Parent / Adult', beanie: 'parent beanie' },
+  'loginV6.pickBeanSubtitle': { en: 'Pick your profile', beanie: 'pick your bean' },
+  'loginV6.parentBean': { en: 'Adult', beanie: 'adult beanie' },
   'loginV6.littleBean': { en: 'Child', beanie: 'child beanie' },
   'loginV6.setupNeeded': { en: 'Set up', beanie: 'set up' },
   'loginV6.signInAs': { en: 'Sign in as', beanie: 'sign in as' },
@@ -3179,8 +3179,10 @@ const STRING_DEFS = {
     beanie: 'save a .beanpod file to your device',
   },
   'loginV6.addBeansTitle': { en: 'Add your family 🫘', beanie: 'add your family 🫘' },
-  'loginV6.addMember': { en: 'Add bean', beanie: 'add bean' },
+  'loginV6.addMember': { en: 'Add member', beanie: 'add bean' },
   'loginV6.addAnotherBeanie': { en: 'Add another family member?', beanie: 'add another beanie?' },
+  'loginV6.addAnAdult': { en: 'Add an adult', beanie: 'add an adult' },
+  'loginV6.addALittleBean': { en: 'Add a child', beanie: 'add a little bean' },
   'loginV6.finish': {
     en: 'Finish · take me to the nook 🏡',
     beanie: 'finish · take me to the nook 🏡',
@@ -3212,7 +3214,7 @@ const STRING_DEFS = {
     beanie: 'no servers, no tracking, no data collection.',
   },
   'loginV6.pickBeanInfoText': {
-    en: 'Onboarded beans can sign in with their password. New beans need to create a password first.',
+    en: 'Onboarded members can sign in with their password. New members need to create a password first.',
     beanie:
       'onboarded beans can sign in with their password. new beans need to create a password first.',
   },
@@ -3222,7 +3224,7 @@ const STRING_DEFS = {
   },
   'loginV6.signInPasswordLabel': { en: 'Your sign-in password', beanie: 'your sign-in password' },
   'loginV6.signInPasswordHint': {
-    en: '8+ characters. Used to sign into your bean profile.',
+    en: '8+ characters. Used to sign into your profile.',
     beanie: '8+ characters. used to sign into your bean profile.',
   },
   'loginV6.storageSectionLabel': {
@@ -3421,7 +3423,7 @@ const STRING_DEFS = {
     beanie: "this invite link isn't recognized. ask the inviter for a new one.",
   },
   'join.error.noUnclaimed': {
-    en: 'Every bean in this family has already been claimed. Ask a family admin to add you.',
+    en: 'Every member in this family has already been claimed. Ask a family admin to add you.',
     beanie: 'every bean in this pod has already been claimed. ask a family admin to add you.',
   },
 
@@ -3436,7 +3438,7 @@ const STRING_DEFS = {
     beanie: 'continue on another device',
   },
   'join.recovery.pickDifferentBean': {
-    en: 'Pick a different bean',
+    en: 'Pick a different member',
     beanie: 'pick a different bean',
   },
   // Diagnostic-info copy modal — shown from a small link below the error
@@ -3554,12 +3556,12 @@ const STRING_DEFS = {
     beanie: 'is this safe?',
   },
   'inviteWizard.step1.faq.a1': {
-    en: "Yes. The family data file is encrypted with a key only you and your beanies have. Google can't read what's inside — they're just storing the locked file for you.",
+    en: "Yes. The family data file is encrypted with a key only you and your family members have. Google can't read what's inside — they're just storing the locked file for you.",
     beanie:
       "yes. the family pod is encrypted with a key only you and your beanies have. google can't read what's inside — they're just storing the locked pod for you",
   },
   'inviteWizard.step1.faq.q2': {
-    en: 'What about the little beanies?',
+    en: 'What about the children?',
     beanie: 'what about the little beanies?',
   },
   'inviteWizard.step1.faq.a2': {
@@ -3593,7 +3595,7 @@ const STRING_DEFS = {
     beanie: 'scan to join.',
   },
   'inviteWizard.step2.qr.help': {
-    en: "Point a beanie's camera at this — they'll be in the pod in seconds.",
+    en: "Point a family member's camera at this — they'll be in the pod in seconds.",
     beanie: "point a beanie's camera at this — they'll be in the pod in seconds",
   },
   'inviteWizard.step2.qr.unavailable': {
@@ -3646,7 +3648,7 @@ const STRING_DEFS = {
     beanie: "who's joining the pod?",
   },
   'inviteWizard.picker.subhead': {
-    en: 'Pick a beanie to invite, or add someone new.',
+    en: 'Pick a family member to invite, or add someone new.',
     beanie: 'pick a beanie to invite, or add someone new',
   },
   'inviteWizard.picker.statusOwner': {
@@ -3662,11 +3664,11 @@ const STRING_DEFS = {
     beanie: 'no email yet',
   },
   'inviteWizard.picker.addBean': {
-    en: 'add a new beanie',
+    en: 'Add a new member',
     beanie: 'add a new beanie',
   },
   'inviteWizard.picker.empty': {
-    en: 'No beanies waiting yet — add one to send your first invite.',
+    en: 'No members waiting yet — add one to send your first invite.',
     beanie: 'no beanies waiting yet — add one to send your first invite',
   },
   'inviteWizard.invitee.label': {
@@ -5086,7 +5088,7 @@ const STRING_DEFS = {
     beanie: 'your family net worth: all accounts and assets minus all liabilities.',
   },
   'hints.nookFiguresHidden': {
-    en: 'Figures are hidden for privacy. You can also toggle them anytime by tapping the beanie icon in the header.',
+    en: 'Figures are hidden for privacy. You can also toggle them anytime by tapping the bean icon in the header.',
     beanie:
       'figures are hidden for privacy. you can also toggle them anytime by tapping the beanie in the header.',
   },
@@ -5306,7 +5308,7 @@ const STRING_DEFS = {
   'onboarding.invite.title': { en: 'Invite the rest?', beanie: 'invite the rest?' },
   'onboarding.invite.optional': { en: 'Optional', beanie: 'optional' },
   'onboarding.invite.lede': {
-    en: "Each beanie gets their own personalised invite link. Tap Send and we'll walk you through sharing it via QR code, text, or email.",
+    en: "Each member gets their own personalised invite link. Tap Send and we'll walk you through sharing it via QR code, text, or email.",
     beanie:
       "each beanie gets their own personalised invite link. tap send and we'll walk you through sharing it via qr code, text, or email.",
   },
@@ -6033,11 +6035,11 @@ const STRING_DEFS = {
   'quickAdd.cookLog.label': { en: 'Cook log', beanie: 'cook log' },
   'quickAdd.cookLog.hint': { en: '5-star · note · photo', beanie: '5-star · note · photo' },
   'quickAdd.saying.label': { en: 'Saying', beanie: 'saying' },
-  'quickAdd.saying.hint': { en: 'quote a beanie', beanie: 'quote a beanie' },
+  'quickAdd.saying.hint': { en: 'Quote a family member', beanie: 'quote a beanie' },
   'quickAdd.favorite.label': { en: 'Favorite', beanie: 'favorite' },
   'quickAdd.favorite.hint': { en: 'food · game · song', beanie: 'food · game · song' },
   'quickAdd.note.label': { en: 'Note', beanie: 'note' },
-  'quickAdd.note.hint': { en: 'per-bean journal', beanie: 'per-bean journal' },
+  'quickAdd.note.hint': { en: 'Per-member journal', beanie: 'per-bean journal' },
   'quickAdd.recipe.label': { en: 'Recipe', beanie: 'recipe' },
   'quickAdd.recipe.hint': { en: 'ingredients · steps', beanie: 'ingredients · steps' },
   'quickAdd.tripIdea.label': { en: 'Trip idea', beanie: 'trip idea' },
@@ -6108,14 +6110,14 @@ const STRING_DEFS = {
     beanie: 'open this from another page',
   },
   'quickAdd.error.notHere.message': {
-    en: "The Quick-add menu is hidden on this page for focus. Tap the beanie once you're back on the main app.",
+    en: "The Quick-add menu is hidden on this page for focus. Tap the bean icon once you're back on the main app.",
     beanie:
       "the quick-add menu is hidden on this page for focus. tap the beanie once you're back on the main app.",
   },
 
   // Quick-add FAB — parent picker (bean / recipe / medication)
   'quickAdd.picker.back': { en: 'Back', beanie: 'back' },
-  'quickAdd.picker.bean.title': { en: 'Pick a beanie', beanie: 'pick a beanie' },
+  'quickAdd.picker.bean.title': { en: 'Pick a member', beanie: 'pick a beanie' },
   'quickAdd.picker.bean.empty': {
     en: "You haven't added any beanies yet — add one from the Pod.",
     beanie: "you haven't added any beanies yet — add one from the pod.",
@@ -6130,7 +6132,7 @@ const STRING_DEFS = {
     beanie: 'pick a medication',
   },
   'quickAdd.picker.medication.empty': {
-    en: 'No active medications — add one from a beanie‘s Care tab.',
+    en: "No active medications — add one from a member's Care tab.",
     beanie: 'no active medications — add one from a beanie‘s care tab.',
   },
   'quickAdd.picker.vacation.title': { en: 'Pick a trip', beanie: 'pick a trip' },
