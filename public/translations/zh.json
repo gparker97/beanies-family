@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-14",
-    "translationCount": 2827
+    "translationCount": 2828
   },
   "translations": {
     "app.name": {
@@ -14139,6 +14139,11 @@
     "loginV6.addALittleBean": {
       "translation": "添加一个孩子",
       "hash": "t5zjsu",
+      "lastUpdated": "2026-05-14"
+    },
+    "combobox.showingHint": {
+      "translation": "显示{visible}/{total} —继续键入以缩小范围",
+      "hash": "svmdwa",
       "lastUpdated": "2026-05-14"
     }
   }
