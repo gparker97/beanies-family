@@ -194,6 +194,16 @@ function selectQuick(iso: string) {
   closePopover();
 }
 
+// Clear the selected date. Used by both the inline X on the trigger (instant
+// clear without opening the popover) and the "Clear" link in the popover
+// footer (for users who opened it intending to change, then decided no date).
+// Available regardless of `required` — validation handles empty-state UX
+// separately rather than the picker pretending the affordance doesn't exist.
+function clearSelection() {
+  emit('update:modelValue', '');
+  closePopover();
+}
+
 function prevMonth() {
   viewMonth.value = addMonths(viewMonth.value, -1);
 }
@@ -287,16 +297,39 @@ const isTomorrowDisabled = computed(() => {
         <span class="shrink-0 text-[0.85rem] leading-none">📅</span>
         <span class="truncate">{{ displayLabel }}</span>
       </span>
-      <svg
-        class="h-3 w-3 shrink-0 transition-transform"
-        :class="{ 'rotate-180': isOpen }"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        stroke-width="2.5"
-      >
-        <path d="M19 9l-7 7-7-7" />
-      </svg>
+      <span class="flex shrink-0 items-center gap-1">
+        <!-- Inline clear — appears only when a date is selected. Stops
+             propagation so it doesn't toggle the popover. Mirrors the
+             clear-X pattern used in BaseCombobox's trigger. -->
+        <button
+          v-if="modelValue && !disabled"
+          type="button"
+          data-testid="beanie-date-picker-clear"
+          :aria-label="t('date.clearAriaLabel')"
+          class="-mr-0.5 flex h-4 w-4 items-center justify-center rounded-full text-current opacity-70 transition-opacity hover:bg-[var(--tint-orange-12)] hover:opacity-100 dark:hover:bg-slate-700"
+          @click.stop="clearSelection"
+        >
+          <svg
+            class="h-3 w-3"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            stroke-width="2.5"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <svg
+          class="h-3 w-3 transition-transform"
+          :class="{ 'rotate-180': isOpen }"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          stroke-width="2.5"
+        >
+          <path d="M19 9l-7 7-7-7" />
+        </svg>
+      </span>
     </button>
 
     <!-- Calendar popover — teleported so clipping ancestors (e.g. a card
@@ -432,17 +465,36 @@ const isTomorrowDisabled = computed(() => {
             </button>
           </div>
 
-          <!-- Footer: jump to today -->
+          <!-- Footer: jump-to-today + clear. Each link is independently
+               visible; layout fills with the visible one(s):
+               - both visible → space-between
+               - one visible → that one centered
+               - neither → footer hides entirely -->
           <div
-            v-if="formatMonthYearShort(viewMonth) !== formatMonthYearShort(today)"
-            class="flex justify-center border-t border-[var(--tint-slate-10)] px-3 py-1.5 dark:border-slate-700"
+            v-if="formatMonthYearShort(viewMonth) !== formatMonthYearShort(today) || modelValue"
+            class="flex items-center border-t border-[var(--tint-slate-10)] px-3 py-1.5 dark:border-slate-700"
+            :class="
+              formatMonthYearShort(viewMonth) !== formatMonthYearShort(today) && modelValue
+                ? 'justify-between'
+                : 'justify-center'
+            "
           >
             <button
+              v-if="formatMonthYearShort(viewMonth) !== formatMonthYearShort(today)"
               type="button"
               class="font-outfit text-primary-500 hover:text-primary-600 text-xs font-semibold transition-colors"
               @click="goToToday"
             >
               {{ t('date.jumpToToday') }}
+            </button>
+            <button
+              v-if="modelValue"
+              type="button"
+              data-testid="beanie-date-picker-clear-link"
+              class="font-outfit text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)] dark:hover:text-gray-200"
+              @click="clearSelection"
+            >
+              {{ t('date.clear') }}
             </button>
           </div>
         </div>

@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-14",
-    "translationCount": 2828
+    "translationCount": 2830
   },
   "translations": {
     "app.name": {
@@ -14144,6 +14144,16 @@
     "combobox.showingHint": {
       "translation": "显示{visible}/{total} —继续键入以缩小范围",
       "hash": "svmdwa",
+      "lastUpdated": "2026-05-14"
+    },
+    "date.clear": {
+      "translation": "清楚",
+      "hash": "12tbn1",
+      "lastUpdated": "2026-05-14"
+    },
+    "date.clearAriaLabel": {
+      "translation": "清除日期",
+      "hash": "jvmu9t",
       "lastUpdated": "2026-05-14"
     }
   }
