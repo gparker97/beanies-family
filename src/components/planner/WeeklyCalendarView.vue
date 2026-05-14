@@ -9,7 +9,7 @@ import {
   groupOverlapping,
 } from '@/composables/useCalendarNavigation';
 import { useBreakpoint } from '@/composables/useBreakpoint';
-import { useHorizontalSwipe } from '@/composables/useHorizontalSwipe';
+import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -51,11 +51,12 @@ const referenceDate = ref(new Date());
 const { weekDays, weekLabel, prevWeek, nextWeek, goToToday } = useWeekNavigation(referenceDate);
 
 // ── Swipe gesture ──────────────────────────────────────────────────────────
-// Horizontal swipe on the calendar surface advances/retreats by one week.
+// Horizontal swipe on the calendar surface advances/retreats by one week,
+// with an iOS-Calendar-style slide-out / slide-in animation.
 const swipeRef = ref<HTMLElement | null>(null);
-useHorizontalSwipe(swipeRef, {
-  onSwipeLeft: nextWeek,
-  onSwipeRight: prevWeek,
+useCalendarSlide(swipeRef, {
+  onNext: nextWeek,
+  onPrev: prevWeek,
 });
 
 // Mobile: selected day within the week
@@ -411,7 +412,7 @@ defineExpose({ weekLabel, activityCount });
   <div
     ref="swipeRef"
     class="rounded-3xl bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
-    style="touch-action: pan-y"
+    style="touch-action: pan-y; will-change: transform"
   >
     <CalendarNavBar :label="weekLabel" @prev="prevWeek" @next="nextWeek" @today="goToToday" />
 

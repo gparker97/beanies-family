@@ -9,7 +9,7 @@ import {
   groupOverlapping,
 } from '@/composables/useCalendarNavigation';
 import { useBreakpoint } from '@/composables/useBreakpoint';
-import { useHorizontalSwipe } from '@/composables/useHorizontalSwipe';
+import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -195,13 +195,14 @@ const showNowIndicator = computed(() => {
 const gridRef = ref<HTMLElement | null>(null);
 
 // ── Swipe gesture ──────────────────────────────────────────────────────────
-// Horizontal swipe on the calendar surface advances/retreats by one day.
-// Container needs `touch-action: pan-y` so vertical scroll still works
-// natively while horizontal pans reach our pointer-event handler.
+// Horizontal swipe on the calendar surface advances/retreats by one day,
+// with an iOS-Calendar-style slide-out / slide-in animation. Container
+// needs `touch-action: pan-y` so vertical scroll still works natively
+// while horizontal pans reach our pointer-event handler.
 const swipeRef = ref<HTMLElement | null>(null);
-useHorizontalSwipe(swipeRef, {
-  onSwipeLeft: nextDay,
-  onSwipeRight: prevDay,
+useCalendarSlide(swipeRef, {
+  onNext: nextDay,
+  onPrev: prevDay,
 });
 
 onMounted(async () => {
@@ -243,7 +244,7 @@ defineExpose({ dayLabel, activityCount });
   <div
     ref="swipeRef"
     class="rounded-3xl bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
-    style="touch-action: pan-y"
+    style="touch-action: pan-y; will-change: transform"
   >
     <CalendarNavBar :label="dayLabel" @prev="prevDay" @next="nextDay" @today="goToToday">
       <template #actions>

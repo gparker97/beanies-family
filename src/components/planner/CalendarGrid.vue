@@ -11,7 +11,7 @@ import { tripTypeEmoji, transportEmoji, type TravelSegmentOccurrence } from '@/u
 import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
 import HolidayChip from '@/components/planner/HolidayChip.vue';
-import { useHorizontalSwipe } from '@/composables/useHorizontalSwipe';
+import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import type { ActivityCategory, FamilyActivity, HolidayOccurrence } from '@/types/models';
 
 /**
@@ -372,11 +372,12 @@ function handleDayClick(date: string) {
 }
 
 // ── Swipe gesture ──────────────────────────────────────────────────────────
-// Horizontal swipe on the calendar surface advances/retreats by one month.
+// Horizontal swipe on the calendar surface advances/retreats by one month,
+// with an iOS-Calendar-style slide-out / slide-in animation.
 const swipeRef = ref<HTMLElement | null>(null);
-useHorizontalSwipe(swipeRef, {
-  onSwipeLeft: nextMonth,
-  onSwipeRight: prevMonth,
+useCalendarSlide(swipeRef, {
+  onNext: nextMonth,
+  onPrev: prevMonth,
 });
 
 defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
@@ -386,7 +387,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
   <div
     ref="swipeRef"
     class="rounded-3xl bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
-    style="touch-action: pan-y"
+    style="touch-action: pan-y; will-change: transform"
   >
     <CalendarNavBar :label="monthLabel" @prev="prevMonth" @next="nextMonth" @today="goToToday" />
 
