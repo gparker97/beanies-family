@@ -43,6 +43,7 @@ import {
   isSilentRefreshPending,
   isTokenValid,
   isUserCancellation,
+  getLastSilentRefreshDiagnostics,
 } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
 import { slackNotify } from '@/utils/slackNotify';
@@ -92,6 +93,47 @@ export type MigrateStorageResult =
   | { outcome: 'cancelled' }
   | { outcome: 'failed'; reason: string }
   | { outcome: 'recovery-needed'; reason: string };
+
+// ─── Visibility tracker (module-scope, lazy-registered) ─────────────────────
+//
+// Tracks `document.visibilityState` transitions so the
+// `cold-start-reconnect-escalation` alert can report "how long was the page
+// hidden before this failure" — the iOS PWA wake path is the primary suspect,
+// and we can't diagnose it without knowing whether the load fired right after
+// a wake or during a long-foreground session.
+//
+// Lazy-registered (on first call to `getHiddenDurationMs`) so importing this
+// module doesn't add a visibilitychange listener at module-load time —
+// unrelated tests assert listener counts and would break otherwise.
+const visibilityTracker = {
+  lastHiddenAt: null as number | null,
+  lastVisibleAt: typeof document !== 'undefined' ? Date.now() : null,
+  listenerRegistered: false,
+};
+
+function ensureVisibilityListener(): void {
+  if (visibilityTracker.listenerRegistered) return;
+  if (typeof document === 'undefined') return;
+  document.addEventListener('visibilitychange', () => {
+    const now = Date.now();
+    if (document.visibilityState === 'hidden') {
+      visibilityTracker.lastHiddenAt = now;
+    } else {
+      visibilityTracker.lastVisibleAt = now;
+    }
+  });
+  visibilityTracker.listenerRegistered = true;
+}
+
+/** ms the page was last hidden before becoming visible, or null if never hidden
+ *  this session. Used as a wake-time diagnostic on cold-start failures. */
+function getHiddenDurationMs(): number | null {
+  ensureVisibilityListener();
+  const { lastHiddenAt, lastVisibleAt } = visibilityTracker;
+  if (lastHiddenAt === null || lastVisibleAt === null) return null;
+  if (lastVisibleAt < lastHiddenAt) return null; // page is still hidden — n/a
+  return lastVisibleAt - lastHiddenAt;
+}
 
 export const useSyncStore = defineStore('sync', () => {
   // State
@@ -1414,12 +1456,32 @@ export const useSyncStore = defineStore('sync', () => {
       if (isTokenValid()) return; // recovered via wake event; nothing to do
       if (showGoogleReconnect.value) return; // raced with the auth-layer escalation
       showGoogleReconnect.value = true;
+
+      // Diagnostic context for the silent-refresh failure mode. Added
+      // 2026-05-14 to disambiguate iOS PWA wake-race vs Lambda cold start vs
+      // token revocation vs other transient causes. Defensive: tracker /
+      // diagnostics may be null if document isn't available (tests) or no
+      // refresh attempt has actually run yet.
+      const diag = getLastSilentRefreshDiagnostics();
+      const hiddenForMs = getHiddenDurationMs();
+      const visibilityState = typeof document !== 'undefined' ? document.visibilityState : null;
+
       reportError({
         surface: 'cold-start-reconnect-escalation',
         message:
           'Cold-start data load stuck on auth-transient (silent refresh failed); ' +
           `banner surfaced after ${COLD_START_RECONNECT_DEFER_MS}ms defer window. ` +
           `lastError: ${lastErr ?? 'unknown'}`,
+        context: {
+          // Array; the Slack renderer JSON-stringifies non-primitive context
+          // values at display time. redactContext passes through unchanged
+          // (it only truncates string values, not arrays).
+          silent_refresh_attempts: diag?.attempts ?? null,
+          silent_refresh_had_refresh_token: diag?.hadRefreshToken ?? null,
+          silent_refresh_consecutive_failures: diag?.consecutiveFailures ?? null,
+          page_hidden_for_ms: hiddenForMs,
+          visibility_state: visibilityState,
+        },
       });
     });
   }
