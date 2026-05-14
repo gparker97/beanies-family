@@ -40,6 +40,8 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: 'vite'
         update-types: ['version-update:semver-major']
+      - dependency-name: 'vue-router'
+        update-types: ['version-update:semver-major']
       - dependency-name: 'astro-seo'
         update-types: ['version-update:semver-major']
       - dependency-name: 'astro-og-canvas'
