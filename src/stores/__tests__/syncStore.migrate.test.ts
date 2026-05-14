@@ -9,7 +9,8 @@
  */
 import { setActivePinia, createPinia, type Pinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { Settings } from '@/types/models';
+import { nextTick } from 'vue';
+import type { Settings, GlobalSettings } from '@/types/models';
 
 const {
   mockSave,
@@ -52,10 +53,52 @@ const defaultSettings: Settings = {
   updatedAt: '2024-01-01',
 };
 
+// Mutable settings state — lets country-watcher tests below seed/change country
+// without hitting real persistence. Reset to defaults in beforeEach.
+const settingsState: { current: Settings } = { current: { ...defaultSettings } };
+
 vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
   getDefaultSettings: () => ({ ...defaultSettings }),
-  getSettings: vi.fn(async () => ({ ...defaultSettings })),
-  saveSettings: vi.fn(async () => ({ ...defaultSettings })),
+  getSettings: vi.fn(async () => ({ ...settingsState.current })),
+  saveSettings: vi.fn(async (partial: Partial<Settings>) => {
+    settingsState.current = {
+      ...settingsState.current,
+      ...partial,
+      id: 'app_settings',
+      updatedAt: new Date().toISOString(),
+    };
+    return { ...settingsState.current };
+  }),
+}));
+
+const defaultGlobalSettings: GlobalSettings = {
+  id: 'global_settings',
+  theme: 'light',
+  language: 'en',
+  lastActiveFamilyId: null,
+  exchangeRates: [],
+  exchangeRateAutoUpdate: true,
+  exchangeRateLastFetch: null,
+  isTrustedDevice: false,
+  trustedDevicePromptShown: false,
+};
+const globalSettingsState: { current: GlobalSettings } = { current: { ...defaultGlobalSettings } };
+
+vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
+  getDefaultGlobalSettings: () => ({ ...defaultGlobalSettings }),
+  getGlobalSettings: vi.fn(async () => ({ ...globalSettingsState.current })),
+  saveGlobalSettings: vi.fn(async (partial: Partial<GlobalSettings>) => {
+    globalSettingsState.current = {
+      ...globalSettingsState.current,
+      ...partial,
+      id: 'global_settings',
+    };
+    return { ...globalSettingsState.current };
+  }),
+  setGlobalTheme: vi.fn(),
+  setGlobalLanguage: vi.fn(),
+  setLastActiveFamilyId: vi.fn(),
+  updateGlobalExchangeRates: vi.fn(async () => ({ ...globalSettingsState.current })),
 }));
 
 vi.mock('@/services/sync/syncService', async () => {
@@ -412,5 +455,78 @@ describe('syncStore.configureSyncFileGoogleDrive (exercises the shared installPr
 
     expect(ok).toBe(false);
     expect(store.error).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Registry country sync — verifies the country field flows through every
+// registerCurrentFamily payload + the syncStore-side watcher fires
+// ensureRegistered() on Settings.country changes (own + Automerge-synced).
+// ---------------------------------------------------------------------------
+
+describe('syncStore — registry country sync', () => {
+  beforeEach(async () => {
+    settingsState.current = { ...defaultSettings };
+    globalSettingsState.current = { ...defaultGlobalSettings };
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    mockSave.mockResolvedValue(true);
+    mockGetFileTimestamp.mockResolvedValue(null);
+    mockGetProvider.mockReturnValue(null);
+  });
+
+  it('includes country in the registerFamily payload when settings has it', async () => {
+    settingsState.current = { ...defaultSettings, country: 'US' };
+    const { useSettingsStore } = await import('@/stores/settingsStore');
+    const settings = useSettingsStore();
+    await settings.loadSettings(); // pulls the seeded US country into the store
+    const store = useSyncStore();
+    store.isConfigured = true;
+    store.storageProviderType = 'local';
+    mockGetProvider.mockReturnValue(makeProvider('local', 'my-family.beanpod'));
+
+    store.ensureRegistered();
+    await nextTick();
+
+    expect(mockRegisterFamily).toHaveBeenCalledWith(
+      'family-123',
+      expect.objectContaining({ country: 'US' })
+    );
+  });
+
+  it('sends country: null when no country has been picked', async () => {
+    // defaults already have no country — exercise the null fallback
+    const store = useSyncStore();
+    store.isConfigured = true;
+    store.storageProviderType = 'local';
+    mockGetProvider.mockReturnValue(makeProvider('local', 'my-family.beanpod'));
+
+    store.ensureRegistered();
+    await nextTick();
+
+    expect(mockRegisterFamily).toHaveBeenCalledWith(
+      'family-123',
+      expect.objectContaining({ country: null })
+    );
+  });
+
+  it('fires registerFamily automatically when Settings.country changes (watcher path)', async () => {
+    const { useSettingsStore } = await import('@/stores/settingsStore');
+    const store = useSyncStore();
+    store.isConfigured = true;
+    store.storageProviderType = 'local';
+    mockGetProvider.mockReturnValue(makeProvider('local', 'my-family.beanpod'));
+
+    const settings = useSettingsStore();
+    await settings.loadSettings();
+    mockRegisterFamily.mockClear(); // baseline: ignore the initial null fire from store setup
+
+    await settings.setCountry('JP');
+    await nextTick();
+
+    expect(mockRegisterFamily).toHaveBeenCalledWith(
+      'family-123',
+      expect.objectContaining({ country: 'JP' })
+    );
   });
 });
