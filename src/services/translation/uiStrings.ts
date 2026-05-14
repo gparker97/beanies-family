@@ -95,6 +95,12 @@ const STRING_DEFS = {
   'common.whatsThis': { en: "What's this?", beanie: "what's this?" },
   'common.family': { en: 'Family', beanie: 'the pod' },
 
+  // BaseCombobox shared
+  'combobox.showingHint': {
+    en: 'Showing {visible} of {total} — keep typing to narrow',
+    beanie: 'showing {visible} of {total} — keep typing to narrow',
+  },
+
   // Modal shared labels
   'modal.selectCategory': { en: 'Select a category', beanie: 'select a category' },
   'modal.selectSubcategory': { en: 'Select a type', beanie: 'select a type' },
