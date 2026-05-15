@@ -24,6 +24,7 @@ import type {
   InviteKeyPackage,
 } from '@/types/syncFileV4';
 import type { FamilyDocument } from '@/types/automerge';
+import { CorruptPayloadError } from '@/types/sync';
 
 /**
  * Create a V4 beanpod file envelope from the current Automerge document.
@@ -106,6 +107,11 @@ export function detectFileVersion(jsonString: string): '4.0' | null {
 /**
  * Decrypt the encrypted payload from a V4 envelope using the family key.
  * Returns the loaded Automerge document.
+ *
+ * Throws `CorruptPayloadError` if the decrypted bytes can't be loaded as
+ * a usable Automerge document — catches the Shaun-class "envelope parses,
+ * decrypt succeeds, but `automerge_materialize` blows up on first read"
+ * failure mode at every read site (sync, load, resume).
  */
 export async function decryptBeanpodPayload(
   envelope: BeanpodFileV4,
@@ -116,7 +122,33 @@ export async function decryptBeanpodPayload(
   // Use Automerge.load() directly — NOT loadDoc() which has the side effect
   // of replacing the in-memory currentDoc singleton. Callers that need to
   // replace (replaceDoc) or merge (mergeDoc) do so explicitly after this returns.
-  return Automerge.load<FamilyDocument>(binary);
+
+  let doc: Automerge.Doc<FamilyDocument>;
+  try {
+    doc = Automerge.load<FamilyDocument>(binary);
+  } catch (e) {
+    throw new CorruptPayloadError(
+      `Automerge.load failed on decrypted payload: ${e instanceof Error ? e.message : String(e)}`,
+      'load',
+      envelope.familyId ?? null
+    );
+  }
+
+  // Materialize sanity check — `Automerge.load` can accept byte streams that
+  // are individually parseable but produce a doc whose first property read
+  // throws "Out of bounds table access" from the WASM materializer. Touching
+  // `familyMembers` (always a Record, never absent) forces the read.
+  try {
+    Object.keys(doc.familyMembers ?? {});
+  } catch (e) {
+    throw new CorruptPayloadError(
+      `Automerge materialize failed on decrypted payload: ${e instanceof Error ? e.message : String(e)}`,
+      'materialize',
+      envelope.familyId ?? null
+    );
+  }
+
+  return doc;
 }
 
 /**

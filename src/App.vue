@@ -208,6 +208,31 @@ const showLayout = computed(() => {
 });
 
 /**
+ * Awaited `router.replace` with structured failure handling.
+ *
+ * Awaited is the load-bearing part: the post-init health check at the bottom
+ * of init() reads `route.path` to decide whether to show the recovery overlay.
+ * If we don't await, the route hasn't updated yet and the check sees the old
+ * path — producing the `app.postInitNoData` false-fires that prompted this
+ * fix. The try/catch keeps router rejection from wedging init; the worst case
+ * is a brief recovery overlay flash, not data loss.
+ */
+async function safeRouterReplace(target: string, callerTag: string): Promise<void> {
+  try {
+    await router.replace(target);
+  } catch (e) {
+    const err = e instanceof Error ? e : new Error(String(e));
+    console.warn(`[App] router.replace('${target}') from ${callerTag} failed:`, err);
+    reportError({
+      surface: 'app.loadFamilyData.replaceFailed',
+      message: `router.replace('${target}') threw during init (caller=${callerTag}): ${err.message}`,
+      error: err,
+      severity: 'warning',
+    });
+  }
+}
+
+/**
  * Load all family data. The data file (.beanpod V4) is the source of truth.
  *
  * Priority:
@@ -298,17 +323,20 @@ async function loadFamilyData() {
           return;
         }
 
-        // Can't auto-decrypt — redirect to login page for password/biometric entry
+        // Can't auto-decrypt — redirect to login page for password/biometric entry.
+        // Awaited so `route.path` updates before the post-init health check at the
+        // bottom of init() reads it — otherwise the check sees the pre-replace
+        // path and false-fires `app.postInitNoData` with the recovery overlay.
         initBreadcrumbs.push('path1b: needsPassword but no cached key — redirecting to login');
         console.warn('[loadFamilyData] Cannot auto-decrypt — redirecting to login');
-        router.replace('/welcome');
+        await safeRouterReplace('/welcome', 'path1b-needs-password');
         return;
       }
 
       // File load failed for non-password reasons (network error, 404, etc.)
       initBreadcrumbs.push('path1b: loadFromFile failed — redirecting to login');
       console.warn('[loadFamilyData] File load failed — redirecting to login');
-      router.replace('/welcome');
+      await safeRouterReplace('/welcome', 'path1b-load-failed');
       return;
     } catch (err) {
       throw new Error(
@@ -909,7 +937,17 @@ watch(isTabVisible, (visible) => {
 
 useStaleTabRefresh();
 
-function handleBeforeUnload() {
+function handleBeforeUnload(event: BeforeUnloadEvent): void {
+  // Block the unload if a non-interruptible write is in flight (pod creation,
+  // recovery load). The native browser confirm dialog gives the user one last
+  // chance to stay; if they bail anyway the partial-write cleanup paths in
+  // syncStore.createNewFile will already have run on the catch side.
+  if (syncStore.criticalWriteState?.kind && syncStore.criticalWriteState.kind !== 'idle') {
+    event.preventDefault();
+    event.returnValue = ''; // legacy spec — required for Chrome/Edge
+  }
+  // Best-effort save regardless of write-in-flight; harmless if there's
+  // nothing to save.
   saveWithKeyRecovery();
 }
 

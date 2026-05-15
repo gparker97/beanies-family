@@ -8,7 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
-## 2026-05-14
+## 2026-05-15
+
+### Fixed
+
+- **Pod creation now fails loud instead of silently writing a broken file.** A pilot user on iPhone Safari recently hit a worst-case bug where the `.beanpod` file they created looked normal in Google Drive but, when opened on a second device with the correct password, the encrypted contents couldn't be loaded as a valid family pod — and their data was unrecoverable. The creation flow had reported success and entered the app, with no error fired anywhere. This release adds an end-to-end verify-and-confirm step at pod creation: after writing the file, the app reads it back, decrypts it, and confirms the resulting pod loads cleanly before flipping the "your pod is ready" switch. If any step fails — bad bytes from the network, a partial upload, a cache write that didn't land, or a registry write that couldn't reach our servers — the partial file in Google Drive is renamed to `<family>.beanpod.corrupt-<timestamp>` (forensic preservation, not deleted), local state is reset so a retry starts clean, and the user sees a concrete error message explaining which step failed and what to do next instead of landing on an empty Family Nook with no idea why. The same Automerge sanity check now also runs at every file _read_ site (initial load, sign-in, cross-device sync, resume-setup recovery) — so the same corruption pattern is detected anywhere it could surface, with a typed `CorruptPayloadError` that downstream UIs can react to.
+
+- **Recovery overlay no longer flashes on the way to `/welcome`.** When the app couldn't decrypt your data automatically and redirected you to the welcome page, the post-init health check could fire a moment too early and show the "oh no, the beans spilled" recovery overlay on top of the welcome screen — alarming for what was a clean redirect. The two redirect sites in `loadFamilyData` now `await` their route changes so the health check sees the final route, not the pre-redirect one. Also: the browser's native "leave site?" confirmation now appears if you try to close the tab during pod creation, so you can't accidentally bail mid-write.
 
 ### Changed
 

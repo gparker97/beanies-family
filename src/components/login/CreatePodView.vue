@@ -361,27 +361,41 @@ async function handleStep2Next() {
   // V4 envelope. createNewFile() also fires the "🎉 pod created" Slack ping
   // and sets authStore.podCreated on success.
   const podFileName = `${familyName.value || 'my-family'}.beanpod`;
-  const success = await syncStore.createNewFile(
+  const result = await syncStore.createNewFile(
     podFileName,
     password.value,
     authStore.currentUser.memberId,
     familyContextStore.activeFamilyId ?? '',
     familyName.value
   );
-  if (!success) {
-    const msg = syncStore.error ?? t('setup.fileCreateFailed');
-    formError.value = msg;
-    console.error('[CreatePodView] createNewFile failed:', msg);
-    reportError({
-      surface: 'createPod.createNewFile',
-      message: msg,
-      severity: 'error',
-      context: { provider_type: storageType.value },
-    });
+
+  if (result.ok) {
+    currentStep.value = 3;
     return;
   }
 
-  currentStep.value = 3;
+  // Failure — branch on reason to show the user something concrete. The
+  // store layer already (a) renamed any partial Drive file to .corrupt-<ts>
+  // and (b) cleared in-memory key/envelope state, so a retry starts clean.
+  // Each branch reports to Slack with a focused surface so we can see the
+  // failure distribution in prod.
+  const reasonKey: Record<typeof result.reason, string> = {
+    verify: 'createPod.failedReasonVerify',
+    persist: 'createPod.failedReasonPersist',
+    register: 'createPod.failedReasonRegister',
+    write: 'createPod.failedReasonWrite',
+    precondition: 'createPod.failedReasonPrecondition',
+    'concurrent-write': 'createPod.failedReasonConcurrent',
+  };
+  formError.value = t(reasonKey[result.reason] as Parameters<typeof t>[0]);
+  console.error(`[CreatePodView] createNewFile failed (reason=${result.reason}):`, result.error);
+  reportError({
+    surface: `createPod.${result.reason}`,
+    message: `createNewFile failed at step '${result.reason}': ${result.error.message}`,
+    error: result.error,
+    severity: 'error',
+    context: { provider_type: storageType.value },
+  });
 }
 
 async function handleAddMember() {

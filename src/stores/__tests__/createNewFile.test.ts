@@ -33,11 +33,27 @@ const {
 } = vi.hoisted(() => {
   const mockFamilyKey = {} as CryptoKey;
   const mockProviderWrite = vi.fn(async () => {});
+  // read() is called by `verifyJustWritten` after every successful write —
+  // return a parseable V4 envelope so the verify step's decrypt call (also
+  // mocked at the fileSync level) doesn't trip on empty bytes.
+  const mockProviderRead = vi.fn(async () =>
+    JSON.stringify({
+      version: '4.0',
+      familyId: 'fam-test-1',
+      familyName: 'Test Family',
+      keyId: 'k',
+      wrappedKeys: {},
+      passkeyWrappedKeys: {},
+      inviteKeys: {},
+      encryptedPayload: 'base64==',
+    })
+  );
   const mockProvider = {
     write: mockProviderWrite,
+    read: mockProviderRead,
     getAccountEmail: () => null,
     getDisplayName: () => 'test.beanpod',
-    getFileId: () => null,
+    getFileId: () => 'mock-file-id',
     type: 'local' as const,
   };
   return {
@@ -314,6 +330,12 @@ describe('pod creation: full end-to-end flow', () => {
     vi.clearAllMocks();
     // Ensure clean Automerge state — no document loaded
     resetDoc();
+    // authStore.podCreated defaults to TRUE when localStorage key is absent
+    // (migration-true semantics — see restorePodCreated). Reset to '0' so
+    // failure-path tests can assert it never flips to '1'.
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('beanies_pod_created', '0');
+    }
   });
 
   afterEach(() => {
@@ -380,14 +402,182 @@ describe('pod creation: full end-to-end flow', () => {
       'fam-test-1',
       'Test Family'
     );
-    expect(createResult).toBe(true);
+    expect(createResult.ok).toBe(true);
     expect(syncStore.familyKey).toBe(mockFamilyKey);
     expect(syncStore.envelope).not.toBeNull();
+    // criticalWriteState must return to idle after every createNewFile call
+    // (success or failure) — otherwise the router beforeEach guard would
+    // block every subsequent navigation.
+    expect(syncStore.criticalWriteState.kind).toBe('idle');
 
     // --- Step 3: Final save (handleFinish) ---
     const syncResult = await syncStore.syncNow(true);
     // syncService.save is mocked to return true
     expect(syncResult).toBe(true);
+  });
+
+  // ── Discriminated-result failure paths ──────────────────────────────────
+  //
+  // Every reason in `CreatePodFailureReason` is exercised here so the
+  // markPodCreated point-of-no-return invariant has a unit test for every
+  // path that could otherwise reach it. On every failure we also assert
+  // `criticalWriteState` returns to idle (the router/beforeunload guards
+  // depend on this) and `authStore.podCreated` is NOT set.
+
+  async function signUpAndConfigureStorage() {
+    const authStore = useAuthStore();
+    const signUp = await authStore.signUp({
+      email: 'test@example.com',
+      password: 'password123',
+      familyName: 'Test Family',
+      memberName: 'Test User',
+    });
+    expect(signUp.success).toBe(true);
+    stateChangeCallbackHolder.callback?.({
+      isInitialized: true,
+      isConfigured: true,
+      fileName: 'test.beanpod',
+      isSyncing: false,
+      lastError: null,
+    });
+    return { authStore, memberId: authStore.currentUser!.memberId };
+  }
+
+  it('returns reason="precondition" when the owner member is missing from the family store', async () => {
+    const syncStore = useSyncStore();
+    // No signUp — so familyStore.members is empty, the precondition guard at
+    // the top of createNewFile catches it before any I/O runs.
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      'pod-password',
+      'no-such-member',
+      'fam-test-1',
+      'Test Family'
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return; // type narrow
+    expect(result.reason).toBe('precondition');
+    expect(mockProvider.write).not.toHaveBeenCalled();
+    expect(syncStore.criticalWriteState.kind).toBe('idle');
+    const authStore = useAuthStore();
+    expect(authStore.podCreated).toBe(false);
+  });
+
+  it('returns reason="write" when provider.write throws', async () => {
+    const { memberId } = await signUpAndConfigureStorage();
+    const syncStore = useSyncStore();
+    mockProvider.write.mockRejectedValueOnce(new Error('Network down'));
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      'pod-password',
+      memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('write');
+    expect(result.error.message).toContain('Network down');
+    expect(syncStore.criticalWriteState.kind).toBe('idle');
+    expect(useAuthStore().podCreated).toBe(false);
+  });
+
+  it('returns reason="verify" when the read-back envelope is empty', async () => {
+    const { memberId } = await signUpAndConfigureStorage();
+    const syncStore = useSyncStore();
+    // Simulate Shaun-class corruption: write returns 200 OK but the file we
+    // read back is empty/inconsistent. verifyJustWritten throws → reason=verify.
+    mockProvider.read.mockResolvedValueOnce('');
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      'pod-password',
+      memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('verify');
+    expect(syncStore.criticalWriteState.kind).toBe('idle');
+    expect(useAuthStore().podCreated).toBe(false);
+  });
+
+  it('returns reason="persist" when persistDoc throws', async () => {
+    const { memberId } = await signUpAndConfigureStorage();
+    const syncStore = useSyncStore();
+    mockPersistDoc.mockRejectedValueOnce(new Error('IndexedDB quota'));
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      'pod-password',
+      memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('persist');
+    expect(syncStore.criticalWriteState.kind).toBe('idle');
+    expect(useAuthStore().podCreated).toBe(false);
+  });
+
+  it('returns reason="register" when registry.registerFamily throws', async () => {
+    const { memberId } = await signUpAndConfigureStorage();
+    const syncStore = useSyncStore();
+    const registry = await import('@/services/registry/registryService');
+    vi.mocked(registry.registerFamily).mockRejectedValueOnce(new Error('Registry 503'));
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      'pod-password',
+      memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('register');
+    expect(syncStore.criticalWriteState.kind).toBe('idle');
+    expect(useAuthStore().podCreated).toBe(false);
+  });
+
+  it('returns reason="concurrent-write" when called while another createNewFile is in flight', async () => {
+    const { memberId } = await signUpAndConfigureStorage();
+    const syncStore = useSyncStore();
+    // Block the first call's `provider.write` so the critical section stays
+    // open; fire the second call and assert it's refused with the typed
+    // reason. Then unblock the first call.
+    let releaseWrite: () => void;
+    const writeBlocker = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    mockProvider.write.mockImplementationOnce(async () => {
+      await writeBlocker;
+    });
+
+    const first = syncStore.createNewFile(
+      'test.beanpod',
+      'pod-password',
+      memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+    // Microtask: let the first call enter the critical section and flip the flag.
+    await Promise.resolve();
+    expect(syncStore.criticalWriteState.kind).toBe('creating');
+
+    const second = await syncStore.createNewFile(
+      'test.beanpod',
+      'pod-password',
+      memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.reason).toBe('concurrent-write');
+
+    releaseWrite!();
+    const firstResult = await first;
+    expect(firstResult.ok).toBe(true);
+    expect(syncStore.criticalWriteState.kind).toBe('idle');
   });
 
   /**

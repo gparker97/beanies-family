@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as Automerge from '@automerge/automerge';
+import { CorruptPayloadError } from '@/types/sync';
 import {
   initDoc,
   saveDoc,
@@ -241,6 +242,53 @@ describe('fileSync V4 format', () => {
     expect(restored.accounts['a-1']!.currency).toBe('GBP');
     expect(restored.settings!.baseCurrency).toBe('GBP');
     expect(restored.settings!.theme).toBe('dark');
+  });
+
+  // ── Corruption-handling: CorruptPayloadError surfaces at every read site ──
+  //
+  // Catches the Shaun-class failure mode (2026-05-15): the V4 envelope is
+  // valid, AES-GCM decrypt succeeds with the right password, but the bytes
+  // that come out aren't a usable Automerge document. Without these guards
+  // the doc silently fails to materialize at the first property access and
+  // the user gets a generic "Out of bounds table access" with no recovery.
+
+  describe('decryptBeanpodPayload corruption guards', () => {
+    it('throws CorruptPayloadError with step="load" when the decrypted bytes are not valid Automerge', async () => {
+      // Encrypt random garbage that won't load as Automerge. `decryptPayload`
+      // will return these bytes; `Automerge.load` will reject them.
+      const { encryptPayload } = await import('@/services/crypto/familyKeyService');
+      const garbage = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      const encrypted = await encryptPayload(familyKey, garbage);
+
+      const envelope = parseBeanpodV4(
+        JSON.stringify({
+          version: '4.0',
+          familyId: 'fam-corrupt',
+          familyName: 'Test',
+          keyId: 'k',
+          wrappedKeys: {},
+          passkeyWrappedKeys: {},
+          inviteKeys: {},
+          encryptedPayload: bufferToBase64(encrypted),
+        })
+      );
+
+      try {
+        await decryptBeanpodPayload(envelope, familyKey);
+        expect.fail('decryptBeanpodPayload should have thrown CorruptPayloadError');
+      } catch (e) {
+        expect(e).toBeInstanceOf(CorruptPayloadError);
+        expect((e as CorruptPayloadError).step).toBe('load');
+        expect((e as CorruptPayloadError).familyId).toBe('fam-corrupt');
+      }
+    });
+
+    // Note: the symmetric `step="materialize"` branch is covered structurally
+    // — it uses the same try/catch shape as the load branch above, only
+    // wrapping `Object.keys(doc.familyMembers ?? {})` instead of `load(...)`.
+    // Synthesising an Automerge byte stream that loads but throws on first
+    // property access requires mocking `Automerge.load` (the WASM materializer
+    // is robust by design), which ESM namespace imports don't allow.
   });
 
   // ── Test 5: parseBeanpodV4 rejects invalid input ─────────────────
