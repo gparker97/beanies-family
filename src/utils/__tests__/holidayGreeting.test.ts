@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getHolidayGreeting, getHolidayEmoji } from '@/utils/holidayGreeting';
+import { getHolidayGreeting, getHolidayEmoji, getHolidayTheme } from '@/utils/holidayGreeting';
 import type { HolidayOccurrence } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -93,5 +93,25 @@ describe('getHolidayEmoji', () => {
   it('falls back to the neutral calendar emoji for unmatched holidays', () => {
     expect(getHolidayEmoji(makeHoliday('Vesak Day'))).toBe('🗓️');
     expect(getHolidayEmoji(makeHoliday(''))).toBe('🗓️');
+  });
+});
+
+describe('getHolidayTheme', () => {
+  it('returns the matching theme name for allowlisted holidays', () => {
+    expect(getHolidayTheme(makeHoliday('Christmas Day'))).toBe('christmas');
+    expect(getHolidayTheme(makeHoliday('Lunar New Year'))).toBe('lunarNewYear');
+    expect(getHolidayTheme(makeHoliday("New Year's Day"))).toBe('newYear');
+    expect(getHolidayTheme(makeHoliday('Diwali'))).toBe('diwali');
+    expect(getHolidayTheme(makeHoliday('Eid al-Fitr'))).toBe('eid');
+    expect(getHolidayTheme(makeHoliday("Mother's Day"))).toBe('mothersDay');
+    expect(getHolidayTheme(makeHoliday("Father's Day"))).toBe('fathersDay');
+    expect(getHolidayTheme(makeHoliday('Thanksgiving Day'))).toBe('thanksgiving');
+    expect(getHolidayTheme(makeHoliday('Easter Sunday'))).toBe('easter');
+  });
+
+  it('returns null for non-allowlist holidays', () => {
+    expect(getHolidayTheme(makeHoliday('Vesak Day'))).toBeNull();
+    expect(getHolidayTheme(makeHoliday('Labour Day'))).toBeNull();
+    expect(getHolidayTheme(makeHoliday(''))).toBeNull();
   });
 });

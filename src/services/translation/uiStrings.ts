@@ -4418,6 +4418,18 @@ const STRING_DEFS = {
     beanie: 'happy diwali, beans',
   },
   'nook.holiday.greeting.eid': { en: 'Eid Mubarak, beans', beanie: 'eid mubarak, beans' },
+  'nook.holiday.greeting.birthday': {
+    en: 'Happy birthday, {name}!',
+    beanie: 'happy birthday, {name}!',
+  },
+  'nook.holiday.birthday.caption': {
+    en: "It's your special day",
+    beanie: "it's your special day",
+  },
+  'nook.birthday.overlay': {
+    en: 'Happy Birthday, {name}!',
+    beanie: 'happy birthday, {name}!',
+  },
   'nook.holiday.greeting.default': {
     en: 'Today is {holidayName}',
     beanie: 'today is {holidayName}',
@@ -4428,7 +4440,7 @@ const STRING_DEFS = {
   },
   'nook.holiday.tomorrow.message': {
     en: 'Tomorrow is {holidayName}',
-    beanie: 'tomorrow is {holidayName}',
+    beanie: 'heads up: tomorrow is {holidayName}',
   },
   'nook.holiday.tomorrow.caption': {
     en: 'School and work may be off',
