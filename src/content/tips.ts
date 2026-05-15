@@ -152,11 +152,11 @@ export const ALL_TIPS: BeanTip[] = [
   {
     id: 'tip-budget',
     category: 'finance',
-    tryItRoute: '/dashboard',
+    tryItRoute: '/budgets',
     message: {
-      en: "set a monthly budget on the dashboard and beanies will show you how you're tracking. green means good. orange means... well.",
+      en: "set a monthly budget and beanies will show you how you're tracking. green means good. orange means... well.",
       beanie:
-        "set a monthly budget on the dashboard and beanies will show you how you're tracking. green means good. orange means... well.",
+        "set a monthly budget and beanies will show you how you're tracking. green means good. orange means... well.",
     },
   },
   {
@@ -173,7 +173,10 @@ export const ALL_TIPS: BeanTip[] = [
   {
     id: 'tip-milestones',
     category: 'family',
-    tryItRoute: '/goals',
+    // /pod is the family-pod hub (Meet the Beans). The "add milestone" flow
+    // is bean-scoped — user picks a member, then ＋ Add → 🌟 Milestone — so we
+    // route to the hub rather than /pod/milestones (the family-wide view).
+    tryItRoute: '/pod',
     message: {
       en: "track your family's milestones — first day of school, lost teeth, birthdays. the small stuff matters. that's what beanies is for.",
       beanie:
