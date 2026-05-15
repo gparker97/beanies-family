@@ -124,13 +124,21 @@ This is the one-way door. Plan a **low-traffic window** (suggested: weekend morn
 
 1. Open Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client for beanies.family.
 2. Under "Authorized redirect URIs", **add** (do not remove anything):
-   - `https://app.beanies.family/oauth/callback`
+   - `https://app.beanies.family/oauth/callback` — primary in-app OAuth + redirect-auth callback (used by the iOS redirect flow + popup OAuth)
+   - `https://app.beanies.family/open` — Drive "Open with beanies.family" landing (must match the Marketplace SDK's **Open URL** exactly; if these drift, the Marketplace flow 400s with `redirect_uri_mismatch`)
    - Any other redirect URI pattern currently registered for `https://beanies.family` — mirror it to `app.beanies.family`
 3. Under "Authorized JavaScript origins", **add**:
    - `https://app.beanies.family`
 4. Save. Propagation is typically < 5 minutes but can take longer; wait 15 min before proceeding.
 
 **Rollback note**: the old apex URIs stay registered for 30 days as a safety net.
+
+**Keep this list in sync going forward.** Any new route that initiates OAuth or receives an OAuth redirect must be added here _and_ to the Marketplace SDK config if Drive-side. Today's two known entries:
+
+| Redirect URI                                | Used by                                                         | Mirror in                                                                                                      |
+| ------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `https://app.beanies.family/oauth/callback` | `OAuthCallbackPage.vue` — popup + redirect auth, silent-refresh | Lambda OAuth proxy `CORS_ORIGIN` (auto-derives the URI allowlist; see `infrastructure/lambda/oauth/README.md`) |
+| `https://app.beanies.family/open`           | `OpenFromDrivePage.vue` — Drive UI "Open with beanies.family"   | Google Workspace Marketplace SDK → Drive UI Integration → **Open URL** field                                   |
 
 ### C.2 Update the Vue deploy config for the apex swap
 
