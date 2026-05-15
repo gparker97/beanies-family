@@ -26,6 +26,7 @@ const mockGetFileMetadata = vi.fn().mockResolvedValue({ mimeType: 'application/o
 const mockPatchFileMetadata = vi.fn().mockResolvedValue(undefined);
 const mockGetOrCreateAppFolder = vi.fn().mockResolvedValue('folder-id');
 const mockCreateFile = vi.fn().mockResolvedValue({ fileId: 'new-file-id', name: 'test.beanpod' });
+const mockListBeanpodFiles = vi.fn().mockResolvedValue([]);
 const mockClearFolderCache = vi.fn();
 
 vi.mock('@/services/google/driveService', () => ({
@@ -36,6 +37,7 @@ vi.mock('@/services/google/driveService', () => ({
   patchFileMetadata: (...args: unknown[]) => mockPatchFileMetadata(...args),
   getOrCreateAppFolder: (...args: unknown[]) => mockGetOrCreateAppFolder(...args),
   createFile: (...args: unknown[]) => mockCreateFile(...args),
+  listBeanpodFiles: (...args: unknown[]) => mockListBeanpodFiles(...args),
   clearFolderCache: () => mockClearFolderCache(),
   DriveApiError: class DriveApiError extends Error {
     readonly status: number;
@@ -388,6 +390,56 @@ describe('GoogleDriveProvider', () => {
       mockUpdateFile.mockRejectedValueOnce(new MockDriveApiError('Not Found', 404));
 
       await expect(provider.write('{"data":"test"}')).rejects.toThrow('Not Found');
+    });
+  });
+
+  describe('createNew — name collision detection', () => {
+    // Drive doesn't dedupe by filename — two .beanpod files can coexist in
+    // the same folder with the same name + different fileIds. Pre-fix, this
+    // silently orphaned a user's real pod with an empty duplicate (the
+    // Shaun-class incident on 2026-05-15). `createNew` now lists the folder
+    // first and refuses on collision with a typed error.
+    it('throws FileNameCollisionError when a same-named file exists in the folder', async () => {
+      const { FileNameCollisionError } = await import('@/types/sync');
+      mockListBeanpodFiles.mockResolvedValueOnce([
+        { fileId: 'existing-abc', name: 'LaFleur.beanpod', modifiedTime: '2026-05-14T00:00:00Z' },
+      ]);
+      try {
+        await GoogleDriveProvider.createNew('LaFleur.beanpod', { forceConsent: false });
+        expect.fail('createNew should have thrown FileNameCollisionError');
+      } catch (e) {
+        expect(e).toBeInstanceOf(FileNameCollisionError);
+        expect((e as InstanceType<typeof FileNameCollisionError>).existingFileId).toBe(
+          'existing-abc'
+        );
+        expect((e as InstanceType<typeof FileNameCollisionError>).fileName).toBe('LaFleur.beanpod');
+      }
+      // Must NOT have called createFile — the whole point is to prevent the
+      // duplicate from being written in the first place.
+      expect(mockCreateFile).not.toHaveBeenCalled();
+    });
+
+    it('proceeds normally when no same-named file exists in the folder', async () => {
+      mockListBeanpodFiles.mockResolvedValueOnce([
+        // Different family pod in the same folder — not a collision
+        { fileId: 'other', name: 'Smith.beanpod', modifiedTime: '2026-05-14T00:00:00Z' },
+      ]);
+      mockCreateFile.mockResolvedValueOnce({ fileId: 'new-id', name: 'LaFleur.beanpod' });
+      const created = await GoogleDriveProvider.createNew('LaFleur.beanpod', {
+        forceConsent: false,
+      });
+      expect(created.getFileId()).toBe('new-id');
+      expect(mockCreateFile).toHaveBeenCalled();
+    });
+
+    it('continues to create when the collision check itself fails (best-effort, never blocks)', async () => {
+      mockListBeanpodFiles.mockRejectedValueOnce(new Error('Drive listing failed'));
+      mockCreateFile.mockResolvedValueOnce({ fileId: 'new-id', name: 'LaFleur.beanpod' });
+      const created = await GoogleDriveProvider.createNew('LaFleur.beanpod', {
+        forceConsent: false,
+      });
+      expect(created.getFileId()).toBe('new-id');
+      expect(mockCreateFile).toHaveBeenCalled();
     });
   });
 });

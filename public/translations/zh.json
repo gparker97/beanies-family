@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-15",
-    "translationCount": 2836
+    "translationCount": 2845
   },
   "translations": {
     "app.name": {
@@ -14184,6 +14184,51 @@
     "createPod.failedReasonConcurrent": {
       "translation": "另一个Pod设置已在进行中。请稍等片刻，然后重试。",
       "hash": "8aon81",
+      "lastUpdated": "2026-05-15"
+    },
+    "createPod.duplicateFile": {
+      "translation": "您的Google云端硬盘中已存在具有此姓氏的pod文件。请选择其他姓氏，然后重试—我们不会触及现有文件。",
+      "hash": "op2qqm",
+      "lastUpdated": "2026-05-15"
+    },
+    "resumeSetup.checking": {
+      "translation": "正在查找您的Pod…",
+      "hash": "cowxsq",
+      "lastUpdated": "2026-05-15"
+    },
+    "resumeSetup.foundPod": {
+      "translation": "我们找到了你家人的吊舱。输入密码即可解锁。",
+      "hash": "h6jayg",
+      "lastUpdated": "2026-05-15"
+    },
+    "resumeSetup.lastSaved": {
+      "translation": "上次保存时间:",
+      "hash": "bcu6kj",
+      "lastUpdated": "2026-05-15"
+    },
+    "resumeSetup.unlockPod": {
+      "translation": "解锁我的Pod",
+      "hash": "pbg1e5",
+      "lastUpdated": "2026-05-15"
+    },
+    "resumeSetup.couldNotFindPod": {
+      "translation": "我们无法自动加载您的Pod —请在下面选择它所在的位置。",
+      "hash": "4pqbl1",
+      "lastUpdated": "2026-05-15"
+    },
+    "resumeSetup.registryError": {
+      "translation": "我们目前无法连接到我们的家庭服务器—请在下面选择您的Pod所在的位置，或稍后重试。",
+      "hash": "vjuttt",
+      "lastUpdated": "2026-05-15"
+    },
+    "resumeSetup.podCorrupted": {
+      "translation": "您的pod文件似乎已损坏，无法打开。请联系support@beanies.family ，提供以下诊断详细信息—我们可能会提供帮助。",
+      "hash": "41yuf8",
+      "lastUpdated": "2026-05-15"
+    },
+    "auth.passwordIncorrect": {
+      "translation": "该密码未解锁Pod。请重试。",
+      "hash": "wa43tn",
       "lastUpdated": "2026-05-15"
     }
   }
