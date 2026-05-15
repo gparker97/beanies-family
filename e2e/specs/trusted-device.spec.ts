@@ -128,8 +128,10 @@ test.describe('Trusted Device Password Cache', () => {
 
     // --- Phase 2: Clear all data removes cached password and trust flag ---
 
-    // Navigate to settings and open Data Management modal
-    await page.goto('/settings');
+    // Navigate to settings and open Data Management modal.
+    // `waitUntil: 'commit'` is the proven harden for webkit-CI's first-
+    // paint redirect race (same pattern as gotoRoot in helpers/navigation.ts).
+    await page.goto('/settings', { waitUntil: 'commit' });
     await page.waitForURL('/settings');
     await page.getByText(ui('settings.dataManagement')).first().click();
 
