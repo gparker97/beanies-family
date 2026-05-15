@@ -85,6 +85,8 @@ import {
   type CreatePodResult,
   type CreatePodFailureReason,
   type CriticalWriteState,
+  type ResumeFromRegistryResult,
+  type CompleteAutoLoadResult,
   CorruptPayloadError,
 } from '@/types/sync';
 
@@ -772,9 +774,15 @@ export const useSyncStore = defineStore('sync', () => {
    * The password is used to derive a member wrapping key, which unwraps the
    * family key. The family key then decrypts the Automerge binary payload.
    */
-  async function decryptPendingFile(
-    password: string
-  ): Promise<{ success: boolean; error?: string; memberIds?: string[] }> {
+  async function decryptPendingFile(password: string): Promise<{
+    success: boolean;
+    error?: string;
+    memberIds?: string[];
+    /** Set when the envelope decrypted but the payload bytes aren't a usable
+     *  Automerge doc. Lets the caller distinguish corruption from wrong
+     *  password / network failure when picking the user-facing message. */
+    corrupted?: CorruptPayloadError;
+  }> {
     const pending = pendingEncryptedFile.value;
     if (!pending) {
       return { success: false, error: 'No pending encrypted file' };
@@ -904,6 +912,9 @@ export const useSyncStore = defineStore('sync', () => {
       return { success: true, memberIds };
     } catch (e) {
       const errorMessage = (e as Error).message;
+      if (e instanceof CorruptPayloadError) {
+        return { success: false, error: errorMessage, corrupted: e };
+      }
       if (errorMessage.includes('Incorrect password')) {
         return { success: false, error: 'Incorrect password' };
       }
@@ -1003,7 +1014,11 @@ export const useSyncStore = defineStore('sync', () => {
     }
     const authStoreInst = useAuthStore();
     const provider = syncService.getProvider();
-    await registry.registerFamily(ctx.activeFamilyId, {
+    // `registerFamilyOrThrow` (not `registerFamily`) — the latter swallows
+    // network failures by design (fire-and-forget for background syncs).
+    // Pod creation NEEDS this write to surface as a failure so the recovery
+    // anchor invariant holds: post-`markPodCreated`, the registry has fileId.
+    await registry.registerFamilyOrThrow(ctx.activeFamilyId, {
       provider: storageProviderType.value ?? 'local',
       fileId: provider?.getFileId() ?? null,
       displayPath: provider?.getDisplayName() ?? fileName.value ?? null,
@@ -2094,6 +2109,21 @@ export const useSyncStore = defineStore('sync', () => {
     lastSaveError.value = null;
     error.value = null;
 
+    // Mark this as a critical load so the router beforeEach guard, the
+    // beforeunload handler, and the SetupProgressModal can react. Setting
+    // here covers every load entry point (Picker, /open, join flow,
+    // resume-from-registry) without each one needing to remember.
+    //
+    // Re-entrancy: we don't refuse a second call (load is read-only and
+    // idempotent — Drive returns the same bytes) but we do preserve a
+    // pre-existing 'creating' state so we don't overwrite it. The finally
+    // restores it. In practice the only realistic overlap is a sign-in
+    // racing with a never-fired createNewFile, which isn't a real concern.
+    const previousState = criticalWriteState.value;
+    if (previousState.kind === 'idle') {
+      criticalWriteState.value = { kind: 'loading' };
+    }
+
     try {
       const token = await requestAccessToken();
       await fetchGoogleUserEmail(token);
@@ -2137,6 +2167,158 @@ export const useSyncStore = defineStore('sync', () => {
     } catch (e) {
       error.value = (e as Error).message;
       return { success: false };
+    } finally {
+      // Only restore to idle if WE set it — otherwise a caller that wrapped
+      // us in their own critical section (e.g. a future orchestrator) keeps
+      // their context. Defensive against future composition mistakes.
+      if (previousState.kind === 'idle') {
+        criticalWriteState.value = { kind: 'idle' };
+      }
+    }
+  }
+
+  /**
+   * Resume-from-registry recovery — the orchestrator that makes
+   * `ResumePodSetup` non-destructive.
+   *
+   * The DynamoDB family registry stores `fileId` per family (written by
+   * `_registerCurrentFamilySync` inside every successful `createNewFile`).
+   * On a fresh device — or after iOS Safari evicts the IndexedDB provider
+   * config — `authStore.currentUser.familyId` is still set by the OAuth
+   * identity, so we can look up the registry entry, find the user's existing
+   * `.beanpod`, and fetch its encrypted envelope into `pendingEncryptedFile`.
+   * The user then enters their password and `completeAutoLoad` finishes.
+   *
+   * Critically: this does NOT call `createNewFile`. The previous recovery
+   * path did, generating a fresh family key and overwriting/duplicating the
+   * user's real `.beanpod` with an empty envelope (the Shaun-class data loss
+   * on 2026-05-15).
+   *
+   * Never throws — every failure mode is a typed result kind so the UI
+   * (`ResumePodSetup`) can render a flat switch.
+   */
+  async function attemptResumeFromRegistry(): Promise<ResumeFromRegistryResult> {
+    const ctx = useFamilyContextStore();
+    const authStoreInst = useAuthStore();
+    const familyId = ctx.activeFamilyId ?? authStoreInst.currentUser?.familyId ?? null;
+    if (!familyId) {
+      return { kind: 'no-registry-entry' };
+    }
+
+    let entry: RegistryEntry | null;
+    try {
+      entry = await registry.lookupFamily(familyId);
+    } catch (e) {
+      // `lookupFamily` is defensively coded to return null on any error, so
+      // this catch is a belt-and-braces guard for future contract drift.
+      return {
+        kind: 'registry-error',
+        error: e instanceof Error ? e : new Error(String(e)),
+      };
+    }
+
+    if (!entry || !entry.fileId || entry.provider !== 'google_drive') {
+      // Registry knows nothing about this family, or knows it as a local-file
+      // pod (which we can't auto-load — the file picker is user-driven).
+      // Either way the user picks storage manually in the fallback flow.
+      return { kind: 'no-registry-entry' };
+    }
+
+    // Fetch the encrypted envelope into `pendingEncryptedFile`. The inner
+    // `loadFromGoogleDrive` already sets `criticalWriteState = 'loading'`
+    // for its duration; we clear after so the user can interact with the
+    // password form. `completeAutoLoad` re-sets it for the decrypt step.
+    const loadResult = await loadFromGoogleDrive(
+      entry.fileId,
+      entry.displayPath ?? `${entry.familyName ?? 'pod'}.beanpod`
+    );
+
+    if (!loadResult.needsPassword) {
+      // Either succeeded outright (impossible — V4 envelopes always need a
+      // password) or hard-failed (network, token, 404, version). The
+      // `error` ref carries the message set by loadFromGoogleDrive.
+      return {
+        kind: 'load-failed',
+        error: new Error(error.value ?? 'Could not load pod file from Google Drive'),
+      };
+    }
+
+    return {
+      kind: 'auto-loadable',
+      familyName: entry.familyName ?? 'your family',
+      lastSaved: entry.updatedAt ?? null,
+      fileId: entry.fileId,
+    };
+  }
+
+  /**
+   * Second half of resume-from-registry: the user submitted the password.
+   * Unwrap → decrypt → materialize-check → replace state → markPodCreated.
+   *
+   * Returns a discriminated result so the UI can pick the right surface:
+   * - `success` → route to `/nook`
+   * - `wrong-password` → re-show the password form with an error
+   * - `corrupted` → render the canonical fatal-error modal (`App.initError`)
+   *   with diagnostics and a contact-support message; do NOT recreate.
+   * - `network-error` → recoverable, show a retry button.
+   */
+  async function completeAutoLoad(password: string): Promise<CompleteAutoLoadResult> {
+    const pending = pendingEncryptedFile.value;
+    if (!pending) {
+      return {
+        kind: 'network-error',
+        error: new Error('No pending pod envelope — fetch step did not run'),
+      };
+    }
+
+    const previousState = criticalWriteState.value;
+    if (previousState.kind === 'idle') {
+      criticalWriteState.value = { kind: 'loading' };
+    }
+
+    try {
+      const decryptResult = await decryptPendingFile(password);
+
+      if (decryptResult.corrupted) {
+        return {
+          kind: 'corrupted',
+          fileId: pending.driveFileId ?? '',
+          familyId: pending.envelope.familyId ?? '',
+          error: decryptResult.corrupted,
+        };
+      }
+
+      if (!decryptResult.success) {
+        if (decryptResult.error === 'Incorrect password') {
+          return { kind: 'wrong-password' };
+        }
+        return {
+          kind: 'network-error',
+          error: new Error(decryptResult.error ?? 'Could not decrypt pod file'),
+        };
+      }
+
+      // Decrypt + state replacement + cache write all succeeded. Flip the
+      // auth invariant — the user has a working pod again.
+      useAuthStore().markPodCreated();
+      return { kind: 'success' };
+    } catch (e) {
+      // `decryptPendingFile` catches its own errors and returns a result,
+      // but defensively handle a future contract drift.
+      const err = e instanceof Error ? e : new Error(String(e));
+      if (err instanceof CorruptPayloadError) {
+        return {
+          kind: 'corrupted',
+          fileId: pending.driveFileId ?? '',
+          familyId: pending.envelope.familyId ?? '',
+          error: err,
+        };
+      }
+      return { kind: 'network-error', error: err };
+    } finally {
+      if (previousState.kind === 'idle') {
+        criticalWriteState.value = { kind: 'idle' };
+      }
     }
   }
 
@@ -2469,6 +2651,8 @@ export const useSyncStore = defineStore('sync', () => {
     loadFromNewFile,
     loadFromDroppedFile,
     loadFromGoogleDrive,
+    attemptResumeFromRegistry,
+    completeAutoLoad,
     listGoogleDriveFiles,
     recoverFromMissingFile,
     decryptPendingFile,

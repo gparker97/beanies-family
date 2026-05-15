@@ -56,6 +56,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { setSoundEnabled } from '@/composables/useSounds';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
@@ -120,6 +121,21 @@ const initError = ref<string | null>(null);
 const initErrorDetail = ref<string | null>(null);
 const showClearConfirm = ref(false);
 const initBreadcrumbs: string[] = [];
+
+// Mirror the fatalErrorStore into the local refs that drive the recovery
+// overlay. Any non-App.vue caller (e.g. ResumePodSetup's corrupted-pod path)
+// uses the store; init-time failures still write `initError` directly. Both
+// paths land on the same overlay UI.
+const fatalErrorStore = useFatalErrorStore();
+watch(
+  () => [fatalErrorStore.message, fatalErrorStore.detail] as const,
+  ([msg, detail]) => {
+    if (msg) {
+      initError.value = msg;
+      initErrorDetail.value = detail;
+    }
+  }
+);
 const isMenuOpen = ref(false);
 const showTrustPrompt = ref(false);
 const showPasskeyPrompt = ref(false);

@@ -37,17 +37,47 @@ export async function lookupFamily(familyId: string): Promise<RegistryEntry | nu
 /**
  * Register or update a family's file location.
  * Fire-and-forget — failures are logged but never block the caller.
+ *
+ * Used by every non-critical write path (background sync, country change,
+ * etc.). Callers that NEED the write to succeed before they can proceed
+ * (notably `syncStore.createNewFile`, where the registry write is the
+ * recovery anchor for resume-from-registry) must use
+ * `registerFamilyOrThrow` instead.
  */
 export async function registerFamily(
   familyId: string,
   entry: Omit<RegistryEntry, 'familyId' | 'updatedAt'>
 ): Promise<void> {
-  if (!features.registry) return;
-
   try {
-    await request('PUT', familyId, entry);
+    await registerFamilyOrThrow(familyId, entry);
   } catch (err) {
     console.warn('[registry] registerFamily failed — registry unavailable', err);
+  }
+}
+
+/**
+ * Register or update a family's file location — THROWS on failure.
+ *
+ * Use from call sites where the registry write is critical (e.g. pod
+ * creation, where the recovery flow reads `fileId` from the registry to
+ * find the user's pod on a fresh device). For non-critical background
+ * writes, use `registerFamily` which swallows failures.
+ *
+ * Behaviour matches `registerFamily` in the registry-disabled case: it's
+ * a no-op success (the registry just isn't part of this self-host's
+ * feature set, so the contract is trivially satisfied).
+ */
+export async function registerFamilyOrThrow(
+  familyId: string,
+  entry: Omit<RegistryEntry, 'familyId' | 'updatedAt'>
+): Promise<void> {
+  if (!features.registry) return;
+
+  const res = await request('PUT', familyId, entry);
+  if (!res.ok) {
+    throw new Error(
+      `Registry PUT failed: HTTP ${res.status}${res.statusText ? ' ' + res.statusText : ''}`
+    );
   }
 }
 
