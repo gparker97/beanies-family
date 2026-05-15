@@ -3,9 +3,11 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { isMedicationActive, useMedicationsStore } from '@/stores/medicationsStore';
+import { useHolidayStore } from '@/stores/holidayStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { isAdultMember, useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
-import { formatTime12, formatDateShort } from '@/utils/date';
+import { formatTime12, formatDateShort, addDays, toISODateString } from '@/utils/date';
 import { useToday } from '@/composables/useToday';
 import { normalizeAssignees, formatNameList } from '@/utils/assignees';
 import { isTodoOverdue } from '@/utils/todo';
@@ -15,7 +17,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export interface CriticalItem {
   id: string;
-  type: 'todo' | 'activity' | 'medication';
+  type: 'todo' | 'activity' | 'medication' | 'holiday';
   message: string;
   icon: string;
   time: string; // HH:mm for sorting, '' if untimed
@@ -23,6 +25,7 @@ export interface CriticalItem {
   completable?: boolean; // whether this item can be checked off inline
   completed?: boolean; // whether this item is done
   dutyType?: 'dropoff' | 'pickup' | 'dropoff-pickup'; // for duty items only
+  caption?: string; // optional subtitle below the message (used by 'holiday')
 }
 
 /** How many briefing items show before the "Show all N" disclosure appears. */
@@ -105,6 +108,8 @@ export function useCriticalItems() {
   const todoStore = useTodoStore();
   const activityStore = useActivityStore();
   const medicationsStore = useMedicationsStore();
+  const holidayStore = useHolidayStore();
+  const settingsStore = useSettingsStore();
   const { getMemberName, getMemberById } = useMemberInfo();
   const { t } = useTranslation();
   const { today: todayStr } = useToday();
@@ -312,6 +317,26 @@ export function useCriticalItems() {
       if (!a.time && b.time) return 1;
       return 0;
     });
+
+    // ── Tomorrow's public holiday (pinned to position 0) ──────────────
+    // Gated on country + the planner's "show public holidays" toggle
+    // (`settingsStore.showPublicHolidays` auto-returns false when no
+    // country is set). One entry max per day; no checkbox.
+    if (settingsStore.showPublicHolidays) {
+      const tomorrowISO = toISODateString(addDays(new Date(todayStr.value + 'T00:00:00'), 1));
+      const holiday = holidayStore.holidayForDate(tomorrowISO);
+      if (holiday) {
+        items.unshift({
+          id: `holiday-${holiday.date}`,
+          type: 'holiday',
+          message: buildMessage('nook.holiday.tomorrow.message', { holidayName: holiday.name }),
+          caption: t('nook.holiday.tomorrow.caption'),
+          icon: '💡',
+          time: '',
+          completable: false,
+        });
+      }
+    }
 
     return items;
   });
