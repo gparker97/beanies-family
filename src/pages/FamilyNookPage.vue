@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import NookGreeting from '@/components/nook/NookGreeting.vue';
 import FamilyStatusToast from '@/components/nook/FamilyStatusToast.vue';
 import HolidayBriefingBanner from '@/components/nook/HolidayBriefingBanner.vue';
+import BirthdayConfettiOverlay from '@/components/nook/BirthdayConfettiOverlay.vue';
 import BeanListStrip from '@/components/common/BeanListStrip.vue';
 import ScheduleCards from '@/components/nook/ScheduleCards.vue';
 import NookTodoWidget from '@/components/nook/NookTodoWidget.vue';
@@ -208,8 +209,14 @@ async function handleTransactionDelete(id: string) {
     <NookGreeting />
 
     <!-- Day-of public holiday banner (renders only when there's a holiday today
-         and the user has `showPublicHolidays` enabled with a country set) -->
+         and the user has `showPublicHolidays` enabled with a country set, OR
+         when today is the viewer's birthday — which takes precedence) -->
     <HolidayBriefingBanner />
+
+    <!-- Birthday screen-fill celebration — one-shot per birthday per device,
+         gated on localStorage. Component is the gate; renders nothing on
+         non-birthday days. -->
+    <BirthdayConfettiOverlay />
 
     <!-- Status toast -->
     <FamilyStatusToast

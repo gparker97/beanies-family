@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-15",
-    "translationCount": 2871
+    "translationCount": 2874
   },
   "translations": {
     "app.name": {
@@ -14359,6 +14359,21 @@
     "nook.holiday.tomorrow.caption": {
       "translation": "学校和工作可能不上班",
       "hash": "k3ry6f",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.greeting.birthday": {
+      "translation": "{name} ，生日快乐！",
+      "hash": "ozm6zr",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.birthday.caption": {
+      "translation": "今天是您的特殊日子",
+      "hash": "37nv69",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.birthday.overlay": {
+      "translation": "{name} ，生日快乐！",
+      "hash": "uvplhj",
       "lastUpdated": "2026-05-15"
     }
   }
