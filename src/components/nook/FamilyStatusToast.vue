@@ -127,7 +127,10 @@ function handleItemClick(item: CriticalItem) {
           {{ title }}
         </p>
         <p class="mt-0.5 text-xs text-white/65">
-          {{ subtitle }}
+          <span class="font-outfit font-semibold tracking-wide text-white uppercase">{{
+            t('nook.briefingLabel')
+          }}</span>
+          <span class="mx-1.5 text-white/40">·</span>{{ subtitle }}
         </p>
       </div>
     </div>
