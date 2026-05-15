@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-15",
-    "translationCount": 2858
+    "translationCount": 2871
   },
   "translations": {
     "app.name": {
@@ -14294,6 +14294,71 @@
     "nook.briefingLabel": {
       "translation": "每日简报",
       "hash": "mzasck",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.greeting.christmas": {
+      "translation": "圣诞快乐，豆子",
+      "hash": "f9y6zw",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.greeting.newYear": {
+      "translation": "新年快乐，豆子",
+      "hash": "bc56pa",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.greeting.lunarNewYear": {
+      "translation": "农历新年快乐，豆子",
+      "hash": "sx5im0",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.greeting.easter": {
+      "translation": "复活节快乐，豆子",
+      "hash": "9bbf4r",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.greeting.mothersDay": {
+      "translation": "母亲节快乐，豆子",
+      "hash": "6x5w4k",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.greeting.fathersDay": {
+      "translation": "父亲节快乐，豆子",
+      "hash": "jm4jrp",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.greeting.thanksgiving": {
+      "translation": "感恩节快乐，豆子",
+      "hash": "yl7z8o",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.greeting.diwali": {
+      "translation": "排灯节快乐，豆类",
+      "hash": "fxvjel",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.greeting.eid": {
+      "translation": "开斋节穆巴拉克，豆类",
+      "hash": "uacjui",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.greeting.default": {
+      "translation": "今天是{holidayName}",
+      "hash": "jrkcjm",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.banner.caption": {
+      "translation": "学校和工作今天可能休息",
+      "hash": "tzawmg",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.tomorrow.message": {
+      "translation": "明天是{holidayName}",
+      "hash": "nhqiva",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.holiday.tomorrow.caption": {
+      "translation": "学校和工作可能不上班",
+      "hash": "k3ry6f",
       "lastUpdated": "2026-05-15"
     }
   }

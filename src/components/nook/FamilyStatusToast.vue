@@ -108,6 +108,8 @@ const title = computed(() => {
 function handleItemClick(item: CriticalItem) {
   if (item.type === 'todo') emit('open-todo', item.id);
   else if (item.type === 'medication') emit('open-medication', item.id);
+  else if (item.type === 'holiday')
+    return; // informational only — no target view
   else emit('open-activity', item.id, item.occurrenceDate ?? '');
 }
 </script>
@@ -145,7 +147,10 @@ function handleItemClick(item: CriticalItem) {
           v-for="(item, index) in shownItems"
           :key="item.id + item.type + item.time"
           class="critical-item"
-          :class="{ 'opacity-50': item.completed }"
+          :class="{
+            'opacity-50': item.completed,
+            'cursor-default': item.type === 'holiday',
+          }"
           :style="{ animationDelay: `${(index % CRITICAL_ITEMS_INITIAL_VISIBLE) * 60}ms` }"
           @click="handleItemClick(item)"
         >
@@ -175,16 +180,24 @@ function handleItemClick(item: CriticalItem) {
             {{ item.icon }}
           </span>
 
-          <!-- Message text -->
+          <!-- Message text (+ optional caption beneath, used by holiday items) -->
           <span
-            class="line-clamp-2 flex-1 text-xs leading-snug font-medium text-white/90"
-            :class="{ 'line-through': item.completed }"
+            class="flex-1 text-xs leading-snug font-medium text-white/90"
+            :class="{
+              'line-through': item.completed,
+              italic: item.type === 'holiday',
+              'line-clamp-2': item.type !== 'holiday',
+            }"
           >
             {{ item.message }}
+            <span v-if="item.caption" class="mt-0.5 block text-xs font-normal text-white/60">
+              {{ item.caption }}
+            </span>
           </span>
 
-          <!-- Tap chevron -->
+          <!-- Tap chevron (hidden for purely informational items like holidays) -->
           <svg
+            v-if="item.type !== 'holiday'"
             class="h-3.5 w-3.5 shrink-0 text-white/30 transition-transform group-hover:translate-x-0.5"
             viewBox="0 0 16 16"
             fill="none"
