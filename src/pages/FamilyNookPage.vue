@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import NookGreeting from '@/components/nook/NookGreeting.vue';
 import FamilyStatusToast from '@/components/nook/FamilyStatusToast.vue';
+import HolidayBriefingBanner from '@/components/nook/HolidayBriefingBanner.vue';
 import BeanListStrip from '@/components/common/BeanListStrip.vue';
 import ScheduleCards from '@/components/nook/ScheduleCards.vue';
 import NookTodoWidget from '@/components/nook/NookTodoWidget.vue';
@@ -205,6 +206,10 @@ async function handleTransactionDelete(id: string) {
   <div class="space-y-6">
     <!-- Greeting header -->
     <NookGreeting />
+
+    <!-- Day-of public holiday banner (renders only when there's a holiday today
+         and the user has `showPublicHolidays` enabled with a country set) -->
+    <HolidayBriefingBanner />
 
     <!-- Status toast -->
     <FamilyStatusToast

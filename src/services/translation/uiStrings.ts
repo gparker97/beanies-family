@@ -4387,6 +4387,54 @@ const STRING_DEFS = {
   'nook.spent': { en: 'Spent', beanie: 'spent' },
   'nook.received': { en: 'Received', beanie: 'received' },
 
+  // Holiday briefing — day-of greetings (allowlist) + tomorrow heads-up.
+  'nook.holiday.greeting.christmas': {
+    en: 'Merry Christmas, beans',
+    beanie: 'merry christmas, beans',
+  },
+  'nook.holiday.greeting.newYear': {
+    en: 'Happy New Year, beans',
+    beanie: 'happy new year, beans',
+  },
+  'nook.holiday.greeting.lunarNewYear': {
+    en: 'Happy Lunar New Year, beans',
+    beanie: 'happy lunar new year, beans',
+  },
+  'nook.holiday.greeting.easter': { en: 'Happy Easter, beans', beanie: 'happy easter, beans' },
+  'nook.holiday.greeting.mothersDay': {
+    en: "Happy Mother's Day, beans",
+    beanie: "happy mother's day, beans",
+  },
+  'nook.holiday.greeting.fathersDay': {
+    en: "Happy Father's Day, beans",
+    beanie: "happy father's day, beans",
+  },
+  'nook.holiday.greeting.thanksgiving': {
+    en: 'Happy Thanksgiving, beans',
+    beanie: 'happy thanksgiving, beans',
+  },
+  'nook.holiday.greeting.diwali': {
+    en: 'Happy Diwali, beans',
+    beanie: 'happy diwali, beans',
+  },
+  'nook.holiday.greeting.eid': { en: 'Eid Mubarak, beans', beanie: 'eid mubarak, beans' },
+  'nook.holiday.greeting.default': {
+    en: 'Today is {holidayName}',
+    beanie: 'today is {holidayName}',
+  },
+  'nook.holiday.banner.caption': {
+    en: 'School and work may be off today',
+    beanie: 'school and work may be off today',
+  },
+  'nook.holiday.tomorrow.message': {
+    en: 'Tomorrow is {holidayName}',
+    beanie: 'tomorrow is {holidayName}',
+  },
+  'nook.holiday.tomorrow.caption': {
+    en: 'School and work may be off',
+    beanie: 'school and work may be off',
+  },
+
   // Mobile navigation — v3 bottom nav uses 4 category tabs.
   'mobile.nook': { en: 'Nook', beanie: 'nook' },
   'mobile.planning': { en: 'Planning', beanie: 'planning' },
