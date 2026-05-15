@@ -19,7 +19,9 @@ export class TransactionsPage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto('/transactions', { waitUntil: 'domcontentloaded' });
+    // See `gotoRoot` — `waitUntil: 'commit'` survives the webkit-CI race
+    // where `domcontentloaded` loses to the SPA's first-paint redirect.
+    await this.page.goto('/transactions', { waitUntil: 'commit' });
   }
 
   /**

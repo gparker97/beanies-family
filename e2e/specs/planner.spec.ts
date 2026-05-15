@@ -24,8 +24,9 @@ test.describe('Family Planner', () => {
     await gotoRoot(page);
     await bypassLoginIfNeeded(page);
 
-    // Navigate to planner (defaults to month view)
-    await page.goto('/activities');
+    // Navigate to planner (defaults to month view).
+    // `waitUntil: 'commit'` survives the webkit-CI first-paint redirect race.
+    await page.goto('/activities', { waitUntil: 'commit' });
     await page.waitForURL('/activities');
   }
 
