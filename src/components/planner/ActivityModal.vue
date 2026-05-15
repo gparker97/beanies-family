@@ -27,6 +27,7 @@ import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { getActivityCategoryColor, getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { addHourToTime, formatNookDate } from '@/utils/date';
+import { buildRecurrenceOptions } from '@/utils/format';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import type {
   FamilyActivity,
@@ -69,10 +70,15 @@ const endDate = ref('');
 const isAllDay = ref(false);
 const startTime = ref('');
 const endTime = ref('');
-const recurrenceMode = ref<'recurring' | 'one-off'>('recurring');
-const recurrenceFrequency = ref<'weekly' | 'monthly'>('weekly');
+// Single source of truth for the activity's recurrence rule. The pill row
+// below presents all 5 options (One-time / Weekly / Every 2 weeks / Monthly
+// on the Nth / Monthly on the Nth weekday) directly — no separate mode
+// toggle. Auto-labelled via `buildRecurrenceOptions` so each pill spells
+// out what it means using the current start date.
+const recurrence = ref<ActivityRecurrence>('weekly');
 const daysOfWeek = ref<number[]>([]);
 const recurrenceEndDate = ref('');
+const isRecurring = computed(() => recurrence.value !== 'none');
 const category = ref<ActivityCategory>('' as ActivityCategory);
 const assigneeIds = ref<string[]>([]);
 const dropoffMemberId = ref<string>('');
@@ -94,11 +100,13 @@ const color = ref('');
 const showMoreDetails = ref(false);
 const showErrors = ref(false);
 
-// Map recurrence mode + frequency to ActivityRecurrence
-const effectiveRecurrence = computed<ActivityRecurrence>(() => {
-  if (recurrenceMode.value === 'one-off') return 'none';
-  return recurrenceFrequency.value;
-});
+// The 5 pill options, auto-labelled from the current `date`. Vue's reactivity
+// re-evaluates this whenever `date` changes, so the pill labels update live
+// (e.g. typing 13 May → "Monthly on the 13th" / "Monthly on the 2nd Wed";
+// changing to 20 May → "Monthly on the 20th" / "Monthly on the 3rd Wed").
+const recurrenceOptions = computed(() =>
+  buildRecurrenceOptions({ date: date.value, daysOfWeek: daysOfWeek.value }, t)
+);
 
 // Check if any "more details" field has data (for auto-expand in edit mode)
 function hasDetailData(activity: FamilyActivity): boolean {
@@ -126,13 +134,7 @@ const { isEditing, isSubmitting } = useFormModal(
       isAllDay.value = activity.isAllDay ?? false;
       startTime.value = activity.startTime ?? '';
       endTime.value = activity.endTime ?? '';
-      recurrenceMode.value = activity.recurrence === 'none' ? 'one-off' : 'recurring';
-      recurrenceFrequency.value =
-        activity.recurrence === 'monthly'
-          ? 'monthly'
-          : activity.recurrence === 'weekly'
-            ? 'weekly'
-            : 'weekly';
+      recurrence.value = activity.recurrence;
       daysOfWeek.value = activity.daysOfWeek ?? [];
       recurrenceEndDate.value = activity.recurrenceEndDate ?? '';
       category.value = activity.category;
@@ -165,8 +167,7 @@ const { isEditing, isSubmitting } = useFormModal(
       isAllDay.value = false;
       startTime.value = props.defaultStartTime ?? '09:00';
       endTime.value = addHourToTime(startTime.value);
-      recurrenceMode.value = 'recurring';
-      recurrenceFrequency.value = 'weekly';
+      recurrence.value = 'weekly';
       daysOfWeek.value = [];
       recurrenceEndDate.value = '';
       category.value = '' as ActivityCategory;
@@ -200,9 +201,10 @@ watch(category, (newCategory) => {
   color.value = getActivityCategoryColor(newCategory);
 });
 
-// Auto-set daysOfWeek from date if empty
+// Auto-set daysOfWeek from date if empty (only relevant for recurring kinds
+// that respect daysOfWeek — currently just weekly).
 watch(date, (newDate) => {
-  if (newDate && daysOfWeek.value.length === 0 && recurrenceMode.value === 'recurring') {
+  if (newDate && daysOfWeek.value.length === 0 && isRecurring.value) {
     const d = new Date(newDate + 'T00:00:00');
     daysOfWeek.value = [d.getDay()];
   }
@@ -239,9 +241,7 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-const allScheduleEnabled = computed(
-  () => recurrenceMode.value === 'recurring' && !!recurrenceEndDate.value
-);
+const allScheduleEnabled = computed(() => isRecurring.value && !!recurrenceEndDate.value);
 
 const feeScheduleChipOptions = computed(() => {
   const allChip = {
@@ -278,11 +278,6 @@ const reminderChipOptions = [
   { value: '1440', label: '1 day' },
 ];
 
-const frequencyOptions = [
-  { value: 'weekly', label: t('planner.recurrence.weekly') },
-  { value: 'monthly', label: t('planner.recurrence.monthly') },
-];
-
 const hasCost = computed(() => (feeAmount.value ?? 0) > 0);
 
 const isAllSchedule = computed(() => feeSchedule.value === 'all');
@@ -305,7 +300,7 @@ const totalSessions = computed(() => {
   const end = new Date(recurrenceEndDate.value + 'T00:00:00');
   if (end < start) return 1;
 
-  if (recurrenceFrequency.value === 'weekly') {
+  if (recurrence.value === 'weekly') {
     // Count exact matching days-of-week between start and end (inclusive)
     const targetDays = daysOfWeek.value.length > 0 ? daysOfWeek.value : [start.getDay()];
     let count = 0;
@@ -372,15 +367,13 @@ function buildPayload(): CreateFamilyActivityInput {
     isAllDay: isAllDay.value || undefined,
     startTime: isAllDay.value ? undefined : startTime.value || undefined,
     endTime: isAllDay.value ? undefined : endTime.value || undefined,
-    recurrence: effectiveRecurrence.value,
-    daysOfWeek:
-      recurrenceMode.value === 'recurring' && effectiveRecurrence.value === 'weekly'
-        ? [...daysOfWeek.value]
-        : undefined,
+    recurrence: recurrence.value,
+    // `daysOfWeek` only persisted for weekly (multi-day picker). Other
+    // kinds (biweekly anchored single-day, monthly variants) derive their
+    // anchor from the activity's `date` per the recurrence-rule contract.
+    daysOfWeek: recurrence.value === 'weekly' ? [...daysOfWeek.value] : undefined,
     recurrenceEndDate:
-      recurrenceMode.value === 'recurring' && recurrenceEndDate.value
-        ? recurrenceEndDate.value
-        : undefined,
+      isRecurring.value && recurrenceEndDate.value ? recurrenceEndDate.value : undefined,
     category: category.value,
     ...assigneePayload,
     dropoffMemberId: dropoffMemberId.value || undefined,
@@ -561,62 +554,12 @@ function handleSave() {
         </div>
       </div>
 
-      <!-- 1. Schedule mode tab bar (recurring / one-time) -->
-      <div class="rounded-2xl bg-[var(--tint-slate-5)] p-1.5 dark:bg-slate-700/50">
-        <div class="grid grid-cols-2 gap-1.5">
-          <button
-            v-for="opt in [
-              {
-                value: 'recurring',
-                icon: '🔁',
-                label: t('vacation.scheduleRecurring'),
-                desc: t('vacation.scheduleRecurringDesc'),
-              },
-              {
-                value: 'one-off',
-                icon: '📌',
-                label: t('vacation.scheduleOneTime'),
-                desc: t('vacation.scheduleOneTimeDesc'),
-              },
-            ]"
-            :key="opt.value"
-            type="button"
-            class="relative flex flex-col items-center gap-0.5 rounded-xl px-3 py-2.5 transition-all duration-200"
-            :class="
-              recurrenceMode === opt.value
-                ? 'border-primary-500 border-2 bg-white shadow-sm dark:bg-slate-600'
-                : 'border-2 border-transparent hover:bg-white/60 dark:hover:bg-slate-600/40'
-            "
-            @click="recurrenceMode = opt.value as 'recurring' | 'one-off'"
-          >
-            <span class="text-lg leading-none">{{ opt.icon }}</span>
-            <span
-              class="font-outfit text-xs font-bold"
-              :class="
-                recurrenceMode === opt.value
-                  ? 'text-[var(--color-text)] dark:text-gray-100'
-                  : 'text-[var(--color-text)] opacity-35 dark:text-gray-400'
-              "
-            >
-              {{ opt.label }}
-            </span>
-            <span
-              class="text-[0.625rem]"
-              :class="
-                recurrenceMode === opt.value
-                  ? 'text-[var(--color-text-muted)]'
-                  : 'opacity-25 dark:text-gray-500'
-              "
-            >
-              {{ opt.desc }}
-            </span>
-            <span
-              v-if="recurrenceMode === opt.value"
-              class="bg-primary-500 absolute bottom-1.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full"
-            />
-          </button>
-        </div>
-      </div>
+      <!-- 1. Recurrence pill row — one click = one decision. Pill labels are
+           auto-generated from the activity's `date` so each option spells
+           out what it means (e.g. "Monthly on the 2nd Tue"). -->
+      <FormFieldGroup :label="t('modal.schedule')">
+        <FrequencyChips v-model="recurrence" :options="recurrenceOptions" />
+      </FormFieldGroup>
 
       <!-- 2. Activity title -->
       <FormFieldGroup :label="t('modal.whatsTheActivity')" required :error="errorTitle">
@@ -632,15 +575,12 @@ function handleSave() {
         </div>
       </FormFieldGroup>
 
-      <!-- 3. Schedule: frequency + day-of-week (recurring only) -->
-      <template v-if="recurrenceMode === 'recurring'">
-        <FormFieldGroup :label="t('modal.schedule')">
-          <div class="space-y-3">
-            <FrequencyChips v-model="recurrenceFrequency" :options="frequencyOptions" />
-            <DayOfWeekSelector v-if="recurrenceFrequency === 'weekly'" v-model="daysOfWeek" />
-          </div>
-        </FormFieldGroup>
-      </template>
+      <!-- 3. Day-of-week selector — only relevant for weekly multi-day
+           (e.g. Mon + Wed + Fri). Other kinds anchor to the activity's
+           `date` per the recurrence-rule contract. -->
+      <FormFieldGroup v-if="recurrence === 'weekly'" :label="t('planner.field.dayOfWeek')">
+        <DayOfWeekSelector v-model="daysOfWeek" />
+      </FormFieldGroup>
 
       <!-- 4. All-day toggle -->
       <FormFieldGroup :label="t('planner.allDay')">
@@ -658,7 +598,7 @@ function handleSave() {
 
       <!-- 5. Date + Times -->
       <!-- Recurring: Start Date / End Date row, then Start Time / End Time row -->
-      <template v-if="recurrenceMode === 'recurring'">
+      <template v-if="isRecurring">
         <div class="grid grid-cols-2 gap-4">
           <FormFieldGroup :label="t('planner.field.date')" required :error="errorDate">
             <BeanieDatePicker v-model="date" required />
@@ -729,7 +669,7 @@ function handleSave() {
       <!-- 9. Cost + Fee Schedule -->
       <FormFieldGroup
         :label="
-          recurrenceMode === 'one-off'
+          !isRecurring
             ? t('planner.fee.totalCost')
             : isAllSchedule
               ? t('planner.fee.totalCost')
@@ -743,7 +683,7 @@ function handleSave() {
         />
       </FormFieldGroup>
       <!-- Fee schedule chips (recurring only — one-off activities just have a flat cost) -->
-      <template v-if="recurrenceMode === 'recurring'">
+      <template v-if="isRecurring">
         <FormFieldGroup :label="t('planner.field.feeSchedule')">
           <template #label-extra>
             <InfoHintBadge
@@ -814,19 +754,15 @@ function handleSave() {
 
       <!-- Linked payment prompt -->
       <RecurringPaymentPrompt
-        v-if="hasCost && (recurrenceMode === 'recurring' ? feeSchedule !== 'none' : true)"
+        v-if="hasCost && (isRecurring ? feeSchedule !== 'none' : true)"
         v-model="createRecurringPayment"
         :pay-from-account-id="feePayFromAccountId"
         :payment-amount="
-          recurrenceMode === 'one-off'
-            ? (feeAmount ?? 0)
-            : isAllSchedule
-              ? (feeAmount ?? 0)
-              : calculatedMonthly
+          !isRecurring ? (feeAmount ?? 0) : isAllSchedule ? (feeAmount ?? 0) : calculatedMonthly
         "
         :currency="feeCurrency || 'USD'"
         :start-date="date"
-        :frequency="recurrenceMode === 'one-off' || isAllSchedule ? 'one-time' : 'monthly'"
+        :frequency="!isRecurring || isAllSchedule ? 'one-time' : 'monthly'"
         @update:pay-from-account-id="feePayFromAccountId = $event"
       />
 

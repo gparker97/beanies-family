@@ -460,7 +460,36 @@ export type ActivityCategory =
   | 'other_appointment'
   // Other
   | 'other_activity';
-export type ActivityRecurrence = 'weekly' | 'daily' | 'monthly' | 'yearly' | 'none';
+/**
+ * Recurrence rule for a `FamilyActivity`.
+ *
+ * The rule is fully determined by THIS enum value plus the activity's
+ * `date`, `daysOfWeek` (weekly only), and `recurrenceEndDate`. There
+ * are NO hidden anchor fields — anything else (day-of-month for `'monthly'`,
+ * nth-weekday + day-of-week for `'monthly-by-day'`) is derived from
+ * `date` at occurrence-generation time. If you need an anchor that
+ * differs from what `date` implies, change the start date or the
+ * recurrence kind; don't add a new field.
+ *
+ * For `'monthly-by-day'`: the nth-weekday anchor is `ceil(startDate.getDate() / 7)`,
+ * coerced to `-1` ("last weekday of month") when that would be 5 — so an
+ * activity starting on the 5th Wednesday of its month becomes "last Wednesday
+ * of every month". Matches Google Calendar's behaviour; produces an
+ * occurrence in every month (vs. silently skipping months with only 4
+ * Wednesdays).
+ *
+ * For `'biweekly'`: single day-of-week anchored to `date`, step 14 days.
+ * Multi-day biweekly ("every other Mon + Wed") is intentionally not supported
+ * — `daysOfWeek` is ignored for this kind.
+ */
+export type ActivityRecurrence =
+  | 'none'
+  | 'daily'
+  | 'weekly'
+  | 'biweekly'
+  | 'monthly'
+  | 'monthly-by-day'
+  | 'yearly';
 export type FeeSchedule =
   | 'none'
   | 'per_session'

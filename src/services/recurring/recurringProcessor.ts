@@ -15,6 +15,7 @@ import {
 } from '@/utils/date';
 import { computeGoalAllocRaw, calculateBalanceAdjustment } from '@/utils/finance';
 import { calculateAmortization, findLoanDetails } from '@/utils/loanPayment';
+import { getOrdinalSuffix } from '@/utils/format';
 
 export interface ProcessResult {
   processed: number;
@@ -363,13 +364,6 @@ export function formatFrequency(item: RecurringItem): string {
     default:
       return item.frequency;
   }
-}
-
-function getOrdinalSuffix(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  const suffix = s[(v - 20) % 10] ?? s[v] ?? s[0] ?? 'th';
-  return n + suffix;
 }
 
 function getMonthName(month: number): string {
