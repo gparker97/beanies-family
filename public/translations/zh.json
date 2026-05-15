@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-14",
-    "translationCount": 2830
+    "lastUpdated": "2026-05-15",
+    "translationCount": 2836
   },
   "translations": {
     "app.name": {
@@ -14155,6 +14155,36 @@
       "translation": "清除日期",
       "hash": "jvmu9t",
       "lastUpdated": "2026-05-14"
+    },
+    "createPod.failedReasonWrite": {
+      "translation": "我们无法将您的pod保存到您的存储空间。请检查您的网络连接，然后重试。",
+      "hash": "g5vh6b",
+      "lastUpdated": "2026-05-15"
+    },
+    "createPod.failedReasonVerify": {
+      "translation": "我们已保存您的Pod ，但无法验证其是否正确加载。请重试—您之前的尝试已被搁置，因此无法加载。",
+      "hash": "b8wp59",
+      "lastUpdated": "2026-05-15"
+    },
+    "createPod.failedReasonPersist": {
+      "translation": "我们已保存您的Pod ，但无法将其缓存在此设备上。请重试。",
+      "hash": "cep5y1",
+      "lastUpdated": "2026-05-15"
+    },
+    "createPod.failedReasonRegister": {
+      "translation": "我们保存了您的pod ，但无法访问我们的家庭登记处。请检查您的网络连接，然后重试。",
+      "hash": "hn7mth",
+      "lastUpdated": "2026-05-15"
+    },
+    "createPod.failedReasonPrecondition": {
+      "translation": "我们在准备您的吊舱时遇到了问题。请刷新页面并重试。",
+      "hash": "tuoe7f",
+      "lastUpdated": "2026-05-15"
+    },
+    "createPod.failedReasonConcurrent": {
+      "translation": "另一个Pod设置已在进行中。请稍等片刻，然后重试。",
+      "hash": "8aon81",
+      "lastUpdated": "2026-05-15"
     }
   }
 }

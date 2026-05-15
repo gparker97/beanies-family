@@ -159,20 +159,20 @@ async function finalizePod(): Promise<boolean> {
     return false;
   }
   const podFileName = `${familyContextStore.activeFamilyName || 'my-family'}.beanpod`;
-  const ok = await syncStore.createNewFile(
+  const result = await syncStore.createNewFile(
     podFileName,
     password.value,
     user.memberId,
     familyContextStore.activeFamilyId ?? user.familyId ?? '',
     familyContextStore.activeFamilyName ?? 'My Family'
   );
-  if (!ok) {
-    const msg = syncStore.error ?? t('setup.fileCreateFailed');
-    formError.value = msg;
-    console.error('[ResumePodSetup] createNewFile failed:', msg);
+  if (!result.ok) {
+    formError.value = t('setup.fileCreateFailed');
+    console.error(`[ResumePodSetup] createNewFile failed (reason=${result.reason}):`, result.error);
     reportError({
-      surface: 'resumeSetup.finalize',
-      message: `createNewFile failed during resume: ${msg}`,
+      surface: `resumeSetup.${result.reason}`,
+      message: `createNewFile failed during resume at step '${result.reason}': ${result.error.message}`,
+      error: result.error,
       severity: 'error',
       context: { provider_type: syncStore.storageProviderType ?? null },
     });
