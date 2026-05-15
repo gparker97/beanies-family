@@ -6,7 +6,7 @@ category: use-case
 coverImage: /blog/activity-finance-linking.png
 excerpt: 'your family married to your finances (with apologies to lin-manuel miranda).'
 subtitle: 'your family married to your finances (with apologies to lin-manuel miranda)'
-featured: true
+featured: false
 author: greg
 draft: false
 ---
