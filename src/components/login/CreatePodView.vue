@@ -274,6 +274,24 @@ async function handleChooseGoogleDriveStorage() {
       storageSaved.value = true;
       storageType.value = 'google_drive';
       showDriveResultModal.value = true; // success state
+    } else if (r.errorKind === 'name-collision') {
+      // A `.beanpod` with this family-name already exists in the user's
+      // Drive folder. Surface a focused message + a hint to pick a different
+      // family name — rather than the generic "auth failed" copy. The
+      // existing file is NOT touched (vs. the pre-fix behaviour of silently
+      // creating a duplicate and orphaning the original).
+      driveResultError.value = t('createPod.duplicateFile');
+      console.error('[CreatePodView] Drive name collision:', r.error);
+      reportError({
+        surface: 'createPod.nameCollision',
+        message: r.error,
+        severity: 'warning',
+        context: {
+          provider_type: 'google_drive',
+          collision_file_id: r.collisionFileId ?? null,
+        },
+      });
+      showDriveResultModal.value = true;
     } else {
       driveResultError.value = r.error || t('googleDrive.authFailed');
       // A genuine cancellation (closed the chooser) is benign; anything else

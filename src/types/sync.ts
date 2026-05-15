@@ -52,6 +52,60 @@ export type CriticalWriteState =
   | { kind: 'creating' } // syncStore.createNewFile in flight
   | { kind: 'loading' }; // syncStore.loadFromGoogleDrive (recovery) in flight
 
+// ─── Resume-from-registry recovery ────────────────────────────────────────
+
+/**
+ * `attemptResumeFromRegistry` result.
+ *
+ * - `auto-loadable` — the registry has a `fileId` for this family AND we
+ *   successfully fetched the envelope; password prompt is next.
+ * - `no-registry-entry` — the family is unknown to the registry (genuinely
+ *   never finished setup, or registry write was lost). Fall back to the
+ *   current "pick storage" flow.
+ * - `registry-error` — lookup threw or returned an unexpected shape.
+ *   Treated as recoverable; UI falls back to pick-storage with a
+ *   "couldn't reach our servers" hint.
+ * - `load-failed` — registry had a fileId but the Drive load itself failed
+ *   (token denied, file 404, network error). UI surfaces and offers retry
+ *   / fallback.
+ */
+export type ResumeFromRegistryResult =
+  | {
+      kind: 'auto-loadable';
+      familyName: string;
+      lastSaved: string | null;
+      fileId: string;
+    }
+  | { kind: 'no-registry-entry' }
+  | { kind: 'registry-error'; error: Error }
+  | { kind: 'load-failed'; error: Error };
+
+/**
+ * `completeAutoLoad` result — what happened when the user submitted their
+ * password against the envelope `attemptResumeFromRegistry` fetched.
+ *
+ * - `success` — decrypt + state setup + markPodCreated all succeeded.
+ * - `wrong-password` — the password didn't unwrap any wrapped key.
+ *   Caller shows the password form's error state; user retries.
+ * - `corrupted` — the bytes decrypted but failed Automerge load/materialize.
+ *   This is the Shaun-class failure mode at READ time. Caller surfaces a
+ *   "your pod file is damaged — contact support" screen with diagnostic
+ *   context; do NOT fall back to `createNewFile` (that's what caused the
+ *   original data loss).
+ * - `network-error` — anything else (Drive 5xx, IndexedDB write fail, etc.).
+ *   Recoverable — user retries or contacts support.
+ */
+export type CompleteAutoLoadResult =
+  | { kind: 'success' }
+  | { kind: 'wrong-password' }
+  | {
+      kind: 'corrupted';
+      fileId: string;
+      familyId: string;
+      error: CorruptPayloadError;
+    }
+  | { kind: 'network-error'; error: Error };
+
 // ─── Typed errors ─────────────────────────────────────────────────────────
 
 /**

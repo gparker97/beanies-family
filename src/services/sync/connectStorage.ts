@@ -20,6 +20,7 @@ import {
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import * as syncService from '@/services/sync/syncService';
 import { withTimeout } from '@/utils/timing';
+import { FileNameCollisionError } from '@/types/sync';
 
 /** Path the OAuth redirect returns to — `LoginPage` shows the resume-setup screen here. */
 export const RESUME_SETUP_PATH = '/welcome?resume=setup';
@@ -34,6 +35,15 @@ export interface StorageConnectFailed {
   status: 'failed';
   error: string;
   cancelled?: boolean;
+  /**
+   * Discriminator for failure classes the caller may want to surface with
+   * a focused message. Currently only `name-collision` (Drive folder already
+   * has a `.beanpod` with this name); other failures pass through with no
+   * `errorKind` set and the caller shows the generic error.
+   */
+  errorKind?: 'name-collision';
+  /** Set when `errorKind === 'name-collision'`. */
+  collisionFileId?: string;
 }
 /** A full-page redirect to Google is in flight; nothing after this runs. */
 export interface StorageRedirecting {
@@ -81,6 +91,14 @@ export async function connectDriveStorage(
     if (opts.activeFamilyId) await provider.persist(opts.activeFamilyId);
     return { status: 'connected', type: 'google_drive' };
   } catch (e) {
+    if (e instanceof FileNameCollisionError) {
+      return {
+        status: 'failed',
+        error: e.message,
+        errorKind: 'name-collision',
+        collisionFileId: e.existingFileId,
+      };
+    }
     return { status: 'failed', error: e instanceof Error ? e.message : String(e) };
   }
 }

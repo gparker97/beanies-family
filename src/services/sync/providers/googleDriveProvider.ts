@@ -30,10 +30,12 @@ import {
   patchFileMetadata,
   getOrCreateAppFolder,
   createFile,
+  listBeanpodFiles,
   clearFolderCache,
   DriveApiError,
 } from '@/services/google/driveService';
 import { enqueueOfflineSave, setFlushProvider } from '../offlineQueue';
+import { FileNameCollisionError } from '@/types/sync';
 
 /**
  * Retry a Drive API call with exponential backoff on transient failures.
@@ -336,6 +338,35 @@ export class GoogleDriveProvider implements StorageProvider {
     const email = await fetchGoogleUserEmail(token);
 
     const folderId = await getOrCreateAppFolder(token);
+
+    // Collision check before creating — Drive happily allows multiple files
+    // with the same name in the same folder (different fileIds), which is
+    // how the 2026-05-15 incident orphaned a real pod with an empty
+    // duplicate. If a file with this name already exists, throw a typed
+    // error so the caller (`connectStorage.connectDriveStorage`) can surface
+    // a focused "duplicate name" message and let the user pick a different
+    // family name. List failure is non-fatal — fall through to create as
+    // before; the worst case is we re-introduce the original behaviour for
+    // this user, not data loss.
+    try {
+      const existing = await listBeanpodFiles(token, folderId);
+      const collision = existing.find((f) => f.name === fileName);
+      if (collision) {
+        throw new FileNameCollisionError(
+          `A .beanpod file named "${fileName}" already exists in this Google Drive folder (fileId: ${collision.fileId})`,
+          collision.fileId,
+          fileName
+        );
+      }
+    } catch (e) {
+      // Re-throw the typed collision — only swallow listing failures.
+      if (e instanceof FileNameCollisionError) throw e;
+      console.warn(
+        '[GoogleDriveProvider.createNew] pre-create collision check failed (continuing):',
+        e
+      );
+    }
+
     const { fileId, name } = await createFile(token, folderId, fileName, '{}');
     const provider = new GoogleDriveProvider(fileId, name, email);
 

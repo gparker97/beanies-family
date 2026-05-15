@@ -292,6 +292,8 @@ vi.mock('@/services/sync/offlineQueue', () => ({
 // Registry service
 vi.mock('@/services/registry/registryService', () => ({
   registerFamily: vi.fn(async () => {}),
+  registerFamilyOrThrow: vi.fn(async () => {}),
+  lookupFamily: vi.fn(async () => null),
   removeFamily: vi.fn(async () => {}),
 }));
 
@@ -520,11 +522,11 @@ describe('pod creation: full end-to-end flow', () => {
     expect(useAuthStore().podCreated).toBe(false);
   });
 
-  it('returns reason="register" when registry.registerFamily throws', async () => {
+  it('returns reason="register" when registry.registerFamilyOrThrow throws', async () => {
     const { memberId } = await signUpAndConfigureStorage();
     const syncStore = useSyncStore();
     const registry = await import('@/services/registry/registryService');
-    vi.mocked(registry.registerFamily).mockRejectedValueOnce(new Error('Registry 503'));
+    vi.mocked(registry.registerFamilyOrThrow).mockRejectedValueOnce(new Error('Registry 503'));
     const result = await syncStore.createNewFile(
       'test.beanpod',
       'pod-password',

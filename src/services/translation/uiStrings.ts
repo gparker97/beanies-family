@@ -2760,6 +2760,11 @@ const STRING_DEFS = {
     en: 'Another pod setup is already in progress. Please wait a moment and try again.',
     beanie: 'another pod setup is already in progress. please wait a moment and try again.',
   },
+  'createPod.duplicateFile': {
+    en: "A pod file with this family name already exists in your Google Drive. Please pick a different family name and try again — we won't touch the existing file.",
+    beanie:
+      "a pod file with this family name already exists in your google drive. please pick a different family name and try again — we won't touch the existing file.",
+  },
 
   // Auth
   'auth.signingIn': { en: 'Signing in...', beanie: 'signing in...' },
@@ -3205,6 +3210,47 @@ const STRING_DEFS = {
   'resumeSetup.startOver': {
     en: 'Start over instead',
     beanie: 'start over instead',
+  },
+
+  // Auto-load (non-destructive) recovery — shown when the family registry
+  // confirms the user already has a pod we can fetch. Replaces the
+  // destructive "rebuild from scratch" path that produced the 2026-05-15
+  // data loss for Shaun. See `attemptResumeFromRegistry` in syncStore.
+  'resumeSetup.checking': {
+    en: 'Looking for your pod…',
+    beanie: 'looking for your pod…',
+  },
+  'resumeSetup.foundPod': {
+    en: "We found your family's pod. Enter your password to unlock it.",
+    beanie: "we found your family's pod. enter your password to unlock it.",
+  },
+  'resumeSetup.lastSaved': {
+    en: 'Last saved:',
+    beanie: 'last saved:',
+  },
+  'resumeSetup.unlockPod': {
+    en: 'Unlock my pod',
+    beanie: 'unlock my pod',
+  },
+  'resumeSetup.couldNotFindPod': {
+    en: "We couldn't auto-load your pod — please pick where it lives below.",
+    beanie: "we couldn't auto-load your pod — please pick where it lives below.",
+  },
+  'resumeSetup.registryError': {
+    en: "We couldn't reach our family servers right now — please pick where your pod lives below, or try again in a moment.",
+    beanie:
+      "we couldn't reach our family servers right now — please pick where your pod lives below, or try again in a moment.",
+  },
+  'resumeSetup.podCorrupted': {
+    en: "Your pod file appears damaged and can't be opened. Please contact support@beanies.family with the diagnostic details below — we may be able to help.",
+    beanie:
+      "your pod file appears damaged and can't be opened. please contact support@beanies.family with the diagnostic details below — we may be able to help.",
+  },
+
+  // Generic "wrong password" prompt — used by ResumePodSetup auto-load too.
+  'auth.passwordIncorrect': {
+    en: "That password didn't unlock the pod. Please try again.",
+    beanie: "that password didn't unlock the pod. please try again.",
   },
   'loginV6.alreadyHavePod': { en: 'Already have a pod?', beanie: 'already have a pod?' },
   'loginV6.loadItLink': { en: 'Load it', beanie: 'load it' },

@@ -7,6 +7,7 @@ import {
 import { useTranslationStore } from '@/stores/translationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useSyncStore } from '@/stores/syncStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { MARKETING_URL } from '@/utils/marketing';
 import { showToast } from '@/composables/useToast';
@@ -283,6 +284,27 @@ const router = createRouter({
 // user may legitimately be accepting an invite to a different pod, and the
 // OAuth callback must always execute its handler regardless of state.
 const ALREADY_AUTH_REDIRECT_FROM = new Set(['/welcome', '/login']);
+
+/**
+ * Critical-write guard. When `syncStore.createNewFile` or the recovery
+ * `loadFromGoogleDrive` is in flight, we cannot let the user navigate away
+ * — the in-flight write hasn't reached its point of no return yet, and a
+ * mid-flight nav would leave durable state inconsistent. The
+ * SetupProgressModal is showing during these windows so the user gets
+ * visual feedback for why their click didn't navigate.
+ *
+ * Paired with `App.vue:beforeunload`, which returns truthy in the same
+ * state so the native browser confirm fires for close-tab.
+ *
+ * Lives above every other guard because none of the others matter while a
+ * critical write is in flight — block first, ask questions later.
+ */
+router.beforeEach(() => {
+  const syncStore = useSyncStore();
+  if (syncStore.criticalWriteState.kind !== 'idle') {
+    return false;
+  }
+});
 
 router.beforeEach((to) => {
   if (!ALREADY_AUTH_REDIRECT_FROM.has(to.path)) return;
