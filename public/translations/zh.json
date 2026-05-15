@@ -14287,8 +14287,8 @@
       "lastUpdated": "2026-05-15"
     },
     "planner.recurrence.multiDayWeeklyOnlyHint": {
-      "translation": "只需选择一周中的某一天即可使用此选项，也可以继续使用“每周”选项。",
-      "hash": "pgypje",
+      "translation": "只选择一周中的某一天使用此选项",
+      "hash": "q67t34",
       "lastUpdated": "2026-05-15"
     }
   }
