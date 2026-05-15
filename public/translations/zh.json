@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-15",
-    "translationCount": 2856
+    "translationCount": 2857
   },
   "translations": {
     "app.name": {
@@ -14284,6 +14284,11 @@
     "planner.frequencyChip.monthlyOnDay": {
       "translation": "每月的{ordinal} {day}",
       "hash": "nl9mpm",
+      "lastUpdated": "2026-05-15"
+    },
+    "planner.recurrence.multiDayWeeklyOnlyHint": {
+      "translation": "只需选择一周中的某一天即可使用此选项，也可以继续使用“每周”选项。",
+      "hash": "pgypje",
       "lastUpdated": "2026-05-15"
     }
   }
