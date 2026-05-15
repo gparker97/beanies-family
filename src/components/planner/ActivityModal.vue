@@ -100,13 +100,35 @@ const color = ref('');
 const showMoreDetails = ref(false);
 const showErrors = ref(false);
 
-// The 5 pill options, auto-labelled from the current `date`. Vue's reactivity
-// re-evaluates this whenever `date` changes, so the pill labels update live
-// (e.g. typing 13 May → "Monthly on the 13th" / "Monthly on the 2nd Wed";
-// changing to 20 May → "Monthly on the 20th" / "Monthly on the 3rd Wed").
+// Auto-labelled frequency chips shown inside the Schedule section when
+// `recurrence !== 'none'`. The 'none' / one-off option is handled by the
+// mode-toggle CARDS at the top of the modal (not by the chip row), so the
+// chips here only enumerate the 4 recurring kinds.
+//
+// Labels are derived live from the activity's current `date` — so changing
+// the start date updates "Monthly on the 14th" → "Monthly on the 15th"
+// without an extra round-trip.
 const recurrenceOptions = computed(() =>
-  buildRecurrenceOptions({ date: date.value, daysOfWeek: daysOfWeek.value }, t)
+  buildRecurrenceOptions({ date: date.value, daysOfWeek: daysOfWeek.value }, t).filter(
+    (o) => o.value !== 'none'
+  )
 );
+
+/**
+ * The top-of-modal cards split "one-time" vs "recurring" — the first-order
+ * decision. The user's frequency choice is preserved across toggles so a
+ * recurring → one-time → recurring round-trip doesn't silently lose their
+ * previous selection. We remember the last non-'none' recurrence value in
+ * `lastRecurringKind` (default: 'weekly') and restore it on toggle-back.
+ */
+const lastRecurringKind = ref<ActivityRecurrence>('weekly');
+watch(recurrence, (next) => {
+  if (next !== 'none') lastRecurringKind.value = next;
+});
+
+function setRecurrenceMode(mode: 'recurring' | 'one-off'): void {
+  recurrence.value = mode === 'one-off' ? 'none' : lastRecurringKind.value;
+}
 
 // Check if any "more details" field has data (for auto-expand in edit mode)
 function hasDetailData(activity: FamilyActivity): boolean {
@@ -554,12 +576,65 @@ function handleSave() {
         </div>
       </div>
 
-      <!-- 1. Recurrence pill row — one click = one decision. Pill labels are
-           auto-generated from the activity's `date` so each option spells
-           out what it means (e.g. "Monthly on the 2nd Tue"). -->
-      <FormFieldGroup :label="t('modal.schedule')">
-        <FrequencyChips v-model="recurrence" :options="recurrenceOptions" />
-      </FormFieldGroup>
+      <!-- 1. Schedule mode tab bar (recurring / one-time) — the first-order
+           decision. Frequency chips (weekly / biweekly / monthly variants)
+           live inside the Schedule field group below, only visible when
+           recurring is selected. -->
+      <div class="rounded-2xl bg-[var(--tint-slate-5)] p-1.5 dark:bg-slate-700/50">
+        <div class="grid grid-cols-2 gap-1.5">
+          <button
+            v-for="opt in [
+              {
+                value: 'recurring',
+                icon: '🔁',
+                label: t('vacation.scheduleRecurring'),
+                desc: t('vacation.scheduleRecurringDesc'),
+              },
+              {
+                value: 'one-off',
+                icon: '📌',
+                label: t('vacation.scheduleOneTime'),
+                desc: t('vacation.scheduleOneTimeDesc'),
+              },
+            ]"
+            :key="opt.value"
+            type="button"
+            class="relative flex flex-col items-center gap-0.5 rounded-xl px-3 py-2.5 transition-all duration-200"
+            :class="
+              (opt.value === 'recurring' ? isRecurring : !isRecurring)
+                ? 'border-primary-500 border-2 bg-white shadow-sm dark:bg-slate-600'
+                : 'border-2 border-transparent hover:bg-white/60 dark:hover:bg-slate-600/40'
+            "
+            @click="setRecurrenceMode(opt.value as 'recurring' | 'one-off')"
+          >
+            <span class="text-lg leading-none">{{ opt.icon }}</span>
+            <span
+              class="font-outfit text-xs font-bold"
+              :class="
+                (opt.value === 'recurring' ? isRecurring : !isRecurring)
+                  ? 'text-[var(--color-text)] dark:text-gray-100'
+                  : 'text-[var(--color-text)] opacity-35 dark:text-gray-400'
+              "
+            >
+              {{ opt.label }}
+            </span>
+            <span
+              class="text-[0.625rem]"
+              :class="
+                (opt.value === 'recurring' ? isRecurring : !isRecurring)
+                  ? 'text-[var(--color-text-muted)]'
+                  : 'opacity-25 dark:text-gray-500'
+              "
+            >
+              {{ opt.desc }}
+            </span>
+            <span
+              v-if="opt.value === 'recurring' ? isRecurring : !isRecurring"
+              class="bg-primary-500 absolute bottom-1.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full"
+            />
+          </button>
+        </div>
+      </div>
 
       <!-- 2. Activity title -->
       <FormFieldGroup :label="t('modal.whatsTheActivity')" required :error="errorTitle">
@@ -575,12 +650,20 @@ function handleSave() {
         </div>
       </FormFieldGroup>
 
-      <!-- 3. Day-of-week selector — only relevant for weekly multi-day
-           (e.g. Mon + Wed + Fri). Other kinds anchor to the activity's
-           `date` per the recurrence-rule contract. -->
-      <FormFieldGroup v-if="recurrence === 'weekly'" :label="t('planner.field.dayOfWeek')">
-        <DayOfWeekSelector v-model="daysOfWeek" />
-      </FormFieldGroup>
+      <!-- 3. Schedule: frequency chips + (weekly only) day-of-week selector.
+           Chips are auto-labelled from the activity's `date` so each option
+           spells out what it means in the user's context — picking start
+           date 13 May 2026 renders "Monthly on the 13th" and "Monthly on
+           the 2nd Wed" so the difference between the two monthly variants
+           is self-evident. -->
+      <template v-if="isRecurring">
+        <FormFieldGroup :label="t('modal.schedule')">
+          <div class="space-y-3">
+            <FrequencyChips v-model="recurrence" :options="recurrenceOptions" />
+            <DayOfWeekSelector v-if="recurrence === 'weekly'" v-model="daysOfWeek" />
+          </div>
+        </FormFieldGroup>
+      </template>
 
       <!-- 4. All-day toggle -->
       <FormFieldGroup :label="t('planner.allDay')">
