@@ -139,6 +139,17 @@ async function runFromStep(startIdx: number) {
     return;
   }
 
+  // Claim the critical-write flag for the modal's entire animation +
+  // finalize phase. Without this, back-button / close-tab during the step-
+  // by-step animation would bypass the router guard + beforeunload confirm
+  // (criticalWriteState went back to idle the moment createNewFile returned
+  // — well before this modal's UI work finishes and emits 'complete'). See
+  // 2026-05-15 incident notes — greg hit this on a real device.
+  const previousCriticalWriteState = syncStore.criticalWriteState;
+  if (previousCriticalWriteState.kind === 'idle') {
+    syncStore.criticalWriteState = { kind: 'creating' };
+  }
+
   try {
     for (let i = startIdx; i < 5; i++) {
       currentStep.value = i;
@@ -215,6 +226,13 @@ async function runFromStep(startIdx: number) {
     errorMessage.value = (e as Error)?.message || t('setupProgress.error.title');
     setStep(Math.min(Math.max(currentStep.value, 0), 4), 'error');
     phase.value = 'error';
+  } finally {
+    // Release the critical-write flag — but only if we set it. Idle restore
+    // covers the success path AND the early-error path; for the latter the
+    // user can still cancel/retry/continue without being silently blocked.
+    if (previousCriticalWriteState.kind === 'idle') {
+      syncStore.criticalWriteState = { kind: 'idle' };
+    }
   }
 }
 

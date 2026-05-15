@@ -1196,7 +1196,36 @@ export const useSyncStore = defineStore('sync', () => {
       step = 'register';
       await _registerCurrentFamilySync();
 
-      // 7. Point of no return. Auth invariant flips here and nowhere else
+      // 7. Cache the family key for auto-decrypt on reload — symmetric with
+      //    what `decryptPendingFile` does for the load path. Without this,
+      //    a hard reload (or an unexpected back-button interruption that
+      //    survives the router guard) would land in a state where the
+      //    provider config is persisted but the in-memory key is gone, and
+      //    the user'd hit the "spilled beans" overlay with no way to
+      //    auto-recover. `{force: true}` bypasses the trusted-device check
+      //    — the user JUST entered the password on this device.
+      try {
+        const exported = await getExportedFamilyKey();
+        if (exported) {
+          const settingsStoreInst = useSettingsStore();
+          await settingsStoreInst.cacheFamilyKey(exported, familyId, { force: true });
+        }
+      } catch (cacheErr) {
+        // Cache failure is non-fatal — the pod itself is fine, the user
+        // just won't get the seamless reload. Report so we see if it
+        // happens in the wild.
+        console.warn('[syncStore] cacheFamilyKey after createNewFile failed:', cacheErr);
+        reportError({
+          surface: 'createPod.cacheFamilyKey',
+          message: `Could not cache family key after pod creation: ${
+            cacheErr instanceof Error ? cacheErr.message : String(cacheErr)
+          }`,
+          error: cacheErr instanceof Error ? cacheErr : new Error(String(cacheErr)),
+          severity: 'warning',
+        });
+      }
+
+      // 8. Point of no return. Auth invariant flips here and nowhere else
       //    in this function. From the caller's perspective, this is "your
       //    pod exists and the app is safe to enter".
       lastSync.value = toISODateString(new Date());

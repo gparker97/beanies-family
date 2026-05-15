@@ -230,12 +230,37 @@ const showLayout = computed(() => {
  * of init() reads `route.path` to decide whether to show the recovery overlay.
  * If we don't await, the route hasn't updated yet and the check sees the old
  * path — producing the `app.postInitNoData` false-fires that prompted this
- * fix. The try/catch keeps router rejection from wedging init; the worst case
- * is a brief recovery overlay flash, not data loss.
+ * fix.
+ *
+ * **Navigation cancellation** is also handled here. Vue Router's
+ * `beforeEach` guards can return `false` to block a navigation; the promise
+ * then RESOLVES (not rejects) with a `NavigationFailure` object. A plain
+ * `await router.replace(...)` will silently succeed in that case, leaving
+ * `route.path` unchanged — and the health check would then see the wrong
+ * path. The check below treats a `NavigationFailure` like a thrown error
+ * and reports + falls back to `window.location.replace` for the genuinely-
+ * stuck cases (e.g. a critical-write guard blocking the redirect).
  */
 async function safeRouterReplace(target: string, callerTag: string): Promise<void> {
   try {
-    await router.replace(target);
+    const result = await router.replace(target);
+    // Vue Router returns `undefined` on success, `NavigationFailure` when a
+    // guard blocked the nav (incl. our critical-write guard). The failure
+    // object always has a numeric `type` field — detect it that way without
+    // pulling in the type-guard from vue-router. If the navigation was
+    // aborted, fall back to `location.replace` so the user lands at the
+    // correct path on init.
+    if (result && typeof (result as { type?: number }).type === 'number') {
+      console.warn(
+        `[App] router.replace('${target}') from ${callerTag} was cancelled by a guard (type=${(result as { type: number }).type}); falling back to location.replace`
+      );
+      reportError({
+        surface: 'app.loadFamilyData.replaceCancelled',
+        message: `router.replace('${target}') was cancelled by a guard (caller=${callerTag}, type=${(result as { type: number }).type})`,
+        severity: 'warning',
+      });
+      window.location.replace(target);
+    }
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
     console.warn(`[App] router.replace('${target}') from ${callerTag} failed:`, err);
