@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-15",
-    "translationCount": 2857
+    "translationCount": 2858
   },
   "translations": {
     "app.name": {
@@ -3482,9 +3482,9 @@
       "lastUpdated": "2026-03-03"
     },
     "nook.statusSummary": {
-      "translation": "今天计划的{activities}活动\\ u00B7 {tasks}个任务即将到来",
-      "hash": "6w03dp",
-      "lastUpdated": "2026-03-08"
+      "translation": "今天计划了{activities}项活动· {tasks}项任务即将到来",
+      "hash": "nv2cpm",
+      "lastUpdated": "2026-05-15"
     },
     "nook.yourBeans": {
       "translation": "你的豆子",
@@ -14289,6 +14289,11 @@
     "planner.recurrence.multiDayWeeklyOnlyHint": {
       "translation": "只选择一周中的某一天使用此选项",
       "hash": "q67t34",
+      "lastUpdated": "2026-05-15"
+    },
+    "nook.briefingLabel": {
+      "translation": "每日简报",
+      "hash": "mzasck",
       "lastUpdated": "2026-05-15"
     }
   }

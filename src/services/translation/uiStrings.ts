@@ -4227,9 +4227,13 @@ const STRING_DEFS = {
     en: "There's more to life than being really, really, ridiculously beanie looking.",
     beanie: "there's more to life than being really, really, ridiculously beanie looking.",
   },
+  'nook.briefingLabel': {
+    en: 'Your Daily Briefing',
+    beanie: 'your daily briefing',
+  },
   'nook.statusSummary': {
-    en: '{activities} activities planned today \u00B7 {tasks} tasks coming up',
-    beanie: '{activities} activities today \u00B7 {tasks} tasks coming up!',
+    en: '{activities} activities planned today · {tasks} tasks coming up',
+    beanie: '{activities} activities today · {tasks} tasks coming up!',
   },
   'nook.criticalPickup': {
     en: "Don't forget to pick up {child} from {activity} at {time} today!",
