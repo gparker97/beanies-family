@@ -4806,8 +4806,8 @@ const STRING_DEFS = {
   // days of the week — biweekly + monthly variants are single-anchor by
   // design, so they can't honour multi-day selection.
   'planner.recurrence.multiDayWeeklyOnlyHint': {
-    en: 'Pick just one day of the week to use this option, or stay on Weekly.',
-    beanie: 'pick just one day of the week to use this option, or stay on weekly.',
+    en: 'Pick just one day of the week to use this option',
+    beanie: 'pick just one day of the week to use this option',
   },
 
   // Short weekday names used by recurrence summaries (Sunday-first per JS Date).
