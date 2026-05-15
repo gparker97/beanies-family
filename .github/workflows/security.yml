@@ -103,6 +103,52 @@ jobs:
           npx eslint . --config eslint.security.config.js --rule 'no-secrets/no-secrets: error'
         continue-on-error: false
 
+  license-audit:
+    # Diff-free license audit over the full production dependency tree.
+    # Fires on push (including direct-to-main) + PRs + the daily cron + manual
+    # dispatch — i.e. every code path that lands on prod. Sister job
+    # `dependency-review` (below, PR-only) covers diffed PRs from outside the
+    # normal develop-on-main workflow; this one closes the main-push gap.
+    #
+    # Allowlist policy: standard permissive licenses only (MIT family + a few
+    # commonly-permissive extras). Anything outside this list — copyleft (GPL,
+    # AGPL, LGPL), source-available (BUSL, SSPL, Commons Clause), custom
+    # non-commercial, or missing — fails the job. To allow a new license,
+    # add it explicitly here (not via a config file) so the policy change is
+    # auditable in version control.
+    name: License Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit production dependency licenses
+        run: |
+          npx license-checker \
+            --production \
+            --excludePrivatePackages \
+            --onlyAllow 'MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;CC-BY-4.0;Unlicense;BlueOak-1.0.0;Python-2.0'
+
+      - name: Write license summary
+        if: always()
+        run: |
+          echo "## License Audit Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Production dependency license breakdown:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          npx license-checker --production --excludePrivatePackages --summary >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
   codeql-analysis:
     name: CodeQL Security Analysis
     runs-on: ubuntu-latest
@@ -152,7 +198,7 @@ jobs:
   security-summary:
     name: Security Summary
     runs-on: ubuntu-latest
-    needs: [dependency-audit, security-linting, secrets-scanning]
+    needs: [dependency-audit, security-linting, secrets-scanning, license-audit]
     if: always()
 
     steps:
@@ -164,6 +210,7 @@ jobs:
           echo "- Dependency Audit: ${{ needs.dependency-audit.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Security Linting: ${{ needs.security-linting.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Secrets Scanning: ${{ needs.secrets-scanning.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- License Audit: ${{ needs.license-audit.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Recommendations:" >> $GITHUB_STEP_SUMMARY
           echo "1. Review and fix any HIGH or CRITICAL vulnerabilities immediately" >> $GITHUB_STEP_SUMMARY
