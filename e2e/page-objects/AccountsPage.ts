@@ -6,7 +6,11 @@ export class AccountsPage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto('/accounts', { waitUntil: 'domcontentloaded' });
+    // `waitUntil: 'commit'` rather than `'domcontentloaded'` — webkit-CI
+    // is contention-prone; the SPA router's redirect on first paint races
+    // against `domcontentloaded` and produces "Navigation interrupted by
+    // another navigation to /nook". See `gotoRoot` in helpers/navigation.ts.
+    await this.page.goto('/accounts', { waitUntil: 'commit' });
   }
 
   getInstitutionCombobox() {

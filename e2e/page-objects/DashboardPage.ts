@@ -4,7 +4,9 @@ export class DashboardPage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    // See `gotoRoot` — `waitUntil: 'commit'` survives the webkit-CI race
+    // where `domcontentloaded` loses to the SPA's first-paint redirect.
+    await this.page.goto('/dashboard', { waitUntil: 'commit' });
   }
 
   /** Click the privacy mode unlock button to reveal masked financial figures */

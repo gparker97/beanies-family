@@ -154,8 +154,9 @@ test.describe('Onboarding Wizard', () => {
       sessionStorage.setItem('e2e_force_onboarding', 'true');
     });
 
-    // Restart onboarding via Settings → Family Data modal
-    await page.goto('/settings');
+    // Restart onboarding via Settings → Family Data modal.
+    // `waitUntil: 'commit'` survives the webkit-CI first-paint redirect race.
+    await page.goto('/settings', { waitUntil: 'commit' });
     await page.getByText(ui('settings.card.familyData')).first().click();
     await page.getByTestId('restart-onboarding').waitFor({ state: 'visible', timeout: 5000 });
     await page.getByTestId('restart-onboarding').click();
@@ -286,7 +287,8 @@ test.describe('Loan & Activity Linking', () => {
     amount: number,
     accountName: string
   ) {
-    await page.goto('/activities');
+    // `waitUntil: 'commit'` survives the webkit-CI first-paint redirect race.
+    await page.goto('/activities', { waitUntil: 'commit' });
     await page.waitForURL('/activities');
 
     // Open add activity modal
@@ -422,7 +424,8 @@ test.describe('Loan & Activity Linking', () => {
     await createCheckingAccount(page, 'Integrity Checking');
 
     // Navigate to planner and create a one-off activity WITHOUT cost first
-    await page.goto('/activities');
+    // `waitUntil: 'commit'` survives the webkit-CI first-paint redirect race.
+    await page.goto('/activities', { waitUntil: 'commit' });
     await page.waitForURL('/activities');
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
