@@ -81,6 +81,12 @@ import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
 import type { StorageProvider, StorageProviderType } from '@/services/sync/storageProvider';
 import { toISODateString } from '@/utils/date';
 import { deduplicateRecurringTransactions } from '@/services/recurring/recurringProcessor';
+import {
+  type CreatePodResult,
+  type CreatePodFailureReason,
+  type CriticalWriteState,
+  CorruptPayloadError,
+} from '@/types/sync';
 
 /**
  * Outcome of `migrateStorage`. `failed` means the move was rolled back and
@@ -159,6 +165,12 @@ export const useSyncStore = defineStore('sync', () => {
     driveFileName?: string;
     driveAccountEmail?: string;
   } | null>(null);
+
+  // Single source of truth for "is a non-interruptible write in flight?".
+  // Read by the router beforeEach guard (blocks navigation), App.vue's
+  // beforeunload handler (returns truthy → native browser confirm), and the
+  // SetupProgressModal visibility gate. See `src/types/sync.ts` for shape.
+  const criticalWriteState = ref<CriticalWriteState>({ kind: 'idle' });
 
   // Google Drive state
   const storageProviderType = ref<StorageProviderType | null>(null);
@@ -952,8 +964,131 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Verify a freshly-written envelope: read it back from the provider, parse,
+   * decrypt with the same family key, and ensure the resulting Automerge doc
+   * materializes cleanly (`decryptBeanpodPayload` throws `CorruptPayloadError`
+   * if the bytes are bad — Shaun-class corruption).
+   *
+   * Throws on any inconsistency. Caller classifies the failure as 'verify'.
+   */
+  async function verifyJustWritten(
+    provider: StorageProvider,
+    fk: CryptoKey,
+    expectedFamilyId: string
+  ): Promise<void> {
+    const text = await provider.read();
+    if (!text) {
+      throw new Error('Verify failed: provider.read() returned empty after write');
+    }
+    const env = parseBeanpodV4(text);
+    if (env.familyId !== expectedFamilyId) {
+      throw new Error(
+        `Verify failed: envelope familyId mismatch (read ${env.familyId}, expected ${expectedFamilyId})`
+      );
+    }
+    // Throws CorruptPayloadError on bad payload; propagates to the caller.
+    await decryptBeanpodPayload(env, fk);
+  }
+
+  /**
+   * Awaited variant of `registerCurrentFamily` — used only by `createNewFile`,
+   * which treats registry write as critical (it's the recovery anchor for the
+   * resume-from-registry path). The public `registerCurrentFamily` keeps its
+   * fire-and-forget contract for non-critical background syncs.
+   */
+  async function _registerCurrentFamilySync(): Promise<void> {
+    const ctx = useFamilyContextStore();
+    if (!ctx.activeFamilyId) {
+      throw new Error('Cannot register family: no active family ID');
+    }
+    const authStoreInst = useAuthStore();
+    const provider = syncService.getProvider();
+    await registry.registerFamily(ctx.activeFamilyId, {
+      provider: storageProviderType.value ?? 'local',
+      fileId: provider?.getFileId() ?? null,
+      displayPath: provider?.getDisplayName() ?? fileName.value ?? null,
+      familyName: ctx.activeFamilyName,
+      ownerEmail: authStoreInst.currentUser?.email ?? null,
+      subscribeNewsletter: authStoreInst.newsletterOptIn ?? null,
+      country: useSettingsStore().country ?? null,
+    });
+  }
+
+  /**
+   * Cleanup after a failed `createNewFile`. Best-effort, never throws — the
+   * caller's catch already has the originating error; this helper exists to
+   * reduce the blast radius of the failure (don't leave a corrupt file under
+   * its expected name where a future load attempt would pick it up).
+   *
+   * Steps:
+   *   1. If we have a Drive fileId, rename it to `<name>.corrupt-<ts>` via
+   *      `patchFileMetadata`. Rename failures log + report but don't propagate
+   *      — the worst case is the corrupt file stays at its original name,
+   *      still better than continuing as if the write succeeded.
+   *   2. Clear in-memory state so a retry starts clean (no stale family key,
+   *      no stale envelope, no pending file).
+   *
+   * The user-facing surface is the caller's responsibility — they have the
+   * failure reason and can pick the right translated message. This keeps the
+   * store layer free of UI concerns.
+   */
+  async function handleCreateFailure(partialFileId: string | null): Promise<void> {
+    if (partialFileId && storageProviderType.value === 'google_drive') {
+      try {
+        const token = await requestAccessToken({ forceConsent: false });
+        const { patchFileMetadata } = await import('@/services/google/driveService');
+        const originalName = fileName.value ?? 'pod.beanpod';
+        const corruptName = `${originalName}.corrupt-${Date.now()}`;
+        await patchFileMetadata(token, partialFileId, { name: corruptName });
+        console.warn(`[syncStore] Renamed partial pod file to ${corruptName}`);
+      } catch (renameErr) {
+        console.error('[syncStore] Failed to rename corrupt pod file:', renameErr);
+        reportError({
+          surface: 'createPod.renameFailed',
+          message: 'Could not rename corrupt pod file during cleanup',
+          error: renameErr instanceof Error ? renameErr : new Error(String(renameErr)),
+          context: { fileId: partialFileId },
+        });
+      }
+    }
+    familyKey.value = null;
+    envelope.value = null;
+    pendingEncryptedFile.value = null;
+  }
+
+  /**
+   * Map a thrown error from `createNewFile`'s critical section to the
+   * `CreatePodFailureReason` tag we surface to the caller. The `step` argument
+   * is the last marker the body crossed before throwing — set linearly through
+   * the function body so classification is deterministic, not heuristic.
+   */
+  function classifyCreateFailure(step: CreatePodFailureReason, e: unknown): CreatePodFailureReason {
+    // `verify` is also signalled by the typed `CorruptPayloadError` thrown
+    // from `decryptBeanpodPayload` — if we see it anywhere, it's a verify
+    // failure regardless of the step marker. (Defensive: the marker should
+    // already be 'verify' by the time that throw happens.)
+    if (e instanceof CorruptPayloadError) return 'verify';
+    return step;
+  }
+
+  /**
    * Create a new V4 beanpod file.
-   * Called by CreatePodView when setting up a new family.
+   *
+   * Returns a `CreatePodResult` discriminated union: on success `{ ok: true }`,
+   * on failure `{ ok: false, reason, error }` where `reason` is the specific
+   * failure mode the caller can branch on. The caller is responsible for
+   * surfacing the failure to the user (it has translation context and can
+   * pick the right per-reason message); this function does cleanup only.
+   *
+   * Ordering invariant — `markPodCreated()` is the point of no return and runs
+   * ONLY after every preceding step succeeds, so the post-success state-
+   * consistency invariant holds (see `docs/plans/`-equivalent or `src/types/sync.ts`):
+   *   1. provider.write           (write)
+   *   2. verifyJustWritten        (verify)  ← catches Shaun-class corruption
+   *   3. await persistDoc         (persist) ← previously fire-and-forget
+   *   4. await persistEnvelope    (persist) ← previously fire-and-forget
+   *   5. await _registerCurrentFamilySync  (register) ← previously fire-and-forget
+   *   6. markPodCreated + slack notify (success)
    */
   async function createNewFile(
     _podFileName: string,
@@ -961,60 +1096,96 @@ export const useSyncStore = defineStore('sync', () => {
     memberId: string,
     familyId: string,
     familyName: string
-  ): Promise<boolean> {
-    try {
-      // 1. Generate family key
-      const fk = await generateFamilyKey();
+  ): Promise<CreatePodResult> {
+    // Re-entrancy guard. The UI shouldn't be able to call this twice
+    // concurrently (the storage step disables its CTA while in flight), but
+    // returning a typed reason instead of throwing makes any misuse loud and
+    // testable rather than producing a silent race.
+    if (criticalWriteState.value.kind !== 'idle') {
+      return {
+        ok: false,
+        reason: 'concurrent-write',
+        error: new Error(
+          `createNewFile called while ${criticalWriteState.value.kind} is in flight`
+        ),
+      };
+    }
 
-      // 2. Derive member wrapping key from password
+    // Preconditions — `signUp()` should have left the doc initialized with the
+    // owner member; refusing here keeps the failure visible BEFORE we write
+    // anything to Drive, instead of producing an empty-doc envelope that the
+    // user could land on `/nook` with.
+    const familyStoreInst = useFamilyStore();
+    const ownerMember = familyStoreInst.members.find((m) => m.id === memberId);
+    if (!ownerMember) {
+      return {
+        ok: false,
+        reason: 'precondition',
+        error: new Error(
+          `createNewFile precondition failed: owner member ${memberId} not in family store`
+        ),
+      };
+    }
+
+    criticalWriteState.value = { kind: 'creating' };
+    let step: CreatePodFailureReason = 'write';
+    let partialFileId: string | null = null;
+
+    try {
+      // 1. Build the encrypted envelope (in-memory, no I/O).
+      const fk = await generateFamilyKey();
       const salt = crypto.getRandomValues(new Uint8Array(16));
       const memberKey = await deriveMemberKey(password, salt);
-
-      // 3. Wrap the family key
       const wrapped = await wrapFamilyKey(fk, memberKey);
-
-      // 4. Build wrappedKeys record
       const wrappedKeys: Record<string, WrappedMemberKey> = {
-        [memberId]: {
-          salt: bufferToBase64(salt),
-          wrapped,
-        },
+        [memberId]: { salt: bufferToBase64(salt), wrapped },
       };
-
-      // 5. Automerge doc is already initialized by authStore.signUp() (which calls
-      // initDoc before creating the owner member). Do NOT call initDoc() here —
-      // it would wipe the member data already written to the doc.
-
-      // 6. Create V4 envelope
+      // Note: the Automerge doc was initialized by `authStore.signUp()` before
+      // this function was called. We deliberately do NOT call `initDoc()` here
+      // — that would wipe the owner-member writes already in the doc.
       const envelopeJson = await createBeanpodV4(familyId, familyName, fk, wrappedKeys);
 
-      // 7. Write to provider
+      // 2. Write to provider. `getFileId()` is captured after write so the
+      //    cleanup helper can target the correct file for rename on failure.
       const provider = syncService.getProvider();
-      if (provider) {
-        await provider.write(envelopeJson);
+      if (!provider) {
+        // Same shape as the precondition failures above: refuse to advance
+        // when a required dependency is missing rather than producing partial
+        // state. Classified as 'write' because this is the write step's setup.
+        throw new Error('createNewFile: syncService has no provider configured');
       }
+      step = 'write';
+      await provider.write(envelopeJson);
+      partialFileId = provider.getFileId() ?? null;
 
-      // 8. Set state
+      // 3. Verify the bytes we just wrote round-trip cleanly. Throws
+      //    `CorruptPayloadError` (or generic Error for non-payload issues).
+      step = 'verify';
+      await verifyJustWritten(provider, fk, familyId);
+
+      // 4. Commit in-memory state — we know the write is good.
       const env = parseBeanpodV4(envelopeJson);
       familyKey.value = fk;
       envelope.value = env;
       syncService.setFamilyKey(fk, env);
 
-      // 9. Initialize persistence cache (doc + envelope)
+      // 5. Persist local cache (was fire-and-forget — now awaited so a cache
+      //    failure surfaces as a real error before `markPodCreated`).
+      step = 'persist';
       await initPersistenceDB(familyId);
-      persistDoc(fk).catch(console.warn);
-      persistEnvelope(env).catch(console.warn);
+      await persistDoc(fk);
+      await persistEnvelope(env);
 
+      // 6. Register with the family registry (was fire-and-forget — now the
+      //    recovery anchor for `ResumePodSetup`'s registry-first flow).
+      step = 'register';
+      await _registerCurrentFamilySync();
+
+      // 7. Point of no return. Auth invariant flips here and nowhere else
+      //    in this function. From the caller's perspective, this is "your
+      //    pod exists and the app is safe to enter".
       lastSync.value = toISODateString(new Date());
-
-      // The pod now physically exists — Automerge doc initialized, family key
-      // generated and wrapped, V4 envelope written to the provider, cache
-      // primed. This is the single, definitive "a family was created" moment:
-      // mark the auth invariant (so the routing guard lets the user into the
-      // app) and fire the pod-created Slack ping (one place, every storage
-      // type — `slackNotify` no-ops with a warn if the webhook is unset).
       useAuthStore().markPodCreated();
-      const ownerName = useFamilyStore().members.find((m) => m.id === memberId)?.name ?? '(owner)';
       const providerType = syncService.getProviderType();
       const storageLabel =
         providerType === 'google_drive'
@@ -1023,13 +1194,25 @@ export const useSyncStore = defineStore('sync', () => {
             ? 'Local File'
             : '(unknown)';
       slackNotify(
-        `🎉 *Family pod created!*\n*Family:* ${familyName}\n*Owner:* ${ownerName}\n*Storage:* ${storageLabel}`
+        `🎉 *Family pod created!*\n*Family:* ${familyName}\n*Owner:* ${ownerMember.name}\n*Storage:* ${storageLabel}`
       );
 
-      return true;
+      return { ok: true };
     } catch (e) {
-      error.value = (e as Error).message;
-      return false;
+      const err = e instanceof Error ? e : new Error(String(e));
+      const reason = classifyCreateFailure(step, err);
+      console.error(`[syncStore] createNewFile failed at step '${step}':`, err);
+      // Cleanup is best-effort and swallows its own errors; we always return
+      // the originating reason + error so the caller can show a focused
+      // user-facing message.
+      await handleCreateFailure(partialFileId);
+      // Mirror to legacy error ref so any old callers still reading it see
+      // the latest message; canonical signal is the returned discriminated
+      // result.
+      error.value = err.message;
+      return { ok: false, reason, error: err };
+    } finally {
+      criticalWriteState.value = { kind: 'idle' };
     }
   }
 
@@ -2264,6 +2447,7 @@ export const useSyncStore = defineStore('sync', () => {
     isGoogleDriveAvailable,
     showGoogleReconnect,
     driveFileNotFound,
+    criticalWriteState,
     saveFailureLevel,
     lastSaveError,
     showSaveFailureBanner,

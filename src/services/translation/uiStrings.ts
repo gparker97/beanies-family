@@ -2730,6 +2730,37 @@ const STRING_DEFS = {
     beanie: 'failed to create file. please try again.',
   },
 
+  // Create-pod failures — one key per `CreatePodFailureReason` so the user
+  // sees a message they can act on rather than a generic "something broke".
+  // Used by CreatePodView.handleStep2Next's switch on `result.reason`.
+  'createPod.failedReasonWrite': {
+    en: "We couldn't save your pod to your storage. Please check your connection and try again.",
+    beanie:
+      "we couldn't save your pod to your storage. please check your connection and try again.",
+  },
+  'createPod.failedReasonVerify': {
+    en: "We saved your pod but couldn't verify it loaded correctly. Please try again — your previous attempt was set aside so it can't be loaded.",
+    beanie:
+      "we saved your pod but couldn't verify it loaded correctly. please try again - your previous attempt was set aside so it can't be loaded.",
+  },
+  'createPod.failedReasonPersist': {
+    en: "We saved your pod, but couldn't cache it on this device. Please try again.",
+    beanie: "we saved your pod, but couldn't cache it on this device. please try again.",
+  },
+  'createPod.failedReasonRegister': {
+    en: "We saved your pod, but couldn't reach our family registry. Please check your connection and try again.",
+    beanie:
+      "we saved your pod, but couldn't reach our family registry. please check your connection and try again.",
+  },
+  'createPod.failedReasonPrecondition': {
+    en: 'We hit a problem getting your pod ready. Please refresh the page and try again.',
+    beanie: 'we hit a problem getting your pod ready. please refresh the page and try again.',
+  },
+  'createPod.failedReasonConcurrent': {
+    en: 'Another pod setup is already in progress. Please wait a moment and try again.',
+    beanie: 'another pod setup is already in progress. please wait a moment and try again.',
+  },
+
   // Auth
   'auth.signingIn': { en: 'Signing in...', beanie: 'signing in...' },
   'auth.creatingAccount': { en: 'Creating account...', beanie: 'creating account...' },
