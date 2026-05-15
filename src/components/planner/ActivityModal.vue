@@ -108,11 +108,21 @@ const showErrors = ref(false);
 // Labels are derived live from the activity's current `date` — so changing
 // the start date updates "Monthly on the 14th" → "Monthly on the 15th"
 // without an extra round-trip.
-const recurrenceOptions = computed(() =>
-  buildRecurrenceOptions({ date: date.value, daysOfWeek: daysOfWeek.value }, t).filter(
+//
+// Multi-day weekly (e.g. Mon + Wed + Fri) is weekly-only by design: biweekly
+// anchors to a single weekday and monthly variants anchor to a single date.
+// When the user has picked >1 day, the non-weekly chips are disabled with a
+// hint explaining why — keeps them discoverable rather than silently hiding,
+// and prevents silently losing extra day-of-week selections on a chip swap.
+const hasMultipleDaysOfWeek = computed(() => daysOfWeek.value.length > 1);
+const recurrenceOptions = computed(() => {
+  const base = buildRecurrenceOptions({ date: date.value, daysOfWeek: daysOfWeek.value }, t).filter(
     (o) => o.value !== 'none'
-  )
-);
+  );
+  if (!hasMultipleDaysOfWeek.value) return base;
+  const hint = t('planner.recurrence.multiDayWeeklyOnlyHint');
+  return base.map((o) => (o.value === 'weekly' ? o : { ...o, disabled: true, disabledHint: hint }));
+});
 
 /**
  * The top-of-modal cards split "one-time" vs "recurring" — the first-order

@@ -4802,6 +4802,13 @@ const STRING_DEFS = {
   'planner.recurrence.monthly-by-day': { en: 'Monthly by day', beanie: 'monthly by day' },
   // Used inside the weekly recurrence summary, e.g. "Weekly on Mon, Wed, Fri".
   'planner.recurrence.onSeparator': { en: 'on', beanie: 'on' },
+  // Shown on disabled non-weekly chips when the user has selected multiple
+  // days of the week — biweekly + monthly variants are single-anchor by
+  // design, so they can't honour multi-day selection.
+  'planner.recurrence.multiDayWeeklyOnlyHint': {
+    en: 'Pick just one day of the week to use this option, or stay on Weekly.',
+    beanie: 'pick just one day of the week to use this option, or stay on weekly.',
+  },
 
   // Short weekday names used by recurrence summaries (Sunday-first per JS Date).
   'planner.weekday.short.sun': { en: 'Sun', beanie: 'sun' },
