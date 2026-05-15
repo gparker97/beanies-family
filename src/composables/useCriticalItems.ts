@@ -331,7 +331,7 @@ export function useCriticalItems() {
           type: 'holiday',
           message: buildMessage('nook.holiday.tomorrow.message', { holidayName: holiday.name }),
           caption: t('nook.holiday.tomorrow.caption'),
-          icon: '💡',
+          icon: '✨',
           time: '',
           completable: false,
         });
