@@ -7,6 +7,8 @@ import {
   formatDayLong,
   formatLogEntryTime,
   formatBirthdayShort,
+  getWeekdayOrdinalInMonth,
+  nthWeekdayOfMonth,
 } from '../date';
 
 describe('toDateInputValue', () => {
@@ -251,5 +253,77 @@ describe('formatBirthdayShort', () => {
     expect(formatBirthdayShort({ month: 0, day: 5 })).toBe('');
     expect(formatBirthdayShort({ month: 13, day: 5 })).toBe('');
     expect(formatBirthdayShort({ month: 5 } as unknown as { month: number; day: number })).toBe('');
+  });
+});
+
+describe('getWeekdayOrdinalInMonth', () => {
+  // May 2026: Fridays fall on 1, 8, 15, 22, 29 (5 of them).
+  // Wednesdays fall on 6, 13, 20, 27 (4 of them).
+  it('returns 1..4 for the first four occurrences of the weekday', () => {
+    expect(getWeekdayOrdinalInMonth(new Date(2026, 4, 1))).toBe(1); // 1st Friday
+    expect(getWeekdayOrdinalInMonth(new Date(2026, 4, 8))).toBe(2); // 2nd Friday
+    expect(getWeekdayOrdinalInMonth(new Date(2026, 4, 15))).toBe(3); // 3rd Friday
+    expect(getWeekdayOrdinalInMonth(new Date(2026, 4, 22))).toBe(4); // 4th Friday
+
+    expect(getWeekdayOrdinalInMonth(new Date(2026, 4, 6))).toBe(1); // 1st Wednesday
+    expect(getWeekdayOrdinalInMonth(new Date(2026, 4, 13))).toBe(2); // 2nd Wednesday
+    expect(getWeekdayOrdinalInMonth(new Date(2026, 4, 20))).toBe(3); // 3rd Wednesday
+    expect(getWeekdayOrdinalInMonth(new Date(2026, 4, 27))).toBe(4); // 4th Wednesday
+  });
+
+  it('coerces the 5th occurrence to -1 ("last")', () => {
+    // May 29 2026 is the 5th Friday — should round-trip as -1.
+    expect(getWeekdayOrdinalInMonth(new Date(2026, 4, 29))).toBe(-1);
+
+    // Also: July 31 2026 is the 5th Friday.
+    expect(getWeekdayOrdinalInMonth(new Date(2026, 6, 31))).toBe(-1);
+  });
+
+  it('throws on invalid date', () => {
+    expect(() => getWeekdayOrdinalInMonth(new Date('not a date'))).toThrow();
+  });
+});
+
+describe('nthWeekdayOfMonth', () => {
+  it('returns the Nth weekday for a given ordinal', () => {
+    // 2nd Wednesday of June 2026 is June 10.
+    expect(nthWeekdayOfMonth(new Date(2026, 5, 1), 2, 3).getDate()).toBe(10);
+    // 1st Friday of June 2026 is June 5.
+    expect(nthWeekdayOfMonth(new Date(2026, 5, 1), 1, 5).getDate()).toBe(5);
+    // 4th Monday of June 2026 is June 22.
+    expect(nthWeekdayOfMonth(new Date(2026, 5, 15), 4, 1).getDate()).toBe(22);
+  });
+
+  it('returns the LAST weekday of the month for ordinal -1', () => {
+    // Last Wednesday of June 2026 is June 24.
+    expect(nthWeekdayOfMonth(new Date(2026, 5, 1), -1, 3).getDate()).toBe(24);
+    // Last Saturday of June 2026 is June 27.
+    expect(nthWeekdayOfMonth(new Date(2026, 5, 1), -1, 6).getDate()).toBe(27);
+    // Last Friday of June 2026 is June 26.
+    expect(nthWeekdayOfMonth(new Date(2026, 5, 1), -1, 5).getDate()).toBe(26);
+  });
+
+  it('handles 28-day February (non-leap) correctly', () => {
+    // Feb 2026 is non-leap (28 days). Last Saturday is Feb 28.
+    expect(nthWeekdayOfMonth(new Date(2026, 1, 1), -1, 6).getDate()).toBe(28);
+    // 4th Wednesday of Feb 2026 is Feb 25.
+    expect(nthWeekdayOfMonth(new Date(2026, 1, 1), 4, 3).getDate()).toBe(25);
+  });
+
+  it('handles 29-day February (leap year) correctly', () => {
+    // Feb 2028 is a leap year (29 days). Last Tuesday is Feb 29.
+    expect(nthWeekdayOfMonth(new Date(2028, 1, 1), -1, 2).getDate()).toBe(29);
+  });
+
+  it('handles months with 5 occurrences of a weekday', () => {
+    // May 2026 has 5 Fridays — last is May 29.
+    expect(nthWeekdayOfMonth(new Date(2026, 4, 1), -1, 5).getDate()).toBe(29);
+  });
+
+  it('throws on invalid inputs', () => {
+    expect(() => nthWeekdayOfMonth(new Date('bad'), 1, 0)).toThrow();
+    expect(() => nthWeekdayOfMonth(new Date(2026, 5, 1), 1, 7)).toThrow();
+    expect(() => nthWeekdayOfMonth(new Date(2026, 5, 1), 1, -1)).toThrow();
+    expect(() => nthWeekdayOfMonth(new Date(2026, 5, 1), 0 as 1, 3)).toThrow();
   });
 });

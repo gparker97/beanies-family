@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-15",
-    "translationCount": 2845
+    "translationCount": 2856
   },
   "translations": {
     "app.name": {
@@ -5042,9 +5042,9 @@
       "lastUpdated": "2026-03-03"
     },
     "planner.recurrence.biweekly": {
-      "translation": "两周一次",
-      "hash": "kw3f6w",
-      "lastUpdated": "2026-03-03"
+      "translation": "每2周",
+      "hash": "anic4",
+      "lastUpdated": "2026-05-15"
     },
     "budget.category.overAmount": {
       "translation": "超過",
@@ -14229,6 +14229,61 @@
     "auth.passwordIncorrect": {
       "translation": "该密码未解锁Pod。请重试。",
       "hash": "wa43tn",
+      "lastUpdated": "2026-05-15"
+    },
+    "planner.recurrence.monthly-by-day": {
+      "translation": "按天按月",
+      "hash": "m0md46",
+      "lastUpdated": "2026-05-15"
+    },
+    "planner.recurrence.onSeparator": {
+      "translation": "开",
+      "hash": "2qn",
+      "lastUpdated": "2026-05-15"
+    },
+    "planner.weekday.short.sun": {
+      "translation": "Sun",
+      "hash": "1sfg",
+      "lastUpdated": "2026-05-15"
+    },
+    "planner.weekday.short.mon": {
+      "translation": "星期一",
+      "hash": "1nu4",
+      "lastUpdated": "2026-05-15"
+    },
+    "planner.weekday.short.tue": {
+      "translation": "週二",
+      "hash": "1t5w",
+      "lastUpdated": "2026-05-15"
+    },
+    "planner.weekday.short.wed": {
+      "translation": "周三",
+      "hash": "1v06",
+      "lastUpdated": "2026-05-15"
+    },
+    "planner.weekday.short.thu": {
+      "translation": "週四",
+      "hash": "1sv5",
+      "lastUpdated": "2026-05-15"
+    },
+    "planner.weekday.short.fri": {
+      "translation": "週五",
+      "hash": "1ipp",
+      "lastUpdated": "2026-05-15"
+    },
+    "planner.weekday.short.sat": {
+      "translation": "星期6",
+      "hash": "1rye",
+      "lastUpdated": "2026-05-15"
+    },
+    "planner.frequencyChip.monthlyOnDate": {
+      "translation": "每月{date}",
+      "hash": "4qc1d",
+      "lastUpdated": "2026-05-15"
+    },
+    "planner.frequencyChip.monthlyOnDay": {
+      "translation": "每月的{ordinal} {day}",
+      "hash": "nl9mpm",
       "lastUpdated": "2026-05-15"
     }
   }

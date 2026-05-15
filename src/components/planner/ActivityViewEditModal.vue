@@ -15,6 +15,7 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { getActivityCategoryName } from '@/constants/activityCategories';
+import { formatActivityRecurrence } from '@/utils/format';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import {
   formatDate,
@@ -411,43 +412,18 @@ const viewIsAllDay = computed(() => activity.value?.isAllDay ?? false);
 
 const isRecurring = computed(() => activity.value?.recurrence !== 'none');
 
+// Both the short label (chip-style) and the longer schedule summary now go
+// through the single shared formatter `formatActivityRecurrence`. Old per-
+// kind inline branching is gone — adding a new recurrence kind only requires
+// extending the formatter in one place, not every consumer.
 const recurrenceLabel = computed(() => {
   if (!activity.value) return '';
-  return t(`planner.recurrence.${activity.value.recurrence}`);
+  return formatActivityRecurrence(activity.value, t);
 });
-
-const FULL_DAY_NAMES: Record<number, string> = {
-  0: 'Sundays',
-  1: 'Mondays',
-  2: 'Tuesdays',
-  3: 'Wednesdays',
-  4: 'Thursdays',
-  5: 'Fridays',
-  6: 'Saturdays',
-};
 
 const scheduleSummary = computed(() => {
   if (!activity.value || activity.value.recurrence === 'none') return '';
-  const freq = recurrenceLabel.value;
-  const days = activity.value.daysOfWeek;
-  if (activity.value.recurrence === 'monthly') {
-    const day = new Date(activity.value.date + 'T00:00:00').getDate();
-    const suffix =
-      day === 1 || day === 21 || day === 31
-        ? 'st'
-        : day === 2 || day === 22
-          ? 'nd'
-          : day === 3 || day === 23
-            ? 'rd'
-            : 'th';
-    return `${freq} on the ${day}${suffix}`;
-  }
-  if (!days?.length || activity.value.recurrence !== 'weekly') return freq;
-  const sorted = [...days].sort((a, b) => (a || 7) - (b || 7));
-  const dayNames = sorted.map((d) => FULL_DAY_NAMES[d] ?? 'Sundays');
-  if (dayNames.length === 1) return `${freq} on ${dayNames[0]}`;
-  const last = dayNames.pop();
-  return `${freq} on ${dayNames.join(', ')} and ${last}`;
+  return formatActivityRecurrence(activity.value, t);
 });
 
 const endDateFormatted = computed(() => {
