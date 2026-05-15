@@ -1540,4 +1540,152 @@ describe('activityStore', () => {
       expect(result).toHaveLength(1);
     });
   });
+
+  // ── New recurrence kinds (biweekly + monthly-by-day) ─────────────────────
+
+  describe('monthActivities — biweekly', () => {
+    it('emits occurrences every 14 days starting from the activity date', () => {
+      const store = useActivityStore();
+      // 14 May 2026 is a Thursday. Biweekly: 14, 28 May; 11, 25 Jun; ...
+      store.activities.push(makeActivity({ id: '1', date: '2026-05-14', recurrence: 'biweekly' }));
+
+      const may = store.monthActivities(2026, 4);
+      expect(may.map((o) => o.date)).toEqual(['2026-05-14', '2026-05-28']);
+
+      const jun = store.monthActivities(2026, 5);
+      expect(jun.map((o) => o.date)).toEqual(['2026-06-11', '2026-06-25']);
+
+      const jul = store.monthActivities(2026, 6);
+      expect(jul.map((o) => o.date)).toEqual(['2026-07-09', '2026-07-23']);
+    });
+
+    it('respects recurrenceEndDate for biweekly', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({
+          id: '1',
+          date: '2026-05-14',
+          recurrence: 'biweekly',
+          recurrenceEndDate: '2026-06-20',
+        })
+      );
+
+      const jun = store.monthActivities(2026, 5);
+      // 11 Jun emitted (before endDate), 25 Jun NOT emitted (after endDate)
+      expect(jun.map((o) => o.date)).toEqual(['2026-06-11']);
+    });
+
+    it('ignores daysOfWeek for biweekly (single day only)', () => {
+      const store = useActivityStore();
+      // Even though daysOfWeek is set, biweekly only uses the start date's weekday
+      store.activities.push(
+        makeActivity({
+          id: '1',
+          date: '2026-05-14',
+          recurrence: 'biweekly',
+          daysOfWeek: [1, 3, 5], // should be ignored
+        })
+      );
+
+      const may = store.monthActivities(2026, 4);
+      // Same as the single-day biweekly result above — daysOfWeek had no effect.
+      expect(may.map((o) => o.date)).toEqual(['2026-05-14', '2026-05-28']);
+    });
+  });
+
+  describe('monthActivities — monthly-by-day', () => {
+    it('emits the Nth weekday derived from the start date', () => {
+      const store = useActivityStore();
+      // 13 May 2026 is the 2nd Wednesday of May.
+      store.activities.push(
+        makeActivity({ id: '1', date: '2026-05-13', recurrence: 'monthly-by-day' })
+      );
+
+      // May: 13 May (2nd Wed). June: 10 Jun (2nd Wed). July: 8 Jul. Aug: 12 Aug.
+      expect(store.monthActivities(2026, 4).map((o) => o.date)).toEqual(['2026-05-13']);
+      expect(store.monthActivities(2026, 5).map((o) => o.date)).toEqual(['2026-06-10']);
+      expect(store.monthActivities(2026, 6).map((o) => o.date)).toEqual(['2026-07-08']);
+      expect(store.monthActivities(2026, 7).map((o) => o.date)).toEqual(['2026-08-12']);
+    });
+
+    it('coerces 5th-weekday start dates to "last weekday of month"', () => {
+      const store = useActivityStore();
+      // 29 May 2026 is the 5th Friday. Coerced → "last Friday of every month".
+      store.activities.push(
+        makeActivity({ id: '1', date: '2026-05-29', recurrence: 'monthly-by-day' })
+      );
+
+      // May 29 (last Fri), Jun 26 (last Fri — only 4 Fridays in June),
+      // Jul 31 (5 Fridays — last is 31), Aug 28 (last Fri).
+      expect(store.monthActivities(2026, 4).map((o) => o.date)).toEqual(['2026-05-29']);
+      expect(store.monthActivities(2026, 5).map((o) => o.date)).toEqual(['2026-06-26']);
+      expect(store.monthActivities(2026, 6).map((o) => o.date)).toEqual(['2026-07-31']);
+      expect(store.monthActivities(2026, 7).map((o) => o.date)).toEqual(['2026-08-28']);
+    });
+
+    it('respects recurrenceEndDate for monthly-by-day', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({
+          id: '1',
+          date: '2026-05-13',
+          recurrence: 'monthly-by-day',
+          recurrenceEndDate: '2026-06-30',
+        })
+      );
+
+      expect(store.monthActivities(2026, 5).map((o) => o.date)).toEqual(['2026-06-10']);
+      expect(store.monthActivities(2026, 6)).toHaveLength(0); // past endDate
+    });
+  });
+
+  // ── Error paths (silent-failure gap closed by reportError) ──────────────
+
+  describe('monthActivities — error paths', () => {
+    it('emits no occurrences and reports error when activity.date is invalid', async () => {
+      const errorReporter = await import('@/utils/errorReporter');
+      const reportSpy = vi.spyOn(errorReporter, 'reportError').mockImplementation(() => {});
+
+      const store = useActivityStore();
+      store.activities.push(makeActivity({ id: '1', date: 'not-a-date', recurrence: 'weekly' }));
+
+      const occurrences = store.monthActivities(2026, 5);
+      expect(occurrences).toHaveLength(0);
+      expect(reportSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'activityStore.invalidStartDate',
+          severity: 'warning',
+        })
+      );
+
+      reportSpy.mockRestore();
+    });
+
+    it('emits no occurrences and reports error when recurrence value is unknown', async () => {
+      const errorReporter = await import('@/utils/errorReporter');
+      const reportSpy = vi.spyOn(errorReporter, 'reportError').mockImplementation(() => {});
+
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({
+          id: '1',
+          date: '2026-05-14',
+          // Force an invalid value past the type system to simulate corrupt data
+          // or a future enum drift.
+          recurrence: 'monthly-by-quarter' as unknown as FamilyActivity['recurrence'],
+        })
+      );
+
+      const occurrences = store.monthActivities(2026, 4);
+      expect(occurrences).toHaveLength(0);
+      expect(reportSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'activityStore.unknownRecurrence',
+          severity: 'error',
+        })
+      );
+
+      reportSpy.mockRestore();
+    });
+  });
 });

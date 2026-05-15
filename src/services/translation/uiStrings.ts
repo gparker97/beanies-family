@@ -4798,7 +4798,32 @@ const STRING_DEFS = {
   'planner.recurrence.monthly': { en: 'Monthly', beanie: 'monthly' },
   'planner.recurrence.yearly': { en: 'Yearly', beanie: 'yearly' },
   'planner.recurrence.none': { en: 'One-time', beanie: 'one-time' },
-  'planner.recurrence.biweekly': { en: 'Biweekly', beanie: 'biweekly' },
+  'planner.recurrence.biweekly': { en: 'Every 2 weeks', beanie: 'every 2 weeks' },
+  'planner.recurrence.monthly-by-day': { en: 'Monthly by day', beanie: 'monthly by day' },
+  // Used inside the weekly recurrence summary, e.g. "Weekly on Mon, Wed, Fri".
+  'planner.recurrence.onSeparator': { en: 'on', beanie: 'on' },
+
+  // Short weekday names used by recurrence summaries (Sunday-first per JS Date).
+  'planner.weekday.short.sun': { en: 'Sun', beanie: 'sun' },
+  'planner.weekday.short.mon': { en: 'Mon', beanie: 'mon' },
+  'planner.weekday.short.tue': { en: 'Tue', beanie: 'tue' },
+  'planner.weekday.short.wed': { en: 'Wed', beanie: 'wed' },
+  'planner.weekday.short.thu': { en: 'Thu', beanie: 'thu' },
+  'planner.weekday.short.fri': { en: 'Fri', beanie: 'fri' },
+  'planner.weekday.short.sat': { en: 'Sat', beanie: 'sat' },
+
+  // Recurrence pill labels that include start-date-derived anchors.
+  // `{date}` is replaced with an ordinal day-of-month string (e.g. "14th").
+  // `{ordinal}` is replaced with a weekday ordinal (e.g. "2nd" or "last").
+  // `{day}` is replaced with a short weekday name (e.g. "Tue").
+  'planner.frequencyChip.monthlyOnDate': {
+    en: 'Monthly on the {date}',
+    beanie: 'monthly on the {date}',
+  },
+  'planner.frequencyChip.monthlyOnDay': {
+    en: 'Monthly on the {ordinal} {day}',
+    beanie: 'monthly on the {ordinal} {day}',
+  },
 
   // Planner — Fee schedule labels
   'planner.fee.none': { en: 'No fees', beanie: 'no fees' },

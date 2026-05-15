@@ -7,10 +7,17 @@ import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
 import { activityCategoryToExpenseCategory } from '@/constants/categories';
 import { calculateMonthlyFee } from '@/utils/finance';
 import { useSettingsStore } from './settingsStore';
-import { toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
+import {
+  toDateInputValue,
+  addDays,
+  parseLocalDate,
+  getWeekdayOrdinalInMonth,
+  nthWeekdayOfMonth,
+} from '@/utils/date';
 import { useToday } from '@/composables/useToday';
 import { normalizeAssignees } from '@/utils/assignees';
 import { ACTIVITY_COLORS, getActivityCategoryColor } from '@/constants/activityCategories';
+import { reportError } from '@/utils/errorReporter';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
@@ -57,86 +64,241 @@ export const useActivityStore = defineStore('activities', () => {
   });
 
   /**
+   * Periodic (every-N-days) recurrence helper, shared by `'weekly'` and
+   * `'biweekly'`. The weekly case passes `stepDays=7` and may include
+   * multi-day-of-week (via `daysOfWeek`); the biweekly case passes
+   * `stepDays=14` and single-day-only (anchored to `startDate`'s weekday).
+   */
+  function expandPeriodic(
+    activity: FamilyActivity,
+    startDate: Date,
+    monthStart: Date,
+    effectiveEnd: Date,
+    stepDays: 7 | 14
+  ): { activity: FamilyActivity; date: string }[] {
+    const results: { activity: FamilyActivity; date: string }[] = [];
+    // Multi-day only for weekly (step=7); biweekly anchors to the start
+    // date's weekday and ignores `daysOfWeek` (out of scope by design).
+    const targetDays =
+      stepDays === 7 && activity.daysOfWeek?.length ? activity.daysOfWeek : [startDate.getDay()];
+
+    for (const targetDay of targetDays) {
+      // For biweekly: anchor to a date that's both this targetDay AND
+      // aligned to startDate's cadence (same parity of weeks-since-start).
+      // We start from startDate and step forward by `stepDays` until we're
+      // within the month window.
+      const cursor =
+        stepDays === 14
+          ? new Date(startDate)
+          : (() => {
+              const c = new Date(monthStart);
+              while (c.getDay() !== targetDay) c.setDate(c.getDate() + 1);
+              return c;
+            })();
+
+      // Advance cursor up to monthStart (for biweekly when startDate is earlier).
+      while (cursor < monthStart) {
+        cursor.setDate(cursor.getDate() + stepDays);
+      }
+
+      while (cursor <= effectiveEnd) {
+        if (cursor >= startDate) {
+          results.push({ activity, date: formatDate(cursor) });
+        }
+        cursor.setDate(cursor.getDate() + stepDays);
+      }
+    }
+    return results;
+  }
+
+  /**
    * Expand a single recurring activity into occurrences for a given month.
+   *
+   * Failure modes (NEVER silent — all surface via `reportError`):
+   *   - `activity.date` is missing/invalid → warning, no occurrences emitted.
+   *   - `activity.recurrence` is not a known enum value → error, no
+   *     occurrences. Catches future enum drift and corrupt data.
+   *
+   * On success, applies the override filter (`parentActivityId` +
+   * `originalOccurrenceDate`) so a one-off override of a recurring date
+   * replaces the parent's occurrence at that date.
    */
   function expandRecurring(
     activity: FamilyActivity,
     year: number,
     month: number
   ): { activity: FamilyActivity; date: string }[] {
-    const results: { activity: FamilyActivity; date: string }[] = [];
-    const startDate = parseLocalDate(activity.date);
+    const startDate = activity.date ? parseLocalDate(activity.date) : null;
+    if (!startDate || Number.isNaN(startDate.getTime())) {
+      reportError({
+        surface: 'activityStore.invalidStartDate',
+        message: `Activity ${activity.id} has invalid date "${activity.date}" — skipping occurrence expansion`,
+        severity: 'warning',
+        context: {
+          activity_id: activity.id,
+          recurrence: activity.recurrence,
+          raw_date: activity.date ?? null,
+        },
+      });
+      return [];
+    }
+
     const endDate = activity.recurrenceEndDate ? parseLocalDate(activity.recurrenceEndDate) : null;
     const monthStart = new Date(year, month, 1);
     const monthEnd = new Date(year, month + 1, 0);
 
-    // If the recurrence ended before this month, skip entirely
-    if (endDate && endDate < monthStart) return results;
+    // If the recurrence ended before this month, skip entirely.
+    if (endDate && endDate < monthStart) return [];
 
-    // Effective month boundary respecting end date
+    // Effective month boundary respecting end date.
     const effectiveEnd = endDate && endDate < monthEnd ? endDate : monthEnd;
 
-    if (activity.recurrence === 'none') {
-      // Multi-day all-day: expand to each day in the date range
-      if (activity.isAllDay && activity.endDate) {
-        const rangeEnd = parseLocalDate(activity.endDate);
-        const cursor = new Date(Math.max(startDate.getTime(), monthStart.getTime()));
-        const limit = rangeEnd < monthEnd ? rangeEnd : monthEnd;
-        while (cursor <= limit) {
-          if (cursor >= startDate) {
-            results.push({ activity, date: formatDate(cursor) });
-          }
-          cursor.setDate(cursor.getDate() + 1);
-        }
-      } else if (startDate >= monthStart && startDate <= monthEnd) {
-        // Single-day one-off
-        results.push({ activity, date: activity.date });
+    let results: { activity: FamilyActivity; date: string }[];
+    switch (activity.recurrence) {
+      case 'none':
+        results = expandOneOff(activity, startDate, monthStart, monthEnd);
+        break;
+      case 'daily':
+        results = expandDaily(activity, startDate, monthStart, effectiveEnd);
+        break;
+      case 'weekly':
+        results = expandPeriodic(activity, startDate, monthStart, effectiveEnd, 7);
+        break;
+      case 'biweekly':
+        results = expandPeriodic(activity, startDate, monthStart, effectiveEnd, 14);
+        break;
+      case 'monthly':
+        results = expandMonthlyByDate(
+          activity,
+          startDate,
+          year,
+          month,
+          monthStart,
+          monthEnd,
+          effectiveEnd
+        );
+        break;
+      case 'monthly-by-day':
+        results = expandMonthlyByDay(activity, startDate, year, month, monthStart, effectiveEnd);
+        break;
+      case 'yearly':
+        results = expandYearly(activity, startDate, year, month, endDate);
+        break;
+      default: {
+        // Exhaustive guard. If a future `ActivityRecurrence` value is added
+        // without a case here, we surface loudly + return no occurrences
+        // rather than silently dropping the activity from the calendar.
+        const exhaustiveCheck: never = activity.recurrence;
+        reportError({
+          surface: 'activityStore.unknownRecurrence',
+          message: `Activity ${activity.id} has unknown recurrence "${String(exhaustiveCheck)}" — calendar will not show it until this is fixed`,
+          severity: 'error',
+          context: { activity_id: activity.id, recurrence: String(exhaustiveCheck) },
+        });
+        return [];
       }
-    } else if (activity.recurrence === 'daily') {
+    }
+
+    // Filter out dates that have materialized overrides (one-offs with
+    // parentActivityId). Same path for every recurrence kind.
+    const overrides = overridesByParent.value.get(activity.id);
+    return overrides ? results.filter((r) => !overrides.has(r.date)) : results;
+  }
+
+  /** Single one-off activity (no recurrence). Multi-day all-day expands into
+   *  one occurrence per day in the range; single-day emits one occurrence. */
+  function expandOneOff(
+    activity: FamilyActivity,
+    startDate: Date,
+    monthStart: Date,
+    monthEnd: Date
+  ): { activity: FamilyActivity; date: string }[] {
+    const results: { activity: FamilyActivity; date: string }[] = [];
+    if (activity.isAllDay && activity.endDate) {
+      const rangeEnd = parseLocalDate(activity.endDate);
       const cursor = new Date(Math.max(startDate.getTime(), monthStart.getTime()));
-      while (cursor <= effectiveEnd) {
-        results.push({ activity, date: formatDate(cursor) });
+      const limit = rangeEnd < monthEnd ? rangeEnd : monthEnd;
+      while (cursor <= limit) {
+        if (cursor >= startDate) {
+          results.push({ activity, date: formatDate(cursor) });
+        }
         cursor.setDate(cursor.getDate() + 1);
       }
-    } else if (activity.recurrence === 'weekly') {
-      // Multi-day support: use daysOfWeek array, fall back to single day from start date
-      const targetDays = activity.daysOfWeek?.length ? activity.daysOfWeek : [startDate.getDay()];
-
-      for (const targetDay of targetDays) {
-        // Find first occurrence of targetDay in the month
-        const cursor = new Date(monthStart);
-        while (cursor.getDay() !== targetDay) {
-          cursor.setDate(cursor.getDate() + 1);
-        }
-        // Only include if activity has started by this date
-        while (cursor <= effectiveEnd) {
-          if (cursor >= startDate) {
-            results.push({ activity, date: formatDate(cursor) });
-          }
-          cursor.setDate(cursor.getDate() + 7);
-        }
-      }
-    } else if (activity.recurrence === 'monthly') {
-      const dayOfMonth = startDate.getDate();
-      const candidate = new Date(year, month, Math.min(dayOfMonth, monthEnd.getDate()));
-      if (candidate >= startDate && candidate >= monthStart && candidate <= effectiveEnd) {
-        results.push({ activity, date: formatDate(candidate) });
-      }
-    } else if (activity.recurrence === 'yearly') {
-      if (startDate.getMonth() === month) {
-        const candidate = new Date(year, month, startDate.getDate());
-        if (candidate >= startDate && (!endDate || candidate <= endDate)) {
-          results.push({ activity, date: formatDate(candidate) });
-        }
-      }
-    }
-
-    // Filter out dates that have materialized overrides (one-offs with parentActivityId)
-    const overrides = overridesByParent.value.get(activity.id);
-    if (overrides) {
-      return results.filter((r) => !overrides.has(r.date));
+    } else if (startDate >= monthStart && startDate <= monthEnd) {
+      results.push({ activity, date: activity.date });
     }
     return results;
+  }
+
+  /** Every day within the month, bounded by startDate + effectiveEnd. */
+  function expandDaily(
+    activity: FamilyActivity,
+    startDate: Date,
+    monthStart: Date,
+    effectiveEnd: Date
+  ): { activity: FamilyActivity; date: string }[] {
+    const results: { activity: FamilyActivity; date: string }[] = [];
+    const cursor = new Date(Math.max(startDate.getTime(), monthStart.getTime()));
+    while (cursor <= effectiveEnd) {
+      results.push({ activity, date: formatDate(cursor) });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return results;
+  }
+
+  /** Monthly on the Nth of the month, derived from startDate. Clamps to the
+   *  month's last day for months without that date (e.g. Feb 30 → Feb 28). */
+  function expandMonthlyByDate(
+    activity: FamilyActivity,
+    startDate: Date,
+    year: number,
+    month: number,
+    monthStart: Date,
+    monthEnd: Date,
+    effectiveEnd: Date
+  ): { activity: FamilyActivity; date: string }[] {
+    const dayOfMonth = startDate.getDate();
+    const candidate = new Date(year, month, Math.min(dayOfMonth, monthEnd.getDate()));
+    if (candidate >= startDate && candidate >= monthStart && candidate <= effectiveEnd) {
+      return [{ activity, date: formatDate(candidate) }];
+    }
+    return [];
+  }
+
+  /** Monthly on the Nth weekday of the month, derived from startDate. The
+   *  5th-weekday case is coerced to "last weekday" by
+   *  `getWeekdayOrdinalInMonth` so every month gets an occurrence. */
+  function expandMonthlyByDay(
+    activity: FamilyActivity,
+    startDate: Date,
+    year: number,
+    month: number,
+    monthStart: Date,
+    effectiveEnd: Date
+  ): { activity: FamilyActivity; date: string }[] {
+    const ordinal = getWeekdayOrdinalInMonth(startDate);
+    const weekday = startDate.getDay();
+    const candidate = nthWeekdayOfMonth(new Date(year, month, 1), ordinal, weekday);
+    if (candidate >= startDate && candidate >= monthStart && candidate <= effectiveEnd) {
+      return [{ activity, date: formatDate(candidate) }];
+    }
+    return [];
+  }
+
+  /** Yearly on the same month + day as startDate. */
+  function expandYearly(
+    activity: FamilyActivity,
+    startDate: Date,
+    year: number,
+    month: number,
+    endDate: Date | null
+  ): { activity: FamilyActivity; date: string }[] {
+    if (startDate.getMonth() !== month) return [];
+    const candidate = new Date(year, month, startDate.getDate());
+    if (candidate >= startDate && (!endDate || candidate <= endDate)) {
+      return [{ activity, date: formatDate(candidate) }];
+    }
+    return [];
   }
 
   const formatDate = toDateInputValue;

@@ -95,6 +95,78 @@ export function getEndOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
 }
 
+/**
+ * Return the ordinal of `date`'s weekday within its month, in {1, 2, 3, 4, -1}.
+ *
+ * A date that's the 5th occurrence of its weekday in the month (rare — only
+ * happens in months that span a weekday boundary 5×) is coerced to `-1`
+ * meaning "last weekday of month". This is the policy chosen for the
+ * `'monthly-by-day'` activity recurrence so that an activity anchored to
+ * the 5th weekday produces an occurrence in every month, never silently
+ * skipping months with only 4 occurrences.
+ *
+ * Pure function. Throws on invalid Date (NaN).
+ *
+ * Examples:
+ *   getWeekdayOrdinalInMonth(new Date('2026-05-13')) → 2  (2nd Wednesday of May 2026)
+ *   getWeekdayOrdinalInMonth(new Date('2026-05-29')) → 5 → coerced → -1  (5th Friday → last)
+ */
+export function getWeekdayOrdinalInMonth(date: Date): 1 | 2 | 3 | 4 | -1 {
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('getWeekdayOrdinalInMonth: invalid Date');
+  }
+  const raw = Math.ceil(date.getDate() / 7);
+  if (raw === 5) return -1;
+  if (raw === 1 || raw === 2 || raw === 3 || raw === 4) return raw;
+  // Unreachable given valid Date input — getDate() returns 1..31, so
+  // ceil/7 yields 1..5. Defensive: throw rather than misroute.
+  throw new Error(
+    `getWeekdayOrdinalInMonth: unexpected ordinal ${raw} for date ${date.toISOString()}`
+  );
+}
+
+/**
+ * Return the date in `month` that is the Nth occurrence of `weekday`.
+ *
+ * `month` may point at any day of the target month — the function aligns to
+ * the month from the year + month components. `ordinal === -1` means "the
+ * last occurrence of `weekday` in the month" (typically the 4th or 5th).
+ *
+ * Pure function. Throws on invalid inputs (`weekday` out of 0..6, invalid
+ * Date, ordinal not in {1, 2, 3, 4, -1}).
+ *
+ * Examples:
+ *   nthWeekdayOfMonth(new Date('2026-06-01'), 2, 3) → 2026-06-10 (2nd Wed of Jun)
+ *   nthWeekdayOfMonth(new Date('2026-06-01'), -1, 6) → 2026-06-27 (last Sat of Jun)
+ */
+export function nthWeekdayOfMonth(month: Date, ordinal: 1 | 2 | 3 | 4 | -1, weekday: number): Date {
+  if (Number.isNaN(month.getTime())) {
+    throw new Error('nthWeekdayOfMonth: invalid month');
+  }
+  if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) {
+    throw new Error(`nthWeekdayOfMonth: weekday must be 0..6, got ${weekday}`);
+  }
+  if (ordinal !== -1 && (ordinal < 1 || ordinal > 4)) {
+    throw new Error(`nthWeekdayOfMonth: ordinal must be 1..4 or -1, got ${ordinal}`);
+  }
+
+  const year = month.getFullYear();
+  const monthIdx = month.getMonth();
+
+  if (ordinal === -1) {
+    // Walk backwards from the last day of the month until we hit the weekday.
+    const lastDay = new Date(year, monthIdx + 1, 0); // day 0 of next month = last of this
+    const offset = (lastDay.getDay() - weekday + 7) % 7;
+    return new Date(year, monthIdx, lastDay.getDate() - offset);
+  }
+
+  // Walk forward from day 1 to find the first occurrence, then add (ordinal-1) weeks.
+  const firstDay = new Date(year, monthIdx, 1);
+  const offsetToFirst = (weekday - firstDay.getDay() + 7) % 7;
+  const dayOfMonth = 1 + offsetToFirst + (ordinal - 1) * 7;
+  return new Date(year, monthIdx, dayOfMonth);
+}
+
 export function addDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
