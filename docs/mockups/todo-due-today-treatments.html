@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family · todo "due today" treatments · swatch comparison</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500;1,9..144,600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ---------- brand tokens ---------- */
+      :root {
+        --orange: #f15d22;
+        --orange-soft: #e0551f;
+        --terracotta: #e67e22;
+        --silk: #aed6f1;
+        --slate: #2c3e50;
+        --slate-muted: #6b7d8f;
+        --cream: #fdfaf6;
+        --paper: #ffffff;
+        --page-bg: #f5f1ea;
+        --ink: #2c3e50;
+        --ink-muted: #6b7d8f;
+
+        --hairline: rgba(44, 62, 80, 0.08);
+        --hairline-strong: rgba(44, 62, 80, 0.16);
+
+        --tint-orange-6: rgba(241, 93, 34, 0.06);
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-12: rgba(241, 93, 34, 0.12);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-orange-22: rgba(241, 93, 34, 0.22);
+        --tint-silk-10: rgba(174, 214, 241, 0.18);
+        --tint-silk-20: rgba(174, 214, 241, 0.28);
+        --tint-silk-30: rgba(174, 214, 241, 0.4);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+        --tint-slate-10: rgba(44, 62, 80, 0.1);
+        --red-50: #fef2f2;
+        --red-100: #fee2e2;
+        --red-200: #fecaca;
+        --red-400: #f87171;
+
+        --shadow-soft: 0 4px 24px rgba(44, 62, 80, 0.08);
+        --shadow-card: 0 1px 3px rgba(44, 62, 80, 0.06), 0 1px 2px rgba(44, 62, 80, 0.04);
+        --shadow-glow-orange: 0 0 0 4px rgba(241, 93, 34, 0.12);
+
+        --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      [data-theme='dark'] {
+        --paper: #243342;
+        --page-bg: #1a252f;
+        --cream: #2c3e50;
+        --ink: #ecf0f1;
+        --ink-muted: rgba(236, 240, 241, 0.65);
+        --hairline: rgba(236, 240, 241, 0.08);
+        --hairline-strong: rgba(236, 240, 241, 0.18);
+        --tint-slate-5: rgba(236, 240, 241, 0.05);
+        --tint-slate-10: rgba(236, 240, 241, 0.1);
+        --red-50: rgba(239, 68, 68, 0.12);
+        --red-100: rgba(239, 68, 68, 0.18);
+        --red-200: rgba(239, 68, 68, 0.35);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background:
+          radial-gradient(1200px 800px at 20% -10%, var(--tint-silk-20), transparent 60%),
+          radial-gradient(1000px 700px at 100% 110%, var(--tint-orange-8), transparent 65%),
+          var(--page-bg);
+        color: var(--ink);
+        min-height: 100vh;
+        padding: 64px 32px 96px;
+      }
+
+      /* ---------- page chrome ---------- */
+      .page {
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+      .masthead {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 48px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--hairline);
+      }
+      .kicker {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 14px;
+        color: var(--orange);
+        letter-spacing: 0.02em;
+        margin: 0 0 6px;
+      }
+      h1.title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 34px;
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+      .lede {
+        font-size: 14.5px;
+        color: var(--ink-muted);
+        max-width: 560px;
+        margin: 12px 0 0;
+        line-height: 1.55;
+      }
+      .theme-toggle {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--hairline-strong);
+        background: var(--paper);
+        color: var(--ink);
+        cursor: pointer;
+        transition: all 200ms var(--ease-out);
+      }
+      .theme-toggle:hover {
+        background: var(--tint-slate-5);
+      }
+
+      /* ---------- swatch grid ---------- */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 32px;
+      }
+      @media (max-width: 980px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .swatch {
+        background: var(--paper);
+        border-radius: 24px;
+        padding: 28px 28px 24px;
+        box-shadow: var(--shadow-card);
+        border: 1px solid var(--hairline);
+        position: relative;
+      }
+      .swatch-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 4px;
+      }
+      .swatch-eyebrow {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 12px;
+        color: var(--orange);
+        letter-spacing: 0.02em;
+      }
+      .swatch-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--ink-muted);
+        background: var(--tint-slate-5);
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+      .swatch-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 19px;
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+      .swatch-pitch {
+        font-size: 13px;
+        color: var(--ink-muted);
+        line-height: 1.5;
+        margin: 0 0 22px;
+      }
+      .swatch-strip {
+        height: 1px;
+        background: var(--hairline);
+        margin: 0 -28px 22px;
+      }
+
+      .ladder {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      /* ---------- todo row (mirrors TodoItemRow.vue) ---------- */
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-radius: 16px;
+        border: 1px solid var(--tint-slate-5);
+        padding: 14px 16px;
+        background: var(--paper);
+        transition: background 220ms var(--ease-out);
+        position: relative;
+      }
+      .row .check {
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+        border-radius: 8px;
+        border: 2.5px solid var(--orange);
+      }
+      .row .body {
+        flex: 1;
+        min-width: 0;
+      }
+      .row .title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--ink);
+        margin: 0 0 4px;
+      }
+      .row .meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10.5px;
+        font-weight: 600;
+        font-family: 'Outfit', sans-serif;
+      }
+      .pill-date {
+        font-size: 11px;
+        font-weight: 600;
+        font-family: 'Outfit', sans-serif;
+        color: var(--orange);
+      }
+      .member {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--tint-slate-5);
+        font-size: 10.5px;
+        font-weight: 500;
+      }
+      .member-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+
+      /* ---------- baseline overdue row (red, unchanged from prod) ---------- */
+      .row.overdue {
+        background: var(--red-50);
+        border-color: var(--red-200);
+      }
+      [data-theme='dark'] .row.overdue {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.3);
+      }
+      .row.overdue .check {
+        border-color: var(--red-400);
+      }
+      .pill.overdue {
+        background: var(--orange);
+        color: white;
+      }
+      .pill.overdue .tag {
+        margin-left: 4px;
+        background: rgba(255, 255, 255, 0.25);
+        padding: 1px 5px;
+        border-radius: 999px;
+        font-size: 9px;
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+
+      /* ---------- baseline someday row (Sky Silk, unchanged from prod) ---------- */
+      .row.someday {
+        background: linear-gradient(
+          135deg,
+          var(--tint-silk-10),
+          var(--tint-silk-20)
+        );
+        border-color: var(--tint-silk-30);
+      }
+      .row.someday .check {
+        border-color: #7fb6dc;
+      }
+      .row.someday .title::before {
+        content: '💭 ';
+      }
+
+      /* ============================================================
+         OPTION 1 — Warm wash (gradient, mirrors someday on the warm side)
+         ============================================================ */
+      .opt1 .row.today {
+        background: linear-gradient(
+          135deg,
+          var(--tint-orange-8),
+          var(--tint-orange-15)
+        );
+        border-color: var(--tint-orange-22);
+      }
+      .opt1 .pill.today {
+        background: var(--orange);
+        color: white;
+      }
+
+      /* ============================================================
+         OPTION 2 — Lane marker (left-edge accent stripe)
+         ============================================================ */
+      .opt2 .row.today {
+        background: var(--paper);
+        border-color: var(--hairline);
+        border-left: 3px solid var(--orange);
+        border-radius: 12px 16px 16px 12px;
+        padding-left: 14px;
+      }
+      .opt2 .pill.today {
+        background: var(--orange);
+        color: white;
+      }
+
+      /* ============================================================
+         OPTION 3 — Pill-only (restrained — card stays neutral)
+         ============================================================ */
+      .opt3 .row.today {
+        background: var(--paper);
+        border-color: var(--hairline);
+      }
+      .opt3 .pill.today {
+        background: var(--orange);
+        color: white;
+      }
+      .opt3 .pill.today .tag {
+        margin-left: 4px;
+        background: rgba(255, 255, 255, 0.25);
+        padding: 1px 5px;
+        border-radius: 999px;
+        font-size: 9px;
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+
+      /* ============================================================
+         OPTION 4 — Outlined glow (2px orange border + warm halo)
+         ============================================================ */
+      .opt4 .row.today {
+        background: var(--paper);
+        border: 1.5px solid var(--orange);
+        box-shadow: var(--shadow-glow-orange);
+      }
+      [data-theme='dark'] .opt4 .row.today {
+        background: var(--paper);
+      }
+      .opt4 .pill.today {
+        background: var(--tint-orange-15);
+        color: var(--orange);
+        border: 1px solid var(--tint-orange-22);
+      }
+
+      /* ---------- footer scratchpad ---------- */
+      .verdict {
+        margin-top: 48px;
+        padding: 28px 32px;
+        background: var(--paper);
+        border-radius: 24px;
+        border: 1px solid var(--hairline);
+        box-shadow: var(--shadow-card);
+      }
+      .verdict h2 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 16px;
+        margin: 0 0 16px;
+        letter-spacing: -0.005em;
+      }
+      .verdict .grid-verdict {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+      }
+      @media (max-width: 980px) {
+        .verdict .grid-verdict {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .verdict-col h3 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        margin: 0 0 6px;
+        color: var(--orange);
+      }
+      .verdict-col p {
+        font-size: 12.5px;
+        line-height: 1.55;
+        color: var(--ink-muted);
+        margin: 0 0 6px;
+      }
+      .verdict-col p.note {
+        font-style: italic;
+        color: var(--ink);
+      }
+
+      .compare-strip {
+        margin-top: 32px;
+        padding: 28px 32px;
+        background: var(--paper);
+        border-radius: 24px;
+        border: 1px solid var(--hairline);
+        box-shadow: var(--shadow-card);
+      }
+      .compare-strip h2 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 16px;
+        margin: 0 0 4px;
+      }
+      .compare-strip .sub {
+        font-size: 13px;
+        color: var(--ink-muted);
+        margin: 0 0 22px;
+      }
+      .compare-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+      }
+      @media (max-width: 980px) {
+        .compare-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .compare-cell {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .compare-cell .name {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--ink-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <div>
+          <p class="kicker">a swatch book · pick one</p>
+          <h1 class="title">to-do · "due today" treatments</h1>
+          <p class="lede">
+            Four ways to slot a "due today" state between the existing overdue (red banding) and
+            normal/upcoming (white card) rungs. Each option shows the full urgency ladder so the
+            today row is comparable in context.
+          </p>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()">flip theme</button>
+      </header>
+
+      <div class="grid">
+        <!-- ===================================================================
+             OPTION 1 — Warm wash
+             =================================================================== -->
+        <article class="swatch opt1">
+          <div class="swatch-head">
+            <span class="swatch-eyebrow">option one</span>
+            <span class="swatch-label">warm wash</span>
+          </div>
+          <h2 class="swatch-title">Heritage Orange gradient mirrors someday</h2>
+          <p class="swatch-pitch">
+            A soft warm gradient on the today row, mirroring the Sky Silk gradient already used for
+            someday. Reads as a system: every "lane" gets its own wash, plain white = neutral
+            upcoming. The pill upgrades to a filled orange chip.
+          </p>
+          <div class="swatch-strip"></div>
+
+          <div class="ladder">
+            <div class="row overdue">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Return the library books</p>
+                <div class="meta">
+                  <span class="pill overdue">⏰ Mon, 14:00<span class="tag">Overdue</span></span>
+                  <span class="member"
+                    ><span class="member-dot" style="background: #e67e22"></span>Sophia</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="row today">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Pay Joey's enrichment invoice</p>
+                <div class="meta">
+                  <span class="pill today">📅 Today, 17:00</span>
+                  <span class="member"
+                    ><span class="member-dot" style="background: #f15d22"></span>Greg</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Book dentist for Lewis</p>
+                <div class="meta">
+                  <span class="pill-date">📅 Mon 25 May</span>
+                  <span class="member"
+                    ><span class="member-dot" style="background: #aed6f1"></span>Anyone</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="row someday">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Plan the August Hokkaido trip</p>
+                <div class="meta">
+                  <span class="member"
+                    ><span class="member-dot" style="background: #2c3e50"></span>Family</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- ===================================================================
+             OPTION 2 — Lane marker
+             =================================================================== -->
+        <article class="swatch opt2">
+          <div class="swatch-head">
+            <span class="swatch-eyebrow">option two</span>
+            <span class="swatch-label">lane marker</span>
+          </div>
+          <h2 class="swatch-title">Left-edge orange stripe, card stays calm</h2>
+          <p class="swatch-pitch">
+            White card, but a 3px Heritage Orange stripe runs down the left edge — borrowing the
+            "today's lane" cue from a paper calendar. The pill still upgrades to a filled chip. Less
+            shouty than the wash; reads like a marker rather than a state.
+          </p>
+          <div class="swatch-strip"></div>
+
+          <div class="ladder">
+            <div class="row overdue">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Return the library books</p>
+                <div class="meta">
+                  <span class="pill overdue">⏰ Mon, 14:00<span class="tag">Overdue</span></span>
+                  <span class="member"
+                    ><span class="member-dot" style="background: #e67e22"></span>Sophia</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="row today">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Pay Joey's enrichment invoice</p>
+                <div class="meta">
+                  <span class="pill today">📅 Today, 17:00</span>
+                  <span class="member"
+                    ><span class="member-dot" style="background: #f15d22"></span>Greg</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Book dentist for Lewis</p>
+                <div class="meta">
+                  <span class="pill-date">📅 Mon 25 May</span>
+                  <span class="member"
+                    ><span class="member-dot" style="background: #aed6f1"></span>Anyone</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="row someday">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Plan the August Hokkaido trip</p>
+                <div class="meta">
+                  <span class="member"
+                    ><span class="member-dot" style="background: #2c3e50"></span>Family</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- ===================================================================
+             OPTION 3 — Pill only
+             =================================================================== -->
+        <article class="swatch opt3">
+          <div class="swatch-head">
+            <span class="swatch-eyebrow">option three</span>
+            <span class="swatch-label">pill only</span>
+          </div>
+          <h2 class="swatch-title">Only the chip changes; card stays neutral</h2>
+          <p class="swatch-pitch">
+            The most restrained option. The card is identical to a regular upcoming row — only the
+            date chip flips to a filled Heritage Orange pill with a "TODAY" tag, mirroring the
+            structure of the overdue pill (but in standard orange, no red). Lightest visual touch.
+          </p>
+          <div class="swatch-strip"></div>
+
+          <div class="ladder">
+            <div class="row overdue">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Return the library books</p>
+                <div class="meta">
+                  <span class="pill overdue">⏰ Mon, 14:00<span class="tag">Overdue</span></span>
+                  <span class="member"
+                    ><span class="member-dot" style="background: #e67e22"></span>Sophia</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="row today">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Pay Joey's enrichment invoice</p>
+                <div class="meta">
+                  <span class="pill today">📅 17:00<span class="tag">Today</span></span>
+                  <span class="member"
+                    ><span class="member-dot" style="background: #f15d22"></span>Greg</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Book dentist for Lewis</p>
+                <div class="meta">
+                  <span class="pill-date">📅 Mon 25 May</span>
+                  <span class="member"
+                    ><span class="member-dot" style="background: #aed6f1"></span>Anyone</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="row someday">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Plan the August Hokkaido trip</p>
+                <div class="meta">
+                  <span class="member"
+                    ><span class="member-dot" style="background: #2c3e50"></span>Family</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- ===================================================================
+             OPTION 4 — Outlined glow
+             =================================================================== -->
+        <article class="swatch opt4">
+          <div class="swatch-head">
+            <span class="swatch-eyebrow">option four</span>
+            <span class="swatch-label">outlined glow</span>
+          </div>
+          <h2 class="swatch-title">Orange border + soft halo, white card</h2>
+          <p class="swatch-pitch">
+            A 1.5px Heritage Orange border on a white card, plus a soft 4px orange halo (box-shadow
+            ring). Reads like the row is "selected for today" — a calendar's today-cell pattern.
+            More attention-grabbing than 1-3; closest neighbour to overdue's intensity without
+            tipping into red.
+          </p>
+          <div class="swatch-strip"></div>
+
+          <div class="ladder">
+            <div class="row overdue">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Return the library books</p>
+                <div class="meta">
+                  <span class="pill overdue">⏰ Mon, 14:00<span class="tag">Overdue</span></span>
+                  <span class="member"
+                    ><span class="member-dot" style="background: #e67e22"></span>Sophia</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="row today">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Pay Joey's enrichment invoice</p>
+                <div class="meta">
+                  <span class="pill today">📅 Today, 17:00</span>
+                  <span class="member"
+                    ><span class="member-dot" style="background: #f15d22"></span>Greg</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Book dentist for Lewis</p>
+                <div class="meta">
+                  <span class="pill-date">📅 Mon 25 May</span>
+                  <span class="member"
+                    ><span class="member-dot" style="background: #aed6f1"></span>Anyone</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="row someday">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Plan the August Hokkaido trip</p>
+                <div class="meta">
+                  <span class="member"
+                    ><span class="member-dot" style="background: #2c3e50"></span>Family</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- ===================================================================
+           today-row only, side by side
+           =================================================================== -->
+      <section class="compare-strip">
+        <h2>today rows, isolated</h2>
+        <p class="sub">
+          Same row, four treatments — nothing else to distract. Look at this side-by-side first;
+          ladders above show context.
+        </p>
+        <div class="compare-grid">
+          <div class="compare-cell opt1">
+            <span class="name">one · warm wash</span>
+            <div class="row today">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Pay Joey's enrichment invoice</p>
+                <div class="meta">
+                  <span class="pill today">📅 Today, 17:00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="compare-cell opt2">
+            <span class="name">two · lane marker</span>
+            <div class="row today">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Pay Joey's enrichment invoice</p>
+                <div class="meta">
+                  <span class="pill today">📅 Today, 17:00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="compare-cell opt3">
+            <span class="name">three · pill only</span>
+            <div class="row today">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Pay Joey's enrichment invoice</p>
+                <div class="meta">
+                  <span class="pill today">📅 17:00<span class="tag">Today</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="compare-cell opt4">
+            <span class="name">four · outlined glow</span>
+            <div class="row today">
+              <div class="check"></div>
+              <div class="body">
+                <p class="title">Pay Joey's enrichment invoice</p>
+                <div class="meta">
+                  <span class="pill today">📅 Today, 17:00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================================
+           verdict scratchpad
+           =================================================================== -->
+      <section class="verdict">
+        <h2>my read</h2>
+        <div class="grid-verdict">
+          <div class="verdict-col">
+            <h3>one · warm wash</h3>
+            <p>
+              Strongest system fit — every special state gets a gradient. Pairs with someday's Sky
+              Silk wash like two sides of one design language: warm vs. calm.
+            </p>
+            <p class="note">recommended</p>
+          </div>
+          <div class="verdict-col">
+            <h3>two · lane marker</h3>
+            <p>
+              Calmest. Reads as a hint not a state. Risk: the stripe might feel out of place since
+              no other row in the system uses a side accent.
+            </p>
+          </div>
+          <div class="verdict-col">
+            <h3>three · pill only</h3>
+            <p>
+              Lightest touch. Risk: a scanning user might miss it — the pill is small and the card
+              looks identical to "due in three weeks".
+            </p>
+          </div>
+          <div class="verdict-col">
+            <h3>four · outlined glow</h3>
+            <p>
+              Most attention-grabbing. Risk: gets close enough to overdue's intensity that the
+              ladder flattens — today and overdue start to feel like a single "urgent" cluster.
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      function toggleTheme() {
+        const html = document.documentElement;
+        html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+      }
+    </script>
+  </body>
+</html>

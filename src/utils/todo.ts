@@ -1,4 +1,5 @@
 import type { TodoItem } from '@/types/models';
+import { localToday } from './date';
 import { parseIsoDateSafely } from './safeDate';
 
 /**
@@ -18,4 +19,15 @@ export function isTodoOverdue(todo: TodoItem): boolean {
     dueDate.setHours(23, 59, 59, 999);
   }
   return new Date() > dueDate;
+}
+
+/**
+ * Check whether a todo item is due today (date matches local-today and not
+ * overdue). Overdue takes precedence: a todo with `dueTime` earlier than now
+ * but `dueDate` matching today is overdue, not due-today.
+ */
+export function isTodoDueToday(todo: TodoItem): boolean {
+  if (todo.completed || !todo.dueDate) return false;
+  if (isTodoOverdue(todo)) return false;
+  return todo.dueDate.slice(0, 10) === localToday();
 }

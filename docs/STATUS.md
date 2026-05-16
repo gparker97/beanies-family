@@ -320,10 +320,9 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 >
 > **Earlier 2026-04-28 validation:** removed three stale blocks already shipped — auto-send onboarding diagnostics to Slack (delivered universally via `errorReporter` in commit `2950638`; `useJoinFlow.ts:237` routes every step failure to `#beanies-errors` with the registry code as the surface, so the "Send to support" button is moot), mobile nav v3 implementation (shipped to prod in `1b6b8d9`, greg verified bean-tap navigation on real devices), and guides/FAQ/glossary layout pass (FAQ + glossary `DRAFT=false` and live; pillars went through curriculum reframe + GEO citation pass + voice-reviewed copy + payoff reorder; arrow artifacts and `<!-- greg confirm -->` placeholders all cleaned up).
 
-**🟡 Smoke-test 2026-05-13 UI ships (deployed — `cd13eda` + `0c6b4ba`):**
+**🟡 Smoke-test 2026-05-13 UI ships — partial (deployed — `cd13eda` + `0c6b4ba`):**
 
-- All three are covered by `npm run validate` (type-check / lint / format / 2196 unit tests / build) and the new test files (`useCriticalItems` +9, `useExpandableList` ×6, `ShowMoreToggle` ×5, `SmoothHeight` ×2, `LocalFileSyncWarning` ×5) — but **not** a hands-on browser pass.
-- **Daily briefing** (`/nook`): with >5 critical items, "Show all N" expands the box _smoothly_ (the box grows with a 320 ms ease-out, rows 6+ cascade in), "Show less" folds it back to 5; switch the current member (member picker) and check an unassigned to-do shows for everyone ("… (anyone can do this)"), a child-only to-do shows for adults as "{child}: …" and for the child as "Don't forget: …", adding a parent narrows it; pets never show a briefing.
+- Daily briefing expand/collapse on `/nook` confirmed clean on 2026-05-16 (greg, real device). Two surfaces remain unsmoked:
 - **Planner**: "Upcoming activities" with >6 items — "View more" pages by 6, "Show less" resets, the list grows/shrinks smoothly. Planner-sidebar to-do preview: same.
 - **Onboarding** (Welcome Gate → "Create a new pod" → Step 1 → Step 2): the Google Drive hero card (icon + "Recommended" pill + benefit line + "Connect Google Drive →"), the quiet "Prefer to store your data locally on this device?" link → the reworked modal ("Heads up — local files don't sync", three short lines, "Use Google Drive instead" / "Use a local file" / × top-right) → connecting Drive flips the card green ("Connected to Google Drive") and enables "Next"; picking local turns the link into "✓ Saving to a local file on this device". Dark mode + the "How this works" / "More providers coming soon" disclosures.
 
@@ -335,14 +334,6 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 **🟡 `app.onboardingZombieState` pattern-watch (passive — no action unless a family stays stuck):**
 
 - Fires ONCE per OAuth-redirect-return per page-load in the zombie state. The single alert per round-trip is expected — it's the safety net working. Pattern signals: (a) the same `family_id` firing multiple times across hours/days → a user is genuinely stuck on the resume-setup screen and may need a nudge; (b) the alert firing with `route_path` other than `/welcome` or `/welcome?resume=setup` → the router guard caught it on an SPA nav (e.g. `/activities`) which means they were trying to use the app while their session was zombie'd. (c) The `family_email` context being null in the Slack message (shown as "(not yet authenticated)") is a minor format oddity — it doesn't mean the user isn't authenticated; just that the family context wasn't initialized when the alert fired. Worth a small follow-up to backfill from `authStore.currentUser.email` if `family_email` is unset.
-
-**🟡 Smoke-test 2026-05-16 sidebar + mobile-nav attention-badge ships (deployed — `3460664`):**
-
-- The badge system is heavily unit-tested (24 new tests, all in `useNavBadges.test.ts` / `safeDate.test.ts` / `navigation.test.ts` / `MobileBottomNav.test.ts`) but the visual + interaction layer needs a hands-on browser pass on a real device.
-- **Sidebar (desktop)**: set a todo dueDate to yesterday → orange pill (count) next to To-Do; overspend a budget category → pill next to Budget; set a goal deadline to yesterday → pill next to Goals; create a vacation starting tomorrow → Sky Silk dot next to Travel. Each clears when the underlying state clears. Hover/active-row states still render correctly with the badge present.
-- **Mobile (devtools mobile mode or real iPhone)**: with the same data, closed Planning + Money tabs show top-left orange dot. Tap Planning → bean stack opens → To-Do bean shows orange pill, Travel bean shows Sky Silk dot. Tap Money → Budget + Goals beans show orange pills. The existing top-right open/closed dot is untouched.
-- **Accessibility**: tap-and-hold on a row with a count badge: screen reader should read "{label}, {N} need attention" — informational dots remain decorative (`aria-hidden`).
-- **Dark mode**: confirm Sky Silk dot stays distinguishable from the orange pill across both modes.
 
 **🟢 (future, low-priority) Seed family settings from globalSettings on pod creation:**
 
