@@ -99,9 +99,19 @@ test.describe('Trusted Device Password Cache', () => {
     await bypassLoginIfNeeded(page);
   });
 
+  // Webkit-CI quarantine (E2E_HEALTH 2026-05-16): `page.goto('/settings')` is
+  // consistently interrupted by another navigation to '/nook' under sustained
+  // webkit-CI contention, even with `waitUntil: 'commit'`. The race survives
+  // 3 retries hard, every push, while passing 21/21 on chromium. Per the
+  // 2026-05-13 entry's "quarantine the affected spec on webkit rather than
+  // tuning more timeouts" guidance. Re-enable when we have a SPA-internal
+  // navigation path here (or a webkit-CI gateway fix lands).
   test('Password cache lifecycle: set, persist across reload, clear all data removes it', async ({
     page,
+    browserName,
   }) => {
+    test.skip(browserName === 'webkit', 'webkit-CI: page.goto race (E2E_HEALTH 2026-05-16)');
+
     // --- Phase 1: Set cached password and verify persistence across reload ---
 
     // Simulate trusted device with cached password (as if user trusted + decrypted)

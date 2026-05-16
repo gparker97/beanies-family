@@ -255,8 +255,16 @@ function handleSidebarEdit(id: string, date: string) {
   openViewModal(id, date);
 }
 
-function handleViewOpenEdit(activity: FamilyActivity) {
+async function handleViewOpenEdit(activity: FamilyActivity) {
+  // `scopedViewOpenEdit` closes the view modal (sets viewingActivity=null)
+  // and synchronously returns the target. Without `await nextTick()` here,
+  // the view modal's v-if removal and the edit modal's mount would happen
+  // in the SAME render pass — two role=dialog overlays coexist for one
+  // tick, which webkit's a11y/focus engine under CI contention has stalled
+  // on for >15s. Same shape as the 2026-05-03 handleSave fix; see
+  // docs/E2E_HEALTH.md for the cross-entity history.
   const { activity: target, occurrenceDate } = scopedViewOpenEdit(activity);
+  await nextTick();
   editingActivity.value = target;
   editingOccurrenceDate.value = occurrenceDate;
   showModal.value = true;
