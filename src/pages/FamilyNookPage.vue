@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import NookGreeting from '@/components/nook/NookGreeting.vue';
 import FamilyStatusToast from '@/components/nook/FamilyStatusToast.vue';
@@ -119,8 +119,12 @@ async function handleTodoComplete(id: string) {
   await todoStore.toggleComplete(id, memberId);
 }
 
-function handleActivityOpenEdit(activity: FamilyActivity) {
+async function handleActivityOpenEdit(activity: FamilyActivity) {
+  // Close the view modal first, let Vue flush, then open the edit modal —
+  // prevents two role=dialog overlays coexisting which webkit-CI stalls on.
+  // Same pattern as FamilyPlannerPage; see docs/E2E_HEALTH.md 2026-05-03.
   const { activity: target, occurrenceDate } = scopedActivityOpenEdit(activity);
+  await nextTick();
   editingActivity.value = target;
   editingOccurrenceDate.value = occurrenceDate;
   showActivityEditModal.value = true;

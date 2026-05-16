@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
@@ -806,8 +806,13 @@ function handleMaterializedRecurringClick(tx: DisplayTransaction) {
   openEditRecurringModal(ri);
 }
 
-function handleViewOpenEdit(transaction: Transaction) {
+async function handleViewOpenEdit(transaction: Transaction) {
+  // Close view modal, let Vue flush the v-if removal, then open edit modal.
+  // Prevents two role=dialog overlays coexisting; webkit-CI has stalled on
+  // that pattern. See FamilyPlannerPage.handleViewOpenEdit + E2E_HEALTH
+  // 2026-05-03 (preventative apply per the note left there).
   viewingTransaction.value = null;
+  await nextTick();
   const tx = transaction as DisplayTransaction;
   if (tx.isProjected) {
     handleProjectedClick(tx);
