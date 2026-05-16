@@ -2625,12 +2625,12 @@ const STRING_DEFS = {
   },
   'settings.saveDataToFile': { en: 'Save your data to a file', beanie: 'save your data to a file' },
   'settings.createOrLoadDataFile': {
-    en: 'Create an encrypted data file or load an existing one.',
-    beanie: 'create an encrypted data file or load an existing one.',
+    en: 'Finish setting up your encrypted data file, or load an existing one.',
+    beanie: 'finish setting up your encrypted data file, or load an existing one.',
   },
-  'settings.createNewDataFile': {
-    en: 'Create New Family Data File',
-    beanie: 'create new family data file',
+  'settings.resumeSetup': {
+    en: 'Resume Setup',
+    beanie: 'resume setup',
   },
   'settings.loadExistingDataFile': {
     en: 'Load Existing Family Data File',
