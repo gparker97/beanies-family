@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-16
 
+### Fixed
+
+- **Offline-queue flush no longer fires duplicate Slack alerts on PWA cold-start, and the alerts now carry the actual failure cause.** On iOS PWA reopens, the offline save-queue triggers (token-acquired, visibility-change, provider-attach) could all fire within ~10ms of each other, kicking off concurrent Drive writes and producing two or three identical Slack alerts per occurrence — all reading `flush returned false` with no underlying cause. Two structural changes fix this: (1) a coalescing guard so only one flush runs at a time — subsequent triggers in the same window piggy-back on the in-flight attempt silently, and (2) the underlying `write()` error now propagates through to the Slack payload so operators see the real cause (token-rejected, Drive 404, network TypeError, etc.) instead of a synthetic placeholder. A new `startup` reason also distinguishes provider-attach auto-flushes from the three event-driven recovery paths, so we can tell at a glance which window the failures are clustering in.
+
 ### Changed
 
 - **Settings → Family Data: "Create New Data File" is now "Resume Setup".** When a signed-in session somehow lands without a pod configured, Settings used to offer a "Create New Data File" button that silently failed pre-pod — exactly the scenario our first user hit in HK. The button now reads "Resume Setup" and routes you into the same hardened pod-creation flow used by `/welcome?resume=setup`, which verifies the file after writing, preserves any partial file as `.corrupt-<timestamp>` on failure, and surfaces a concrete error if anything goes wrong. The sibling "Load Existing Data File" button is unchanged. Subhead reworded from "Create an encrypted data file or load an existing one." to "Finish setting up your encrypted data file, or load an existing one."
