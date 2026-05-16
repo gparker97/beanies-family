@@ -4,6 +4,7 @@ import { celebrate } from '@/composables/useCelebration';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { generateUUID } from '@/utils/id';
+import { parseIsoDateSafely } from '@/utils/safeDate';
 import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 import type {
   Goal,
@@ -63,9 +64,13 @@ export const useGoalsStore = defineStore('goals', () => {
 
   const familyGoals = computed(() => goals.value.filter((g) => !g.memberId));
 
-  const overdueGoals = computed(() =>
-    activeGoals.value.filter((g) => g.deadline && new Date(g.deadline) < new Date())
-  );
+  const overdueGoals = computed(() => {
+    const now = Date.now();
+    return activeGoals.value.filter((g) => {
+      const deadline = parseIsoDateSafely(g.deadline, `goal ${g.id}.deadline`);
+      return deadline ? deadline.getTime() < now : false;
+    });
+  });
 
   const goalsByPriority = computed(() => {
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };

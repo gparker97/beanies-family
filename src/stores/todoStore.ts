@@ -3,8 +3,10 @@ import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
+import { useToday } from '@/composables/useToday';
 import * as todoRepo from '@/services/automerge/repositories/todoRepository';
 import { normalizeAssignees } from '@/utils/assignees';
+import { isTodoOverdue } from '@/utils/todo';
 import type { TodoItem, CreateTodoInput, UpdateTodoInput } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 
@@ -36,6 +38,21 @@ export const useTodoStore = defineStore('todos', () => {
   const scheduledTodos = computed(() => activeTodos.value.filter((t) => t.dueDate));
 
   const undatedTodos = computed(() => activeTodos.value.filter((t) => !t.dueDate));
+
+  // Attention computeds — surfaced via the sidebar/mobile-nav attention
+  // badges (see useNavBadges) and the daily briefing (useCriticalItems).
+  // Single source of truth: anywhere that needs "what's overdue or due
+  // today" reads from here, not from inline filters.
+  const { today } = useToday();
+  const overdueTodos = computed(() => activeTodos.value.filter((t) => isTodoOverdue(t)));
+  const dueTodayTodos = computed(() =>
+    activeTodos.value.filter((t) => {
+      if (!t.dueDate || isTodoOverdue(t)) return false;
+      // dueDate is an ISODateString; slice handles both date-only and
+      // full datetime forms. Comparing as strings avoids re-parsing.
+      return t.dueDate.slice(0, 10) === today.value;
+    })
+  );
 
   // ========== FILTERED GETTERS (by global member filter) ==========
 
@@ -181,6 +198,9 @@ export const useTodoStore = defineStore('todos', () => {
     completedTodos,
     scheduledTodos,
     undatedTodos,
+    // Attention getters — drive sidebar/mobile badges + daily briefing
+    overdueTodos,
+    dueTodayTodos,
     // Filtered getters (by global member filter)
     filteredTodos,
     filteredActiveTodos,

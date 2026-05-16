@@ -141,6 +141,15 @@ export function getDoc(): Automerge.Doc<FamilyDocument> {
 }
 
 /**
+ * True if a document is currently loaded. Cheap precondition check for
+ * consumers that need to gracefully handle the pre-pod state (e.g. the
+ * welcome-gate language picker) without tripping getDoc()'s throw.
+ */
+export function isDocLoaded(): boolean {
+  return currentDoc !== null;
+}
+
+/**
  * Apply a mutation to the document.
  * Bumps docVersion and schedules a debounced persist.
  */

@@ -4,6 +4,7 @@ import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
+import { isDocLoaded } from '@/services/automerge/docService';
 import * as globalSettingsRepo from '@/services/indexeddb/repositories/globalSettingsRepository';
 import type {
   Settings,
@@ -188,8 +189,6 @@ export const useSettingsStore = defineStore('settings', () => {
     error.value = null;
     try {
       settings.value = await settingsRepo.getSettings();
-      // Also sync theme/language from per-family settings to global if they differ
-      // This maintains backward compatibility
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load settings';
     } finally {
@@ -247,7 +246,18 @@ export const useSettingsStore = defineStore('settings', () => {
       globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
         [key]: value,
       } as Partial<GlobalSettings>);
-      settings.value = await settingsRepo.saveSettings({ [key]: value } as Partial<Settings>);
+      if (isDocLoaded()) {
+        settings.value = await settingsRepo.saveSettings({ [key]: value } as Partial<Settings>);
+      } else {
+        // Pre-pod: globalSettings is the only layer that exists yet. The
+        // per-family Automerge write is deferred — settingsStore.language
+        // (and theme/textSize/country) read globalSettings preferentially,
+        // so the user's choice still drives the UI. The family-doc seed
+        // on pod creation will pick this up later (tracked in STATUS.md).
+        console.warn(
+          `[settingsStore] '${String(key)}' persisted to device only — no family doc loaded yet (pre-pod state).`
+        );
+      }
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
       error.value = detail;
