@@ -4168,8 +4168,9 @@ const STRING_DEFS = {
     beanie: 'beans, beans, good for your heart!',
   },
   'nook.motto21': {
-    en: 'First you get the beans, then you get the money, and then you get the women',
-    beanie: 'first you get the beans, then you get the money, and then you get the womeeen',
+    en: 'In America, first you get the beans, then you get the money, and then you get the women',
+    beanie:
+      'in america, first you get the beans, then you get the money, and then you get the women',
   },
   'nook.motto22': {
     en: "Don't count your beans before they sprout!",
