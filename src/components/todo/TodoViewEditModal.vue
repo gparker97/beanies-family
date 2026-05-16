@@ -17,6 +17,7 @@ import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import { extractUrls, getUrlDomain, getUrlLabel, getFaviconUrl } from '@/utils/url';
 import { formatDateWithDay } from '@/utils/date';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
+import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
 import type { TodoItem } from '@/types/models';
 
 type EditableField = 'title' | 'dueDate' | 'dueTime' | 'assignee' | 'description';
@@ -160,18 +161,8 @@ const viewCreatedBy = computed(() => {
   return familyStore.members.find((m) => m.id === todo.value!.createdBy);
 });
 
-const viewIsOverdue = computed(() => {
-  if (!todo.value || todo.value.completed || !todo.value.dueDate) return false;
-  const now = new Date();
-  const dueDate = new Date(todo.value.dueDate);
-  if (todo.value.dueTime) {
-    const parts = todo.value.dueTime.split(':').map(Number);
-    dueDate.setHours(parts[0] ?? 23, parts[1] ?? 59, 0, 0);
-  } else {
-    dueDate.setHours(23, 59, 59, 999);
-  }
-  return now > dueDate;
-});
+const viewIsOverdue = computed(() => (todo.value ? isTodoOverdue(todo.value) : false));
+const viewIsDueToday = computed(() => (todo.value ? isTodoDueToday(todo.value) : false));
 
 const viewFormattedDate = computed(() => {
   if (!todo.value?.dueDate) return null;
@@ -385,6 +376,13 @@ async function handleDelete() {
               <span class="rounded-full bg-white/25 px-1.5 py-px text-xs font-bold uppercase">
                 {{ t('todo.overdue') }}
               </span>
+            </span>
+            <span
+              v-else-if="viewFormattedDate && viewIsDueToday"
+              class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-orange-15)] px-3 py-1.5 text-xs font-semibold text-[var(--color-primary-500)]"
+            >
+              {{ t('date.today') }}
+              <template v-if="todo.dueTime"> &middot; {{ todo.dueTime }}</template>
             </span>
             <span
               v-else-if="viewFormattedDate"

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 import TodoItemRow from '../TodoItemRow.vue';
@@ -52,5 +52,42 @@ describe('TodoItemRow', () => {
     expect(btn?.text()).toContain('📋');
     btn!.trigger('click');
     expect(wrapper.emitted('set-someday')).toEqual([['t-1', false]]);
+  });
+
+  describe('due-today row', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-05-16T07:00:00.000Z')); // 15:00 SGT
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('renders the outlined-glow treatment (Heritage Orange border + halo) and a tinted "Today" pill', () => {
+      const wrapper = mount(TodoItemRow, { props: { todo: todo({ dueDate: '2026-05-16' }) } });
+
+      // Card: orange border + halo shadow, NOT the red overdue treatment and NOT the someday wash
+      expect(wrapper.classes()).toContain('border-[var(--color-primary-500)]');
+      expect(wrapper.classes()).toContain('shadow-[0_0_0_3px_rgba(241,93,34,0.12)]');
+      expect(wrapper.classes()).toContain('bg-white');
+      expect(wrapper.classes()).not.toContain('bg-red-50');
+      expect(wrapper.classes()).not.toContain('bg-gradient-to-br');
+
+      // Pill: tinted orange chip reading "Today" (beanie/lowercase in tests)
+      expect(wrapper.text()).toContain('today');
+      expect(wrapper.text()).not.toContain('overdue');
+    });
+
+    it('overdue takes precedence over due-today when dueTime is in the past', () => {
+      const wrapper = mount(TodoItemRow, {
+        props: { todo: todo({ dueDate: '2026-05-16', dueTime: '10:00' }) },
+      });
+
+      // Reads as overdue, NOT due-today
+      expect(wrapper.classes()).toContain('bg-red-50');
+      expect(wrapper.classes()).not.toContain('border-[var(--color-primary-500)]');
+      expect(wrapper.classes()).not.toContain('shadow-[0_0_0_3px_rgba(241,93,34,0.12)]');
+    });
   });
 });
