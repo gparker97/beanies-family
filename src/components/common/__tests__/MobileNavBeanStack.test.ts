@@ -32,6 +32,17 @@ vi.mock('@/composables/useReducedMotion', () => ({
   useReducedMotion: () => ({ prefersReducedMotion: { value: false } }),
 }));
 
+// Stub the nav-badges composable — its derivation is covered by
+// useNavBadges.test.ts; here we only care that the bean stack renders.
+vi.mock('@/composables/useNavBadges', () => ({
+  useNavBadges: () => ({
+    badges: { value: {} },
+    badgeFor: () => null,
+    categoryAttention: { value: { nook: false, planning: false, money: false, pod: false } },
+  }),
+  ATTENTION_DOT: { kind: 'dot', severity: 'attention', active: true },
+}));
+
 const planning = MOBILE_NAV_CATEGORIES.find((c) => c.id === 'planning')!;
 const money = MOBILE_NAV_CATEGORIES.find((c) => c.id === 'money')!;
 const pod = MOBILE_NAV_CATEGORIES.find((c) => c.id === 'pod')!;

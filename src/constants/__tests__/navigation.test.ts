@@ -3,6 +3,9 @@ import {
   NAV_ITEMS,
   MOBILE_NAV_CATEGORIES,
   MONEY_ROUTE_PATHS,
+  KNOWN_BADGE_KEYS,
+  getBadgeKeyForPath,
+  MOBILE_TAGGED_NAV_ITEMS,
   type MobileCategoryId,
 } from '../navigation';
 
@@ -93,5 +96,41 @@ describe('navigation: MOBILE_NAV_CATEGORIES', () => {
       }
     }
     expect(new Set(paths).size).toBe(paths.length);
+  });
+});
+
+describe('navigation: badge registry', () => {
+  it('every NAV_ITEM.badgeKey is in KNOWN_BADGE_KEYS', () => {
+    const known = new Set<string>(KNOWN_BADGE_KEYS);
+    for (const item of NAV_ITEMS) {
+      if (item.badgeKey) {
+        expect(known.has(item.badgeKey)).toBe(true);
+      }
+    }
+  });
+
+  it('getBadgeKeyForPath returns the registered key for the 4 wired surfaces', () => {
+    expect(getBadgeKeyForPath('/todo')).toBe('overdueTodos');
+    expect(getBadgeKeyForPath('/travel')).toBe('activeTravel');
+    expect(getBadgeKeyForPath('/budgets')).toBe('overBudgets');
+    expect(getBadgeKeyForPath('/goals')).toBe('overdueGoals');
+  });
+
+  it('getBadgeKeyForPath returns undefined for paths with no badge', () => {
+    expect(getBadgeKeyForPath('/nook')).toBeUndefined();
+    expect(getBadgeKeyForPath('/dashboard')).toBeUndefined();
+    expect(getBadgeKeyForPath('/unknown-path')).toBeUndefined();
+  });
+
+  it('MOBILE_TAGGED_NAV_ITEMS includes parents and children with mobileCategory', () => {
+    const paths = MOBILE_TAGGED_NAV_ITEMS.map((i) => i.path);
+    // Parents tagged with mobileCategory
+    expect(paths).toContain('/todo');
+    expect(paths).toContain('/travel');
+    expect(paths).toContain('/budgets');
+    expect(paths).toContain('/goals');
+    // Pod children tagged with mobileCategory
+    expect(paths).toContain('/pod/scrapbook');
+    expect(paths).toContain('/pod/cookbook');
   });
 });

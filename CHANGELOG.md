@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-16
+
+### Changed
+
+- **Sidebar and mobile nav now use a consistent attention-badge system.** The orange numeric pill (previously only next to Goals) is now an attention-only signal — it appears next to any nav item that has something needing your attention, and disappears when there's nothing. **To-Do** shows the count of overdue + due-today tasks. **Budget** shows the count of categories over the limit this period. **Goals** now shows the count of goals past their deadline (replacing the previous "all open goals" count, which wasn't really an alert). **Travel** shows a quieter Sky Silk dot (no count) when a trip is ongoing or starts within the next 30 days — informational, not action-needed. On mobile, the same badges appear inside each nav category when you tap to expand it, and the closed category tab gets a small orange dot at top-left when any item underneath needs attention — so PWA users see the signal at a glance without opening the menu. Screen readers now announce the count alongside the nav label (e.g. "Goals, 3 need attention"). A small foundational hardening also went in: corrupt deadline / date values across goals, to-dos, and trips are now logged to the dev console with a clear context label rather than silently dropping the item from "overdue" filters.
+
+### Fixed
+
+- **Switching language on the welcome screen no longer shows a misleading "couldn't save your preference" error.** A brand-new visitor who tapped the language picker (top-right of the welcome gate) before creating a pod got an error toast — even though the language did switch correctly — and the same gesture quietly fired two error alerts per click to our error channel. The dual-layer save (device + family) didn't gracefully handle the "no family yet" state: the device write succeeded, but the family-doc write threw because no family doc exists yet. Now the device write — the only one that matters before a pod exists — happens cleanly, the family-layer write is skipped with a dev-only console note for telemetry, and the user sees a clean language switch with no error.
+
+---
+
 ## 2026-05-15
 
 ### Added

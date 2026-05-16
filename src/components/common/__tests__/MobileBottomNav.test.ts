@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { reactive, ref } from 'vue';
+import { reactive, ref, computed } from 'vue';
 import MobileBottomNav from '@/components/common/MobileBottomNav.vue';
 
 const mockRoute = reactive({ path: '/nook' });
@@ -34,6 +34,24 @@ vi.mock('@/composables/useReducedMotion', () => ({
   useReducedMotion: () => ({ prefersReducedMotion: { value: false } }),
 }));
 
+// Mock the nav-badges composable directly. The composable's own tests
+// cover its derivation logic; these tests only verify that the tab
+// renders the attention dot when categoryAttention is true.
+const mockCategoryAttention = reactive<Record<string, boolean>>({
+  nook: false,
+  planning: false,
+  money: false,
+  pod: false,
+});
+vi.mock('@/composables/useNavBadges', () => ({
+  useNavBadges: () => ({
+    badges: computed(() => ({})),
+    badgeFor: () => null,
+    categoryAttention: computed(() => mockCategoryAttention),
+  }),
+  ATTENTION_DOT: { kind: 'dot', severity: 'attention', active: true },
+}));
+
 // Stub the bean stack to keep the parent-component tests focused on the
 // state machine and tab rendering. The stack itself has its own test file.
 vi.mock('@/components/common/MobileNavBeanStack.vue', () => ({
@@ -51,6 +69,10 @@ describe('MobileBottomNav v3', () => {
     mockPush.mockClear();
     mockRoute.path = '/nook';
     canViewFinances.value = true;
+    mockCategoryAttention.nook = false;
+    mockCategoryAttention.planning = false;
+    mockCategoryAttention.money = false;
+    mockCategoryAttention.pod = false;
   });
 
   it('renders 4 category tabs', () => {
@@ -217,5 +239,36 @@ describe('MobileBottomNav v3', () => {
     expect(buttons[1]!.find('span.rounded-full').exists()).toBe(true);
     expect(buttons[2]!.find('span.rounded-full').exists()).toBe(true);
     expect(buttons[3]!.find('span.rounded-full').exists()).toBe(true);
+  });
+
+  describe('attention dot (category aggregate)', () => {
+    it('renders no attention dot when categoryAttention is all false', () => {
+      const wrapper = mount(MobileBottomNav);
+      // The attention dot sits inside a `span.absolute.top-1.left-1`.
+      // The existing open/closed state dot sits at `top-1.right-1`.
+      expect(wrapper.find('span.absolute.top-1.left-1').exists()).toBe(false);
+    });
+
+    it('renders an attention dot at top-left of the Planning tab when planning is true', async () => {
+      mockCategoryAttention.planning = true;
+      const wrapper = mount(MobileBottomNav);
+      const buttons = wrapper.findAll('nav > button');
+      // Planning is at index 1 (after Nook). It should now have a
+      // top-left attention dot.
+      const dot = buttons[1]!.find('span.absolute.top-1.left-1');
+      expect(dot.exists()).toBe(true);
+      // Other tabs should NOT have it.
+      expect(buttons[0]!.find('span.absolute.top-1.left-1').exists()).toBe(false);
+      expect(buttons[2]!.find('span.absolute.top-1.left-1').exists()).toBe(false);
+      expect(buttons[3]!.find('span.absolute.top-1.left-1').exists()).toBe(false);
+    });
+
+    it('renders an attention dot at top-left of the Money tab when money is true', () => {
+      mockCategoryAttention.money = true;
+      const wrapper = mount(MobileBottomNav);
+      const buttons = wrapper.findAll('nav > button');
+      // Money is at index 2.
+      expect(buttons[2]!.find('span.absolute.top-1.left-1').exists()).toBe(true);
+    });
   });
 });

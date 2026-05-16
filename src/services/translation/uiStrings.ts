@@ -1011,6 +1011,14 @@ const STRING_DEFS = {
   'nav.overview': { en: 'Overview', beanie: 'finance corner' },
   'nav.budgets': { en: 'Budgets', beanie: 'budgets' },
   'nav.comingSoon': { en: 'Soon!', beanie: 'soon!' },
+  'nav.aria.countAttention': {
+    en: '{label}, {count} need attention',
+    beanie: '{label}, {count} need attention',
+  },
+  'mobileNav.attentionBadge': {
+    en: 'This section has items that need your attention',
+    beanie: 'this section has items that need your attention',
+  },
 
   // Common actions
   'action.add': { en: 'Add', beanie: 'add' },

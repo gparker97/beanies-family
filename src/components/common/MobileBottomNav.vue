@@ -25,7 +25,9 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MobileNavBeanStack from '@/components/common/MobileNavBeanStack.vue';
+import NavBadge from '@/components/ui/NavBadge.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useNavBadges, ATTENTION_DOT } from '@/composables/useNavBadges';
 import { usePermissions } from '@/composables/usePermissions';
 import { isRouteActive } from '@/utils/route';
 import {
@@ -39,6 +41,7 @@ const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
 const { canViewFinances } = usePermissions();
+const { categoryAttention } = useNavBadges();
 
 const openCategoryId = ref<StackableCategoryId | null>(null);
 const tabRefs = ref<Record<MobileCategoryId, HTMLButtonElement | null>>({
@@ -188,6 +191,17 @@ watch(
           "
           aria-hidden="true"
         ></span>
+        <!-- Attention aggregate: top-left of the tab when any item under
+             this category has an escalating badge. The aria-label is on
+             the parent button (passes through aria-haspopup/expanded);
+             the dot itself is decorative via NavBadge's aria-hidden. -->
+        <span
+          v-if="categoryAttention[cat.id]"
+          class="absolute top-1 left-1"
+          :title="t('mobileNav.attentionBadge')"
+        >
+          <NavBadge :badge="ATTENTION_DOT" />
+        </span>
 
         <span class="text-xl leading-none">{{ cat.emoji }}</span>
         <span
