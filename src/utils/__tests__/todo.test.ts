@@ -16,9 +16,11 @@ function todo(overrides: Partial<TodoItem> = {}): TodoItem {
 
 describe('todo helpers', () => {
   beforeEach(() => {
-    // Pin "now" to mid-afternoon on 2026-05-16 (Asia/Singapore-ish local).
+    // Pin "now" to 15:00 LOCAL on 2026-05-16. Using the (y, m, d, h) constructor
+    // makes this deterministic in any timezone — CI runs UTC, dev machines often
+    // do not, and the previous UTC-fixed instant only worked east of UTC.
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-16T07:00:00.000Z')); // 15:00 SGT
+    vi.setSystemTime(new Date(2026, 4, 16, 15, 0, 0));
   });
 
   afterEach(() => {
