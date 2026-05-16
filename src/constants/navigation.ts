@@ -80,6 +80,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     path: '/travel',
     emoji: '✈️',
     section: 'treehouse',
+    badgeKey: 'activeTravel',
     mobileCategory: 'planning',
   },
   {
@@ -87,6 +88,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     path: '/todo',
     emoji: '✅',
     section: 'treehouse',
+    badgeKey: 'overdueTodos',
     mobileCategory: 'planning',
   },
   {
@@ -156,6 +158,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     path: '/budgets',
     emoji: '\u{1F4B5}',
     section: 'piggyBank',
+    badgeKey: 'overBudgets',
     mobileCategory: 'money',
   },
   {
@@ -170,7 +173,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     path: '/goals',
     emoji: '\u{1F3AF}',
     section: 'piggyBank',
-    badgeKey: 'activeGoals',
+    badgeKey: 'overdueGoals',
     mobileCategory: 'money',
   },
   {
@@ -195,6 +198,86 @@ export const NAV_ITEMS: NavItemDef[] = [
 export const TREEHOUSE_ITEMS = NAV_ITEMS.filter((item) => item.section === 'treehouse');
 export const PIGGY_BANK_ITEMS = NAV_ITEMS.filter((item) => item.section === 'piggyBank');
 export const PINNED_ITEMS = NAV_ITEMS.filter((item) => item.section === 'pinned');
+
+// =============================================================================
+// Badge registry — single source of truth for which attention/info badges
+// can attach to nav items. Adding a new badge:
+//   1. Add the key here (KNOWN_BADGE_KEYS).
+//   2. Add a `badges[<key>]` entry in src/composables/useNavBadges.ts.
+//   3. Tag the relevant NAV_ITEM with `badgeKey: '<key>'`.
+// The module-load invariant below catches mismatches; the navigation unit
+// test exercises it on every build.
+// =============================================================================
+
+export const KNOWN_BADGE_KEYS = [
+  'overdueTodos',
+  'overBudgets',
+  'overdueGoals',
+  'activeTravel',
+] as const;
+export type KnownBadgeKey = (typeof KNOWN_BADGE_KEYS)[number];
+const KNOWN_BADGE_KEY_SET: ReadonlySet<string> = new Set(KNOWN_BADGE_KEYS);
+
+/**
+ * Flat list of every nav entry (parents AND children), carrying only the
+ * fields downstream lookups need. Built once at module load. Drives
+ * `getBadgeKeyForPath`, `MOBILE_TAGGED_NAV_ITEMS`, and the badge-key
+ * invariant check below.
+ */
+const NAV_ITEMS_FLAT: ReadonlyArray<{
+  path: string;
+  badgeKey?: string;
+  mobileCategory?: MobileCategoryId;
+}> = (() => {
+  const flat: Array<{
+    path: string;
+    badgeKey?: string;
+    mobileCategory?: MobileCategoryId;
+  }> = [];
+  for (const item of NAV_ITEMS) {
+    flat.push({
+      path: item.path,
+      badgeKey: item.badgeKey,
+      mobileCategory: item.mobileCategory,
+    });
+    for (const child of item.children ?? []) {
+      flat.push({ path: child.path, mobileCategory: child.mobileCategory });
+    }
+  }
+  return flat;
+})();
+
+// Module-load invariant — every NAV_ITEM.badgeKey must be a known key.
+// Throws on typo / stale reference so it can never ship; the navigation
+// unit test exercises this path.
+for (const entry of NAV_ITEMS_FLAT) {
+  if (entry.badgeKey && !KNOWN_BADGE_KEY_SET.has(entry.badgeKey)) {
+    throw new Error(
+      `[navigation] NAV_ITEM "${entry.path}" has badgeKey "${entry.badgeKey}" which is not in KNOWN_BADGE_KEYS. ` +
+        `Add it to KNOWN_BADGE_KEYS here AND to the badges map in useNavBadges.ts, then re-run tests.`
+    );
+  }
+}
+
+const NAV_ITEMS_BY_PATH: ReadonlyMap<string, (typeof NAV_ITEMS_FLAT)[number]> = new Map(
+  NAV_ITEMS_FLAT.map((entry) => [entry.path, entry])
+);
+
+/** Look up the badge key registered for a route path, if any. */
+export function getBadgeKeyForPath(path: string): KnownBadgeKey | undefined {
+  const key = NAV_ITEMS_BY_PATH.get(path)?.badgeKey;
+  return key && KNOWN_BADGE_KEY_SET.has(key) ? (key as KnownBadgeKey) : undefined;
+}
+
+/** Every nav entry tagged with a mobile category, flattened. Used by the
+ *  mobile tab-level attention aggregator. */
+export const MOBILE_TAGGED_NAV_ITEMS: ReadonlyArray<{
+  path: string;
+  mobileCategory: MobileCategoryId;
+}> = NAV_ITEMS_FLAT.filter(
+  (e): e is { path: string; badgeKey?: string; mobileCategory: MobileCategoryId } =>
+    !!e.mobileCategory
+).map((e) => ({ path: e.path, mobileCategory: e.mobileCategory }));
 
 // =============================================================================
 // Mobile nav v3 — derived from NAV_ITEMS

@@ -4,8 +4,10 @@ import { useRoute, useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
+import NavBadge from '@/components/ui/NavBadge.vue';
 import AppSidebarSubNav from '@/components/common/AppSidebarSubNav.vue';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
+import { useNavBadges, type NavBadge as NavBadgeType } from '@/composables/useNavBadges';
 import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useTranslation } from '@/composables/useTranslation';
 import { isRouteActive } from '@/utils/route';
@@ -19,21 +21,16 @@ import {
 } from '@/constants/navigation';
 import { usePermissions } from '@/composables/usePermissions';
 import { useFamilyStore } from '@/stores/familyStore';
-import { useGoalsStore } from '@/stores/goalsStore';
 import { useSyncStore } from '@/stores/syncStore';
 
 const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
-const goalsStore = useGoalsStore();
 const syncStore = useSyncStore();
 const { isOpen, toggle, isItemExpanded, toggleItem } = useSidebarAccordion();
 const { canViewFinances } = usePermissions();
-
-const badges = computed<Record<string, number>>(() => ({
-  activeGoals: goalsStore.activeGoals.length,
-}));
+const { badgeFor } = useNavBadges();
 
 function mapItems(items: NavItemDef[]) {
   return items.map((item) => ({
@@ -41,11 +38,25 @@ function mapItems(items: NavItemDef[]) {
     path: item.path,
     emoji: item.emoji,
     comingSoon: item.comingSoon ?? false,
-    badge: item.badgeKey ? (badges.value[item.badgeKey] ?? 0) : 0,
+    badge: badgeFor(item.path),
     external: item.external ?? false,
     externalUrl: item.externalUrl,
     children: item.children,
   }));
+}
+
+/**
+ * Augment the row's accessible name when an attention count badge is
+ * present so screen readers announce e.g. "Goals, 3 need attention"
+ * rather than just "Goals". Informational dots stay decorative.
+ */
+function ariaLabelFor(item: { label: string; badge: NavBadgeType | null }): string {
+  if (item.badge?.kind === 'count' && item.badge.count > 0) {
+    return t('nav.aria.countAttention')
+      .replace('{label}', item.label)
+      .replace('{count}', String(item.badge.count));
+  }
+  return item.label;
 }
 
 type MappedNavItem = ReturnType<typeof mapItems>[number];
@@ -181,17 +192,13 @@ function subItemsOf(item: MappedNavItem): NavSubItemDef[] {
                     ? 'text-white/40 hover:text-white/70'
                     : '',
               ]"
+              :aria-label="ariaLabelFor(item)"
               @click="onParentClick(item)"
             >
               <span class="w-6 text-center text-base">{{ item.emoji }}</span>
               <span class="flex-1">{{ item.label }}</span>
-              <!-- Badge (e.g. active goals count) -->
-              <span
-                v-if="item.badge > 0"
-                class="bg-primary-500 min-w-[1.2rem] rounded-full px-1.5 text-center text-xs font-semibold text-white"
-              >
-                {{ item.badge }}
-              </span>
+              <!-- Attention/info badge — see useNavBadges -->
+              <NavBadge :badge="item.badge" />
               <!-- Coming soon indicator -->
               <span
                 v-if="item.comingSoon"

@@ -29,8 +29,10 @@
  */
 import { computed, nextTick, onScopeDispose, ref, toRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import NavBadge from '@/components/ui/NavBadge.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFullscreenOverlay } from '@/composables/useFullscreenOverlay';
+import { useNavBadges } from '@/composables/useNavBadges';
 import { useReducedMotion } from '@/composables/useReducedMotion';
 import { usePermissions, FINANCE_ROUTES } from '@/composables/usePermissions';
 import { isRouteActive } from '@/utils/route';
@@ -53,6 +55,7 @@ const route = useRoute();
 const { t } = useTranslation();
 const { canViewFinances } = usePermissions();
 const { prefersReducedMotion } = useReducedMotion();
+const { badgeFor } = useNavBadges();
 
 // Stable id so the trigger tab can reference us via aria-controls.
 const stackId = `mobile-nav-stack-${props.category.id}`;
@@ -300,7 +303,12 @@ const sideClass = computed(() => (side.value === 'left' ? 'side-left' : 'side-ri
           <span class="jar-bean-emoji">{{ item.emoji }}</span>
         </span>
         <span class="jar-text">
-          <span class="jar-label font-outfit text-sm font-semibold">{{ t(item.labelKey) }}</span>
+          <span
+            class="jar-label font-outfit inline-flex items-center gap-1.5 text-sm font-semibold"
+          >
+            {{ t(item.labelKey) }}
+            <NavBadge :badge="badgeFor(item.path)" />
+          </span>
           <span class="jar-hint text-xs">{{ t(item.hintKey) }}</span>
         </span>
       </button>
