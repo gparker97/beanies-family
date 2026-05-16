@@ -224,10 +224,17 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside);
-  document.removeEventListener('keydown', handleKeydown);
-  window.removeEventListener('resize', updatePopoverPosition);
-  window.removeEventListener('scroll', updatePopoverPosition, true);
+  // happy-dom (test env) tears down `document` / `window` before async unmount
+  // hooks fire when a Vue test wrapper is unmounted via teleport. Guard so the
+  // teardown doesn't throw an unhandled rejection that fails CI.
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('click', handleClickOutside);
+    document.removeEventListener('keydown', handleKeydown);
+  }
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', updatePopoverPosition);
+    window.removeEventListener('scroll', updatePopoverPosition, true);
+  }
 });
 
 function handleClickOutside(event: MouseEvent) {
