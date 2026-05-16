@@ -4,8 +4,8 @@ slug: have-your-cake-and-eat-it-too
 date: 2026-05-15
 category: use-case
 coverImage: /blog/beanies-privacy-security-infographic.webp
-excerpt: "manage your family's precious data without giving it away."
-subtitle: "manage your family's precious data without giving it away"
+excerpt: "how to manage your family's precious data without giving it away."
+subtitle: "how to manage your family's precious data without giving it away"
 featured: true
 author: greg
 ---
