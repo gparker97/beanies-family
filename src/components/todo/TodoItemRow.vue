@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { normalizeAssignees } from '@/utils/assignees';
 import { formatNookDate } from '@/utils/date';
-import { isTodoOverdue } from '@/utils/todo';
+import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import type { TodoItem } from '@/types/models';
 
@@ -28,15 +28,15 @@ const emit = defineEmits<{
 
 const isSomeday = computed(() => !!props.todo.someday);
 const isOverdue = computed(() => isTodoOverdue(props.todo));
+const isDueToday = computed(() => isTodoDueToday(props.todo));
 
 // Container styling — early returns rather than a deep nested ternary in the
-// template. A someday row gets a soft Sky-Silk "daydream" wash — a gentle
-// diagonal gradient in the brand's calm/safety colour, kept light enough that
-// it reads as quieter than (never louder than) an active white row, but still
-// bright and fully clickable (*not* the greyed "disabled/done" look). It
-// brightens on hover. Never the overdue-red path (a someday item has no date,
-// so it's never overdue). The `--tint-silk-*` tokens carry their own light/dark
-// values, so no `dark:` overrides needed here.
+// template. A someday row gets a soft Sky-Silk "daydream" wash. A due-today
+// row gets the "outlined glow" treatment — Heritage Orange border + soft
+// orange halo (box-shadow ring) on an otherwise neutral card, reading as
+// "selected for today" without tipping into overdue's red intensity.
+// Overdue stays red. The `--tint-silk-*` tokens carry their own light/dark
+// values, so no `dark:` overrides needed there.
 const containerClass = computed(() => {
   const pad = props.compact ? 'cursor-pointer p-3.5' : 'p-3 md:gap-4 md:p-4';
   if (isSomeday.value) {
@@ -44,6 +44,9 @@ const containerClass = computed(() => {
   }
   if (isOverdue.value) {
     return `${pad} border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:hover:bg-red-950/50`;
+  }
+  if (isDueToday.value) {
+    return `${pad} border-[var(--color-primary-500)] bg-white shadow-[0_0_0_3px_rgba(241,93,34,0.12)] hover:bg-[var(--tint-orange-8)] dark:bg-slate-800`;
   }
   if (props.compact) {
     return `${pad} border-[var(--tint-slate-10)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-slate-700 dark:hover:bg-slate-600`;
@@ -130,6 +133,14 @@ const timeAgo = computed(() => {
           >
             {{ t('todo.overdue') }}
           </span>
+        </span>
+
+        <!-- Due today badge — tinted pill (the card's outlined glow does the heavy lifting) -->
+        <span
+          v-else-if="formattedDate && isDueToday"
+          class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-primary-500)] md:gap-1.5 md:px-2.5 md:text-xs"
+        >
+          📅 {{ t('date.today') }}<template v-if="todo.dueTime">, {{ todo.dueTime }}</template>
         </span>
 
         <!-- Normal date -->

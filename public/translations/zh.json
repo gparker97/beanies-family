@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-15",
-    "translationCount": 2874
+    "lastUpdated": "2026-05-16",
+    "translationCount": 2876
   },
   "translations": {
     "app.name": {
@@ -14375,6 +14375,16 @@
       "translation": "{name} ，生日快乐！",
       "hash": "uvplhj",
       "lastUpdated": "2026-05-15"
+    },
+    "nav.aria.countAttention": {
+      "translation": "{label} ， {count}需要注意",
+      "hash": "chzrnh",
+      "lastUpdated": "2026-05-16"
+    },
+    "mobileNav.attentionBadge": {
+      "translation": "此部分包含需要您注意的项目",
+      "hash": "4tac7v",
+      "lastUpdated": "2026-05-16"
     }
   }
 }
