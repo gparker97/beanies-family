@@ -429,8 +429,8 @@ export const useSyncStore = defineStore('sync', () => {
    * migration flow (`migrateStorage`) captures the previous provider and
    * re-installs it on failure.
    *
-   * Shared by `configureSyncFile`, `configureSyncFileGoogleDrive`, and
-   * `migrateStorage` — keeps the "install this provider" sequence in one place.
+   * Shared by `configureSyncFileGoogleDrive` and `migrateStorage` — keeps
+   * the "install this provider" sequence in one place.
    */
   async function installProvider(
     provider: StorageProvider,
@@ -471,24 +471,6 @@ export const useSyncStore = defineStore('sync', () => {
       setupTokenExpiryHandler();
     } else {
       setupAutoSync();
-    }
-  }
-
-  /**
-   * Configure a sync file (opens file picker).
-   * Creates a new V4 file with the current family key.
-   */
-  async function configureSyncFile(): Promise<boolean> {
-    try {
-      const success = await syncService.selectSyncFile();
-      if (!success) return false;
-      const provider = syncService.getProvider();
-      if (!provider) return false;
-      await installProvider(provider, 'local');
-      return true;
-    } catch (e) {
-      error.value = (e as Error).message;
-      return false;
     }
   }
 
@@ -2670,7 +2652,6 @@ export const useSyncStore = defineStore('sync', () => {
     // Actions
     initialize,
     requestPermission,
-    configureSyncFile,
     configureSyncFileGoogleDrive,
     migrateStorage,
     syncNow,

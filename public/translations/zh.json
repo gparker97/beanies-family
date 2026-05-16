@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-15",
-    "translationCount": 2874
+    "lastUpdated": "2026-05-16",
+    "translationCount": 2876
   },
   "translations": {
     "app.name": {
@@ -2102,14 +2102,9 @@
       "lastUpdated": "2026-03-03"
     },
     "settings.createOrLoadDataFile": {
-      "translation": "创建加密数据文件或加载现有文件。",
-      "hash": "iusu00",
-      "lastUpdated": "2026-02-24"
-    },
-    "settings.createNewDataFile": {
-      "translation": "创建新的家庭数据文件",
-      "hash": "avtnzu",
-      "lastUpdated": "2026-03-03"
+      "translation": "完成加密数据文件的设置，或加载现有文件。",
+      "hash": "us0584",
+      "lastUpdated": "2026-05-16"
     },
     "settings.loadExistingDataFile": {
       "translation": "加载现有家庭数据文件",
@@ -14375,6 +14370,21 @@
       "translation": "{name} ，生日快乐！",
       "hash": "uvplhj",
       "lastUpdated": "2026-05-15"
+    },
+    "nav.aria.countAttention": {
+      "translation": "{label} ， {count}需要注意",
+      "hash": "chzrnh",
+      "lastUpdated": "2026-05-16"
+    },
+    "mobileNav.attentionBadge": {
+      "translation": "此部分包含需要您注意的项目",
+      "hash": "4tac7v",
+      "lastUpdated": "2026-05-16"
+    },
+    "settings.resumeSetup": {
+      "translation": "繼續安裝?",
+      "hash": "2wkclm",
+      "lastUpdated": "2026-05-16"
     }
   }
 }

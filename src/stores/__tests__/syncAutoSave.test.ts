@@ -1,7 +1,7 @@
 /**
  * Auto-save arming tests for syncStore.
  *
- * Validates that after configureSyncFile / loadFromNewFile / loadFromDroppedFile,
+ * Validates that after loadFromNewFile / loadFromDroppedFile,
  * the auto-sync watcher is armed so that store changes trigger
  * triggerDebouncedSave. Without this, changes made in the session (including
  * preferredCurrencies) are never written to the .beanpod file and are lost on
@@ -18,14 +18,12 @@ import type { Settings, GlobalSettings } from '@/types/models';
 
 const {
   mockTriggerDebouncedSave,
-  mockSelectSyncFile,
   mockSave,
   mockSettingsStateHolder,
   stateChangeCallbackHolder,
   mockLoadAndImport,
 } = vi.hoisted(() => ({
   mockTriggerDebouncedSave: vi.fn(),
-  mockSelectSyncFile: vi.fn(async () => true),
   mockSave: vi.fn(async () => true),
   // Wrap in object so the factory can read/write the shared state
   mockSettingsStateHolder: {
@@ -181,16 +179,6 @@ vi.mock('@/services/sync/syncService', async () => {
     onStateChange: vi.fn((cb: (state: Record<string, unknown>) => void) => {
       stateChangeCallbackHolder.callback = cb;
     }),
-    selectSyncFile: (...args: unknown[]) => {
-      stateChangeCallbackHolder.callback?.({
-        isInitialized: true,
-        isConfigured: true,
-        fileName: 'test.beanpod',
-        isSyncing: false,
-        lastError: null,
-      });
-      return (mockSelectSyncFile as (...a: unknown[]) => unknown)(...args);
-    },
     save: (...args: unknown[]) => (mockSave as (...a: unknown[]) => unknown)(...args),
     triggerDebouncedSave: (...args: unknown[]) => mockTriggerDebouncedSave(...args),
     loadAndImport: (...args: unknown[]) =>
@@ -327,14 +315,12 @@ describe('syncStore auto-save arming', () => {
     setActivePinia(pinia);
     mockSettingsStateHolder.state = { ...defaultSettings };
     mockTriggerDebouncedSave.mockClear();
-    mockSelectSyncFile.mockClear();
     mockSave.mockClear();
   });
 
   // In V4, auto-sync is driven by docService.onDocPersistNeeded() callback, not Vue store watchers.
   // Settings changes flow: settingsStore → automerge repo → changeDoc() → persist callback → triggerDebouncedSave.
   // These tests need real (unmocked) Automerge plumbing to test the full flow.
-  it.todo('configureSyncFile arms auto-sync so Automerge doc changes trigger file save');
   it.todo('setupAutoSync does not register duplicate doc persist callbacks');
   it.todo('resetState tears down the auto-sync doc persist callback');
   it.todo('setupAutoSync can be re-armed after resetState');
