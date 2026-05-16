@@ -53,6 +53,8 @@ const photoStore = usePhotoStore();
 const { t } = useTranslation();
 const { canManagePod } = usePermissions();
 const { syncHighlightClass } = useSyncHighlight();
+// Admin reset-password lives on the Bean Detail page now (BeanAccountPanel).
+// Removed from this page along with the lock icon on the card cluster.
 const inviteAvailable = computed(() => canInviteFamily());
 const inviteUnavailableTooltip = computed(() => t('selfHost.inviteUnavailableTooltip'));
 

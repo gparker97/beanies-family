@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-16",
-    "translationCount": 2876
+    "translationCount": 2901
   },
   "translations": {
     "app.name": {
@@ -2262,9 +2262,9 @@
       "lastUpdated": "2026-02-24"
     },
     "password.decryptionError": {
-      "translation": "å®è£",
-      "hash": "ez3w8z",
-      "lastUpdated": "2026-03-03"
+      "translation": "该密码未解锁Pod。如果您确定答案正确，请先让家庭成员打开Pod ，我们会在您下次登录时自动修复此问题。",
+      "hash": "qryp0o",
+      "lastUpdated": "2026-05-16"
     },
     "password.setAndContinue": {
       "translation": "设置密码并继续",
@@ -5927,9 +5927,9 @@
       "lastUpdated": "2026-03-08"
     },
     "settings.card.securityDesc": {
-      "translation": "密钥和设备信任",
-      "hash": "a43azh",
-      "lastUpdated": "2026-03-08"
+      "translation": "加密和设备信任",
+      "hash": "wxxkpn",
+      "lastUpdated": "2026-05-16"
     },
     "settings.card.familyMembers": {
       "translation": "家庭成员",
@@ -6137,9 +6137,9 @@
       "lastUpdated": "2026-03-08"
     },
     "nook.motto21": {
-      "translation": "首先你得到豆子，然后你得到钱，然后你得到女人",
-      "hash": "sz3vta",
-      "lastUpdated": "2026-03-13"
+      "translation": "在美国，首先你得到豆子，然后你得到钱，然后你得到女人",
+      "hash": "3oy14p",
+      "lastUpdated": "2026-05-16"
     },
     "nook.motto22": {
       "translation": "在豆子发芽之前不要数它们！",
@@ -14384,6 +14384,131 @@
     "settings.resumeSetup": {
       "translation": "繼續安裝?",
       "hash": "2wkclm",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.modalTitle": {
+      "translation": "重置{name}的密码",
+      "hash": "jg1pem",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.modalDescription": {
+      "translation": "设置新的临时密码。登录后， {name}可以在“设置” “→更改密码”下进行更改。",
+      "hash": "pq8iu1",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.warning": {
+      "translation": "与{name}私下共享此密码—任何拥有此密码的人都可以以他们的身份登录。",
+      "hash": "f7tb3y",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.submit": {
+      "translation": "重置密码",
+      "hash": "b4wo6k",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.success": {
+      "translation": "密码重置。与{name}共享新密码。",
+      "hash": "llsjxy",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.successDeferredSync": {
+      "translation": "当连接恢复时，将同步到您的云文件。",
+      "hash": "z4bfim",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.error.required": {
+      "translation": "请输入并确认新密码。",
+      "hash": "aq5ndf",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.error.mismatch": {
+      "translation": "密码不一致。",
+      "hash": "9sze77",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.error.notAuthenticated": {
+      "translation": "您的会话已过期。请重新登录并重试。",
+      "hash": "b4mbym",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.error.memberNotFound": {
+      "translation": "找不到该家庭成员。",
+      "hash": "bl2eds",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.error.cannotResetSelf": {
+      "translation": "为您自己的帐户使用“设置” “→更改密码”。",
+      "hash": "tt94l2",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.error.isPet": {
+      "translation": "宠物没有密码。",
+      "hash": "lsyavs",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.error.cannotResetOwner": {
+      "translation": "Pod所有者必须在“设置”中更改自己的密码。",
+      "hash": "ax56ve",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.error.notAuthorized": {
+      "translation": "您无权重置其他成员的密码。",
+      "hash": "kxhmn6",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.error.familyKeyMissing": {
+      "translation": "无法加载家庭密钥—请注销并重新登录，然后重试。",
+      "hash": "207vpj",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.error.wrapFailed": {
+      "translation": "无法重新包装帐户密钥。请重试。",
+      "hash": "cgyqoo",
+      "lastUpdated": "2026-05-16"
+    },
+    "family.resetPassword.error.updateFailed": {
+      "translation": "已在本地保存新密钥，但无法更新其密码记录。请重试。",
+      "hash": "hjw0u0",
+      "lastUpdated": "2026-05-16"
+    },
+    "auth.signinHeal.unexpectedError": {
+      "translation": "无法重新同步您的帐户密钥",
+      "hash": "x9dbdc",
+      "lastUpdated": "2026-05-16"
+    },
+    "auth.signinHeal.unexpectedErrorHint": {
+      "translation": "登录成功，但需要注意跨设备密钥同步。请尝试退出并重新登录。控制平台(Console)中的详细信息。",
+      "hash": "401g9n",
+      "lastUpdated": "2026-05-16"
+    },
+    "bean.account.title": {
+      "translation": "帐号访问",
+      "hash": "rf4op5",
+      "lastUpdated": "2026-05-16"
+    },
+    "bean.account.description": {
+      "translation": "{name}使用密码登录。如果他们无法登录，您可以设置新的账号并与他们分享。",
+      "hash": "icdw5",
+      "lastUpdated": "2026-05-16"
+    },
+    "bean.account.resetButton": {
+      "translation": "重置{name}的密码",
+      "hash": "pk8p89",
+      "lastUpdated": "2026-05-16"
+    },
+    "settings.card.account": {
+      "translation": "您的帐号",
+      "hash": "bjlmo",
+      "lastUpdated": "2026-05-16"
+    },
+    "settings.card.accountDesc": {
+      "translation": "密码、密钥和注销",
+      "hash": "frkx81",
+      "lastUpdated": "2026-05-16"
+    },
+    "settings.accountModal.title": {
+      "translation": "您的帐号",
+      "hash": "bjlmo",
       "lastUpdated": "2026-05-16"
     }
   }

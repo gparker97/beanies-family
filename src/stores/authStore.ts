@@ -19,6 +19,141 @@ import { flushPendingSave, cancelPendingSave } from '@/services/sync/syncService
 import { initDoc } from '@/services/automerge/docService';
 import { clearGoogleSessionState } from '@/services/google/googleAuth';
 import { clearFolderCache } from '@/services/google/driveService';
+import { reportError } from '@/utils/errorReporter';
+import { showToast } from '@/composables/useToast';
+import { useTranslationStore } from './translationStore';
+
+// ─── Password-rotation shared helper ─────────────────────────────────────
+// `rotateMemberPassword` is the single source of truth for the four-step
+// "re-wrap envelope, hash, updateMember, sync" sequence. All three flows
+// (changePassword, resetMemberPassword, signIn self-heal) delegate to it.
+// The discriminated-union return type forces each caller to check `success`
+// before reading any other field.
+// ─────────────────────────────────────────────────────────────────────────
+
+export type RotateError = 'familyKeyMissing' | 'wrapFailed' | 'updateFailed';
+export type RotateResult =
+  | { success: true; syncDeferred: boolean }
+  | { success: false; error: RotateError };
+
+export type RotateSurface = 'change-password' | 'reset-member-password' | 'signin-heal';
+
+/**
+ * Closed union of every reason `resetMemberPassword` can fail. Adding a
+ * new failure mode requires updating this type AND every caller's mapping
+ * — compile-time enforcement of the no-silent-failures contract.
+ */
+export type ResetError =
+  | RotateError
+  | 'notAuthenticated'
+  | 'memberNotFound'
+  | 'cannotResetSelf'
+  | 'isPet'
+  | 'cannotResetOwner'
+  | 'notAuthorized';
+
+async function rotateMemberPassword(
+  memberId: string,
+  newPassword: string,
+  surface: RotateSurface
+): Promise<RotateResult> {
+  // Lazy import to avoid the syncStore ↔ authStore circular dependency
+  // (established pattern — see other lazy imports below).
+  const { useSyncStore } = await import('@/stores/syncStore');
+  const syncStore = useSyncStore();
+  if (!syncStore.familyKey) {
+    reportError({
+      surface,
+      message: 'familyKey not loaded — cannot wrap',
+      severity: 'warning',
+      context: { member_id_tail: memberId.slice(-8) },
+    });
+    return { success: false, error: 'familyKeyMissing' };
+  }
+
+  try {
+    await syncStore.wrapFamilyKeyForMember(memberId, newPassword);
+  } catch (e) {
+    reportError({
+      surface,
+      message: 'wrapFamilyKeyForMember threw',
+      error: e,
+      context: { member_id_tail: memberId.slice(-8) },
+    });
+    return { success: false, error: 'wrapFailed' };
+  }
+
+  const newHash = await hashPassword(newPassword);
+  const familyStore = useFamilyStore();
+  const updated = await familyStore.updateMember(memberId, {
+    passwordHash: newHash,
+    requiresPassword: false,
+  });
+  if (!updated) {
+    // Inconsistent local state: wrappedKey rotated but passwordHash unchanged.
+    // Retry is idempotent — both writes overwrite. Surface explicitly.
+    reportError({
+      surface,
+      message:
+        'updateMember returned null after wrap succeeded — passwordHash stale; retry is idempotent',
+      severity: 'error',
+      context: { member_id_tail: memberId.slice(-8) },
+    });
+    return { success: false, error: 'updateFailed' };
+  }
+
+  const synced = await syncStore.syncNow(true);
+  // syncNow failure already raises SaveFailureBanner. We expose syncDeferred
+  // so callers can include "will sync when online" in their success toast.
+  return { success: true, syncDeferred: !synced };
+}
+
+/**
+ * Self-heal stale `envelope.wrappedKeys[memberId]` on successful password
+ * sign-in. Fires whenever a member authenticates via password (PickBean or
+ * welcome-gate auto-sign-in). Compares the just-verified password against
+ * the envelope's wrappedKey entry; if missing or unwrappable with a
+ * different password, re-wraps and pushes.
+ *
+ * Defense-in-depth for the envelope-merge corruption mode: once the merge
+ * fixes ship, fresh corruption stops; this heal cleans up any
+ * already-corrupted pod the next time the affected member signs in. Safe
+ * because `verifyPassword` has already proven the caller is the legitimate
+ * member.
+ *
+ * Never throws to the caller — every failure mode is surfaced via banner
+ * (sync), toast (defensive crash), or `reportError` (all paths). Sign-in
+ * proceeds regardless.
+ */
+async function healStaleWrappedKey(memberId: string, password: string): Promise<void> {
+  try {
+    const { useSyncStore } = await import('@/stores/syncStore');
+    const { unwrapWrappedKey } = await import('@/services/sync/fileSync');
+    const syncStore = useSyncStore();
+    const env = syncStore.envelope;
+    if (!env || !syncStore.familyKey) return; // passkey / cache-only sign-in — no password-shaped repair possible
+    const entry = env.wrappedKeys?.[memberId];
+    if (entry && (await unwrapWrappedKey(entry, password))) return; // fresh — no heal needed
+
+    console.warn(
+      `[authStore.signIn] stale wrappedKey for ${memberId} — re-wrapping; symptom of envelope-merge corruption, verify replaceEnvelope/preserveLocalKeyDicts are deployed`
+    );
+    await rotateMemberPassword(memberId, password, 'signin-heal');
+    // rotateMemberPassword reports its own failures via reportError;
+    // SaveFailureBanner surfaces sync issues to the user. Nothing further.
+  } catch (e) {
+    // Should be unreachable — every internal call has its own catch. Loud-fail
+    // required so this never silently regresses.
+    const translationStore = useTranslationStore();
+    showToast(
+      'error',
+      translationStore.t('auth.signinHeal.unexpectedError'),
+      translationStore.t('auth.signinHeal.unexpectedErrorHint'),
+      { surface: 'auth-signin-heal' }
+    );
+    console.error('[authStore.signIn] healStaleWrappedKey threw unexpectedly:', e);
+  }
+}
 
 export interface AuthUser {
   memberId: string;
@@ -200,6 +335,13 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = 'Incorrect password';
         return { success: false, error: error.value };
       }
+
+      // Self-heal any drifted envelope.wrappedKeys[memberId] using the
+      // just-verified password. Never throws to us — every failure surfaces
+      // via banner/toast/reportError inside the helper. Awaited so the next
+      // cold sign-in (which only has the envelope to go on) works the first
+      // time, not the second.
+      await healStaleWrappedKey(memberId, password);
 
       const familyContextStore = useFamilyContextStore();
 
@@ -413,51 +555,78 @@ export const useAuthStore = defineStore('auth', () => {
       return { success: false, error: 'New password must be different from current' };
     }
 
-    try {
-      const familyStore = useFamilyStore();
-      const memberId = currentUser.value.memberId;
-      const member = familyStore.members.find((m) => m.id === memberId);
-      if (!member?.passwordHash) {
-        return { success: false, error: 'No current password set for this account' };
-      }
-
-      const valid = await verifyPassword(currentPassword, member.passwordHash);
-      if (!valid) {
-        return { success: false, error: 'Current password is incorrect' };
-      }
-
-      // Family key must be loaded in memory to re-wrap. After any successful
-      // sign-in (password OR passkey), syncStore.familyKey is populated; if
-      // it's missing here the user's session is in an unexpected state and
-      // we ask them to sign in again rather than silently corrupting the
-      // wrappedKeys entry.
-      const { useSyncStore } = await import('@/stores/syncStore');
-      const syncStore = useSyncStore();
-      if (!syncStore.familyKey) {
-        return {
-          success: false,
-          error: 'Could not load family key — please sign out and back in, then try again',
-        };
-      }
-
-      // Replace the existing wrappedKey for this member. After this call the
-      // OLD password will no longer unwrap (different salt + new wrapping
-      // key), and any future file-open with this member will require the
-      // new password. wrapFamilyKeyForMember overwrites by memberId.
-      await syncStore.wrapFamilyKeyForMember(memberId, newPassword);
-
-      const newHash = await hashPassword(newPassword);
-      await familyStore.updateMember(memberId, { passwordHash: newHash });
-
-      // Best-effort push to remote so other devices pick up the change on
-      // next pull. Local change is already persisted regardless.
-      await syncStore.syncNow(true);
-
-      return { success: true };
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Failed to change password';
-      return { success: false, error: message };
+    const familyStore = useFamilyStore();
+    const memberId = currentUser.value.memberId;
+    const member = familyStore.members.find((m) => m.id === memberId);
+    if (!member?.passwordHash) {
+      return { success: false, error: 'No current password set for this account' };
     }
+
+    const valid = await verifyPassword(currentPassword, member.passwordHash);
+    if (!valid) {
+      return { success: false, error: 'Current password is incorrect' };
+    }
+
+    const result = await rotateMemberPassword(memberId, newPassword, 'change-password');
+    if (!result.success) {
+      // Map RotateError → user-facing copy for THIS surface. Each translation
+      // is owned by the caller, so different surfaces (Settings vs. Family
+      // page) can use different language. `result.error` is a closed union,
+      // so this switch is exhaustive at compile time.
+      const errorMessages: Record<RotateError, string> = {
+        familyKeyMissing: 'Could not load family key — please sign out and back in, then try again',
+        wrapFailed: 'Failed to re-wrap your account key. Please try again.',
+        updateFailed:
+          "Saved the new key locally but couldn't update your password record. Please try again.",
+      };
+      return { success: false, error: errorMessages[result.error] };
+    }
+    return { success: true };
+  }
+
+  /**
+   * Admin/owner reset of another member's password. Closed `ResetError`
+   * union forces callers to handle every authz reject + every RotateError
+   * propagation at compile time. Caller is responsible for translating
+   * error keys to user-facing copy.
+   *
+   * Security: no new attack surface — any user with `canManagePod`
+   * (owner / admin) already has the family key in memory and can decrypt
+   * the pod. Resetting another member's password is strictly less
+   * destructive than the delete-member capability they already have.
+   */
+  async function resetMemberPassword(
+    targetMemberId: string,
+    newPassword: string
+  ): Promise<{ success: true; syncDeferred: boolean } | { success: false; error: ResetError }> {
+    if (!isAuthenticated.value || !currentUser.value) {
+      return { success: false, error: 'notAuthenticated' };
+    }
+    if (targetMemberId === currentUser.value.memberId) {
+      return { success: false, error: 'cannotResetSelf' };
+    }
+    const familyStore = useFamilyStore();
+    const target = familyStore.members.find((m) => m.id === targetMemberId);
+    if (!target) {
+      return { success: false, error: 'memberNotFound' };
+    }
+    if (target.isPet) {
+      return { success: false, error: 'isPet' };
+    }
+    if (target.role === 'owner') {
+      return { success: false, error: 'cannotResetOwner' };
+    }
+    const me = familyStore.members.find((m) => m.id === currentUser.value!.memberId);
+    if (!me?.canManagePod) {
+      return { success: false, error: 'notAuthorized' };
+    }
+
+    const result = await rotateMemberPassword(targetMemberId, newPassword, 'reset-member-password');
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+    window.plausible?.('admin_password_reset');
+    return { success: true, syncDeferred: result.syncDeferred };
   }
 
   /**
@@ -898,6 +1067,7 @@ export const useAuthStore = defineStore('auth', () => {
     signUp,
     setPassword,
     changePassword,
+    resetMemberPassword,
     joinFamily,
     signOut,
     signOutAndClearData,

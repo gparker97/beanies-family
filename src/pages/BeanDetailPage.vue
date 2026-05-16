@@ -22,6 +22,7 @@ import BeanNotesTab from '@/components/pod/BeanNotesTab.vue';
 import BeanAllergiesTab from '@/components/pod/BeanAllergiesTab.vue';
 import BeanMedicationsTab from '@/components/pod/BeanMedicationsTab.vue';
 import BeanMilestonesTab from '@/components/pod/BeanMilestonesTab.vue';
+import BeanAccountPanel from '@/components/pod/BeanAccountPanel.vue';
 import FamilyMemberModal from '@/components/family/FamilyMemberModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -114,6 +115,11 @@ function selectTab(tab: BeanTabId): void {
       <BeanMedicationsTab v-else-if="activeTab === 'medications'" :member-id="member.id" />
       <BeanNotesTab v-else-if="activeTab === 'notes'" :member-id="member.id" />
       <BeanMilestonesTab v-else-if="activeTab === 'milestones'" :member-id="member.id" />
+
+      <!-- Admin-only account-management surface. Renders below tab content
+           on every tab so the recovery path is consistently reachable;
+           self-hides when the viewing user can't manage this member. -->
+      <BeanAccountPanel :member="member" />
 
       <FamilyMemberModal
         :open="showEditModal"
