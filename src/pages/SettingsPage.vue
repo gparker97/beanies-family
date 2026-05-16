@@ -315,8 +315,9 @@ async function handleForceSave() {
   await syncStore.forceSyncNow();
 }
 
-async function handleConfigureSync() {
-  await syncStore.configureSyncFile();
+async function handleResumeSetup() {
+  showFamilyData.value = false;
+  await router.push({ path: '/welcome', query: { resume: 'setup' } });
 }
 
 async function handleRequestPermission() {
@@ -1084,8 +1085,8 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             {{ t('settings.createOrLoadDataFile') }}
           </p>
           <div class="flex flex-col gap-3">
-            <BaseButton @click="handleConfigureSync">
-              {{ t('settings.createNewDataFile') }}
+            <BaseButton @click="handleResumeSetup">
+              {{ t('settings.resumeSetup') }}
             </BaseButton>
             <BaseButton variant="secondary" @click="handleLoadFromFileClick">
               {{ t('settings.loadExistingDataFile') }}
