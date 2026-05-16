@@ -114,6 +114,11 @@ const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'silent_refresh_consecutive_failures',
   'page_hidden_for_ms',
   'visibility_state',
+  // Password-rotation surfaces (changePassword / resetMemberPassword /
+  // signin-heal) — tail of the affected member's UUID lets us correlate
+  // a failure in telemetry to a specific entry in the corrupted envelope
+  // without leaking the full id. Family scoping comes from `family_id`.
+  'member_id_tail',
 ]);
 
 const MAX_STRING_LEN = 200;

@@ -78,6 +78,7 @@ const { isReconnecting, reconnectError, reconnect } = useGoogleReconnect();
 const showAppearance = ref(false);
 const showCurrency = ref(false);
 const showCountryHolidays = ref(false);
+const showAccount = ref(false);
 const showSecurity = ref(false);
 const showFamilyData = ref(false);
 const showDataManagement = ref(false);
@@ -97,6 +98,9 @@ const cardOpenMap: Record<string, () => void> = {
   },
   'country-holidays': () => {
     showCountryHolidays.value = true;
+  },
+  account: () => {
+    showAccount.value = true;
   },
   security: () => {
     showSecurity.value = true;
@@ -584,6 +588,16 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
 
     <!-- ── Settings Card Grid ──────────────────────────────────────────── -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <!-- Your Account first — most common self-serve action (password,
+           passkeys, sign-out). Moved out of "Security & Privacy" so the
+           change-password path is discoverable in two clicks. -->
+      <SettingsCard
+        icon="👤"
+        :title="t('settings.card.account')"
+        :description="t('settings.card.accountDesc')"
+        icon-bg="var(--tint-orange-8)"
+        @click="showAccount = true"
+      />
       <SettingsCard
         icon="🎨"
         :title="t('settings.card.appearance')"
@@ -1014,7 +1028,31 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       </div>
     </BeanieFormModal>
 
-    <!-- ── Security & Privacy Modal ────────────────────────────────────── -->
+    <!-- ── Your Account Modal ─────────────────────────────────────────────
+         The "this is me" surface: password, passkeys, sign-out lives.
+         Separated from Security & Privacy (which is system-level: encryption,
+         device trust) so the change-password path is two clicks deep.
+    ────────────────────────────────────────────────────────────────────── -->
+    <BeanieFormModal
+      v-if="authStore.isAuthenticated"
+      variant="drawer"
+      :open="showAccount"
+      :title="t('settings.accountModal.title')"
+      icon="👤"
+      icon-bg="var(--tint-orange-8)"
+      size="wide"
+      :save-label="t('action.close')"
+      @close="showAccount = false"
+      @save="showAccount = false"
+    >
+      <ChangePasswordSettings />
+      <PasskeySettings class="mt-4" />
+    </BeanieFormModal>
+
+    <!-- ── Security & Privacy Modal ──────────────────────────────────────
+         System-level controls only (trusted device + future advanced
+         toggles). Self-serve account actions moved to Your Account above.
+    ────────────────────────────────────────────────────────────────────── -->
     <BeanieFormModal
       v-if="authStore.isAuthenticated"
       variant="drawer"
@@ -1044,12 +1082,6 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           @update:model-value="settingsStore.setTrustedDevice($event)"
         />
       </div>
-
-      <!-- Change Password -->
-      <ChangePasswordSettings class="mt-4" />
-
-      <!-- Passkey Settings -->
-      <PasskeySettings />
     </BeanieFormModal>
 
     <!-- ── Family Data Modal ───────────────────────────────────────────── -->

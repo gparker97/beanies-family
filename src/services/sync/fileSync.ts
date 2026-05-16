@@ -152,6 +152,29 @@ export async function decryptBeanpodPayload(
 }
 
 /**
+ * Try to unwrap a single wrappedKey entry with a password. Returns the family
+ * key on success, or `null` on any failure (wrong password, malformed salt,
+ * AES-KW unwrap error). Pure crypto — no I/O, no state mutation.
+ *
+ * Returning null is signal, not silence — every caller branches explicitly
+ * on it. Used by `tryUnwrapFamilyKey` (iterates) and by the per-member
+ * stale-wrappedKey check in `authStore.signIn`'s self-heal.
+ */
+export async function unwrapWrappedKey(
+  wrappedKey: WrappedMemberKey,
+  password: string
+): Promise<CryptoKey | null> {
+  try {
+    const salt = new Uint8Array(base64ToBuffer(wrappedKey.salt));
+    if (salt.length !== SALT_LENGTH) return null;
+    const memberKey = await deriveMemberKey(password, salt);
+    return await unwrapFamilyKey(wrappedKey.wrapped, memberKey);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Try to unwrap the family key using a password.
  *
  * Iterates over EVERY wrappedKey in the envelope and collects all
@@ -187,18 +210,10 @@ export async function tryUnwrapFamilyKey(
   const memberIds: string[] = [];
 
   for (const [memberId, wrappedKey] of entries) {
-    try {
-      const salt = new Uint8Array(base64ToBuffer(wrappedKey.salt));
-      if (salt.length !== SALT_LENGTH) continue;
-
-      const memberKey = await deriveMemberKey(password, salt);
-      const fk = await unwrapFamilyKey(wrappedKey.wrapped, memberKey);
-      familyKey ??= fk;
-      memberIds.push(memberId);
-    } catch {
-      // Wrong password for this member — try the next one
-      continue;
-    }
+    const fk = await unwrapWrappedKey(wrappedKey, password);
+    if (!fk) continue;
+    familyKey ??= fk;
+    memberIds.push(memberId);
   }
 
   if (!familyKey || memberIds.length === 0) {

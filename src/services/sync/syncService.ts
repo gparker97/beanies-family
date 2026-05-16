@@ -28,6 +28,7 @@ import type { StorageProvider, StorageProviderType } from './storageProvider';
 import { LocalStorageProvider } from './providers/localProvider';
 import { DriveApiError } from '@/services/google/driveService';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
+import { preserveLocalKeyDicts } from './envelopeMerge';
 import {
   usePollWhileVisible,
   type PollWhileVisibleHandle,
@@ -356,9 +357,11 @@ export function getEnvelope(): BeanpodFileV4 | null {
 }
 
 /**
- * Update the current envelope (e.g. after adding a new wrapped key).
+ * Update the current envelope (e.g. after adding a new wrapped key). Accepts
+ * null to allow the store's `clearEnvelope` to null us out on sign-out
+ * without an `as unknown` cast.
  */
-export function setEnvelope(envelope: BeanpodFileV4): void {
+export function setEnvelope(envelope: BeanpodFileV4 | null): void {
   currentEnvelope = envelope;
 }
 
@@ -620,28 +623,16 @@ async function fetchAndMergeRemote(): Promise<void> {
     suppressAutoSave = false;
   }
 
-  // Update envelope with remote's key material (may have new wrapped keys).
-  // Merge local-only envelope fields (inviteKeys, wrappedKeys, passkeySecrets)
-  // into the remote envelope to avoid losing locally-added keys when the remote
-  // file was written before the local change (e.g. invite generated between saves).
-  if (currentEnvelope) {
-    if (currentEnvelope.inviteKeys) {
-      remoteEnvelope.inviteKeys = { ...currentEnvelope.inviteKeys, ...remoteEnvelope.inviteKeys };
-    }
-    if (currentEnvelope.wrappedKeys) {
-      remoteEnvelope.wrappedKeys = {
-        ...currentEnvelope.wrappedKeys,
-        ...remoteEnvelope.wrappedKeys,
-      };
-    }
-    if (currentEnvelope.passkeyWrappedKeys) {
-      remoteEnvelope.passkeyWrappedKeys = {
-        ...currentEnvelope.passkeyWrappedKeys,
-        ...remoteEnvelope.passkeyWrappedKeys,
-      };
-    }
-  }
-  currentEnvelope = remoteEnvelope;
+  // Local-wins merge of the three key dicts (wrappedKeys / inviteKeys /
+  // passkeyWrappedKeys) — the local side is the just-mutated state about to
+  // be pushed (changePassword, join, passkey register, admin reset all
+  // mutate local first). Without local-wins, a stale remote entry would
+  // silently overwrite the freshly-rotated local one and the corresponding
+  // member/invite/passkey would diverge from its in-doc passwordHash —
+  // exactly the root cause of the welcome-gate sign-in regression. The
+  // store-side equivalent is `replaceEnvelope`; both flow through
+  // `preserveLocalKeyDicts` so this is the single source of truth.
+  currentEnvelope = preserveLocalKeyDicts(remoteEnvelope, currentEnvelope);
   lastKnownFileTimestamp = remoteTimestamp;
 }
 

@@ -43,6 +43,10 @@ const emit = defineEmits<{
   delete: [];
   'share-invite': [];
 }>();
+// Reset-password lives on the Bean Detail page now (see `BeanAccountPanel`).
+// The card cluster used to host a 🔒 icon for it, but the icon was
+// semantically wrong and the cluster was too crowded — see the design
+// review in the recent session for the rationale.
 
 const { t } = useTranslation();
 const router = useRouter();
