@@ -221,6 +221,16 @@ const STRING_DEFS = {
   'bean.hero.birthday': { en: 'Birthday', beanie: 'birthday' },
   'bean.hero.role.parent': { en: 'Adult', beanie: 'parent bean' },
   'bean.hero.role.child': { en: 'Child', beanie: 'little bean' },
+  // Bean Detail → "Account access" panel — admin-only recovery surface.
+  // Shown when the viewing admin can reset the bean's password (not self,
+  // not owner, not pet, member has joined).
+  'bean.account.title': { en: 'Account Access', beanie: 'account access' },
+  'bean.account.description': {
+    en: "{name} signs in with a password. If they can't sign in, you can set a new one and share it with them.",
+    beanie:
+      "{name} signs in with a password. if they can't sign in, you can set a new one and share it.",
+  },
+  'bean.account.resetButton': { en: "Reset {name}'s password", beanie: "reset {name}'s password" },
   'bean.notFound.title': { en: "We can't find this member", beanie: "can't find this bean" },
   'bean.notFound.body': {
     en: "This member isn't in your pod (or has been removed).",
@@ -1715,6 +1725,77 @@ const STRING_DEFS = {
     beanie: 'could not update password. please try again.',
   },
 
+  // ── Admin/owner reset of another member's password ────────────────────────
+  // Used by ResetMemberPasswordModal. Error keys map 1:1 onto `ResetError`
+  // in authStore — adding a new ResetError requires adding a key here.
+  'family.resetPassword.modalTitle': {
+    en: 'Reset password for {name}',
+    beanie: 'reset password for {name}',
+  },
+  'family.resetPassword.modalDescription': {
+    en: 'Set a new temporary password. {name} can change it under Settings → Change Password after they sign in.',
+    beanie:
+      'set a new temporary password. {name} can change it under settings → change password after they sign in.',
+  },
+  'family.resetPassword.warning': {
+    en: 'Share this password with {name} privately — anyone with it can sign in as them.',
+    beanie: 'share this password with {name} privately — anyone with it can sign in as them.',
+  },
+  'family.resetPassword.submit': { en: 'Reset password', beanie: 'reset password' },
+  'family.resetPassword.success': {
+    en: 'Password reset. Share the new password with {name}.',
+    beanie: 'password reset. share the new password with {name}.',
+  },
+  'family.resetPassword.successDeferredSync': {
+    en: 'Will sync to your cloud file when the connection returns.',
+    beanie: 'will sync to your cloud file when the connection returns.',
+  },
+  'family.resetPassword.error.required': {
+    en: 'Please enter and confirm a new password.',
+    beanie: 'please enter and confirm a new password.',
+  },
+  'family.resetPassword.error.mismatch': {
+    en: 'Passwords do not match.',
+    beanie: 'passwords do not match.',
+  },
+  'family.resetPassword.error.notAuthenticated': {
+    en: 'Your session has expired. Sign in again and try.',
+    beanie: 'your session has expired. sign in again and try.',
+  },
+  'family.resetPassword.error.memberNotFound': {
+    en: "Couldn't find that family member.",
+    beanie: "couldn't find that family member.",
+  },
+  'family.resetPassword.error.cannotResetSelf': {
+    en: 'Use Settings → Change Password for your own account.',
+    beanie: 'use settings → change password for your own account.',
+  },
+  'family.resetPassword.error.isPet': {
+    en: 'Pets do not have passwords.',
+    beanie: 'pets do not have passwords.',
+  },
+  'family.resetPassword.error.cannotResetOwner': {
+    en: 'The pod owner must change their own password from Settings.',
+    beanie: 'the pod owner must change their own password from settings.',
+  },
+  'family.resetPassword.error.notAuthorized': {
+    en: "You don't have permission to reset another member's password.",
+    beanie: "you don't have permission to reset another member's password.",
+  },
+  'family.resetPassword.error.familyKeyMissing': {
+    en: 'Could not load family key — please sign out and back in, then try again.',
+    beanie: 'could not load family key — please sign out and back in, then try again.',
+  },
+  'family.resetPassword.error.wrapFailed': {
+    en: 'Failed to re-wrap the account key. Please try again.',
+    beanie: 'failed to re-wrap the account key. please try again.',
+  },
+  'family.resetPassword.error.updateFailed': {
+    en: "Saved the new key locally but couldn't update their password record. Please try again.",
+    beanie:
+      "saved the new key locally but couldn't update their password record. please try again.",
+  },
+
   // ── Transfer Ownership ────────────────────────────────────────────────────
   'transferOwnership.entryTitle': {
     en: 'Transfer Pod Ownership',
@@ -1898,8 +1979,14 @@ const STRING_DEFS = {
     en: 'Base currency & exchange rates',
     beanie: 'your bean currency',
   },
+  'settings.card.account': { en: 'Your Account', beanie: 'your account' },
+  'settings.card.accountDesc': {
+    en: 'Password, passkeys, and sign-out',
+    beanie: 'password, passkeys, sign-out',
+  },
   'settings.card.security': { en: 'Security & Privacy', beanie: 'security & privacy' },
-  'settings.card.securityDesc': { en: 'Passkeys & device trust', beanie: 'keep your beans safe' },
+  'settings.card.securityDesc': { en: 'Encryption & device trust', beanie: 'keep your beans safe' },
+  'settings.accountModal.title': { en: 'Your Account', beanie: 'your account' },
   'settings.card.familyMembers': { en: 'Family Members', beanie: 'family members' },
   'settings.card.familyMembersDesc': { en: 'Manage your family', beanie: 'manage your pod' },
   'settings.card.familyData': { en: 'Family Data', beanie: 'family data' },
@@ -2719,7 +2806,11 @@ const STRING_DEFS = {
     en: 'Incorrect password. Please try again.',
     beanie: 'wrong password. try again.',
   },
-  'password.decryptionError': { en: 'Decryption Error', beanie: 'decryption error' },
+  'password.decryptionError': {
+    en: "That password didn't unlock the pod. If you're sure it's right, ask a family member to open the pod first — we'll automatically repair the issue on your next sign-in.",
+    beanie:
+      "that password didn't unlock the pod. if you're sure it's right, ask a family bean to open the pod first — we'll quietly fix it next time you sign in.",
+  },
   'password.setAndContinue': { en: 'Set Password & Continue', beanie: 'set password & continue' },
   'password.strongPasswordDescription': {
     en: "Choose a strong password to protect your data file. You'll need this password each time you open the app.",
@@ -2886,6 +2977,17 @@ const STRING_DEFS = {
       "the move failed and we couldn't fully switch back to your previous storage. sign out and sign back in to recover — your data is safe in your file.",
   },
   'auth.fillAllFields': { en: 'Please fill in all fields', beanie: 'please fill in all fields' },
+  // Self-heal toast strings — defensive paths that only fire on bugs. Visible
+  // user-facing text on the rare case that the heal flow itself crashes.
+  'auth.signinHeal.unexpectedError': {
+    en: "Couldn't re-sync your account key",
+    beanie: "couldn't re-sync your account key",
+  },
+  'auth.signinHeal.unexpectedErrorHint': {
+    en: 'Sign in worked, but the cross-device key sync needs attention. Try signing out and back in. Details in console.',
+    beanie:
+      'sign-in worked, but the cross-device key sync needs attention. try signing out and back in. details in console.',
+  },
   'auth.passwordsDoNotMatch': { en: 'Passwords do not match', beanie: 'passwords do not match' },
   'auth.passwordMinLength': {
     en: 'Password must be at least 8 characters',

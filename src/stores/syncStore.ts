@@ -63,6 +63,7 @@ import {
   reEncryptEnvelope,
   detectFileVersion,
 } from '@/services/sync/fileSync';
+import { preserveLocalKeyDicts } from '@/services/sync/envelopeMerge';
 import {
   generateFamilyKey,
   deriveMemberKey,
@@ -157,6 +158,39 @@ export const useSyncStore = defineStore('sync', () => {
   // Family key state — the unwrapped AES-GCM key for the active .beanpod envelope
   const familyKey = shallowRef<CryptoKey | null>(null);
   const envelope = shallowRef<BeanpodFileV4 | null>(null);
+
+  // ─── Envelope replacement invariant ───────────────────────────────────
+  // ALL non-additive writes to `envelope.value` MUST go through
+  // `replaceEnvelope` or `clearEnvelope`. Direct `envelope.value = X`
+  // assignments are an anti-pattern: they bypass the local-wins merge
+  // in `preserveLocalKeyDicts` and silently drop any wrappedKeys /
+  // inviteKeys / passkeyWrappedKeys the user just rotated locally —
+  // the root cause of the welcome-gate sign-in divergence bug.
+  //
+  // Additive writes (envelope.wrappedKeys[id] = X done via spread inside
+  // addMemberWrappedKey / addInvitePackage / addPasskeySecret) are safe
+  // because they preserve all existing entries by construction.
+  // ─────────────────────────────────────────────────────────────────────
+
+  /**
+   * Install a fetched envelope as the in-memory envelope, preserving any
+   * local-only key entries (wrappedKeys / inviteKeys / passkeyWrappedKeys)
+   * the fetched envelope doesn't have yet — e.g. a wrappedKey added in this
+   * session but not yet pushed to Drive. Returns the merged envelope so
+   * callers can pass the same reference onward.
+   */
+  function replaceEnvelope(incoming: BeanpodFileV4): BeanpodFileV4 {
+    const merged = preserveLocalKeyDicts(incoming, envelope.value);
+    envelope.value = merged;
+    syncService.setEnvelope(merged);
+    return merged;
+  }
+
+  /** Null the envelope on sign-out / disconnect. */
+  function clearEnvelope(): void {
+    envelope.value = null;
+    syncService.setEnvelope(null);
+  }
 
   // Pending encrypted file — V4 envelope that needs password to unlock
   const pendingEncryptedFile = ref<{
@@ -631,9 +665,12 @@ export const useSyncStore = defineStore('sync', () => {
             }
           }
 
-          // Update envelope and ensure syncService has the family key
-          envelope.value = remoteEnvelope;
-          syncService.setFamilyKey(familyKey.value!, remoteEnvelope);
+          // Update envelope and ensure syncService has the family key.
+          // `replaceEnvelope` merges in local-only key entries (rotate-key
+          // writes that may not be on the fetched envelope yet) — see the
+          // envelope-replacement invariant near the top of this file.
+          const merged = replaceEnvelope(remoteEnvelope);
+          syncService.setFamilyKey(familyKey.value!, merged);
 
           // Prevent next doSave() from re-fetching what we just loaded
           const loadedTs = await syncService.getFileTimestamp();
@@ -790,10 +827,13 @@ export const useSyncStore = defineStore('sync', () => {
         replaceDoc(doc);
       }
 
-      // Set the family key and envelope
+      // Set the family key and envelope. `replaceEnvelope` is the safe path
+      // (merges any local-only entries); at this point `envelope.value` is
+      // typically null (fresh decrypt), so the merge is a no-op — but using
+      // the uniform pattern keeps the invariant grep-checkable.
       familyKey.value = fk;
-      envelope.value = pending.envelope;
-      syncService.setFamilyKey(fk, pending.envelope);
+      const mergedEnvelope = replaceEnvelope(pending.envelope);
+      syncService.setFamilyKey(fk, mergedEnvelope);
 
       // Adopt family identity — ensure the file's family is registered and active
       const { getActiveFamilyId } = await import('@/services/indexeddb/database');
@@ -930,11 +970,13 @@ export const useSyncStore = defineStore('sync', () => {
       const doc = await loadCachedDoc(fk);
       if (!doc) return { success: false };
 
-      // Set up state
+      // Set up state. `replaceEnvelope` is the uniform entry point even
+      // for cache loads where `envelope.value` is typically null and the
+      // merge is a no-op.
       replaceDoc(doc);
       familyKey.value = fk;
-      envelope.value = cachedEnvelope;
-      syncService.setFamilyKey(fk, cachedEnvelope);
+      const cachedMerged = replaceEnvelope(cachedEnvelope);
+      syncService.setFamilyKey(fk, cachedMerged);
       if (!options?.preservePermissionState) {
         isConfigured.value = true; // Data is loaded — show configured UI
         needsPermission.value = true; // Still need file permission for future saves
@@ -1049,7 +1091,7 @@ export const useSyncStore = defineStore('sync', () => {
       }
     }
     familyKey.value = null;
-    envelope.value = null;
+    clearEnvelope();
     pendingEncryptedFile.value = null;
   }
 
@@ -1160,11 +1202,13 @@ export const useSyncStore = defineStore('sync', () => {
       step = 'verify';
       await verifyJustWritten(provider, fk, familyId);
 
-      // 4. Commit in-memory state — we know the write is good.
+      // 4. Commit in-memory state — we know the write is good. `replaceEnvelope`
+      // is the uniform entry point; at this point `envelope.value` is null
+      // (fresh pod creation), so the merge is a no-op.
       const env = parseBeanpodV4(envelopeJson);
       familyKey.value = fk;
-      envelope.value = env;
-      syncService.setFamilyKey(fk, env);
+      const mergedNew = replaceEnvelope(env);
+      syncService.setFamilyKey(fk, mergedNew);
 
       // 5. Persist local cache (was fire-and-forget — now awaited so a cache
       //    failure surfaces as a real error before `markPodCreated`).
@@ -1247,7 +1291,7 @@ export const useSyncStore = defineStore('sync', () => {
    */
   function clearSessionPassword(): void {
     familyKey.value = null;
-    envelope.value = null;
+    clearEnvelope();
   }
 
   /**
@@ -1285,8 +1329,8 @@ export const useSyncStore = defineStore('sync', () => {
       }
 
       familyKey.value = fk;
-      envelope.value = pending.envelope;
-      syncService.setFamilyKey(fk, pending.envelope);
+      const decryptedMerged = replaceEnvelope(pending.envelope);
+      syncService.setFamilyKey(fk, decryptedMerged);
       isConfigured.value = true;
 
       // Adopt family identity — ensure the file's family is registered and active
@@ -1489,7 +1533,7 @@ export const useSyncStore = defineStore('sync', () => {
     needsPermission.value = false;
     lastSync.value = null;
     familyKey.value = null;
-    envelope.value = null;
+    clearEnvelope();
     storageProviderType.value = null;
     providerAccountEmail.value = null;
     showGoogleReconnect.value = false;
@@ -1724,8 +1768,8 @@ export const useSyncStore = defineStore('sync', () => {
               familyKey.value
             );
             mergeDoc(doc);
-            envelope.value = pendingEncryptedFile.value.envelope;
-            syncService.setFamilyKey(familyKey.value!, pendingEncryptedFile.value.envelope);
+            const bgMerged = replaceEnvelope(pendingEncryptedFile.value.envelope);
+            syncService.setFamilyKey(familyKey.value!, bgMerged);
             pendingEncryptedFile.value = null;
             await reloadAllStores();
             // Clean up duplicate recurring transactions from CRDT merge
@@ -1813,8 +1857,8 @@ export const useSyncStore = defineStore('sync', () => {
                 familyKey.value
               );
               mergeDoc(doc);
-              envelope.value = pendingEncryptedFile.value.envelope;
-              syncService.setFamilyKey(familyKey.value!, pendingEncryptedFile.value.envelope);
+              const bgRecoveryMerged = replaceEnvelope(pendingEncryptedFile.value.envelope);
+              syncService.setFamilyKey(familyKey.value!, bgRecoveryMerged);
               pendingEncryptedFile.value = null;
               await reloadAllStores();
               // Clean up duplicate recurring transactions from CRDT merge
@@ -1936,7 +1980,7 @@ export const useSyncStore = defineStore('sync', () => {
     lastSync.value = null;
     needsPermission.value = false;
     familyKey.value = null;
-    envelope.value = null;
+    clearEnvelope();
     storageProviderType.value = null;
     providerAccountEmail.value = null;
     showGoogleReconnect.value = false;
@@ -2378,9 +2422,12 @@ export const useSyncStore = defineStore('sync', () => {
       await decryptBeanpodPayload(env, familyKey.value);
 
       // Swap the provider so subsequent saves/polls use the new fileId.
+      // `replaceEnvelope` is the uniform entry point even though this is a
+      // recovery rebind where local-only entries from `envelope.value`
+      // typically don't differ from `env`.
       syncService.setProvider(provider);
-      syncService.setFamilyKey(familyKey.value, env);
-      envelope.value = env;
+      const rebindMerged = replaceEnvelope(env);
+      syncService.setFamilyKey(familyKey.value, rebindMerged);
       fileName.value = fileName_param;
       driveFileId.value = fileId;
 

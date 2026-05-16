@@ -4,10 +4,13 @@ import { hashPassword } from '@/services/auth/passwordService';
 
 // ── Mocks for authStore's transitive deps ──────────────────────────────────
 
-// familyStore: provide members array + updateMember spy
-const updateMemberMock = vi.fn<(id: string, patch: Record<string, unknown>) => Promise<void>>(
-  async () => {}
-);
+// familyStore: provide members array + updateMember spy. The real
+// updateMember returns FamilyMember | null; rotateMemberPassword treats
+// null as a failure ('updateFailed' error), so the mock must return a
+// truthy value on the happy path.
+const updateMemberMock = vi.fn<
+  (id: string, patch: Record<string, unknown>) => Promise<Record<string, unknown> | null>
+>(async (id) => ({ id, updated: true }));
 const membersRef = { value: [] as Array<Record<string, unknown>> };
 
 vi.mock('@/stores/familyStore', () => ({

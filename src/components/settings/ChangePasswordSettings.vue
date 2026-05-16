@@ -14,6 +14,7 @@
 import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import PasswordEntryFields from '@/components/ui/PasswordEntryFields.vue';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -152,37 +153,12 @@ async function handleSave() {
         />
       </div>
 
-      <div class="space-y-1">
-        <label
-          for="cp-new"
-          class="font-outfit text-xs font-semibold tracking-wide text-[var(--color-text-muted)] uppercase"
-        >
-          {{ t('changePassword.newPassword') }}
-        </label>
-        <BaseInput
-          id="cp-new"
-          v-model="newPassword"
-          type="password"
-          autocomplete="new-password"
-          :placeholder="t('changePassword.newPasswordPlaceholder')"
-        />
-      </div>
-
-      <div class="space-y-1">
-        <label
-          for="cp-confirm"
-          class="font-outfit text-xs font-semibold tracking-wide text-[var(--color-text-muted)] uppercase"
-        >
-          {{ t('changePassword.confirmNewPassword') }}
-        </label>
-        <BaseInput
-          id="cp-confirm"
-          v-model="confirmPassword"
-          type="password"
-          autocomplete="new-password"
-          :placeholder="t('changePassword.confirmNewPasswordPlaceholder')"
-        />
-      </div>
+      <PasswordEntryFields
+        v-model:new-password="newPassword"
+        v-model:confirm="confirmPassword"
+        id-prefix="cp"
+        :disabled="isSubmitting"
+      />
 
       <p
         v-if="formError"
