@@ -4,9 +4,12 @@
  * When a Drive write() fails due to network error, the content is queued here.
  * Only the latest save is kept (each is a full file replacement).
  *
- * Three recovery paths trigger a flush attempt — the queue can be stuck
- * for any of three reasons, each with its own recovery signal:
+ * Four recovery paths trigger a flush attempt — the queue can be stuck
+ * for any of these reasons, each with its own recovery signal:
  *
+ *   - `startup`        — a provider attached at app boot with pending
+ *                        content already restored from sessionStorage.
+ *                        Usually the FIRST trigger on PWA cold-start.
  *   - `online`         — network came back from offline. Catches the
  *                        original "WiFi just reconnected" case.
  *   - `token-acquired` — silent refresh succeeded after auth was the
@@ -15,6 +18,11 @@
  *                        where neither network nor auth events fired
  *                        but conditions improved while the tab was
  *                        backgrounded.
+ *
+ * Concurrent triggers coalesce: only one flush runs at a time, the first
+ * trigger's reason wins for the failure report. Without this, PWA
+ * cold-start would fire 2-3 alerts per occurrence (one per trigger that
+ * arrives during the startup window) — see #beanies-errors history.
  *
  * Persists to sessionStorage so queued saves survive page refreshes
  * (but not full browser restarts — session-scoped is appropriate).
@@ -59,7 +67,7 @@ export function enqueueOfflineSave(content: string): void {
 export function setFlushProvider(provider: StorageProvider): void {
   flushProvider = provider;
   if (pendingContent && navigator.onLine) {
-    flushQueue().catch(console.warn);
+    tryFlush('startup');
   }
 }
 
@@ -71,26 +79,29 @@ export function hasPendingSave(): boolean {
 }
 
 /**
- * Flush the queued save. Called automatically on 'online' event.
+ * Flush the queued save.
+ *
+ * Returns `true` if the flush completed and the queue is now clear.
+ * Returns `false` only when there is nothing to flush (no pending content
+ * or no provider attached) — a no-op, not a failure.
+ *
+ * Throws the underlying error if the provider's `write()` rejects. Callers
+ * are responsible for catching, classifying, and reporting. The queue is
+ * left intact on failure for the next recovery trigger to retry.
  */
 export async function flushQueue(): Promise<boolean> {
   if (!pendingContent || !flushProvider) return false;
 
   const content = pendingContent;
-  try {
-    await flushProvider.write(content);
-    // Only clear if this specific content was flushed
-    // (a newer save may have been queued during the flush)
-    if (pendingContent === content) {
-      pendingContent = null;
-      clearFromSession();
-    }
-    console.log('[offlineQueue] Queued save flushed successfully');
-    return true;
-  } catch (e) {
-    console.warn('[offlineQueue] Flush failed, will retry on next online event:', e);
-    return false;
+  await flushProvider.write(content);
+  // Only clear if this specific content was flushed
+  // (a newer save may have been queued during the flush)
+  if (pendingContent === content) {
+    pendingContent = null;
+    clearFromSession();
   }
+  console.log('[offlineQueue] Queued save flushed successfully');
+  return true;
 }
 
 /**
@@ -127,44 +138,54 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let tokenAcquiredUnsub: (() => void) | null = null;
 let visibilityHandler: (() => void) | null = null;
 
-type FlushReason = 'online' | 'token-acquired' | 'visible';
+// Coalescing guard: only one flush attempt runs at a time. Triggers that
+// arrive while a flush is already in flight (e.g. `token-acquired` and
+// `visible` firing 10ms apart on PWA cold-start) share the existing
+// attempt instead of stacking duplicate Drive writes and duplicate Slack
+// alerts. The first trigger's reason wins for the failure report.
+let flushInFlight: Promise<void> | null = null;
+
+type FlushReason = 'online' | 'token-acquired' | 'visible' | 'startup';
 
 /**
  * Surface a flush failure via console + reportError. Centralizes the
- * telemetry shape so all three recovery hooks emit the same structure
- * with the only difference being the `reason` field — post-deploy
- * Slack telemetry can then show which recovery path produces the
- * most stuck queues.
+ * telemetry shape so all recovery hooks emit the same structure with the
+ * only difference being the `reason` field — post-deploy Slack telemetry
+ * can then show which recovery path produces the most stuck queues.
+ *
+ * The underlying error from `flushQueue` is always forwarded so the
+ * Slack alert carries the real failure cause (token-rejected, drive 404,
+ * network TypeError, etc.) instead of an opaque "flush returned false".
  */
-function reportFlushFailure(reason: FlushReason, err?: unknown): void {
+function reportFlushFailure(reason: FlushReason, err: unknown): void {
   console.warn(`[offlineQueue] flush rejected (reason: ${reason})`, err);
   reportError({
     surface: 'offline-queue-flush',
     message: `flush rejected after ${reason}`,
-    error:
-      err instanceof Error
-        ? err
-        : new Error(err ? String(err) : `flush returned false (${reason})`),
+    error: err instanceof Error ? err : new Error(String(err)),
   });
 }
 
 /**
  * Single entry point for all flush triggers. No-ops when there's nothing
- * to flush or no provider yet (e.g. event fires before sync is initialized).
+ * to flush, no provider yet, or another flush is already in flight.
  *
- * `flushQueue` resolves to a boolean (it catches its own errors internally
- * and returns false on failure), so we check the resolved value rather
- * than relying on `.catch`. The defensive `.catch` is still there for
- * truly unexpected throws (provider lookup race, sessionStorage failure
- * inside flushQueue's own cleanup).
+ * Coalescing matters on PWA cold-start where multiple recovery triggers
+ * fire within milliseconds: the first wins, the rest piggy-back on its
+ * outcome silently — no duplicate writes, no duplicate alerts.
  */
 function tryFlush(reason: FlushReason): void {
   if (!pendingContent || !flushProvider) return;
-  flushQueue()
-    .then((success) => {
-      if (!success) reportFlushFailure(reason);
-    })
-    .catch((e) => reportFlushFailure(reason, e));
+  if (flushInFlight) return;
+
+  const p = flushQueue().then(
+    () => {},
+    (e) => reportFlushFailure(reason, e)
+  );
+  flushInFlight = p;
+  void p.finally(() => {
+    if (flushInFlight === p) flushInFlight = null;
+  });
 }
 
 function handleOnline(): void {
@@ -172,18 +193,20 @@ function handleOnline(): void {
     clearTimeout(retryTimer);
     retryTimer = null;
   }
-  flushQueue()
-    .then((success) => {
-      if (success) return;
-      reportFlushFailure('online');
-      if (pendingContent) {
-        retryTimer = setTimeout(() => {
-          retryTimer = null;
-          tryFlush('online');
-        }, 5000);
-      }
-    })
-    .catch((e) => reportFlushFailure('online', e));
+  tryFlush('online');
+  // Schedule a single 5s retry if the queue is still pending after this
+  // attempt resolves. The retry goes back through `tryFlush`, which means
+  // it'll coalesce with anything else triggered in that window.
+  const settled = flushInFlight;
+  if (!settled) return;
+  void settled.then(() => {
+    if (pendingContent) {
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        tryFlush('online');
+      }, 5000);
+    }
+  });
 }
 
 function startListening(): void {

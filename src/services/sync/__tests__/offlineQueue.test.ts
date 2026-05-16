@@ -99,16 +99,18 @@ describe('offlineQueue', () => {
       expect(sessionStorage.getItem('beanies_offline_queue')).toBeNull();
     });
 
-    it('keeps queue on flush failure', async () => {
+    it('throws underlying write error and keeps queue on flush failure', async () => {
       const mockWrite = vi.fn().mockRejectedValue(new Error('Network error'));
       const mockProvider = { write: mockWrite } as any;
       offlineQueue.setFlushProvider(mockProvider);
 
       offlineQueue.enqueueOfflineSave('{"data":"retry"}');
 
-      const result = await offlineQueue.flushQueue();
+      // flushQueue now propagates the underlying write error so the
+      // offline-queue-flush surface can include the real cause in Slack
+      // (rather than the opaque "flush returned false" placeholder).
+      await expect(offlineQueue.flushQueue()).rejects.toThrow('Network error');
 
-      expect(result).toBe(false);
       expect(offlineQueue.hasPendingSave()).toBe(true);
       // Content should still be in sessionStorage for retry
       expect(sessionStorage.getItem('beanies_offline_queue')).toBe('{"data":"retry"}');
@@ -290,6 +292,29 @@ describe('offlineQueue', () => {
         );
       });
     });
+
+    it('forwards the underlying write error into the Slack alert', async () => {
+      const { reportError } = await import('@/utils/errorReporter');
+      offlineQueue.enqueueOfflineSave('{"data":"will-fail"}');
+
+      const underlying = new Error('TokenExpiredError: Drive write failed');
+      const mockWrite = vi.fn().mockRejectedValue(underlying);
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+      vi.mocked(reportError).mockClear();
+      tokenAcquiredCallbackHolder.cb!();
+
+      await vi.waitFor(() => {
+        expect(reportError).toHaveBeenCalledWith(
+          expect.objectContaining({
+            surface: 'offline-queue-flush',
+            error: underlying,
+          })
+        );
+      });
+    });
   });
 
   describe('visibilitychange flush hook', () => {
@@ -375,6 +400,117 @@ describe('offlineQueue', () => {
       expect(freshQueue.hasPendingSave()).toBe(false);
 
       freshQueue.clearQueue();
+    });
+  });
+
+  // ─── Concurrent-trigger coalescing (2026-05-16) ──────────────────────────
+  // On PWA cold-start, `token-acquired` and `visible` fire within ~10ms of
+  // each other. Without coalescing, both triggered duplicate Drive writes
+  // and duplicate Slack alerts. The in-flight guard ensures the second
+  // trigger piggy-backs on the first attempt silently.
+
+  describe('coalescing concurrent triggers', () => {
+    it('only one write fires when token-acquired and visible arrive together', async () => {
+      const { reportError } = await import('@/utils/errorReporter');
+
+      // Long-running write — both triggers will land while it's in flight.
+      let resolveWrite: () => void = () => {};
+      const writePromise = new Promise<void>((r) => {
+        resolveWrite = r;
+      });
+      const mockWrite = vi.fn().mockReturnValue(writePromise);
+
+      // Force offline through provider-attach to avoid the startup auto-flush
+      // consuming our coalescing window.
+      offlineQueue.enqueueOfflineSave('{"data":"cold-start"}');
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+      vi.mocked(reportError).mockClear();
+
+      // Fire both triggers within the same tick — token-acquired first,
+      // then visibilitychange — matching the user-reported PWA cold-start
+      // pattern from the Slack alert.
+      tokenAcquiredCallbackHolder.cb!();
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      // Give microtasks a chance to settle without resolving the write.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Only one write should be in flight.
+      expect(mockWrite).toHaveBeenCalledTimes(1);
+
+      // Resolve the write successfully — neither trigger should report.
+      resolveWrite();
+      await vi.waitFor(() => expect(offlineQueue.hasPendingSave()).toBe(false));
+      expect(reportError).not.toHaveBeenCalled();
+    });
+
+    it('only one Slack alert fires when both triggers see a failed flush', async () => {
+      const { reportError } = await import('@/utils/errorReporter');
+
+      let rejectWrite: (e: unknown) => void = () => {};
+      const writePromise = new Promise<void>((_, reject) => {
+        rejectWrite = reject;
+      });
+      const mockWrite = vi.fn().mockReturnValue(writePromise);
+
+      offlineQueue.enqueueOfflineSave('{"data":"cold-start-fail"}');
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+      vi.mocked(reportError).mockClear();
+
+      tokenAcquiredCallbackHolder.cb!();
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mockWrite).toHaveBeenCalledTimes(1);
+
+      rejectWrite(new Error('Drive 401'));
+      await vi.waitFor(() => expect(reportError).toHaveBeenCalled());
+
+      // Exactly one alert, attributed to the FIRST trigger (token-acquired).
+      expect(reportError).toHaveBeenCalledTimes(1);
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'offline-queue-flush',
+          message: 'flush rejected after token-acquired',
+        })
+      );
+    });
+  });
+
+  describe('startup-reason trigger', () => {
+    it('reports flush failures with reason "startup" when setFlushProvider auto-flushes', async () => {
+      const { reportError } = await import('@/utils/errorReporter');
+
+      // Pending content already restored (simulating PWA cold-start with
+      // sessionStorage-restored queue). Provider attaches with onLine=true,
+      // which should kick off tryFlush('startup').
+      offlineQueue.enqueueOfflineSave('{"data":"startup-fail"}');
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+      vi.mocked(reportError).mockClear();
+
+      const mockWrite = vi.fn().mockRejectedValue(new Error('Network down'));
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+
+      await vi.waitFor(() => {
+        expect(reportError).toHaveBeenCalledWith(
+          expect.objectContaining({
+            surface: 'offline-queue-flush',
+            message: 'flush rejected after startup',
+          })
+        );
+      });
     });
   });
 });
