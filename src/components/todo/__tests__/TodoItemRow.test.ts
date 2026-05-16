@@ -56,8 +56,11 @@ describe('TodoItemRow', () => {
 
   describe('due-today row', () => {
     beforeEach(() => {
+      // Pin "now" to 15:00 LOCAL so the overdue/due-today branch behaves
+      // identically in any timezone (CI runs UTC; the previous UTC-fixed
+      // instant only worked east of UTC).
       vi.useFakeTimers();
-      vi.setSystemTime(new Date('2026-05-16T07:00:00.000Z')); // 15:00 SGT
+      vi.setSystemTime(new Date(2026, 4, 16, 15, 0, 0));
     });
 
     afterEach(() => {
