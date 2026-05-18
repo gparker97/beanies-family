@@ -57,13 +57,64 @@ export interface PhotoEntityBindingOptions {
   surface: string;
 }
 
+/**
+ * Shallow content equality for UUID arrays. Avoids spurious re-renders when
+ * the source emits a fresh array reference with the same content.
+ */
+function sameContent(a: readonly UUID[], b: readonly UUID[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 export function usePhotoEntityBinding(opts: PhotoEntityBindingOptions) {
   const { t } = useTranslation();
   const photoIds = ref<UUID[]>(opts.initialPhotoIds() ?? []);
 
+  /**
+   * Counter of in-flight `updatePhotoIds` awaits. While > 0, the deep watch
+   * on `initialPhotoIds` skips its re-sync so we don't clobber an active
+   * optimistic snapshot. Resolved ops re-sync from source one more time on
+   * the way out to catch any background changes that arrived mid-await.
+   */
+  let pendingOps = 0;
+
+  /**
+   * Prop-swap re-sync — the entity itself changed (e.g. modal was re-bound
+   * to a different activity). Pull fresh photoIds from the new source.
+   */
   watch(opts.watchSource, () => {
     photoIds.value = opts.initialPhotoIds() ?? [];
   });
+
+  /**
+   * Background re-sync — the entity's photoIds changed in the doc while
+   * this binding was alive (e.g. a long-running photo upload completed
+   * after the modal's drawer closed; BaseSidePanel's v-if unmounted the
+   * slot, so PhotoAttachments couldn't emit `update:photo-ids` back here;
+   * but `photoStore.attachPhotoToEntity` already wrote the photoId into
+   * `entity.photoIds` directly). Without this watch, the binding's local
+   * ref stays stale until a full page refresh.
+   *
+   * Suppressed during in-flight optimistic ops (pendingOps > 0). The
+   * finally-block in `updatePhotoIds` re-syncs once on the way out so
+   * we don't lose background changes that landed mid-await.
+   *
+   * Caught 2026-05-18 from greg's repro: add photo → close drawer mid-
+   * upload → reopen → photo not visible until refresh.
+   */
+  watch(
+    () => opts.initialPhotoIds(),
+    (newIds) => {
+      if (pendingOps > 0) return;
+      const next = newIds ?? [];
+      if (sameContent(photoIds.value, next)) return;
+      photoIds.value = [...next];
+    },
+    { deep: true }
+  );
 
   async function updatePhotoIds(ids: UUID[]): Promise<void> {
     const id = opts.entityId.value;
@@ -79,20 +130,40 @@ export function usePhotoEntityBinding(opts: PhotoEntityBindingOptions) {
       return;
     }
 
+    pendingOps++;
     const previous = photoIds.value;
+    // Snapshot the source at op-start so we can detect concurrent background
+    // changes that arrived while the deep watch was suppressed.
+    const sourceAtStart = opts.initialPhotoIds() ?? [];
     photoIds.value = ids; // optimistic — render new tile immediately
 
-    const result = await opts.update(id, { photoIds: ids });
-    if (result === null || result === undefined) {
-      // Store-level error already in errorReporter via wrapAsync.
-      // Without this toast the user sees a "saved" photo that orphans
-      // in Drive on next reload. showToast('error') re-fires the
-      // reporter with our surface tag for support context.
-      photoIds.value = previous;
-      showToast('error', t('photos.linkFailed.title'), t('photos.linkFailed.body'), {
-        surface: opts.surface,
-        context: { action: 'updatePhotoIds' },
-      });
+    try {
+      const result = await opts.update(id, { photoIds: ids });
+      if (result === null || result === undefined) {
+        // Store-level error already in errorReporter via wrapAsync.
+        // Without this toast the user sees a "saved" photo that orphans
+        // in Drive on next reload. showToast('error') re-fires the
+        // reporter with our surface tag for support context.
+        photoIds.value = previous;
+        showToast('error', t('photos.linkFailed.title'), t('photos.linkFailed.body'), {
+          surface: opts.surface,
+          context: { action: 'updatePhotoIds' },
+        });
+      }
+    } finally {
+      pendingOps--;
+      // After the last in-flight op resolves, catch any background change
+      // to the source that landed during the await (the deep watch was
+      // suppressed during pendingOps > 0). Only re-sync if the source
+      // ACTUALLY changed since op-start — otherwise we'd clobber the
+      // persisted optimistic value when the source's reactive reflection
+      // is delayed (e.g. tests that don't propagate update() to the source).
+      if (pendingOps === 0) {
+        const sourceNow = opts.initialPhotoIds() ?? [];
+        if (!sameContent(sourceAtStart, sourceNow)) {
+          photoIds.value = [...sourceNow];
+        }
+      }
     }
   }
 

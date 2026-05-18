@@ -134,4 +134,85 @@ describe('usePhotoEntityBinding', () => {
     // Local state untouched on the no-id path
     expect(api.photoIds.value).toEqual([]);
   });
+
+  describe('background source-content sync', () => {
+    it('picks up a background photoId added to the source while no op is in flight', async () => {
+      // Simulates the drawer-close-mid-upload bug: the photoStore writes
+      // a new photoId directly to entity.photoIds (via attachPhotoToEntity)
+      // while the modal is closed. The binding has no watchSource swap
+      // (same entity), so the old behavior was to stay stale until a full
+      // refresh. The deep watch now catches it.
+      const sourceIds = ref<string[]>([PHOTO_A]);
+      const { api } = makeHarness({
+        initialPhotoIds: () => sourceIds.value,
+      });
+      expect(api.photoIds.value).toEqual([PHOTO_A]);
+
+      // Simulate background change: photoStore wrote a new id directly.
+      sourceIds.value = [PHOTO_A, PHOTO_B];
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(api.photoIds.value).toEqual([PHOTO_A, PHOTO_B]);
+    });
+
+    it('does NOT clobber an in-flight optimistic update with a background source change', async () => {
+      // Race scenario: user adds a photo (optimistic update fires), and
+      // mid-await another change lands on the source. The optimistic
+      // snapshot must win until the op resolves.
+      const sourceIds = ref<string[]>([]);
+      let resolveUpdate: ((v: unknown) => void) | undefined;
+      const updatePromise = new Promise((r) => {
+        resolveUpdate = r;
+      });
+      const update = vi.fn(async (_id: string, _patch: { photoIds: string[] }) => updatePromise);
+
+      const { api } = makeHarness({
+        initialPhotoIds: () => sourceIds.value,
+        update,
+      });
+
+      // Start an optimistic update (don't await yet).
+      const opPromise = api.updatePhotoIds([PHOTO_A]);
+      // Optimistic value should be set synchronously.
+      expect(api.photoIds.value).toEqual([PHOTO_A]);
+
+      // While the op is awaiting, simulate a background source change that
+      // adds a DIFFERENT photoId.
+      sourceIds.value = [PHOTO_B];
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Optimistic snapshot must still be the in-flight value, not the
+      // background change.
+      expect(api.photoIds.value).toEqual([PHOTO_A]);
+
+      // Resolve the op. The finally block re-syncs from source — picks
+      // up the background change we missed.
+      resolveUpdate!({ ok: true });
+      await opPromise;
+      await Promise.resolve();
+
+      // After op resolves, local re-syncs from source.
+      expect(api.photoIds.value).toEqual([PHOTO_B]);
+    });
+
+    it('skips re-render when the source emits a fresh array with the same content', async () => {
+      // Defensive: avoids spurious updates if a parent passes a fresh
+      // array reference on every render (a common pitfall).
+      const sourceIds = ref<string[]>([PHOTO_A]);
+      const { api } = makeHarness({
+        initialPhotoIds: () => sourceIds.value,
+      });
+      const initialArrayRef = api.photoIds.value;
+
+      // Same content, new array reference.
+      sourceIds.value = [PHOTO_A];
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // photoIds.value should NOT have been replaced (sameContent check).
+      expect(api.photoIds.value).toBe(initialArrayRef);
+    });
+  });
 });
