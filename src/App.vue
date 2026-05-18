@@ -658,18 +658,27 @@ onMounted(async () => {
     // path, after async auth hydration completes.)
     if (!authStore.needsAuth && !authStore.podCreated) {
       initBreadcrumbs.push('auth: authenticated but no pod file — routing to resume-setup');
-      reportError({
-        surface: 'app.onboardingZombieState',
-        message:
-          'App boot found an authenticated session with no pod file — routing to resume-setup',
-        severity: 'error',
-        // fullPath preserves the query — tells us whether the URL was
-        // already on `?resume=setup` (the post-OAuth-return case) or got
-        // here some other way.
-        context: { route_path: route.fullPath },
-      });
       const onResumeScreen = route.path === '/welcome' && route.query.resume === 'setup';
-      if (!onResumeScreen) await router.replace('/welcome?resume=setup');
+      // Only alert when the user is NOT already on the recovery screen.
+      // A cold reload (e.g. PWA reopen) while mid-recovery would otherwise
+      // fire this every boot even though the system is working as designed.
+      // The router-guard alert in src/router/index.ts:362 still fires when
+      // a user navigates TO a protected route in zombie state — that's the
+      // signal we genuinely want to track. (Caught 2026-05-18 from the HK
+      // pilot's recovery-flow boot triggering an error-channel alert on a
+      // page that was rendering correctly.)
+      if (!onResumeScreen) {
+        reportError({
+          surface: 'app.onboardingZombieState',
+          message:
+            'App boot found an authenticated session with no pod file — routing to resume-setup',
+          severity: 'error',
+          // fullPath preserves the query — useful for diagnosing how the
+          // user reached a non-recovery route in zombie state.
+          context: { route_path: route.fullPath },
+        });
+        await router.replace('/welcome?resume=setup');
+      }
       isInitializing.value = false;
       return;
     }
