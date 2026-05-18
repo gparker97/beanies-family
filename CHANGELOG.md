@@ -8,6 +8,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-18
+
+### Changed
+
+- **Welcome gate redesigned for clearer onboarding hierarchy.** A first-time visitor used to see three equal-weight cards (Sign In / Create / Join) with the question "What would you like to do?" and reasonably picked Sign In even when they had no pod yet, dragging them into a loop. The page is now a hero + secondary row: a larger _"where would you like to **begin**?"_ prompt with the verb in the brand gradient heads the page; a full-width **"plant a new pod"** gradient card is the obvious lead, with a "start here" pill, seedling emoji 🌱, and a chevron that nudges right on hover; an "Or" divider; then **"welcome back"** (sign in, 👋) and **"join your family"** (💌) as a paired secondary row underneath. Each secondary card carries a 3px left accent strip (slate for Sign In, Sky Silk for Join) and a faint radial halo behind its icon — quietly belongs to the brand family without competing with the Create gradient. Copy refreshed across the board: Sign In subtitle is now _"Sign in with your .beanpod file"_ (self-disqualifies first-timers who don't have one), Join subtitle is _"Someone sent you a join link"_ (concrete vs the old vague "your family is waiting for you"), Create subtitle ties the encryption pitch to the action: _"Start your family's bean pod - encrypted, yours to keep."_
+
+- **"every bean counts" tagline upgraded.** From plain gray Inter to Outfit italic, lightly tracked, with the word **"bean"** rendered in the brand gradient — a small typographic echo of the "begin" highlight in the prompt below, landing on a different word position so they read as designed-together rather than repeated.
+
+### Fixed
+
+- **Sign In → Google Drive → "no pod" → click-Drive-again loop closed.** When a new visitor without a pod picked Sign In then Google Drive, the "no pod files found" empty state was appended _below_ the still-prominent Drive card, so users re-clicked the same card in a loop. The amber empty-state notice is replaced by a focused "no pod yet on this Google account" panel — Sky Silk seed icon, redirect framing (not error), and three CTAs (**Create a new pod** / Try a different Google account / I have a .beanpod file) plus a low-weight _"just added a pod? Check again →"_ deliberate-retry link. The storage cards no longer render while this panel is showing — they can't bait a re-click. If the user navigates back to the storage cards afterwards, the Drive card now carries a dimmed treatment with a "Checked — nothing found" badge (still clickable for the rare case of a genuinely-just-added file, just not magnetic).
+
+- **`autoLoadFile` no longer silently swallows file-load errors.** A previous bare `catch {}` in `LoadPodView.autoLoadFile` could leave a user stranded on the storage picker with no feedback when the persisted file handle failed to read. Now sets a user-facing `formError` and logs `[LoadPodView] autoLoadFile failed: …` to the console for telemetry. Same console-error breadcrumb pattern added to `handleLoadFromGoogleDrive`, `handleDriveRetry`, and `handleDriveSwitchAccount` so failures in any of those Drive paths carry a developer trail alongside the existing user-facing message.
+
+---
+
 ## 2026-05-16
 
 ### Added

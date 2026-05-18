@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
+import { splitAroundAccent } from '@/utils/splitAroundAccent';
+import LoginChoiceCard from './LoginChoiceCard.vue';
 
 const { t } = useTranslation();
 
@@ -15,98 +17,217 @@ type LoginView = 'load-pod' | 'create' | 'join';
 const emit = defineEmits<{
   navigate: [view: LoginView];
 }>();
+
+/**
+ * Split the prompt ("where would you like to begin?") around the accent word
+ * ("begin") so the brand gradient can be applied to that single word without
+ * putting HTML into the translation value. See `splitAroundAccent` for the
+ * graceful-fallback contract when the accent isn't present in the translated
+ * string.
+ */
+function promptParts() {
+  return splitAroundAccent(t('loginV6.welcomePrompt'), t('loginV6.welcomePromptAccent'));
+}
 </script>
 
 <template>
   <div class="space-y-6">
-    <div class="text-center">
-      <p class="text-sm text-gray-500 dark:text-gray-400">
-        {{ t('loginV6.welcomePrompt') }}
+    <!-- ────────────────────────────────────────────────────────────────
+         Welcome prompt — eyebrow + larger heading with a single accented
+         word rendered in the brand gradient. More inviting than the
+         small grey subhead it replaces; serves as the page-level heading
+         for /welcome (semantic <h1>).
+         ──────────────────────────────────────────────────────────────── -->
+    <header class="text-center">
+      <p
+        class="font-outfit text-primary-500 mb-2 text-xs font-semibold tracking-[0.12em] uppercase"
+      >
+        {{ t('loginV6.welcomeEyebrow') }}
       </p>
-    </div>
-
-    <div class="flex flex-col gap-4 sm:flex-row">
-      <!-- Sign in to your pod -->
-      <button
-        class="flex-1 rounded-3xl bg-white p-6 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl dark:bg-slate-800"
-        @click="emit('navigate', 'load-pod')"
+      <h1
+        class="font-outfit text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl dark:text-gray-100"
       >
+        <template v-for="(part, i) in [promptParts()]" :key="i">
+          {{ part.lead
+          }}<span
+            class="from-primary-500 to-terracotta-400 bg-gradient-to-r bg-clip-text text-transparent"
+            >{{ part.accent }}</span
+          >{{ part.trail }}
+        </template>
+      </h1>
+    </header>
+
+    <!-- ────────────────────────────────────────────────────────────────
+         PRIMARY: Create card. Full-width hero. Gradient orange backdrop
+         with frosted-glass icon box + tagline + title + subtitle + chevron
+         that nudges right on hover. The "start here" pill in the top-
+         right makes it unmistakable which action a first-timer should
+         take, without lecturing.
+         ──────────────────────────────────────────────────────────────── -->
+    <LoginChoiceCard
+      testid="create-pod-button"
+      :aria-label="t('loginV6.createTitle')"
+      class="from-primary-500 to-terracotta-400 relative overflow-hidden rounded-3xl bg-gradient-to-br p-6 shadow-lg hover:shadow-xl"
+      @click="emit('navigate', 'create')"
+    >
+      <!-- Soft radial highlight in the upper-right; adds depth to the gradient. -->
+      <span
+        aria-hidden="true"
+        class="pointer-events-none absolute -top-1/2 -right-[20%] h-[200%] w-[70%]"
+        style="
+          background: radial-gradient(
+            ellipse at center,
+            rgb(255 255 255 / 18%) 0%,
+            transparent 60%
+          );
+        "
+      ></span>
+
+      <!-- "Start here" pill — frosted glass over the gradient. Sits in the
+           upper-right CORNER (top-3/right-3, smaller padding, smaller type)
+           so it stays clear of the chevron at the right edge of the content
+           row below. Earlier top-4/right-4/py-1 caused the pill's bottom
+           edge to meet the chevron's top edge with zero gap on desktop. -->
+      <span
+        class="font-outfit absolute top-3 right-3 rounded-full border border-white/25 bg-white/20 px-2.5 py-[3px] text-[0.625rem] font-semibold tracking-[0.04em] text-white uppercase backdrop-blur-md"
+      >
+        {{ t('loginV6.createPill') }}
+      </span>
+
+      <div class="relative z-10 flex items-center gap-4">
+        <!-- Seedling icon in a frosted glass box. Rotates and scales subtly on
+             hover — a small moment of delight without going overboard. -->
         <div
-          class="bg-secondary-500 mb-4 flex h-12 w-12 items-center justify-center rounded-2xl dark:bg-slate-600"
+          aria-hidden="true"
+          class="flex h-16 w-16 flex-none items-center justify-center rounded-[18px] border border-white/25 bg-white/20 text-[2rem] backdrop-blur-md transition-transform duration-300 ease-out group-hover:scale-[1.06] group-hover:-rotate-6"
         >
-          <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
-            />
-          </svg>
+          🌱
         </div>
-        <p class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
-          {{ t('loginV6.signInTitle') }}
-        </p>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {{ t('loginV6.signInSubtitle') }}
-        </p>
-      </button>
-
-      <!-- Create a new pod -->
-      <button
-        data-testid="create-pod-button"
-        class="from-primary-500 to-terracotta-400 flex-1 rounded-3xl bg-gradient-to-br p-6 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
-        @click="emit('navigate', 'create')"
-      >
-        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
-          <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-            />
-          </svg>
+        <div class="min-w-0 flex-1">
+          <p
+            class="font-outfit mb-1 text-[0.75rem] font-medium tracking-[0.08em] text-white/80 uppercase"
+          >
+            {{ t('loginV6.createTagline') }}
+          </p>
+          <p class="font-outfit mb-1 text-xl font-bold tracking-tight text-white">
+            {{ t('loginV6.createTitle') }}
+          </p>
+          <p class="text-sm leading-snug text-white/90">
+            {{ t('loginV6.createSubtitle') }}
+          </p>
         </div>
-        <p class="font-outfit text-base font-bold text-white">
-          {{ t('loginV6.createTitle') }}
-        </p>
-        <p class="mt-1 text-sm text-white/80">
-          {{ t('loginV6.createSubtitle') }}
-        </p>
-      </button>
-
-      <!-- Join an existing pod -->
-      <button
-        class="flex-1 rounded-3xl bg-white p-6 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl dark:bg-slate-800"
-        @click="emit('navigate', 'join')"
-      >
+        <!-- Chevron — translates right on hover. -->
         <div
-          class="bg-sky-silk-300/30 dark:bg-sky-silk-300/10 mb-4 flex h-12 w-12 items-center justify-center rounded-2xl"
+          aria-hidden="true"
+          class="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-white/20 transition-transform duration-200 group-hover:translate-x-1"
         >
           <svg
-            class="text-secondary-500 dark:text-sky-silk-300 h-6 w-6"
+            class="h-4 w-4 text-white"
+            viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            viewBox="0 0 24 24"
+            stroke-width="2.5"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-            />
+            <polyline points="9 18 15 12 9 6" />
           </svg>
         </div>
-        <p class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
-          {{ t('loginV6.joinTitle') }}
-        </p>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {{ t('loginV6.joinSubtitle') }}
-        </p>
-      </button>
+      </div>
+    </LoginChoiceCard>
+
+    <!-- ────────────────────────────────────────────────────────────────
+         "Or" divider — hairline gradient lines + tiny uppercase label.
+         Signals visual demotion of what follows without lecturing.
+         ──────────────────────────────────────────────────────────────── -->
+    <div class="flex items-center gap-3" aria-hidden="true">
+      <span
+        class="h-px flex-1 bg-gradient-to-r from-transparent via-gray-400/30 to-transparent dark:via-gray-500/30"
+      ></span>
+      <span
+        class="font-outfit text-[0.6875rem] font-medium tracking-[0.15em] text-gray-500/70 uppercase dark:text-gray-400/70"
+      >
+        {{ t('loginV6.orDivider') }}
+      </span>
+      <span
+        class="h-px flex-1 bg-gradient-to-r from-transparent via-gray-400/30 to-transparent dark:via-gray-500/30"
+      ></span>
     </div>
 
-    <div class="mt-6 text-center">
+    <!-- ────────────────────────────────────────────────────────────────
+         SECONDARY ROW: Sign In + Join. Equal-weight pair, visibly quieter
+         than the Create hero above. Each carries a 3px left accent strip
+         in its own brand colour (slate for Sign In, Sky Silk for Join)
+         and a faint radial halo behind the icon — gives them belonging
+         to the brand family without competing with the Create gradient.
+         ──────────────────────────────────────────────────────────────── -->
+    <div class="grid grid-cols-2 gap-3">
+      <!-- Sign In (welcome back, waving hand emoji) -->
+      <LoginChoiceCard
+        :aria-label="t('loginV6.signInTitle')"
+        class="hover:border-primary-500/20 relative overflow-hidden rounded-[18px] border border-gray-200/80 bg-white p-4 shadow-[0_6px_24px_-8px_rgba(44,62,80,0.12)] hover:shadow-[0_12px_32px_-8px_rgba(44,62,80,0.18)] dark:border-slate-600 dark:bg-slate-800"
+        @click="emit('navigate', 'load-pod')"
+      >
+        <!-- 3px left accent strip in slate (foundation colour). -->
+        <span
+          aria-hidden="true"
+          class="from-secondary-500 to-secondary-500/40 absolute top-0 bottom-0 left-0 w-[3px] bg-gradient-to-b"
+        ></span>
+        <!-- Faint warm halo upper-right. -->
+        <span
+          aria-hidden="true"
+          class="pointer-events-none absolute -top-[40%] -right-[30%] h-[180%] w-[60%] opacity-50"
+          style="background: radial-gradient(ellipse, rgb(241 93 34 / 5%) 0%, transparent 60%)"
+        ></span>
+        <div class="relative">
+          <div
+            class="bg-secondary-500/[0.07] mb-2 flex h-9 w-9 items-center justify-center rounded-xl text-lg dark:bg-slate-700"
+            aria-hidden="true"
+          >
+            👋
+          </div>
+          <p class="font-outfit text-sm font-bold tracking-tight text-gray-900 dark:text-gray-100">
+            {{ t('loginV6.signInTitle') }}
+          </p>
+          <p class="mt-0.5 text-xs leading-snug text-gray-500 dark:text-gray-400">
+            {{ t('loginV6.signInSubtitle') }}
+          </p>
+        </div>
+      </LoginChoiceCard>
+
+      <!-- Join (heart letter emoji = "someone sent you a join link") -->
+      <LoginChoiceCard
+        :aria-label="t('loginV6.joinTitle')"
+        class="hover:border-primary-500/20 relative overflow-hidden rounded-[18px] border border-gray-200/80 bg-white p-4 shadow-[0_6px_24px_-8px_rgba(44,62,80,0.12)] hover:shadow-[0_12px_32px_-8px_rgba(44,62,80,0.18)] dark:border-slate-600 dark:bg-slate-800"
+        @click="emit('navigate', 'join')"
+      >
+        <!-- 3px left accent strip in Sky Silk. -->
+        <span
+          aria-hidden="true"
+          class="from-sky-silk-300 absolute top-0 bottom-0 left-0 w-[3px] bg-gradient-to-b to-[#5dade2]"
+        ></span>
+        <!-- Faint cool halo upper-right. -->
+        <span
+          aria-hidden="true"
+          class="pointer-events-none absolute -top-[40%] -right-[30%] h-[180%] w-[60%] opacity-50"
+          style="background: radial-gradient(ellipse, rgb(174 214 241 / 18%) 0%, transparent 60%)"
+        ></span>
+        <div class="relative">
+          <div
+            class="bg-sky-silk-300/30 dark:bg-sky-silk-300/10 mb-2 flex h-9 w-9 items-center justify-center rounded-xl text-lg"
+            aria-hidden="true"
+          >
+            💌
+          </div>
+          <p class="font-outfit text-sm font-bold tracking-tight text-gray-900 dark:text-gray-100">
+            {{ t('loginV6.joinTitle') }}
+          </p>
+          <p class="mt-0.5 text-xs leading-snug text-gray-500 dark:text-gray-400">
+            {{ t('loginV6.joinSubtitle') }}
+          </p>
+        </div>
+      </LoginChoiceCard>
+    </div>
+
+    <div class="mt-2 text-center">
       <!-- Marketing homepage now lives on the Astro site at the apex, not in
            the Vue app. Cross-origin nav via anchor — no SPA routing. -->
       <a

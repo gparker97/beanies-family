@@ -4,12 +4,22 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { LANGUAGES } from '@/constants/languages';
+import { splitAroundAccent } from '@/utils/splitAroundAccent';
 import type { LanguageCode } from '@/types/models';
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
 const translationStore = useTranslationStore();
 const showLangMenu = ref(false);
+
+/**
+ * Tagline split around the accent word ("bean") so the brand gradient can be
+ * applied to that single word without putting HTML into the i18n value.
+ * Renders verbatim with no accent if the translator drops the accent word.
+ */
+function taglineParts() {
+  return splitAroundAccent(t('app.tagline'), t('app.taglineAccent'));
+}
 
 const currentLanguageInfo = computed(() =>
   LANGUAGES.find((l) => l.code === settingsStore.language)
@@ -79,7 +89,22 @@ async function selectLanguage(code: LanguageCode) {
           <span class="text-secondary-500 dark:text-gray-100">beanies</span
           ><span class="text-primary-500">.family</span>
         </h1>
-        <p class="mt-2 text-gray-600 dark:text-gray-400">{{ t('app.tagline') }}</p>
+        <!-- Tagline: Outfit italic + tracked + lighter gray, with the single
+             word "bean" rendered in the brand gradient (semibold). Echoes the
+             gradient accent on "begin" in the welcome prompt below but lands
+             on a different word position so the two highlights don't pattern-
+             match. -->
+        <p
+          class="font-outfit mt-2 text-base font-normal tracking-[0.04em] text-gray-500 italic dark:text-gray-400"
+        >
+          <template v-for="(part, i) in [taglineParts()]" :key="i">
+            {{ part.lead
+            }}<span
+              class="from-primary-500 to-terracotta-400 bg-gradient-to-r bg-clip-text font-semibold text-transparent"
+              >{{ part.accent }}</span
+            >{{ part.trail }}
+          </template>
+        </p>
       </div>
 
       <slot />
