@@ -241,6 +241,14 @@ const showLayout = computed(() => {
  * and reports + falls back to `window.location.replace` for the genuinely-
  * stuck cases (e.g. a critical-write guard blocking the redirect).
  */
+/** Max times we'll fall back to `window.location.replace` for the same target
+ *  before assuming a redirect loop and surfacing the recovery overlay instead.
+ *  3 is enough for legitimate two-step redirects (e.g. SW lifecycle quirks
+ *  needing one retry) without being so high that a true loop wastes 40+
+ *  reloads before stopping. */
+const SAFE_REPLACE_MAX_ATTEMPTS = 3;
+const SAFE_REPLACE_STORAGE_PREFIX = 'safeRouterReplace:attempt:';
+
 async function safeRouterReplace(target: string, callerTag: string): Promise<void> {
   try {
     const result = await router.replace(target);
@@ -251,15 +259,71 @@ async function safeRouterReplace(target: string, callerTag: string): Promise<voi
     // aborted, fall back to `location.replace` so the user lands at the
     // correct path on init.
     if (result && typeof (result as { type?: number }).type === 'number') {
+      const type = (result as { type: number }).type;
       console.warn(
-        `[App] router.replace('${target}') from ${callerTag} was cancelled by a guard (type=${(result as { type: number }).type}); falling back to location.replace`
+        `[App] router.replace('${target}') from ${callerTag} was cancelled by a guard (type=${type}); falling back to location.replace`
       );
       reportError({
         surface: 'app.loadFamilyData.replaceCancelled',
-        message: `router.replace('${target}') was cancelled by a guard (caller=${callerTag}, type=${(result as { type: number }).type})`,
+        message: `router.replace('${target}') was cancelled by a guard (caller=${callerTag}, type=${type})`,
         severity: 'warning',
       });
+
+      // Loop-resistance backstop: track attempts to redirect to this target
+      // in this tab session. If we've fallen through to location.replace
+      // SAFE_REPLACE_MAX_ATTEMPTS times in a row and keep getting bounced
+      // back here, that's an infinite reload loop — stop trying and surface
+      // the recovery overlay instead. Caught 2026-05-18 from a user hitting
+      // an init → fail-load → safeRouterReplace → guard cancels →
+      // location.replace → reload → init → loop, generating ~40 error
+      // alerts/30s. The primary fix (skip redirect on path1b-load-failed)
+      // prevents the specific case; this is defence-in-depth for any
+      // future caller that hits the same shape.
+      const flagKey = `${SAFE_REPLACE_STORAGE_PREFIX}${target}`;
+      let attempts = 0;
+      try {
+        attempts = parseInt(sessionStorage.getItem(flagKey) ?? '0', 10) || 0;
+      } catch {
+        // sessionStorage unavailable (private mode, etc.) — backstop
+        // degrades to a no-op. Original behaviour applies.
+      }
+      attempts++;
+      try {
+        sessionStorage.setItem(flagKey, String(attempts));
+      } catch {
+        // ignore
+      }
+
+      if (attempts >= SAFE_REPLACE_MAX_ATTEMPTS) {
+        console.error(
+          `[App] safeRouterReplace('${target}') from ${callerTag} cancelled ${attempts}× in a row — aborting fallback to break loop`
+        );
+        reportError({
+          surface: 'app.loadFamilyData.replaceLoopDetected',
+          message: `router.replace('${target}') cancelled ${attempts}× in a row (caller=${callerTag}, type=${type}); aborting fallback to break reload loop`,
+          severity: 'error',
+          context: { route_path: route.path },
+        });
+        // Set initError so the recovery overlay shows on this load.
+        // The post-init health check would also set it, but doing it here
+        // means we always have a message even if some race re-runs init
+        // before the health check.
+        if (!initError.value) {
+          initError.value = t('app.initError.description');
+          initErrorDetail.value = initBreadcrumbs.join('\n');
+        }
+        return;
+      }
+
       window.location.replace(target);
+    } else {
+      // Successful navigation — reset the attempt counter for this target so
+      // a future legitimate redirect to the same path starts fresh.
+      try {
+        sessionStorage.removeItem(`${SAFE_REPLACE_STORAGE_PREFIX}${target}`);
+      } catch {
+        // ignore
+      }
     }
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
@@ -374,10 +438,20 @@ async function loadFamilyData() {
         return;
       }
 
-      // File load failed for non-password reasons (network error, 404, etc.)
-      initBreadcrumbs.push('path1b: loadFromFile failed — redirecting to login');
-      console.warn('[loadFamilyData] File load failed — redirecting to login');
-      await safeRouterReplace('/welcome', 'path1b-load-failed');
+      // File load failed for non-password reasons (file unreadable, missing,
+      // permission revoked, etc.). DO NOT redirect to /welcome — the router's
+      // `ALREADY_AUTH_REDIRECT_FROM` guard at `src/router/index.ts:309-319`
+      // bounces /welcome → /nook for signed-in users with `podCreated: true`,
+      // creating an infinite reload loop (caught 2026-05-18 from one family
+      // hitting 40+ error alerts in 30s as init → safeRouterReplace('/welcome')
+      // → guard cancels → window.location.replace fallback → reload → repeat).
+      //
+      // Instead, fall through to the post-init health check below. It sees
+      // no doc loaded + route still /nook (not a login-flow route), sets
+      // `initError`, and surfaces the recovery overlay where the user can
+      // Reload or Clear Data. No redirect, no guard fight, no loop.
+      initBreadcrumbs.push('path1b: loadFromFile failed — falling through to recovery overlay');
+      console.warn('[loadFamilyData] File load failed — falling through to recovery overlay');
       return;
     } catch (err) {
       throw new Error(

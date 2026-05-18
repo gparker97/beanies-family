@@ -159,9 +159,27 @@ export function redactContext(raw: Record<string, unknown>): Record<string, unkn
 }
 
 // ─── Spam prevention: count-summary dedup ────────────────────────────────────
+//
+// Two layers — both keyed by (surface, normalized message):
+//
+//   1. In-memory `buckets` map — covers the typical same-session flood.
+//      First occurrence sends; subsequent within 60s increment a counter;
+//      at the 60s mark a single summary fires if count > 1.
+//
+//   2. sessionStorage timestamp — covers reload loops that destroy the
+//      in-memory bucket on every page reload. Caught 2026-05-18 from one
+//      family hitting 40+ alerts in 30s during an init → fail-load →
+//      redirect-cancelled → reload → init → fail-load loop. Each reload
+//      wiped the in-memory bucket, so layer 1's dedup couldn't help.
+//      sessionStorage survives reloads within the same tab.
+//
+// If layer 2 suppresses, no Slack send AND no in-memory bucket creation —
+// the in-memory bucket would re-fire its "first occurrence sends" branch.
+// Layer 2 IS the dedup for cross-reload patterns.
 
 const DEDUP_WINDOW_MS = 60 * 1000;
 const MAX_BUCKETS = 200;
+const STORAGE_KEY_PREFIX = '__er_bucket_';
 
 interface BucketState {
   surface: string;
@@ -173,6 +191,33 @@ interface BucketState {
 
 const buckets: Map<string, BucketState> = new Map();
 let reentryGuard = false;
+
+/**
+ * Read the timestamp the given bucket key was last sent to Slack, persisted
+ * across page reloads in `sessionStorage`. Returns null if never sent in
+ * this tab or if sessionStorage is unavailable (private mode, server
+ * environment, etc.) — falls back to in-memory dedup only.
+ */
+function getStoredFiredAt(key: string): number | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY_PREFIX + key);
+    if (!raw) return null;
+    const ts = parseInt(raw, 10);
+    return Number.isFinite(ts) ? ts : null;
+  } catch {
+    return null;
+  }
+}
+
+function setStoredFiredAt(key: string, ts: number): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.setItem(STORAGE_KEY_PREFIX + key, String(ts));
+  } catch {
+    // sessionStorage quota / private-mode — degrade to in-memory dedup only.
+  }
+}
 
 /**
  * Normalize a message before bucketing so "nearly identical" errors
@@ -201,16 +246,45 @@ function bucketKey(surface: string, message: string): string {
  * Returns true if this report should be suppressed (count-only); false if
  * the caller should proceed with the immediate Slack POST. Also handles
  * bucket creation, summary timer scheduling, and LRU eviction.
+ *
+ * Two-layer suppression — see the layered-dedup comment block above:
+ *   1. In-memory bucket existing → suppress (count only).
+ *   2. sessionStorage timestamp within DEDUP_WINDOW_MS → suppress (across
+ *      reloads). The in-memory bucket is NOT created in this case, since
+ *      the layer-2 suppression handles the dedup contract entirely.
+ *   3. First fire in the window → send. Both layers updated.
  */
 function shouldSuppress(surface: string, message: string): boolean {
   const key = bucketKey(surface, message);
+
+  // Layer 1: in-memory bucket (same session).
   const existing = buckets.get(key);
   if (existing) {
     existing.count++;
     console.warn('[errorReporter] dedup-counted', surface, message, 'count=' + existing.count);
     return true;
   }
-  // New bucket — first occurrence sends immediately.
+
+  // Layer 2: sessionStorage timestamp (across reloads in the same tab).
+  // Catches reload-loop floods that destroy the in-memory bucket on every
+  // page reload. If we sent this bucket within the dedup window during a
+  // previous page load, suppress this one too.
+  const now = Date.now();
+  const lastFiredAt = getStoredFiredAt(key);
+  if (lastFiredAt !== null && now - lastFiredAt < DEDUP_WINDOW_MS) {
+    console.warn(
+      '[errorReporter] dedup-counted-across-reload',
+      surface,
+      'lastFiredAt=' + new Date(lastFiredAt).toISOString()
+    );
+    return true;
+  }
+
+  // First fire in this window — proceed to send. Record the timestamp in
+  // sessionStorage so any reload within the window can suppress.
+  setStoredFiredAt(key, now);
+
+  // New in-memory bucket — first occurrence sends immediately.
   if (buckets.size >= MAX_BUCKETS) {
     // LRU eviction — Map iteration is insertion order, so first key is oldest.
     const oldestKey = buckets.keys().next().value;
@@ -225,7 +299,7 @@ function shouldSuppress(surface: string, message: string): boolean {
   buckets.set(key, {
     surface,
     message,
-    firstSeenAt: Date.now(),
+    firstSeenAt: now,
     count: 1,
     summaryTimer: timer,
   });
@@ -408,9 +482,27 @@ function formatContextValue(v: unknown): string {
 /**
  * Test-only — clears all dedup buckets and timers + resets the re-entry
  * guard. Production code never calls this; tests use it between cases.
+ *
+ * Also clears the sessionStorage-backed layer-2 dedup so tests start fresh.
+ * Pass `{ keepSessionStorage: true }` to simulate a "page reload" scenario
+ * where in-memory buckets are gone but the persistent timestamps remain.
  */
-export function __resetErrorReporterForTesting(): void {
+export function __resetErrorReporterForTesting(opts?: { keepSessionStorage?: boolean }): void {
   for (const b of buckets.values()) clearTimeout(b.summaryTimer);
   buckets.clear();
   reentryGuard = false;
+  if (!opts?.keepSessionStorage && typeof sessionStorage !== 'undefined') {
+    try {
+      // Iterate over a snapshot of keys — calling removeItem during iteration
+      // shifts the storage's index and would skip entries.
+      const keys: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k && k.startsWith(STORAGE_KEY_PREFIX)) keys.push(k);
+      }
+      for (const k of keys) sessionStorage.removeItem(k);
+    } catch {
+      // sessionStorage unavailable — nothing to clean up
+    }
+  }
 }

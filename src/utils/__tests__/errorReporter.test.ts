@@ -166,6 +166,52 @@ describe('errorReporter', () => {
     });
   });
 
+  describe('cross-reload dedup — sessionStorage layer', () => {
+    it('suppresses identical errors across simulated page reloads within the window', () => {
+      // Initial page load: first occurrence fires.
+      reportError({ surface: 'app.postInitNoData', message: 'no doc loaded' });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      // Simulate a page reload: in-memory buckets are gone but sessionStorage
+      // persists. This is exactly the reload-loop scenario the Ritterbusch
+      // family hit on 2026-05-18 — fix(loop): 502ebab era.
+      __resetErrorReporterForTesting({ keepSessionStorage: true });
+
+      // Same error fires again on the new page load — should be suppressed
+      // by the sessionStorage layer, even though the in-memory bucket is fresh.
+      reportError({ surface: 'app.postInitNoData', message: 'no doc loaded' });
+      expect(fetchSpy).toHaveBeenCalledTimes(1); // still just the first
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[errorReporter] dedup-counted-across-reload',
+        'app.postInitNoData',
+        expect.stringMatching(/^lastFiredAt=/)
+      );
+    });
+
+    it('allows a fresh fire after the dedup window elapses across reloads', () => {
+      vi.useFakeTimers();
+      // First fire on this tab.
+      reportError({ surface: 'app.postInitNoData', message: 'no doc' });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      // Simulate a reload AND advance past the dedup window.
+      __resetErrorReporterForTesting({ keepSessionStorage: true });
+      vi.advanceTimersByTime(60_000 + 100);
+
+      // Same error fires after the window — should NOT be suppressed.
+      reportError({ surface: 'app.postInitNoData', message: 'no doc' });
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('different surfaces are tracked independently across reloads', () => {
+      reportError({ surface: 'app.postInitNoData', message: 'no doc' });
+      __resetErrorReporterForTesting({ keepSessionStorage: true });
+      // Different surface — should still fire.
+      reportError({ surface: 'create-activity', message: 'failed' });
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('failure handling — no silent paths', () => {
     it('does nothing if webhook URL is unset (and warns)', () => {
       vi.stubEnv('VITE_BEANIES_ERROR_WEBHOOK_URL', '');
