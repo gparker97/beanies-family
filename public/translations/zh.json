@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-18",
-    "translationCount": 2916
+    "translationCount": 2917
   },
   "translations": {
     "app.name": {
@@ -9362,9 +9362,9 @@
       "lastUpdated": "2026-04-19"
     },
     "photos.queuedOffline": {
-      "translation": "您已离线。当您重新上线时，照片将上传。",
-      "hash": "6ruagg",
-      "lastUpdated": "2026-04-19"
+      "translation": "照片已排队-连接准备就绪后，我们将完成上传。",
+      "hash": "9pwqqv",
+      "lastUpdated": "2026-05-18"
     },
     "photos.queueAtCap": {
       "translation": "有很多照片正在等待上传。请稍后重新连接。",
@@ -14584,6 +14584,11 @@
     "app.taglineAccent": {
       "translation": "豆子",
       "hash": "1sq0g",
+      "lastUpdated": "2026-05-18"
+    },
+    "photos.queueFailed": {
+      "translation": "无法保存您的照片以供稍后使用。请检查您的设备存储空间，然后重试。",
+      "hash": "fjja3h",
       "lastUpdated": "2026-05-18"
     }
   }

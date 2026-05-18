@@ -262,4 +262,93 @@ describe('usePhotos', () => {
   it('MAX_PHOTOS_PER_SET is 4', () => {
     expect(MAX_PHOTOS_PER_SET).toBe(4);
   });
+
+  describe('queue-fallback awareness (transient online failures)', () => {
+    it('shows info toast and does NOT call updatePhotoIds when the upload is queued (transient 503)', async () => {
+      const photoIds = ref<string[]>([]);
+      const updates: string[][] = [];
+      const { add } = usePhotos({
+        collection: 'activities',
+        entityId: ref('act-1'),
+        photoIds,
+        updatePhotoIds: (ids) => {
+          updates.push([...ids]);
+          photoIds.value = ids;
+        },
+      });
+
+      driveMocks.createFile
+        .mockReset()
+        .mockRejectedValueOnce(new Error('Drive upload failed: 503 Service Unavailable'));
+
+      const ids = await add([makeFile('flaky.jpg')]);
+
+      expect(ids).toHaveLength(1);
+      // updatePhotoIds is the path that emits to the form's local photoIds ref.
+      // Queued uploads must NOT trigger this — the pending tile renders via
+      // `pending` instead, and the doc record is written when the queue flushes.
+      expect(updates).toHaveLength(0);
+      // User-facing surface: info toast (queued), not error.
+      expect(toastCalls.some((c) => c.type === 'info' && c.title === 'photos.queuedOffline')).toBe(
+        true
+      );
+      expect(toastCalls.every((c) => c.title !== 'photos.uploadFailed')).toBe(true);
+      expect(toastCalls.every((c) => c.title !== 'photos.queueFailed')).toBe(true);
+    });
+
+    it('shows error toast with photos.queueFailed when the queue write itself fails', async () => {
+      const photoIds = ref<string[]>([]);
+      const { add } = usePhotos({
+        collection: 'activities',
+        entityId: ref('act-1'),
+        photoIds,
+        updatePhotoIds: (ids) => {
+          photoIds.value = ids;
+        },
+      });
+
+      // Transient Drive failure → fallback to queue → queue ALSO fails.
+      driveMocks.createFile
+        .mockReset()
+        .mockRejectedValueOnce(new Error('Drive upload failed: 503'));
+      // Force the photo queue to throw on enqueue by stomping its enqueueUpload
+      // mid-test. queueInternals.reset() in afterEach cleans up.
+      const queueModule = await import('@/services/sync/photoUploadQueue');
+      const enqueueSpy = vi
+        .spyOn(queueModule, 'enqueueUpload')
+        .mockRejectedValueOnce(new Error('IndexedDB quota exceeded'));
+
+      const ids = await add([makeFile('quota.jpg')]);
+
+      enqueueSpy.mockRestore();
+      expect(ids).toHaveLength(0); // upload genuinely failed end-to-end
+      expect(toastCalls.some((c) => c.type === 'error' && c.title === 'photos.queueFailed')).toBe(
+        true
+      );
+    });
+
+    it('shows error toast with photos.uploadFailed on a non-transient failure (Drive 400)', async () => {
+      const photoIds = ref<string[]>([]);
+      const { add } = usePhotos({
+        collection: 'activities',
+        entityId: ref('act-1'),
+        photoIds,
+        updatePhotoIds: (ids) => {
+          photoIds.value = ids;
+        },
+      });
+
+      driveMocks.createFile
+        .mockReset()
+        .mockRejectedValueOnce(new Error('Drive upload failed: 400 Bad Request'));
+
+      const ids = await add([makeFile('bad.jpg')]);
+
+      expect(ids).toHaveLength(0);
+      expect(toastCalls.some((c) => c.type === 'error' && c.title === 'photos.uploadFailed')).toBe(
+        true
+      );
+      expect(toastCalls.every((c) => c.title !== 'photos.queueFailed')).toBe(true);
+    });
+  });
 });

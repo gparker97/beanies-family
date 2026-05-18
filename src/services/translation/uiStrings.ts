@@ -6286,9 +6286,13 @@ const STRING_DEFS = {
     en: "Couldn't upload photo. Please try again.",
     beanie: "couldn't upload photo. please try again.",
   },
+  'photos.queueFailed': {
+    en: "Couldn't save your photo for later. Please check your device storage and try again.",
+    beanie: "couldn't save your photo for later. please check your device storage and try again.",
+  },
   'photos.queuedOffline': {
-    en: "You're offline. Photo will upload when you're back online.",
-    beanie: "you're offline. photo will upload when you're back online.",
+    en: "Photo queued - we'll finish uploading when your connection is ready.",
+    beanie: "photo queued - we'll finish uploading when your connection is ready.",
   },
   'photos.queueAtCap': {
     en: 'A lot of photos are waiting to upload. Reconnect soon.',

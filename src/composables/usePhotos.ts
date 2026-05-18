@@ -15,7 +15,7 @@
  *   });
  */
 import { computed, ref, type ComputedRef, type Ref, unref } from 'vue';
-import { usePhotoStore } from '@/stores/photoStore';
+import { usePhotoStore, QueueWriteFailedError } from '@/stores/photoStore';
 import { useToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import type { PhotoAttachment, UUID } from '@/types/models';
@@ -126,52 +126,79 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
 
     const createdBy = unref(options.currentMemberId);
     const entityId = unref(options.entityId);
-    const wasOffline = !navigator.onLine;
-    const ids: UUID[] = [];
+    const completedIds: UUID[] = [];
+    const queuedIds: UUID[] = [];
     // Bump the in-flight counter once per accepted file BEFORE any
     // awaits so the UI spinner tiles render immediately. Decrement
     // happens per file in the loop below regardless of success.
     uploading.value += accepted.length;
     for (const file of accepted) {
       try {
-        const id = await store.addPhoto(file, options.collection, entityId, createdBy);
-        ids.push(id);
+        const result = await store.addPhoto(file, options.collection, entityId, createdBy);
+        if (result.status === 'completed') {
+          completedIds.push(result.photoId);
+        } else {
+          queuedIds.push(result.photoId);
+        }
       } catch (e) {
-        console.warn('[usePhotos] addPhoto failed', e);
-        showToast('error', t('photos.uploadFailed'));
+        // Promoted to console.error (was warn): a user-impacting upload
+        // failure deserves error-level logging alongside the toast.
+        console.error('[usePhotos] addPhoto failed:', e);
+        const errorContext = {
+          surface: 'usePhotos.add',
+          context: {
+            underlying_error: String(e),
+            entity_collection: options.collection,
+            file_mime: file.type,
+            file_size: file.size,
+          },
+        };
+        if (e instanceof QueueWriteFailedError) {
+          // Drive failed AND the queue couldn't save the upload for later —
+          // photo is genuinely lost. Distinct copy from the generic failure
+          // so users know "we couldn't even keep it for retry" vs a transient
+          // upload error that may succeed on retry.
+          showToast('error', t('photos.queueFailed'), undefined, errorContext);
+        } else {
+          showToast('error', t('photos.uploadFailed'), undefined, errorContext);
+        }
       } finally {
         uploading.value = Math.max(0, uploading.value - 1);
       }
     }
 
-    // Online uploads are appended to entity.photoIds inside photoStore
+    // Completed uploads are appended to entity.photoIds inside photoStore
     // via `attachPhotoToEntity`, which keeps the Automerge doc itself
     // correct. But the form modals that host this composable keep their
     // own local `photoIds` ref (so the Save handler knows what to
     // persist), and that ref needs to see the new id too — otherwise
     // the just-uploaded photo doesn't render in the drawer until the
     // user closes and reopens it. Emit the refreshed ids back to the
-    // caller whenever at least one online upload succeeded. Offline
+    // caller whenever at least one completed upload succeeded. Queued
     // uploads skip this (no Automerge record yet — queue entry renders
     // via `pending` instead).
-    if (!wasOffline && ids.length > 0) {
+    if (completedIds.length > 0) {
       const currentIds = unref(options.photoIds) ?? [];
       // De-dupe in case a caller round-trips this back to the doc.
       const merged = [...currentIds];
-      for (const id of ids) {
+      for (const id of completedIds) {
         if (!merged.includes(id)) merged.push(id);
       }
       options.updatePhotoIds(merged);
     }
 
-    if (wasOffline && ids.length > 0) {
+    // Queued uploads (covers BOTH offline-original AND online-fallback paths
+    // — same outcome from the user's POV). The `pending` reactive list
+    // renders these as placeholder tiles; the queue flushes them when
+    // conditions permit. One info toast covers both cases.
+    if (queuedIds.length > 0) {
       showToast('info', t('photos.queuedOffline'));
-      if (totalCount.value + ids.length >= store.QUEUE_SOFT_CAP) {
+      if (totalCount.value + queuedIds.length >= store.QUEUE_SOFT_CAP) {
         showToast('warning', t('photos.queueAtCap'));
       }
     }
 
-    return ids;
+    return [...completedIds, ...queuedIds];
   }
 
   function remove(photoId: UUID): void {
