@@ -21,6 +21,7 @@ import { calculateMonthlyFee } from '@/utils/finance';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useActivityStore } from '@/stores/activityStore';
+import { usePhotoStore } from '@/stores/photoStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
@@ -60,6 +61,7 @@ const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const activityStore = useActivityStore();
+const photoStore = usePhotoStore();
 
 // Form state
 const icon = ref('');
@@ -475,7 +477,14 @@ const eager = useEagerEntityCreate<FamilyActivity, CreateFamilyActivityInput>({
 
 const binding = usePhotoEntityBinding({
   entityId: eager.entityId,
-  initialPhotoIds: () => props.activity?.photoIds,
+  // Read photoIds from the live Automerge doc rather than the prop snapshot.
+  // The parent (FamilyPlannerPage) captures `editingActivity.value = target`
+  // at click-time — a plain object reference that doesn't reactively update
+  // when the doc changes. Reading via `photoStore.photoIdsFor` subscribes
+  // to docVersion so background uploads (e.g. one that completes after the
+  // user closes the drawer) get picked up on reopen via the deep watch
+  // inside the binding. See `photoIdsFor`'s JSDoc for the full chain.
+  initialPhotoIds: () => photoStore.photoIdsFor('activities', eager.entityId.value),
   watchSource: () => props.activity?.id,
   update: (id, patch) => activityStore.updateActivity(id, patch),
   surface: 'ActivityModal',
