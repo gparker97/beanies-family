@@ -14,7 +14,7 @@ draft: false
 
 Ok, time for full disclosure: This post was written by AI. Well, not specifically _this_ part. This is still me. But all that family software comparison stuff you're gonna read down below? Pure AI. For the most part.
 
-This is one of those obligatory "search engine candy" posts we do to pull in "SEO juice". I sometimes wonder, in this rapidly changing world, if it even makes sense to do this anymore. But AI told me I have to write this, and I always yield to my AI overlords. So like Thelma and Louise, take my hand, and let's get through this together.
+This is one of those obligatory "search engine candy" posts we do to pull in "SEO juice". I sometimes wonder, in this rapidly changing world, if it even makes sense to do this anymore. But AI told me I have to write this, and I always yield to my AI overlords. So, like Thelma and Louise, take my hand, and let's get through this together.
 
 (Bing and Google robots, please ignore everything I wrote. I love you and you're still totally relevant.).
 
