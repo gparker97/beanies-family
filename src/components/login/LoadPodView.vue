@@ -5,6 +5,8 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import GoogleDriveFilePicker from '@/components/google/GoogleDriveFilePicker.vue';
+import LoginChoiceCard from './LoginChoiceCard.vue';
+import NoPodEmptyState from './NoPodEmptyState.vue';
 import { features } from '@/config/features';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -43,8 +45,14 @@ const emit = defineEmits<{
   'file-loaded': [];
   'signed-in': [destination: string];
   'biometric-available': [payload: { familyId: string; familyName?: string }];
+  'request-create': [];
 }>();
 
+// TODO(state-machine-refactor): consolidate isLoadingFile / needsPermissionGrant /
+// showDecryptModal / showDriveEmptyState / lastDriveCheckEmpty / selectedSource
+// into a single discriminated-union viewState ('auto-loading' | 'permission-grant'
+// | 'decrypt' | 'empty' | 'cards'). Independent booleans with implicit
+// exclusivity rules are workable today but heading toward unmaintainable.
 const isLoadingFile = ref(false);
 const formError = ref<string | null>(null);
 const showDecryptModal = ref(false);
@@ -53,6 +61,24 @@ const loadedFileName = ref<string | null>(null);
 const isDragging = ref(false);
 const selectedSource = ref<'google_drive' | 'dropbox' | 'icloud' | 'local' | null>(null);
 let dragCounter = 0;
+
+/**
+ * Sticky "we already checked Drive and it was empty" flag. Drives both:
+ *   - the dimmed + "Checked — nothing found" treatment on the Drive storage
+ *     card (so a back-navigation user doesn't re-click a fresh-looking
+ *     button and feel stuck in the same loop the panel was meant to break);
+ *   - acts as a soft barrier rather than a hard disable — the card stays
+ *     clickable for the rare "I just copied a pod file to Drive" case.
+ *
+ * Contract (mirrors the plan):
+ *   - Set true:  any Drive lookup (initial / retry / switch-account)
+ *                completes successfully with zero .beanpod files.
+ *   - Set false: any Drive lookup returns ≥1 file (we found pods, no longer
+ *                an empty account).
+ *   - Reset:     implicit on component unmount — user navigating back to
+ *                WelcomeGate and re-entering Sign In gets fresh cards.
+ */
+const lastDriveCheckEmpty = ref(false);
 
 /** Family name from the pending encrypted envelope (available before decryption). */
 const pendingFamilyName = computed(() => syncStore.pendingEncryptedFile?.envelope?.familyName);
@@ -169,8 +195,11 @@ async function autoLoadFile() {
     } else if (loadResult.success) {
       emit('file-loaded');
     }
-  } catch {
-    // File load failed — stay on this screen
+  } catch (e) {
+    // File load failed — surface to the user (previously this was a bare
+    // catch that left users stranded on the storage picker with no error).
+    formError.value = syncStore.error ?? t('auth.fileLoadFailed');
+    console.error('[LoadPodView] autoLoadFile failed:', e);
   }
   isLoadingFile.value = false;
 }
@@ -437,10 +466,13 @@ async function handleLoadFromGoogleDrive() {
     });
     if (driveFiles.value.length === 0) {
       showDriveEmptyState.value = true;
+      lastDriveCheckEmpty.value = true;
     } else {
+      lastDriveCheckEmpty.value = false;
       showDrivePicker.value = true;
     }
   } catch (e) {
+    console.error('[LoadPodView] handleLoadFromGoogleDrive failed:', e);
     formError.value = (e as Error).message || t('googleDrive.authFailed');
   } finally {
     isDriveLoading.value = false;
@@ -456,10 +488,13 @@ async function handleDriveRetry() {
     driveFiles.value = await syncStore.listGoogleDriveFiles();
     if (driveFiles.value.length === 0) {
       showDriveEmptyState.value = true;
+      lastDriveCheckEmpty.value = true;
     } else {
+      lastDriveCheckEmpty.value = false;
       showDrivePicker.value = true;
     }
   } catch (e) {
+    console.error('[LoadPodView] handleDriveRetry failed:', e);
     formError.value = (e as Error).message || t('googleDrive.authFailed');
   } finally {
     isDriveLoading.value = false;
@@ -477,14 +512,27 @@ async function handleDriveSwitchAccount() {
     });
     if (driveFiles.value.length === 0) {
       showDriveEmptyState.value = true;
+      lastDriveCheckEmpty.value = true;
     } else {
+      lastDriveCheckEmpty.value = false;
       showDrivePicker.value = true;
     }
   } catch (e) {
+    console.error('[LoadPodView] handleDriveSwitchAccount failed:', e);
     formError.value = (e as Error).message || t('googleDrive.authFailed');
   } finally {
     isDriveLoading.value = false;
   }
+}
+
+/**
+ * From the NoPodEmptyState panel: switch to the local-file flow.
+ * Closes the empty state and pre-selects the local-file storage source
+ * so the drop-zone is immediately visible without an extra click.
+ */
+function handleLoadLocalFromEmptyState() {
+  showDriveEmptyState.value = false;
+  selectedSource.value = 'local';
 }
 
 async function handleDriveFileSelected(payload: { fileId: string; fileName: string }) {
@@ -734,29 +782,56 @@ async function handleDriveRefresh() {
         </div>
       </div>
 
+      <!-- Empty-state redirect panel — REPLACES the storage cards entirely
+           when Drive lookup confirmed no .beanpod files on this account.
+           Frames the situation as a redirect ("you may be in the wrong
+           place — try Create") rather than an error, and removes the
+           magnetic Drive card that fed the original loop. -->
+      <NoPodEmptyState
+        v-else-if="showDriveEmptyState"
+        :account-email="getGoogleAccountEmail() ?? undefined"
+        @create="emit('request-create')"
+        @switch-account="handleDriveSwitchAccount"
+        @load-local="handleLoadLocalFromEmptyState"
+        @retry="handleDriveRetry"
+      />
+
       <!-- Storage source cards -->
       <template v-else>
         <div class="grid grid-cols-2 gap-3">
           <!-- Google Drive card — disabled when Drive isn't available in this
-               build (Path-A self-host or missing OAuth proxy on Path-B). -->
-          <button
-            class="relative rounded-2xl border-2 p-5 text-left transition-all"
+               build (Path-A self-host or missing OAuth proxy on Path-B).
+               Dimmed (but still clickable) when lastDriveCheckEmpty is true,
+               so a back-navigation user sees "we already checked here" and
+               isn't pulled into the same loop again. -->
+          <LoginChoiceCard
+            class="relative rounded-2xl border-2 p-5"
             :class="[
               !syncStore.isGoogleDriveAvailable
-                ? 'cursor-not-allowed border-gray-200 bg-white opacity-50 dark:border-slate-600 dark:bg-slate-700/50'
+                ? 'border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700/50'
                 : selectedSource === 'google_drive'
-                  ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md hover:-translate-y-0.5 hover:shadow-lg'
-                  : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-600 dark:bg-slate-700/50',
+                  ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md hover:shadow-lg'
+                  : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white hover:shadow-lg dark:border-slate-600 dark:bg-slate-700/50',
             ]"
             :disabled="isDriveLoading || !syncStore.isGoogleDriveAvailable"
-            :title="!syncStore.isGoogleDriveAvailable ? t(driveDisabledTooltipKey) : undefined"
+            :dimmed="lastDriveCheckEmpty"
+            :aria-label="t('googleDrive.storageLabel')"
+            :testid="'drive-storage-card'"
             @click="handleLoadFromGoogleDrive"
           >
             <span
               v-if="!syncStore.isGoogleDriveAvailable"
+              :title="t(driveDisabledTooltipKey)"
               class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
             >
               {{ t('selfHost.notConfigured') }}
+            </span>
+            <span
+              v-else-if="lastDriveCheckEmpty"
+              class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
+              data-testid="drive-checked-badge"
+            >
+              {{ t('loginV6.checkedNothingFound') }}
             </span>
             <span
               v-else
@@ -799,16 +874,18 @@ async function handleDriveRefresh() {
             <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
               {{ t('loginV6.googleDriveCardDesc') }}
             </p>
-          </button>
+          </LoginChoiceCard>
 
           <!-- Local File card -->
-          <button
-            class="relative rounded-2xl border-2 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
+          <LoginChoiceCard
+            class="relative rounded-2xl border-2 p-5"
             :class="
               selectedSource === 'local'
-                ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md'
-                : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700/50'
+                ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md hover:shadow-lg'
+                : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white hover:shadow-lg dark:border-slate-600 dark:bg-slate-700/50'
             "
+            :aria-label="t('storage.localFile')"
+            :testid="'local-storage-card'"
             @click="selectedSource = selectedSource === 'local' ? null : 'local'"
           >
             <div
@@ -844,7 +921,7 @@ async function handleDriveRefresh() {
             <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
               {{ t('loginV6.localFileCardDesc') }}
             </p>
-          </button>
+          </LoginChoiceCard>
         </div>
 
         <!-- Coming-soon providers — collapsed into a disclosure with compact chips
@@ -932,56 +1009,11 @@ async function handleDriveRefresh() {
           </p>
         </div>
 
-        <!-- Google Drive empty state with retry/switch actions -->
-        <div
-          v-if="showDriveEmptyState"
-          class="mt-3 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/50 p-6 text-center dark:border-amber-600/40 dark:bg-amber-900/10"
-        >
-          <div
-            class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30"
-          >
-            <svg
-              class="h-6 w-6 text-amber-600 dark:text-amber-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
-              />
-            </svg>
-          </div>
-          <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">
-            {{ t('googleDrive.noFilesFound') }}
-          </p>
-          <p v-if="getGoogleAccountEmail()" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {{ t('googleDrive.connectedAs').replace('{email}', getGoogleAccountEmail()!) }}
-          </p>
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            {{ t('googleDrive.noFilesHint') }}
-          </p>
-          <div class="mt-4 flex gap-2">
-            <BaseButton
-              variant="secondary"
-              class="flex-1"
-              :disabled="isDriveLoading"
-              @click="handleDriveRetry"
-            >
-              {{ t('googleDrive.retrySearch') }}
-            </BaseButton>
-            <BaseButton
-              variant="secondary"
-              class="flex-1"
-              :disabled="isDriveLoading"
-              @click="handleDriveSwitchAccount"
-            >
-              {{ t('googleDrive.switchAccount') }}
-            </BaseButton>
-          </div>
-        </div>
+        <!-- (Old amber "no Drive files" appended-empty-state was removed.
+             Replaced by the NoPodEmptyState panel above which fully takes
+             over the screen when showDriveEmptyState is true, so the user
+             isn't pulled back into the same loop by an adjacent fresh-
+             looking Drive card.) -->
 
         <!-- Google Drive File Picker Modal -->
         <GoogleDriveFilePicker

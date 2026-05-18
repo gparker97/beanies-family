@@ -32,6 +32,9 @@ const STRING_DEFS = {
   // App branding
   'app.name': { en: 'beanies.family' },
   'app.tagline': { en: 'every bean counts' },
+  // The single word in `app.tagline` rendered with the brand gradient on the
+  // welcome page. Kept separate so the i18n value stays plain text.
+  'app.taglineAccent': { en: 'bean' },
   'app.version': { en: 'v1.0.0 - MVP' },
 
   // Global search
@@ -3195,24 +3198,37 @@ const STRING_DEFS = {
     en: 'Zero Data on Our Servers',
     beanie: 'zero data on our servers',
   },
+  'loginV6.welcomeEyebrow': {
+    en: 'Welcome home',
+    beanie: 'welcome home',
+  },
   'loginV6.welcomePrompt': {
-    en: 'What would you like to do?',
-    beanie: 'what would you like to do?',
+    en: 'Where would you like to begin?',
+    beanie: 'where would you like to begin?',
   },
-  'loginV6.signInTitle': { en: 'Sign in', beanie: 'sign in to your bean pod' },
+  // The single word in the welcomePrompt that renders with the brand gradient.
+  // Kept separate so it can be styled inline without HTML in the i18n value.
+  'loginV6.welcomePromptAccent': {
+    en: 'begin',
+    beanie: 'begin',
+  },
+  'loginV6.orDivider': { en: 'Or', beanie: 'or' },
+  'loginV6.signInTitle': { en: 'Welcome back', beanie: 'welcome back' },
   'loginV6.signInSubtitle': {
-    en: 'Load your family data file',
-    beanie: 'load your family data file',
+    en: 'Sign in with your .beanpod file',
+    beanie: 'sign in with your .beanpod file',
   },
-  'loginV6.createTitle': { en: 'Create a new pod!', beanie: 'start a new bean pod!' },
+  'loginV6.createPill': { en: 'Start here', beanie: 'start here' },
+  'loginV6.createTagline': { en: 'New to beanies?', beanie: 'new to beanies?' },
+  'loginV6.createTitle': { en: 'Plant a new pod', beanie: 'plant a new pod' },
   'loginV6.createSubtitle': {
-    en: "Start your family's financial journey",
-    beanie: 'plant your first bean!',
+    en: "Start your family's bean pod - encrypted, yours to keep.",
+    beanie: "start your family's bean pod - encrypted, yours to keep.",
   },
-  'loginV6.joinTitle': { en: 'Join an existing pod', beanie: 'join an existing pod' },
+  'loginV6.joinTitle': { en: 'Join your family', beanie: 'join your family' },
   'loginV6.joinSubtitle': {
-    en: 'Your family is waiting for you',
-    beanie: 'your family pod is waiting for you!',
+    en: 'Someone sent you a join link',
+    beanie: 'someone sent you a join link',
   },
   'loginV6.loadPodTitle': { en: 'Load your pod', beanie: 'load your pod' },
   'loginV6.loadPodSubtitle': {
@@ -3462,6 +3478,47 @@ const STRING_DEFS = {
   },
   'loginV6.removeMember': { en: 'Remove', beanie: 'remove' },
   'loginV6.you': { en: 'You', beanie: 'you' },
+
+  // "No pod yet on this account" empty-state panel — replaces the storage cards
+  // when a Google Drive lookup confirms zero .beanpod files. Redirect framing,
+  // not error: the most likely correct path is Create.
+  'loginV6.noPodOnAccount.title': {
+    en: 'No pod yet on this Google account',
+    beanie: 'no pod yet on this google account',
+  },
+  'loginV6.noPodOnAccount.body': {
+    en: "Pods are created once, then everyone in your family signs in to the same one. If this is your first time here, you'll want to create one.",
+    beanie:
+      "pods are created once, then everyone in your family signs in to the same one. if this is your first time here, you'll want to create one.",
+  },
+  'loginV6.noPodOnAccount.createCta': {
+    en: 'Create a new pod',
+    beanie: 'create a new pod',
+  },
+  'loginV6.noPodOnAccount.createDesc': {
+    en: "Set up your family's encrypted file",
+    beanie: "set up your family's encrypted file",
+  },
+  'loginV6.noPodOnAccount.switchCta': {
+    en: 'Try a different Google account',
+    beanie: 'try a different google account',
+  },
+  'loginV6.noPodOnAccount.loadLocalCta': {
+    en: 'I have a .beanpod file to load',
+    beanie: 'i have a .beanpod file to load',
+  },
+  'loginV6.noPodOnAccount.joinHint': {
+    en: 'Already a family member? Ask for a join link →',
+    beanie: 'already a family member? ask for a join link →',
+  },
+  'loginV6.noPodOnAccount.retryHint': {
+    en: 'Just added a pod to this account? Check again →',
+    beanie: 'just added a pod to this account? check again →',
+  },
+  'loginV6.checkedNothingFound': {
+    en: 'Checked — nothing found',
+    beanie: 'checked — nothing found',
+  },
 
   // Join flow (magic link invites)
   'join.verifyTitle': { en: 'Join your family', beanie: 'join your family pod!' },

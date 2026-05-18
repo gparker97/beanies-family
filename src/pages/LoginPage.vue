@@ -424,6 +424,15 @@ function handleBiometricAvailable(payload: { familyId: string; familyName?: stri
   activeView.value = 'biometric';
 }
 
+/**
+ * Triggered from LoadPodView's NoPodEmptyState panel when a Drive lookup
+ * returned zero pods. The user picked "Create a new pod" instead — route
+ * them into the create flow without going back through WelcomeGate.
+ */
+function handleRequestCreate() {
+  activeView.value = 'create';
+}
+
 function handleFileLoaded() {
   activeView.value = 'pick-bean';
 }
@@ -515,6 +524,7 @@ async function handleStartOver() {
         @file-loaded="handleFileLoaded"
         @signed-in="handleSignedIn"
         @biometric-available="handleBiometricAvailable"
+        @request-create="handleRequestCreate"
       />
 
       <PickBeanView
