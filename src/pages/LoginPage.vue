@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, watchEffect } from 'vue';
+import type { WatchStopHandle } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import LoginBackground from '@/components/login/LoginBackground.vue';
 import LoginSecurityFooter from '@/components/login/LoginSecurityFooter.vue';
@@ -77,7 +78,19 @@ const inviteGateLocked = ref(features.inviteGate);
 //      WelcomeGate / family-picker / etc.) instead of ResumePodSetup.
 //
 // Stops itself once we've taken the resume-setup branch.
-const stopResumeWatch = watchEffect(() => {
+//
+// TDZ guard (caught 2026-05-18 from Boeder Familienplan onboarding on
+// Android — see #beanies-errors `vue-render` alert): `watchEffect` runs its
+// callback synchronously on first invocation. When all conditions are
+// already true at mount (e.g. router guard just redirected from /nook to
+// /welcome?resume=setup with auth already initialized), the first run hits
+// `stopResumeWatch()` before `const stopResumeWatch = watchEffect(...)` has
+// finished assigning — ReferenceError: Cannot access 'stopResumeWatch'
+// before initialization. Using `let` + no-op default lets the first run
+// safely call the no-op, then assignment completes and any reactive re-run
+// calls the real stop handle.
+let stopResumeWatch: WatchStopHandle = () => {};
+stopResumeWatch = watchEffect(() => {
   if (!authStore.isInitialized) return;
   if (!authStore.isAuthenticated) return;
   if (route.query.resume !== 'setup') return;
