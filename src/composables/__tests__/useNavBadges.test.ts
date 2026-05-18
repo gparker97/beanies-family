@@ -14,6 +14,26 @@
  */
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+// Mock useToday so its `today` ref reflects whatever time is set via
+// `vi.setSystemTime` at the moment useToday() is invoked. The real
+// composable initialises a module-scoped singleton at import time, which
+// captures the real system date before vi.useFakeTimers() runs in
+// beforeEach — making `dueTodayTodos` miss anything dated FAKE_TODAY.
+vi.mock('@/composables/useToday', async () => {
+  const { ref, computed } = await import('vue');
+  const { toDateInputValue, getStartOfDay } = await import('@/utils/date');
+  return {
+    useToday: () => ({
+      today: ref(toDateInputValue(new Date())),
+      startOfToday: computed(() => getStartOfDay(new Date())),
+      isVisible: ref(true),
+      lastVisibleAt: ref(0),
+      lastHiddenAt: ref(0),
+    }),
+  };
+});
+
 import { useNavBadges } from '../useNavBadges';
 import { useTodoStore } from '@/stores/todoStore';
 import { useGoalsStore } from '@/stores/goalsStore';
