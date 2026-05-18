@@ -156,13 +156,20 @@ type FlushReason = 'online' | 'token-acquired' | 'visible' | 'startup';
  * The underlying error from `flushQueue` is always forwarded so the
  * Slack alert carries the real failure cause (token-rejected, drive 404,
  * network TypeError, etc.) instead of an opaque "flush returned false".
+ *
+ * The inner message is also concatenated into `input.message` because the
+ * Slack alert format only renders `input.message` + `error.stack` — not
+ * `error.message`. Without this, the Slack body reads "flush rejected
+ * after visible" with no indication of WHY, and triages can't make a call
+ * from the alert alone (see 2026-05-18 HK pilot cascade).
  */
 function reportFlushFailure(reason: FlushReason, err: unknown): void {
   console.warn(`[offlineQueue] flush rejected (reason: ${reason})`, err);
+  const inner = err instanceof Error ? err : new Error(String(err));
   reportError({
     surface: 'offline-queue-flush',
-    message: `flush rejected after ${reason}`,
-    error: err instanceof Error ? err : new Error(String(err)),
+    message: `flush rejected after ${reason}: ${inner.message}`,
+    error: inner,
   });
 }
 

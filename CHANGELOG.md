@@ -34,6 +34,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **`autoLoadFile` no longer silently swallows file-load errors.** A previous bare `catch {}` in `LoadPodView.autoLoadFile` could leave a user stranded on the storage picker with no feedback when the persisted file handle failed to read. Now sets a user-facing `formError` and logs `[LoadPodView] autoLoadFile failed: …` to the console for telemetry. Same console-error breadcrumb pattern added to `handleLoadFromGoogleDrive`, `handleDriveRetry`, and `handleDriveSwitchAccount` so failures in any of those Drive paths carry a developer trail alongside the existing user-facing message.
 
+- **`offline-queue-flush` Slack alerts now carry the underlying cause string.** The alert message used to read `flush rejected after visible` (or `after online` / `after token-acquired` / `after startup`) with no indication of WHY the Drive write rejected — operators had to read the minified stack to triage. The Slack alert format only renders `input.message` + `error.stack` (not `error.message`), so the inner cause was invisible from the alert body. Fix concatenates the underlying error's `.message` into the outer telemetry message, so future cascades on iOS Safari PWA wake (and any other stuck-queue failure) read e.g. `flush rejected after visible: TokenExpiredError: Drive write failed; save queued offline` and triage can decide noise-vs-genuine from the alert alone. Caught from the 2026-05-18 HK pilot cascade.
+
 ---
 
 ## 2026-05-16

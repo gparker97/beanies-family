@@ -287,7 +287,7 @@ describe('offlineQueue', () => {
         expect(reportError).toHaveBeenCalledWith(
           expect.objectContaining({
             surface: 'offline-queue-flush',
-            message: 'flush rejected after token-acquired',
+            message: 'flush rejected after token-acquired: Network down',
           })
         );
       });
@@ -482,7 +482,7 @@ describe('offlineQueue', () => {
       expect(reportError).toHaveBeenCalledWith(
         expect.objectContaining({
           surface: 'offline-queue-flush',
-          message: 'flush rejected after token-acquired',
+          message: 'flush rejected after token-acquired: Drive 401',
         })
       );
     });
@@ -507,7 +507,7 @@ describe('offlineQueue', () => {
         expect(reportError).toHaveBeenCalledWith(
           expect.objectContaining({
             surface: 'offline-queue-flush',
-            message: 'flush rejected after startup',
+            message: 'flush rejected after startup: Network down',
           })
         );
       });
