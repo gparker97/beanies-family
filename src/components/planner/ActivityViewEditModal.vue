@@ -9,6 +9,7 @@ import { useInlineEdit } from '@/composables/useInlineEdit';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
+import { usePhotoStore } from '@/stores/photoStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
@@ -65,6 +66,7 @@ const { t, isBeanieMode } = useTranslation();
 const router = useRouter();
 const { playWhoosh } = useSounds();
 const activityStore = useActivityStore();
+const photoStore = usePhotoStore();
 const familyStore = useFamilyStore();
 const transactionsStore = useTransactionsStore();
 const recurringStore = useRecurringStore();
@@ -127,7 +129,11 @@ const activity = computed(() =>
 const activityIdRef = computed(() => activity.value?.id ?? null);
 const photoBinding = usePhotoEntityBinding({
   entityId: activityIdRef,
-  initialPhotoIds: () => activity.value?.photoIds,
+  // Live photoIds from the doc — see ActivityModal for the rationale on
+  // bypassing the prop snapshot. The "live activity" computed above still
+  // serves the rest of the modal's reads (title, date, etc., for which a
+  // snapshot is fine), but photo state needs to follow background uploads.
+  initialPhotoIds: () => photoStore.photoIdsFor('activities', activityIdRef.value),
   watchSource: () => activity.value?.id,
   update: (id, patch) => activityStore.updateActivity(id, patch),
   surface: 'ActivityViewEditModal',

@@ -23,6 +23,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { confirm } from '@/composables/useConfirm';
 import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
+import { usePhotoStore } from '@/stores/photoStore';
 import { toDateInputValue } from '@/utils/date';
 import { frequencyDisplayFor, isValidDosesPerDay } from '@/utils/medicationFrequency';
 import type { Medication, UUID } from '@/types/models';
@@ -39,6 +40,7 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const medicationsStore = useMedicationsStore();
+const photoStore = usePhotoStore();
 const familyStore = useFamilyStore();
 
 const name = ref('');
@@ -190,7 +192,9 @@ const eager = useEagerEntityCreate<Medication, ReturnType<typeof buildPayload>>(
 
 const binding = usePhotoEntityBinding({
   entityId: eager.entityId,
-  initialPhotoIds: () => props.medication?.photoIds,
+  // Live photoIds from the doc — see ActivityModal for the rationale on
+  // bypassing the prop snapshot.
+  initialPhotoIds: () => photoStore.photoIdsFor('medications', eager.entityId.value),
   watchSource: () => props.medication?.id,
   update: (id, patch) => medicationsStore.updateMedication(id, patch),
   surface: 'MedicationFormModal',

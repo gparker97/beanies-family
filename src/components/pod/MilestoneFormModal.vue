@@ -43,6 +43,7 @@ import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
 import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
+import { usePhotoStore } from '@/stores/photoStore';
 import { toDateInputValue } from '@/utils/date';
 import { MILESTONE_CATEGORIES, MILESTONE_CATEGORY_GROUPS } from '@/constants/milestoneCategories';
 import type { Milestone, MilestoneCategory, UUID } from '@/types/models';
@@ -66,6 +67,7 @@ const emit = defineEmits<{
 
 const { t, isBeanieMode } = useTranslation();
 const milestonesStore = useMilestonesStore();
+const photoStore = usePhotoStore();
 const familyStore = useFamilyStore();
 
 /**
@@ -229,7 +231,10 @@ const eager = useEagerEntityCreate<Milestone, ReturnType<typeof buildPayload>>({
 
 const binding = usePhotoEntityBinding({
   entityId: eager.entityId,
-  initialPhotoIds: () => props.milestone?.photoIds,
+  // Live photoIds from the doc — see ActivityModal for the rationale on
+  // bypassing the prop snapshot (background upload completes while drawer
+  // is closed; in-memory entity store doesn't auto-sync from doc).
+  initialPhotoIds: () => photoStore.photoIdsFor('milestones', eager.entityId.value),
   watchSource: () => props.milestone?.id,
   update: (id, patch) => milestonesStore.updateMilestone(id, patch),
   surface: 'MilestoneFormModal',
