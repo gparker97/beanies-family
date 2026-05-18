@@ -9,10 +9,13 @@ test.describe('Google Drive Sync', () => {
     await dbHelper.clearAllData();
     await page.goto('/welcome');
 
-    // Click "Load my pod" on welcome gate
-    const loadButton = page.getByRole('button', { name: /load/i });
-    await loadButton.first().waitFor({ state: 'visible', timeout: 5000 });
-    await loadButton.first().click();
+    // Click the Sign In card on the welcome gate. Match via the i18n key
+    // rather than a copy-specific regex so future copy edits don't break
+    // the selector. (Previously matched /load/i, which broke when the
+    // 2026-05-18 WelcomeGate refresh renamed Sign In to "Welcome back".)
+    const signInButton = page.getByRole('button', { name: ui('loginV6.signInTitle') });
+    await signInButton.first().waitFor({ state: 'visible', timeout: 5000 });
+    await signInButton.first().click();
 
     // Google Drive label should be visible (either as button or disabled div)
     const driveLabel = page.getByText(ui('googleDrive.storageLabel')).first();
@@ -40,7 +43,10 @@ test.describe('Google Drive Sync', () => {
       sessionStorage.setItem('e2e_auto_auth', 'true');
     });
 
-    const createButton = page.getByRole('button', { name: /create/i }).first();
+    // Match the Create card by its stable testid — most resilient to copy
+    // changes. (Previously /create/i, which broke when the 2026-05-18
+    // WelcomeGate refresh renamed the card to "Plant a new pod".)
+    const createButton = page.getByTestId('create-pod-button');
     await createButton.waitFor({ state: 'visible', timeout: 5000 });
     await createButton.click();
 
