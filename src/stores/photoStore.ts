@@ -805,6 +805,54 @@ export const usePhotoStore = defineStore('photos', () => {
     );
   }
 
+  /**
+   * Live photoIds for an entity, read directly from the Automerge doc and
+   * subscribed to `docVersion` so callers re-render when the doc changes.
+   *
+   * Use this instead of reading `photoIds` from a captured prop snapshot when
+   * the caller needs to reflect background updates. The motivating case
+   * (caught 2026-05-18 from greg's localhost repro):
+   *
+   *   1. User adds a photo to an activity.
+   *   2. Closes the drawer mid-upload (BaseSidePanel's `v-if="open"` unmounts
+   *      PhotoAttachments + its composable).
+   *   3. `finalizeUpload` continues in the background; its `changeDoc` writes
+   *      the photoId into `doc.activities[id].photoIds` via `attachPhotoToEntity`.
+   *   4. `activityStore.activities` is a static `ref<Activity[]>` that's only
+   *      re-read on explicit `loadActivities()` calls — it does NOT subscribe
+   *      to `docVersion`. So its in-memory snapshot of the activity is stale.
+   *   5. The `update:photo-ids` emit from the (now unmounted) PhotoAttachments
+   *      is a no-op, so the normal `activityStore.updateActivity` follow-up
+   *      doesn't fire either.
+   *   6. User reopens the drawer; the binding's `initialPhotoIds` getter
+   *      reads from `props.activity?.photoIds` — also stale because
+   *      `editingActivity.value = target` captured a plain object reference
+   *      at click time.
+   *   7. Photo doesn't appear until a full refresh re-loads activities from
+   *      the doc.
+   *
+   * This getter bypasses the stale-store / stale-prop chain by reading the
+   * doc directly. Reactive on `docVersion`, so any consumer using it inside
+   * a `computed` / `watch` / `usePhotoEntityBinding` re-renders when the
+   * photoId lands. Returns `undefined` when the entity isn't found yet
+   * (caller treats that the same as "no photoIds").
+   */
+  function photoIdsFor(
+    entityCollection: string,
+    entityId: string | null | undefined
+  ): UUID[] | undefined {
+    if (!entityId) return undefined;
+    void docVersion.value;
+    try {
+      const entities = (
+        getDoc() as unknown as Record<string, Record<string, { photoIds?: UUID[] }>>
+      )[entityCollection];
+      return entities?.[entityId]?.photoIds;
+    } catch {
+      return undefined;
+    }
+  }
+
   // --- Helpers ---------------------------------------------------------
 
   function attachPhotoToEntity(
@@ -844,6 +892,7 @@ export const usePhotoStore = defineStore('photos', () => {
     gcOrphans,
     resolveCanonicalFolderId,
     pendingUploadsFor,
+    photoIdsFor,
     refreshPending,
     // constants
     QUEUE_SOFT_CAP,

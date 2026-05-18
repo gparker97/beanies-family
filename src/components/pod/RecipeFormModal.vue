@@ -24,6 +24,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { confirm } from '@/composables/useConfirm';
 import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
+import { usePhotoStore } from '@/stores/photoStore';
 import type { Recipe, UUID } from '@/types/models';
 
 const props = defineProps<{
@@ -43,6 +44,7 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const recipesStore = useRecipesStore();
+const photoStore = usePhotoStore();
 const familyStore = useFamilyStore();
 
 const name = ref('');
@@ -123,7 +125,9 @@ const eager = useEagerEntityCreate<Recipe, ReturnType<typeof buildPayload>>({
 
 const binding = usePhotoEntityBinding({
   entityId: eager.entityId,
-  initialPhotoIds: () => props.recipe?.photoIds,
+  // Live photoIds from the doc — see ActivityModal for the rationale on
+  // bypassing the prop snapshot.
+  initialPhotoIds: () => photoStore.photoIdsFor('recipes', eager.entityId.value),
   watchSource: () => props.recipe?.id,
   update: (id, patch) => recipesStore.updateRecipe(id, patch),
   surface: 'RecipeFormModal',
