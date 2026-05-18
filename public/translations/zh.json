@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-16",
-    "translationCount": 2901
+    "lastUpdated": "2026-05-18",
+    "translationCount": 2916
   },
   "translations": {
     "app.name": {
@@ -2602,39 +2602,39 @@
       "lastUpdated": "2026-03-03"
     },
     "loginV6.welcomePrompt": {
-      "translation": "您希望如何处理?",
-      "hash": "5pcods",
-      "lastUpdated": "2026-03-03"
+      "translation": "您想从哪里开始？",
+      "hash": "ui7ak7",
+      "lastUpdated": "2026-05-18"
     },
     "loginV6.signInTitle": {
-      "translation": "登陆",
-      "hash": "8yrbnc",
-      "lastUpdated": "2026-03-03"
+      "translation": "欢迎回来 ",
+      "hash": "oat",
+      "lastUpdated": "2026-05-18"
     },
     "loginV6.signInSubtitle": {
-      "translation": "加载您的家庭数据文件",
-      "hash": "97e6g9",
-      "lastUpdated": "2026-03-03"
+      "translation": "使用您的.beanpod文件登录",
+      "hash": "ob7j86",
+      "lastUpdated": "2026-05-18"
     },
     "loginV6.createTitle": {
-      "translation": "新建 ",
-      "hash": "jyjrmp",
-      "lastUpdated": "2026-03-03"
+      "translation": "种植新的豆荚",
+      "hash": "pa2tn3",
+      "lastUpdated": "2026-05-18"
     },
     "loginV6.createSubtitle": {
-      "translation": "开启家庭理财之旅",
-      "hash": "s7clhk",
-      "lastUpdated": "2026-03-03"
+      "translation": "启动您家族的豆荚-加密，您的豆荚保留。",
+      "hash": "8g5kgx",
+      "lastUpdated": "2026-05-18"
     },
     "loginV6.joinTitle": {
-      "translation": "加入现有Pod",
-      "hash": "mv6p3n",
-      "lastUpdated": "2026-03-03"
+      "translation": "加入您的家庭",
+      "hash": "85abj9",
+      "lastUpdated": "2026-05-18"
     },
     "loginV6.joinSubtitle": {
-      "translation": "您的家人正在等您",
-      "hash": "qfbb9u",
-      "lastUpdated": "2026-03-03"
+      "translation": "有人向您发送了加入链接",
+      "hash": "j5qx86",
+      "lastUpdated": "2026-05-18"
     },
     "loginV6.loadPodTitle": {
       "translation": "加载您的Pod",
@@ -14510,6 +14510,81 @@
       "translation": "您的帐号",
       "hash": "bjlmo",
       "lastUpdated": "2026-05-16"
+    },
+    "loginV6.noPodOnAccount.title": {
+      "translation": "此Google帐户尚未有pod",
+      "hash": "7a5shz",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.noPodOnAccount.body": {
+      "translation": "Pod创建一次，然后您家庭中的每个人都会登录到同一个Pod。如果这是您第一次来这里，您需要创建一个。",
+      "hash": "grs8oy",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.noPodOnAccount.createCta": {
+      "translation": "新建 ",
+      "hash": "7in3em",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.noPodOnAccount.createDesc": {
+      "translation": "设置家人的加密文件",
+      "hash": "o9kygu",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.noPodOnAccount.switchCta": {
+      "translation": "尝试其他Google帐户",
+      "hash": "yg70b3",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.noPodOnAccount.loadLocalCta": {
+      "translation": "我有一个.beanpod文件要加载",
+      "hash": "pi0qow",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.noPodOnAccount.joinHint": {
+      "translation": "已经是家庭成员了？请求加入链接 →",
+      "hash": "a4pn11",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.noPodOnAccount.retryHint": {
+      "translation": "刚刚向此账号添加了Pod ？请再次检查 →",
+      "hash": "t4na21",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.checkedNothingFound": {
+      "translation": "已检查—未找到任何内容",
+      "hash": "y4j4a",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.welcomeEyebrow": {
+      "translation": "欢迎回家。",
+      "hash": "4su5",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.welcomePromptAccent": {
+      "translation": "开始",
+      "hash": "1jqisp",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.orDivider": {
+      "translation": "或",
+      "hash": "1z7",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.createPill": {
+      "translation": "点击开始……",
+      "hash": "5ze4ge",
+      "lastUpdated": "2026-05-18"
+    },
+    "loginV6.createTagline": {
+      "translation": "刚开始接触Beanies ？",
+      "hash": "vtpspv",
+      "lastUpdated": "2026-05-18"
+    },
+    "app.taglineAccent": {
+      "translation": "豆子",
+      "hash": "1sq0g",
+      "lastUpdated": "2026-05-18"
     }
   }
 }
