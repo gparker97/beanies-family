@@ -277,43 +277,60 @@ async function handleRemoveMissing(): Promise<void> {
     </div>
 
     <template v-if="!readOnly" #footer>
-      <div class="flex items-center justify-between gap-2">
-        <div class="text-xs text-gray-500 dark:text-white/60">{{ positionLabel }}</div>
-        <div class="flex items-center gap-2">
-          <template v-if="isMissing">
-            <button
-              type="button"
-              class="bg-primary-500 hover:bg-primary-600 rounded-lg px-3 py-1.5 text-sm font-medium text-white"
-              @click="replacePicker.open"
-            >
-              {{ t('photos.replace') }}
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10"
-              @click="handleRemoveMissing"
-            >
-              {{ t('photos.remove') }}
-            </button>
-          </template>
-          <template v-else>
-            <a
-              v-if="fullUrl"
-              :href="fullUrl"
-              download
-              class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700"
-            >
-              {{ t('photos.download') }}
-            </a>
-            <button
-              type="button"
-              class="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10"
-              @click="handleDelete"
-            >
-              {{ t('photos.remove') }}
-            </button>
-          </template>
-        </div>
+      <!--
+        Footer mirrors BeanieFormModal's convention:
+          - Leftmost: destructive 🗑️ icon-only button (red-tinted square).
+          - Adjacent: secondary utility actions as icon-only buttons (here:
+            📥 Download, hidden in the missing-photo state).
+          - Rightmost: flex-1 gradient-orange primary with a clear label
+            ("Close" normally; "Replace photo" when the file is missing).
+        Position info ("1 of 3") is already rendered as pip dots inside
+        the photo area, so the footer dropped the redundant text label.
+      -->
+      <div class="flex items-center gap-3">
+        <!-- Destructive: trash icon, same shape as BeanieFormModal's delete. -->
+        <button
+          type="button"
+          :aria-label="t('photos.remove')"
+          class="flex h-[48px] w-[48px] flex-shrink-0 items-center justify-center rounded-[14px] text-xl transition-all duration-150 hover:scale-105"
+          style="background: rgb(239 68 68 / 8%)"
+          @click="isMissing ? handleRemoveMissing() : handleDelete()"
+        >
+          🗑️
+        </button>
+
+        <!-- Utility: download. Hidden in the missing-photo state because
+             there's no file to download. Slate-tinted bg differentiates
+             "safe utility" from the destructive trash. -->
+        <a
+          v-if="!isMissing && fullUrl"
+          :href="fullUrl"
+          download
+          :aria-label="t('photos.download')"
+          class="flex h-[48px] w-[48px] flex-shrink-0 items-center justify-center rounded-[14px] text-xl no-underline transition-all duration-150 hover:scale-105"
+          style="background: rgb(44 62 80 / 6%)"
+        >
+          📥
+        </a>
+
+        <!-- Primary: Close (or Replace photo when the file is missing).
+             Mirrors BeanieFormModal's flex-1 gradient-orange Save button. -->
+        <button
+          v-if="isMissing"
+          type="button"
+          class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 flex-1 rounded-[16px] bg-gradient-to-r py-3.5 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:shadow-md"
+          @click="replacePicker.open"
+        >
+          {{ t('photos.replace') }}
+        </button>
+        <button
+          v-else
+          type="button"
+          class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 flex-1 rounded-[16px] bg-gradient-to-r py-3.5 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:shadow-md"
+          @click="emit('close')"
+        >
+          {{ t('action.close') }}
+        </button>
       </div>
       <!-- Hidden input backing the Replace action. -->
       <input
