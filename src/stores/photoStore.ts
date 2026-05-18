@@ -44,6 +44,67 @@ const TOMBSTONE_GRACE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const DEFAULT_THUMB_SIZE = 400;
 const DEFAULT_FULL_SIZE = 2048;
 
+/**
+ * Discriminated result for `addPhoto`. Lets callers distinguish:
+ *   - `'completed'` — Drive upload + Automerge write succeeded synchronously;
+ *     the photo is fully attached to the entity.
+ *   - `'queued'` — the upload is in the photo queue and will sync when
+ *     conditions permit. Caller's optimistic local update is still valid;
+ *     the photo tile renders via `pendingUploads`.
+ *
+ * Explicit shape (vs inferring from `!store.photos[id]`) so the contract is
+ * self-documenting and survives any future refactor of how pending state is
+ * tracked in the doc.
+ */
+export interface AddPhotoResult {
+  photoId: UUID;
+  status: 'completed' | 'queued';
+}
+
+/**
+ * Thrown when the fallback `enqueueUpload` itself fails (IndexedDB quota,
+ * private-browsing restrictions, DB corruption). Caller (`usePhotos.add`)
+ * `instanceof`-checks this to surface a distinct "couldn't save your photo
+ * for later" toast — different from the generic non-transient upload error.
+ *
+ * Modeled after `CompressionError` in `photoCompression.ts:32-39`.
+ */
+export class QueueWriteFailedError extends Error {
+  readonly cause?: unknown;
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'QueueWriteFailedError';
+    this.cause = cause;
+  }
+}
+
+/**
+ * Classify whether a `finalizeUpload` failure is transient (worth queuing
+ * for later retry) or genuine (re-throw → user-facing error toast).
+ *
+ * Transient: network blips, slow connections, server-side wobble, rate
+ * limit. The same payload retried in a few seconds may succeed.
+ *
+ * Non-transient: auth (need reconnect, not retry), malformed requests
+ * (bug), explicit folder-not-found (after the driveService auto-retry).
+ *
+ * Used by both the online branch of `addPhoto` and (future) `addAvatarPhoto`
+ * once the queue infrastructure supports avatars.
+ */
+function isTransientUploadError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  const name = e.name;
+  const msg = e.message;
+  // Browser fetch failure shapes.
+  if (name === 'AbortError') return true;
+  if (name === 'NetworkError') return true;
+  if (name === 'TypeError' && msg.includes('Failed to fetch')) return true;
+  // Drive REST error shapes — driveService throws Error with the response
+  // status in the message; we pattern-match on that.
+  if (/\b(5\d{2}|429)\b/.test(msg)) return true;
+  return false;
+}
+
 export type PhotoSize = 'thumb' | 'full';
 
 export type PhotoResolution =
@@ -186,12 +247,38 @@ export const usePhotoStore = defineStore('photos', () => {
 
   // --- Upload ----------------------------------------------------------
 
+  /**
+   * Attach a photo to an entity.
+   *
+   * Persistence contract — the returned `photoId` is durably recorded in one
+   * of two ways regardless of caller lifecycle (component unmount, modal
+   * close, navigation):
+   *
+   *   - `status: 'completed'` → photo record is in `doc.photos[photoId]` AND
+   *     the photoId is appended to `entity.photoIds`. Drive upload succeeded;
+   *     a persist save is scheduled (500ms debounce in docService).
+   *
+   *   - `status: 'queued'` → upload payload is in the photo queue. Will sync
+   *     when conditions permit (next `'online'` event, token-refresh, or 5s
+   *     retry timer). The doc record is written when the queue flushes.
+   *     Caller's optimistic UI (rendering a pending tile) is safe — the
+   *     photoId is stable for the lifetime of the upload.
+   *
+   * Throws:
+   *   - `CompressionError` — image couldn't be compressed (corrupt file, etc.)
+   *   - `QueueWriteFailedError` — the upload was non-transiently failed
+   *     online AND the queue fallback also failed to persist. Photo is lost;
+   *     user should retry. The user-facing toast in `usePhotos` distinguishes
+   *     this from a clean-non-transient failure.
+   *   - Other `Error` — non-transient Drive failure (401/403 auth, 400
+   *     malformed, etc.); caller surfaces as a generic "couldn't upload" toast.
+   */
   async function addPhoto(
     file: File,
     entityCollection: string,
     entityId: string,
     createdBy?: UUID
-  ): Promise<UUID> {
+  ): Promise<AddPhotoResult> {
     if (!photosEnabled.value) {
       throw new Error('photoStore: cloud sync is required to attach photos.');
     }
@@ -208,28 +295,7 @@ export const usePhotoStore = defineStore('photos', () => {
 
     const photoId = crypto.randomUUID();
     const filename = `beanies-photo-${photoId}.jpg`;
-
-    // Offline path: queue for later. Metadata is only written to Automerge
-    // after the upload actually succeeds (avoids half-baked records).
-    if (!navigator.onLine) {
-      await enqueueUpload({
-        photoId,
-        entityCollection,
-        entityId,
-        blob: compressed.blob,
-        filename,
-        mime: compressed.mime,
-        width: compressed.width,
-        height: compressed.height,
-        sizeBytes: compressed.blob.size,
-        createdBy,
-      });
-      await refreshPending();
-      return photoId;
-    }
-
-    // Online path: upload → write Automerge → push to entity.photoIds.
-    await finalizeUpload({
+    const payload = {
       photoId,
       entityCollection,
       entityId,
@@ -240,8 +306,55 @@ export const usePhotoStore = defineStore('photos', () => {
       height: compressed.height,
       sizeBytes: compressed.blob.size,
       createdBy,
-    });
-    return photoId;
+    };
+
+    // Offline path: queue for later. Metadata is only written to Automerge
+    // after the upload actually succeeds (avoids half-baked records).
+    if (!navigator.onLine) {
+      await enqueueWithWrap(payload);
+      await refreshPending();
+      return { photoId, status: 'queued' };
+    }
+
+    // Online path: try direct Drive upload + Automerge write. On a transient
+    // failure (network blip, AbortError, Drive 5xx/429), fall back to the
+    // queue so the photo isn't lost on a flaky-but-online connection. The
+    // queue's flushHandler IS finalizeUpload, so retry semantics are
+    // identical to a fresh offline-queued entry.
+    try {
+      await finalizeUpload(payload);
+      return { photoId, status: 'completed' };
+    } catch (e) {
+      if (!isTransientUploadError(e)) {
+        // Non-transient (auth, malformed, etc.) — re-throw so caller surfaces
+        // an error toast. Retrying won't help.
+        throw e;
+      }
+      // Transient: queue for later retry. If THAT also fails, we wrap and
+      // re-throw so the caller can distinguish from a clean upload failure.
+      console.warn('[photoStore] Drive upload failed transiently; falling back to queue', e);
+      await enqueueWithWrap(payload);
+      await refreshPending();
+      return { photoId, status: 'queued' };
+    }
+  }
+
+  /**
+   * Wraps `enqueueUpload` so a queue-write failure (IndexedDB quota, private-
+   * browsing restrictions, DB corruption) throws a typed `QueueWriteFailedError`
+   * the caller can branch on. Without this, an underlying DOMException leaks
+   * out and `usePhotos` couldn't distinguish "Drive failed AND we couldn't
+   * even save it for later" from "Drive failed".
+   */
+  async function enqueueWithWrap(
+    payload: Omit<QueuedPhotoUpload, 'id' | 'createdAt'>
+  ): Promise<void> {
+    try {
+      await enqueueUpload(payload);
+    } catch (queueErr) {
+      console.error('[photoStore] enqueueUpload failed — photo cannot be saved', queueErr);
+      throw new QueueWriteFailedError('Failed to queue photo upload', queueErr);
+    }
   }
 
   /**

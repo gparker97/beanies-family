@@ -157,7 +157,7 @@ describe('photoStore', () => {
     ensureEntity('activities', 'act-1');
     const store = usePhotoStore();
 
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-1', 'member-1');
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1', 'member-1');
 
     expect(photoId).toBeTruthy();
     expect(driveMocks.createFile).toHaveBeenCalledTimes(1);
@@ -210,7 +210,7 @@ describe('photoStore', () => {
     ensureEntity('activities', 'act-1');
     const store = usePhotoStore();
 
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
 
     expect(driveMocks.createFile).not.toHaveBeenCalled();
     expect(getDoc().photos[photoId]).toBeUndefined();
@@ -229,7 +229,7 @@ describe('photoStore', () => {
         thumbnailLink: 'https://lh3.googleusercontent.com/abc=s220',
       });
 
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
 
     const url = await store.getImageUrl(photoId, 'thumb');
     expect(url).toMatch(/=s400$/);
@@ -250,7 +250,7 @@ describe('photoStore', () => {
       .mockResolvedValueOnce({ parents: ['folder-1'] })
       .mockRejectedValueOnce(new DriveFileNotFoundError('not found', 404));
 
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
     const url = await store.getImageUrl(photoId, 'thumb');
     expect(url).toBeNull();
     expect(store.isUnresolved(photoId)).toBe(true);
@@ -260,7 +260,7 @@ describe('photoStore', () => {
     storeInternals.registerPhotoCollection('activities');
     ensureEntity('activities', 'act-pub');
     const store = usePhotoStore();
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-pub');
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-pub');
     const photo = store.photos[photoId];
     expect(photo).toBeDefined();
     const driveFileId = photo!.driveFileId;
@@ -299,7 +299,7 @@ describe('photoStore', () => {
     );
     const store = usePhotoStore();
     // Should not throw — permission failure is non-fatal for upload.
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-perm-fail');
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-perm-fail');
     expect(store.photos[photoId]).toBeDefined();
   });
 
@@ -311,7 +311,7 @@ describe('photoStore', () => {
       .mockResolvedValueOnce({ fileId: 'drive-original', name: 'x' })
       .mockResolvedValueOnce({ fileId: 'drive-replacement', name: 'x' });
 
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
     const originalCreatedAt = getDoc().photos[photoId]!.createdAt;
 
     await new Promise((resolve) => setTimeout(resolve, 5));
@@ -330,7 +330,7 @@ describe('photoStore', () => {
     ensureEntity('activities', 'act-1');
     const store = usePhotoStore();
 
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
     driveMocks.deleteFile.mockClear();
     store.markDeleted(photoId);
 
@@ -343,7 +343,7 @@ describe('photoStore', () => {
     ensureEntity('activities', 'act-1');
     const store = usePhotoStore();
 
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
     // Manually backdate the tombstone so it's past the grace period.
     const longAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     changeDoc((d) => {
@@ -362,7 +362,7 @@ describe('photoStore', () => {
     ensureEntity('activities', 'act-1');
     const store = usePhotoStore();
 
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
     store.markDeleted(photoId); // recent tombstone
 
     const result = await store.gcOrphans();
@@ -374,7 +374,7 @@ describe('photoStore', () => {
     storeInternals.registerPhotoCollection('activities');
     ensureEntity('activities', 'act-1');
     const store = usePhotoStore();
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
 
     // Manually detach the photo from the entity → zero references.
     changeDoc((d) => {
@@ -395,10 +395,66 @@ describe('photoStore', () => {
     // No registerPhotoCollection call — zero-ref check is disabled.
     ensureEntity('activities', 'act-1');
     const store = usePhotoStore();
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
 
     const result = await store.gcOrphans();
     expect(result.deleted).toBe(0);
     expect(getDoc().photos[photoId]).toBeDefined();
+  });
+
+  describe('addPhoto — transient-failure queue fallback', () => {
+    it('returns status:completed on a successful online upload', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      ensureEntity('activities', 'act-completed');
+      const store = usePhotoStore();
+      const result = await store.addPhoto(makeFile(), 'activities', 'act-completed');
+      expect(result.status).toBe('completed');
+      expect(getDoc().photos[result.photoId]).toBeDefined();
+    });
+
+    it('falls back to the queue on a transient Drive failure (5xx)', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      ensureEntity('activities', 'act-503');
+      driveMocks.createFile
+        .mockReset()
+        .mockRejectedValueOnce(new Error('Drive upload failed: 503 Service Unavailable'));
+      const store = usePhotoStore();
+
+      const result = await store.addPhoto(makeFile(), 'activities', 'act-503');
+
+      expect(result.status).toBe('queued');
+      expect(result.photoId).toBeTruthy();
+      // No doc record yet — queue writes it when flushed
+      expect(getDoc().photos[result.photoId]).toBeUndefined();
+      // Queue entry exists
+      const pending = store.pendingUploadsFor('activities', 'act-503');
+      expect(pending).toHaveLength(1);
+      expect(pending[0]!.photoId).toBe(result.photoId);
+    });
+
+    it('falls back to the queue on AbortError', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      ensureEntity('activities', 'act-abort');
+      const abortErr = new Error('aborted');
+      abortErr.name = 'AbortError';
+      driveMocks.createFile.mockReset().mockRejectedValueOnce(abortErr);
+      const store = usePhotoStore();
+
+      const result = await store.addPhoto(makeFile(), 'activities', 'act-abort');
+      expect(result.status).toBe('queued');
+    });
+
+    it('re-throws non-transient errors (Drive 400) without queueing', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      ensureEntity('activities', 'act-400');
+      driveMocks.createFile
+        .mockReset()
+        .mockRejectedValueOnce(new Error('Drive upload failed: 400 Bad Request'));
+      const store = usePhotoStore();
+
+      await expect(store.addPhoto(makeFile(), 'activities', 'act-400')).rejects.toThrow(/400/);
+      // No queue entry — non-transient failures don't get retried.
+      expect(store.pendingUploadsFor('activities', 'act-400')).toHaveLength(0);
+    });
   });
 });
