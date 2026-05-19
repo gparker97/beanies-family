@@ -516,18 +516,33 @@ const weekStripData = computed<WeekStripWeek[]>(() => {
   const week1Days = stripWeek1Days.value.map((d) => buildDay(d.date));
   const week2Days = Array.from({ length: 7 }, (_, i) => buildDay(addDays(week1Start, 7 + i)));
 
+  /**
+   * Resolve the row's label key by its position relative to today's week:
+   *   - contains today               → "this week"
+   *   - immediately after today's    → "next week"
+   *   - immediately before today's   → "last week"
+   *   - further forward              → "upcoming"
+   *   - further back                 → "earlier"
+   *
+   * Rows are always week-aligned (7 contiguous days starting on the
+   * settings-configured first day), so comparing the row's first vs.
+   * last day to today gives a clean past/future split.
+   */
   function labelFor(rowDays: WeekStripDay[]): WeekStripWeek['labelKey'] {
-    const todayInRow = rowDays.some((d) => d.isToday);
-    if (todayInRow) return 'planner.weekThis';
-    // Today might be in the week immediately before this row (= "next week")
-    const rowStart = parseLocalDate(rowDays[0]!.dateStr);
-    const prevWeekStart = addDays(rowStart, -7);
-    const todayDate = parseLocalDate(todayDateStr.value);
-    const todayWeekStartStr = toDateInputValue(
-      addDays(todayDate, -((todayDate.getDay() - prevWeekStart.getDay() + 7) % 7))
-    );
-    if (todayWeekStartStr === toDateInputValue(prevWeekStart)) return 'planner.weekNext';
-    return 'planner.weekUpcoming';
+    if (rowDays.some((d) => d.isToday)) return 'planner.weekThis';
+    const today = todayDateStr.value;
+    const rowFirstStr = rowDays[0]!.dateStr;
+    const rowLastStr = rowDays[rowDays.length - 1]!.dateStr;
+    const dayMs = 24 * 60 * 60 * 1000;
+    if (rowFirstStr > today) {
+      // Row is fully in the future.
+      const days =
+        (parseLocalDate(rowFirstStr).getTime() - parseLocalDate(today).getTime()) / dayMs;
+      return days <= 7 ? 'planner.weekNext' : 'planner.weekUpcoming';
+    }
+    // Row is fully in the past (rowLast < today, since today isn't in the row).
+    const days = (parseLocalDate(today).getTime() - parseLocalDate(rowLastStr).getTime()) / dayMs;
+    return days <= 7 ? 'planner.weekLast' : 'planner.weekEarlier';
   }
 
   const week1FocusedDateStr = stripWeek1Days.value[0]?.dateStr ?? '';
