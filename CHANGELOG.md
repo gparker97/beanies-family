@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-19
 
+### Fixed
+
+- **Less noise in #beanies-errors when a user simply needs to reconnect.** Cold-start reconnect banners with `hadRefreshToken: false` (no stored refresh token → no auto-recovery possible → user must re-authenticate) no longer fire a Slack alert. The banner UX is unchanged — the user still sees the reconnect prompt — but the by-design state stops cluttering the bug channel. Genuine silent-refresh failures (where a refresh token existed and the attempt failed) still alert.
+
+- **iOS Safari's spurious "internal IndexedDB error" no longer surfaces as a bug.** WebKit occasionally throws "An internal error was encountered in the Indexed Database server" on PWA wake-from-background — a transient, recoverable failure that briefly polluted #beanies-errors with `unhandled-promise-rejection`. We now classify these (alongside the existing chunk-load suppression), retry the IDB write/read once after a 250 ms backoff inside the persistence service, and only escalate to Slack if both attempts fail. Quota/schema/permission errors still surface unchanged.
+
 ### Added
 
 - **2-week navigator strip on the weekly calendar.** A new compact strip sits above the weekly timeline (desktop AND mobile), showing the focused week + the next week as side-by-side rows of day pills. Each pill carries DOW, day-number, and 1-3 member-color event-density dots (same grammar as the monthly chips). The focused week gets an orange accent strip on the left; today gets the orange fill. Tap any pill to focus that day on mobile or advance the visible week on desktop; the agenda sidebar is no longer opened (you stay in weekly mode). Doesn't change the existing weekly timeline below — just adds the week-shape overview that was missing.
