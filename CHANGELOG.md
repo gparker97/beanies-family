@@ -16,6 +16,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **E2E `planner.spec.ts:72` Activity CRUD test now matches the new calendar UI.** The earlier chip-redesign commit (`ea66dd4`) deleted `UpcomingActivities` + `TodoPreview` from the planner page, so the CRUD test's `h3 "upcoming activities" .locator('..')` scope no longer matched anything — both chromium and webkit hard-failed on the two pushes after the redesign. Test rewritten to click activity titles directly (`page.getByText(title).first()`), matching the convention the other 4 planner tests already use.
+
 - **Weekly mobile no longer shows two competing day-pill strips.** Phase B's 2-week navigator strip rendered alongside the legacy 7-pill mobile strip, stacking them on top of each other. The legacy strip is removed — the new navigator is a superset (same week + the next, plus density dots that respect the chip color rule). Less vertical real estate, fewer competing affordances.
 
 - **Tapping a day on the navigator strip keeps you in weekly mode.** Previously the strip emitted `select-date` which the parent page handles by opening the day-agenda sidebar — yanking the user out of weekly view. The strip is now strictly for week-internal navigation: tap a day to focus it (mobile) or to advance the week (desktop). To open the agenda, click an event chip directly.
