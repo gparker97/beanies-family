@@ -40,6 +40,13 @@ export interface WeekStripWeek {
 
 const props = defineProps<{
   weeks: WeekStripWeek[];
+  /**
+   * The day currently "selected" in the timeline below — gets the strongest
+   * highlight on its pill (filled orange background). Separate from "today",
+   * which gets a subtler outline-only treatment so users can always see
+   * where today is even when looking at a different week.
+   */
+  selectedDate?: string;
 }>();
 
 const emit = defineEmits<{
@@ -90,18 +97,22 @@ function onDayClick(dateStr: string) {
         </span>
       </div>
 
-      <!-- Day pills, one per visible day. -->
+      <!-- Day pills, one per visible day. Visual hierarchy (strongest first):
+           selected day (filled orange) > today (orange outline) > focused week
+           pill (sky outline) > other week pill (neutral). -->
       <button
         v-for="day in week.days"
         :key="day.dateStr"
         type="button"
         class="font-outfit flex min-h-[44px] flex-col items-center justify-center gap-0.5 rounded-lg border px-0.5 py-1 transition-colors md:min-h-[48px]"
         :class="[
-          day.isToday
-            ? 'border-primary-500 bg-primary-500/10 text-primary-500'
-            : week.isFocused
-              ? 'text-secondary-500 border-sky-200/60 bg-white hover:border-sky-300 dark:border-slate-600/60 dark:bg-slate-700/60 dark:text-gray-200'
-              : 'text-secondary-500/70 border-gray-200/60 bg-white hover:border-gray-300 dark:border-slate-700/60 dark:bg-slate-800/40 dark:text-gray-400',
+          day.dateStr === selectedDate
+            ? 'border-primary-500 bg-primary-500 text-white shadow-[0_2px_8px_rgba(241,93,34,0.25)]'
+            : day.isToday
+              ? 'border-primary-500 bg-primary-500/10 text-primary-500'
+              : week.isFocused
+                ? 'text-secondary-500 border-sky-200/60 bg-white hover:border-sky-300 dark:border-slate-600/60 dark:bg-slate-700/60 dark:text-gray-200'
+                : 'text-secondary-500/70 border-gray-200/60 bg-white hover:border-gray-300 dark:border-slate-700/60 dark:bg-slate-800/40 dark:text-gray-400',
           day.isOutsideCurrentMonth ? 'opacity-60' : '',
         ]"
         :aria-label="`${day.dowLabel} ${day.dayNum}`"
@@ -127,7 +138,12 @@ function onDayClick(dateStr: string) {
           />
           <span
             v-if="day.moreCount > 0"
-            class="text-secondary-500/40 text-[0.5rem] leading-none font-semibold dark:text-gray-500"
+            class="text-[0.5rem] leading-none font-semibold"
+            :class="
+              day.dateStr === selectedDate
+                ? 'text-white/85'
+                : 'text-secondary-500/40 dark:text-gray-500'
+            "
           >
             +{{ day.moreCount }}
           </span>
