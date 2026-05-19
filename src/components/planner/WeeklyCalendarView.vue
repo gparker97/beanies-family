@@ -18,13 +18,25 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { normalizeAssignees } from '@/utils/assignees';
-import { toDateInputValue, extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
+import {
+  toDateInputValue,
+  extractDatePart,
+  formatTime12,
+  addHourToTime,
+  addDays,
+  parseLocalDate,
+} from '@/utils/date';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
 import HolidayChip from '@/components/planner/HolidayChip.vue';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
+import WeekStripNav, {
+  type WeekStripDay,
+  type WeekStripWeek,
+} from '@/components/planner/WeekStripNav.vue';
+import { useActivityChipClass } from '@/composables/useActivityChipClass';
 import type { FamilyActivity, TodoItem, HolidayOccurrence } from '@/types/models';
 
 defineProps<{ selectedDate?: string }>();
@@ -405,6 +417,146 @@ const dayDensities = computed(() => {
   return byDate;
 });
 
+// ── 2-week navigator strip ─────────────────────────────────────────────────
+// Shows the focused week + the week immediately after, with event-density
+// dots per day. Reuses memberColorById + classification helpers so colors
+// stay consistent with the monthly chip rule (no parallel implementation).
+
+const DOW_KEYS = [
+  'planner.day.sun',
+  'planner.day.mon',
+  'planner.day.tue',
+  'planner.day.wed',
+  'planner.day.thu',
+  'planner.day.fri',
+  'planner.day.sat',
+] as const;
+
+const { classify: classifyStripChip } = useActivityChipClass();
+
+/**
+ * Build a fresh density-by-date map covering the focused week + the next
+ * week (14 days). Distinct from `dayDensities` (which only covers the
+ * focused week and is consumed by the existing mobile pill strip).
+ */
+const stripDensities = computed(() => {
+  const byDate = new Map<string, { memberColors: string[]; moreCount: number }>();
+  const startDate = weekDays.value[0]?.date ?? new Date();
+
+  // Build a small set of dates we care about (14 days from focused week start)
+  const stripDates: string[] = [];
+  for (let i = 0; i < 14; i++) {
+    stripDates.push(toDateInputValue(addDays(startDate, i)));
+  }
+  const stripDateSet = new Set(stripDates);
+
+  // Fetch occurrences across the months this 14-day window touches
+  const months = new Set<string>();
+  for (const dateStr of stripDates) {
+    const d = parseLocalDate(dateStr);
+    months.add(`${d.getFullYear()}-${d.getMonth()}`);
+  }
+  const occByDate = new Map<string, FamilyActivity[]>();
+  for (const key of months) {
+    const [y, m] = key.split('-').map(Number);
+    const occs = activityStore.monthActivities(y!, m!);
+    for (const occ of occs) {
+      if (occ.activity.vacationId) continue;
+      if (!stripDateSet.has(occ.date)) continue;
+      if (!occByDate.has(occ.date)) occByDate.set(occ.date, []);
+      occByDate.get(occ.date)!.push(occ.activity);
+    }
+  }
+
+  // For each strip date, build the per-day distinct color set. Family
+  // events (0 assignees) project as the Heritage-Orange dot via
+  // classifyStripChip so the strip mirrors the chip color grammar.
+  for (const dateStr of stripDates) {
+    const activities = occByDate.get(dateStr) ?? [];
+    const seen = new Set<string>();
+    const colors: string[] = [];
+    for (const a of activities) {
+      const cls = classifyStripChip(a);
+      if (cls.kind === 'solo') {
+        if (!seen.has(cls.color)) {
+          seen.add(cls.color);
+          colors.push(cls.color);
+        }
+        continue;
+      }
+      // family / shared → one Heritage Orange dot per day at most
+      if (!seen.has(cls.color)) {
+        seen.add(cls.color);
+        colors.push(cls.color);
+      }
+    }
+    byDate.set(dateStr, {
+      memberColors: colors.slice(0, 3),
+      moreCount: Math.max(0, colors.length - 3),
+    });
+  }
+  return byDate;
+});
+
+const todayDateStr = computed(() => toDateInputValue(new Date()));
+
+/**
+ * Build the WeekStripWeek[] structure for `<WeekStripNav>`. Always two
+ * weeks: the focused week first, then the next week. Labels adapt to
+ * the focused week's relation to today.
+ */
+const weekStripData = computed<WeekStripWeek[]>(() => {
+  const focusedStart = weekDays.value[0]?.date;
+  if (!focusedStart) return [];
+
+  const focusedContainsToday = weekDays.value.some((d) => d.dateStr === todayDateStr.value);
+
+  function buildDay(date: Date): WeekStripDay {
+    const dateStr = toDateInputValue(date);
+    const dow = DOW_KEYS[date.getDay()]!;
+    const density = stripDensities.value.get(dateStr);
+    return {
+      dateStr,
+      dayNum: date.getDate(),
+      dowLabel: t(dow),
+      isToday: dateStr === todayDateStr.value,
+      memberColors: density?.memberColors ?? [],
+      moreCount: density?.moreCount ?? 0,
+    };
+  }
+
+  const focusedDays: WeekStripDay[] = weekDays.value.map((d) => buildDay(d.date));
+  const nextDays: WeekStripDay[] = Array.from({ length: 7 }, (_, i) =>
+    buildDay(addDays(focusedStart, 7 + i))
+  );
+
+  return [
+    {
+      labelKey: focusedContainsToday ? 'planner.weekThis' : 'planner.weekUpcoming',
+      isFocused: true,
+      days: focusedDays,
+    },
+    {
+      labelKey: focusedContainsToday ? 'planner.weekNext' : 'planner.weekUpcoming',
+      isFocused: false,
+      days: nextDays,
+    },
+  ];
+});
+
+function onStripDayClick(dateStr: string) {
+  const targetDate = parseLocalDate(dateStr);
+  const inFocusedWeek = weekDays.value.some((d) => d.dateStr === dateStr);
+  if (!inFocusedWeek) {
+    // Tap on a day in the next-week row jumps the timeline to that week.
+    referenceDate.value = targetDate;
+  }
+  // Mobile single-day view focuses the tapped day. Desktop emits select-
+  // date so the parent page's agenda sidebar (if any) responds.
+  selectedMobileDay.value = dateStr;
+  emit('select-date', dateStr);
+}
+
 defineExpose({ weekLabel, activityCount });
 </script>
 
@@ -415,6 +567,12 @@ defineExpose({ weekLabel, activityCount });
     style="touch-action: pan-y; will-change: transform"
   >
     <CalendarNavBar :label="weekLabel" @prev="prevWeek" @next="nextWeek" @today="goToToday" />
+
+    <!-- 2-week date navigator. Compact pills per day with member-colored
+         event-density dots; current week marked with an orange accent.
+         Renders on both desktop and mobile so the week-shape view greg
+         flagged exists at every viewport size. -->
+    <WeekStripNav :weeks="weekStripData" @select-date="onStripDayClick" />
 
     <!-- ── Desktop: Time Grid ──────────────────────────────────────────── -->
     <template v-if="!isMobile">
