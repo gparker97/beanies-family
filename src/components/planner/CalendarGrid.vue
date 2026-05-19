@@ -1,31 +1,24 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useActivityStore, CATEGORY_COLORS } from '@/stores/activityStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { extractDatePart, formatMonthYear, formatTime12 } from '@/utils/date';
+import { extractDatePart, formatMonthYear, formatNookDate } from '@/utils/date';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
-import { tripTypeEmoji, transportEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
+import { tripTypeEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
 import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
-import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
-import HolidayChip from '@/components/planner/HolidayChip.vue';
+import MonthDayCard, {
+  type MonthDayCellData,
+  type CellAllDayItem,
+  type CellTimedOccurrence,
+  type CellVacation,
+} from '@/components/planner/MonthDayCard.vue';
+import MemberChip from '@/components/ui/MemberChip.vue';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
-import type { ActivityCategory, FamilyActivity, HolidayOccurrence } from '@/types/models';
-
-/**
- * Per-cell all-day item — either a slice of a multi-day run or a single-day
- * chip. The view layer doesn't need to distinguish them; both render via
- * `<AllDayActivityChip>` with the right isStart/isEnd flags. Carrying the
- * activity reference (not just an id) lets the chip resolve color + title
- * without a second store lookup.
- */
-interface CellAllDayItem {
-  activity: FamilyActivity;
-  isStart: boolean;
-  isEnd: boolean;
-}
+import type { FamilyActivity, HolidayOccurrence } from '@/types/models';
 
 const props = defineProps<{
   selectedDate?: string;
@@ -46,16 +39,17 @@ const activityStore = useActivityStore();
 const vacationStore = useVacationStore();
 const settingsStore = useSettingsStore();
 const holidayStore = useHolidayStore();
+const familyStore = useFamilyStore();
 
 const today = new Date();
 const currentYear = ref(today.getFullYear());
 const currentMonth = ref(today.getMonth());
 
-// Visible cap for the all-day lane in each cell. Cells are tight (60–72 px
-// at default root) — 2 chips + the dots row + travel chips + vacation bar
-// is the practical ceiling before overflow. Overflow falls into the
-// existing day-click handler.
+// Visible caps for each cell row. Cells grow naturally with content but
+// `+N more` overflow keeps any one day from ballooning a whole row's
+// height beyond reason on busy days.
 const ALL_DAY_VISIBLE_CAP = 2;
+const TIMED_VISIBLE_CAP = 4;
 
 const allDayLabels = [
   () => t('planner.day.sun'),
@@ -96,7 +90,7 @@ const todayWeekRow = computed(() => {
 });
 
 // Build grid cells
-const calendarDays = computed(() => {
+const calendarDays = computed<MonthDayCellData[]>(() => {
   const year = currentYear.value;
   const month = currentMonth.value;
   const firstDay = new Date(year, month, 1);
@@ -109,49 +103,40 @@ const calendarDays = computed(() => {
   const gridStartStr = formatDate(new Date(year, month, 1 - startOffset));
   const gridEndStr = formatDate(new Date(year, month, 1 - startOffset + totalGridCells - 1));
 
-  const days: Array<{
-    date: string;
-    day: number;
-    isCurrentMonth: boolean;
-    isToday: boolean;
-    weekRow: number;
-    activities: Array<{ category: ActivityCategory; color?: string }>;
-    vacations: Array<{ id: string; name: string; emoji: string; isStart: boolean }>;
-    segments: TravelSegmentOccurrence[];
-    allDayItems: CellAllDayItem[];
-    holidays: HolidayOccurrence[];
-  }> = [];
+  const days: MonthDayCellData[] = [];
 
-  // Get activity occurrences for this month
+  // Activity occurrences for this month — fetched once, partitioned below.
   const monthOccurrences = activityStore.monthActivities(year, month);
 
-  // Build a map of date -> activity info (category + optional color override)
-  // for the timed-dot row. Skip vacation-linked activities (they render as
-  // vacation bars at the bottom) AND skip all-day activities (they render
-  // as category-colored chips in the all-day lane, not as dots — that's
-  // the entire point of this lane).
-  const dateActivities = new Map<string, Array<{ category: ActivityCategory; color?: string }>>();
-  // All-day occurrences for the all-day lane. Same vacation-linked skip
-  // (those land in the vacation bar). The util dedupes multi-day per-id.
+  // Map date → full timed occurrences (replaces the old {category, color}
+  // shape — MonthChip needs the full activity to resolve member color,
+  // emoji, time and title).
+  const dateTimedOccurrences = new Map<string, CellTimedOccurrence[]>();
   const allDayOccurrences: Array<{ activity: FamilyActivity; date: string }> = [];
   for (const occ of monthOccurrences) {
+    // Vacation-linked activities render as the trailing vacation bar.
     if (occ.activity.vacationId) continue;
+    // All-day activities feed the all-day lane, not the timed chip row.
     if (occ.activity.isAllDay) {
       allDayOccurrences.push({ activity: occ.activity, date: occ.date });
       continue;
     }
-    if (!dateActivities.has(occ.date)) {
-      dateActivities.set(occ.date, []);
+    if (!dateTimedOccurrences.has(occ.date)) {
+      dateTimedOccurrences.set(occ.date, []);
     }
-    dateActivities
-      .get(occ.date)!
-      .push({ category: occ.activity.category, color: occ.activity.color });
+    dateTimedOccurrences.get(occ.date)!.push({ activity: occ.activity, date: occ.date });
+  }
+
+  // Sort timed occurrences chronologically within each day (earliest first).
+  for (const list of dateTimedOccurrences.values()) {
+    list.sort((a, b) => {
+      const ta = a.activity.startTime ?? '99:99';
+      const tb = b.activity.startTime ?? '99:99';
+      return ta.localeCompare(tb);
+    });
   }
 
   // Build a map of date -> travel-segment occurrences (flights, trains, etc).
-  // Visible window = first padded day of the grid through the last; we pull
-  // a generous month-bounded range and let per-cell filter handle the rest.
-  // (Cross-month occurrences appear in their own month — see validation tests.)
   const monthStartStr = formatDate(new Date(year, month, 1));
   const monthEndStr = formatDate(new Date(year, month + 1, 0));
   const dateSegments = new Map<string, TravelSegmentOccurrence[]>();
@@ -161,16 +146,12 @@ const calendarDays = computed(() => {
   }
 
   // Build a map of date -> vacations covering that date
-  const dateVacations = new Map<
-    string,
-    Array<{ id: string; name: string; emoji: string; isStart: boolean }>
-  >();
+  const dateVacations = new Map<string, CellVacation[]>();
   for (const v of vacationStore.vacations) {
     if (!v.startDate || !v.endDate) continue;
     const vStart = extractDatePart(v.startDate);
     const vEnd = extractDatePart(v.endDate);
     const emoji = tripTypeEmoji(v.tripType, v.tripPurpose);
-    // Walk each day of the vacation
     const startD = new Date(vStart + 'T00:00:00');
     const endD = new Date(vEnd + 'T00:00:00');
     for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
@@ -185,9 +166,7 @@ const calendarDays = computed(() => {
     }
   }
 
-  // Build a map of date -> public holidays (read-only reference data; empty
-  // when the family has no country set or has hidden holidays). Almost always
-  // 0 or 1 per date; the array tolerates the rare two-holidays-one-day case.
+  // Build a map of date -> public holidays
   const dateHolidays = new Map<string, HolidayOccurrence[]>();
   for (const h of holidayStore.holidaysInRange(gridStartStr, gridEndStr)) {
     if (!dateHolidays.has(h.date)) dateHolidays.set(h.date, []);
@@ -205,10 +184,10 @@ const calendarDays = computed(() => {
       isCurrentMonth: false,
       isToday: false,
       weekRow: days.length < 7 ? 0 : Math.floor(days.length / 7),
-      activities: dateActivities.get(dateStr) ?? [],
+      timedOccurrences: dateTimedOccurrences.get(dateStr) ?? [],
       vacations: dateVacations.get(dateStr) ?? [],
       segments: dateSegments.get(dateStr) ?? [],
-      allDayItems: [], // populated below, per week-row
+      allDayItems: [],
       holidays: dateHolidays.get(dateStr) ?? [],
     });
   }
@@ -222,10 +201,10 @@ const calendarDays = computed(() => {
       isCurrentMonth: true,
       isToday: dateStr === todayStr.value,
       weekRow: Math.floor(days.length / 7),
-      activities: dateActivities.get(dateStr) ?? [],
+      timedOccurrences: dateTimedOccurrences.get(dateStr) ?? [],
       vacations: dateVacations.get(dateStr) ?? [],
       segments: dateSegments.get(dateStr) ?? [],
-      allDayItems: [], // populated below, per week-row
+      allDayItems: [],
       holidays: dateHolidays.get(dateStr) ?? [],
     });
   }
@@ -241,10 +220,10 @@ const calendarDays = computed(() => {
         isCurrentMonth: false,
         isToday: false,
         weekRow: Math.floor(days.length / 7),
-        activities: dateActivities.get(dateStr) ?? [],
+        timedOccurrences: dateTimedOccurrences.get(dateStr) ?? [],
         vacations: dateVacations.get(dateStr) ?? [],
         segments: dateSegments.get(dateStr) ?? [],
-        allDayItems: [], // populated below, per week-row
+        allDayItems: [],
         holidays: dateHolidays.get(dateStr) ?? [],
       });
     }
@@ -252,39 +231,30 @@ const calendarDays = computed(() => {
 
   // Compute per-week-row all-day spans + single-day chips. Run the util
   // ONCE per week (not once per cell) — each invocation handles one row's
-  // worth of days and the activity occurrences in the same range. The util
-  // dedupes multi-day activities by id, so a 3-day activity that produces
-  // 3 occurrences becomes one span entry.
+  // worth of days and the activity occurrences in the same range.
   const numRows = Math.ceil(days.length / 7);
   for (let row = 0; row < numRows; row++) {
     const rowDays = days.slice(row * 7, row * 7 + 7);
     if (rowDays.length === 0) continue;
     const rowDateSet = new Set(rowDays.map((d) => d.date));
-    // Filter occurrences down to this row's visible dates so the util's
-    // dedup-by-id doesn't see a multi-day activity from a different row
-    // first and skip later rows.
     const rowOccurrences = allDayOccurrences.filter((o) => rowDateSet.has(o.date));
-    // Util expects `{ dateStr }` keyed days (matches WeeklyCalendarView's
-    // `weekDays` shape); CalendarGrid uses `{ date }`. Map once per row.
     const result = computeAllDaySpans(
       rowOccurrences,
       rowDays.map((d) => ({ dateStr: d.date }))
     );
 
-    // Attach multi-day slices: walk each span's covered cells, marking
-    // isStart on the first cell of the run and isEnd on the last.
     for (const span of result.spans) {
       for (let i = 0; i < span.span; i++) {
         const cell = rowDays[span.startCol + i];
         if (!cell) continue;
-        cell.allDayItems.push({
+        const item: CellAllDayItem = {
           activity: span.activity,
           isStart: i === 0,
           isEnd: i === span.span - 1,
-        });
+        };
+        cell.allDayItems.push(item);
       }
     }
-    // Attach single-day chips: each is its own start AND end.
     for (const cell of rowDays) {
       const singles = result.singleByDate.get(cell.date) ?? [];
       for (const a of singles) {
@@ -322,23 +292,63 @@ const holidayDateSet = computed(() => {
 });
 
 /**
- * Background class for a day cell. Precedence (highest first): a vacation day
- * keeps the established teal tint; otherwise a public holiday gets the clay
- * tint; otherwise today's week-row gets the faint orange tint; otherwise the
- * normal hover state. (A holiday during a trip still surfaces — via the corner
- * flag + the holiday chip — just not via the cell background.)
+ * Background class for a day cell. Precedence (highest first): vacation > holiday
+ * > today's week-row > default. (A holiday during a trip still surfaces — via the
+ * holiday chip — just not via the cell background.)
  */
 function cellBgClass(cell: { date: string; weekRow: number; isCurrentMonth: boolean }): string {
-  if (vacationDateSet.value.has(cell.date)) return 'bg-[var(--vacation-teal-tint)]';
-  if (holidayDateSet.value.has(cell.date)) return 'bg-[var(--holiday-clay-tint)]';
+  if (vacationDateSet.value.has(cell.date)) return 'md:bg-[var(--vacation-teal-tint)]';
+  if (holidayDateSet.value.has(cell.date)) return 'md:bg-[var(--holiday-clay-tint)]';
   if (cell.weekRow === todayWeekRow.value && cell.isCurrentMonth)
-    return 'bg-[rgba(241,93,34,0.04)]';
-  return 'hover:bg-gray-50 dark:hover:bg-slate-700/50';
+    return 'md:bg-[rgba(241,93,34,0.04)]';
+  return 'md:hover:bg-gray-50 md:dark:hover:bg-slate-700/50';
 }
 
-// Vacation span bars for each week row
 const activityCount = computed(() => {
   return activityStore.monthActivities(currentYear.value, currentMonth.value).length;
+});
+
+/**
+ * Set of indexes in `calendarDays` that should be preceded by a mobile-only
+ * week separator. A separator appears before the first current-month cell
+ * of each week — that way week 0 (which may start with prev-month padding
+ * hidden on mobile) still gets its label above the first visible card.
+ */
+const weekSeparatorIndexes = computed(() => {
+  const set = new Set<number>();
+  const days = calendarDays.value;
+  let lastSepWeekRow = -1;
+  for (let i = 0; i < days.length; i++) {
+    const cell = days[i]!;
+    if (cell.weekRow !== lastSepWeekRow && cell.isCurrentMonth) {
+      set.add(i);
+      lastSepWeekRow = cell.weekRow;
+    }
+  }
+  return set;
+});
+
+/**
+ * Per-weekRow metadata for the mobile separator labels: human-friendly
+ * range ("May 18 – 24") + a flag for whether this is the current week.
+ */
+const weekRangeByRow = computed(() => {
+  const map = new Map<number, { range: string; isCurrent: boolean; isNext: boolean }>();
+  const days = calendarDays.value;
+  const todayStrVal = todayStr.value;
+  for (let row = 0; row < Math.ceil(days.length / 7); row++) {
+    const rowDays = days.slice(row * 7, row * 7 + 7);
+    if (rowDays.length === 0) continue;
+    const startCell = rowDays[0]!;
+    const endCell = rowDays[rowDays.length - 1]!;
+    const isCurrent = startCell.date <= todayStrVal && todayStrVal <= endCell.date;
+    map.set(row, {
+      range: `${formatNookDate(startCell.date)} – ${formatNookDate(endCell.date)}`,
+      isCurrent,
+      isNext: !isCurrent && startCell.date > todayStrVal,
+    });
+  }
+  return map;
 });
 
 function prevMonth() {
@@ -372,8 +382,6 @@ function handleDayClick(date: string) {
 }
 
 // ── Swipe gesture ──────────────────────────────────────────────────────────
-// Horizontal swipe on the calendar surface advances/retreats by one month,
-// with an iOS-Calendar-style slide-out / slide-in animation.
 const swipeRef = ref<HTMLElement | null>(null);
 useCalendarSlide(swipeRef, {
   onNext: nextMonth,
@@ -386,13 +394,40 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
 <template>
   <div
     ref="swipeRef"
-    class="rounded-3xl bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
+    class="rounded-3xl bg-white p-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)] md:p-5 dark:bg-slate-800"
     style="touch-action: pan-y; will-change: transform"
   >
     <CalendarNavBar :label="monthLabel" @prev="prevMonth" @next="nextMonth" @today="goToToday" />
 
-    <!-- Day headers -->
-    <div class="mb-1 grid grid-cols-7 gap-0">
+    <!-- Mobile-only avatar legend strip — one row of dots, never wraps.
+         The avatars themselves carry the color grammar of the chips below,
+         so this IS the legend (no name labels needed at this size). -->
+    <div
+      v-if="familyStore.humans.length > 0"
+      class="mt-1 mb-3 flex items-center gap-2 overflow-x-auto pb-1 md:hidden"
+    >
+      <span
+        class="font-outfit text-secondary-500/50 flex-shrink-0 text-[0.625rem] font-bold tracking-[0.14em] uppercase dark:text-gray-500"
+      >
+        {{ t('planner.legendShow') }}
+      </span>
+      <MemberChip
+        v-for="m in familyStore.humans"
+        :key="m.id"
+        :member-id="m.id"
+        size="dot"
+        class="!h-7 !w-7 !text-xs"
+      />
+      <span
+        class="from-primary-500 to-terracotta-400 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-bold text-white"
+        :title="t('planner.legendFamily')"
+      >
+        ★
+      </span>
+    </div>
+
+    <!-- Desktop-only day-of-week column headers -->
+    <div class="hidden md:mb-1 md:grid md:grid-cols-7 md:gap-0">
       <div
         v-for="label in dayLabels"
         :key="label"
@@ -402,152 +437,63 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
       </div>
     </div>
 
-    <!-- Calendar grid -->
-    <div>
-      <div class="grid grid-cols-7 gap-0">
-        <button
-          v-for="(cell, idx) in calendarDays"
-          :key="idx"
-          type="button"
-          class="relative flex h-[60px] cursor-pointer flex-col items-center justify-start rounded-xl pt-1.5 transition-colors md:h-[72px]"
-          :class="[
-            cell.isCurrentMonth
-              ? 'text-secondary-500 dark:text-gray-200'
-              : 'text-secondary-500/20 dark:text-gray-600',
-            cellBgClass(cell),
-            props.selectedDate === cell.date ? 'ring-primary-500 ring-2 ring-inset' : '',
-          ]"
-          @click="handleDayClick(cell.date)"
+    <!-- Calendar body. Mobile = vertical day-stack (`flex flex-col`) with
+         week separators between weeks; desktop = 7-column grid. Outside-
+         month cells hide on mobile and show faded on desktop. -->
+    <div class="flex flex-col gap-1.5 md:grid md:grid-cols-7 md:gap-0">
+      <template v-for="(cell, idx) in calendarDays" :key="cell.date">
+        <!-- Mobile-only week separator before the first visible cell of each week -->
+        <div
+          v-if="weekSeparatorIndexes.has(idx)"
+          class="flex items-center gap-2 px-1 pt-1 pb-0.5 md:hidden"
+          :class="
+            weekRangeByRow.get(cell.weekRow)?.isCurrent
+              ? 'text-primary-500'
+              : 'text-secondary-500/50 dark:text-gray-500'
+          "
         >
-          <!-- Day number -->
-          <span
-            class="font-outfit flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold"
-            :class="
-              cell.isToday
-                ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white shadow-[0_2px_6px_rgba(241,93,34,0.3)]'
-                : ''
-            "
-          >
-            {{ cell.day }}
+          <span class="font-outfit text-[0.625rem] font-bold tracking-[0.14em] uppercase">
+            {{
+              weekRangeByRow.get(cell.weekRow)?.isCurrent
+                ? t('planner.weekThis')
+                : weekRangeByRow.get(cell.weekRow)?.isNext
+                  ? t('planner.weekNext')
+                  : t('planner.weekUpcoming')
+            }}
           </span>
-
-          <!-- All-day lane: public-holiday chip(s) pinned to the top, then
-               multi-day activity slices + single-day chips, capped at 2
-               visible total with `+N` overflow (overflow falls back to the
-               day-click handler that opens the day-detail surface). Per-cell
-               slices form a continuous bar via rounded-corner CSS on
-               isStart/isEnd. -->
-          <div
-            v-if="cell.holidays.length > 0 || cell.allDayItems.length > 0"
-            class="mt-0.5 flex w-full flex-col gap-px"
+          <span
+            class="font-outfit text-[0.625rem] font-medium normal-case"
+            :class="weekRangeByRow.get(cell.weekRow)?.isCurrent ? 'opacity-90' : 'opacity-70'"
           >
-            <HolidayChip
-              v-for="(h, hi) in cell.holidays"
-              :key="'h:' + hi"
-              :holiday="h"
-              :is-start="true"
-              :is-end="true"
-              class="block w-full"
-              @click.stop="emit('holiday-click', h)"
-            />
-            <AllDayActivityChip
-              v-for="(item, i) in cell.allDayItems.slice(
-                0,
-                Math.max(0, ALL_DAY_VISIBLE_CAP - cell.holidays.length)
-              )"
-              :key="item.activity.id + ':' + i"
-              :activity="item.activity"
-              :is-start="item.isStart"
-              :is-end="item.isEnd"
-              class="block w-full"
-              @click.stop="emit('view-activity', item.activity.id, cell.date)"
-            />
-            <span
-              v-if="cell.holidays.length + cell.allDayItems.length > ALL_DAY_VISIBLE_CAP"
-              class="text-secondary-500/40 px-0.5 text-[0.5625rem] leading-tight dark:text-gray-500"
-            >
-              +{{ cell.holidays.length + cell.allDayItems.length - ALL_DAY_VISIBLE_CAP }}
-            </span>
-          </div>
+            · {{ weekRangeByRow.get(cell.weekRow)?.range }}
+          </span>
+          <span
+            class="h-px flex-1"
+            :class="
+              weekRangeByRow.get(cell.weekRow)?.isCurrent
+                ? 'bg-primary-500/30'
+                : 'bg-gray-200 dark:bg-slate-700'
+            "
+          />
+        </div>
 
-          <!-- Activity dots -->
-          <div v-if="cell.activities.length > 0" class="mt-0.5 flex items-center gap-[3px]">
-            <span
-              v-for="(act, i) in cell.activities.slice(0, 4)"
-              :key="i"
-              class="inline-block h-[5px] w-[5px] rounded-full"
-              :style="{ backgroundColor: act.color ?? CATEGORY_COLORS[act.category] }"
-            />
-            <span
-              v-if="cell.activities.length > 4"
-              class="text-secondary-500/30 text-xs dark:text-gray-500"
-            >
-              +{{ cell.activities.length - 4 }}
-            </span>
-          </div>
-
-          <!-- Travel-segment chips (compact emoji + time; click → opens segment editor) -->
-          <div
-            v-if="cell.segments.length > 0"
-            class="mt-0.5 flex w-full items-center gap-[2px] px-0.5"
-          >
-            <span
-              v-for="seg in cell.segments.slice(0, 2)"
-              :key="seg.segmentId + '-' + seg.kind"
-              class="font-outfit truncate rounded-sm px-0.5 text-[0.5625rem] leading-tight font-bold text-[#0077B6] dark:text-[#00B4D8]"
-              :class="
-                seg.status === 'pending'
-                  ? 'border border-dashed border-[var(--vacation-teal)] bg-[var(--vacation-teal-5)] italic opacity-80'
-                  : 'border-l-2 border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)]'
-              "
-              :title="seg.title"
-              @click.stop="emit('view-segment', seg.vacationId, seg.segmentIndex)"
-            >
-              {{ transportEmoji(seg.transportType, seg.kind) }}
-              <span class="opacity-80">{{
-                seg.kind === 'departure'
-                  ? t('planner.segmentDepartureShort')
-                  : t('planner.segmentArrivalShort')
-              }}</span>
-              <template v-if="seg.time">
-                {{ ' ' + formatTime12(seg.time) }}
-              </template>
-              <span class="sr-only">{{
-                seg.kind === 'departure'
-                  ? t('planner.segmentDeparture')
-                  : t('planner.segmentArrival')
-              }}</span>
-            </span>
-            <span
-              v-if="cell.segments.length > 2"
-              class="text-secondary-500/40 text-[0.5625rem]"
-              aria-hidden="true"
-            >
-              +{{ cell.segments.length - 2 }}
-            </span>
-          </div>
-
-          <!-- Spacer pushes vacation bars to bottom of cell (aligned across columns) -->
-          <div class="flex-1" />
-
-          <!-- Vacation indicators (anchored to bottom of cell) -->
-          <div
-            v-for="vac in cell.vacations"
-            :key="vac.id"
-            class="mt-0.5 w-full cursor-pointer overflow-hidden rounded-sm px-0.5"
-            style="background: rgb(0 180 216 / 12%)"
-            @click.stop="emit('vacation-click', vac.id)"
-          >
-            <span
-              v-if="vac.isStart"
-              class="font-outfit block truncate text-[0.5rem] leading-tight font-bold text-[#0077B6] dark:text-[#00B4D8]"
-            >
-              {{ vac.emoji }} {{ vac.name }}
-            </span>
-            <span v-else class="block h-[10px]" />
-          </div>
-        </button>
-      </div>
+        <!-- Day card. Outside-month cells hide on mobile to keep the
+             day-stack focused; they still render (faded) on desktop to
+             keep the 7-column grid aligned. -->
+        <MonthDayCard
+          :cell="cell"
+          :all-day-cap="ALL_DAY_VISIBLE_CAP"
+          :timed-cap="TIMED_VISIBLE_CAP"
+          :selected="props.selectedDate === cell.date"
+          :bg-class="cellBgClass(cell)"
+          :class="cell.isCurrentMonth ? '' : 'hidden md:flex'"
+          @select-date="handleDayClick"
+          @view-activity="(id, date) => emit('view-activity', id, date)"
+          @holiday-click="(h) => emit('holiday-click', h)"
+          @vacation-click="(vid) => emit('vacation-click', vid)"
+          @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
+        />
+      </template>
     </div>
   </div>
 </template>
