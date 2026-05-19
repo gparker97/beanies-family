@@ -5,6 +5,7 @@ import router from './router';
 import { initAnalytics } from './services/analytics/plausible';
 import { reportError } from './utils/errorReporter';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from './utils/hardReload';
+import { isIdbTransientError } from './utils/idbTransient';
 import './style.css';
 
 initAnalytics();
@@ -52,6 +53,14 @@ window.addEventListener('unhandledrejection', (event) => {
   // below — surface them to console for devs but skip the Slack reporter.
   if (isChunkLoadError(reason)) {
     console.warn('[main] chunk load failure — recovering via hardReload:', reason);
+    return;
+  }
+  // iOS WebKit's "internal error" IDB transient — call sites that matter
+  // wrap with `withIdbRetry`, but anything that slips past a catch should
+  // not pollute #beanies-errors with a non-actionable browser-platform
+  // signal. Same shape as the `isChunkLoadError` suppression above.
+  if (isIdbTransientError(reason)) {
+    console.warn('[main] IDB transient — call-site retry should handle, leaving alone:', reason);
     return;
   }
   reportError({

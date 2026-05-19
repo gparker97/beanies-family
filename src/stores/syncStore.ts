@@ -1719,6 +1719,21 @@ export const useSyncStore = defineStore('sync', () => {
       const hiddenForMs = getHiddenDurationMs();
       const visibilityState = typeof document !== 'undefined' ? document.visibilityState : null;
 
+      // hadRefreshToken=false → no refresh was even attempted (none stored).
+      // This is the "user must reconnect" terminal state, not a transient
+      // failure — the banner is the designed UX response and there is no
+      // bug to investigate. Log to console for local diagnostics but don't
+      // pollute #beanies-errors with by-design events. Real silent-refresh
+      // failures (hadRefreshToken=true with attempts) still alert.
+      if (diag?.hadRefreshToken === false) {
+        console.warn(
+          '[syncStore] cold-start reconnect: no stored refresh token, banner shown ' +
+            '(no auto-recovery possible; user must reconnect). ' +
+            `lastError: ${lastErr ?? 'unknown'}, visibility: ${visibilityState}`
+        );
+        return;
+      }
+
       reportError({
         surface: 'cold-start-reconnect-escalation',
         message:
