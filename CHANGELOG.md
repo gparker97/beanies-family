@@ -24,6 +24,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Navigator strip rows stay static when tapping inside.** Clicking a day in the second (next-week) row used to reshuffle the strip — the second row moved up and a new row appeared below, which made the strip feel like it was running away from the user. Now the strip stays anchored to whatever 2 weeks it was showing; tapping any day moves the timeline below to that day's week and shifts the "focused-week" accent strip between the two rows. The prev/next arrows above the strip are the only thing that moves the strip itself (along with the timeline, in sync).
 
+- **2-week navigator strip is mobile-only.** On desktop and tablet the full week is already visible in the time grid and the prev/next arrows handle week navigation, so the strip was duplicating information without adding any. It now only renders below the `md` breakpoint — desktop/tablet weekly view goes back to its original layout.
+
 - **Monthly mobile opens at today, with today visible even when empty.** The vertical day-stack used to land at the 1st of the month, forcing users to scroll to find today. Now on first mount of the current month, the view auto-scrolls to today's card (with ~80px headroom under the topbar). Today's card itself gets a 3px orange left bar and a soft orange wash, so even when there are zero events scheduled it reads as the intentional "you are here" placeholder — including a small `TODAY` caption under the day number when the events column is empty. Navigating to a different month no longer auto-scrolls.
 
 ### Changed

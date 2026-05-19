@@ -575,11 +575,15 @@ defineExpose({ weekLabel, activityCount });
   >
     <CalendarNavBar :label="weekLabel" @prev="prevWeek" @next="nextWeek" @today="goToToday" />
 
-    <!-- 2-week date navigator. Stays static when tapping a day inside —
-         only the prev/next arrows on the nav bar above move it. The
-         orange "selected" pill follows `selectedMobileDay` so the user
-         sees which day's events are showing in the timeline below. -->
+    <!-- 2-week date navigator — MOBILE ONLY. Desktop already shows the
+         full week in the time grid below + has prev/next arrows for week
+         navigation, so the strip is redundant there. Stays static when
+         tapping a day inside — only the prev/next arrows on the nav bar
+         move it. The orange "selected" pill follows `selectedMobileDay`
+         so the user sees which day's events are showing in the timeline
+         below. -->
     <WeekStripNav
+      v-if="isMobile"
       :weeks="weekStripData"
       :selected-date="selectedMobileDay"
       @select-date="onStripDayClick"
