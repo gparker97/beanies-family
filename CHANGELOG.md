@@ -26,6 +26,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **2-week navigator strip is mobile-only.** On desktop and tablet the full week is already visible in the time grid and the prev/next arrows handle week navigation, so the strip was duplicating information without adding any. It now only renders below the `md` breakpoint — desktop/tablet weekly view goes back to its original layout.
 
+- **"Today" button on the monthly view now scrolls to today on mobile.** Tapping the today button used to be a no-op when you were already on the current month — but on mobile the long vertical day-stack means today's card could be ~800px below the viewport. The button now always smooth-scrolls to today's card with the same 80px headroom as the first-mount auto-scroll, whether you were on a different month (which also changes the year/month) or already on the current one.
+
 - **Monthly mobile opens at today, with today visible even when empty.** The vertical day-stack used to land at the 1st of the month, forcing users to scroll to find today. Now on first mount of the current month, the view auto-scrolls to today's card (with ~80px headroom under the topbar). Today's card itself gets a 3px orange left bar and a soft orange wash, so even when there are zero events scheduled it reads as the intentional "you are here" placeholder — including a small `TODAY` caption under the day number when the events column is empty. Navigating to a different month no longer auto-scrolls.
 
 ### Changed
