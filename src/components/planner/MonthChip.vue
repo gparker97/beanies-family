@@ -19,13 +19,13 @@
  * blocks consume the same rule.
  */
 import { computed } from 'vue';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberInfo } from '@/composables/useMemberInfo';
+import { useActivityChipClass } from '@/composables/useActivityChipClass';
 import { getActivityCategoryById, getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { formatNameList, normalizeAssignees } from '@/utils/assignees';
 import { formatTime12 } from '@/utils/date';
 import MemberChip from '@/components/ui/MemberChip.vue';
-import type { FamilyActivity, FamilyMember } from '@/types/models';
+import type { FamilyActivity } from '@/types/models';
 
 interface ActivityOccurrence {
   activity: FamilyActivity;
@@ -40,49 +40,10 @@ const emit = defineEmits<{
   'view-activity': [activityId: string, date: string];
 }>();
 
-const familyStore = useFamilyStore();
-const { getMemberById, getMemberName, getMemberColor } = useMemberInfo();
+const { getMemberName } = useMemberInfo();
+const { classify } = useActivityChipClass();
 
-// Heritage Orange — used for "family" (no assignees) and "shared" (2+) chips.
-// Hex constant (not CSS var) because we tint the background with `${hex}1f`
-// to match the existing AllDayActivityChip pattern, which only works on hex.
-const HERITAGE_ORANGE = '#F15D22';
-
-type Classification =
-  | { kind: 'solo'; color: string; members: FamilyMember[] }
-  | { kind: 'family'; color: string; members: FamilyMember[] }
-  | { kind: 'shared'; color: string; members: FamilyMember[] };
-
-const classification = computed<Classification>(() => {
-  const ids = normalizeAssignees(props.occurrence.activity);
-
-  // 0 assignees = whole-family event. Stack = all humans (pets excluded
-  // via familyStore.humans).
-  if (ids.length === 0) {
-    return { kind: 'family', color: HERITAGE_ORANGE, members: familyStore.humans };
-  }
-
-  // 1 assignee = solo. Left bar carries the member's color; no stack.
-  if (ids.length === 1) {
-    return {
-      kind: 'solo',
-      color: getMemberColor(ids[0]),
-      members: [],
-    };
-  }
-
-  // 2+ assignees = shared. Resolve to real members, drop deleted-ID
-  // references. If every assignee turns out to be unknown (rare data-
-  // corruption case), fall back to solo semantics with the default color
-  // rather than misrepresent as a multi-person event.
-  const members = ids.map((id) => getMemberById(id)).filter((m): m is FamilyMember => Boolean(m));
-
-  if (members.length === 0) {
-    return { kind: 'solo', color: getMemberColor(null), members: [] };
-  }
-
-  return { kind: 'shared', color: HERITAGE_ORANGE, members };
-});
+const classification = computed(() => classify(props.occurrence.activity));
 
 const emoji = computed(() => {
   const a = props.occurrence.activity;
