@@ -8,8 +8,6 @@ import { useFamilyStore } from '@/stores/familyStore';
 import CalendarGrid from '@/components/planner/CalendarGrid.vue';
 import WeeklyCalendarView from '@/components/planner/WeeklyCalendarView.vue';
 import DailyCalendarView from '@/components/planner/DailyCalendarView.vue';
-import UpcomingActivities from '@/components/planner/UpcomingActivities.vue';
-import TodoPreview from '@/components/planner/TodoPreview.vue';
 import ActivityModal from '@/components/planner/ActivityModal.vue';
 import ActivityViewEditModal from '@/components/planner/ActivityViewEditModal.vue';
 import TravelSegmentEditModal from '@/components/travel/TravelSegmentEditModal.vue';
@@ -617,15 +615,6 @@ function handleActivitySwapped(newId: string) {
       @view-segment="handleViewSegment"
       @holiday-click="handleHolidayClick"
     />
-
-    <!-- Two-column layout: Upcoming + Todo preview -->
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <UpcomingActivities
-        @edit="(id: string, date: string) => openViewModal(id, date)"
-        @holiday-click="handleHolidayClick"
-      />
-      <TodoPreview @view="openTodoViewModal" />
-    </div>
 
     <!-- Inactive activities toggle (month view only) -->
     <div v-if="activeView === 'month' && activityStore.inactiveActivities.length > 0">

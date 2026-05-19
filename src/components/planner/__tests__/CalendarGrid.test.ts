@@ -119,9 +119,10 @@ describe('CalendarGrid travel-segment chips', () => {
 
     const wrapper = mount(CalendarGrid);
     const html = wrapper.html();
-    // Pending → dashed border + italic
-    expect(html).toContain('border-dashed');
-    expect(html).toContain('italic');
+    // Pending → travel-chip-pending class. Scoped CSS in TravelSegmentChip.vue
+    // supplies the dashed border + italic styles; the test checks the class
+    // hook (which survives the chip extraction during the chip refactor).
+    expect(html).toContain('travel-chip-pending');
   });
 
   it('caps visible chips at 2 with a +N overflow indicator', () => {
@@ -214,5 +215,88 @@ describe('CalendarGrid all-day lane', () => {
     const events = wrapper.emitted('view-activity');
     expect(events).toBeTruthy();
     expect(events![0]).toEqual(['a-click', '2026-04-14']);
+  });
+});
+
+describe('CalendarGrid timed-chip row', () => {
+  it('renders a MonthChip for each timed activity on a day', () => {
+    // Two timed activities on the same day (April 14, 2026 — system time pinned above)
+    mockActivityOccurrences.push(
+      {
+        activity: {
+          id: 'a-timed-1',
+          title: 'Piano',
+          date: '2026-04-14',
+          startTime: '15:30',
+          category: 'piano',
+          isAllDay: false,
+          recurrence: { type: 'none' },
+          feeSchedule: 'none',
+          reminderMinutes: { default: 15 },
+          isActive: true,
+          createdBy: 'm-1',
+          createdAt: NOW,
+          updatedAt: NOW,
+          assigneeIds: ['m-1'],
+        } as unknown as FamilyActivity,
+        date: '2026-04-14',
+      },
+      {
+        activity: {
+          id: 'a-timed-2',
+          title: 'Soccer',
+          date: '2026-04-14',
+          startTime: '16:00',
+          category: 'soccer',
+          isAllDay: false,
+          recurrence: { type: 'none' },
+          feeSchedule: 'none',
+          reminderMinutes: { default: 15 },
+          isActive: true,
+          createdBy: 'm-1',
+          createdAt: NOW,
+          updatedAt: NOW,
+          assigneeIds: ['m-1'],
+        } as unknown as FamilyActivity,
+        date: '2026-04-14',
+      }
+    );
+
+    const wrapper = mount(CalendarGrid);
+    const chips = wrapper.findAll('[data-testid="month-chip"]');
+    expect(chips.length).toBe(2);
+    const text = wrapper.text();
+    expect(text).toContain('Piano');
+    expect(text).toContain('Soccer');
+  });
+
+  it('renders +N more button when a day exceeds the timed-chip cap', () => {
+    // 6 timed activities on the same day → cap is 4 → 4 chips + "+2 more"
+    for (let i = 0; i < 6; i++) {
+      mockActivityOccurrences.push({
+        activity: {
+          id: `a-overflow-${i}`,
+          title: `Event ${i}`,
+          date: '2026-04-14',
+          startTime: `${10 + i}:00`,
+          category: 'other_activity',
+          isAllDay: false,
+          recurrence: { type: 'none' },
+          feeSchedule: 'none',
+          reminderMinutes: { default: 15 },
+          isActive: true,
+          createdBy: 'm-1',
+          createdAt: NOW,
+          updatedAt: NOW,
+          assigneeIds: ['m-1'],
+        } as unknown as FamilyActivity,
+        date: '2026-04-14',
+      });
+    }
+
+    const wrapper = mount(CalendarGrid);
+    const chips = wrapper.findAll('[data-testid="month-chip"]');
+    expect(chips.length).toBe(4);
+    expect(wrapper.text()).toContain('+2');
   });
 });

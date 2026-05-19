@@ -4942,12 +4942,6 @@ const STRING_DEFS = {
   },
   'planner.today': { en: 'Today', beanie: 'today' },
   'planner.openAgenda': { en: 'Open agenda view', beanie: 'open agenda view' },
-  'planner.upcoming': { en: 'Upcoming Activities', beanie: 'upcoming activities' },
-  'planner.noUpcoming': { en: 'No upcoming activities', beanie: 'no upcoming activities' },
-  'planner.todoPreview': { en: 'Family To-Do', beanie: 'family to-do' },
-  'planner.viewAllTodos': { en: 'View all →', beanie: 'view all →' },
-  'planner.onCalendar': { en: 'On calendar', beanie: 'on calendar' },
-  'planner.viewMore': { en: 'View more', beanie: 'view more' },
   'planner.inactiveActivities': { en: 'Inactive Activities', beanie: 'inactive activities' },
   'planner.noInactive': { en: 'No inactive activities', beanie: 'no inactive activities' },
   'planner.showInactive': { en: 'Show inactive', beanie: 'show inactive' },
@@ -4959,6 +4953,15 @@ const STRING_DEFS = {
     beanie: 'no specific start or end time',
   },
   'planner.agenda': { en: 'Agenda', beanie: 'agenda' },
+
+  // Planner — Month grid chip overflow + mobile legend + week separators
+  'planner.moreEvents': { en: '{count} more activities', beanie: '{count} more activities' },
+  'planner.moreEventsShort': { en: 'more', beanie: 'more' },
+  'planner.legendShow': { en: 'Show', beanie: 'show' },
+  'planner.legendFamily': { en: 'Family events', beanie: 'family events' },
+  'planner.weekThis': { en: 'This week', beanie: 'this week' },
+  'planner.weekNext': { en: 'Next week', beanie: 'next week' },
+  'planner.weekUpcoming': { en: 'Upcoming', beanie: 'upcoming' },
 
   // Planner — View toggle
   'planner.view.month': { en: 'Month', beanie: 'month' },

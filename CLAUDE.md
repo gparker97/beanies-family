@@ -19,6 +19,8 @@
 > - `docs/prompts/` — Prompt archive (all user prompts logged per task with timestamps and categories)
 > - `CHANGELOG.md` — Human-readable changelog (updated every push)
 > - `docs/E2E_HEALTH.md` — E2E test failure tracking log
+> - `docs/lessons.md` — Lessons learned from corrections (this project's version of the global `tasks/lessons.md` convention; review at session start, append to after corrections)
+> - `docs/mockups/` — HTML mockups and design explorations (one file per concept)
 >
 > **Brand:**
 >

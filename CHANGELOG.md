@@ -8,6 +8,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-19
+
+### Changed
+
+- **Monthly calendar replaces dots with member-color chips.** The month view previously showed timed activities as small colored dots — readable as "something is happening" but never "what". Each day now renders up to 4 chips per cell with the assigned bean's color as a left bar, the category emoji, the time, and the truncated title. A `+N more` button opens the full day. Solo events use the bean's own colour; whole-family (no-assignee) and shared (2+ assignees) events use Heritage Orange. On mobile, the 7-column grid collapses to a vertical day-stack — each day card gets a DOW label ("tue 19"), week separators between Mondays mark the current week in orange, and multi-person events surface an avatar stack on the right so you can tell "everyone vs just the parents" at a glance. A new mobile-only legend strip below the toolbar lists the family members as colored dots in a single row, never wrapping.
+
+- **Activities page simplified.** "Upcoming Activities" and "Family To-Do" sections below the calendar are removed — the new chip calendar carries the upcoming list directly, and todos with due dates already appear on the calendar. The canonical to-do page stays at `/todo`. The page is now vacations card → calendar → archived-activities toggle, ~270 LOC lighter, and reads as a single calm scroll on mobile.
+
+### Removed
+
+- `UpcomingActivities.vue` and `TodoPreview.vue` components, plus 6 orphan translation keys (`planner.upcoming`, `planner.noUpcoming`, `planner.todoPreview`, `planner.viewAllTodos`, `planner.onCalendar`, `planner.viewMore`).
+
+---
+
 ## 2026-05-18
 
 ### Changed

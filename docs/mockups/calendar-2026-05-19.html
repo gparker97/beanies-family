@@ -1,0 +1,3359 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family · calendar concepts</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Caveat:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* ============================================================
+         beanies.family · calendar concept mockups · 2026-05-19
+         5 monthly directions + a weekly redesign, each wrapped in
+         the live app shell (sidebar + topbar + mobile bottom nav)
+         and fully responsive at desktop / tablet / mobile widths.
+         ============================================================ */
+
+      :root {
+        /* brand */
+        --orange: #f15d22;
+        --orange-soft: #fce4d6;
+        --orange-glow: rgba(241, 93, 34, 0.12);
+        --orange-ink: #c84612;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --slate-soft: #5d6d7e;
+        --slate-mute: #8b97a3;
+        --sky: #aed6f1;
+        --sky-soft: #e1f0f9;
+        --cloud: #f8f9fa;
+        --paper: #ffffff;
+        --line: #e8ecef;
+        --line-strong: #d6dde2;
+
+        /* family member palette */
+        --m-greg: #2c3e50;
+        --m-greg-soft: #dde3e9;
+        --m-mira: #7e57c2;
+        --m-mira-soft: #ebe3f6;
+        --m-aria: #6aa84f;
+        --m-aria-soft: #e3eedb;
+        --m-oren: #4a90c2;
+        --m-oren-soft: #e0ecf5;
+        --m-juno: #f15d22;
+        --m-juno-soft: #fce4d6;
+
+        --lift-1: 0 1px 2px rgba(44, 62, 80, 0.04);
+        --lift-2: 0 6px 18px -8px rgba(44, 62, 80, 0.12);
+        --lift-3: 0 18px 40px -16px rgba(44, 62, 80, 0.18);
+
+        --r-sm: 6px;
+        --r-md: 10px;
+        --r-lg: 14px;
+        --r-xl: 20px;
+        --r-pill: 999px;
+
+        --sidebar-w: 240px;
+        --topbar-h: 60px;
+        --switcher-h: 44px;
+        --mobile-bottomnav-h: 64px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background: var(--cloud);
+        color: var(--slate);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ============================================================
+         SCREEN SWITCHER — fixed top bar to flip between concepts
+         ============================================================ */
+      .switcher {
+        position: fixed;
+        inset: 0 0 auto 0;
+        height: var(--switcher-h);
+        background: linear-gradient(180deg, var(--slate), #243240);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0 12px;
+        z-index: 100;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .switcher .badge {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--orange);
+        margin-right: 14px;
+        white-space: nowrap;
+      }
+
+      .switcher button {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: var(--r-pill);
+        border: 1px solid transparent;
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.65);
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s, color 0.15s;
+      }
+
+      .switcher button:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+      }
+
+      .switcher button.active {
+        background: var(--orange);
+        color: #fff;
+        border-color: var(--orange);
+      }
+
+      /* ============================================================
+         APP SHELL
+         ============================================================ */
+      .app-shell {
+        position: fixed;
+        inset: var(--switcher-h) 0 0 0;
+        display: grid;
+        grid-template-columns: var(--sidebar-w) 1fr;
+        grid-template-rows: var(--topbar-h) 1fr;
+        grid-template-areas:
+          'sidebar topbar'
+          'sidebar main';
+        background: var(--cloud);
+        overflow: hidden;
+      }
+
+      .sidebar {
+        grid-area: sidebar;
+        background: var(--slate);
+        color: #fff;
+        display: flex;
+        flex-direction: column;
+        padding: 16px 12px;
+        overflow-y: auto;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 4px 6px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        margin-bottom: 14px;
+      }
+
+      .brand-mark {
+        width: 38px;
+        height: 38px;
+        border-radius: 11px;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        display: grid;
+        place-items: center;
+        font-size: 20px;
+        flex-shrink: 0;
+      }
+
+      .brand-name {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 15px;
+        line-height: 1.1;
+      }
+
+      .brand-name span {
+        color: var(--orange);
+      }
+
+      .brand-tag {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 300;
+        font-style: italic;
+        letter-spacing: 0.04em;
+        color: rgba(255, 255, 255, 0.3);
+        margin-top: 2px;
+      }
+
+      .nav-section-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        padding: 14px 10px 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .nav-section-label.treehouse {
+        color: var(--orange);
+      }
+
+      .nav-section-label.piggy {
+        color: #27ae60;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 12px;
+        border-radius: 14px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 500;
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.42);
+        cursor: pointer;
+        position: relative;
+        border-left: 4px solid transparent;
+        transition: background 0.15s, color 0.15s;
+      }
+
+      .nav-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .nav-item.active {
+        background: linear-gradient(
+          90deg,
+          rgba(241, 93, 34, 0.2),
+          rgba(230, 126, 34, 0.1) 80%,
+          transparent
+        );
+        color: #fff;
+        font-weight: 600;
+        border-left-color: var(--orange);
+        padding-left: 8px;
+      }
+
+      .nav-item .emoji {
+        width: 22px;
+        text-align: center;
+        font-size: 15px;
+      }
+
+      .nav-item .label {
+        flex: 1;
+      }
+
+      .nav-item .nav-badge {
+        font-family: 'Inter', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: var(--orange);
+        color: #fff;
+      }
+
+      .sidebar-pin {
+        margin-top: auto;
+      }
+
+      .sidebar-footer {
+        margin-top: 8px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .sidebar-footer .avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--orange);
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+      }
+
+      .sidebar-footer .who {
+        font-family: 'Outfit', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      .sidebar-footer .who small {
+        display: block;
+        font-weight: 400;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.35);
+        margin-top: 1px;
+      }
+
+      .sidebar-meta {
+        margin-top: 8px;
+        padding: 0 6px;
+        font-family: 'Inter', sans-serif;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.25);
+      }
+
+      .sidebar-meta .lock {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: rgba(110, 231, 183, 0.45);
+      }
+
+      .topbar {
+        grid-area: topbar;
+        background: var(--paper);
+        border-bottom: 1px solid var(--line);
+        padding: 0 24px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .topbar .hamburger {
+        display: none;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border: 0;
+        background: var(--cloud);
+        color: var(--slate);
+        cursor: pointer;
+        font-size: 18px;
+      }
+
+      .topbar .page-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 500;
+        font-size: 20px;
+        letter-spacing: -0.01em;
+        flex: 1;
+        margin: 0;
+      }
+
+      .topbar .page-title .accent {
+        color: var(--orange);
+      }
+
+      .topbar .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .top-actions .icon-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: var(--paper);
+        color: var(--slate-soft);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        font-size: 15px;
+      }
+
+      .top-actions .icon-btn:hover {
+        border-color: var(--line-strong);
+        color: var(--slate);
+      }
+
+      .top-actions .me {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--orange);
+        color: white;
+        display: grid;
+        place-items: center;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+      }
+
+      .main {
+        grid-area: main;
+        overflow-y: auto;
+        padding: 24px;
+      }
+
+      .main-inner {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .concept-intro {
+        background: linear-gradient(135deg, #fff8f3 0%, #fff 60%);
+        border: 1px solid var(--orange-soft);
+        border-radius: var(--r-lg);
+        padding: 14px 18px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 12px 24px;
+      }
+
+      .concept-intro .num {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--orange);
+      }
+
+      .concept-intro h2 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 500;
+        font-size: 20px;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+
+      .concept-intro h2 em {
+        font-style: italic;
+        font-weight: 500;
+        color: var(--orange);
+      }
+
+      .concept-intro p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--slate-soft);
+        flex-basis: 100%;
+      }
+
+      /* "Page-level" sections that wrap the calendar on the real
+         activities page — vacations strip above, inactive toggle below. */
+      .page-section {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--r-lg);
+        padding: 14px 18px;
+      }
+
+      .page-section.vacations {
+        background: linear-gradient(135deg, #f4faff 0%, #fff 60%);
+        border-color: var(--sky-soft);
+      }
+
+      .page-section .section-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .page-section .section-head h3 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--slate);
+        margin: 0;
+        letter-spacing: -0.005em;
+      }
+
+      .page-section .section-head .count-pill {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--cloud);
+        color: var(--slate-mute);
+      }
+
+      .vacations-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 10px;
+      }
+
+      .vacation-card {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--r-md);
+        padding: 12px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        cursor: pointer;
+      }
+
+      .vacation-card .emoji {
+        font-size: 24px;
+        background: var(--sky-soft);
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+      }
+
+      .vacation-card .info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .vacation-card .name {
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--slate);
+        line-height: 1.2;
+      }
+
+      .vacation-card .meta {
+        font-family: 'Inter', sans-serif;
+        font-size: 12px;
+        color: var(--slate-mute);
+        margin-top: 2px;
+      }
+
+      .vacation-card .countdown {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--orange);
+        background: var(--orange-soft);
+        padding: 2px 8px;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+
+      .inactive-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: transparent;
+        border: 0;
+        padding: 12px 0 4px;
+        cursor: pointer;
+        font-family: 'Outfit', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--slate-mute);
+      }
+
+      .inactive-toggle:hover {
+        color: var(--slate);
+      }
+
+      .inactive-toggle .chev {
+        font-size: 10px;
+        color: var(--slate-mute);
+      }
+
+      .inactive-list {
+        display: none;
+        margin-top: 8px;
+        gap: 6px;
+        flex-direction: column;
+      }
+
+      .inactive-list.open {
+        display: flex;
+      }
+
+      .inactive-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        background: var(--paper);
+        border-radius: var(--r-md);
+        border-left: 3px solid #95a5a6;
+        opacity: 0.7;
+        cursor: pointer;
+        font-family: 'Inter', sans-serif;
+        font-size: 13px;
+      }
+
+      .inactive-row:hover {
+        opacity: 1;
+      }
+
+      .inactive-row .emoji {
+        font-size: 14px;
+        opacity: 0.7;
+      }
+
+      .inactive-row .title {
+        flex: 1;
+        font-weight: 500;
+        color: var(--slate);
+      }
+
+      .inactive-row .badge {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--slate-mute);
+      }
+
+      .removal-note {
+        background: linear-gradient(135deg, #fffbed 0%, #fff 60%);
+        border: 1px dashed #f1c40f;
+        border-radius: var(--r-md);
+        padding: 12px 14px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        color: #8a6d0e;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-top: 4px;
+      }
+
+      .removal-note .label {
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+
+      .mobile-bottomnav {
+        display: none;
+        position: fixed;
+        inset: auto 0 0 0;
+        height: var(--mobile-bottomnav-h);
+        background: var(--paper);
+        border-top: 1px solid var(--line);
+        padding: 8px 12px;
+        z-index: 50;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
+      }
+
+      .mobile-bottomnav button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        border: 0;
+        background: transparent;
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--slate-mute);
+        cursor: pointer;
+        border-radius: 10px;
+      }
+
+      .mobile-bottomnav button .emoji {
+        font-size: 18px;
+      }
+
+      .mobile-bottomnav button.active {
+        color: var(--orange);
+      }
+
+      .mobile-bottomnav button.active .emoji {
+        filter: drop-shadow(0 0 8px var(--orange-glow));
+      }
+
+      /* ============================================================
+         RESPONSIVE — collapse sidebar, switch chrome at breakpoints
+         ============================================================ */
+      @media (max-width: 1100px) {
+        :root {
+          --sidebar-w: 64px;
+        }
+        .brand-name,
+        .brand-tag,
+        .nav-section-label,
+        .nav-item .label,
+        .nav-item .nav-badge,
+        .sidebar-footer .who,
+        .sidebar-meta {
+          display: none;
+        }
+        .nav-item {
+          justify-content: center;
+          padding: 10px 8px;
+        }
+        .nav-item .emoji {
+          font-size: 17px;
+        }
+        .nav-item.active {
+          padding-left: 6px;
+        }
+        .brand {
+          justify-content: center;
+          padding: 4px 0 14px;
+        }
+        .sidebar-footer {
+          justify-content: center;
+        }
+        .main {
+          padding: 20px;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .app-shell {
+          grid-template-columns: 1fr;
+          grid-template-areas:
+            'topbar'
+            'main';
+        }
+        .sidebar {
+          display: none;
+        }
+        .topbar {
+          padding: 0 12px;
+        }
+        .topbar .hamburger {
+          display: grid;
+          place-items: center;
+        }
+        .topbar .page-title {
+          font-size: 17px;
+        }
+        .mobile-bottomnav {
+          display: grid;
+        }
+        .main {
+          padding: 14px 12px calc(var(--mobile-bottomnav-h) + 20px);
+        }
+        .top-actions .icon-btn:not(.keep) {
+          display: none;
+        }
+      }
+
+      /* ============================================================
+         SHARED CALENDAR PRIMITIVES
+         ============================================================ */
+      .calendar-card {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--r-xl);
+        box-shadow: var(--lift-2);
+        overflow: hidden;
+      }
+
+      .cal-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, #fcfcfd, #fafafc);
+        flex-wrap: wrap;
+      }
+
+      .cal-toolbar .month {
+        font-family: 'Outfit', sans-serif;
+        font-size: 20px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+      }
+
+      .cal-toolbar .month .yr {
+        color: var(--slate-mute);
+        font-weight: 300;
+        margin-left: 6px;
+      }
+
+      .cal-toolbar .spacer {
+        flex: 1;
+      }
+
+      .nav-btn {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r-md);
+        border: 1px solid var(--line);
+        background: var(--paper);
+        color: var(--slate);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+      }
+
+      .nav-btn:hover {
+        background: var(--cloud);
+        border-color: var(--line-strong);
+      }
+
+      .today-pill {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 6px 12px;
+        border-radius: var(--r-pill);
+        border: 1px solid var(--line);
+        background: var(--paper);
+        color: var(--slate);
+        cursor: pointer;
+      }
+
+      .view-toggle {
+        display: flex;
+        background: var(--cloud);
+        border-radius: var(--r-pill);
+        padding: 3px;
+        gap: 2px;
+      }
+
+      .view-toggle button {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 6px 12px;
+        border-radius: var(--r-pill);
+        border: 0;
+        background: transparent;
+        color: var(--slate-soft);
+        cursor: pointer;
+      }
+
+      .view-toggle button.active {
+        background: var(--paper);
+        color: var(--slate);
+        box-shadow: var(--lift-1);
+      }
+
+      .filter-strip {
+        display: flex;
+        gap: 6px;
+        padding: 10px 18px;
+        border-bottom: 1px solid var(--line);
+        background: var(--paper);
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .filter-strip .label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--slate-mute);
+        margin-right: 4px;
+      }
+
+      .member-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px 4px 5px;
+        border-radius: var(--r-pill);
+        background: var(--cloud);
+        border: 1px solid var(--line);
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--slate);
+        cursor: pointer;
+      }
+
+      .member-chip .avatar {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        color: white;
+        display: grid;
+        place-items: center;
+        font-size: 10px;
+        font-weight: 700;
+      }
+
+      .a-greg {
+        background: var(--m-greg);
+      }
+      .a-mira {
+        background: var(--m-mira);
+      }
+      .a-aria {
+        background: var(--m-aria);
+      }
+      .a-oren {
+        background: var(--m-oren);
+      }
+      .a-juno {
+        background: var(--m-juno);
+      }
+
+      .month-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 1px;
+        background: var(--line);
+      }
+
+      .dow-header {
+        background: var(--paper);
+        padding: 10px 12px 8px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--slate-mute);
+      }
+
+      .day-cell {
+        background: var(--paper);
+        min-height: 122px;
+        padding: 7px 7px 5px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .day-cell.outside {
+        background: #fafbfc;
+      }
+
+      .day-cell.outside .daynum {
+        color: var(--slate-mute);
+        opacity: 0.55;
+      }
+
+      .day-cell.today {
+        background: linear-gradient(180deg, #fff7f2 0%, #ffffff 60%);
+      }
+
+      .day-cell.today .daynum {
+        background: var(--orange);
+        color: white;
+        font-weight: 600;
+      }
+
+      .day-cell.busy-heat-1 {
+        background: linear-gradient(180deg, #fbfbfc 0%, #ffffff 70%);
+      }
+
+      .day-cell.busy-heat-2 {
+        background: linear-gradient(180deg, #fdf3ed 0%, #ffffff 75%);
+      }
+
+      .daynum-wrap {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2px;
+      }
+
+      .daynum {
+        font-family: 'Outfit', sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--slate);
+        width: 22px;
+        height: 22px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        line-height: 1;
+      }
+
+      .day-meta {
+        font-family: 'Outfit', sans-serif;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: var(--slate-mute);
+        text-transform: uppercase;
+      }
+
+      .events-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .chip {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 6px 2px 4px;
+        background: var(--paper);
+        border-radius: var(--r-sm);
+        font-family: 'Inter', sans-serif;
+        font-size: 11px;
+        line-height: 1.15;
+        color: var(--slate);
+        white-space: nowrap;
+        overflow: hidden;
+        cursor: pointer;
+        border-left: 3px solid transparent;
+      }
+
+      .chip:hover {
+        filter: brightness(0.97);
+      }
+
+      .chip .emoji {
+        font-size: 11px;
+        line-height: 1;
+      }
+
+      .chip .time {
+        font-family: 'Inter', sans-serif;
+        font-size: 10px;
+        color: var(--slate-mute);
+        font-weight: 500;
+      }
+
+      .chip .title {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 500;
+      }
+
+      .chip.greg {
+        border-left-color: var(--m-greg);
+        background: var(--m-greg-soft);
+      }
+      .chip.mira {
+        border-left-color: var(--m-mira);
+        background: var(--m-mira-soft);
+      }
+      .chip.aria {
+        border-left-color: var(--m-aria);
+        background: var(--m-aria-soft);
+      }
+      .chip.oren {
+        border-left-color: var(--m-oren);
+        background: var(--m-oren-soft);
+      }
+      .chip.juno {
+        border-left-color: var(--m-juno);
+        background: var(--m-juno-soft);
+      }
+      .chip.family {
+        border-left-color: var(--orange);
+        background: var(--orange-soft);
+        color: var(--orange-ink);
+      }
+      .chip.all-day {
+        border-left: 0;
+        background: var(--sky-soft);
+        font-weight: 600;
+      }
+      .chip.holiday-chip {
+        border-left: 0;
+        background: linear-gradient(135deg, #fff3e0, #ffe2c2);
+        color: #b04a05;
+        font-weight: 600;
+      }
+
+      .more-chip {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        color: var(--slate-mute);
+        cursor: pointer;
+        padding: 1px 6px;
+        letter-spacing: 0.04em;
+        font-weight: 600;
+      }
+
+      .more-chip:hover {
+        color: var(--orange);
+      }
+
+      /* Right-edge avatar stack inside a chip. Hidden on desktop —
+         the left member-color bar carries that role on the grid. On
+         mobile day-stack rows, multi-person events surface the stack
+         on the right where there's room for the extra signal. */
+      .chip-avatars {
+        display: none;
+        margin-left: auto;
+        padding-left: 6px;
+        flex-shrink: 0;
+      }
+
+      .chip-avatars .avatar {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        color: white;
+        font-family: 'Outfit', sans-serif;
+        font-size: 8px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+        margin-left: -4px;
+        box-shadow: 0 0 0 1.5px var(--paper);
+      }
+
+      .chip-avatars .avatar:first-child {
+        margin-left: 0;
+      }
+
+      .chip-avatars .overflow {
+        font-family: 'Outfit', sans-serif;
+        font-size: 8px;
+        font-weight: 700;
+        color: var(--slate-mute);
+        background: var(--cloud);
+        border-radius: 50%;
+        width: 16px;
+        height: 16px;
+        display: grid;
+        place-items: center;
+        margin-left: -4px;
+        box-shadow: 0 0 0 1.5px var(--paper);
+      }
+
+      .av-chip {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 6px 2px 2px;
+        border-radius: var(--r-pill);
+        background: var(--cloud);
+        font-family: 'Inter', sans-serif;
+        font-size: 11px;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        line-height: 1.1;
+      }
+
+      .av-chip:hover {
+        background: #eef2f5;
+      }
+
+      .av-stack {
+        display: flex;
+      }
+
+      .av-stack .avatar {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        color: white;
+        font-size: 8px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+        border: 1.5px solid var(--paper);
+        margin-left: -5px;
+      }
+
+      .av-stack .avatar:first-child {
+        margin-left: 0;
+      }
+
+      .av-chip .label {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 500;
+      }
+
+      .av-chip .time {
+        font-family: 'Inter', sans-serif;
+        font-size: 9px;
+        color: var(--slate-mute);
+      }
+
+      /* Tablet: tighter month cells, hide chip time */
+      @media (max-width: 1100px) {
+        .day-cell {
+          min-height: 108px;
+        }
+        .chip .time {
+          display: none;
+        }
+      }
+
+      @media (max-width: 920px) {
+        .day-cell {
+          min-height: 94px;
+          padding: 5px 5px 4px;
+        }
+        .dow-header {
+          padding: 8px 6px;
+          font-size: 9px;
+        }
+      }
+
+      /* Mobile: collapse month grid to vertical day-stack */
+      @media (max-width: 720px) {
+        .month-grid.compactable {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          background: transparent;
+        }
+        .month-grid.compactable .dow-header {
+          display: none;
+        }
+        .month-grid.compactable .day-cell {
+          flex-direction: row;
+          gap: 12px;
+          align-items: flex-start;
+          background: var(--paper);
+          border-radius: var(--r-md);
+          border: 1px solid var(--line);
+          padding: 10px 12px;
+          min-height: 0;
+        }
+        .month-grid.compactable .day-cell.outside {
+          display: none;
+        }
+        .month-grid.compactable .daynum-wrap {
+          flex-direction: column;
+          align-items: center;
+          gap: 1px;
+          margin: 0;
+          width: 38px;
+          flex-shrink: 0;
+          padding-top: 1px;
+        }
+        .month-grid.compactable .dow-mobile {
+          display: block;
+          font-family: 'Outfit', sans-serif;
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: var(--slate-mute);
+          line-height: 1;
+        }
+        .month-grid.compactable .day-cell.today .dow-mobile {
+          color: var(--orange);
+        }
+        .month-grid.compactable .daynum {
+          width: auto;
+          height: auto;
+          border-radius: 0;
+          font-size: 20px;
+          font-weight: 600;
+          line-height: 1.05;
+        }
+        .month-grid.compactable .day-cell.today .daynum {
+          background: transparent;
+          color: var(--orange);
+        }
+        .month-grid.compactable .day-meta {
+          display: none;
+        }
+        .month-grid.compactable .events-wrap {
+          flex: 1;
+          gap: 3px;
+        }
+        .month-grid.compactable .chip {
+          font-size: 12px;
+          padding: 4px 8px 4px 6px;
+        }
+        .month-grid.compactable .chip .time {
+          display: inline;
+        }
+        .month-grid.compactable .chip-avatars {
+          display: flex;
+        }
+        .month-grid.compactable .week-sep {
+          display: flex;
+        }
+        /* On very narrow phones (<340px) hide the right stack to give
+           long titles full room. The left bar still conveys whose. */
+        @media (max-width: 339px) {
+          .month-grid.compactable .chip-avatars {
+            display: none;
+          }
+        }
+      }
+
+      /* DOW label sits above the daynum on mobile cards. Hidden on desktop. */
+      .dow-mobile {
+        display: none;
+      }
+
+      /* Week separator band — only renders inside compactable grid on mobile.
+         Hidden everywhere else (so desktop grid layout is unaffected). */
+      .week-sep {
+        display: none;
+      }
+      .month-grid.compactable .week-sep {
+        align-items: center;
+        gap: 10px;
+        padding: 10px 4px 2px;
+        margin-top: 4px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--slate-mute);
+      }
+      .month-grid.compactable .week-sep:first-child {
+        margin-top: 0;
+        padding-top: 0;
+      }
+      .month-grid.compactable .week-sep::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--line);
+      }
+      .month-grid.compactable .week-sep.current {
+        color: var(--orange);
+      }
+      .month-grid.compactable .week-sep.current::after {
+        background: var(--orange-soft);
+      }
+      .month-grid.compactable .week-sep .range {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 500;
+        font-size: 10px;
+        color: var(--slate-soft);
+        letter-spacing: 0.02em;
+        text-transform: none;
+      }
+      .month-grid.compactable .week-sep.current .range {
+        color: var(--orange-ink);
+      }
+
+      /* Mobile family-color legend — one row of avatar pucks, scrollable.
+         Replaces the wrapping desktop pill legend at mobile width. */
+      .mobile-legend {
+        display: none;
+      }
+      @media (max-width: 720px) {
+        .mobile-legend {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          padding: 10px 14px;
+          border-bottom: 1px solid var(--line);
+          background: var(--paper);
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        .mobile-legend::-webkit-scrollbar {
+          display: none;
+        }
+      }
+      .mobile-legend .legend-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--slate-mute);
+        margin-right: 4px;
+        flex-shrink: 0;
+      }
+      .mobile-legend .legend-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        color: white;
+        display: grid;
+        place-items: center;
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        flex-shrink: 0;
+        cursor: pointer;
+        border: 0;
+        padding: 0;
+        transition: transform 0.12s, opacity 0.12s;
+        position: relative;
+      }
+      .mobile-legend .legend-avatar:active {
+        transform: scale(0.92);
+      }
+      .mobile-legend .legend-avatar.off {
+        opacity: 0.3;
+        filter: grayscale(0.6);
+      }
+      .mobile-legend .legend-avatar.family-mark {
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        font-size: 14px;
+      }
+
+      /* ============================================================
+         OPTION 03 — Family Rows
+         ============================================================ */
+      .swimlane-grid {
+        display: grid;
+        grid-template-columns: 88px repeat(7, 1fr);
+        gap: 1px;
+        background: var(--line);
+      }
+
+      .swim-header {
+        background: var(--paper);
+        padding: 12px 8px 10px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--slate-mute);
+      }
+
+      .swim-header.day {
+        text-align: center;
+      }
+
+      .swim-header.day .dow {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .swim-header.day .num {
+        font-family: 'Outfit', sans-serif;
+        font-size: 18px;
+        font-weight: 500;
+        color: var(--slate);
+      }
+
+      .swim-header.day.today .num {
+        color: var(--orange);
+        font-weight: 600;
+      }
+
+      .swim-row-label {
+        background: var(--paper);
+        padding: 10px 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .swim-row-label .name {
+        font-family: 'Outfit', sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--slate);
+      }
+
+      .swim-row-label .count {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--slate-mute);
+        margin-left: auto;
+      }
+
+      .swim-row-label .avatar-lg,
+      .swim-mobile-card .head .avatar-lg {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        color: white;
+        display: grid;
+        place-items: center;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .swim-cell {
+        background: var(--paper);
+        min-height: 76px;
+        padding: 5px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .swim-cell.today {
+        background: #fff7f2;
+      }
+
+      .swim-pill {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 6px;
+        border-radius: var(--r-md);
+        font-family: 'Inter', sans-serif;
+        font-size: 10px;
+        font-weight: 500;
+        background: var(--cloud);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .swim-pill .time {
+        font-family: 'Inter', sans-serif;
+        font-size: 9px;
+        color: var(--slate-mute);
+        font-weight: 500;
+      }
+
+      .swim-pill.greg {
+        background: var(--m-greg-soft);
+        color: var(--m-greg);
+      }
+      .swim-pill.mira {
+        background: var(--m-mira-soft);
+        color: var(--m-mira);
+      }
+      .swim-pill.aria {
+        background: var(--m-aria-soft);
+        color: var(--m-aria);
+      }
+      .swim-pill.oren {
+        background: var(--m-oren-soft);
+        color: var(--m-oren);
+      }
+      .swim-pill.juno {
+        background: var(--m-juno-soft);
+        color: var(--m-juno);
+      }
+      .swim-pill.family {
+        background: var(--orange-soft);
+        color: var(--orange-ink);
+      }
+
+      .swim-mobile-card {
+        display: none;
+      }
+
+      @media (max-width: 1100px) {
+        .swimlane-grid {
+          grid-template-columns: 76px repeat(7, 1fr);
+        }
+        .swim-pill {
+          font-size: 9px;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .swimlane-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          background: transparent;
+        }
+        .swim-header,
+        .swim-row-label,
+        .swim-cell {
+          display: none;
+        }
+        .swim-mobile-card {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          background: var(--paper);
+          border: 1px solid var(--line);
+          border-radius: var(--r-lg);
+          padding: 12px 14px;
+        }
+        .swim-mobile-card .head {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .swim-mobile-card .head .name {
+          font-family: 'Outfit', sans-serif;
+          font-size: 16px;
+          font-weight: 600;
+          color: var(--slate);
+          flex: 1;
+        }
+        .swim-mobile-card .head .count {
+          font-family: 'Outfit', sans-serif;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--slate-mute);
+        }
+        .swim-mobile-card .days {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 4px;
+        }
+        .swim-mobile-card .day {
+          aspect-ratio: 1;
+          background: var(--cloud);
+          border-radius: var(--r-sm);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
+          font-family: 'Outfit', sans-serif;
+          font-size: 10px;
+          color: var(--slate-mute);
+          position: relative;
+          padding: 3px;
+        }
+        .swim-mobile-card .day .num {
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--slate);
+        }
+        .swim-mobile-card .day .dow {
+          font-size: 8px;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+        }
+        .swim-mobile-card .day.today {
+          background: var(--orange-soft);
+        }
+        .swim-mobile-card .day.today .num {
+          color: var(--orange-ink);
+          font-weight: 700;
+        }
+        .swim-mobile-card .day .dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+        }
+        .swim-mobile-card .day .has {
+          font-family: 'Inter', sans-serif;
+          font-size: 10px;
+          font-weight: 700;
+          color: var(--slate);
+          background: var(--cloud);
+          padding: 0 4px;
+          border-radius: 999px;
+          line-height: 1.4;
+        }
+      }
+
+      /* ============================================================
+         OPTION 04 — Month + Agenda
+         ============================================================ */
+      .split-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) 340px;
+      }
+
+      .split-layout .month-side {
+        border-right: 1px solid var(--line);
+      }
+
+      .agenda-side {
+        background: linear-gradient(180deg, #fcfcfd 0%, #ffffff 320px);
+        padding: 16px 18px 24px;
+        max-height: 640px;
+        overflow-y: auto;
+      }
+
+      .agenda-side h3 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 500;
+        font-size: 15px;
+        margin: 0 0 14px;
+        letter-spacing: -0.01em;
+      }
+
+      .agenda-day {
+        margin-bottom: 18px;
+      }
+
+      .agenda-day .day-head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 6px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .agenda-day .day-head .dow {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--slate-mute);
+      }
+
+      .agenda-day .day-head .num {
+        font-family: 'Outfit', sans-serif;
+        font-size: 22px;
+        font-weight: 500;
+        color: var(--slate);
+      }
+
+      .agenda-day.today .day-head .num {
+        color: var(--orange);
+      }
+
+      .agenda-day .day-head .label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--slate-mute);
+        margin-left: auto;
+      }
+
+      .agenda-event {
+        display: grid;
+        grid-template-columns: 56px 1fr;
+        gap: 10px;
+        padding: 6px 0;
+        border-bottom: 1px solid #f0f3f5;
+        cursor: pointer;
+      }
+
+      .agenda-event:last-child {
+        border-bottom: 0;
+      }
+
+      .agenda-event .time-col {
+        font-family: 'Inter', sans-serif;
+        font-size: 11px;
+        color: var(--slate-soft);
+        font-weight: 500;
+        padding-top: 2px;
+      }
+
+      .agenda-event .time-col .end {
+        display: block;
+        color: var(--slate-mute);
+        font-size: 10px;
+      }
+
+      .agenda-event .title-col {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .agenda-event .title-col .title {
+        font-family: 'Inter', sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--slate);
+      }
+
+      .agenda-event .title-col .meta {
+        font-family: 'Inter', sans-serif;
+        font-size: 11px;
+        color: var(--slate-mute);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .agenda-event .av {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        color: white;
+        display: grid;
+        place-items: center;
+        font-family: 'Outfit', sans-serif;
+        font-size: 8px;
+        font-weight: 700;
+      }
+
+      @media (max-width: 1100px) {
+        .split-layout {
+          grid-template-columns: 1fr;
+        }
+        .split-layout .month-side {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .agenda-side {
+          max-height: none;
+        }
+      }
+
+      /* ============================================================
+         OPTION 05 — Mobile Two-Week Peek
+         ============================================================ */
+      .mobile-phone {
+        width: 380px;
+        max-width: 100%;
+        height: 720px;
+        background: var(--paper);
+        border-radius: 32px;
+        border: 8px solid var(--slate);
+        overflow: hidden;
+        margin: 0 auto;
+        box-shadow: var(--lift-3);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .mp-header {
+        padding: 26px 18px 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .mp-header .month {
+        font-family: 'Outfit', sans-serif;
+        font-size: 22px;
+        font-weight: 500;
+      }
+
+      .mp-header .month .yr {
+        color: var(--slate-mute);
+        font-weight: 300;
+      }
+
+      .mp-strip {
+        padding: 0 12px 6px;
+      }
+
+      .mp-strip .dow-row {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        font-family: 'Outfit', sans-serif;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        color: var(--slate-mute);
+        text-align: center;
+        margin-bottom: 5px;
+      }
+
+      .mp-strip .week {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+        margin-bottom: 5px;
+      }
+
+      .mp-day {
+        aspect-ratio: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        border-radius: var(--r-md);
+        cursor: pointer;
+        padding: 3px;
+      }
+
+      .mp-day .num {
+        font-family: 'Outfit', sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      .mp-day.today {
+        background: var(--orange-soft);
+      }
+
+      .mp-day.today .num {
+        color: var(--orange-ink);
+        font-weight: 700;
+      }
+
+      .mp-day.focused {
+        background: var(--slate);
+      }
+
+      .mp-day.focused .num {
+        color: white;
+        font-weight: 600;
+      }
+
+      .mp-day .dots {
+        display: flex;
+        gap: 2px;
+      }
+
+      .mp-day .dots span {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+      }
+
+      .mp-day .count-stub {
+        font-family: 'Inter', sans-serif;
+        font-size: 8px;
+        color: var(--slate-mute);
+      }
+
+      .mp-day.focused .count-stub {
+        color: rgba(255, 255, 255, 0.75);
+      }
+
+      .mp-agenda {
+        background: var(--cloud);
+        padding: 16px;
+        flex: 1;
+        overflow-y: auto;
+      }
+
+      .mp-agenda .focus-head {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .mp-agenda .focus-head .dow {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        color: var(--slate-mute);
+      }
+
+      .mp-agenda .focus-head .label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 20px;
+        font-weight: 500;
+        color: var(--slate);
+      }
+
+      .mp-event {
+        background: var(--paper);
+        border-radius: var(--r-lg);
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        display: flex;
+        gap: 10px;
+        box-shadow: var(--lift-1);
+      }
+
+      .mp-event .accent {
+        width: 3px;
+        border-radius: 2px;
+      }
+
+      .mp-event .info {
+        flex: 1;
+      }
+
+      .mp-event .top-row {
+        font-family: 'Inter', sans-serif;
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--slate-mute);
+      }
+
+      .mp-event .title {
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--slate);
+        margin: 2px 0;
+      }
+
+      .mp-event .who {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+        font-family: 'Inter', sans-serif;
+        font-size: 11px;
+        color: var(--slate-soft);
+      }
+
+      .mp-event .who .av {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        color: white;
+        font-family: 'Outfit', sans-serif;
+        font-size: 8px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+      }
+
+      /* At mobile width, drop the phone frame — show the real thing */
+      @media (max-width: 720px) {
+        .mobile-phone {
+          width: 100%;
+          height: auto;
+          min-height: 60vh;
+          border: 0;
+          border-radius: 0;
+          box-shadow: none;
+          margin: -14px -12px 0;
+        }
+        .mp-header {
+          padding: 4px 4px 10px;
+        }
+        .mp-strip {
+          padding: 0 4px 8px;
+        }
+        .mp-agenda {
+          background: transparent;
+          padding: 14px 4px;
+        }
+      }
+
+      /* ============================================================
+         WEEKLY REDESIGN
+         ============================================================ */
+      .week-canvas {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--r-xl);
+        box-shadow: var(--lift-2);
+        overflow: hidden;
+      }
+
+      .week-grid-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* 2-week strip — date navigator above the timeline grid */
+      .week-strip {
+        padding: 12px 16px 10px;
+        background: linear-gradient(180deg, #fcfcfd, #fafafc);
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .week-strip .strip-row {
+        display: grid;
+        grid-template-columns: 56px repeat(7, 1fr);
+        gap: 4px;
+        align-items: stretch;
+      }
+
+      .strip-row .row-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--slate-mute);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-end;
+        padding-right: 10px;
+        line-height: 1.2;
+        position: relative;
+      }
+
+      .strip-row.current .row-label {
+        color: var(--orange);
+      }
+
+      .strip-row.current .row-label::before {
+        content: '';
+        position: absolute;
+        left: 6px;
+        top: 4px;
+        bottom: 4px;
+        width: 2px;
+        border-radius: 2px;
+        background: var(--orange);
+      }
+
+      .strip-row .row-label .wk {
+        font-family: 'Inter', sans-serif;
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--slate-mute);
+        letter-spacing: 0.02em;
+        text-transform: none;
+        margin-top: 1px;
+      }
+
+      .strip-row.current .row-label .wk {
+        color: var(--orange);
+      }
+
+      .strip-day {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--r-md);
+        padding: 6px 4px 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        cursor: pointer;
+        transition: background 0.12s, border-color 0.12s;
+        min-height: 50px;
+      }
+
+      .strip-day:hover {
+        background: var(--cloud);
+        border-color: var(--line-strong);
+      }
+
+      .strip-day .dow {
+        font-family: 'Outfit', sans-serif;
+        font-size: 8px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--slate-mute);
+        line-height: 1;
+      }
+
+      .strip-day .num {
+        font-family: 'Outfit', sans-serif;
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--slate);
+        line-height: 1;
+      }
+
+      .strip-day .dots {
+        display: flex;
+        gap: 2px;
+        margin-top: 1px;
+        height: 4px;
+      }
+
+      .strip-day .dots span {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+      }
+
+      .strip-day.today {
+        background: var(--orange-soft);
+        border-color: var(--orange);
+      }
+
+      .strip-day.today .dow {
+        color: var(--orange-ink);
+      }
+
+      .strip-day.today .num {
+        color: var(--orange-ink);
+        font-weight: 700;
+      }
+
+      .strip-day.in-week {
+        box-shadow: 0 0 0 2px var(--orange-soft);
+      }
+
+      @media (max-width: 1100px) {
+        .week-strip .strip-row {
+          grid-template-columns: 44px repeat(7, 1fr);
+        }
+        .strip-day {
+          min-height: 44px;
+          padding: 4px 3px 3px;
+        }
+        .strip-day .num {
+          font-size: 14px;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .week-strip {
+          padding: 10px 12px 8px;
+        }
+      }
+
+      .week-grid {
+        display: grid;
+        grid-template-columns: 56px repeat(7, 1fr);
+        min-width: 720px;
+      }
+
+      .week-corner {
+        background: var(--paper);
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .week-day-head {
+        padding: 12px 8px 10px;
+        text-align: center;
+        background: var(--paper);
+        border-bottom: 1px solid var(--line);
+        border-right: 1px solid var(--line);
+      }
+
+      .week-day-head:last-child {
+        border-right: 0;
+      }
+
+      .week-day-head.today {
+        background: linear-gradient(180deg, #fff7f2, #ffffff);
+      }
+
+      .week-day-head .dow {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        color: var(--slate-mute);
+      }
+
+      .week-day-head .num {
+        font-family: 'Outfit', sans-serif;
+        font-size: 24px;
+        font-weight: 500;
+        color: var(--slate);
+        margin-top: 2px;
+      }
+
+      .week-day-head.today .num {
+        color: var(--orange);
+      }
+
+      .all-day-lane-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: var(--slate-mute);
+        padding: 8px 6px;
+        text-align: right;
+        background: #fbfbfc;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        line-height: 1.1;
+      }
+
+      .all-day-lane-cell {
+        background: #fbfbfc;
+        padding: 5px;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        min-height: 52px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .all-day-lane-cell:last-child {
+        border-right: 0;
+      }
+
+      .ad-pill {
+        font-family: 'Inter', sans-serif;
+        font-size: 10px;
+        padding: 3px 6px;
+        border-radius: var(--r-sm);
+        background: var(--sky-soft);
+        color: var(--slate);
+        font-weight: 600;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .week-hour-label {
+        font-family: 'Inter', sans-serif;
+        font-size: 10px;
+        color: var(--slate-mute);
+        font-weight: 500;
+        padding: 4px 8px;
+        text-align: right;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        height: 52px;
+        line-height: 1;
+      }
+
+      .week-day-col {
+        position: relative;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        background: var(--paper);
+        height: 52px;
+      }
+
+      .week-day-col:last-child {
+        border-right: 0;
+      }
+
+      .week-day-col.today {
+        background: #fffbf8;
+      }
+
+      .week-event {
+        position: absolute;
+        left: 3px;
+        right: 3px;
+        border-radius: var(--r-sm);
+        padding: 3px 5px;
+        font-family: 'Inter', sans-serif;
+        font-size: 10px;
+        line-height: 1.2;
+        cursor: pointer;
+        overflow: hidden;
+        border-left: 3px solid;
+        background: var(--paper);
+        box-shadow: var(--lift-1);
+      }
+
+      .week-event .t {
+        font-family: 'Inter', sans-serif;
+        font-size: 9px;
+        color: var(--slate-mute);
+        display: block;
+        margin-bottom: 1px;
+        font-weight: 500;
+      }
+
+      .week-event .ttl {
+        font-weight: 600;
+        color: var(--slate);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .week-event.greg {
+        border-color: var(--m-greg);
+        background: var(--m-greg-soft);
+      }
+      .week-event.mira {
+        border-color: var(--m-mira);
+        background: var(--m-mira-soft);
+      }
+      .week-event.aria {
+        border-color: var(--m-aria);
+        background: var(--m-aria-soft);
+      }
+      .week-event.oren {
+        border-color: var(--m-oren);
+        background: var(--m-oren-soft);
+      }
+      .week-event.juno {
+        border-color: var(--m-juno);
+        background: var(--m-juno-soft);
+      }
+      .week-event.family {
+        border-color: var(--orange);
+        background: var(--orange-soft);
+      }
+
+      @media (max-width: 1100px) {
+        .week-grid {
+          grid-template-columns: 44px repeat(7, 1fr);
+        }
+        .week-day-head .num {
+          font-size: 20px;
+        }
+        .week-event {
+          font-size: 9px;
+        }
+      }
+
+      /* ============================================================
+         Screen visibility + utilities
+         ============================================================ */
+      .screen {
+        display: none;
+      }
+
+      .screen.active {
+        display: block;
+      }
+
+      .device-note {
+        background: var(--orange-glow);
+        border-radius: var(--r-md);
+        padding: 8px 12px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--orange-ink);
+        display: none;
+        align-items: center;
+        gap: 8px;
+      }
+
+      @media (max-width: 720px) {
+        .device-note.mobile {
+          display: flex;
+        }
+        .hide-on-mobile {
+          display: none !important;
+        }
+      }
+      @media (min-width: 721px) {
+        .device-note.desktop {
+          display: flex;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- SCREEN SWITCHER -->
+    <nav class="switcher">
+      <span class="badge">calendar · 2026-05-19</span>
+      <button class="active" data-target="opt-01" onclick="showScreen(this)">01 · Refined Chips</button>
+      <button data-target="opt-02" onclick="showScreen(this)">02 · Avatar Stack</button>
+      <button data-target="opt-03" onclick="showScreen(this)">03 · Family Rows</button>
+      <button data-target="opt-04" onclick="showScreen(this)">04 · Month + Agenda</button>
+      <button data-target="opt-05" onclick="showScreen(this)">05 · Mobile Peek</button>
+      <button data-target="weekly" onclick="showScreen(this)">w · Weekly redesign</button>
+    </nav>
+
+    <!-- APP SHELL -->
+    <div class="app-shell">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">🫛</div>
+          <div>
+            <div class="brand-name">beanies<span>.family</span></div>
+            <div class="brand-tag">every bean counts</div>
+          </div>
+        </div>
+
+        <div class="nav-section-label treehouse"><span>🌳</span><span>Treehouse</span></div>
+        <div class="nav-item"><span class="emoji">🏡</span><span class="label">Family Nook</span></div>
+        <div class="nav-item active"><span class="emoji">📅</span><span class="label">Family Planner</span></div>
+        <div class="nav-item"><span class="emoji">✅</span><span class="label">Family To-Do</span><span class="nav-badge">3</span></div>
+        <div class="nav-item"><span class="emoji">✈️</span><span class="label">Travel Plans</span></div>
+        <div class="nav-item"><span class="emoji">🌱</span><span class="label">The Pod</span></div>
+
+        <div class="nav-section-label piggy"><span>🐷</span><span>Piggy Bank</span></div>
+        <div class="nav-item"><span class="emoji">🏠</span><span class="label">Overview</span></div>
+        <div class="nav-item"><span class="emoji">💰</span><span class="label">Accounts</span></div>
+        <div class="nav-item"><span class="emoji">💵</span><span class="label">Budgets</span></div>
+        <div class="nav-item"><span class="emoji">💳</span><span class="label">Transactions</span></div>
+        <div class="nav-item"><span class="emoji">🎯</span><span class="label">Goals</span><span class="nav-badge">2</span></div>
+
+        <div class="sidebar-pin">
+          <div class="nav-item"><span class="emoji">⚙️</span><span class="label">Settings</span></div>
+          <div class="sidebar-footer">
+            <div class="avatar">g</div>
+            <div class="who">greg<small>Parker family · owner</small></div>
+          </div>
+          <div class="sidebar-meta">
+            <div class="lock">🔒 data encrypted</div>
+            <div>v0.18.4</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Topbar -->
+      <header class="topbar">
+        <button class="hamburger">☰</button>
+        <h1 class="page-title">Family <span class="accent">Planner</span></h1>
+        <div class="top-actions">
+          <button class="icon-btn">🔍</button>
+          <button class="icon-btn">🔔</button>
+          <button class="icon-btn keep">+</button>
+          <div class="me">g</div>
+        </div>
+      </header>
+
+      <!-- Main scrolling area -->
+      <main class="main">
+        <div class="main-inner">
+
+          <!-- ====================================================
+               OPTION 01 · REFINED CHIPS
+               ==================================================== -->
+          <section class="screen active" id="opt-01">
+            <div class="concept-intro">
+              <span class="num">option 01 · full page</span>
+              <h2>activities page — <em>recomposed around the new calendar</em></h2>
+              <p>The full activities page in context. With the chip-based calendar carrying the load, "Upcoming Activities" and the "Todo Preview" sections become redundant — removed. The page is vacations card on top, calendar in the middle, inactive-activities toggle at the bottom. Calmer, faster, ~270 LOC lighter.</p>
+            </div>
+
+            <div class="device-note desktop">🖥 desktop view — resize browser to ≤720px to see the mobile-adapted version</div>
+            <div class="device-note mobile">📱 mobile view — same data, vertically stacked for legibility</div>
+
+            <!-- Upcoming vacations (kept — distinct from regular activities) -->
+            <section class="page-section vacations">
+              <div class="section-head">
+                <span style="font-size: 18px">✈️</span>
+                <h3>upcoming vacations</h3>
+                <span class="count-pill">2</span>
+              </div>
+              <div class="vacations-row">
+                <div class="vacation-card">
+                  <div class="emoji">🏖️</div>
+                  <div class="info">
+                    <div class="name">Taipei trip</div>
+                    <div class="meta">may 8 – 11 · 4 days · greg</div>
+                  </div>
+                  <div class="countdown">in 20 days</div>
+                </div>
+                <div class="vacation-card">
+                  <div class="emoji">⛺</div>
+                  <div class="info">
+                    <div class="name">family camping</div>
+                    <div class="meta">may 30 – 31 · 2 days · everyone</div>
+                  </div>
+                  <div class="countdown">in 42 days</div>
+                </div>
+              </div>
+            </section>
+
+            <div class="calendar-card">
+              <div class="cal-toolbar">
+                <button class="nav-btn">‹</button>
+                <button class="nav-btn">›</button>
+                <span class="month">May<span class="yr">2026</span></span>
+                <button class="today-pill">today</button>
+                <div class="spacer"></div>
+                <div class="view-toggle">
+                  <button>day</button>
+                  <button>week</button>
+                  <button class="active">month</button>
+                </div>
+              </div>
+
+              <div class="filter-strip hide-on-mobile">
+                <span class="label">show</span>
+                <span class="member-chip"><span class="avatar a-greg">g</span>greg</span>
+                <span class="member-chip"><span class="avatar a-mira">m</span>mira</span>
+                <span class="member-chip"><span class="avatar a-aria">a</span>aria</span>
+                <span class="member-chip"><span class="avatar a-oren">o</span>oren</span>
+                <span class="member-chip"><span class="avatar a-juno">j</span>juno</span>
+                <span class="member-chip" style="background: var(--orange-soft); border-color: var(--orange); color: var(--orange-ink)">family</span>
+              </div>
+
+              <!-- Mobile-only legend: avatars in a single scrollable row.
+                   Same color grammar as the chips, so this strip IS the legend. -->
+              <div class="mobile-legend">
+                <span class="legend-label">show</span>
+                <button class="legend-avatar a-greg">g</button>
+                <button class="legend-avatar a-mira">m</button>
+                <button class="legend-avatar a-aria">a</button>
+                <button class="legend-avatar a-oren">o</button>
+                <button class="legend-avatar a-juno">j</button>
+                <button class="legend-avatar family-mark" title="family events">★</button>
+              </div>
+
+              <div class="month-grid compactable">
+                <div class="dow-header">mon</div>
+                <div class="dow-header">tue</div>
+                <div class="dow-header">wed</div>
+                <div class="dow-header">thu</div>
+                <div class="dow-header">fri</div>
+                <div class="dow-header">sat</div>
+                <div class="dow-header">sun</div>
+
+                <div class="day-cell outside"><div class="daynum-wrap"><span class="daynum">11</span></div></div>
+                <div class="day-cell outside"><div class="daynum-wrap"><span class="daynum">12</span></div></div>
+                <div class="day-cell outside"><div class="daynum-wrap"><span class="daynum">13</span></div></div>
+                <div class="day-cell outside"><div class="daynum-wrap"><span class="daynum">14</span></div></div>
+                <div class="day-cell outside"><div class="daynum-wrap"><span class="daynum">15</span></div></div>
+                <div class="day-cell outside"><div class="daynum-wrap"><span class="daynum">16</span></div></div>
+                <div class="day-cell outside"><div class="daynum-wrap"><span class="daynum">17</span></div></div>
+
+                <!-- Week separator (mobile only) -->
+                <div class="week-sep current">this week<span class="range">· May 18 – 24</span></div>
+
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="dow-mobile">mon</span><span class="daynum">18</span></div>
+                  <div class="events-wrap">
+                    <span class="chip aria"><span class="emoji">🎹</span><span class="time">15:30</span><span class="title">piano</span></span>
+                    <span class="chip mira"><span class="emoji">🧘</span><span class="time">19:00</span><span class="title">yoga</span></span>
+                  </div>
+                </div>
+                <div class="day-cell today busy-heat-1">
+                  <div class="daynum-wrap"><span class="dow-mobile">tue</span><span class="daynum">19</span><span class="day-meta" style="color: var(--orange)">today</span></div>
+                  <div class="events-wrap">
+                    <span class="chip aria"><span class="emoji">⚽</span><span class="time">16:00</span><span class="title">soccer practice</span></span>
+                    <span class="chip oren"><span class="emoji">🎨</span><span class="time">16:30</span><span class="title">art class</span></span>
+                    <span class="chip family"><span class="emoji">🍝</span><span class="time">19:30</span><span class="title">family pasta night</span><span class="chip-avatars"><span class="avatar a-greg">g</span><span class="avatar a-mira">m</span><span class="avatar a-aria">a</span><span class="avatar a-oren">o</span><span class="avatar a-juno">j</span></span></span>
+                  </div>
+                </div>
+                <div class="day-cell busy-heat-2">
+                  <div class="daynum-wrap"><span class="dow-mobile">wed</span><span class="daynum">20</span></div>
+                  <div class="events-wrap">
+                    <span class="chip oren"><span class="emoji">🦷</span><span class="time">09:00</span><span class="title">dentist follow-up</span></span>
+                    <span class="chip aria"><span class="emoji">🎹</span><span class="time">15:30</span><span class="title">piano</span></span>
+                    <span class="chip juno"><span class="emoji">🏊</span><span class="time">17:00</span><span class="title">swim lesson</span></span>
+                    <span class="chip greg"><span class="emoji">💼</span><span class="time">19:00</span><span class="title">team dinner</span></span>
+                  </div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="dow-mobile">thu</span><span class="daynum">21</span></div>
+                  <div class="events-wrap">
+                    <span class="chip aria"><span class="emoji">⚽</span><span class="time">16:00</span><span class="title">soccer</span></span>
+                  </div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="dow-mobile">fri</span><span class="daynum">22</span></div>
+                  <div class="events-wrap">
+                    <span class="chip family"><span class="emoji">🍱</span><span class="time">18:30</span><span class="title">dinner w/ grandparents</span><span class="chip-avatars"><span class="avatar a-greg">g</span><span class="avatar a-mira">m</span><span class="avatar a-aria">a</span><span class="avatar a-oren">o</span><span class="avatar a-juno">j</span></span></span>
+                  </div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="dow-mobile">sat</span><span class="daynum">23</span></div>
+                  <div class="events-wrap">
+                    <span class="chip juno"><span class="emoji">🎂</span><span class="time">14:00</span><span class="title">Mia's bday party</span></span>
+                    <span class="chip family"><span class="emoji">🌳</span><span class="time">16:30</span><span class="title">park & picnic</span><span class="chip-avatars"><span class="avatar a-greg">g</span><span class="avatar a-mira">m</span><span class="avatar a-aria">a</span><span class="avatar a-oren">o</span></span></span>
+                  </div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="dow-mobile">sun</span><span class="daynum">24</span></div>
+                  <div class="events-wrap">
+                    <span class="chip family"><span class="emoji">🥞</span><span class="time">10:00</span><span class="title">Sunday brunch</span><span class="chip-avatars"><span class="avatar a-greg">g</span><span class="avatar a-mira">m</span><span class="avatar a-aria">a</span><span class="avatar a-oren">o</span><span class="avatar a-juno">j</span></span></span>
+                  </div>
+                </div>
+
+                <!-- Next-week separator -->
+                <div class="week-sep">next week<span class="range">· May 25 – 31</span></div>
+
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="dow-mobile">mon</span><span class="daynum">25</span></div>
+                  <div class="events-wrap"><span class="chip aria"><span class="emoji">🎹</span><span class="time">15:30</span><span class="title">piano</span></span></div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="dow-mobile">tue</span><span class="daynum">26</span></div>
+                  <div class="events-wrap"><span class="chip oren"><span class="emoji">🩺</span><span class="time">10:00</span><span class="title">eye check</span></span></div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="dow-mobile">wed</span><span class="daynum">27</span></div>
+                  <div class="events-wrap"><span class="chip aria"><span class="emoji">🏫</span><span class="title">school open day</span></span></div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="dow-mobile">thu</span><span class="daynum">28</span></div>
+                  <div class="events-wrap"><span class="chip aria"><span class="emoji">⚽</span><span class="time">16:00</span><span class="title">soccer</span></span></div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="dow-mobile">fri</span><span class="daynum">29</span></div>
+                  <div class="events-wrap"><span class="chip family"><span class="emoji">🎬</span><span class="time">19:30</span><span class="title">movie night</span><span class="chip-avatars"><span class="avatar a-greg">g</span><span class="avatar a-mira">m</span><span class="avatar a-aria">a</span><span class="avatar a-oren">o</span><span class="avatar a-juno">j</span></span></span></div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="dow-mobile">sat</span><span class="daynum">30</span></div>
+                  <div class="events-wrap"><span class="chip all-day"><span class="emoji">⛺</span><span class="title">family camping</span></span></div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="dow-mobile">sun</span><span class="daynum">31</span></div>
+                  <div class="events-wrap"><span class="chip all-day"><span class="emoji">⛺</span><span class="title">family camping</span></span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Inactive / archived activities — slim toggle below the calendar -->
+            <section>
+              <button class="inactive-toggle" onclick="this.nextElementSibling.classList.toggle('open'); this.querySelector('.chev').textContent = this.nextElementSibling.classList.contains('open') ? '▲' : '▼';">
+                <span class="chev">▼</span>
+                <span>show archived activities</span>
+                <span class="count-pill">3</span>
+              </button>
+              <div class="inactive-list">
+                <div class="inactive-row">
+                  <span class="emoji">⚽</span>
+                  <span class="title">u8 soccer (2024 season)</span>
+                  <span class="badge">archived</span>
+                </div>
+                <div class="inactive-row">
+                  <span class="emoji">🎻</span>
+                  <span class="title">violin lessons</span>
+                  <span class="badge">archived</span>
+                </div>
+                <div class="inactive-row">
+                  <span class="emoji">🏊</span>
+                  <span class="title">swim school (last term)</span>
+                  <span class="badge">archived</span>
+                </div>
+              </div>
+            </section>
+
+            <div class="removal-note">
+              <span class="label">removed:</span>
+              <span>"Upcoming Activities" + "Todo Preview" two-column section that used to live here. The chip calendar above carries the upcoming list (with DOW + week separators on mobile), and todos with due dates already appear as calendar chips. The canonical to-do page stays at <code style="background: rgba(0,0,0,0.05); padding: 1px 4px; border-radius: 3px;">/todo</code>. Net code reduction: ~270 LOC.</span>
+            </div>
+          </section>
+
+          <!-- ====================================================
+               OPTION 02 · AVATAR STACK
+               ==================================================== -->
+          <section class="screen" id="opt-02">
+            <div class="concept-intro">
+              <span class="num">option 02</span>
+              <h2>avatar stack — <em>who first, what second</em></h2>
+              <p>Each event leads with the assigned bean's avatar. Shared events show a stack of avatars (overlapping). Lighter weight per chip means more fit per cell — calendar reads "who is involved" at a glance.</p>
+            </div>
+
+            <div class="calendar-card">
+              <div class="cal-toolbar">
+                <button class="nav-btn">‹</button>
+                <button class="nav-btn">›</button>
+                <span class="month">May<span class="yr">2026</span></span>
+                <button class="today-pill">today</button>
+                <div class="spacer"></div>
+                <div class="view-toggle">
+                  <button>day</button>
+                  <button>week</button>
+                  <button class="active">month</button>
+                </div>
+              </div>
+
+              <div class="month-grid compactable">
+                <div class="dow-header">mon</div>
+                <div class="dow-header">tue</div>
+                <div class="dow-header">wed</div>
+                <div class="dow-header">thu</div>
+                <div class="dow-header">fri</div>
+                <div class="dow-header">sat</div>
+                <div class="dow-header">sun</div>
+
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="daynum">18</span></div>
+                  <div class="events-wrap">
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-aria">a</span></span><span>🎹</span><span class="time">15:30</span><span class="label">piano</span></span>
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-mira">m</span></span><span>🧘</span><span class="time">19:00</span><span class="label">yoga</span></span>
+                  </div>
+                </div>
+                <div class="day-cell today">
+                  <div class="daynum-wrap"><span class="daynum">19</span><span class="day-meta" style="color: var(--orange)">today</span></div>
+                  <div class="events-wrap">
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-aria">a</span></span><span>⚽</span><span class="time">16:00</span><span class="label">soccer</span></span>
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-oren">o</span></span><span>🎨</span><span class="time">16:30</span><span class="label">art class</span></span>
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-greg">g</span><span class="avatar a-mira">m</span><span class="avatar a-aria">a</span><span class="avatar a-oren">o</span><span class="avatar a-juno">j</span></span><span>🍝</span><span class="time">19:30</span><span class="label">pasta night</span></span>
+                  </div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="daynum">20</span></div>
+                  <div class="events-wrap">
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-oren">o</span></span><span>🦷</span><span class="time">09:00</span><span class="label">dentist</span></span>
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-aria">a</span></span><span>🎹</span><span class="time">15:30</span><span class="label">piano</span></span>
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-juno">j</span></span><span>🏊</span><span class="time">17:00</span><span class="label">swim</span></span>
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-greg">g</span></span><span>💼</span><span class="time">19:00</span><span class="label">team dinner</span></span>
+                    <span class="more-chip">+ 1 more</span>
+                  </div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="daynum">21</span></div>
+                  <div class="events-wrap">
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-aria">a</span></span><span>⚽</span><span class="time">16:00</span><span class="label">soccer</span></span>
+                  </div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="daynum">22</span></div>
+                  <div class="events-wrap">
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-greg">g</span><span class="avatar a-mira">m</span><span class="avatar a-aria">a</span><span class="avatar a-oren">o</span><span class="avatar a-juno">j</span></span><span>🍱</span><span class="time">18:30</span><span class="label">grandparents</span></span>
+                  </div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="daynum">23</span></div>
+                  <div class="events-wrap">
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-juno">j</span></span><span>🎂</span><span class="time">14:00</span><span class="label">Mia's bday</span></span>
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-greg">g</span><span class="avatar a-mira">m</span><span class="avatar a-aria">a</span><span class="avatar a-oren">o</span><span class="avatar a-juno">j</span></span><span>🌳</span><span class="time">16:30</span><span class="label">picnic</span></span>
+                  </div>
+                </div>
+                <div class="day-cell">
+                  <div class="daynum-wrap"><span class="daynum">24</span></div>
+                  <div class="events-wrap">
+                    <span class="av-chip"><span class="av-stack"><span class="avatar a-greg">g</span><span class="avatar a-mira">m</span><span class="avatar a-aria">a</span><span class="avatar a-oren">o</span><span class="avatar a-juno">j</span></span><span>🥞</span><span class="time">10:00</span><span class="label">brunch</span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ====================================================
+               OPTION 03 · FAMILY ROWS
+               ==================================================== -->
+          <section class="screen" id="opt-03">
+            <div class="concept-intro">
+              <span class="num">option 03</span>
+              <h2>family rows — <em>each bean a lane</em></h2>
+              <p>A swim-lane week view that no consumer family calendar does. Rows are family members, columns are days. Read horizontally for one person's week or vertically for who's busy on a given day. On mobile, lanes flip into per-member cards with a 7-day strip — same insight, different ergonomics.</p>
+            </div>
+
+            <div class="calendar-card">
+              <div class="cal-toolbar">
+                <button class="nav-btn">‹</button>
+                <button class="nav-btn">›</button>
+                <span class="month">May 18 – 24<span class="yr">2026</span></span>
+                <button class="today-pill">this week</button>
+                <div class="spacer"></div>
+                <div class="view-toggle">
+                  <button>day</button>
+                  <button>week</button>
+                  <button>month</button>
+                  <button class="active">family</button>
+                </div>
+              </div>
+
+              <div class="swimlane-grid">
+                <div class="swim-header">who</div>
+                <div class="swim-header day"><span class="dow">mon</span><span class="num">18</span></div>
+                <div class="swim-header day today"><span class="dow">tue</span><span class="num">19</span></div>
+                <div class="swim-header day"><span class="dow">wed</span><span class="num">20</span></div>
+                <div class="swim-header day"><span class="dow">thu</span><span class="num">21</span></div>
+                <div class="swim-header day"><span class="dow">fri</span><span class="num">22</span></div>
+                <div class="swim-header day"><span class="dow">sat</span><span class="num">23</span></div>
+                <div class="swim-header day"><span class="dow">sun</span><span class="num">24</span></div>
+
+                <div class="swim-row-label"><span class="avatar-lg a-greg">g</span><span class="name">greg</span><span class="count">4</span></div>
+                <div class="swim-cell"></div>
+                <div class="swim-cell today"></div>
+                <div class="swim-cell"><span class="swim-pill greg"><span class="time">19:00</span> team dinner</span></div>
+                <div class="swim-cell"></div>
+                <div class="swim-cell"><span class="swim-pill family">grandparents</span></div>
+                <div class="swim-cell"><span class="swim-pill family">picnic</span></div>
+                <div class="swim-cell"><span class="swim-pill family">brunch</span></div>
+
+                <div class="swim-row-label"><span class="avatar-lg a-mira">m</span><span class="name">mira</span><span class="count">5</span></div>
+                <div class="swim-cell"><span class="swim-pill mira"><span class="time">19:00</span> yoga</span></div>
+                <div class="swim-cell today"></div>
+                <div class="swim-cell"></div>
+                <div class="swim-cell"></div>
+                <div class="swim-cell"><span class="swim-pill family">grandparents</span></div>
+                <div class="swim-cell"><span class="swim-pill family">picnic</span></div>
+                <div class="swim-cell"><span class="swim-pill family">brunch</span></div>
+
+                <div class="swim-row-label"><span class="avatar-lg a-aria">a</span><span class="name">aria</span><span class="count">7</span></div>
+                <div class="swim-cell"><span class="swim-pill aria"><span class="time">15:30</span> piano</span></div>
+                <div class="swim-cell today"><span class="swim-pill aria"><span class="time">16:00</span> soccer</span><span class="swim-pill family">pasta night</span></div>
+                <div class="swim-cell"><span class="swim-pill aria"><span class="time">15:30</span> piano</span></div>
+                <div class="swim-cell"><span class="swim-pill aria"><span class="time">16:00</span> soccer</span></div>
+                <div class="swim-cell"><span class="swim-pill family">grandparents</span></div>
+                <div class="swim-cell"><span class="swim-pill family">picnic</span></div>
+                <div class="swim-cell"><span class="swim-pill family">brunch</span></div>
+
+                <div class="swim-row-label"><span class="avatar-lg a-oren">o</span><span class="name">oren</span><span class="count">5</span></div>
+                <div class="swim-cell"></div>
+                <div class="swim-cell today"><span class="swim-pill oren"><span class="time">16:30</span> art</span><span class="swim-pill family">pasta night</span></div>
+                <div class="swim-cell"><span class="swim-pill oren"><span class="time">09:00</span> dentist</span></div>
+                <div class="swim-cell"></div>
+                <div class="swim-cell"><span class="swim-pill family">grandparents</span></div>
+                <div class="swim-cell"><span class="swim-pill family">picnic</span></div>
+                <div class="swim-cell"><span class="swim-pill family">brunch</span></div>
+
+                <div class="swim-row-label"><span class="avatar-lg a-juno">j</span><span class="name">juno</span><span class="count">5</span></div>
+                <div class="swim-cell"></div>
+                <div class="swim-cell today"><span class="swim-pill family">pasta night</span></div>
+                <div class="swim-cell"><span class="swim-pill juno"><span class="time">17:00</span> swim</span></div>
+                <div class="swim-cell"></div>
+                <div class="swim-cell"><span class="swim-pill family">grandparents</span></div>
+                <div class="swim-cell"><span class="swim-pill juno"><span class="time">14:00</span> Mia's</span><span class="swim-pill family">picnic</span></div>
+                <div class="swim-cell"><span class="swim-pill family">brunch</span></div>
+
+                <!-- mobile per-member cards (render only at ≤720px) -->
+                <div class="swim-mobile-card">
+                  <div class="head"><span class="avatar-lg a-greg">g</span><span class="name">greg</span><span class="count">4 events</span></div>
+                  <div class="days">
+                    <div class="day"><span class="dow">m</span><span class="num">18</span></div>
+                    <div class="day today"><span class="dow">t</span><span class="num">19</span></div>
+                    <div class="day"><span class="dow">w</span><span class="num">20</span><span class="dot" style="background: var(--m-greg)"></span></div>
+                    <div class="day"><span class="dow">t</span><span class="num">21</span></div>
+                    <div class="day"><span class="dow">f</span><span class="num">22</span><span class="dot" style="background: var(--orange)"></span></div>
+                    <div class="day"><span class="dow">s</span><span class="num">23</span><span class="dot" style="background: var(--orange)"></span></div>
+                    <div class="day"><span class="dow">s</span><span class="num">24</span><span class="dot" style="background: var(--orange)"></span></div>
+                  </div>
+                </div>
+                <div class="swim-mobile-card">
+                  <div class="head"><span class="avatar-lg a-mira">m</span><span class="name">mira</span><span class="count">5 events</span></div>
+                  <div class="days">
+                    <div class="day"><span class="dow">m</span><span class="num">18</span><span class="dot" style="background: var(--m-mira)"></span></div>
+                    <div class="day today"><span class="dow">t</span><span class="num">19</span></div>
+                    <div class="day"><span class="dow">w</span><span class="num">20</span></div>
+                    <div class="day"><span class="dow">t</span><span class="num">21</span></div>
+                    <div class="day"><span class="dow">f</span><span class="num">22</span><span class="dot" style="background: var(--orange)"></span></div>
+                    <div class="day"><span class="dow">s</span><span class="num">23</span><span class="dot" style="background: var(--orange)"></span></div>
+                    <div class="day"><span class="dow">s</span><span class="num">24</span><span class="dot" style="background: var(--orange)"></span></div>
+                  </div>
+                </div>
+                <div class="swim-mobile-card">
+                  <div class="head"><span class="avatar-lg a-aria">a</span><span class="name">aria</span><span class="count">7 events</span></div>
+                  <div class="days">
+                    <div class="day"><span class="dow">m</span><span class="num">18</span><span class="dot" style="background: var(--m-aria)"></span></div>
+                    <div class="day today"><span class="dow">t</span><span class="num">19</span><span class="has">2</span></div>
+                    <div class="day"><span class="dow">w</span><span class="num">20</span><span class="dot" style="background: var(--m-aria)"></span></div>
+                    <div class="day"><span class="dow">t</span><span class="num">21</span><span class="dot" style="background: var(--m-aria)"></span></div>
+                    <div class="day"><span class="dow">f</span><span class="num">22</span><span class="dot" style="background: var(--orange)"></span></div>
+                    <div class="day"><span class="dow">s</span><span class="num">23</span><span class="dot" style="background: var(--orange)"></span></div>
+                    <div class="day"><span class="dow">s</span><span class="num">24</span><span class="dot" style="background: var(--orange)"></span></div>
+                  </div>
+                </div>
+                <div class="swim-mobile-card">
+                  <div class="head"><span class="avatar-lg a-oren">o</span><span class="name">oren</span><span class="count">5 events</span></div>
+                  <div class="days">
+                    <div class="day"><span class="dow">m</span><span class="num">18</span></div>
+                    <div class="day today"><span class="dow">t</span><span class="num">19</span><span class="has">2</span></div>
+                    <div class="day"><span class="dow">w</span><span class="num">20</span><span class="dot" style="background: var(--m-oren)"></span></div>
+                    <div class="day"><span class="dow">t</span><span class="num">21</span></div>
+                    <div class="day"><span class="dow">f</span><span class="num">22</span><span class="dot" style="background: var(--orange)"></span></div>
+                    <div class="day"><span class="dow">s</span><span class="num">23</span><span class="dot" style="background: var(--orange)"></span></div>
+                    <div class="day"><span class="dow">s</span><span class="num">24</span><span class="dot" style="background: var(--orange)"></span></div>
+                  </div>
+                </div>
+                <div class="swim-mobile-card">
+                  <div class="head"><span class="avatar-lg a-juno">j</span><span class="name">juno</span><span class="count">5 events</span></div>
+                  <div class="days">
+                    <div class="day"><span class="dow">m</span><span class="num">18</span></div>
+                    <div class="day today"><span class="dow">t</span><span class="num">19</span></div>
+                    <div class="day"><span class="dow">w</span><span class="num">20</span><span class="dot" style="background: var(--m-juno)"></span></div>
+                    <div class="day"><span class="dow">t</span><span class="num">21</span></div>
+                    <div class="day"><span class="dow">f</span><span class="num">22</span><span class="dot" style="background: var(--orange)"></span></div>
+                    <div class="day"><span class="dow">s</span><span class="num">23</span><span class="has">2</span></div>
+                    <div class="day"><span class="dow">s</span><span class="num">24</span><span class="dot" style="background: var(--orange)"></span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ====================================================
+               OPTION 04 · MONTH + AGENDA
+               ==================================================== -->
+          <section class="screen" id="opt-04">
+            <div class="concept-intro">
+              <span class="num">option 04</span>
+              <h2>month + agenda — <em>two views, one mind</em></h2>
+              <p>Month grid on the left, scrolling agenda on the right. On tablet and below the two stack vertically. On mobile, the agenda becomes the primary view (day-stack from option 01 above, expanded into full agenda below).</p>
+            </div>
+
+            <div class="calendar-card">
+              <div class="cal-toolbar">
+                <button class="nav-btn">‹</button>
+                <button class="nav-btn">›</button>
+                <span class="month">May<span class="yr">2026</span></span>
+                <button class="today-pill">today</button>
+                <div class="spacer"></div>
+                <div class="view-toggle">
+                  <button>day</button>
+                  <button>week</button>
+                  <button class="active">month+agenda</button>
+                </div>
+              </div>
+
+              <div class="split-layout">
+                <div class="month-side">
+                  <div class="month-grid compactable">
+                    <div class="dow-header">m</div>
+                    <div class="dow-header">t</div>
+                    <div class="dow-header">w</div>
+                    <div class="dow-header">t</div>
+                    <div class="dow-header">f</div>
+                    <div class="dow-header">s</div>
+                    <div class="dow-header">s</div>
+
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">18</span></div><div class="events-wrap"><span class="chip aria"><span class="emoji">🎹</span><span class="title">piano</span></span></div></div>
+                    <div class="day-cell today" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">19</span></div><div class="events-wrap"><span class="chip aria"><span class="emoji">⚽</span><span class="title">soccer</span></span><span class="chip family"><span class="emoji">🍝</span><span class="title">pasta</span></span></div></div>
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">20</span></div><div class="events-wrap"><span class="chip oren"><span class="emoji">🦷</span><span class="title">dentist</span></span><span class="more-chip">+ 3</span></div></div>
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">21</span></div><div class="events-wrap"><span class="chip aria"><span class="emoji">⚽</span><span class="title">soccer</span></span></div></div>
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">22</span></div><div class="events-wrap"><span class="chip family"><span class="emoji">🍱</span><span class="title">grandparents</span></span></div></div>
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">23</span></div><div class="events-wrap"><span class="chip juno"><span class="emoji">🎂</span><span class="title">Mia's</span></span></div></div>
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">24</span></div><div class="events-wrap"><span class="chip family"><span class="emoji">🥞</span><span class="title">brunch</span></span></div></div>
+
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">25</span></div><div class="events-wrap"><span class="chip aria"><span class="emoji">🎹</span><span class="title">piano</span></span></div></div>
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">26</span></div><div class="events-wrap"><span class="chip oren"><span class="emoji">🩺</span><span class="title">eye check</span></span></div></div>
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">27</span></div><div class="events-wrap"><span class="chip aria"><span class="emoji">🏫</span><span class="title">school</span></span></div></div>
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">28</span></div><div class="events-wrap"><span class="chip aria"><span class="emoji">⚽</span><span class="title">soccer</span></span></div></div>
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">29</span></div><div class="events-wrap"><span class="chip family"><span class="emoji">🎬</span><span class="title">movie</span></span></div></div>
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">30</span></div><div class="events-wrap"><span class="chip all-day"><span class="emoji">⛺</span><span class="title">camping</span></span></div></div>
+                    <div class="day-cell" style="min-height: 88px"><div class="daynum-wrap"><span class="daynum">31</span></div><div class="events-wrap"><span class="chip all-day"><span class="emoji">⛺</span><span class="title">camping</span></span></div></div>
+                  </div>
+                </div>
+
+                <aside class="agenda-side">
+                  <h3>upcoming · 7 days</h3>
+
+                  <div class="agenda-day today">
+                    <div class="day-head"><span class="dow">tue</span><span class="num">19</span><span class="label">today · 3</span></div>
+                    <div class="agenda-event">
+                      <div class="time-col">16:00<span class="end">17:00</span></div>
+                      <div class="title-col"><div class="title">⚽ soccer practice</div><div class="meta"><span class="av a-aria">a</span>aria · East Coast Park</div></div>
+                    </div>
+                    <div class="agenda-event">
+                      <div class="time-col">16:30<span class="end">17:30</span></div>
+                      <div class="title-col"><div class="title">🎨 art class</div><div class="meta"><span class="av a-oren">o</span>oren · Little Arts Academy</div></div>
+                    </div>
+                    <div class="agenda-event">
+                      <div class="time-col">19:30<span class="end">21:00</span></div>
+                      <div class="title-col"><div class="title">🍝 family pasta night</div><div class="meta">everyone · home</div></div>
+                    </div>
+                  </div>
+
+                  <div class="agenda-day">
+                    <div class="day-head"><span class="dow">wed</span><span class="num">20</span><span class="label">4 · busy</span></div>
+                    <div class="agenda-event"><div class="time-col">09:00<span class="end">10:00</span></div><div class="title-col"><div class="title">🦷 dentist follow-up</div><div class="meta"><span class="av a-oren">o</span>oren</div></div></div>
+                    <div class="agenda-event"><div class="time-col">15:30<span class="end">16:30</span></div><div class="title-col"><div class="title">🎹 piano</div><div class="meta"><span class="av a-aria">a</span>aria</div></div></div>
+                    <div class="agenda-event"><div class="time-col">17:00<span class="end">18:00</span></div><div class="title-col"><div class="title">🏊 swim lesson</div><div class="meta"><span class="av a-juno">j</span>juno</div></div></div>
+                    <div class="agenda-event"><div class="time-col">19:00<span class="end">22:00</span></div><div class="title-col"><div class="title">💼 team dinner</div><div class="meta"><span class="av a-greg">g</span>greg · Tanjong Pagar</div></div></div>
+                  </div>
+
+                  <div class="agenda-day">
+                    <div class="day-head"><span class="dow">thu</span><span class="num">21</span><span class="label">1</span></div>
+                    <div class="agenda-event"><div class="time-col">16:00<span class="end">17:00</span></div><div class="title-col"><div class="title">⚽ soccer</div><div class="meta"><span class="av a-aria">a</span>aria</div></div></div>
+                  </div>
+
+                  <div class="agenda-day">
+                    <div class="day-head"><span class="dow">fri</span><span class="num">22</span><span class="label">1</span></div>
+                    <div class="agenda-event"><div class="time-col">18:30<span class="end">21:00</span></div><div class="title-col"><div class="title">🍱 dinner w/ grandparents</div><div class="meta">everyone</div></div></div>
+                  </div>
+
+                  <div class="agenda-day">
+                    <div class="day-head"><span class="dow">sat</span><span class="num">23</span><span class="label">2</span></div>
+                    <div class="agenda-event"><div class="time-col">14:00<span class="end">17:00</span></div><div class="title-col"><div class="title">🎂 Mia's birthday party</div><div class="meta"><span class="av a-juno">j</span>juno</div></div></div>
+                    <div class="agenda-event"><div class="time-col">16:30<span class="end">18:00</span></div><div class="title-col"><div class="title">🌳 park & picnic</div><div class="meta">everyone · Bishan Park</div></div></div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </section>
+
+          <!-- ====================================================
+               OPTION 05 · MOBILE TWO-WEEK PEEK
+               ==================================================== -->
+          <section class="screen" id="opt-05">
+            <div class="concept-intro">
+              <span class="num">option 05 · mobile</span>
+              <h2>two-week peek — <em>finally, an overview on phone</em></h2>
+              <p>On desktop this concept previews inside a phone frame; on mobile you see the real thing at viewport size. Two-week strip on top (compact dots + count), focused-day agenda below. Swipe the strip to page two weeks at a time.</p>
+            </div>
+
+            <div class="mobile-phone">
+              <div class="mp-header">
+                <span class="month">May<span class="yr"> 2026</span></span>
+                <span style="font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 600; color: var(--slate-mute)">w 21</span>
+              </div>
+              <div class="mp-strip">
+                <div class="dow-row">
+                  <span>m</span><span>t</span><span>w</span><span>t</span><span>f</span><span>s</span><span>s</span>
+                </div>
+                <div class="week">
+                  <div class="mp-day"><span class="num">18</span><span class="dots"><span style="background: var(--m-aria)"></span><span style="background: var(--m-mira)"></span></span></div>
+                  <div class="mp-day focused"><span class="num">19</span><span class="count-stub">3 today</span></div>
+                  <div class="mp-day"><span class="num">20</span><span class="dots"><span style="background: var(--m-oren)"></span><span style="background: var(--m-aria)"></span><span style="background: var(--m-juno)"></span><span style="background: var(--m-greg)"></span></span></div>
+                  <div class="mp-day"><span class="num">21</span><span class="dots"><span style="background: var(--m-aria)"></span></span></div>
+                  <div class="mp-day"><span class="num">22</span><span class="dots"><span style="background: var(--orange)"></span></span></div>
+                  <div class="mp-day"><span class="num">23</span><span class="dots"><span style="background: var(--m-juno)"></span><span style="background: var(--orange)"></span></span></div>
+                  <div class="mp-day"><span class="num">24</span><span class="dots"><span style="background: var(--orange)"></span></span></div>
+                </div>
+                <div class="week">
+                  <div class="mp-day"><span class="num">25</span><span class="dots"><span style="background: var(--m-aria)"></span></span></div>
+                  <div class="mp-day"><span class="num">26</span><span class="dots"><span style="background: var(--m-oren)"></span></span></div>
+                  <div class="mp-day"><span class="num">27</span><span class="dots"><span style="background: var(--m-aria)"></span></span></div>
+                  <div class="mp-day"><span class="num">28</span><span class="dots"><span style="background: var(--m-aria)"></span></span></div>
+                  <div class="mp-day"><span class="num">29</span><span class="dots"><span style="background: var(--orange)"></span></span></div>
+                  <div class="mp-day"><span class="num">30</span><span class="dots"><span style="background: var(--orange)"></span></span></div>
+                  <div class="mp-day"><span class="num">31</span><span class="dots"><span style="background: var(--orange)"></span></span></div>
+                </div>
+              </div>
+
+              <div class="mp-agenda">
+                <div class="focus-head">
+                  <span class="dow">tuesday</span>
+                  <span class="label">may 19 · today</span>
+                </div>
+
+                <div class="mp-event">
+                  <div class="accent" style="background: var(--m-aria)"></div>
+                  <div class="info">
+                    <div class="top-row">16:00 — 17:00</div>
+                    <div class="title">⚽ soccer practice</div>
+                    <div class="who"><span class="av a-aria">a</span>aria · East Coast Park</div>
+                  </div>
+                </div>
+                <div class="mp-event">
+                  <div class="accent" style="background: var(--m-oren)"></div>
+                  <div class="info">
+                    <div class="top-row">16:30 — 17:30</div>
+                    <div class="title">🎨 art class</div>
+                    <div class="who"><span class="av a-oren">o</span>oren · Little Arts Academy</div>
+                  </div>
+                </div>
+                <div class="mp-event">
+                  <div class="accent" style="background: var(--orange)"></div>
+                  <div class="info">
+                    <div class="top-row">19:30 — 21:00</div>
+                    <div class="title">🍝 family pasta night</div>
+                    <div class="who">
+                      <span class="av a-greg">g</span><span class="av a-mira">m</span><span class="av a-aria">a</span><span class="av a-oren">o</span><span class="av a-juno">j</span>
+                      <span>· home</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ====================================================
+               WEEKLY REDESIGN
+               ==================================================== -->
+          <section class="screen" id="weekly">
+            <div class="concept-intro">
+              <span class="num">bonus · weekly v2</span>
+              <h2>weekly, re-thought — <em>two-week strip + seven-column timeline</em></h2>
+              <p>Two-week navigation strip on top — compact, dots for event presence, today highlighted, current week marked with an orange accent. The real estate-eating timeline grid stays the star of the show below: all seven days side-by-side, all-day lane, compressed hour rows, member-colored event blocks. Tapping a date on the strip jumps the timeline to that week.</p>
+            </div>
+
+            <div class="week-canvas">
+              <div class="cal-toolbar">
+                <button class="nav-btn">‹</button>
+                <button class="nav-btn">›</button>
+                <span class="month">May 18 – 24<span class="yr">2026</span></span>
+                <button class="today-pill">this week</button>
+                <div class="spacer"></div>
+                <div class="view-toggle">
+                  <button>day</button>
+                  <button class="active">week</button>
+                  <button>month</button>
+                </div>
+              </div>
+
+              <!-- 2-week date navigator. Aligned to the timeline columns
+                   below so each date sits above the day it points to. -->
+              <div class="week-strip">
+                <div class="strip-row current">
+                  <div class="row-label">this<span class="wk">w 21</span></div>
+                  <div class="strip-day in-week">
+                    <span class="dow">mon</span><span class="num">18</span>
+                    <span class="dots"><span style="background: var(--m-aria)"></span><span style="background: var(--m-mira)"></span></span>
+                  </div>
+                  <div class="strip-day today in-week">
+                    <span class="dow">tue</span><span class="num">19</span>
+                    <span class="dots"><span style="background: var(--m-aria)"></span><span style="background: var(--m-oren)"></span><span style="background: var(--orange)"></span></span>
+                  </div>
+                  <div class="strip-day in-week">
+                    <span class="dow">wed</span><span class="num">20</span>
+                    <span class="dots"><span style="background: var(--m-oren)"></span><span style="background: var(--m-aria)"></span><span style="background: var(--m-juno)"></span><span style="background: var(--m-greg)"></span></span>
+                  </div>
+                  <div class="strip-day in-week">
+                    <span class="dow">thu</span><span class="num">21</span>
+                    <span class="dots"><span style="background: var(--m-aria)"></span></span>
+                  </div>
+                  <div class="strip-day in-week">
+                    <span class="dow">fri</span><span class="num">22</span>
+                    <span class="dots"><span style="background: var(--orange)"></span></span>
+                  </div>
+                  <div class="strip-day in-week">
+                    <span class="dow">sat</span><span class="num">23</span>
+                    <span class="dots"><span style="background: var(--m-juno)"></span><span style="background: var(--orange)"></span></span>
+                  </div>
+                  <div class="strip-day in-week">
+                    <span class="dow">sun</span><span class="num">24</span>
+                    <span class="dots"><span style="background: var(--orange)"></span></span>
+                  </div>
+                </div>
+                <div class="strip-row">
+                  <div class="row-label">next<span class="wk">w 22</span></div>
+                  <div class="strip-day">
+                    <span class="dow">mon</span><span class="num">25</span>
+                    <span class="dots"><span style="background: var(--m-aria)"></span></span>
+                  </div>
+                  <div class="strip-day">
+                    <span class="dow">tue</span><span class="num">26</span>
+                    <span class="dots"><span style="background: var(--m-oren)"></span></span>
+                  </div>
+                  <div class="strip-day">
+                    <span class="dow">wed</span><span class="num">27</span>
+                    <span class="dots"><span style="background: var(--m-aria)"></span></span>
+                  </div>
+                  <div class="strip-day">
+                    <span class="dow">thu</span><span class="num">28</span>
+                    <span class="dots"><span style="background: var(--m-aria)"></span></span>
+                  </div>
+                  <div class="strip-day">
+                    <span class="dow">fri</span><span class="num">29</span>
+                    <span class="dots"><span style="background: var(--orange)"></span></span>
+                  </div>
+                  <div class="strip-day">
+                    <span class="dow">sat</span><span class="num">30</span>
+                    <span class="dots"><span style="background: var(--orange)"></span></span>
+                  </div>
+                  <div class="strip-day">
+                    <span class="dow">sun</span><span class="num">31</span>
+                    <span class="dots"><span style="background: var(--orange)"></span></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="week-grid-wrap">
+                <div class="week-grid">
+                  <div class="week-corner"></div>
+                  <div class="week-day-head"><span class="dow">mon</span><div class="num">18</div></div>
+                  <div class="week-day-head today"><span class="dow">tue</span><div class="num">19</div></div>
+                  <div class="week-day-head"><span class="dow">wed</span><div class="num">20</div></div>
+                  <div class="week-day-head"><span class="dow">thu</span><div class="num">21</div></div>
+                  <div class="week-day-head"><span class="dow">fri</span><div class="num">22</div></div>
+                  <div class="week-day-head"><span class="dow">sat</span><div class="num">23</div></div>
+                  <div class="week-day-head"><span class="dow">sun</span><div class="num">24</div></div>
+
+                  <div class="all-day-lane-label">all-day</div>
+                  <div class="all-day-lane-cell"></div>
+                  <div class="all-day-lane-cell"></div>
+                  <div class="all-day-lane-cell"></div>
+                  <div class="all-day-lane-cell"></div>
+                  <div class="all-day-lane-cell"></div>
+                  <div class="all-day-lane-cell"><span class="ad-pill" style="background: var(--m-juno-soft); color: var(--m-juno)">🎂 Mia's bday</span></div>
+                  <div class="all-day-lane-cell"></div>
+
+                  <div class="week-hour-label">09:00</div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col today"></div>
+                  <div class="week-day-col">
+                    <div class="week-event oren" style="top: 0; height: 52px"><span class="t">09:00</span><span class="ttl">🦷 dentist</span></div>
+                  </div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+
+                  <div class="week-hour-label">10:00</div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col today"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"><div class="week-event family" style="top: 0; height: 104px"><span class="t">10:00 — 12:00</span><span class="ttl">🥞 brunch</span></div></div>
+
+                  <div class="week-hour-label">11:00</div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col today"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+
+                  <div class="week-hour-label">12:00</div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col today"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+
+                  <div class="week-hour-label">13:00</div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col today"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+
+                  <div class="week-hour-label">14:00</div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col today"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"><div class="week-event juno" style="top: 0; height: 156px"><span class="t">14:00 — 17:00</span><span class="ttl">🎂 Mia's bday</span></div></div>
+                  <div class="week-day-col"></div>
+
+                  <div class="week-hour-label">15:00</div>
+                  <div class="week-day-col"><div class="week-event aria" style="top: 16px; height: 52px"><span class="t">15:30 — 16:30</span><span class="ttl">🎹 piano</span></div></div>
+                  <div class="week-day-col today"></div>
+                  <div class="week-day-col"><div class="week-event aria" style="top: 16px; height: 52px"><span class="t">15:30</span><span class="ttl">🎹 piano</span></div></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+
+                  <div class="week-hour-label">16:00</div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col today">
+                    <div class="week-event aria" style="top: 0; height: 52px; right: 50%"><span class="t">16:00</span><span class="ttl">⚽</span></div>
+                    <div class="week-event oren" style="top: 16px; height: 52px; left: 50%"><span class="t">16:30</span><span class="ttl">🎨</span></div>
+                  </div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"><div class="week-event aria" style="top: 0; height: 52px"><span class="t">16:00</span><span class="ttl">⚽ soccer</span></div></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+
+                  <div class="week-hour-label">17:00</div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col today"></div>
+                  <div class="week-day-col"><div class="week-event juno" style="top: 0; height: 52px"><span class="t">17:00</span><span class="ttl">🏊 swim</span></div></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+
+                  <div class="week-hour-label">18:00</div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col today"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"><div class="week-event family" style="top: 30px; height: 130px"><span class="t">18:30 — 21:00</span><span class="ttl">🍱 grandparents</span></div></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+
+                  <div class="week-hour-label">19:00</div>
+                  <div class="week-day-col"><div class="week-event mira" style="top: 0; height: 52px"><span class="t">19:00</span><span class="ttl">🧘 yoga</span></div></div>
+                  <div class="week-day-col today"><div class="week-event family" style="top: 26px; height: 78px"><span class="t">19:30 — 21:00</span><span class="ttl">🍝 pasta night</span></div></div>
+                  <div class="week-day-col"><div class="week-event greg" style="top: 0; height: 156px"><span class="t">19:00 — 22:00</span><span class="ttl">💼 team dinner</span></div></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+
+                  <div class="week-hour-label">20:00</div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col today"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                  <div class="week-day-col"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </main>
+
+      <!-- Mobile bottom nav -->
+      <nav class="mobile-bottomnav">
+        <button><span class="emoji">🏡</span><span>Nook</span></button>
+        <button class="active"><span class="emoji">🌳</span><span>Planning</span></button>
+        <button><span class="emoji">🐷</span><span>Money</span></button>
+        <button><span class="emoji">🌱</span><span>Pod</span></button>
+      </nav>
+    </div>
+
+    <script>
+      function showScreen(btn) {
+        const target = btn.dataset.target;
+        document.querySelectorAll('.switcher button').forEach((b) => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === target));
+        const main = document.querySelector('.main');
+        if (main) main.scrollTop = 0;
+      }
+    </script>
+  </body>
+</html>
