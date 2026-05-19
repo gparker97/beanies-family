@@ -12,7 +12,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
-- **2-week navigator strip on the weekly calendar.** A new compact strip sits above the weekly timeline (desktop AND mobile), showing the focused week + the next week as side-by-side rows of day pills. Each pill carries DOW, day-number, and 1-3 member-color event-density dots (same grammar as the monthly chips). The focused week gets an orange accent strip on the left; today gets the orange fill. Tap any pill to focus that day; tap a day in the next-week row to jump the timeline forward. Doesn't change the existing weekly timeline below — just adds the week-shape overview greg flagged was missing.
+- **2-week navigator strip on the weekly calendar.** A new compact strip sits above the weekly timeline (desktop AND mobile), showing the focused week + the next week as side-by-side rows of day pills. Each pill carries DOW, day-number, and 1-3 member-color event-density dots (same grammar as the monthly chips). The focused week gets an orange accent strip on the left; today gets the orange fill. Tap any pill to focus that day on mobile or advance the visible week on desktop; the agenda sidebar is no longer opened (you stay in weekly mode). Doesn't change the existing weekly timeline below — just adds the week-shape overview that was missing.
+
+### Fixed
+
+- **Weekly mobile no longer shows two competing day-pill strips.** Phase B's 2-week navigator strip rendered alongside the legacy 7-pill mobile strip, stacking them on top of each other. The legacy strip is removed — the new navigator is a superset (same week + the next, plus density dots that respect the chip color rule). Less vertical real estate, fewer competing affordances.
+
+- **Tapping a day on the navigator strip keeps you in weekly mode.** Previously the strip emitted `select-date` which the parent page handles by opening the day-agenda sidebar — yanking the user out of weekly view. The strip is now strictly for week-internal navigation: tap a day to focus it (mobile) or to advance the week (desktop). To open the agenda, click an event chip directly.
 
 ### Changed
 
