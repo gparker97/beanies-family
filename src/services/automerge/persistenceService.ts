@@ -13,6 +13,7 @@ import { openDB, type IDBPDatabase } from 'idb';
 import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
 import { saveDoc } from './docService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
+import { withIdbRetry } from '@/utils/idbTransient';
 import * as Automerge from '@automerge/automerge';
 import type { FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
@@ -64,12 +65,15 @@ export async function persistDoc(familyKey: CryptoKey): Promise<void> {
   const binary = saveDoc();
   const encrypted = await encryptPayload(familyKey, binary);
   const payload = bufferToBase64(encrypted);
+  const db = cacheDb;
 
-  await cacheDb.put(STORE_NAME, {
-    id: DOC_KEY,
-    payload,
-    updatedAt: new Date().toISOString(),
-  });
+  await withIdbRetry('persistDoc', () =>
+    db.put(STORE_NAME, {
+      id: DOC_KEY,
+      payload,
+      updatedAt: new Date().toISOString(),
+    })
+  );
 }
 
 /**
@@ -80,8 +84,9 @@ export async function loadCachedDoc(
   familyKey: CryptoKey
 ): Promise<Automerge.Doc<FamilyDocument> | null> {
   if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
+  const db = cacheDb;
 
-  const entry = await cacheDb.get(STORE_NAME, DOC_KEY);
+  const entry = await withIdbRetry('loadCachedDoc', () => db.get(STORE_NAME, DOC_KEY));
   if (!entry) return null;
 
   const encrypted = new Uint8Array(base64ToBuffer(entry.payload));
@@ -95,12 +100,15 @@ export async function loadCachedDoc(
  */
 export async function persistEnvelope(envelope: BeanpodFileV4): Promise<void> {
   if (!cacheDb) return; // Silently skip if not initialized
+  const db = cacheDb;
 
-  await cacheDb.put(STORE_NAME, {
-    id: ENVELOPE_KEY,
-    payload: JSON.stringify(envelope),
-    updatedAt: new Date().toISOString(),
-  });
+  await withIdbRetry('persistEnvelope', () =>
+    db.put(STORE_NAME, {
+      id: ENVELOPE_KEY,
+      payload: JSON.stringify(envelope),
+      updatedAt: new Date().toISOString(),
+    })
+  );
 }
 
 /**
@@ -108,8 +116,9 @@ export async function persistEnvelope(envelope: BeanpodFileV4): Promise<void> {
  */
 export async function loadCachedEnvelope(): Promise<BeanpodFileV4 | null> {
   if (!cacheDb) return null;
+  const db = cacheDb;
 
-  const entry = await cacheDb.get(STORE_NAME, ENVELOPE_KEY);
+  const entry = await withIdbRetry('loadCachedEnvelope', () => db.get(STORE_NAME, ENVELOPE_KEY));
   if (!entry) return null;
 
   try {

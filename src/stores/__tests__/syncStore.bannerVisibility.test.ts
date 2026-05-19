@@ -29,6 +29,7 @@ const {
   saveNowMock,
   loadMock,
   getStateMock,
+  getLastSilentRefreshDiagnosticsMock,
 } = vi.hoisted(() => ({
   saveFailureCallbackHolder: {
     cb: null as ((level: string, error: string | null) => void) | null,
@@ -61,6 +62,14 @@ const {
     isSyncing: false,
     lastError: null as string | null,
   })),
+  getLastSilentRefreshDiagnosticsMock: vi.fn(
+    () =>
+      null as null | {
+        attempts: unknown[];
+        hadRefreshToken: boolean;
+        consecutiveFailures: number;
+      }
+  ),
 }));
 
 // Auto-mock for syncService — picked up via the shared __mocks__ defaults,
@@ -101,6 +110,7 @@ vi.mock('@/services/google/googleAuth', () => ({
   fetchGoogleUserEmail: vi.fn(async () => null),
   isSilentRefreshPending: isSilentRefreshPendingMock,
   isTokenValid: isTokenValidMock,
+  getLastSilentRefreshDiagnostics: getLastSilentRefreshDiagnosticsMock,
 }));
 
 // Minimal stubs for the rest of syncStore's import surface
@@ -158,8 +168,11 @@ vi.mock('@/services/crypto/familyKeyService', () => ({
 vi.mock('@/services/recurring/recurringProcessor', () => ({
   deduplicateRecurringTransactions: vi.fn(),
 }));
+const { reportErrorMock } = vi.hoisted(() => ({
+  reportErrorMock: vi.fn(),
+}));
 vi.mock('@/utils/errorReporter', () => ({
-  reportError: vi.fn(),
+  reportError: reportErrorMock,
 }));
 vi.mock('@/config/features', () => ({
   features: { drive: true, oauthProxy: true },
@@ -215,6 +228,8 @@ describe('syncStore — save-failure banner visibility', () => {
     isTokenValidMock.mockReturnValue(false);
     saveNowMock.mockResolvedValue(true);
     loadMock.mockResolvedValue(null);
+    getLastSilentRefreshDiagnosticsMock.mockReturnValue(null);
+    reportErrorMock.mockClear();
     getStateMock.mockReturnValue({
       isInitialized: true,
       isConfigured: true,
@@ -507,6 +522,69 @@ describe('syncStore — save-failure banner visibility', () => {
 
       vi.advanceTimersByTime(10_000);
       expect(store.showGoogleReconnect).toBe(false);
+    });
+
+    // Closes the 2026-05-19 Lafleur (iPhone PWA) Slack noise — repeated
+    // `cold-start-reconnect-escalation` alerts with `hadRefreshToken: false`
+    // and `attempts: []` were the system working as designed (no refresh
+    // token to refresh with → banner is the correct UX) but polluted
+    // #beanies-errors with non-actionable events.
+    it('skips Slack alert (but still shows banner) when hadRefreshToken=false', async () => {
+      const store = useSyncStore();
+      await store.initialize();
+
+      getLastSilentRefreshDiagnosticsMock.mockReturnValue({
+        attempts: [],
+        hadRefreshToken: false,
+        consecutiveFailures: 0,
+      });
+
+      await triggerColdStartAuthTransient(store);
+
+      isTokenValidMock.mockReturnValue(false);
+      vi.advanceTimersByTime(4001);
+
+      // Banner UX still fires — the user genuinely needs to reconnect.
+      expect(store.showGoogleReconnect).toBe(true);
+      // …but Slack stays quiet for this by-design terminal state.
+      const coldStartCalls = reportErrorMock.mock.calls.filter(
+        (call) => (call[0] as { surface?: string })?.surface === 'cold-start-reconnect-escalation'
+      );
+      expect(coldStartCalls).toHaveLength(0);
+    });
+
+    it('still emits Slack alert when hadRefreshToken=true (genuine silent-refresh failure)', async () => {
+      const store = useSyncStore();
+      await store.initialize();
+
+      getLastSilentRefreshDiagnosticsMock.mockReturnValue({
+        attempts: [
+          {
+            attempt: 1,
+            durationMs: 800,
+            classification: 'network',
+            errorName: 'TypeError',
+            errorMessage: 'Failed to fetch',
+          },
+        ],
+        hadRefreshToken: true,
+        consecutiveFailures: 2,
+      });
+
+      await triggerColdStartAuthTransient(store);
+
+      isTokenValidMock.mockReturnValue(false);
+      vi.advanceTimersByTime(4001);
+
+      expect(store.showGoogleReconnect).toBe(true);
+      const coldStartCalls = reportErrorMock.mock.calls.filter(
+        (call) => (call[0] as { surface?: string })?.surface === 'cold-start-reconnect-escalation'
+      );
+      expect(coldStartCalls).toHaveLength(1);
+      const arg = coldStartCalls[0][0] as {
+        context: { silent_refresh_had_refresh_token: boolean };
+      };
+      expect(arg.context.silent_refresh_had_refresh_token).toBe(true);
     });
   });
 });
