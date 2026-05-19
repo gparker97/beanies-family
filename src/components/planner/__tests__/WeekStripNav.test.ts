@@ -93,6 +93,23 @@ describe('WeekStripNav', () => {
     expect(wrapper.emitted('select-date')).toEqual([['2026-05-20']]);
   });
 
+  it('highlights selected-date with the filled-orange treatment (distinct from today)', () => {
+    const days = Array.from({ length: 7 }, (_, i) =>
+      // i=0 → may 18 (today), i=4 → may 22 (selected)
+      makeDay({ dateStr: `2026-05-${18 + i}`, dayNum: 18 + i, isToday: i === 0 })
+    );
+    const wrapper = mount(WeekStripNav, {
+      props: { weeks: [{ ...makeWeek(), days }], selectedDate: '2026-05-22' },
+    });
+    const pills = wrapper.findAll('button');
+    // Selected pill: filled orange + white text + shadow
+    expect(pills[4]!.classes()).toContain('bg-primary-500');
+    expect(pills[4]!.classes()).toContain('text-white');
+    // Today pill: outline-only orange (no white text, no shadow)
+    expect(pills[0]!.classes()).toContain('border-primary-500');
+    expect(pills[0]!.classes()).not.toContain('text-white');
+  });
+
   it('renders event-density dots when memberColors are present', () => {
     const days = Array.from({ length: 7 }, (_, i) =>
       makeDay({
