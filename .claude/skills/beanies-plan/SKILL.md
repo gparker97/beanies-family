@@ -1,6 +1,6 @@
 ---
 name: beanies-plan
-description: Create standardized plans and optionally GitHub issues with full context preservation
+description: Create standardized plans (and optionally GitHub issues) using a mandatory 4-pass review discipline — initial draft, DRY/error-handling, sustainability/maintainability, and fresh-eyes final sweep — with full context preservation.
 ---
 
 # beanies-plan — Standardized Plan & Issue Creator
@@ -26,9 +26,15 @@ This skill creates comprehensive, implementation-ready plans and optionally GitH
 3. **Default to direct implementation — no GitHub issue.** This is a one-dev project; tickets are overhead unless the user explicitly says "create an issue" / "file a ticket" / "open a ticket for this". If the user does ask for an issue, create one per Phase 5; otherwise the plan stands alone in `docs/plans/` with the full prompt history embedded.
 4. Record all follow-up prompts, redirections, and refinements. Every user message that shapes the plan is part of the record.
 
-### Phase 2: Draft the Plan
+### Phase 2: Build the Plan Through Four Review Passes
 
-Prepare a comprehensive plan following the structure in [Plan Document Format](#plan-document-format) below. The plan must include **all** context, details, and information required to implement the request in full. Do not summarize, truncate, or omit anything.
+Every plan — bug fix, feature, refactor, polish, anything — passes through **all four** of the passes below before it is shown to the user. The discipline is unconditional. Each downstream pass (2-4) runs in a **separate Plan subagent with a fresh context window** so it literally hasn't seen the prior pass's reasoning and reviews the artifact with fresh eyes. The verbatim prompts for each pass are in [Review Pass Prompts](#review-pass-prompts) below — the subagent receives the prompt unchanged.
+
+After Pass 4 the plan is ready for Phase 3 (present to user). When all four passes have completed, the skill ends its turn by calling `ExitPlanMode` so the user reviews the final, four-pass-polished plan in plan mode.
+
+#### Phase 2.1 — Pass 1: Initial Draft
+
+Prepare a comprehensive plan following the structure in [Plan Document Format](#plan-document-format) below. The plan must include **all** context, details, and information required to implement the request in full. Do not summarize, truncate, or omit anything. Runs in the main conversation (no subagent).
 
 Key principles:
 - **No context loss**: If the user said it, it's in the plan
@@ -42,10 +48,38 @@ Key principles:
 
 If yes, the plan **must** include a `## Help Center Coverage` section (see format below) that specifies which article(s) are affected and follows the `/beanies-help-docs` skill's article-type conventions. The corresponding article work is part of the implementation acceptance criteria — not a follow-up.
 
+#### Phase 2.2 — Pass 2: DRY + Error Handling (fresh subagent)
+
+Invoke a `Plan` subagent. The subagent receives:
+1. The full Pass-1 plan body as input.
+2. The Pass 2 prompt **verbatim** from [Review Pass Prompts](#review-pass-prompts) — do not paraphrase.
+3. Explicit authorization (and the relevant paths) to read the codebase so it can actually verify reuse claims rather than guess. At minimum: `src/composables/`, `src/utils/`, `src/components/ui/`, `src/components/` (for similar modals/forms/cards), `src/services/`, `src/stores/`.
+
+Apply the subagent's revisions to the plan in-place. Record a one-line summary of what changed (or "No changes — already covered") in the `## Review Passes` section of the plan.
+
+#### Phase 2.3 — Pass 3: Sustainability / Maintainability (fresh subagent)
+
+Invoke a **new** `Plan` subagent — fresh context, no awareness of Pass 2. It receives:
+1. The Pass-2-revised plan body.
+2. The Pass 3 prompt **verbatim** from [Review Pass Prompts](#review-pass-prompts).
+
+Apply revisions. Record a one-line summary in `## Review Passes`.
+
+#### Phase 2.4 — Pass 4: Fresh-Eyes Final Sweep (fresh subagent)
+
+Invoke a **new** `Plan` subagent — fresh context, no awareness of Passes 2 or 3. It receives:
+1. The Pass-3-revised plan body.
+2. The Pass 4 prompt **verbatim** from [Review Pass Prompts](#review-pass-prompts).
+
+Apply revisions. Record a one-line summary in `## Review Passes`. The plan is now ready to present.
+
 ### Phase 3: Iterate Until Approved
 
-1. Present the plan to the user for review.
-2. Incorporate all feedback, redirections, and changes.
+1. Present the plan to the user for review (via `ExitPlanMode`).
+2. Incorporate all feedback, redirections, and changes — but **judge the size of the change before deciding whether to re-run Passes 2-4**:
+   - **Light edits** (wording tweaks, clarifications, renaming a helper, small detail fixes): apply directly. Do **not** re-run Passes 2-4. Note the iteration in the Prompt Log only.
+   - **Substantial edits** (new requirement added, different approach, new files affected, scope removed, materially different design): apply the change, then re-run **Passes 2, 3, and 4** with fresh Plan subagents on the revised plan. Update the `## Review Passes` section to reflect the new round.
+   - When in doubt: re-run. The cost of an extra pass is far lower than the cost of a missed regression in the discipline.
 3. **Record every iteration prompt** — these are saved later.
 4. Repeat until the user explicitly approves the plan.
 
@@ -67,6 +101,36 @@ Once the plan is fully approved:
 2. Apply labels per the project's [Issue Labeling](#issue-labeling) conventions.
 3. Add a **comment** on the issue containing ALL prompts from the conversation (initial + follow-ups + redirections). Use the format in [Prompt Log Comment](#prompt-log-comment-format) below.
 4. Update the plan file to include the issue number and link.
+
+---
+
+## Review Pass Prompts
+
+These prompts are the source of truth for what Passes 2, 3, and 4 actually do. Pass them to each pass's subagent **verbatim** — do not paraphrase, condense, or "improve" them. If a prompt needs refinement, edit it here. The trailing `--` is part of the prompt as Greg authored it; keep it.
+
+### Pass 2 — DRY + Error Handling
+
+> Review the plan again to make sure you are implementing in the most optimal and efficient way, striving for elegance and simplicity, capturing ALL errors and never letting anything fail silently, and following all DRY principles - you are not re-writing or repeating any code.
+>
+> Check existing helpers, functions, composables, etc or other code where a solution already exists, check existing components and other reusable UI elements. If you are re-implementing any code that already exists elsewhere, including a UI modal or component that exists elsewhere (or a very close version exists), function, helper, composable, etc, considering refactoring this into a generic item now as opposed to duplicating code and refactoring later.
+>
+> Ensure that there are never any silent failures. Everything with the potential to fail should be handled gracefully (i.e. a try/catch block or something similar as appropriate). Users should be shown informative error message, with direction for developers as well either in the error modal itself or on the console. Nothing should ever fail silently, and guidance on how to fix the error should always be available.
+>
+> Rewrite the plan ensuring that the design and flow and functionality is implemented in the simplest and most efficient/optimized way without any duplication, silent failures, overly complicated flows, or code bloat where not necessary.
+>
+> --
+
+### Pass 3 — Sustainability / Maintainability
+
+> Let's review the plan again with a focus on long term sustainability, maintainability, and reliability. Ensure we are using strong coding practices and not putting ourselves in a situation where the app will become overly complex or difficult to support or maintain in the future. Check for deep nesting, overly coupled structures, or any other complexity that could lead to supportability, maintenance, or reliability issues that can be simplified.
+>
+> --
+
+### Pass 4 — Fresh-Eyes Final Sweep
+
+> Take one more pass at the plan and review again with fresh eyes. Review all activities proposed and confirm again that we are applying the most simple, secure, robust, and elegant solution, strictly following DRY principles, ensuring a focus on long term sustainability, maintenance, and reliability, and avoiding introducing any bugs or side effects. This will probably be the final iteration of the plan, so please ensure we have captured any relevant issues and are implementing the most robust and sustainable version of this plan.
+>
+> --
 
 ---
 
@@ -141,6 +205,15 @@ The article work is written following `.claude/skills/beanies-help-docs/SKILL.md
 
 1. ...
 2. ...
+
+## Review Passes
+
+Lightweight record that all four review passes ran. One bullet per pass — a 1-line summary of what changed, or "No changes — already covered" if a pass found nothing to revise.
+
+- **Pass 1 (Initial draft)**: <1-line summary of what was drafted>
+- **Pass 2 (DRY + error handling)**: <1-line summary of revisions, or "No changes — already covered">
+- **Pass 3 (Sustainability)**: <1-line summary of revisions, or "No changes — already covered">
+- **Pass 4 (Fresh-eyes sweep)**: <1-line summary of revisions, or "No changes — already covered">
 
 ## Prompt Log
 
@@ -240,6 +313,12 @@ Follow the project's labeling conventions from `CLAUDE.md`:
 
 ## Rules
 
+- **ALWAYS run all four review passes for every plan.** No exceptions, no "trivial enough to skip" carve-out. Bug fix, feature, refactor, polish — all four passes run.
+- **Passes 2-4 use Plan subagents with fresh context windows.** That is what "fresh eyes" means in this skill — literal independent context, not just a fresh instruction in the same conversation. Do not run passes 2-4 inline in the main thread.
+- **Pass the prompts verbatim.** Each pass's prompt in [Review Pass Prompts](#review-pass-prompts) is the spec — copy it word-for-word into the subagent invocation. Do not paraphrase, summarize, or "improve" them.
+- **Record the passes in the saved plan.** The `## Review Passes` section is mandatory and proves the discipline ran. Each bullet is one line — what changed, or "No changes — already covered".
+- **Re-run passes 2-4 only on substantial user edits.** Light edits (wording, clarifications, small detail fixes) skip the re-run. Substantial edits (new scope, different approach, new files affected) re-run all three downstream passes against fresh subagents.
+- **End with `ExitPlanMode`.** Once all four passes have completed and the plan file is written, the skill ends its turn by calling `ExitPlanMode` so the user reviews the final plan in plan mode.
 - **NEVER summarize or truncate the plan.** Save exactly what was approved.
 - **DEFAULT to direct implementation.** Do not ask "issue or direct?" — only create a GitHub issue when the user explicitly requests one.
 - **NEVER lose prompts.** Every user message that shaped the plan is recorded.
