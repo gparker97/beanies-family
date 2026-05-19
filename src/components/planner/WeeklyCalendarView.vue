@@ -363,63 +363,9 @@ const mobileDaySegments = computed(() =>
   vacationStore.travelSegmentOccurrencesInRange(selectedMobileDay.value, selectedMobileDay.value)
 );
 
-// Mobile: density data per day for the pill strip — unique member colors for
-// events on that day + whether any vacation span covers it. Drives the dots +
-// underline under each day pill so users see the shape of the week at a glance.
-interface DayDensity {
-  memberColors: string[]; // up to 3 distinct colors, deduped
-  moreCount: number; // 4+ → render a "+N" hint beside the dots
-  hasVacation: boolean;
-}
-
-const memberColorById = computed(() => {
-  const map = new Map<string, string>();
-  for (const m of familyStore.members) map.set(m.id, m.color);
-  return map;
-});
-
-const dayDensities = computed(() => {
-  const byDate = new Map<string, DayDensity>();
-  for (const day of weekDays.value) {
-    const occs = weekActivities.value.get(day.dateStr) ?? [];
-    // Collect distinct member colors for timed + untimed events on this day,
-    // honoring the page-level member filter so the dots reflect what the user
-    // will see when they tap into the day.
-    const seen = new Set<string>();
-    const colors: string[] = [];
-    for (const occ of occs) {
-      const assignees = normalizeAssignees(occ.activity);
-      const inScope =
-        memberFilterStore.isAllSelected ||
-        assignees.some((id) => memberFilterStore.isMemberSelected(id));
-      if (!inScope) continue;
-      for (const memberId of assignees) {
-        if (!memberFilterStore.isAllSelected && !memberFilterStore.isMemberSelected(memberId)) {
-          continue;
-        }
-        const color = memberColorById.value.get(memberId);
-        if (!color || seen.has(color)) continue;
-        seen.add(color);
-        colors.push(color);
-      }
-    }
-    const hasVacation = vacationSpans.value.some(
-      (s) =>
-        day.dateStr >= weekDays.value[s.startCol]!.dateStr &&
-        day.dateStr <= weekDays.value[Math.min(s.startCol + s.span - 1, 6)]!.dateStr
-    );
-    byDate.set(day.dateStr, {
-      memberColors: colors.slice(0, 3),
-      moreCount: Math.max(0, colors.length - 3),
-      hasVacation,
-    });
-  }
-  return byDate;
-});
-
 // ── 2-week navigator strip ─────────────────────────────────────────────────
 // Shows the focused week + the week immediately after, with event-density
-// dots per day. Reuses memberColorById + classification helpers so colors
+// dots per day. Reuses the classifier from `useActivityChipClass` so colors
 // stay consistent with the monthly chip rule (no parallel implementation).
 
 const DOW_KEYS = [
@@ -548,13 +494,16 @@ function onStripDayClick(dateStr: string) {
   const targetDate = parseLocalDate(dateStr);
   const inFocusedWeek = weekDays.value.some((d) => d.dateStr === dateStr);
   if (!inFocusedWeek) {
-    // Tap on a day in the next-week row jumps the timeline to that week.
+    // Tap on a day in the next-week row advances the timeline to that week.
     referenceDate.value = targetDate;
   }
-  // Mobile single-day view focuses the tapped day. Desktop emits select-
-  // date so the parent page's agenda sidebar (if any) responds.
+  // Mobile single-day view focuses the tapped day so the DayTimeline below
+  // updates. Deliberately does NOT emit `select-date` — the strip is for
+  // week-internal navigation, and routing the click to the parent's
+  // select-date handler would open the day-agenda sidebar and pull the
+  // user out of weekly mode (the exact friction the strip is meant to
+  // avoid). To open the agenda, the user clicks an event chip directly.
   selectedMobileDay.value = dateStr;
-  emit('select-date', dateStr);
 }
 
 defineExpose({ weekLabel, activityCount });
@@ -841,74 +790,11 @@ defineExpose({ weekLabel, activityCount });
       </div>
     </template>
 
-    <!-- ── Mobile: Enhanced Day Pills + Unified Timeline ─────────────────── -->
+    <!-- ── Mobile: focused-day timeline (navigator strip lives above the
+         desktop/mobile branch, see WeekStripNav above). The legacy 7-day
+         pill strip that used to live here was removed during the Phase B
+         calendar refactor — the 2-week navigator strip replaces it. -->
     <template v-else>
-      <div class="mb-4 flex gap-1 overflow-x-auto pb-1">
-        <button
-          v-for="day in weekDays"
-          :key="day.dateStr"
-          type="button"
-          class="font-outfit relative flex shrink-0 flex-col items-center rounded-2xl px-3 py-2 text-xs font-semibold transition-all"
-          :class="
-            selectedMobileDay === day.dateStr
-              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
-              : day.isToday
-                ? 'bg-primary-500/10 text-primary-500'
-                : 'text-secondary-500/50 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-slate-700'
-          "
-          @click="selectedMobileDay = day.dateStr"
-        >
-          <span class="uppercase">{{ dayAbbrev(day.date) }}</span>
-          <span class="mt-0.5 text-sm font-bold">{{ day.date.getDate() }}</span>
-
-          <!-- Density: up to 3 member-colored dots + "+N" overflow hint -->
-          <div
-            v-if="(dayDensities.get(day.dateStr)?.memberColors?.length ?? 0) > 0"
-            class="mt-1 flex h-1.5 items-center gap-[3px]"
-          >
-            <span
-              v-for="(color, i) in dayDensities.get(day.dateStr)?.memberColors ?? []"
-              :key="i"
-              class="h-1.5 w-1.5 rounded-full"
-              :style="{
-                backgroundColor: color,
-                opacity: selectedMobileDay === day.dateStr ? 1 : 0.85,
-              }"
-            />
-            <span
-              v-if="(dayDensities.get(day.dateStr)?.moreCount ?? 0) > 0"
-              class="text-[0.5rem] leading-none font-semibold"
-              :class="
-                selectedMobileDay === day.dateStr
-                  ? 'text-white/90'
-                  : 'text-secondary-500/50 dark:text-gray-500'
-              "
-            >
-              +{{ dayDensities.get(day.dateStr)?.moreCount }}
-            </span>
-          </div>
-          <!-- Fallback placeholder to keep pill heights consistent -->
-          <div
-            v-else-if="!dayDensities.get(day.dateStr)?.hasVacation"
-            class="mt-1 h-1.5"
-            aria-hidden="true"
-          />
-
-          <!-- Vacation span underline -->
-          <div
-            v-if="dayDensities.get(day.dateStr)?.hasVacation"
-            class="absolute right-1.5 bottom-1 left-1.5 h-0.5 rounded-full"
-            :style="{
-              backgroundColor:
-                selectedMobileDay === day.dateStr
-                  ? 'rgba(255,255,255,0.9)'
-                  : 'var(--vacation-teal)',
-            }"
-            aria-hidden="true"
-          />
-        </button>
-      </div>
-
       <DayTimeline
         :date-str="selectedMobileDay"
         :activities="mobileDayActivities"
