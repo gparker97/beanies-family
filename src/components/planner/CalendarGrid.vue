@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -386,6 +386,39 @@ const swipeRef = ref<HTMLElement | null>(null);
 useCalendarSlide(swipeRef, {
   onNext: nextMonth,
   onPrev: prevMonth,
+});
+
+/**
+ * Mobile auto-scroll to today's card on first mount when viewing the
+ * current month. Mirrors `WeeklyCalendarView.vue`'s scroll-to-current-hour
+ * behaviour: only fires when the user is freshly on the page (scrollTop
+ * near zero) and only on the current month — navigating to other months
+ * keeps the user at the top of that month.
+ *
+ * Today's MonthDayCard carries a `data-date` attribute we can query.
+ * `<main>` is the scroll container in `App.vue` / `FamilyPlannerPage`.
+ */
+function scrollMobileToToday() {
+  if (typeof window === 'undefined') return;
+  if (window.matchMedia('(min-width: 768px)').matches) return; // md+ = desktop
+  if (today.getMonth() !== currentMonth.value || today.getFullYear() !== currentYear.value) {
+    return;
+  }
+  const root = swipeRef.value;
+  const mainEl = document.querySelector('main');
+  if (!root || !mainEl) return;
+  if (mainEl.scrollTop > 100) return; // user has already scrolled — leave alone
+  const card = root.querySelector<HTMLElement>(`[data-date="${todayStr.value}"]`);
+  if (!card) return;
+  const cardOffsetWithinMain =
+    card.getBoundingClientRect().top - mainEl.getBoundingClientRect().top + mainEl.scrollTop;
+  // 80px headroom so today's card has breathing room under the topbar.
+  mainEl.scrollTop = Math.max(0, cardOffsetWithinMain - 80);
+}
+
+onMounted(async () => {
+  await nextTick();
+  scrollMobileToToday();
 });
 
 defineExpose({ monthLabel, activityCount, currentYear, currentMonth });

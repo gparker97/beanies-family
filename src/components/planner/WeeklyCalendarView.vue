@@ -60,18 +60,52 @@ const todoStore = useTodoStore();
 const holidayStore = useHolidayStore();
 
 const referenceDate = ref(new Date());
-const { weekDays, weekLabel, prevWeek, nextWeek, goToToday } = useWeekNavigation(referenceDate);
+const { weekDays, weekLabel } = useWeekNavigation(referenceDate);
+
+/**
+ * Strip-anchor date — the date whose week is the FIRST row of the 2-week
+ * navigator strip. Independent of `referenceDate` (which controls the
+ * timeline below) so the strip stays static when the user clicks a day
+ * inside it. Moves only via the prev/next nav arrows or the "today"
+ * button (both wired through `advanceBoth` / `goToToday` below).
+ *
+ * Defaults to today so the strip opens showing "this week" + "next week".
+ */
+const stripAnchorDate = ref(new Date());
+
+/** Move both refs by `delta` weeks. Used by prev/next nav + swipe. */
+function advanceBoth(delta: number) {
+  const days = delta * 7;
+  referenceDate.value = addDays(referenceDate.value, days);
+  stripAnchorDate.value = addDays(stripAnchorDate.value, days);
+}
+
+function prevWeek() {
+  advanceBoth(-1);
+}
+
+function nextWeek() {
+  advanceBoth(1);
+}
+
+function goToToday() {
+  const now = new Date();
+  referenceDate.value = now;
+  stripAnchorDate.value = now;
+  selectedMobileDay.value = toDateInputValue(now);
+}
 
 // ── Swipe gesture ──────────────────────────────────────────────────────────
 // Horizontal swipe on the calendar surface advances/retreats by one week,
-// with an iOS-Calendar-style slide-out / slide-in animation.
+// moving the strip + timeline together (consistent with arrow nav).
 const swipeRef = ref<HTMLElement | null>(null);
 useCalendarSlide(swipeRef, {
   onNext: nextWeek,
   onPrev: prevWeek,
 });
 
-// Mobile: selected day within the week
+// Mobile: selected day within the week. Also drives which pill in the
+// strip gets the strongest "selected" highlight.
 const selectedMobileDay = ref(toDateInputValue(new Date()));
 
 // Public holidays in the visible week, keyed by date (read-only reference data;
@@ -364,9 +398,11 @@ const mobileDaySegments = computed(() =>
 );
 
 // ── 2-week navigator strip ─────────────────────────────────────────────────
-// Shows the focused week + the week immediately after, with event-density
-// dots per day. Reuses the classifier from `useActivityChipClass` so colors
-// stay consistent with the monthly chip rule (no parallel implementation).
+// Anchored to `stripAnchorDate` — independent of `referenceDate`. The strip
+// stays static when the user taps a day inside it; only the prev/next nav
+// arrows (which call `advanceBoth`) move both refs together.
+// Reuses the classifier from `useActivityChipClass` so colors stay
+// consistent with the monthly chip rule (no parallel implementation).
 
 const DOW_KEYS = [
   'planner.day.sun',
@@ -381,15 +417,20 @@ const DOW_KEYS = [
 const { classify: classifyStripChip } = useActivityChipClass();
 
 /**
- * Build a fresh density-by-date map covering the focused week + the next
- * week (14 days). Distinct from `dayDensities` (which only covers the
- * focused week and is consumed by the existing mobile pill strip).
+ * Week 1 of the strip (7 days anchored to `stripAnchorDate`'s week). Used
+ * as the basis for week 2 (= these days + 7).
+ */
+const { weekDays: stripWeek1Days } = useWeekNavigation(stripAnchorDate);
+
+/**
+ * Density map covering 14 days from the strip's anchor week — distinct
+ * from the timeline below which only renders the focused week.
  */
 const stripDensities = computed(() => {
   const byDate = new Map<string, { memberColors: string[]; moreCount: number }>();
-  const startDate = weekDays.value[0]?.date ?? new Date();
+  const startDate = stripWeek1Days.value[0]?.date;
+  if (!startDate) return byDate;
 
-  // Build a small set of dates we care about (14 days from focused week start)
   const stripDates: string[] = [];
   for (let i = 0; i < 14; i++) {
     stripDates.push(toDateInputValue(addDays(startDate, i)));
@@ -415,22 +456,14 @@ const stripDensities = computed(() => {
   }
 
   // For each strip date, build the per-day distinct color set. Family
-  // events (0 assignees) project as the Heritage-Orange dot via
-  // classifyStripChip so the strip mirrors the chip color grammar.
+  // events (0 assignees) project as the Heritage-Orange dot via the
+  // shared classifier so the strip mirrors the chip color grammar.
   for (const dateStr of stripDates) {
     const activities = occByDate.get(dateStr) ?? [];
     const seen = new Set<string>();
     const colors: string[] = [];
     for (const a of activities) {
       const cls = classifyStripChip(a);
-      if (cls.kind === 'solo') {
-        if (!seen.has(cls.color)) {
-          seen.add(cls.color);
-          colors.push(cls.color);
-        }
-        continue;
-      }
-      // family / shared → one Heritage Orange dot per day at most
       if (!seen.has(cls.color)) {
         seen.add(cls.color);
         colors.push(cls.color);
@@ -448,14 +481,23 @@ const todayDateStr = computed(() => toDateInputValue(new Date()));
 
 /**
  * Build the WeekStripWeek[] structure for `<WeekStripNav>`. Always two
- * weeks: the focused week first, then the next week. Labels adapt to
- * the focused week's relation to today.
+ * weeks pinned to the strip anchor — they only move when the user uses
+ * prev/next nav (NOT when clicking a day inside).
+ *
+ * `isFocused` marks whichever of the 2 rows contains the timeline's
+ * currently-visible week (so the orange accent strip moves between rows
+ * as the user clicks across the strip).
+ *
+ * Row labels are anchored to *today's* position relative to the row —
+ * "this week" if the row contains today, "next week" if today is in the
+ * week immediately before, otherwise "upcoming". That way labels make
+ * sense whether or not the user has paged forward with the arrows.
  */
 const weekStripData = computed<WeekStripWeek[]>(() => {
-  const focusedStart = weekDays.value[0]?.date;
-  if (!focusedStart) return [];
+  const week1Start = stripWeek1Days.value[0]?.date;
+  if (!week1Start) return [];
 
-  const focusedContainsToday = weekDays.value.some((d) => d.dateStr === todayDateStr.value);
+  const focusedWeekFirstDateStr = weekDays.value[0]?.dateStr ?? '';
 
   function buildDay(date: Date): WeekStripDay {
     const dateStr = toDateInputValue(date);
@@ -471,38 +513,54 @@ const weekStripData = computed<WeekStripWeek[]>(() => {
     };
   }
 
-  const focusedDays: WeekStripDay[] = weekDays.value.map((d) => buildDay(d.date));
-  const nextDays: WeekStripDay[] = Array.from({ length: 7 }, (_, i) =>
-    buildDay(addDays(focusedStart, 7 + i))
-  );
+  const week1Days = stripWeek1Days.value.map((d) => buildDay(d.date));
+  const week2Days = Array.from({ length: 7 }, (_, i) => buildDay(addDays(week1Start, 7 + i)));
+
+  function labelFor(rowDays: WeekStripDay[]): WeekStripWeek['labelKey'] {
+    const todayInRow = rowDays.some((d) => d.isToday);
+    if (todayInRow) return 'planner.weekThis';
+    // Today might be in the week immediately before this row (= "next week")
+    const rowStart = parseLocalDate(rowDays[0]!.dateStr);
+    const prevWeekStart = addDays(rowStart, -7);
+    const todayDate = parseLocalDate(todayDateStr.value);
+    const todayWeekStartStr = toDateInputValue(
+      addDays(todayDate, -((todayDate.getDay() - prevWeekStart.getDay() + 7) % 7))
+    );
+    if (todayWeekStartStr === toDateInputValue(prevWeekStart)) return 'planner.weekNext';
+    return 'planner.weekUpcoming';
+  }
+
+  const week1FocusedDateStr = stripWeek1Days.value[0]?.dateStr ?? '';
+  const week2FocusedDateStr = toDateInputValue(addDays(week1Start, 7));
 
   return [
     {
-      labelKey: focusedContainsToday ? 'planner.weekThis' : 'planner.weekUpcoming',
-      isFocused: true,
-      days: focusedDays,
+      labelKey: labelFor(week1Days),
+      isFocused: week1FocusedDateStr === focusedWeekFirstDateStr,
+      days: week1Days,
     },
     {
-      labelKey: focusedContainsToday ? 'planner.weekNext' : 'planner.weekUpcoming',
-      isFocused: false,
-      days: nextDays,
+      labelKey: labelFor(week2Days),
+      isFocused: week2FocusedDateStr === focusedWeekFirstDateStr,
+      days: week2Days,
     },
   ];
 });
 
+/**
+ * Click handler for a day pill on the strip. The strip stays static —
+ * only the timeline (`referenceDate`) moves. selectedMobileDay updates
+ * so the strip pill highlight follows the tap and the mobile DayTimeline
+ * shows the chosen day's events.
+ *
+ * Deliberately does NOT emit `select-date` — the strip is for week-
+ * internal navigation. Routing the click to the parent's select-date
+ * handler would open the day-agenda sidebar and pull the user out of
+ * weekly mode (the exact friction the strip is meant to avoid). To
+ * open the agenda, the user clicks an event chip directly.
+ */
 function onStripDayClick(dateStr: string) {
-  const targetDate = parseLocalDate(dateStr);
-  const inFocusedWeek = weekDays.value.some((d) => d.dateStr === dateStr);
-  if (!inFocusedWeek) {
-    // Tap on a day in the next-week row advances the timeline to that week.
-    referenceDate.value = targetDate;
-  }
-  // Mobile single-day view focuses the tapped day so the DayTimeline below
-  // updates. Deliberately does NOT emit `select-date` — the strip is for
-  // week-internal navigation, and routing the click to the parent's
-  // select-date handler would open the day-agenda sidebar and pull the
-  // user out of weekly mode (the exact friction the strip is meant to
-  // avoid). To open the agenda, the user clicks an event chip directly.
+  referenceDate.value = parseLocalDate(dateStr);
   selectedMobileDay.value = dateStr;
 }
 
@@ -517,11 +575,15 @@ defineExpose({ weekLabel, activityCount });
   >
     <CalendarNavBar :label="weekLabel" @prev="prevWeek" @next="nextWeek" @today="goToToday" />
 
-    <!-- 2-week date navigator. Compact pills per day with member-colored
-         event-density dots; current week marked with an orange accent.
-         Renders on both desktop and mobile so the week-shape view greg
-         flagged exists at every viewport size. -->
-    <WeekStripNav :weeks="weekStripData" @select-date="onStripDayClick" />
+    <!-- 2-week date navigator. Stays static when tapping a day inside —
+         only the prev/next arrows on the nav bar above move it. The
+         orange "selected" pill follows `selectedMobileDay` so the user
+         sees which day's events are showing in the timeline below. -->
+    <WeekStripNav
+      :weeks="weekStripData"
+      :selected-date="selectedMobileDay"
+      @select-date="onStripDayClick"
+    />
 
     <!-- ── Desktop: Time Grid ──────────────────────────────────────────── -->
     <template v-if="!isMobile">
