@@ -4962,6 +4962,8 @@ const STRING_DEFS = {
   'planner.weekThis': { en: 'This week', beanie: 'this week' },
   'planner.weekNext': { en: 'Next week', beanie: 'next week' },
   'planner.weekUpcoming': { en: 'Upcoming', beanie: 'upcoming' },
+  'planner.weekLast': { en: 'Last week', beanie: 'last week' },
+  'planner.weekEarlier': { en: 'Earlier', beanie: 'earlier' },
 
   // Planner — View toggle
   'planner.view.month': { en: 'Month', beanie: 'month' },

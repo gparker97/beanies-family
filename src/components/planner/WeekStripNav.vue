@@ -29,8 +29,15 @@ export interface WeekStripDay {
 }
 
 export interface WeekStripWeek {
-  /** Translation-key label that prefixes the row ("this week", "next week", "upcoming"). */
-  labelKey: 'planner.weekThis' | 'planner.weekNext' | 'planner.weekUpcoming';
+  /** Translation-key label that prefixes the row. Resolves to the row's
+   *  position relative to today's week — past rows get "last week" /
+   *  "earlier", future rows get "next week" / "upcoming". */
+  labelKey:
+    | 'planner.weekThis'
+    | 'planner.weekNext'
+    | 'planner.weekUpcoming'
+    | 'planner.weekLast'
+    | 'planner.weekEarlier';
   /** Optional "wk 21" ISO week number rendered below the label. */
   weekNumberLabel?: string;
   /** Whether this is the week currently shown in the timeline below. */
