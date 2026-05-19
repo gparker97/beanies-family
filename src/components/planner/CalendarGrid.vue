@@ -371,10 +371,20 @@ function nextMonth() {
   emit('navigated');
 }
 
-function goToToday() {
-  currentYear.value = today.getFullYear();
-  currentMonth.value = today.getMonth();
-  emit('navigated');
+async function goToToday() {
+  const movedMonth =
+    currentYear.value !== today.getFullYear() || currentMonth.value !== today.getMonth();
+  if (movedMonth) {
+    currentYear.value = today.getFullYear();
+    currentMonth.value = today.getMonth();
+    emit('navigated');
+  }
+  // Always scroll to today's card on mobile, whether or not we changed
+  // months — the button is a no-op visually otherwise (today's card may
+  // still be far below the viewport). `force` overrides the "user has
+  // already scrolled" guard since they explicitly asked to jump.
+  await nextTick();
+  scrollMobileToToday({ force: true });
 }
 
 function handleDayClick(date: string) {
@@ -389,16 +399,20 @@ useCalendarSlide(swipeRef, {
 });
 
 /**
- * Mobile auto-scroll to today's card on first mount when viewing the
- * current month. Mirrors `WeeklyCalendarView.vue`'s scroll-to-current-hour
- * behaviour: only fires when the user is freshly on the page (scrollTop
- * near zero) and only on the current month — navigating to other months
- * keeps the user at the top of that month.
+ * Mobile scroll-to-today helper. Used in two ways:
+ *  - **On first mount** (no `force`): scrolls only when the user hasn't
+ *    already scrolled past ~100px. Mirrors `WeeklyCalendarView.vue`'s
+ *    scroll-to-current-hour behaviour — don't disturb a user who's
+ *    deliberately landed somewhere mid-month.
+ *  - **From `goToToday()`** (`force: true`): always scrolls, since the
+ *    user explicitly tapped "today" and expects to land on it whether
+ *    or not they were already scrolled somewhere else.
  *
  * Today's MonthDayCard carries a `data-date` attribute we can query.
  * `<main>` is the scroll container in `App.vue` / `FamilyPlannerPage`.
+ * Skipped on desktop (`md+`) where the 7-column grid keeps today visible.
  */
-function scrollMobileToToday() {
+function scrollMobileToToday(options: { force?: boolean } = {}) {
   if (typeof window === 'undefined') return;
   if (window.matchMedia('(min-width: 768px)').matches) return; // md+ = desktop
   if (today.getMonth() !== currentMonth.value || today.getFullYear() !== currentYear.value) {
@@ -407,13 +421,18 @@ function scrollMobileToToday() {
   const root = swipeRef.value;
   const mainEl = document.querySelector('main');
   if (!root || !mainEl) return;
-  if (mainEl.scrollTop > 100) return; // user has already scrolled — leave alone
+  if (!options.force && mainEl.scrollTop > 100) return; // first-mount guard
   const card = root.querySelector<HTMLElement>(`[data-date="${todayStr.value}"]`);
   if (!card) return;
   const cardOffsetWithinMain =
     card.getBoundingClientRect().top - mainEl.getBoundingClientRect().top + mainEl.scrollTop;
   // 80px headroom so today's card has breathing room under the topbar.
-  mainEl.scrollTop = Math.max(0, cardOffsetWithinMain - 80);
+  // Smooth-scroll on force (user-initiated) so the jump is visible;
+  // instant on first mount so the page lands at today without animation.
+  mainEl.scrollTo({
+    top: Math.max(0, cardOffsetWithinMain - 80),
+    behavior: options.force ? 'smooth' : 'auto',
+  });
 }
 
 onMounted(async () => {
