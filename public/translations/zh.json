@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-18",
-    "translationCount": 2917
+    "lastUpdated": "2026-05-19",
+    "translationCount": 2918
   },
   "translations": {
     "app.name": {
@@ -3894,36 +3894,6 @@
     "planner.today": {
       "translation": "今天",
       "hash": "1c7py9",
-      "lastUpdated": "2026-03-03"
-    },
-    "planner.upcoming": {
-      "translation": "最新活动：",
-      "hash": "mr74hd",
-      "lastUpdated": "2026-03-03"
-    },
-    "planner.noUpcoming": {
-      "translation": "最新活动：",
-      "hash": "2a15ce",
-      "lastUpdated": "2026-03-03"
-    },
-    "planner.todoPreview": {
-      "translation": "家庭待办事项",
-      "hash": "ssz2wx",
-      "lastUpdated": "2026-03-03"
-    },
-    "planner.viewAllTodos": {
-      "translation": "查看全部",
-      "hash": "m9neiw",
-      "lastUpdated": "2026-03-03"
-    },
-    "planner.onCalendar": {
-      "translation": "在日历上查看",
-      "hash": "sveben",
-      "lastUpdated": "2026-03-03"
-    },
-    "planner.viewMore": {
-      "translation": "查看更多",
-      "hash": "65tfbk",
       "lastUpdated": "2026-03-03"
     },
     "planner.inactiveActivities": {
@@ -14590,6 +14560,41 @@
       "translation": "无法保存您的照片以供稍后使用。请检查您的设备存储空间，然后重试。",
       "hash": "fjja3h",
       "lastUpdated": "2026-05-18"
+    },
+    "planner.moreEvents": {
+      "translation": "还有{count}个活动",
+      "hash": "vwayv3",
+      "lastUpdated": "2026-05-19"
+    },
+    "planner.moreEventsShort": {
+      "translation": "更多",
+      "hash": "1zyol",
+      "lastUpdated": "2026-05-19"
+    },
+    "planner.legendShow": {
+      "translation": "顯示",
+      "hash": "1j7rx",
+      "lastUpdated": "2026-05-19"
+    },
+    "planner.legendFamily": {
+      "translation": "家庭活动",
+      "hash": "m9mfuz",
+      "lastUpdated": "2026-05-19"
+    },
+    "planner.weekThis": {
+      "translation": "这个星期",
+      "hash": "mwvrbq",
+      "lastUpdated": "2026-05-19"
+    },
+    "planner.weekNext": {
+      "translation": "下周",
+      "hash": "ipvx9b",
+      "lastUpdated": "2026-05-19"
+    },
+    "planner.weekUpcoming": {
+      "translation": "近期賽事",
+      "hash": "moghmk",
+      "lastUpdated": "2026-05-19"
     }
   }
 }
