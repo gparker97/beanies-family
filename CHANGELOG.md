@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-19
 
+### Added
+
+- **2-week navigator strip on the weekly calendar.** A new compact strip sits above the weekly timeline (desktop AND mobile), showing the focused week + the next week as side-by-side rows of day pills. Each pill carries DOW, day-number, and 1-3 member-color event-density dots (same grammar as the monthly chips). The focused week gets an orange accent strip on the left; today gets the orange fill. Tap any pill to focus that day; tap a day in the next-week row to jump the timeline forward. Doesn't change the existing weekly timeline below — just adds the week-shape overview greg flagged was missing.
+
 ### Changed
 
 - **Monthly calendar replaces dots with member-color chips.** The month view previously showed timed activities as small colored dots — readable as "something is happening" but never "what". Each day now renders up to 4 chips per cell with the assigned bean's color as a left bar, the category emoji, the time, and the truncated title. A `+N more` button opens the full day. Solo events use the bean's own colour; whole-family (no-assignee) and shared (2+ assignees) events use Heritage Orange. On mobile, the 7-column grid collapses to a vertical day-stack — each day card gets a DOW label ("tue 19"), week separators between Mondays mark the current week in orange, and multi-person events surface an avatar stack on the right so you can tell "everyone vs just the parents" at a glance. A new mobile-only legend strip below the toolbar lists the family members as colored dots in a single row, never wrapping.
