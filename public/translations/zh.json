@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-19",
-    "translationCount": 2918
+    "translationCount": 2920
   },
   "translations": {
     "app.name": {
@@ -14594,6 +14594,16 @@
     "planner.weekUpcoming": {
       "translation": "近期賽事",
       "hash": "moghmk",
+      "lastUpdated": "2026-05-19"
+    },
+    "planner.weekLast": {
+      "translation": "上周",
+      "hash": "5jx336",
+      "lastUpdated": "2026-05-19"
+    },
+    "planner.weekEarlier": {
+      "translation": "较早",
+      "hash": "4za5eo",
       "lastUpdated": "2026-05-19"
     }
   }
