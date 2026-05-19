@@ -134,9 +134,10 @@ test.describe('Family Planner', () => {
     expect(pianoLesson!.endTime).toBe('16:00');
 
     // --- EDIT: update the one-time activity ---
-    // Click on the activity in the upcoming list — opens view modal first
-    const upcomingSection = page.locator('h3', { hasText: /upcoming activities/i }).locator('..');
-    await upcomingSection.getByText('Doctor Visit').click();
+    // Click on the activity chip in the calendar grid — opens view modal first.
+    // (Post `ea66dd4`, FamilyPlannerPage no longer renders the Upcoming list;
+    // calendar chips are the single source for activity entry points.)
+    await page.getByText('Doctor Visit').first().click();
     await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
 
     // Click "Edit" button in view modal to open the full edit modal
@@ -155,14 +156,13 @@ test.describe('Family Planner', () => {
     const updatedVisit = exported.activities!.find((a: any) => a.title === 'Updated Visit');
     expect(updatedVisit).toBeDefined();
 
-    // Updated title should be visible in the upcoming list
-    const upcomingAfterEdit = page.locator('h3', { hasText: /upcoming activities/i }).locator('..');
-    await expect(upcomingAfterEdit.getByText('Updated Visit')).toBeVisible();
-    await expect(upcomingAfterEdit.getByText('Doctor Visit')).not.toBeVisible();
+    // Updated title should be visible on the calendar; old title should be gone
+    await expect(page.getByText('Updated Visit').first()).toBeVisible();
+    await expect(page.getByText('Doctor Visit', { exact: true })).toHaveCount(0);
 
     // --- DELETE: remove the one-time activity ---
-    // Click on the activity in the upcoming list — opens view modal
-    await upcomingAfterEdit.getByText('Updated Visit').click();
+    // Click the chip again to reopen the view modal
+    await page.getByText('Updated Visit').first().click();
     await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
 
     // Click the delete button in the view modal footer
