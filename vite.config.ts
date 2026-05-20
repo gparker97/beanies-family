@@ -56,8 +56,9 @@ export default defineConfig({
         // claimed the current page mid-precache-install (asset-fetch
         // race), and on greg's iPhone Safari the chunk-load recovery
         // looped silently for 4-5 minutes before settling. Defaults pair
-        // correctly with 'prompt'; the UpdatePrompt is the intended
-        // control surface for activating a new SW.
+        // correctly with 'prompt'; `usePwaUpdater` (src/composables) is the
+        // intended control surface — it auto-applies a waiting SW on a quiet
+        // moment, which is why registerType stays 'prompt' (not 'autoUpdate').
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

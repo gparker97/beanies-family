@@ -3995,12 +3995,14 @@ const STRING_DEFS = {
   },
   'pwa.installButton': { en: 'Install', beanie: 'plant it!' },
   'pwa.installDismiss': { en: 'Not now', beanie: 'not now' },
-  'pwa.updateAvailable': {
-    en: 'A new version is available',
-    beanie: 'a new version is available!',
+  'pwa.updated': {
+    en: "You're on the latest version",
+    beanie: 'you have fresh beans!',
   },
-  'pwa.updateButton': { en: 'Update now', beanie: 'gimme fresh beans!' },
-  'pwa.updateDismiss': { en: 'Later', beanie: 'later' },
+  'pwa.updatedMessage': {
+    en: "We're always improving your beanies.family experience",
+    beanie: "you're on the latest version - we're always improving",
+  },
   'settings.installApp': { en: 'Install App', beanie: 'install app' },
   'settings.installAppDesc': {
     en: 'Install beanies.family on this device for quick access',

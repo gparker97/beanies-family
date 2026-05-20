@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-19",
-    "translationCount": 2920
+    "lastUpdated": "2026-05-20",
+    "translationCount": 2919
   },
   "translations": {
     "app.name": {
@@ -2994,21 +2994,6 @@
     "pwa.installDismiss": {
       "translation": "立即购买",
       "hash": "8bjtp3",
-      "lastUpdated": "2026-03-03"
-    },
-    "pwa.updateAvailable": {
-      "translation": "有新版本可用",
-      "hash": "68shei",
-      "lastUpdated": "2026-02-24"
-    },
-    "pwa.updateButton": {
-      "translation": "现在更新",
-      "hash": "s1qxwf",
-      "lastUpdated": "2026-03-03"
-    },
-    "pwa.updateDismiss": {
-      "translation": "以后",
-      "hash": "17krcc",
       "lastUpdated": "2026-03-03"
     },
     "settings.installApp": {
@@ -14605,6 +14590,16 @@
       "translation": "较早",
       "hash": "4za5eo",
       "lastUpdated": "2026-05-19"
+    },
+    "pwa.updated": {
+      "translation": "您使用的是最新版本",
+      "hash": "yqw31y",
+      "lastUpdated": "2026-05-20"
+    },
+    "pwa.updatedMessage": {
+      "translation": "我们一直在改善您的beanies.family体验",
+      "hash": "smbchm",
+      "lastUpdated": "2026-05-20"
     }
   }
 }
