@@ -552,7 +552,7 @@ The header uses **visual icons instead of text labels**. All controls are image-
 - Family & More: Family Hub, Documents, Settings
 - Footer: Security indicators (save file + AES-256 encryption)
 
-**Bottom Tab Bar:** Five tabs — 🏡 Nook, 📅 Planner, 🐷 Piggy Bank, 📋 Budget, 👨‍👩‍👦 Pod. Active tab uses Heritage Orange tint (orange-10 background). Icons are emoji-style for warmth.
+**Bottom Tab Bar:** Five evenly-distributed slots — 🏡 Nook · 🌳 Planning · 📅 **Calendar** · 🐷 Money · 👨‍👩‍👦 Pod. Nook and Calendar are one-tap leaves (Calendar → the Family Planner at `/activities`); Planning, Money, and Pod open a `MobileNavBeanStack` popout. **Calendar** is a raised, round Heritage-Orange button (Heritage Orange→Terracotta gradient, ~46px circle, white/slate ring, ~15px peek above the bar) — a permanent one-tap shortcut to the family calendar. The round shape follows the bean/FAB circle precedent (not the squircle rule). Active stackable tabs use the Heritage Orange tint (orange-8 background); icons are emoji-style for warmth.
 
 ---
 

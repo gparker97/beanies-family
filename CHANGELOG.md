@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **The family calendar is now one tap away on mobile.** The bottom nav gains a prominent, raised **Calendar** button in the centre — a round Heritage-Orange shortcut straight to the Family Planner. Previously the calendar lived two taps deep inside the Planning popout (which now holds Travel + To-do). The bar keeps five even slots: Nook · Planning · Calendar · Money · Pod.
 - **App updates now apply automatically — no more "update available" prompt.** When a new version is ready, beanies.family quietly updates itself at a safe moment (never mid-edit or mid-save), lands you back on the page you were on, and shows a brief "you're on the latest version" toast. If you've been away for several releases you jump straight to the newest build in one step — no stacked update prompts. Replaces the old "Update now / Later" banner.
 
 ### Fixed

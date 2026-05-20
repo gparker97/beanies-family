@@ -4617,16 +4617,17 @@ const STRING_DEFS = {
     beanie: 'school and work may be off',
   },
 
-  // Mobile navigation — v3 bottom nav uses 4 category tabs.
+  // Mobile navigation — v3 bottom nav: 5 slots (Nook, Planning, Calendar,
+  // Money, Pod). Calendar is the raised center one-tap leaf → /activities.
   'mobile.nook': { en: 'Nook', beanie: 'nook' },
   'mobile.planning': { en: 'Planning', beanie: 'planning' },
+  'mobile.calendar': { en: 'Calendar', beanie: 'calendar' },
   'mobile.money': { en: 'Money', beanie: 'money' },
   'mobile.pod': { en: 'Pod', beanie: 'your pod' },
   'mobile.budget': { en: 'Budget', beanie: 'budget' },
   // v3 side-card hint copy. Each line is a one-line preview of what the
   // user finds on the route, capped at ~22 chars to never wrap on a
   // 360px phone. See docs/mockups/mobile-nav-bean-jar-v3.html.
-  'mobileNav.hint.activities': { en: 'plan, schedule, log', beanie: 'plan, schedule, log' },
   'mobileNav.hint.todo': { en: 'shared family tasks', beanie: 'shared family tasks' },
   'mobileNav.hint.travel': { en: 'trips & ideas', beanie: 'trips & ideas' },
   'mobileNav.hint.overview': { en: 'your bottom line', beanie: 'your bottom line' },
