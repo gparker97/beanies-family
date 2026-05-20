@@ -254,6 +254,38 @@ export async function initializeAuth(familyId: string): Promise<void> {
   if (stored) {
     currentRefreshToken = stored;
     console.warn('[googleAuth] Loaded refresh token for family', familyId);
+  } else {
+    // Family key empty — rescue a token orphaned under __pending__ by a
+    // redirect-auth reconnect (completeRedirectAuth stores under __pending__
+    // when the family isn't bound yet at App-init Step 2b). This is the
+    // self-heal path; it runs on every cold boot via syncStore.initialize().
+    // Wrap ONLY the migrate call: `getGoogleRefreshToken` above already reports
+    // its own IDB read errors, and syncStore.initialize() only console.warns an
+    // initializeAuth rejection — without this we'd lose the firehose signal.
+    try {
+      const rescued = await migratePendingRefreshToken(familyId);
+      if (rescued) {
+        logEvent({
+          level: 'info',
+          surface: 'auth-init',
+          message: 'rescued orphaned pending refresh token → family key',
+          context: { family_id: familyId },
+        });
+      } else {
+        logEvent({
+          level: 'warn',
+          surface: 'auth-init',
+          message: 'startup: no refresh token under family or pending key',
+          context: { family_id: familyId },
+        });
+      }
+    } catch (e) {
+      reportError({
+        surface: 'auth-init',
+        message: 'pending-token rescue failed',
+        error: e,
+      });
+    }
   }
   installAuthWakeListener();
 }
@@ -365,9 +397,17 @@ export function __resetWakeListenerForTesting(): void {
  * file, call this to move the token to the family-scoped key and update
  * in-memory state.
  */
-export async function migratePendingRefreshToken(familyId: string): Promise<void> {
+export async function migratePendingRefreshToken(familyId: string): Promise<boolean> {
   const pending = await getGoogleRefreshToken(PENDING_FAMILY_KEY);
-  if (!pending) return;
+  if (!pending) return false;
+
+  // INVARIANT: migrate ONLY when the family key is empty — never clobber a good
+  // family token with a (possibly stale) pending one. A redirect-auth reconnect
+  // writes a FRESH token under __pending__ while the family key is empty (the
+  // bad token, if any, was already cleared on invalid_grant), so this guard
+  // still migrates the case that matters. See the 2026-05-20 plan.
+  const existing = await getGoogleRefreshToken(familyId);
+  if (existing) return false;
 
   // Move to the family-scoped key. Forward `pending.issuedAt` LITERALLY —
   // including `null` for legacy bare-string pending entries. Coercing to
@@ -381,6 +421,7 @@ export async function migratePendingRefreshToken(familyId: string): Promise<void
   currentFamilyId = familyId;
   currentRefreshToken = pending;
   console.warn('[googleAuth] Migrated pending refresh token to family', familyId);
+  return true;
 }
 
 /**
@@ -656,14 +697,21 @@ async function performPopupAuth(
   accessToken = tokens.access_token;
   expiresAt = Date.now() + tokens.expires_in * 1000;
 
-  // Store refresh token if provided (Google only sends it on first consent).
-  // When no family is active yet (login page), store under a pending key so
-  // the token survives page refresh and can be migrated once a family is adopted.
+  // Store refresh token. Interactive connect/reconnect callers force
+  // prompt=consent, so Google returns a refresh_token. When no family is active
+  // yet (login page), store under the pending key so it survives the page
+  // refresh and is migrated once a family is adopted (see `initializeAuth`).
   if (tokens.refresh_token) {
     const issuedAt = Date.now();
     currentRefreshToken = { token: tokens.refresh_token, issuedAt };
     const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
     await storeGoogleRefreshToken(storageKey, tokens.refresh_token, { issuedAt });
+  } else {
+    reportError({
+      surface: 'auth-no-refresh-token',
+      severity: 'warning',
+      message: 'popup auth returned no refresh token; offline access not established',
+    });
   }
 
   // Schedule auto-refresh
@@ -1414,7 +1462,15 @@ export async function startRedirectAuth(returnPath: string, loginHint?: string):
     JSON.stringify({ codeVerifier, returnPath } satisfies RedirectAuthState)
   );
 
-  const authUrl = buildAuthUrl(clientId, codeChallenge, 'select_account', loginHint);
+  // INVARIANT: redirect auth ALWAYS forces `prompt=consent`. Every caller of
+  // startRedirectAuth establishes offline Drive access (reconnect, connect-pod,
+  // switch-account, re-pick a .beanpod), and Google only returns a refresh_token
+  // with prompt=consent + access_type=offline. Using 'select_account' here
+  // silently yields an access-token-only grant → no refresh token persisted →
+  // the "disconnected" toast on every PWA restart. Do not change to a
+  // conditional/'select_account' without an explicit non-offline caller.
+  // See docs/plans/2026-05-20-google-refresh-token-persistence-fix.md.
+  const authUrl = buildAuthUrl(clientId, codeChallenge, 'consent', loginHint);
   window.location.href = authUrl;
 }
 
@@ -1458,6 +1514,15 @@ export async function completeRedirectAuth(): Promise<string | null> {
     currentRefreshToken = { token: tokens.refresh_token, issuedAt };
     const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
     await storeGoogleRefreshToken(storageKey, tokens.refresh_token, { issuedAt });
+  } else {
+    // No refresh token despite an interactive redirect — `startRedirectAuth`
+    // forces prompt=consent, so this should not happen; if it does, offline
+    // access wasn't established. Surface it instead of silently continuing.
+    reportError({
+      surface: 'auth-no-refresh-token',
+      severity: 'warning',
+      message: 'redirect auth returned no refresh token; offline access not established',
+    });
   }
 
   scheduleAutoRefresh(tokens.expires_in);
