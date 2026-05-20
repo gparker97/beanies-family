@@ -279,6 +279,26 @@ FamilyMember (0..1) ───▶ (N) Goal
 - Per-family database isolation prevents cross-user data leakage
 - No cloud auth dependencies — the `.beanpod` file IS the auth database
 
+## Observability & Diagnostics
+
+Two complementary telemetry surfaces share one enrichment/redaction core
+(`src/utils/diagnosticContext.ts`) — see [ADR-027](adr/027-diagnostic-logging-telemetry.md):
+
+- **Critical errors → Slack** (`src/utils/errorReporter.ts`): toasts, Vue render
+  errors, unhandled rejections. Strict allowlist, two-layer dedup, fire-and-forget.
+- **Full diagnostic firehose → AWS** (`src/services/telemetry/`): `logEvent()`
+  captures the `debug|info|warn|error` stream, batches it (offline-aware queue),
+  and POSTs to `POST /logs` on the shared API → telemetry Lambda → its own
+  90-day CloudWatch log group. `reportError` also emits a `logEvent`, so every
+  Slack error is queryable historically. Query via Logs Insights filtering
+  `t = "beanlog"` (the AWS CLI works from a Claude session for triage).
+- **Privacy**: the firehose is PII-free — it correlates by `family_id` (random
+  UUID), never email. The shared allowlist is re-enforced server-side in the
+  Lambda as defense-in-depth. Disclosed in the `zero-knowledge-architecture`
+  Help Center article.
+- **Alerting** is the client→Slack webhook today; a server-side CloudWatch
+  metric-filter → Alarm path is designed-for but deferred (ADR-027).
+
 ## Testing
 
 - **Unit tests**: Vitest with happy-dom, files co-located as `*.test.ts`

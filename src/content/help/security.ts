@@ -139,7 +139,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       "We can't see your data. Period. Learn about the zero-knowledge design that keeps your family finances private.",
     icon: '\u{1F440}',
     readTime: 3,
-    updatedDate: '2026-03-09',
+    updatedDate: '2026-05-20',
     sections: [
       {
         type: 'heading',
@@ -185,6 +185,24 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           "If you use Google Drive sync, Google stores your <code>.beanpod</code> file \u2014 but it's fully encrypted. Google sees the file name and size, but the contents are indistinguishable from random data without your password.",
+      },
+      {
+        type: 'heading',
+        content: 'What we collect to keep the app working',
+        level: 2,
+        id: 'diagnostics',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'To find and fix bugs, beanies.family collects <strong>anonymous diagnostic logs</strong> on our own servers. These contain <strong>no</strong> names, balances, transactions, photos, or anything you type \u2014 only a random family identifier, which screen you were on, your browser and version, and technical error details. They are kept for 90 days and then deleted automatically.',
+      },
+      {
+        type: 'callout',
+        content:
+          'Diagnostic logs are <strong>not</strong> your family data. Your financial data stays encrypted and never leaves your control \u2014 the diagnostics only describe <em>that</em> something failed and <em>where</em>, never <em>what</em> your data contains. They live in our own infrastructure, not a third-party analytics service.',
+        title: 'Diagnostics \u2260 your data',
+        icon: '\u{1FAE7}',
       },
     ],
   },

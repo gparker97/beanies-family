@@ -91,6 +91,12 @@ jobs:
           VITE_REGISTRY_API_URL: ${{ secrets.REGISTRY_API_URL }}
           VITE_REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          # Diagnostic-logging firehose (ADR-027) — kept consistent with
+          # deploy.yml so a translation-triggered prod deploy doesn't ship a
+          # telemetry-disabled build. (This workflow's build env is otherwise a
+          # deliberately reduced subset.)
+          VITE_BEANIES_LOG_INGEST_URL: ${{ vars.BEANIES_LOG_INGEST_URL }}
+          VITE_BEANIES_LOG_INGEST_API_KEY: ${{ secrets.BEANIES_LOG_INGEST_API_KEY }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6

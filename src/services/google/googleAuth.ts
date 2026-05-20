@@ -20,6 +20,7 @@ import {
 } from '@/services/sync/fileHandleStore';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry';
 
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
@@ -590,6 +591,16 @@ async function attemptSilentAuthCode(clientId: string): Promise<string | null> {
         await storeGoogleRefreshToken(storageKey, tokens.refresh_token, { issuedAt });
       } catch (e) {
         console.warn('[googleAuth] silent: failed to persist refresh token (non-critical)', e);
+        // Console-only until now — a failed persist means the next cold start
+        // can't silently refresh. Surface to the firehose to catch IDB-write
+        // regressions before they become reconnect-banner cascades.
+        logEvent({
+          level: 'warn',
+          surface: 'refresh-token-persist',
+          message: `silent: failed to persist refresh token: ${e instanceof Error ? e.message : String(e)}`,
+          error: e,
+          context: { action: 'persist-refresh-token' },
+        });
       }
     }
 
