@@ -10,14 +10,26 @@ import {
 } from '../navigation';
 
 describe('navigation: MOBILE_NAV_CATEGORIES', () => {
-  it('exports exactly 4 categories in canonical order', () => {
-    expect(MOBILE_NAV_CATEGORIES.map((c) => c.id)).toEqual(['nook', 'planning', 'money', 'pod']);
+  it('exports exactly 5 categories in canonical order (Calendar centred)', () => {
+    expect(MOBILE_NAV_CATEGORIES.map((c) => c.id)).toEqual([
+      'nook',
+      'planning',
+      'calendar',
+      'money',
+      'pod',
+    ]);
   });
 
   it('Nook is a leaf with rootPath, no items', () => {
     const nook = MOBILE_NAV_CATEGORIES.find((c) => c.id === 'nook')!;
     expect(nook.rootPath).toBe('/nook');
     expect(nook.items).toBeUndefined();
+  });
+
+  it('Calendar is a leaf → /activities, no items', () => {
+    const calendar = MOBILE_NAV_CATEGORIES.find((c) => c.id === 'calendar')!;
+    expect(calendar.rootPath).toBe('/activities');
+    expect(calendar.items).toBeUndefined();
   });
 
   it('every stackable category has at least one item', () => {
@@ -29,14 +41,14 @@ describe('navigation: MOBILE_NAV_CATEGORIES', () => {
     }
   });
 
-  it('total stack items = 15 (matches v3 mockup spec, +1 for Family Timeline)', () => {
+  it('total stack items = 14 (Activities promoted out of Planning to the Calendar leaf)', () => {
     const total = MOBILE_NAV_CATEGORIES.reduce((sum, c) => sum + (c.items?.length ?? 0), 0);
-    expect(total).toBe(15);
+    expect(total).toBe(14);
   });
 
-  it('Planning has Activities, To-do, Travel', () => {
+  it('Planning has Travel, To-do (Activities moved to the Calendar leaf)', () => {
     const planning = MOBILE_NAV_CATEGORIES.find((c) => c.id === 'planning')!;
-    expect(planning.items!.map((i) => i.path)).toEqual(['/activities', '/travel', '/todo']);
+    expect(planning.items!.map((i) => i.path)).toEqual(['/travel', '/todo']);
   });
 
   it('Money has 6 finance routes', () => {

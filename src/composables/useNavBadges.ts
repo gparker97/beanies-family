@@ -121,6 +121,7 @@ export function useNavBadges() {
     const result: Record<MobileCategoryId, boolean> = {
       nook: false,
       planning: false,
+      calendar: false,
       money: false,
       pod: false,
     };
