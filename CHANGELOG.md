@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-20
+
+### Fixed
+
+- **Fewer "Google session expired" interruptions after overnight tab sleep.** Silent refresh now retries up to 5 times (was 3) with stepped backoff totaling ~22.5 s of patience (was ~4.5 s), enough to survive Chrome desktop's wake-from-sleep network race on Windows. Investigation of the 2026-05-19 morning cascade found zero Lambda invocations during the failure windows — the `fetch()` calls never left the user's machine because the network adapter was still reattaching from sleep. With longer patience, the first wake fetch can fail-and-retry through the reattach window instead of surfacing the reconnect banner.
+
+- **Wake-time auth failures self-attribute in #beanies-errors.** `offline-queue-flush` alerts caused by `TokenExpiredError` now carry the same diagnostic blob the cold-start surface already attached: per-attempt classification (network / timeout / http / permanent), hidden-duration, visibility state, and refresh-token age. Operators can tell at a glance whether the next firing was a Lambda timeout, network race, HTTP error, or genuine `invalid_grant` revocation — without digging through CloudWatch. The shared builder lives in a single module (`silentRefreshAlertContext.ts`) so cold-start and offline-queue surfaces stay consistent forever.
+
+- **Refresh-token IDB read/write/clear failures stop failing silently.** `getGoogleRefreshToken` previously swallowed IDB read errors with an empty catch block; the IDB delete path was unwrapped entirely. Both now report to `#beanies-errors` (`refresh-token-idb-read` / `refresh-token-idb-clear`) so a corrupted handle DB shows up as actionable signal instead of a quiet sync failure. The function still falls through to the localStorage fallback / completes the cleanup chain — no behavior regression at the call sites.
+
+---
+
 ## 2026-05-19
 
 ### Fixed

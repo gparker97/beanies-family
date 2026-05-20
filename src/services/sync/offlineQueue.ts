@@ -28,7 +28,8 @@
  * (but not full browser restarts — session-scoped is appropriate).
  */
 import type { StorageProvider } from './storageProvider';
-import { onTokenAcquired } from '@/services/google/googleAuth';
+import { onTokenAcquired, TokenExpiredError } from '@/services/google/googleAuth';
+import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
 
 const SESSION_STORAGE_KEY = 'beanies_offline_queue';
@@ -166,10 +167,21 @@ type FlushReason = 'online' | 'token-acquired' | 'visible' | 'startup';
 function reportFlushFailure(reason: FlushReason, err: unknown): void {
   console.warn(`[offlineQueue] flush rejected (reason: ${reason})`, err);
   const inner = err instanceof Error ? err : new Error(String(err));
+  // Attach silent-refresh diagnostic context when the flush rejection is
+  // auth-driven — i.e. `getValidToken()` threw `TokenExpiredError` because
+  // the underlying silent refresh failed. Matches the cold-start-reconnect
+  // path (DRY: same `buildSilentRefreshAlertContext` source of truth). For
+  // non-auth flush failures (Drive 404, generic NetworkError, etc.) the
+  // diagnostic is irrelevant and would mislead — omit context entirely.
+  const context =
+    err instanceof TokenExpiredError
+      ? (buildSilentRefreshAlertContext() as unknown as Record<string, unknown>)
+      : undefined;
   reportError({
     surface: 'offline-queue-flush',
     message: `flush rejected after ${reason}: ${inner.message}`,
     error: inner,
+    context,
   });
 }
 
