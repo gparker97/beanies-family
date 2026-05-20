@@ -14,6 +14,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // vite-plugin-pwa injects this virtual module at build time; under vitest
+      // it doesn't exist, so resolve it to a test stub. Tests that drive update
+      // behavior override it with `vi.mock('virtual:pwa-register/vue', …)`.
+      'virtual:pwa-register/vue': fileURLToPath(
+        new URL('./src/test/stubs/pwa-register.ts', import.meta.url)
+      ),
     },
   },
 });

@@ -143,7 +143,7 @@ MyMemory allows ~50,000 characters/day with email parameter. If you hit limits:
 
 ### Translations Not Updating in Production
 
-1. Check that the Service Worker has updated (look for `UpdatePrompt` in the app)
+1. Check that the Service Worker has updated (the app auto-applies updates via `usePwaUpdater` and shows a confirmation toast)
 2. Clear browser cache / IndexedDB translations store
 3. Verify `public/translations/{lang}.json` has the expected content
 4. Check the GitHub Actions **Translation Sync** workflow for errors

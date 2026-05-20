@@ -7,7 +7,7 @@ import MobileBottomNav from '@/components/common/MobileBottomNav.vue';
 import MobileHamburgerMenu from '@/components/common/MobileHamburgerMenu.vue';
 import OfflineBanner from '@/components/common/OfflineBanner.vue';
 import InstallPrompt from '@/components/common/InstallPrompt.vue';
-import UpdatePrompt from '@/components/common/UpdatePrompt.vue';
+import { usePwaUpdater, PWA_POST_UPDATE_ROUTE_KEY } from '@/composables/usePwaUpdater';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
@@ -116,6 +116,10 @@ const { isMobile, isDesktop } = useBreakpoint();
 useEnsurePhotosPublic();
 
 const isInitializing = ref(true);
+// Set true (in onMounted) when this load is the result of an applied PWA
+// update; the watcher below fires the confirmation toast once the init loader
+// has cleared. Declared here so the onMounted closure can reference it.
+let pendingUpdateToast = false;
 const isLoadingData = ref(true);
 const initError = ref<string | null>(null);
 const initErrorDetail = ref<string | null>(null);
@@ -573,14 +577,17 @@ onMounted(async () => {
     // Ensure initial route is resolved before checking route names
     await router.isReady();
 
-    // Resume navigation after a PWA hard-reload. UpdatePrompt's route guard
-    // saves the user's intended destination before triggering the reload —
-    // restore it now so the click that triggered the update isn't lost.
-    // Done before auth checks so existing redirects (e.g. unauth → /welcome)
-    // still apply naturally to the resumed route.
-    const postUpdatePath = sessionStorage.getItem('pwa-post-update-route');
+    // Resume navigation after a PWA auto-update reload. `usePwaUpdater` saves
+    // the user's route before the reload (PWA_POST_UPDATE_ROUTE_KEY) — restore
+    // it now so the update doesn't strand them on a different page. Done before
+    // auth checks so existing redirects (e.g. unauth → /welcome) still apply.
+    // NOTE: this key carries TWO meanings — the resume route AND "this reload
+    // was an applied update" (the post-update toast trigger). Never write it
+    // for a non-update reason, or the "updated!" toast would fire falsely.
+    const postUpdatePath = sessionStorage.getItem(PWA_POST_UPDATE_ROUTE_KEY);
     if (postUpdatePath) {
-      sessionStorage.removeItem('pwa-post-update-route');
+      sessionStorage.removeItem(PWA_POST_UPDATE_ROUTE_KEY);
+      pendingUpdateToast = true; // fire once the init loader clears (see watcher)
       if (postUpdatePath !== route.fullPath) {
         initBreadcrumbs.push(`pwa-resume: navigating to ${postUpdatePath}`);
         await router.replace(postUpdatePath);
@@ -1061,6 +1068,27 @@ watch(isTabVisible, (visible) => {
 
 useStaleTabRefresh();
 
+// Auto-apply PWA updates (no prompt) and, after the reload, show a one-time
+// confirmation toast. usePwaUpdater drives the update on a quiet moment and
+// sets PWA_POST_UPDATE_ROUTE_KEY; onMounted reads it into `pendingUpdateToast`.
+usePwaUpdater();
+// Fire the post-update toast only once the init loader has cleared — info
+// toasts auto-dismiss after 5s, so firing during a cold-load loader would
+// vanish unseen.
+watch(
+  isInitializing,
+  (initializing) => {
+    if (initializing || !pendingUpdateToast) return;
+    pendingUpdateToast = false;
+    try {
+      showToast('info', t('pwa.updated'), t('pwa.updatedMessage'));
+    } catch (e) {
+      console.warn('[pwa] post-update toast failed', e);
+    }
+  },
+  { flush: 'post' }
+);
+
 function handleBeforeUnload(event: BeforeUnloadEvent): void {
   // Block the unload if a non-interruptible write is in flight (pod creation,
   // recovery load). The native browser confirm dialog gives the user one last
@@ -1277,7 +1305,6 @@ watch(
         v-if="syncStore.showGoogleReconnect && !authStore.needsAuth"
         @reconnected="handleGoogleReconnected"
       />
-      <UpdatePrompt />
       <InstallPrompt />
     </div>
 
