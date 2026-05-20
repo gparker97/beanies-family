@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-20
 
+### Changed
+
+- **App updates now apply automatically — no more "update available" prompt.** When a new version is ready, beanies.family quietly updates itself at a safe moment (never mid-edit or mid-save), lands you back on the page you were on, and shows a brief "you're on the latest version" toast. If you've been away for several releases you jump straight to the newest build in one step — no stacked update prompts. Replaces the old "Update now / Later" banner.
+
 ### Fixed
 
 - **Google Drive stays connected across app restarts — especially on installed PWAs (Android/iOS).** The PWA was showing a "disconnected" prompt on every force-close/reopen. Root cause (found via the new diagnostic logging): on the full-page redirect sign-in that PWAs/iOS use, the refresh token was being saved under a temporary key instead of your family's key, so the next launch couldn't find it — and reconnecting didn't fix it because the reconnect wasn't asking Google for a fresh refresh token. Now every reconnect explicitly re-grants offline access (you'll see Google's consent screen, by design), the token is always stored under the family key, and any token left under the old temporary key is automatically migrated on the next launch — so existing affected devices self-heal. Applies uniformly to desktop, iPhone/iOS, and Android. See ADR-028.
