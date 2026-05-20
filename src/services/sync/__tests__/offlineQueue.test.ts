@@ -8,13 +8,44 @@ const { tokenAcquiredCallbackHolder } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@/services/google/googleAuth', () => ({
-  onTokenAcquired: vi.fn((cb: () => void) => {
-    tokenAcquiredCallbackHolder.cb = cb;
-    return () => {
-      tokenAcquiredCallbackHolder.cb = null;
-    };
-  }),
+vi.mock('@/services/google/googleAuth', () => {
+  // Real-ish TokenExpiredError class so `instanceof` checks inside
+  // `reportFlushFailure` match. Mirrors the production class shape
+  // (name === 'TokenExpiredError', extends Error).
+  class TokenExpiredErrorMock extends Error {
+    constructor(message = 'Google access token expired and silent refresh failed') {
+      super(message);
+      this.name = 'TokenExpiredError';
+    }
+  }
+  return {
+    onTokenAcquired: vi.fn((cb: () => void) => {
+      tokenAcquiredCallbackHolder.cb = cb;
+      return () => {
+        tokenAcquiredCallbackHolder.cb = null;
+      };
+    }),
+    TokenExpiredError: TokenExpiredErrorMock,
+  };
+});
+
+vi.mock('@/services/google/silentRefreshAlertContext', () => ({
+  buildSilentRefreshAlertContext: vi.fn(() => ({
+    silent_refresh_attempts: [
+      {
+        attempt: 1,
+        durationMs: 50,
+        classification: 'network',
+        errorName: 'TypeError',
+        errorMessage: 'Failed to fetch',
+      },
+    ],
+    silent_refresh_had_refresh_token: true,
+    silent_refresh_consecutive_failures: 1,
+    page_hidden_for_ms: 30_000,
+    visibility_state: 'visible',
+    refresh_token_age_ms: null,
+  })),
 }));
 
 vi.mock('@/utils/errorReporter', () => ({
@@ -510,6 +541,57 @@ describe('offlineQueue', () => {
             message: 'flush rejected after startup: Network down',
           })
         );
+      });
+    });
+
+    // ─── Silent-refresh diagnostic attachment (2026-05-20) ───────────────────
+    describe('TokenExpiredError → silent-refresh diagnostics attached', () => {
+      it('attaches silent-refresh context when the flush failure is TokenExpiredError', async () => {
+        const { reportError } = await import('@/utils/errorReporter');
+        const { TokenExpiredError } = await import('@/services/google/googleAuth');
+        const reportErrorMock = reportError as ReturnType<typeof vi.fn>;
+        reportErrorMock.mockClear();
+
+        offlineQueue.enqueueOfflineSave('{"data":"auth-blocked"}');
+        const tokenErr = new TokenExpiredError();
+        const mockWrite = vi.fn().mockRejectedValue(tokenErr);
+        offlineQueue.setFlushProvider({ write: mockWrite } as any);
+
+        // Visibility-triggered flush
+        Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+
+        await vi.waitFor(() => expect(reportErrorMock).toHaveBeenCalled());
+
+        const call = reportErrorMock.mock.calls.at(-1)?.[0];
+        expect(call?.surface).toBe('offline-queue-flush');
+        expect(call?.context).toBeDefined();
+        expect(call?.context?.silent_refresh_attempts).toEqual([
+          expect.objectContaining({ classification: 'network' }),
+        ]);
+        expect(call?.context?.silent_refresh_had_refresh_token).toBe(true);
+        expect(call?.context?.page_hidden_for_ms).toBe(30_000);
+      });
+
+      it('does NOT attach silent-refresh context when the failure is a non-auth error', async () => {
+        const { reportError } = await import('@/utils/errorReporter');
+        const reportErrorMock = reportError as ReturnType<typeof vi.fn>;
+        reportErrorMock.mockClear();
+
+        offlineQueue.enqueueOfflineSave('{"data":"drive-404"}');
+        const mockWrite = vi.fn().mockRejectedValue(new Error('Drive 404 — file not found'));
+        offlineQueue.setFlushProvider({ write: mockWrite } as any);
+
+        Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+
+        await vi.waitFor(() => expect(reportErrorMock).toHaveBeenCalled());
+
+        const call = reportErrorMock.mock.calls.at(-1)?.[0];
+        expect(call?.surface).toBe('offline-queue-flush');
+        // `context` field is omitted entirely on non-auth failures so the
+        // Slack alert doesn't get misleading diagnostic noise.
+        expect(call?.context).toBeUndefined();
       });
     });
   });

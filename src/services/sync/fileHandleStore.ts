@@ -1,5 +1,6 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
+import { reportError } from '@/utils/errorReporter';
 import type { StorageProviderType } from './storageProvider';
 
 const HANDLE_DB_NAME = 'beanies-file-handles';
@@ -176,61 +177,137 @@ export async function clearProviderConfig(familyId: string): Promise<void> {
 // On PWA/mobile, IndexedDB can be evicted under storage pressure or
 // iOS Safari's 7-day eviction policy. localStorage has different eviction
 // characteristics and serves as a redundant backup.
+//
+// Storage shape: IDB stores `StoredRefreshToken { token, issuedAt }` so the
+// invalid_grant alert path can surface a `refresh_token_age_ms` diagnostic
+// (added 2026-05-20 — see `googleAuth.performSilentRefresh` and
+// `silentRefreshAlertContext`). Legacy bare-string entries are tolerated:
+// the reader returns `{ token, issuedAt: null }` for those, and the next
+// successful write upgrades the entry to the new shape.
+//
+// localStorage stays bare-string — emergency-escape-hatch role; keeping it
+// dead-simple avoids a JSON.parse failure mode on legacy entries that could
+// reintroduce the very silent-failure shape we're fixing.
 
 const LS_REFRESH_TOKEN_PREFIX = 'beanies_grt_';
 
+export interface StoredRefreshToken {
+  token: string;
+  issuedAt: number | null;
+}
+
+function isStoredRefreshToken(v: unknown): v is StoredRefreshToken {
+  return (
+    !!v &&
+    typeof v === 'object' &&
+    typeof (v as StoredRefreshToken).token === 'string' &&
+    'issuedAt' in v &&
+    ((v as StoredRefreshToken).issuedAt === null ||
+      typeof (v as StoredRefreshToken).issuedAt === 'number')
+  );
+}
+
 /**
  * Store a Google OAuth refresh token for a family.
- * Writes to both IndexedDB (primary) and localStorage (fallback).
+ * Writes the structured shape to IndexedDB (primary) and a bare string to
+ * localStorage (fallback).
+ *
+ * `opts.issuedAt` semantics:
+ *   - `undefined` → defaults to `Date.now()` (the common path; the caller
+ *     just acquired the token).
+ *   - `null`      → writes `null` explicitly (used by `migratePendingRefreshToken`
+ *     when forwarding a legacy bare-string entry whose acquisition time is
+ *     unknown — never invent `Date.now()` here, that would mask revocation
+ *     patterns the alert is meant to surface).
+ *   - `number`    → writes the explicit timestamp.
  */
 export async function storeGoogleRefreshToken(
   familyId: string,
-  refreshToken: string
+  refreshToken: string,
+  opts?: { issuedAt?: number | null }
 ): Promise<void> {
+  const issuedAt = opts && 'issuedAt' in opts ? (opts.issuedAt ?? null) : Date.now();
   const db = await getHandleDatabase();
+  const record: StoredRefreshToken = { token: refreshToken, issuedAt };
   await db.put(
     HANDLE_STORE,
-    refreshToken as unknown as FileSystemFileHandle,
+    record as unknown as FileSystemFileHandle,
     `googleRefreshToken-${familyId}`
   );
-  // localStorage fallback — best-effort (may fail in private browsing or quota)
+  // localStorage fallback — best-effort (may fail in private browsing or quota).
+  // Stays bare-string so legacy code paths (and a downgrade) keep working.
   try {
     localStorage.setItem(`${LS_REFRESH_TOKEN_PREFIX}${familyId}`, refreshToken);
-  } catch {
-    // Ignore — IndexedDB is the primary store
+  } catch (e) {
+    console.warn('[fileHandleStore] localStorage refresh-token write failed', e);
   }
 }
 
 /**
  * Retrieve the stored Google OAuth refresh token for a family.
- * Tries IndexedDB first, falls back to localStorage if IndexedDB was evicted.
+ * Tries IndexedDB first, falls back to localStorage if IndexedDB was evicted
+ * or fails to read.
+ *
+ * Returns `StoredRefreshToken | null`. Legacy bare-string IDB entries and the
+ * localStorage fallback both come back as `{ token, issuedAt: null }`.
  */
-export async function getGoogleRefreshToken(familyId: string): Promise<string | null> {
+export async function getGoogleRefreshToken(familyId: string): Promise<StoredRefreshToken | null> {
   try {
     const db = await getHandleDatabase();
-    const token = await db.get(HANDLE_STORE, `googleRefreshToken-${familyId}`);
-    if (typeof token === 'string') return token;
-  } catch {
-    // IndexedDB failed — fall through to localStorage
+    const stored = await db.get(HANDLE_STORE, `googleRefreshToken-${familyId}`);
+    if (typeof stored === 'string') {
+      // Legacy entry written before the shape migration. Treat as unknown age.
+      return { token: stored, issuedAt: null };
+    }
+    if (isStoredRefreshToken(stored)) {
+      return stored;
+    }
+    // Unknown shape — fall through to localStorage rather than coerce.
+  } catch (e) {
+    console.error('[fileHandleStore] Failed to read refresh token from IndexedDB:', e);
+    reportError({
+      surface: 'refresh-token-idb-read',
+      message: 'Failed to read refresh token from IndexedDB',
+      error: e instanceof Error ? e : new Error(String(e)),
+      context: { family_id: familyId },
+    });
   }
-  // Fallback: try localStorage
+  // Fallback: try localStorage. Failure here is typically private-browsing or
+  // quota — high false-positive rate, so log-only (no reportError).
   try {
-    return localStorage.getItem(`${LS_REFRESH_TOKEN_PREFIX}${familyId}`);
-  } catch {
+    const fallback = localStorage.getItem(`${LS_REFRESH_TOKEN_PREFIX}${familyId}`);
+    return fallback ? { token: fallback, issuedAt: null } : null;
+  } catch (e) {
+    console.warn('[fileHandleStore] localStorage refresh-token read failed', e);
     return null;
   }
 }
 
 /**
  * Clear the stored Google OAuth refresh token for a family.
- * Removes from both IndexedDB and localStorage.
+ * Removes from both IndexedDB and localStorage. Both layers are best-effort
+ * — failures are observed (console + reportError for the IDB layer) but
+ * swallowed inside the function so callers (e.g. `performSilentRefresh`'s
+ * `invalid_grant` cleanup branch) complete their diagnostics-write and
+ * permanent-failure-callback chain instead of escaping through the
+ * wake-listener's `.catch(() => {})` with no visible signal.
  */
 export async function clearGoogleRefreshToken(familyId: string): Promise<void> {
-  const db = await getHandleDatabase();
-  await db.delete(HANDLE_STORE, `googleRefreshToken-${familyId}`);
+  try {
+    const db = await getHandleDatabase();
+    await db.delete(HANDLE_STORE, `googleRefreshToken-${familyId}`);
+  } catch (e) {
+    console.error('[fileHandleStore] Failed to clear refresh token from IndexedDB:', e);
+    reportError({
+      surface: 'refresh-token-idb-clear',
+      message: 'Failed to clear refresh token from IndexedDB',
+      error: e instanceof Error ? e : new Error(String(e)),
+      context: { family_id: familyId },
+    });
+  }
   try {
     localStorage.removeItem(`${LS_REFRESH_TOKEN_PREFIX}${familyId}`);
-  } catch {
-    // Ignore
+  } catch (e) {
+    console.warn('[fileHandleStore] localStorage refresh-token clear failed', e);
   }
 }

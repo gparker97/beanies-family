@@ -16,6 +16,7 @@ import {
   storeGoogleRefreshToken,
   getGoogleRefreshToken,
   clearGoogleRefreshToken,
+  type StoredRefreshToken,
 } from '@/services/sync/fileHandleStore';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { reportError } from '@/utils/errorReporter';
@@ -32,7 +33,12 @@ const PENDING_FAMILY_KEY = '__pending__';
 // In-memory token state
 let accessToken: string | null = null;
 let expiresAt: number = 0;
-let refreshToken: string | null = null;
+// 2026-05-20: single-object structure (token + issuedAt) replaced a loose
+// `refreshToken: string | null` + ad-hoc `tokenIssuedAt` pair. Coherence
+// between the two fields must hold across 3 read sites, 4 write sites, and
+// 2 in-memory clear sites — the compiler can't enforce a parallel pair, so
+// the structural shape makes the invariant impossible to break.
+let currentRefreshToken: StoredRefreshToken | null = null;
 let currentFamilyId: string | null = null;
 
 // Deduplication: only one popup auth flow runs at a time.
@@ -245,7 +251,7 @@ export async function initializeAuth(familyId: string): Promise<void> {
   currentFamilyId = familyId;
   const stored = await getGoogleRefreshToken(familyId);
   if (stored) {
-    refreshToken = stored;
+    currentRefreshToken = stored;
     console.warn('[googleAuth] Loaded refresh token for family', familyId);
   }
   installAuthWakeListener();
@@ -316,7 +322,7 @@ function installAuthWakeListener(): void {
 
   const refreshIfStale = (): void => {
     if (typeof document !== 'undefined' && document.hidden) return;
-    if (!refreshToken) return;
+    if (!currentRefreshToken) return;
     const willExpireSoon = Date.now() + WAKE_REFRESH_THRESHOLD_MS >= expiresAt;
     if (!willExpireSoon) return;
     void attemptSilentRefresh().catch(() => {
@@ -362,13 +368,17 @@ export async function migratePendingRefreshToken(familyId: string): Promise<void
   const pending = await getGoogleRefreshToken(PENDING_FAMILY_KEY);
   if (!pending) return;
 
-  // Move to the family-scoped key
-  await storeGoogleRefreshToken(familyId, pending);
+  // Move to the family-scoped key. Forward `pending.issuedAt` LITERALLY —
+  // including `null` for legacy bare-string pending entries. Coercing to
+  // `Date.now()` here would invent a fresh timestamp for a possibly-old
+  // token and mask the revocation patterns the diagnostic is meant to
+  // surface (2026-05-20).
+  await storeGoogleRefreshToken(familyId, pending.token, { issuedAt: pending.issuedAt });
   await clearGoogleRefreshToken(PENDING_FAMILY_KEY);
 
   // Update in-memory state
   currentFamilyId = familyId;
-  refreshToken = pending;
+  currentRefreshToken = pending;
   console.warn('[googleAuth] Migrated pending refresh token to family', familyId);
 }
 
@@ -433,7 +443,7 @@ export async function requestAccessToken(options?: {
   const popup = openBlankPopup();
 
   // Try silent refresh first (if we have a refresh token)
-  if (refreshToken) {
+  if (currentRefreshToken) {
     const silentToken = await attemptSilentRefresh();
     if (silentToken) {
       // Don't need the popup after all — close it
@@ -573,10 +583,11 @@ async function attemptSilentAuthCode(clientId: string): Promise<string | null> {
     expiresAt = Date.now() + tokens.expires_in * 1000;
 
     if (tokens.refresh_token) {
-      refreshToken = tokens.refresh_token;
+      const issuedAt = Date.now();
+      currentRefreshToken = { token: tokens.refresh_token, issuedAt };
       const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
       try {
-        await storeGoogleRefreshToken(storageKey, tokens.refresh_token);
+        await storeGoogleRefreshToken(storageKey, tokens.refresh_token, { issuedAt });
       } catch (e) {
         console.warn('[googleAuth] silent: failed to persist refresh token (non-critical)', e);
       }
@@ -638,9 +649,10 @@ async function performPopupAuth(
   // When no family is active yet (login page), store under a pending key so
   // the token survives page refresh and can be migrated once a family is adopted.
   if (tokens.refresh_token) {
-    refreshToken = tokens.refresh_token;
+    const issuedAt = Date.now();
+    currentRefreshToken = { token: tokens.refresh_token, issuedAt };
     const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
-    await storeGoogleRefreshToken(storageKey, tokens.refresh_token);
+    await storeGoogleRefreshToken(storageKey, tokens.refresh_token, { issuedAt });
   }
 
   // Schedule auto-refresh
@@ -696,6 +708,13 @@ export interface SilentRefreshDiagnostics {
   attempts: SilentRefreshAttemptDiagnostic[];
   hadRefreshToken: boolean;
   consecutiveFailures: number;
+  // Age of the refresh token at the moment a permanent-failure (`invalid_grant`)
+  // classification was recorded. Helps surface revocation patterns (Google
+  // revoking after N days of disuse, password change, etc.). Null when the
+  // failure was not permanent OR the token's `issuedAt` was unknown (legacy
+  // bare-string IDB / localStorage entry). Always null for non-permanent
+  // failures since those don't clear the token.
+  refreshTokenAgeMs?: number | null;
 }
 
 let lastSilentRefreshDiagnostics: SilentRefreshDiagnostics | null = null;
@@ -766,13 +785,13 @@ async function performSilentRefresh(): Promise<string | null> {
   // boundary as a silent failure that prevented the counter from ever
   // incrementing. We now warn + report and continue with no stored token
   // (the caller chain still gets a clean null/`TokenExpiredError` signal).
-  if (!refreshToken) {
+  if (!currentRefreshToken) {
     const familyId = currentFamilyId ?? getActiveFamilyId();
     if (familyId) {
       try {
         const stored = await getGoogleRefreshToken(familyId);
         if (stored) {
-          refreshToken = stored;
+          currentRefreshToken = stored;
           currentFamilyId = familyId;
           console.warn('[googleAuth] Recovered refresh token from IndexedDB during silent refresh');
         }
@@ -788,23 +807,34 @@ async function performSilentRefresh(): Promise<string | null> {
     }
   }
 
-  if (!clientId || !refreshToken) {
+  if (!clientId || !currentRefreshToken) {
     // Capture this failure mode too — "no refresh token" means IDB read
     // returned nothing OR session is uninitialised. Useful diagnostic in
     // its own right (it would otherwise show up as a silent null).
     lastSilentRefreshDiagnostics = {
       attempts: [],
-      hadRefreshToken: !!refreshToken,
+      hadRefreshToken: !!currentRefreshToken,
       consecutiveFailures: consecutiveSilentRefreshFailures,
     };
     return null;
   }
 
-  // Retry up to 3× on transient failures (network blip during SW
-  // activation, brief 5xx from the proxy, mobile-network jitter) with
-  // stepped backoff. `invalid_grant` is permanent and short-circuits —
-  // the refresh token has been revoked at Google's end.
-  const RETRY_BACKOFF_MS = [1500, 3000] as const;
+  // Retry up to 5× on transient failures with stepped backoff. The total
+  // patience window is ~22.5s (1.5 + 3 + 6 + 12 between attempts). Sized to
+  // survive Chrome desktop wake-from-sleep on Windows, where the network
+  // adapter takes 5–20s to reattach (DHCP renewal, WiFi reassociation, DNS
+  // cache rebuild) while `fetch()` already returns `TypeError: Failed to
+  // fetch` immediately. The 2026-05-19 cascade (CloudWatch: zero Lambda
+  // invocations during two 5min failure windows on a Windows Chrome user
+  // with a tab open overnight) confirmed the request never left the client
+  // — exactly the wake-race shape. `invalid_grant` is permanent and
+  // short-circuits — the refresh token has been revoked at Google's end.
+  //
+  // Cap protection: do not extend `RETRY_BACKOFF_MS` past 4 entries (5 total
+  // attempts) without considering the user-visible "stuck" window. A unit
+  // test asserts `MAX_ATTEMPTS <= 5` so a future maintainer doesn't quietly
+  // lift this.
+  const RETRY_BACKOFF_MS = [1500, 3000, 6000, 12000] as const;
   const MAX_ATTEMPTS = RETRY_BACKOFF_MS.length + 1;
   const diagnosticAttempts: SilentRefreshAttemptDiagnostic[] = [];
 
@@ -814,8 +844,12 @@ async function performSilentRefresh(): Promise<string | null> {
       console.warn(
         `[googleAuth] Attempting silent token refresh (attempt ${attempt}/${MAX_ATTEMPTS})...`
       );
+      // Capture into a const so the await below can't lose TypeScript's
+      // narrowing on the module-level `let currentRefreshToken`. The guard
+      // above (line ~810) ensures we never enter the loop with null.
+      const tokenAtAttempt = currentRefreshToken!.token;
       const tokens = await refreshAccessToken({
-        refreshToken,
+        refreshToken: tokenAtAttempt,
         clientId,
       });
 
@@ -855,7 +889,13 @@ async function performSilentRefresh(): Promise<string | null> {
           '[googleAuth] Silent refresh failed (permanent — refresh token revoked):',
           errorMessage
         );
-        refreshToken = null;
+        // Capture age BEFORE clearing — `currentRefreshToken?.issuedAt` after
+        // the assignment would always be null. Null = "unknown age" (legacy
+        // bare-string entry that pre-dates issuedAt tracking); a number =
+        // actual age in ms (helps surface revocation patterns).
+        const refreshTokenAgeMs =
+          currentRefreshToken?.issuedAt != null ? Date.now() - currentRefreshToken.issuedAt : null;
+        currentRefreshToken = null;
         if (currentFamilyId) {
           await clearGoogleRefreshToken(currentFamilyId);
         }
@@ -863,6 +903,7 @@ async function performSilentRefresh(): Promise<string | null> {
           attempts: diagnosticAttempts,
           hadRefreshToken: true,
           consecutiveFailures: consecutiveSilentRefreshFailures,
+          refreshTokenAgeMs,
         };
         firePermanentFailureCallbacks();
         return null;
@@ -915,7 +956,7 @@ async function performSilentRefresh(): Promise<string | null> {
  * Used by other modules to decide whether to force consent on re-auth.
  */
 export function hasRefreshToken(): boolean {
-  return !!refreshToken;
+  return !!currentRefreshToken;
 }
 
 /**
@@ -956,7 +997,7 @@ export async function getValidToken(): Promise<string> {
   // Fall back to interactive auth.
   // Force consent when we have no refresh token — Google only issues
   // refresh tokens with prompt=consent, not prompt=select_account.
-  return requestAccessToken({ forceConsent: !refreshToken });
+  return requestAccessToken({ forceConsent: !currentRefreshToken });
 }
 
 /**
@@ -1144,7 +1185,7 @@ async function notifyTokenAcquired(token: string, interactive: boolean): Promise
 function clearTokenState(): void {
   accessToken = null;
   expiresAt = 0;
-  refreshToken = null;
+  currentRefreshToken = null;
   cachedEmail = null;
   consecutiveSilentRefreshFailures = 0;
   persistFailureCounter(0);
@@ -1402,9 +1443,10 @@ export async function completeRedirectAuth(): Promise<string | null> {
   expiresAt = Date.now() + tokens.expires_in * 1000;
 
   if (tokens.refresh_token) {
-    refreshToken = tokens.refresh_token;
+    const issuedAt = Date.now();
+    currentRefreshToken = { token: tokens.refresh_token, issuedAt };
     const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
-    await storeGoogleRefreshToken(storageKey, tokens.refresh_token);
+    await storeGoogleRefreshToken(storageKey, tokens.refresh_token, { issuedAt });
   }
 
   scheduleAutoRefresh(tokens.expires_in);
