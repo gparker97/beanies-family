@@ -1,7 +1,6 @@
 import { ref } from 'vue';
 import {
   requestAccessToken,
-  hasRefreshToken,
   shouldUseRedirectAuth,
   startRedirectAuth,
 } from '@/services/google/googleAuth';
@@ -37,7 +36,11 @@ export function useGoogleReconnect() {
         // useful way. Return true so callers don't think they failed.
         return true;
       }
-      await requestAccessToken({ forceConsent: !hasRefreshToken(), loginHint });
+      // Force consent so Google re-issues a refresh_token. A stale stored token
+      // would make `!hasRefreshToken()` false → prompt=select_account → an
+      // access-token-only grant with no refresh token (the reconnect-every-launch
+      // bug). Reconnect is interactive + rare, so the extra consent screen is fine.
+      await requestAccessToken({ forceConsent: true, loginHint });
       return true;
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);

@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-20
 
+### Fixed
+
+- **Google Drive stays connected across app restarts — especially on installed PWAs (Android/iOS).** The PWA was showing a "disconnected" prompt on every force-close/reopen. Root cause (found via the new diagnostic logging): on the full-page redirect sign-in that PWAs/iOS use, the refresh token was being saved under a temporary key instead of your family's key, so the next launch couldn't find it — and reconnecting didn't fix it because the reconnect wasn't asking Google for a fresh refresh token. Now every reconnect explicitly re-grants offline access (you'll see Google's consent screen, by design), the token is always stored under the family key, and any token left under the old temporary key is automatically migrated on the next launch — so existing affected devices self-heal. Applies uniformly to desktop, iPhone/iOS, and Android. See ADR-028.
+
 ### Added
 
 - **Full diagnostic logging & telemetry (self-hosted on AWS).** A new `logEvent` tier captures the whole `debug/info/warn/error` diagnostic stream that previously died in the browser console, batches it (offline-aware), and ships it to a new `POST /logs` endpoint → a telemetry Lambda → a 90-day CloudWatch log group we can search with Logs Insights. Every Slack error is now also queryable historically. The firehose is anonymous by design — it correlates by a random family identifier and never carries names, balances, transactions, or email (the allowlist is re-enforced server-side as a safety net). The security Help Center article now discloses this. Activates only after the infrastructure is deployed; until then it's a harmless no-op. See ADR-027.

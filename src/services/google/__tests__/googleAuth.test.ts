@@ -34,6 +34,15 @@ vi.mock('@/services/indexeddb/database', () => ({
   getActiveFamilyId: vi.fn(() => null),
 }));
 
+// Telemetry + error reporter — googleAuth fires these from the auth-init rescue
+// and the no-refresh-token guard; mock so we can assert without the real queue.
+vi.mock('@/services/telemetry', () => ({
+  logEvent: vi.fn(),
+}));
+vi.mock('@/utils/errorReporter', () => ({
+  reportError: vi.fn(),
+}));
+
 // Reset module state between tests
 let googleAuth: typeof import('../googleAuth');
 
@@ -216,6 +225,88 @@ describe('googleAuth (PKCE)', () => {
   describe('loadGIS', () => {
     it('is a no-op (backward compatibility)', async () => {
       await expect(googleAuth.loadGIS()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('refresh-token persistence fix (2026-05-20)', () => {
+    it('startRedirectAuth always builds a prompt=consent + access_type=offline URL', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'cid.apps.googleusercontent.com');
+      let capturedHref = '';
+      const hrefSpy = vi.spyOn(window.location, 'href', 'set').mockImplementation((v: string) => {
+        capturedHref = v;
+      });
+      await googleAuth.startRedirectAuth('/welcome?resume=setup', 'a@b.com');
+      expect(capturedHref).toContain('prompt=consent');
+      expect(capturedHref).toContain('access_type=offline');
+      expect(capturedHref).not.toContain('prompt=select_account');
+      hrefSpy.mockRestore();
+      vi.unstubAllEnvs();
+    });
+
+    it('initializeAuth rescues a __pending__ token into the family key when the family key is empty', async () => {
+      const fhs = await import('@/services/sync/fileHandleStore');
+      (fhs.getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockImplementation(
+        async (key: string) =>
+          key === '__pending__' ? { token: 'pending-tok', issuedAt: 123 } : null
+      );
+      await googleAuth.initializeAuth('fam-1');
+      expect(fhs.storeGoogleRefreshToken).toHaveBeenCalledWith('fam-1', 'pending-tok', {
+        issuedAt: 123,
+      });
+      expect(fhs.clearGoogleRefreshToken).toHaveBeenCalledWith('__pending__');
+      const { logEvent } = await import('@/services/telemetry');
+      expect(vi.mocked(logEvent)).toHaveBeenCalledWith(
+        expect.objectContaining({ level: 'info', surface: 'auth-init' })
+      );
+    });
+
+    it('initializeAuth does NOT rescue/clobber when the family key already holds a token', async () => {
+      const fhs = await import('@/services/sync/fileHandleStore');
+      (fhs.getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockImplementation(
+        async (key: string) =>
+          key === '__pending__'
+            ? { token: 'pending-tok', issuedAt: 1 }
+            : { token: 'family-tok', issuedAt: 2 }
+      );
+      await googleAuth.initializeAuth('fam-1');
+      expect(fhs.storeGoogleRefreshToken).not.toHaveBeenCalled();
+      expect(fhs.clearGoogleRefreshToken).not.toHaveBeenCalled();
+    });
+
+    it('migratePendingRefreshToken refuses to clobber a good family token (returns false)', async () => {
+      const fhs = await import('@/services/sync/fileHandleStore');
+      (fhs.getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockImplementation(
+        async (key: string) =>
+          key === '__pending__'
+            ? { token: 'pending-tok', issuedAt: 1 }
+            : { token: 'family-tok', issuedAt: 2 }
+      );
+      const migrated = await googleAuth.migratePendingRefreshToken('fam-1');
+      expect(migrated).toBe(false);
+      expect(fhs.storeGoogleRefreshToken).not.toHaveBeenCalled();
+    });
+
+    it('reports auth-no-refresh-token when redirect auth returns no refresh token', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'cid.apps.googleusercontent.com');
+      const { exchangeCodeForTokens } = await import('../oauthProxy');
+      (exchangeCodeForTokens as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => ({
+        access_token: 'at-only',
+        expires_in: 3600,
+        token_type: 'Bearer',
+        scope: 'drive.file userinfo.email',
+        // no refresh_token
+      }));
+      sessionStorage.setItem('beanies_redirect_auth_code', 'code-123');
+      sessionStorage.setItem(
+        'beanies_redirect_auth',
+        JSON.stringify({ codeVerifier: 'v', returnPath: '/welcome' })
+      );
+      await googleAuth.completeRedirectAuth();
+      const { reportError } = await import('@/utils/errorReporter');
+      expect(vi.mocked(reportError)).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'auth-no-refresh-token', severity: 'warning' })
+      );
+      vi.unstubAllEnvs();
     });
   });
 
