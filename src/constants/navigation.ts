@@ -5,9 +5,9 @@ export type NavSection = 'treehouse' | 'piggyBank' | 'pinned';
 
 /**
  * Tag a NAV_ITEMS entry with a mobile category to make it appear in the
- * v3 mobile bottom nav. `'nook'` is a leaf (Nook tab navigates directly).
- * The other three are stacks — tapping the tab opens a vertical bean
- * column with the tagged routes as children.
+ * v3 mobile bottom nav. `'nook'` and `'calendar'` are leaves (the tab
+ * navigates directly). The others are stacks — tapping the tab opens a
+ * vertical bean column with the tagged routes as children.
  *
  * Items WITHOUT a mobileCategory (Settings, Help) intentionally do not
  * appear on mobile — desktop-sidebar / hamburger-only.
@@ -15,10 +15,18 @@ export type NavSection = 'treehouse' | 'piggyBank' | 'pinned';
  * Adding a route: tag it here once; the derived `MOBILE_NAV_CATEGORIES`
  * picks it up automatically. Adding a hint: extend `HINT_KEY_BY_PATH`.
  */
-export type MobileCategoryId = 'nook' | 'planning' | 'money' | 'pod';
+export type MobileCategoryId = 'nook' | 'planning' | 'money' | 'pod' | 'calendar';
 
-/** Categories that open a bean stack (Nook is a single-tap leaf). */
-export type StackableCategoryId = Exclude<MobileCategoryId, 'nook'>;
+/**
+ * The ONE source of truth for which categories are leaves (navigate
+ * directly, no bean stack). Both the runtime set and the stackable type
+ * derive from this tuple, so adding/removing a leaf is a one-line edit.
+ */
+const LEAF_CATEGORY_IDS = ['nook', 'calendar'] as const;
+type LeafCategoryId = (typeof LEAF_CATEGORY_IDS)[number];
+/** Categories that open a bean stack (leaves navigate directly). */
+export type StackableCategoryId = Exclude<MobileCategoryId, LeafCategoryId>;
+const LEAF_ID_SET: ReadonlySet<MobileCategoryId> = new Set(LEAF_CATEGORY_IDS);
 
 export interface NavSectionDef {
   id: NavSection;
@@ -73,7 +81,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     path: '/activities',
     emoji: '\u{1F4C5}',
     section: 'treehouse',
-    mobileCategory: 'planning',
+    mobileCategory: 'calendar',
   },
   {
     labelKey: 'nav.travel',
@@ -294,7 +302,7 @@ export interface MobileNavCategory {
   id: MobileCategoryId;
   labelKey: UIStringKey;
   emoji: string;
-  /** A leaf category (Nook) renders as a direct router-push tab. */
+  /** A leaf category (Nook, Calendar) renders as a direct router-push tab. */
   rootPath?: string;
   /** A stackable category (Planning, Money, Pod) renders as a bean stack. */
   items?: MobileNavStackItem[];
@@ -307,7 +315,6 @@ export interface MobileNavCategory {
  * navigation unit test) — making typos impossible to ship.
  */
 const HINT_KEY_BY_PATH: Record<string, UIStringKey> = {
-  '/activities': 'mobileNav.hint.activities',
   '/todo': 'mobileNav.hint.todo',
   '/travel': 'mobileNav.hint.travel',
   '/dashboard': 'mobileNav.hint.overview',
@@ -324,12 +331,13 @@ const HINT_KEY_BY_PATH: Record<string, UIStringKey> = {
   '/pod/contacts': 'mobileNav.hint.contacts',
 };
 
-/** Display order for the 4 mobile tabs. Nook always first. */
-const CATEGORY_ORDER: MobileCategoryId[] = ['nook', 'planning', 'money', 'pod'];
+/** Display order for the 5 mobile tabs. Nook first; Calendar centred. */
+const CATEGORY_ORDER: MobileCategoryId[] = ['nook', 'planning', 'calendar', 'money', 'pod'];
 
 const CATEGORY_META: Record<MobileCategoryId, { labelKey: UIStringKey; emoji: string }> = {
   nook: { labelKey: 'mobile.nook', emoji: '\u{1F3E1}' },
   planning: { labelKey: 'mobile.planning', emoji: '\u{1F333}' },
+  calendar: { labelKey: 'mobile.calendar', emoji: '\u{1F4C5}' },
   money: { labelKey: 'mobile.money', emoji: '\u{1F437}' },
   pod: { labelKey: 'mobile.pod', emoji: '\u{1F331}' },
 };
@@ -390,12 +398,12 @@ function buildMobileNavCategories(): MobileNavCategory[] {
     const meta = CATEGORY_META[id];
     const routes = byCategory.get(id) ?? [];
 
-    if (id === 'nook') {
-      // Nook is a leaf: take the FIRST tagged route as the destination.
+    if (LEAF_ID_SET.has(id)) {
+      // Leaf (Nook, Calendar): take the FIRST tagged route as the destination.
       const root = routes[0];
       if (!root) {
         throw new Error(
-          `[navigation] mobile category "nook" has no tagged route; expected exactly one`
+          `[navigation] mobile leaf category "${id}" has no tagged route; expected exactly one`
         );
       }
       categories.push({
@@ -435,7 +443,7 @@ function buildMobileNavCategories(): MobileNavCategory[] {
 }
 
 /**
- * The 4 mobile bottom-nav categories, derived from NAV_ITEMS at module
+ * The 5 mobile bottom-nav categories, derived from NAV_ITEMS at module
  * load. Module-load throw on misconfiguration; never ships broken.
  */
 export const MOBILE_NAV_CATEGORIES: MobileNavCategory[] = buildMobileNavCategories();

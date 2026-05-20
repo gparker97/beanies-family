@@ -1,18 +1,21 @@
 <script setup lang="ts">
 /**
- * Mobile bottom-nav v3 — 4 category tabs.
+ * Mobile bottom-nav v3 — 5 evenly-distributed slots: Nook, Planning,
+ * Calendar, Money, Pod.
  *
- * Replaces the previous flat 6-tab strip. Tapping Nook navigates directly
- * to /nook. Tapping Planning, Money, or Pod opens a vertical
- * `MobileNavBeanStack` rising from the active tab; the stack carries the
- * category's child routes as labelled beans with side-card hints.
+ * Replaces the previous flat 6-tab strip. Nook and Calendar are leaves —
+ * tapping navigates directly (Nook → /nook, Calendar → /activities). Calendar
+ * renders as a raised, round center hero (see the `.calendar-hero` styles).
+ * Tapping Planning, Money, or Pod opens a vertical `MobileNavBeanStack`
+ * rising from the active tab; the stack carries the category's child routes
+ * as labelled beans with side-card hints.
  *
  * State machine for `openCategoryId`:
- *   null               → tap Nook            → null  (router.push)
+ *   null               → tap leaf (Nook/Cal) → null  (router.push)
  *   null               → tap stackable cat   → <id>  (open stack)
  *   <id>               → tap same tab        → null  (close)
  *   <id>               → tap different cat   → <new> (swap, stack stays mounted)
- *   <id>               → tap Nook            → null  (close + router.push)
+ *   <id>               → tap leaf (Nook/Cal) → null  (close + router.push)
  *   <id>               → tap stack item bean → null  (close + router.push)
  *   <id>               → Esc/scrim           → null  (close)
  *   <id>               → route change        → null  (close)
@@ -47,6 +50,7 @@ const openCategoryId = ref<StackableCategoryId | null>(null);
 const tabRefs = ref<Record<MobileCategoryId, HTMLButtonElement | null>>({
   nook: null,
   planning: null,
+  calendar: null,
   money: null,
   pod: null,
 });
@@ -84,10 +88,13 @@ function getActiveAnchor(): HTMLElement | null {
 // State machine — every transition lives here.
 // ---------------------------------------------------------------------------
 function onTabClick(cat: MobileNavCategory) {
-  // Nook: leaf, always navigates and never opens.
-  if (cat.id === 'nook') {
+  // Leaf categories (Nook, Calendar) navigate directly and never open a
+  // stack. MUST stay above the `!cat.items` defensive warn below — leaves
+  // legitimately have no `items`, so a reorder would log a false
+  // "misconfigured" warning on every leaf tap.
+  if (cat.rootPath) {
     closeStack();
-    if (cat.rootPath) navigate(cat.rootPath);
+    navigate(cat.rootPath);
     return;
   }
 
@@ -176,7 +183,23 @@ watch(
       :aria-controls="cat.items ? `mobile-nav-stack-${cat.id}` : undefined"
       @click="onTabClick(cat)"
     >
+      <!-- Calendar: raised, round, center one-tap hero. Centred within its
+           OWN flex slot (never the viewport), so it stays correct whether 5
+           tabs show or 4 (Money hidden). The label keeps the sibling
+           baseline via the invisible emoji spacer. -->
       <div
+        v-if="cat.id === 'calendar'"
+        class="relative flex flex-col items-center gap-0.5 px-3 py-1"
+      >
+        <span class="calendar-hero" aria-hidden="true">{{ cat.emoji }}</span>
+        <span class="text-xl leading-none opacity-0" aria-hidden="true">{{ cat.emoji }}</span>
+        <span class="calendar-label font-outfit text-primary-500 text-xs font-semibold">
+          {{ t(cat.labelKey) }}
+        </span>
+      </div>
+
+      <div
+        v-else
         class="relative flex flex-col items-center gap-0.5 rounded-2xl px-3 py-1 transition-colors"
         :class="isCategoryActive(cat) ? 'bg-[rgba(241,93,34,0.08)]' : ''"
       >
@@ -224,3 +247,69 @@ watch(
     />
   </nav>
 </template>
+
+<style scoped>
+/* Center Calendar hero — a raised, round Heritage-Orange one-tap button.
+   The round shape follows the established bean/FAB circle precedent
+   (MobileNavBeanStack `.jar-bean`, QuickAddFab `.fab`), not the squircle
+   rule. It is absolutely centred WITHIN its own flex slot (the calendar
+   `<button>`), never the viewport, so it stays centred whether 5 tabs show
+   or 4 (Money hidden). The 3px ring matches the nav surface (white /
+   slate-900) so the circle reads as seated in the bar; ~15px peeks above
+   the top edge. */
+.calendar-hero {
+  background: linear-gradient(155deg, #f15d22 0%, #e67e22 100%);
+  border: 3px solid white;
+  border-radius: 9999px;
+  box-shadow:
+    0 10px 18px -8px rgb(241 93 34 / 60%),
+    0 3px 7px -3px rgb(241 93 34 / 50%),
+    inset 0 1px 0 rgb(255 255 255 / 40%);
+  color: white;
+  display: grid;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative emoji in fixed-size brand circle */
+  font-size: 22px;
+  height: 46px;
+  left: 50%;
+  line-height: 1;
+  place-items: center;
+  position: absolute;
+  top: -22px; /* peeks ~15px above the bar — tune against device safe-area */
+  transform: translateX(-50%);
+  transition:
+    transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.16s ease;
+  width: 46px;
+}
+
+:global(.dark) .calendar-hero {
+  /* slate-900 — matches the nav's dark surface (`dark:bg-slate-900`) so the
+     ring blends into the bar instead of showing a white halo. */
+  border-color: #0f172a;
+}
+
+.calendar-label {
+  line-height: 1.15;
+}
+
+/* Press/hover micro-interaction — kept in sync with the translateX centring;
+   disabled under reduced-motion (mirrors QuickAddFab). */
+button:hover .calendar-hero {
+  transform: translateX(-50%) translateY(-2px);
+}
+
+button:active .calendar-hero {
+  transform: translateX(-50%) translateY(1px) scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-hero {
+    transition: none;
+  }
+
+  button:hover .calendar-hero,
+  button:active .calendar-hero {
+    transform: translateX(-50%);
+  }
+}
+</style>

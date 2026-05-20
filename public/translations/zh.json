@@ -12501,11 +12501,6 @@
       "hash": "18ddb4",
       "lastUpdated": "2026-04-28"
     },
-    "mobileNav.hint.activities": {
-      "translation": "计划，日程安排，日志",
-      "hash": "w2thwc",
-      "lastUpdated": "2026-04-28"
-    },
     "mobileNav.hint.todo": {
       "translation": "共享的家庭任务",
       "hash": "90a5rh",
@@ -14599,6 +14594,11 @@
     "pwa.updatedMessage": {
       "translation": "我们一直在改善您的beanies.family体验",
       "hash": "smbchm",
+      "lastUpdated": "2026-05-20"
+    },
+    "mobile.calendar": {
+      "translation": "日历",
+      "hash": "1vokgy",
       "lastUpdated": "2026-05-20"
     }
   }

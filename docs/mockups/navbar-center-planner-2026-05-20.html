@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family — bottom nav: center Planner shortcut</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --orange: #f15d22;
+        --orange-deep: #e0521b;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --slate-soft: #5b6b7a;
+        --sky: #aed6f1;
+        --cloud: #f8f9fa;
+        --white: #ffffff;
+        --ink-muted: #97a3ad;
+        --line: #eaedf0;
+        --nav-h: 64px;
+        --safe: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: 'Inter', sans-serif;
+        color: var(--slate);
+        background:
+          radial-gradient(120% 90% at 12% -10%, #fff2ec 0%, transparent 55%),
+          radial-gradient(110% 80% at 100% 0%, #eef6fd 0%, transparent 50%),
+          var(--cloud);
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 56px 24px 80px;
+      }
+
+      .eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-size: 12px;
+        color: var(--orange);
+        margin: 0 0 10px;
+      }
+
+      h1 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: clamp(28px, 5vw, 44px);
+        line-height: 1.04;
+        letter-spacing: -0.02em;
+        margin: 0 0 14px;
+      }
+      h1 .accent {
+        background: linear-gradient(120deg, var(--orange), var(--terracotta));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .lede {
+        max-width: 60ch;
+        font-size: 16px;
+        line-height: 1.6;
+        color: var(--slate-soft);
+        margin: 0 0 44px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 40px 48px;
+        align-items: start;
+      }
+
+      .panel-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--slate);
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin: 0 0 18px;
+      }
+      .panel-label .pip {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--orange);
+      }
+      .panel-label.muted {
+        color: var(--ink-muted);
+      }
+      .panel-label.muted .pip {
+        background: #cfd6dc;
+      }
+
+      /* ---- phone frame ---- */
+      .phone {
+        width: 320px;
+        margin: 0 auto;
+        border-radius: 40px;
+        padding: 12px;
+        background: linear-gradient(160deg, #2c3e50, #1c2733);
+        box-shadow:
+          0 30px 60px -24px rgba(28, 39, 51, 0.5),
+          0 8px 18px -10px rgba(28, 39, 51, 0.4);
+      }
+      .screen {
+        position: relative;
+        height: 540px;
+        border-radius: 30px;
+        overflow: hidden;
+        background:
+          radial-gradient(140% 60% at 50% 0%, #fff6f1 0%, transparent 60%), var(--cloud);
+        display: flex;
+        flex-direction: column;
+      }
+      .statusbar {
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 12px;
+        color: var(--slate);
+      }
+      .statusbar .dots {
+        letter-spacing: 2px;
+        color: var(--slate-soft);
+      }
+
+      /* fake content so the nav has context */
+      .content {
+        flex: 1;
+        padding: 8px 18px 0;
+        overflow: hidden;
+      }
+      .greeting {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        letter-spacing: -0.01em;
+        margin: 6px 0 2px;
+      }
+      .greeting .bean {
+        color: var(--orange);
+      }
+      .subtle {
+        color: var(--ink-muted);
+        font-size: 13px;
+        margin: 0 0 16px;
+      }
+      .card {
+        background: var(--white);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 14px 16px;
+        box-shadow: 0 10px 24px -18px rgba(44, 62, 80, 0.4);
+        margin-bottom: 12px;
+      }
+      .card .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .chip {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 19px;
+        background: rgba(241, 93, 34, 0.1);
+      }
+      .chip.sky {
+        background: rgba(174, 214, 241, 0.35);
+      }
+      .card .t {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .card .d {
+        font-size: 12px;
+        color: var(--ink-muted);
+      }
+      .skeleton {
+        height: 12px;
+        border-radius: 6px;
+        background: linear-gradient(90deg, #eef1f4, #f6f8fa, #eef1f4);
+        margin: 8px 0;
+      }
+      .skeleton.s2 {
+        width: 70%;
+      }
+
+      /* ---- the QuickAdd FAB (existing, bottom-right) ---- */
+      .fab {
+        position: absolute;
+        right: 16px;
+        bottom: calc(var(--nav-h) + var(--safe) + 16px);
+        width: 52px;
+        height: 52px;
+        border-radius: 18px;
+        background: linear-gradient(150deg, #ffffff, #fff4ee);
+        border: 1px solid rgba(241, 93, 34, 0.25);
+        display: grid;
+        place-items: center;
+        font-size: 24px;
+        color: var(--orange);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        box-shadow: 0 12px 22px -12px rgba(241, 93, 34, 0.55);
+        z-index: 3;
+      }
+
+      /* ---- bottom nav ---- */
+      .nav {
+        position: relative;
+        height: calc(var(--nav-h) + var(--safe));
+        padding-bottom: var(--safe); /* fake safe-area */
+        background: var(--white);
+        border-top: 1px solid var(--line);
+        display: flex;
+        align-items: stretch;
+        z-index: 2;
+      }
+      /* a shallow notch that just cups the bottom of the circle */
+      .nav.notched::before {
+        content: '';
+        position: absolute;
+        top: -1px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 70px;
+        height: 16px;
+        background: radial-gradient(50% 150% at 50% 0%, transparent 64%, var(--white) 65%);
+      }
+
+      .tab {
+        flex: 1; /* all five slots evenly distributed */
+        border: 0;
+        background: none;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        padding-top: 8px;
+        position: relative;
+        font-family: 'Outfit', sans-serif;
+      }
+      .tab .ico {
+        font-size: 21px;
+        line-height: 1;
+        filter: grayscale(0.15);
+        transition: transform 0.18s ease;
+      }
+      .tab .lab {
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--ink-muted);
+        letter-spacing: 0.01em;
+      }
+      .tab.active .lab {
+        color: var(--orange);
+      }
+      .tab.active .ico {
+        filter: none;
+        transform: translateY(-1px);
+      }
+      .tab.active::after {
+        content: '';
+        position: absolute;
+        top: 6px;
+        width: 30px;
+        height: 28px;
+        border-radius: 12px;
+        background: rgba(241, 93, 34, 0.08);
+        z-index: -1;
+      }
+      .tab.cat .lab::after {
+        content: '⌄';
+        margin-left: 3px;
+        color: #c4ccd3;
+        font-weight: 700;
+      }
+      .tab .att {
+        position: absolute;
+        top: 7px;
+        right: 22px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--orange);
+        box-shadow: 0 0 0 2px var(--white);
+      }
+
+      /* center slot: same structure as siblings (hidden icon spacer keeps the
+         "Planner" label on the exact baseline as the others); the round button
+         floats above and just peeks over the bar's top edge */
+      .tab.center .ico {
+        visibility: hidden;
+      }
+      .tab.center .lab {
+        color: var(--orange);
+      }
+      .hero {
+        position: absolute;
+        left: 50%;
+        bottom: 47px; /* circle bottom hugs the label top; only ~15px peeks above */
+        transform: translateX(-50%);
+        width: 46px;
+        height: 46px;
+        border-radius: 50%; /* fully round — saves width vs. a squircle */
+        background: linear-gradient(155deg, #ff7a45 0%, var(--orange) 52%, var(--orange-deep) 100%);
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 22px;
+        box-shadow:
+          0 10px 18px -8px rgba(241, 93, 34, 0.6),
+          0 3px 7px -3px rgba(241, 93, 34, 0.5),
+          inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        border: 3px solid var(--white);
+        z-index: 4;
+        cursor: pointer;
+        transition:
+          transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+          box-shadow 0.16s ease;
+      }
+      .hero:hover {
+        transform: translateX(-50%) translateY(-2px);
+      }
+      .hero:active {
+        transform: translateX(-50%) translateY(1px) scale(0.96);
+      }
+      .hero .badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        border-radius: 10px;
+        background: var(--slate);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 10px;
+        display: grid;
+        place-items: center;
+        border: 2px solid var(--white);
+      }
+
+      .caption {
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--slate-soft);
+        margin: 18px auto 0;
+        max-width: 300px;
+        text-align: center;
+      }
+      .caption b {
+        color: var(--slate);
+        font-weight: 600;
+      }
+
+      /* ---- raise comparison strip ---- */
+      .compare {
+        margin-top: 64px;
+        border-top: 1px dashed #d8dee3;
+        padding-top: 30px;
+      }
+      .compare h2 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      .compare .sub {
+        font-size: 13px;
+        color: var(--slate-soft);
+        margin: 0 0 26px;
+      }
+      .compare-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 26px;
+      }
+      .mini-wrap {
+        flex: 1;
+        min-width: 220px;
+        text-align: center;
+      }
+      .mini-tag {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+      }
+      .mini-tag.bad {
+        color: var(--ink-muted);
+      }
+      .mini-tag.good {
+        color: var(--orange);
+      }
+      .mini {
+        position: relative;
+        height: 60px;
+        border-radius: 0 0 18px 18px;
+        border: 1px solid var(--line);
+        background: var(--white);
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        padding-top: 6px;
+        box-shadow: 0 10px 22px -18px rgba(44, 62, 80, 0.5);
+        overflow: visible;
+      }
+      .mini .d {
+        font-size: 17px;
+        filter: grayscale(0.2);
+      }
+      .mini .mh {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(155deg, #ff7a45, var(--orange));
+        border: 3px solid var(--white);
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        color: #fff;
+        box-shadow: 0 8px 16px -8px rgba(241, 93, 34, 0.6);
+      }
+      .mini.high .mh {
+        bottom: 26px;
+      } /* too far above */
+      .mini.mid .mh {
+        bottom: 12px;
+      } /* just peeks */
+      .mini.flat .mh {
+        bottom: 4px;
+        border-radius: 14px;
+      } /* inside the bar */
+      .mini-note {
+        font-size: 12px;
+        color: var(--slate-soft);
+        margin-top: 14px;
+        line-height: 1.5;
+      }
+
+      .legend {
+        margin-top: 56px;
+        border-top: 1px dashed #d8dee3;
+        padding-top: 28px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 22px 32px;
+      }
+      .legend h3 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        margin: 0 0 6px;
+      }
+      .legend p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--slate-soft);
+      }
+      .legend .k {
+        color: var(--orange);
+        font-weight: 600;
+      }
+      .foottag {
+        margin-top: 40px;
+        font-size: 12px;
+        color: var(--ink-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <p class="eyebrow">beanies.family · mobile navigation</p>
+      <h1>A one-tap home for the <span class="accent">calendar</span>.</h1>
+      <p class="lede">
+        A round Calendar button that peeks just slightly above the bar — close enough to feel part
+        of the nav, raised enough to be the obvious tap. All five items sit on an even grid, the
+        Planning popout keeps Travel + To-do, and the lower profile clears the bottom-right
+        quick-add.
+      </p>
+
+      <div class="grid">
+        <!-- BEFORE -->
+        <div>
+          <p class="panel-label muted"><span class="pip"></span>Today · 4 even tabs</p>
+          <div class="phone">
+            <div class="screen">
+              <div class="statusbar"><span>9:41</span><span class="dots">● ● ●</span></div>
+              <div class="content">
+                <p class="greeting">good morning, <span class="bean">greg</span></p>
+                <p class="subtle">tuesday · 3 things on today</p>
+                <div class="card">
+                  <div class="row">
+                    <div class="chip">📅</div>
+                    <div>
+                      <div class="t">Sophia · piano</div>
+                      <div class="d">4:30 pm · with Ms. Lee</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card"><div class="skeleton"></div><div class="skeleton s2"></div></div>
+              </div>
+              <nav class="nav">
+                <button class="tab"><span class="ico">🏡</span><span class="lab">Nook</span></button>
+                <button class="tab cat active">
+                  <span class="att"></span><span class="ico">🌳</span><span class="lab">Plans</span>
+                </button>
+                <button class="tab cat">
+                  <span class="ico">🐷</span><span class="lab">Money</span>
+                </button>
+                <button class="tab cat">
+                  <span class="ico">👨‍👩‍👦</span><span class="lab">Family</span>
+                </button>
+              </nav>
+            </div>
+          </div>
+          <p class="caption">
+            Activities lives under <b>Plans → 📅 Activities</b> — two taps every time, and the
+            middle of the bar is just even whitespace.
+          </p>
+        </div>
+
+        <!-- AFTER: middle-ground round hero -->
+        <div>
+          <p class="panel-label"><span class="pip"></span>Proposed · round Calendar, slight peek</p>
+          <div class="phone">
+            <div class="screen">
+              <div class="statusbar"><span>9:41</span><span class="dots">● ● ●</span></div>
+              <div class="content">
+                <p class="greeting">good morning, <span class="bean">greg</span></p>
+                <p class="subtle">tuesday · 3 things on today</p>
+                <div class="card">
+                  <div class="row">
+                    <div class="chip">📅</div>
+                    <div>
+                      <div class="t">Sophia · piano</div>
+                      <div class="d">4:30 pm · with Ms. Lee</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="row">
+                    <div class="chip sky">✈️</div>
+                    <div>
+                      <div class="t">Bali trip</div>
+                      <div class="d">in 12 days</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- existing quick-add FAB stays bottom-right -->
+              <div class="fab">＋</div>
+
+              <nav class="nav notched">
+                <button class="tab"><span class="ico">🏡</span><span class="lab">Nook</span></button>
+                <button class="tab cat">
+                  <span class="att"></span><span class="ico">🌳</span><span class="lab">Plans</span>
+                </button>
+                <button class="tab center">
+                  <span class="ico">📅</span><span class="lab">Calendar</span>
+                </button>
+                <button class="tab cat">
+                  <span class="ico">🐷</span><span class="lab">Money</span>
+                </button>
+                <button class="tab cat">
+                  <span class="ico">👨‍👩‍👦</span><span class="lab">Family</span>
+                </button>
+
+                <!-- the round hero, floating over the center slot -->
+                <button class="hero" aria-label="Calendar">
+                  📅
+                  <span class="badge">3</span>
+                </button>
+              </nav>
+            </div>
+          </div>
+          <p class="caption">
+            Five even slots; <b>📅 Calendar</b> is a round button that lifts only ~15px above the
+            bar. Label sits on the same baseline as its neighbours. Optional dark
+            <b>today-count</b> badge. Quick-add (＋) stays clear, bottom-right.
+          </p>
+        </div>
+      </div>
+
+      <!-- raise comparison -->
+      <div class="compare">
+        <h2>Dialing in the raise</h2>
+        <p class="sub">
+          From your last note — the goal is between &ldquo;floats too high&rdquo; and &ldquo;flat
+          inside the bar.&rdquo; The middle one is what the mockup above uses.
+        </p>
+        <div class="compare-row">
+          <div class="mini-wrap">
+            <div class="mini-tag bad">Too high · prev. (A)</div>
+            <div class="mini high">
+              <span class="d">🏡</span><span class="d">🌳</span><span class="d"></span
+              ><span class="d">🐷</span><span class="d">👨‍👩‍👦</span>
+              <span class="mh">📅</span>
+            </div>
+            <p class="mini-note">Big lift, conflicts with the FAB, feels detached from the bar.</p>
+          </div>
+          <div class="mini-wrap">
+            <div class="mini-tag good">Slight peek · this ✓</div>
+            <div class="mini mid">
+              <span class="d">🏡</span><span class="d">🌳</span><span class="d"></span
+              ><span class="d">🐷</span><span class="d">👨‍👩‍👦</span>
+              <span class="mh">📅</span>
+            </div>
+            <p class="mini-note">Round, ~15px peek — prominent but anchored, clears the FAB.</p>
+          </div>
+          <div class="mini-wrap">
+            <div class="mini-tag bad">Flat · prev. (B)</div>
+            <div class="mini flat">
+              <span class="d">🏡</span><span class="d">🌳</span><span class="d"></span
+              ><span class="d">🐷</span><span class="d">👨‍👩‍👦</span>
+              <span class="mh">📅</span>
+            </div>
+            <p class="mini-note">Fully inside the bar — reads as just another tab.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div>
+          <h3>Why this fits</h3>
+          <p>
+            The brand spec already reserves a dedicated <span class="k">📅</span> planner/calendar
+            slot (<code>beanies-theme/SKILL.md</code>) — this realigns the bar with documented
+            intent. Heritage Orange + Outfit label are on-system.
+          </p>
+        </div>
+        <div>
+          <h3>What moves</h3>
+          <p>
+            Activities (<span class="k">/activities</span>) graduates from the
+            <b>Planning</b> popout to the center as <b>Calendar</b>. Planning popout keeps
+            <span class="k">Travel</span> + <span class="k">To-do</span>. No routes change.
+          </p>
+        </div>
+        <div>
+          <h3>Even distribution</h3>
+          <p>
+            All five slots are <span class="k">flex: 1</span> — equal width. The round button only
+            overlays the center slot, so spacing stays perfectly even left-to-right.
+          </p>
+        </div>
+        <div>
+          <h3>Edge cases</h3>
+          <p>
+            When <b>Money</b> hides (no finance access) the bar rebalances to four even slots with
+            the hero still centered. The badge reuses the existing
+            <span class="k">count</span> model.
+          </p>
+        </div>
+      </div>
+
+      <p class="foottag">
+        Mockup · 2026-05-20 · static HTML, brand colors/fonts only — not wired to the app. Maps to
+        <code>MobileBottomNav.vue</code> + the <code>navigation.ts</code> registry.
+      </p>
+    </div>
+  </body>
+</html>

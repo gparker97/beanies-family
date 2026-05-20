@@ -112,6 +112,7 @@ describe('useNavBadges', () => {
     expect(categoryAttention.value).toEqual({
       nook: false,
       planning: false,
+      calendar: false,
       money: false,
       pod: false,
     });

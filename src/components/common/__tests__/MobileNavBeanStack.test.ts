@@ -38,7 +38,9 @@ vi.mock('@/composables/useNavBadges', () => ({
   useNavBadges: () => ({
     badges: { value: {} },
     badgeFor: () => null,
-    categoryAttention: { value: { nook: false, planning: false, money: false, pod: false } },
+    categoryAttention: {
+      value: { nook: false, planning: false, calendar: false, money: false, pod: false },
+    },
   }),
   ATTENTION_DOT: { kind: 'dot', severity: 'attention', active: true },
 }));
@@ -113,9 +115,9 @@ describe('MobileNavBeanStack', () => {
     expect(wrapper.findAll('[role=menuitem]')).toHaveLength(0);
   });
 
-  it('renders 3 beans for Planning', () => {
+  it('renders 2 beans for Planning (Travel, To-do — Activities moved to the Calendar leaf)', () => {
     const wrapper = mountStack({ category: planning });
-    expect(wrapper.findAll('[role=menuitem]')).toHaveLength(3);
+    expect(wrapper.findAll('[role=menuitem]')).toHaveLength(2);
   });
 
   it('renders 6 beans for Money', () => {
@@ -132,7 +134,7 @@ describe('MobileNavBeanStack', () => {
     const wrapper = mountStack({ category: planning });
     const beans = wrapper.findAll('[role=menuitem]');
     // Items render in REVERSED order — first DOM item is the last category item.
-    // For Planning, items are [/activities, /travel, /todo]; reversed = [/todo, /travel, /activities].
+    // For Planning, items are [/travel, /todo]; reversed = [/todo, /travel].
     await beans[0]!.trigger('click');
     expect(wrapper.emitted('navigate')).toBeTruthy();
     expect(wrapper.emitted('navigate')![0]).toEqual(['/todo']);
