@@ -16,6 +16,8 @@
  * next online event.
  */
 
+import { logEvent } from '@/services/telemetry';
+
 const DB_PREFIX = 'beanies-photo-queue-';
 const STORE_NAME = 'uploads';
 const DB_VERSION = 1;
@@ -140,6 +142,15 @@ export async function flushQueue(): Promise<void> {
     } catch (e) {
       console.warn('[photoUploadQueue] Flush failed for entry', entry.id, e);
       anyFailed = true;
+      // Previously console-only — a genuine silent-failure gap. Surface to the
+      // diagnostic firehose so stuck photo uploads are visible/queryable.
+      logEvent({
+        level: 'warn',
+        surface: 'photo-upload-flush',
+        message: `photo upload flush failed: ${e instanceof Error ? e.message : String(e)}`,
+        error: e,
+        context: { action: 'photo-upload-flush' },
+      });
     }
   }
 

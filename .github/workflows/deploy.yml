@@ -154,6 +154,12 @@ jobs:
           # the rule in tasks/lessons.md — it sits in the client bundle anyway
           # and being a variable makes it auditable + rotatable from the UI.
           VITE_BEANIES_ERROR_WEBHOOK_URL: ${{ vars.BEANIES_ERROR_WEBHOOK_URL }}
+          # Diagnostic-logging firehose (ADR-027). Ingest URL is a repository
+          # VARIABLE (Terraform `telemetry_ingest_url` output) — non-sensitive,
+          # sits in the client bundle anyway. The soft x-api-key is a SECRET
+          # (mirrors VITE_REGISTRY_API_KEY) to deter casual abuse of POST /logs.
+          VITE_BEANIES_LOG_INGEST_URL: ${{ vars.BEANIES_LOG_INGEST_URL }}
+          VITE_BEANIES_LOG_INGEST_API_KEY: ${{ secrets.BEANIES_LOG_INGEST_API_KEY }}
           # Plausible site script ID for app.beanies.family (the Vue PWA).
           # `src/services/analytics/plausible.ts` is gated on this var so a
           # vanilla self-host stays fully offline by default — only the
