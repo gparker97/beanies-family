@@ -111,3 +111,20 @@ module "oauth" {
   api_gateway_execution_arn = module.registry.api_gateway_execution_arn
 }
 
+# ── telemetry — diagnostic-logging ingest (added 2026-05-20, ADR-027) ────────
+# POST /logs on the shared API → telemetry Lambda → its own 90-day CloudWatch
+# log group (the diagnostic firehose, queried via Logs Insights). cors_origins
+# is defaulted in-module (matching oauth/registry). Route-level throttling for
+# POST /logs lives on the registry-owned $default stage.
+
+module "telemetry" {
+  source = "./modules/telemetry"
+
+  app_name                  = var.app_name
+  environment               = var.environment
+  api_gateway_id            = module.registry.api_gateway_id
+  api_gateway_execution_arn = module.registry.api_gateway_execution_arn
+  api_domain_name           = module.registry.api_domain_name
+  log_ingest_api_key        = var.log_ingest_api_key
+}
+

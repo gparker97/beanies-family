@@ -68,3 +68,20 @@ output "oauth_lambda_name" {
   value       = module.oauth.lambda_function_name
 }
 
+# ── Telemetry outputs ────────────────────────────────────────────────────────
+
+output "telemetry_ingest_url" {
+  description = "Diagnostic-log ingest endpoint — set as the BEANIES_LOG_INGEST_URL GitHub repo VARIABLE"
+  value       = module.telemetry.ingest_url
+}
+
+output "telemetry_log_group_name" {
+  description = "CloudWatch Logs group for the diagnostic firehose (query via Logs Insights, filter t = \"beanlog\")"
+  value       = module.telemetry.log_group_name
+}
+
+output "telemetry_lambda_name" {
+  description = "Telemetry Lambda function name"
+  value       = module.telemetry.lambda_function_name
+}
+

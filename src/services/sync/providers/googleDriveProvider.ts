@@ -36,6 +36,7 @@ import {
 } from '@/services/google/driveService';
 import { enqueueOfflineSave, setFlushProvider } from '../offlineQueue';
 import { FileNameCollisionError } from '@/types/sync';
+import { logEvent } from '@/services/telemetry';
 
 /**
  * Retry a Drive API call with exponential backoff on transient failures.
@@ -158,6 +159,15 @@ export class GoogleDriveProvider implements StorageProvider {
         console.warn(
           `[GoogleDriveProvider] write failed after retries (${e.status}), queueing offline`
         );
+        // Console-only until now — surface Drive instability to the firehose so
+        // recurring 5xx waves are visible/queryable (not lost to the console).
+        logEvent({
+          level: 'warn',
+          surface: 'drive-write',
+          message: `Drive write failed after retries (${e.status}), queued offline`,
+          error: e,
+          context: { http_status: e.status, action: 'queue-offline' },
+        });
         enqueueOfflineSave(content);
         return;
       }

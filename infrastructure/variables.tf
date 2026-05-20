@@ -40,6 +40,12 @@ variable "google_client_secret" {
   sensitive   = true
 }
 
+variable "log_ingest_api_key" {
+  description = "Soft API key the client sends to the telemetry ingest endpoint (POST /logs). In the public client bundle, so not a true secret, but kept as a Terraform sensitive var + GitHub secret to deter casual abuse."
+  type        = string
+  sensitive   = true
+}
+
 variable "site_verification_txt_records" {
   description = "TXT strings published at the apex for domain verification (Google Search Console, Bing Webmaster Tools, etc.). All entries merged into a single TXT record on beanies.family. These values are not sensitive — they're publicly readable via DNS."
   type        = list(string)

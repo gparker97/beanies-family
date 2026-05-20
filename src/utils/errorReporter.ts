@@ -7,13 +7,13 @@
  *   B. Vue render errors via `app.config.errorHandler`
  *   C. Unhandled JS errors / promise rejections (window listeners)
  *
- * Privacy contract:
- *   - Strict allowlist for context fields (NOT a blocklist). Email is the
- *     only PII allowed; family name is allowed as identification context.
- *     No member names, no transaction descriptions, no activity titles, no
- *     user-typed content of any kind.
- *   - Stack traces ship as-is (Error.stack contains function@file:line, no
- *     local variable values).
+ * Context enrichment, the privacy allowlist, and message normalization live in
+ * `src/utils/diagnosticContext.ts` (shared with the telemetry firehose in
+ * `src/services/telemetry`). This module owns the Slack-specific
+ * orchestration: dedup, formatting, and the webhook POST.
+ *
+ * Privacy contract: see `diagnosticContext.ts`. The Slack path enriches with
+ * `includeEmail: true` — operators may need to contact the family.
  *
  * Spam prevention contract — count-summary dedup:
  *   - First occurrence sends immediately.
@@ -29,9 +29,13 @@
 
 import { tail } from '@/utils/diagnostics';
 import { slackPost } from '@/utils/slackNotify';
-import { useFamilyStore } from '@/stores/familyStore';
-import { useFamilyContextStore } from '@/stores/familyContextStore';
-import { useSyncStore } from '@/stores/syncStore';
+import {
+  enrichAndRedact,
+  extractStack,
+  getBuildSha,
+  normalizeMessage,
+} from '@/utils/diagnosticContext';
+import { logEvent } from '@/services/telemetry';
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -68,99 +72,6 @@ export function reportError(input: ErrorReportInput): void {
   } finally {
     reentryGuard = false;
   }
-}
-
-// ─── Privacy: context allowlist ──────────────────────────────────────────────
-
-/**
- * The ONLY field names allowed in a Slack-bound context payload. Anything
- * else is dropped + console.warn before send. This is enforced as a unit
- * test contract, so adding a new context field requires explicit opt-in
- * here AND the test continues to pass.
- *
- * Email is the only PII allowed. Family name allowed as identification.
- * Add new fields only after confirming they cannot carry user-typed
- * content (transaction descriptions, activity titles, member names, etc.).
- */
-const ALLOWED_CONTEXT_KEYS = new Set<string>([
-  'family_id',
-  'family_name',
-  'family_email',
-  'route_path',
-  'route_name',
-  'from_path',
-  'action',
-  'error_code',
-  'http_status',
-  'provider_type',
-  'file_id_tail',
-  'invite_token_tail',
-  'build_sha',
-  'browser',
-  'os',
-  'online',
-  'connection_type',
-  'save_failure_level',
-  'drive_file_not_found',
-  'context_build_error',
-  'vue_info',
-  'component',
-  // Silent-refresh diagnostic capture (added 2026-05-14 for the
-  // cold-start-reconnect-escalation surface — see `googleAuth.performSilentRefresh`).
-  // These ship as JSON-serialized arrays/primitives, no user-typed content:
-  // attempt timings, error names/messages from the OAuth proxy, network classifications.
-  'silent_refresh_attempts',
-  'silent_refresh_had_refresh_token',
-  'silent_refresh_consecutive_failures',
-  'page_hidden_for_ms',
-  'visibility_state',
-  // Refresh-token age at the moment of permanent (invalid_grant) failure.
-  // Added 2026-05-20 to detect revocation patterns (Google revoking after N
-  // days of disuse, password change, etc.). Number-of-ms or null when the
-  // token's `issuedAt` is unknown (legacy bare-string IDB / localStorage).
-  'refresh_token_age_ms',
-  // Password-rotation surfaces (changePassword / resetMemberPassword /
-  // signin-heal) — tail of the affected member's UUID lets us correlate
-  // a failure in telemetry to a specific entry in the corrupted envelope
-  // without leaking the full id. Family scoping comes from `family_id`.
-  'member_id_tail',
-]);
-
-const MAX_STRING_LEN = 200;
-
-/**
- * Filter a raw context object to the allowlist. Drops disallowed keys (with
- * a console.warn so devs see the lint signal in dev tools). Truncates
- * string values to 200 chars. Enforces last-4-chars on `*_tail` fields.
- *
- * Exported for testing and for layered contexts that pre-filter before
- * passing through.
- */
-export function redactContext(raw: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  let truncatedAny = false;
-  for (const [key, value] of Object.entries(raw)) {
-    if (!ALLOWED_CONTEXT_KEYS.has(key)) {
-      console.warn('[errorReporter] dropped non-allowlisted context key:', key);
-      continue;
-    }
-    /* eslint-disable security/detect-object-injection -- key is allowlisted above */
-    if (key.endsWith('_tail') && typeof value === 'string') {
-      out[key] = tail(value);
-      continue;
-    }
-    if (typeof value === 'string' && value.length > MAX_STRING_LEN) {
-      out[key] = value.slice(0, MAX_STRING_LEN) + '…';
-      truncatedAny = true;
-      continue;
-    }
-    out[key] = value;
-    /* eslint-enable security/detect-object-injection */
-  }
-  if (truncatedAny) {
-    console.warn('[errorReporter] truncated long string value(s) in context');
-  }
-  return out;
 }
 
 // ─── Spam prevention: count-summary dedup ────────────────────────────────────
@@ -223,25 +134,6 @@ function setStoredFiredAt(key: string, ts: number): void {
     // sessionStorage quota / private-mode — degrade to in-memory dedup only.
   }
 }
-
-/**
- * Normalize a message before bucketing so "nearly identical" errors
- * collapse into a single dedup bucket. The original message still ships
- * to Slack — normalization is for hashing only.
- */
-/* eslint-disable security/detect-unsafe-regex --
-   The patterns below use fixed-length character classes and bounded
-   quantifiers; no catastrophic backtracking is possible. Disabled at
-   the function scope rather than rewriting to less-readable equivalents.
-*/
-export function normalizeMessage(message: string): string {
-  return message
-    .replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, '<uuid>')
-    .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z?/g, '<ts>')
-    .replace(/\b\d{6,}\b/g, '<id>')
-    .replace(/\b[a-f0-9]{8,}\b/gi, '<hex>');
-}
-/* eslint-enable security/detect-unsafe-regex */
 
 function bucketKey(surface: string, message: string): string {
   return `${surface}::${normalizeMessage(message)}`;
@@ -329,11 +221,6 @@ function getWebhookUrl(): string | null {
   return url;
 }
 
-function getBuildSha(): string {
-  if (typeof import.meta === 'undefined') return 'dev';
-  return (import.meta.env?.VITE_BUILD_SHA as string | undefined) ?? 'dev';
-}
-
 /**
  * Send a Slack message via the shared `slackPost` helper. Wraps it so the
  * webhook-URL check + scope tag are consistent across summary + first-fire
@@ -347,11 +234,29 @@ function sendToSlack(payload: { text: string }): void {
 // ─── Report orchestration ────────────────────────────────────────────────────
 
 function handleReport(input: ErrorReportInput): void {
+  // Mirror EVERY reported error into the queryable diagnostic firehose — the
+  // firehose is the complete historical record; Slack is only the critical
+  // subset. Emitted before dedup so suppressed Slack alerts are still logged
+  // (the firehose has its own rate cap). `logEvent` is internally guarded and
+  // never throws, but we belt-and-suspenders wrap it so a hypothetical
+  // telemetry fault can never break the Slack send below.
+  try {
+    logEvent({
+      level: input.severity === 'warning' ? 'warn' : 'error',
+      surface: input.surface,
+      message: input.message,
+      error: input.error,
+      context: input.context,
+    });
+  } catch (e) {
+    console.warn('[errorReporter] telemetry mirror failed', e);
+  }
+
   if (shouldSuppress(input.surface, input.message)) return;
 
   let context: Record<string, unknown>;
   try {
-    context = buildContext(input);
+    context = enrichAndRedact(input, { includeEmail: true });
   } catch (e) {
     console.warn('[errorReporter] context build failed', e);
     context = {
@@ -362,58 +267,6 @@ function handleReport(input: ErrorReportInput): void {
 
   const text = buildSlackMessage(input, context);
   sendToSlack({ text });
-}
-
-/**
- * Read identity + environment context. Wrapped by handleReport's try/catch
- * so a Pinia pre-init race or missing store cannot break the report — the
- * caller falls through to a degraded report with `context_build_error`.
- *
- * Each store/router read is independently try/catched so a single failing
- * subsystem (e.g. Pinia not yet initialized at boot-time error) doesn't
- * lose ALL context — the report still ships with the bits that worked.
- */
-function buildContext(input: ErrorReportInput): Record<string, unknown> {
-  const raw: Record<string, unknown> = {
-    build_sha: getBuildSha(),
-    ...input.context,
-  };
-
-  // Family identity (read once; tolerant of pre-auth state)
-  try {
-    const ctx = useFamilyContextStore();
-    if (ctx.activeFamilyId) raw.family_id = ctx.activeFamilyId;
-    if (ctx.activeFamilyName) raw.family_name = ctx.activeFamilyName;
-  } catch {
-    /* pre-auth, no Pinia, or store error — context is just less rich */
-  }
-  try {
-    const fam = useFamilyStore();
-    const owner = fam.members?.find?.((m) => m.role === 'owner');
-    if (owner?.email) raw.family_email = owner.email;
-  } catch {
-    /* same as above — independent so partial context still ships */
-  }
-
-  // Sync state
-  try {
-    const sync = useSyncStore();
-    raw.provider_type = sync.storageProviderType ?? null;
-    raw.save_failure_level = sync.saveFailureLevel ?? null;
-    raw.drive_file_not_found = sync.driveFileNotFound ?? null;
-  } catch {
-    /* pre-init */
-  }
-
-  // Browser / network — best-effort
-  if (typeof navigator !== 'undefined') {
-    raw.online = navigator.onLine;
-    const conn = (navigator as { connection?: { effectiveType?: string } }).connection;
-    if (conn?.effectiveType) raw.connection_type = conn.effectiveType;
-    raw.browser = navigator.userAgent.slice(0, MAX_STRING_LEN);
-  }
-
-  return redactContext(raw);
 }
 
 // ─── Slack message formatting ────────────────────────────────────────────────
@@ -460,15 +313,6 @@ function buildSummaryPayload(b: BucketState): { text: string } {
   return {
     text: `🔁 *${b.surface}* repeated: \`${b.message}\` fired ${b.count - 1} more times in the last ${DEDUP_WINDOW_MS / 1000}s.`,
   };
-}
-
-function extractStack(err: unknown): string | null {
-  if (!err) return null;
-  if (err instanceof Error && err.stack) {
-    // Trim to first ~12 frames for readability
-    return err.stack.split('\n').slice(0, 12).join('\n');
-  }
-  return null;
 }
 
 function formatContextValue(v: unknown): string {

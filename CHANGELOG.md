@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-20
 
+### Added
+
+- **Full diagnostic logging & telemetry (self-hosted on AWS).** A new `logEvent` tier captures the whole `debug/info/warn/error` diagnostic stream that previously died in the browser console, batches it (offline-aware), and ships it to a new `POST /logs` endpoint → a telemetry Lambda → a 90-day CloudWatch log group we can search with Logs Insights. Every Slack error is now also queryable historically. The firehose is anonymous by design — it correlates by a random family identifier and never carries names, balances, transactions, or email (the allowlist is re-enforced server-side as a safety net). The security Help Center article now discloses this. Activates only after the infrastructure is deployed; until then it's a harmless no-op. See ADR-027.
+
 ### Fixed
 
 - **Fewer "Google session expired" interruptions after overnight tab sleep.** Silent refresh now retries up to 5 times (was 3) with stepped backoff totaling ~22.5 s of patience (was ~4.5 s), enough to survive Chrome desktop's wake-from-sleep network race on Windows. Investigation of the 2026-05-19 morning cascade found zero Lambda invocations during the failure windows — the `fetch()` calls never left the user's machine because the network adapter was still reattaching from sleep. With longer patience, the first wake fetch can fail-and-retry through the reattach window instead of surfacing the reconnect banner.

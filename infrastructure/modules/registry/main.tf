@@ -150,6 +150,16 @@ resource "aws_apigatewayv2_stage" "default" {
   name        = "$default"
   auto_deploy = true
 
+  # Per-route throttle for the telemetry ingest endpoint (telemetry module adds
+  # the `POST /logs` route on this shared API — ADR-027). Keyed by route_key
+  # string, so no cross-module resource dependency. Telemetry is bursty-but-low;
+  # this caps abuse/cost without affecting the registry/oauth routes.
+  route_settings {
+    route_key              = "POST /logs"
+    throttling_burst_limit = 20
+    throttling_rate_limit  = 10
+  }
+
   tags = {
     Name        = "${var.app_name}-registry-default"
     Environment = var.environment
