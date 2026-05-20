@@ -222,9 +222,10 @@ describe('googleAuth (PKCE)', () => {
   describe('initializeAuth', () => {
     it('loads stored refresh token from IndexedDB', async () => {
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
 
       await googleAuth.initializeAuth('family-123');
 
@@ -263,9 +264,10 @@ describe('googleAuth (PKCE)', () => {
 
       // Load a refresh token
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const result = await googleAuth.attemptSilentRefresh();
@@ -283,9 +285,10 @@ describe('googleAuth (PKCE)', () => {
       });
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const { refreshAccessToken } = await import('../oauthProxy');
@@ -313,9 +316,10 @@ describe('googleAuth (PKCE)', () => {
       });
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const { refreshAccessToken } = await import('../oauthProxy');
@@ -400,9 +404,10 @@ describe('googleAuth (PKCE)', () => {
 
     it('returns true after initializeAuth loads a stored token', async () => {
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
       expect(googleAuth.hasRefreshToken()).toBe(true);
     });
@@ -416,7 +421,10 @@ describe('googleAuth (PKCE)', () => {
       });
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
       expect(googleAuth.hasRefreshToken()).toBe(true);
 
@@ -439,9 +447,10 @@ describe('googleAuth (PKCE)', () => {
 
       // Set up refresh token
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const token = await googleAuth.getValidToken();
@@ -463,9 +472,10 @@ describe('googleAuth (PKCE)', () => {
       });
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const { refreshAccessToken } = await import('../oauthProxy');
@@ -492,9 +502,10 @@ describe('googleAuth (PKCE)', () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const { refreshAccessToken } = await import('../oauthProxy');
@@ -513,44 +524,127 @@ describe('googleAuth (PKCE)', () => {
       vi.unstubAllEnvs();
     });
 
-    it('returns null after retrying when transient failure persists (3 attempts with stepped backoff)', async () => {
+    it('returns null after retrying when transient failure persists (5 attempts with stepped backoff)', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const { refreshAccessToken } = await import('../oauthProxy');
       const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
-      // Three transient-error throws — covers all three attempts.
-      refreshFn.mockImplementationOnce(() => {
-        throw new Error('Token refresh failed: network error');
-      });
-      refreshFn.mockImplementationOnce(() => {
-        throw new Error('Token refresh failed: network error');
-      });
-      refreshFn.mockImplementationOnce(() => {
-        throw new Error('Token refresh failed: network error');
-      });
+      // Five transient-error throws — covers all five attempts (initial + 4
+      // retries at 1.5s/3s/6s/12s backoff, 22.5s total). 2026-05-20 widened
+      // from 3 to survive Chrome Windows wake-from-sleep network race.
+      for (let i = 0; i < 5; i++) {
+        refreshFn.mockImplementationOnce(() => {
+          throw new Error('Token refresh failed: network error');
+        });
+      }
 
-      const result = await googleAuth.attemptSilentRefresh();
+      // Fake timers — 22.5s of real-time backoff would exceed any reasonable
+      // test timeout. Pattern matches the escalation test below.
+      vi.useFakeTimers();
+      const promise = googleAuth.attemptSilentRefresh();
+      await vi.advanceTimersByTimeAsync(22_500);
+      const result = await promise;
+      vi.useRealTimers();
+
       expect(result).toBeNull();
-      // Three attempts total (initial + two retries with 1.5s and 3s
-      // backoff), then give up.
-      expect(refreshFn).toHaveBeenCalledTimes(3);
+      expect(refreshFn).toHaveBeenCalledTimes(5);
 
       vi.unstubAllEnvs();
-    }, 10_000);
+    });
+
+    it('retry-loop cumulative backoff is exactly 1.5 + 3 + 6 + 12 = 22.5s', async () => {
+      // Regression guard for A1 (2026-05-20). If anyone changes RETRY_BACKOFF_MS
+      // the cumulative wait should shift visibly. Asserts the loop sleeps
+      // BETWEEN attempts, not after the last one — a 4th sleep after attempt 5
+      // would be a bug.
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
+      await googleAuth.initializeAuth('family-123');
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+      const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
+      for (let i = 0; i < 5; i++) {
+        refreshFn.mockImplementationOnce(() => {
+          throw new Error('Token refresh failed: network error');
+        });
+      }
+
+      vi.useFakeTimers();
+      const promise = googleAuth.attemptSilentRefresh();
+
+      // After 22_499ms, the promise must NOT yet have resolved — the 12s
+      // backoff before attempt 5 hasn't completed. Asserting via a microtask
+      // pulse keeps the wait deterministic.
+      await vi.advanceTimersByTimeAsync(22_499);
+      // refreshFn should have been called <= 4 times so far (attempt 5 is
+      // still mid-sleep at 22_499ms).
+      expect(refreshFn.mock.calls.length).toBeLessThan(5);
+
+      // One more ms ticks the final backoff over → attempt 5 fires and the
+      // loop exits.
+      await vi.advanceTimersByTimeAsync(1);
+      const result = await promise;
+      expect(result).toBeNull();
+      expect(refreshFn).toHaveBeenCalledTimes(5);
+
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    });
+
+    it('MAX_ATTEMPTS cap is at most 5 (cap-protection invariant)', async () => {
+      // Pass 3 §17 / Pass 4 §A2 invariant: extending RETRY_BACKOFF_MS past 4
+      // entries would silently lift the cap into multi-minute "stuck UI"
+      // territory. Cap test catches a future maintainer expanding the array.
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
+      await googleAuth.initializeAuth('family-123');
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+      const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
+      // Queue MANY transient throws — the cap is what stops the loop, not
+      // running out of stubs. We assert refreshFn was called no more than
+      // 5 times.
+      for (let i = 0; i < 20; i++) {
+        refreshFn.mockImplementationOnce(() => {
+          throw new Error('Token refresh failed: network error');
+        });
+      }
+
+      vi.useFakeTimers();
+      const promise = googleAuth.attemptSilentRefresh();
+      // Advance far past any reasonable cumulative backoff so the cap is
+      // what stops us, not a remaining backoff.
+      await vi.advanceTimersByTimeAsync(120_000);
+      await promise;
+      vi.useRealTimers();
+
+      expect(refreshFn.mock.calls.length).toBeLessThanOrEqual(5);
+      vi.unstubAllEnvs();
+    });
 
     it('fires onTokenPermanentlyExpired immediately on invalid_grant — but NOT on a single retry-exhausted transient failure', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const permanentSpy = vi.fn();
@@ -559,26 +653,29 @@ describe('googleAuth (PKCE)', () => {
       const { refreshAccessToken } = await import('../oauthProxy');
       const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
 
+      // Fake timers — 22.5s of stepped backoff per attemptSilentRefresh call.
+      vi.useFakeTimers();
+
       // ONE retry-exhausted transient failure → counter = 1 (below the
-      // escalation threshold of 3). Permanent callback should NOT fire.
-      refreshFn.mockImplementationOnce(() => {
-        throw new Error('Token refresh failed: network error');
-      });
-      refreshFn.mockImplementationOnce(() => {
-        throw new Error('Token refresh failed: network error');
-      });
-      refreshFn.mockImplementationOnce(() => {
-        throw new Error('Token refresh failed: network error');
-      });
-      await googleAuth.attemptSilentRefresh();
+      // escalation threshold of 2). Permanent callback should NOT fire.
+      // Five throws cover the initial + 4 retries at 1.5/3/6/12s.
+      for (let i = 0; i < 5; i++) {
+        refreshFn.mockImplementationOnce(() => {
+          throw new Error('Token refresh failed: network error');
+        });
+      }
+      const p1 = googleAuth.attemptSilentRefresh();
+      await vi.advanceTimersByTimeAsync(22_500);
+      await p1;
       expect(permanentSpy).not.toHaveBeenCalled();
 
       // invalid_grant → permanent callback SHOULD fire immediately, no
       // counter waiting. Re-prime in-memory refreshToken via initializeAuth
       // for a clean slate (the transient path above leaves it intact).
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
       refreshFn.mockImplementationOnce(() => {
         throw new Error('Token refresh failed: invalid_grant');
@@ -586,8 +683,9 @@ describe('googleAuth (PKCE)', () => {
       await googleAuth.attemptSilentRefresh();
       expect(permanentSpy).toHaveBeenCalledTimes(1);
 
+      vi.useRealTimers();
       vi.unstubAllEnvs();
-    }, 10_000);
+    });
 
     it('escalates to onTokenPermanentlyExpired after N consecutive retry-exhausted failures', async () => {
       // Models the bug greg hit: silent refresh kept failing for transient
@@ -599,9 +697,10 @@ describe('googleAuth (PKCE)', () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const permanentSpy = vi.fn();
@@ -609,28 +708,29 @@ describe('googleAuth (PKCE)', () => {
 
       const { refreshAccessToken } = await import('../oauthProxy');
       const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
-      // Queue 9 transient throws — 3 attempts × 3 retries each. We exercise
+      // Queue 15 transient throws — 3 attemptSilentRefresh calls × 5 retries
+      // each (1 initial + 4 retries at 1.5s/3s/6s/12s). We exercise
       // 1 sub-threshold call + 1 threshold-crossing call + 1 past-threshold
       // call. `Once` variants don't leak past their consumed call.
       const queueTransientThrow = () =>
         refreshFn.mockImplementationOnce(() => {
           throw new Error('Token refresh failed: network error');
         });
-      for (let i = 0; i < 9; i++) queueTransientThrow();
+      for (let i = 0; i < 15; i++) queueTransientThrow();
 
-      // Use vi.useFakeTimers to skip the 1.5s + 3s backoff between retries;
-      // otherwise this test would take ~14 real seconds.
+      // Use vi.useFakeTimers to skip the 1.5s/3s/6s/12s backoff between
+      // retries; otherwise each attempt would take ~22.5 real seconds.
       vi.useFakeTimers();
 
       // Call 1 — counter goes 0 → 1. Below threshold (2). No callback yet.
       const p1 = googleAuth.attemptSilentRefresh();
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(22_500);
       expect(await p1).toBeNull();
       expect(permanentSpy).not.toHaveBeenCalled();
 
       // Call 2 — counter = 2, threshold crossed (>= 2), callback fires once.
       const p2 = googleAuth.attemptSilentRefresh();
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(22_500);
       expect(await p2).toBeNull();
       expect(permanentSpy).toHaveBeenCalledTimes(1);
 
@@ -638,7 +738,7 @@ describe('googleAuth (PKCE)', () => {
       // callback DOES fire again on each subsequent failure; subscribers are
       // idempotent (the syncStore subscriber just sets a ref to true).
       const p3 = googleAuth.attemptSilentRefresh();
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(22_500);
       expect(await p3).toBeNull();
       expect(permanentSpy.mock.calls.length).toBeGreaterThanOrEqual(1);
 
@@ -654,9 +754,10 @@ describe('googleAuth (PKCE)', () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const permanentSpy = vi.fn();
@@ -672,10 +773,11 @@ describe('googleAuth (PKCE)', () => {
 
       vi.useFakeTimers();
 
-      // One retry-exhausted failure (counter = 1, below threshold). 3 throws.
-      for (let i = 0; i < 3; i++) queueTransientThrow();
+      // One retry-exhausted failure (counter = 1, below threshold). 5 throws
+      // cover the 5-attempt sequence (1 initial + 4 retries).
+      for (let i = 0; i < 5; i++) queueTransientThrow();
       const p1 = googleAuth.attemptSilentRefresh();
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(22_500);
       await p1;
       expect(permanentSpy).not.toHaveBeenCalled();
 
@@ -686,9 +788,9 @@ describe('googleAuth (PKCE)', () => {
 
       // One more retry-exhausted failure. Counter is now 1 again, NOT 2.
       // Permanent callback must still not have fired.
-      for (let i = 0; i < 3; i++) queueTransientThrow();
+      for (let i = 0; i < 5; i++) queueTransientThrow();
       const p2 = googleAuth.attemptSilentRefresh();
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(22_500);
       await p2;
       expect(permanentSpy).not.toHaveBeenCalled();
 
@@ -702,9 +804,10 @@ describe('googleAuth (PKCE)', () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const expirySpy = vi.fn();
@@ -714,33 +817,38 @@ describe('googleAuth (PKCE)', () => {
 
       const { refreshAccessToken } = await import('../oauthProxy');
       const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
-      // Three Once-mocks cover all three retry attempts. Subsequent tests
-      // see the original factory-default impl restored.
-      refreshFn.mockImplementationOnce(() => {
-        throw new Error('Token refresh failed: network error');
-      });
-      refreshFn.mockImplementationOnce(() => {
-        throw new Error('Token refresh failed: network error');
-      });
-      refreshFn.mockImplementationOnce(() => {
-        throw new Error('Token refresh failed: network error');
-      });
+      // Five Once-mocks cover all five retry attempts (1 initial + 4 retries
+      // at 1.5s/3s/6s/12s, 22.5s total). 2026-05-20 widened from 3 to
+      // survive Windows wake-from-sleep. Subsequent tests see the original
+      // factory-default impl restored.
+      for (let i = 0; i < 5; i++) {
+        refreshFn.mockImplementationOnce(() => {
+          throw new Error('Token refresh failed: network error');
+        });
+      }
 
-      await expect(googleAuth.getValidTokenSilent()).rejects.toThrow('expired');
+      // Fake timers — 22.5s of real backoff would exceed any test timeout.
+      vi.useFakeTimers();
+      const failingCall = expect(googleAuth.getValidTokenSilent()).rejects.toThrow('expired');
+      await vi.advanceTimersByTimeAsync(22_500);
+      await failingCall;
+      vi.useRealTimers();
+
       // Neither registry fires — transient failures don't surface the banner.
       expect(expirySpy).not.toHaveBeenCalled();
       expect(permanentSpy).not.toHaveBeenCalled();
 
       vi.unstubAllEnvs();
-    }, 10_000);
+    });
 
     it('fires onTokenPermanentlyExpired when silent refresh hits invalid_grant', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const permanentSpy = vi.fn();
@@ -770,7 +878,10 @@ describe('googleAuth (PKCE)', () => {
 
       const { getGoogleRefreshToken, clearGoogleRefreshToken } =
         await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       // Acquire a token first (via silent refresh)
@@ -797,7 +908,10 @@ describe('googleAuth (PKCE)', () => {
       });
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-A');
       await googleAuth.attemptSilentRefresh();
 
@@ -822,7 +936,10 @@ describe('googleAuth (PKCE)', () => {
 
       const { getGoogleRefreshToken, clearGoogleRefreshToken } =
         await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-B');
 
       await googleAuth.clearGoogleSessionState();
@@ -842,7 +959,10 @@ describe('googleAuth (PKCE)', () => {
       globalThis.fetch = fetchMock;
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-C');
       await googleAuth.attemptSilentRefresh();
 
@@ -868,7 +988,10 @@ describe('googleAuth (PKCE)', () => {
 
       const { getGoogleRefreshToken, clearGoogleRefreshToken } =
         await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
       // Both clear calls reject (current family + __pending__) — Promise.allSettled
       // should still resolve successfully.
       (clearGoogleRefreshToken as ReturnType<typeof vi.fn>)
@@ -907,9 +1030,10 @@ describe('googleAuth (PKCE)', () => {
     it('removes the subscription when unsub is called', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const cb = vi.fn();
@@ -936,9 +1060,10 @@ describe('googleAuth (PKCE)', () => {
       });
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
 
       const { refreshAccessToken } = await import('../oauthProxy');
       const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
@@ -968,9 +1093,10 @@ describe('googleAuth (PKCE)', () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
 
       const { refreshAccessToken } = await import('../oauthProxy');
       const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
@@ -1026,9 +1152,10 @@ describe('googleAuth (PKCE)', () => {
         });
 
         const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-        (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-          'stored-refresh-token'
-        );
+        (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+          token: 'stored-refresh-token',
+          issuedAt: null,
+        });
         const { refreshAccessToken } = await import('../oauthProxy');
         const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
         refreshFn.mockResolvedValueOnce({
@@ -1070,9 +1197,10 @@ describe('googleAuth (PKCE)', () => {
       googleAuth = await import('../googleAuth');
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       const permanentSpy = vi.fn();
@@ -1080,9 +1208,10 @@ describe('googleAuth (PKCE)', () => {
 
       const { refreshAccessToken } = await import('../oauthProxy');
       const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
-      // 3 throws → one retry-exhausted failure → counter goes 1 → 2,
-      // crosses threshold of 2, escalation fires.
-      for (let i = 0; i < 3; i++) {
+      // 5 throws → one retry-exhausted failure → counter goes 1 → 2,
+      // crosses threshold of 2, escalation fires. 2026-05-20 widened the
+      // backoff to 5 attempts (1 initial + 4 retries at 1.5s/3s/6s/12s).
+      for (let i = 0; i < 5; i++) {
         refreshFn.mockImplementationOnce(() => {
           throw new Error('Token refresh failed: network error');
         });
@@ -1090,7 +1219,7 @@ describe('googleAuth (PKCE)', () => {
 
       vi.useFakeTimers();
       const p = googleAuth.attemptSilentRefresh();
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(22_500);
       await p;
       vi.useRealTimers();
 
@@ -1109,9 +1238,10 @@ describe('googleAuth (PKCE)', () => {
       googleAuth = await import('../googleAuth');
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'stored-refresh-token'
-      );
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-123');
 
       // The default factory mock returns a successful refresh.
@@ -1195,7 +1325,10 @@ describe('googleAuth (PKCE)', () => {
       googleAuth.onTokenAcquired(subscriber);
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-int-silent');
 
       await googleAuth.attemptSilentRefresh();
@@ -1217,7 +1350,10 @@ describe('googleAuth (PKCE)', () => {
       googleAuth.onTokenAcquired(subscriber);
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-X');
 
       await googleAuth.attemptSilentRefresh();
@@ -1244,7 +1380,10 @@ describe('googleAuth (PKCE)', () => {
       googleAuth.onTokenAcquired(good);
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-Y');
       await googleAuth.attemptSilentRefresh();
       await new Promise((r) => setTimeout(r, 10));
@@ -1267,7 +1406,10 @@ describe('googleAuth (PKCE)', () => {
       unsub();
 
       const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
       await googleAuth.initializeAuth('family-Z');
       await googleAuth.attemptSilentRefresh();
       await new Promise((r) => setTimeout(r, 10));
@@ -1283,17 +1425,24 @@ describe('googleAuth (PKCE)', () => {
       const { getGoogleRefreshToken, storeGoogleRefreshToken, clearGoogleRefreshToken } =
         await import('@/services/sync/fileHandleStore');
 
-      // Simulate a pending token stored during login-page OAuth
-      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        'pending-refresh-token'
-      );
+      // Simulate a pending token stored during login-page OAuth. New shape:
+      // the reader returns StoredRefreshToken; bare-string legacy entries
+      // come back as { token, issuedAt: null }. migratePendingRefreshToken
+      // forwards `issuedAt` literally — including null.
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'pending-refresh-token',
+        issuedAt: null,
+      });
 
       await googleAuth.migratePendingRefreshToken('family-456');
 
       // Should read from the pending key
       expect(getGoogleRefreshToken).toHaveBeenCalledWith('__pending__');
-      // Should store under the family key
-      expect(storeGoogleRefreshToken).toHaveBeenCalledWith('family-456', 'pending-refresh-token');
+      // Should store under the family key, carrying issuedAt forward (null
+      // here — never coerced to Date.now() for a legacy pending entry).
+      expect(storeGoogleRefreshToken).toHaveBeenCalledWith('family-456', 'pending-refresh-token', {
+        issuedAt: null,
+      });
       // Should clear the pending key
       expect(clearGoogleRefreshToken).toHaveBeenCalledWith('__pending__');
     });

@@ -114,6 +114,11 @@ const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'silent_refresh_consecutive_failures',
   'page_hidden_for_ms',
   'visibility_state',
+  // Refresh-token age at the moment of permanent (invalid_grant) failure.
+  // Added 2026-05-20 to detect revocation patterns (Google revoking after N
+  // days of disuse, password change, etc.). Number-of-ms or null when the
+  // token's `issuedAt` is unknown (legacy bare-string IDB / localStorage).
+  'refresh_token_age_ms',
   // Password-rotation surfaces (changePassword / resetMemberPassword /
   // signin-heal) — tail of the affected member's UUID lets us correlate
   // a failure in telemetry to a specific entry in the corrupted envelope
