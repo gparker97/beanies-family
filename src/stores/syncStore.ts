@@ -35,7 +35,6 @@ import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvid
 import { LocalStorageProvider } from '@/services/sync/providers/localProvider';
 import {
   initializeAuth,
-  migratePendingRefreshToken,
   requestAccessToken,
   onTokenPermanentlyExpired,
   onTokenAcquired,
@@ -816,10 +815,11 @@ export const useSyncStore = defineStore('sync', () => {
         await familyCtx.switchFamily(activeFamilyId);
       }
 
-      // Bind Google Auth to this family and migrate any pending refresh token
+      // Bind Google Auth to this family. initializeAuth now performs the
+      // guarded pending→family migration itself (single source of truth), so
+      // no separate migratePendingRefreshToken call is needed here.
       if (activeFamilyId && pending.driveFileId) {
         await initializeAuth(activeFamilyId);
-        await migratePendingRefreshToken(activeFamilyId);
       }
 
       // If loaded from Google Drive, persist the config
@@ -1314,10 +1314,11 @@ export const useSyncStore = defineStore('sync', () => {
         await familyCtx.switchFamily(activeFamilyId);
       }
 
-      // Bind Google Auth to this family and migrate any pending refresh token
+      // Bind Google Auth to this family. initializeAuth now performs the
+      // guarded pending→family migration itself (single source of truth), so
+      // no separate migratePendingRefreshToken call is needed here.
       if (activeFamilyId && pending.driveFileId) {
         await initializeAuth(activeFamilyId);
-        await migratePendingRefreshToken(activeFamilyId);
       }
 
       // If loaded from Google Drive, persist the config

@@ -57,14 +57,17 @@ describe('useGoogleReconnect', () => {
     expect(isReconnecting.value).toBe(false);
   });
 
-  it('uses forceConsent: false when refresh token exists', async () => {
+  it('always forces consent on the popup path, even when a refresh token exists', async () => {
+    // Regression guard for the 2026-05-20 fix: a stale stored token must NOT
+    // suppress consent — otherwise Google uses prompt=select_account and returns
+    // no new refresh token (the reconnect-every-launch bug).
     const { hasRefreshToken, requestAccessToken } = await import('@/services/google/googleAuth');
     (hasRefreshToken as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
 
     const { reconnect } = useGoogleReconnect();
     await reconnect();
 
-    expect(requestAccessToken).toHaveBeenCalledWith({ forceConsent: false });
+    expect(requestAccessToken).toHaveBeenCalledWith({ forceConsent: true });
   });
 
   it('routes through startRedirectAuth on standalone PWAs', async () => {
