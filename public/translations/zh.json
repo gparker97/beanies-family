@@ -12832,9 +12832,9 @@
       "lastUpdated": "2026-04-30"
     },
     "storage.localFileBestOnDesktop": {
-      "translation": "在手机上，或在Safari和Firefox中，每次打开应用程序时，您都会重新选择文件。",
-      "hash": "i2yuuv",
-      "lastUpdated": "2026-05-13"
+      "translation": "本地文件仅适用于电脑上的Chrome或Edge。在手机上，或在Safari或Firefox中，选择Google云端硬盘。",
+      "hash": "e7ox83",
+      "lastUpdated": "2026-05-21"
     },
     "error.travelSegmentNotFound": {
       "translation": "我们无法打开该行程",
