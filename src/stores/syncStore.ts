@@ -558,9 +558,11 @@ export const useSyncStore = defineStore('sync', () => {
    * For V4 files: parses envelope, tries to unlock with cached FK or password.
    * @param options.merge - If true, CRDT merge remote doc with local doc.
    */
-  async function loadFromFile(
-    options: { merge?: boolean } = {}
-  ): Promise<{ success: boolean; needsPassword?: boolean }> {
+  async function loadFromFile(options: { merge?: boolean } = {}): Promise<{
+    success: boolean;
+    needsPassword?: boolean;
+    reason?: 'auth' | 'not-found' | 'error';
+  }> {
     const merging = !!options.merge;
 
     if (merging) {
@@ -580,7 +582,7 @@ export const useSyncStore = defineStore('sync', () => {
             showSaveFailureBanner.value = true;
             stopFilePolling();
           }
-          return { success: false };
+          return { success: false, reason: 'not-found' };
         }
         // Don't fire showGoogleReconnect here. Real auth failures are surfaced
         // by the expiry-callback chain (`setupTokenExpiryHandler`) — that's
@@ -594,7 +596,14 @@ export const useSyncStore = defineStore('sync', () => {
             lastError
           );
         }
-        return { success: false };
+        // Classify the failure so the sign-in flow (LoginPage.handleFamilySelected)
+        // can offer a focused reconnect for an expired/absent token instead of the
+        // generic provider+file picker. `isAuthTransientSyncError` is the single
+        // matcher for the TokenExpiredError "silent refresh failed" message shape.
+        return {
+          success: false,
+          reason: isAuthTransientSyncError(lastError) ? 'auth' : 'error',
+        };
       }
 
       const version = detectFileVersion(text);
@@ -2117,7 +2126,11 @@ export const useSyncStore = defineStore('sync', () => {
   async function loadFromGoogleDrive(
     fileId: string,
     driveFileName: string
-  ): Promise<{ success: boolean; needsPassword?: boolean }> {
+  ): Promise<{
+    success: boolean;
+    needsPassword?: boolean;
+    reason?: 'auth' | 'not-found' | 'error';
+  }> {
     // Defensive: clear any banner state left over from a prior session.
     // Sign-out should have done this via resetState(), but if we're here we
     // know the user has a fresh interactive token in hand — there's no
@@ -2152,13 +2165,13 @@ export const useSyncStore = defineStore('sync', () => {
       const text = await provider.read();
       if (!text) {
         error.value = 'File is empty';
-        return { success: false };
+        return { success: false, reason: 'error' };
       }
 
       const version = detectFileVersion(text);
       if (version !== '4.0') {
         error.value = `Unsupported file version: ${version ?? 'unknown'}`;
-        return { success: false };
+        return { success: false, reason: 'error' };
       }
 
       const env = parseBeanpodV4(text);
@@ -2186,7 +2199,15 @@ export const useSyncStore = defineStore('sync', () => {
       return { success: false, needsPassword: true };
     } catch (e) {
       error.value = (e as Error).message;
-      return { success: false };
+      // Classify a missing/inaccessible file structurally (not by message text):
+      // loadFromGoogleDrive bypasses syncService.load(), so `error.value` holds
+      // the RAW Drive message WITHOUT the `DriveApiError:404:` prefix that
+      // syncService.load() would add. Mirrors the idiom used in the
+      // reload-if-changed catch above. The reconnect flow branches on this
+      // `reason` to fall back to the file picker when the known file is gone.
+      const reason: 'not-found' | 'error' =
+        e instanceof DriveApiError && e.status === 404 ? 'not-found' : 'error';
+      return { success: false, reason };
     } finally {
       // Only restore to idle if WE set it — otherwise a caller that wrapped
       // us in their own critical section (e.g. a future orchestrator) keeps

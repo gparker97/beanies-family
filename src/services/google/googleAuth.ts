@@ -1027,6 +1027,12 @@ export function hasRefreshToken(): boolean {
  * Google popup.
  */
 export class TokenExpiredError extends Error {
+  // CLASSIFICATION CONTRACT: the message must contain "silent refresh failed".
+  // syncStore's `isAuthTransientSyncError` (/silent refresh failed/i) matches it
+  // to classify a failed `loadFromFile()` as a token-expiry so the sign-in flow
+  // can offer a focused reconnect. The explicit-message variant in
+  // googleDriveProvider.read() ("…token rejected and silent refresh failed")
+  // shares the phrase. Keep the phrase if you change this message.
   constructor(message = 'Google access token expired and silent refresh failed') {
     super(message);
     this.name = 'TokenExpiredError';
