@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Assignee dropdowns no longer get cut off near the bottom of a section.** On the Nook and To-do pages, the "who" (assignee) picker is clipped when the quick-add row sits near the bottom of its card. The popover now renders above everything and tracks its button (flipping upward when there's no room below) — the same overflow-safe behaviour the date picker already had.
 - **Opening Help from the installed app no longer traps you in a redirect loop.** On the installed PWA (home-screen app), tapping **Help** in the sidebar or the account menu used to ping-pong the app between the marketing site and the app forever. Help now opens the Help Center in a normal browser tab — exactly as it always has in a regular browser. (The app hands external links to the system browser instead of opening them in-place, and the marketing site no longer re-redirects a standalone visitor that has already been bounced once.)
 
 ## 2026-05-20
