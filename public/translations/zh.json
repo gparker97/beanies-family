@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-21",
-    "translationCount": 2921
+    "translationCount": 2922
   },
   "translations": {
     "app.name": {
@@ -14609,6 +14609,11 @@
     "auth.localFileUnsupported": {
       "translation": "此浏览器无法加载本地文件。请改用Google云端硬盘（在此处工作并同步到您的家人） ，或在Chrome或Edge中打开beanies.family。",
       "hash": "1585a5",
+      "lastUpdated": "2026-05-21"
+    },
+    "settings.adminOnly": {
+      "translation": "只有家庭管理员可以更改此设置。询问是否需要更新。",
+      "hash": "x4lok",
       "lastUpdated": "2026-05-21"
     }
   }

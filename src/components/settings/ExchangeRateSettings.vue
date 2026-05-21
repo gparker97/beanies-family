@@ -5,7 +5,10 @@ import { useExchangeRates } from '@/composables/useExchangeRates';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { useSettingsStore } from '@/stores/settingsStore';
 
-const props = withDefaults(defineProps<{ standalone?: boolean }>(), { standalone: true });
+const props = withDefaults(defineProps<{ standalone?: boolean; readOnly?: boolean }>(), {
+  standalone: true,
+  readOnly: false,
+});
 
 const settingsStore = useSettingsStore();
 const {
@@ -31,6 +34,7 @@ async function handleRefresh() {
 }
 
 async function toggleAutoUpdate() {
+  if (props.readOnly) return; // defense in depth — the toggle also renders disabled
   await setAutoUpdate(!autoUpdateEnabled.value);
 }
 
@@ -70,7 +74,12 @@ function formatRate(rate: number): string {
             Rates may be outdated
           </p>
         </div>
-        <BaseButton variant="secondary" size="sm" :disabled="isUpdating" @click="handleRefresh">
+        <BaseButton
+          variant="secondary"
+          size="sm"
+          :disabled="isUpdating || props.readOnly"
+          @click="handleRefresh"
+        >
           <span v-if="isUpdating" class="flex items-center gap-2">
             <img
               src="/brand/beanies_spinner_transparent_192x192.png"
@@ -103,9 +112,11 @@ function formatRate(rate: number): string {
           type="button"
           role="switch"
           :aria-checked="autoUpdateEnabled"
+          :disabled="props.readOnly"
           :class="[
-            'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none',
+            'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none',
             autoUpdateEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700',
+            props.readOnly ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           ]"
           @click="toggleAutoUpdate"
         >
@@ -171,7 +182,12 @@ function formatRate(rate: number): string {
           />
         </svg>
         <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">No exchange rates loaded yet</p>
-        <BaseButton variant="secondary" size="sm" :disabled="isUpdating" @click="handleRefresh">
+        <BaseButton
+          variant="secondary"
+          size="sm"
+          :disabled="isUpdating || props.readOnly"
+          @click="handleRefresh"
+        >
           Fetch Rates
         </BaseButton>
       </div>

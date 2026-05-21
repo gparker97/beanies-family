@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-21
 
+### Changed
+
+- **Family-shared settings are now admin-only.** Base currency, preferred currencies, exchange rates, home country, the public-holidays toggle, and week-start day all affect the whole pod — so only family admins (members with "manage family" permission, plus the owner) can change them now. Everyone else can still _see_ the current values (the controls show as read-only with a short "only a family admin can change this" note) but can't alter them. Personal, device-only preferences — theme, text size, language, trusted-device — stay changeable by everyone, and viewing/editing your own account is unaffected.
+
 ### Fixed
 
 - **Creating a family with a local file in Firefox now explains itself instead of failing silently.** Firefox (and Safari) don't support the browser API local files require, so the setup wizard's "use a local file" option could only ever show "Failed to create file. Please try again." — and trying again gave the same result. It now shows a clear, actionable message: this browser can't save local files, so use Google Drive (it works here and syncs to your family) or open beanies.family in Chrome or Edge. Applies to both the create-family wizard and the resume-setup recovery screen. The same guidance now appears when _loading_ an existing local file in those browsers, instead of opening a file that could never save changes back. Also corrected the local-file setup warning, which wrongly implied local files work-but-degraded ("re-pick the file every time") in Safari and Firefox — they're simply not supported there.
