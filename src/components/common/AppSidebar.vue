@@ -11,6 +11,7 @@ import { useNavBadges, type NavBadge as NavBadgeType } from '@/composables/useNa
 import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useTranslation } from '@/composables/useTranslation';
 import { isRouteActive } from '@/utils/route';
+import { openExternal } from '@/utils/openExternal';
 import {
   NAV_SECTIONS,
   TREEHOUSE_ITEMS,
@@ -83,7 +84,7 @@ function isParentActive(item: MappedNavItem): boolean {
 
 function navigateTo(item: MappedNavItem) {
   if (item.external && item.externalUrl) {
-    window.open(item.externalUrl, '_blank', 'noopener,noreferrer');
+    openExternal(item.externalUrl);
     return;
   }
   router.push(item.path);

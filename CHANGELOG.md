@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-21
+
+### Fixed
+
+- **Opening Help from the installed app no longer traps you in a redirect loop.** On the installed PWA (home-screen app), tapping **Help** in the sidebar or the account menu used to ping-pong the app between the marketing site and the app forever. Help now opens the Help Center in a normal browser tab — exactly as it always has in a regular browser. (The app hands external links to the system browser instead of opening them in-place, and the marketing site no longer re-redirects a standalone visitor that has already been bounced once.)
+
 ## 2026-05-20
 
 ### Changed

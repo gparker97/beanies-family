@@ -28,6 +28,7 @@ import { showToast } from '@/composables/useToast';
 import { isTemporaryEmail } from '@/utils/email';
 import { formatDateFull } from '@/utils/date';
 import { MARKETING_URL } from '@/utils/marketing';
+import { openExternal } from '@/utils/openExternal';
 import { safeServiceWorkerUpdate } from '@/utils/safeServiceWorkerUpdate';
 import { hardReload } from '@/utils/hardReload';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -155,7 +156,7 @@ function handleOpenSettings() {
 
 function handleOpenHelp() {
   showProfileDropdown.value = false;
-  window.open(`${MARKETING_URL}/help`, '_blank', 'noopener,noreferrer');
+  openExternal(`${MARKETING_URL}/help`);
 }
 
 const isRefreshing = ref(false);
