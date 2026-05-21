@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
-- **Family-shared settings are now admin-only.** Base currency, preferred currencies, exchange rates, home country, the public-holidays toggle, and week-start day all affect the whole pod — so only family admins (members with "manage family" permission, plus the owner) can change them now. Everyone else can still _see_ the current values (the controls show as read-only with a short "only a family admin can change this" note) but can't alter them. Personal, device-only preferences — theme, text size, language, trusted-device — stay changeable by everyone, and viewing/editing your own account is unaffected.
+- **Family-shared settings are now admin-only.** Base currency, preferred currencies, the exchange-rate auto-update preference, home country, the public-holidays toggle, and week-start day all affect the whole pod — so only family admins (members with "manage family" permission, plus the owner) can change them now. Everyone else can still _see_ the current values (the controls show as read-only with a short "only a family admin can change this" note) but can't alter them. Manually refreshing exchange rates stays open to everyone — it just pulls current rates and isn't a config change. Personal, device-only preferences — theme, text size, language, trusted-device — stay changeable by everyone, and viewing/editing your own account is unaffected.
 
 ### Fixed
 
