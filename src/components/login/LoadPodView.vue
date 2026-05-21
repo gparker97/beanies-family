@@ -14,6 +14,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { getGoogleAccountEmail } from '@/services/google/googleAuth';
+import { supportsFileSystemAccess } from '@/services/sync/capabilities';
 import {
   isPlatformAuthenticatorAvailable,
   hasRegisteredPasskeys,
@@ -238,6 +239,18 @@ async function handleGrantPermission() {
 
 async function handleLoadFile() {
   formError.value = null;
+
+  // Local files need the File System Access API (Chromium-only). In Firefox/
+  // Safari there's no writable handle, so even if we read the file via the
+  // input fallback, edits could never save back to it — a silent dead-end.
+  // Block here at the onboarding entry and steer to Drive / Chrome / Edge,
+  // matching the create flow. (Settings → manual import keeps its own fallback
+  // for advanced recovery, where the user already has a pod open.)
+  if (!supportsFileSystemAccess()) {
+    formError.value = t('auth.localFileUnsupported');
+    return;
+  }
+
   isLoadingFile.value = true;
 
   try {
