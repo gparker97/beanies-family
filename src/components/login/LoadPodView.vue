@@ -13,7 +13,8 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { getGoogleAccountEmail } from '@/services/google/googleAuth';
+import { getGoogleAccountEmail, shouldUseRedirectAuth } from '@/services/google/googleAuth';
+import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 import { supportsFileSystemAccess } from '@/services/sync/capabilities';
 import {
   isPlatformAuthenticatorAvailable,
@@ -34,6 +35,13 @@ const props = defineProps<{
   forceNewGoogleAccount?: boolean;
   loadError?: string;
   providerHint?: 'local' | 'google_drive';
+  /**
+   * When set, the picked family's pod lives on Google Drive at this exact
+   * file but the token is gone (post-sign-out). Renders the focused
+   * "reconnect to load <family>" panel instead of the generic storage cards —
+   * one consent, then load this fileId directly (no list, no picker).
+   */
+  reconnectDriveFile?: { fileId: string; fileName: string; familyName?: string };
   crossDeviceContext?: {
     crossDevice: true;
     memberId: string;
@@ -49,11 +57,6 @@ const emit = defineEmits<{
   'request-create': [];
 }>();
 
-// TODO(state-machine-refactor): consolidate isLoadingFile / needsPermissionGrant /
-// showDecryptModal / showDriveEmptyState / lastDriveCheckEmpty / selectedSource
-// into a single discriminated-union viewState ('auto-loading' | 'permission-grant'
-// | 'decrypt' | 'empty' | 'cards'). Independent booleans with implicit
-// exclusivity rules are workable today but heading toward unmaintainable.
 const isLoadingFile = ref(false);
 const formError = ref<string | null>(null);
 const showDecryptModal = ref(false);
@@ -450,6 +453,90 @@ const isDriveLoading = ref(false);
 
 const showDriveEmptyState = ref(false);
 
+// ── View state machine ────────────────────────────────────────────────────
+// Single source of truth for which top-level panel renders. Derived from the
+// existing mode inputs (refs + props) with an explicit, total precedence — the
+// booleans still drive *when* each becomes true at their existing transition
+// points; this only consolidates *which one wins* so the template reads one
+// value instead of a fragile overlapping v-if chain. Precedence reproduces the
+// pre-refactor render order exactly: outer decrypt > (reconnect) > the inner
+// chain isLoadingFile → needsPermissionGrant → showDriveEmptyState → cards.
+// NOTE: `decrypt` keys off `showDecryptModal` ALONE, never `hasPendingEncryptedFile`
+// — several flows stage a pending file with the modal closed so the biometric
+// handoff can take over; deriving decrypt from the pending file would render the
+// password panel over biometric. `lastDriveCheckEmpty`/`selectedSource` are
+// card-local sub-state (dim the Drive card / show the local drop-zone), not
+// modes, so they are intentionally NOT variants here.
+// `reconnectDismissed` lets the 404 fallback leave reconnect mode locally (the
+// `reconnectDriveFile` prop is owned by the parent and can't be cleared here).
+const reconnectDismissed = ref(false);
+const viewState = computed<
+  'decrypt' | 'reconnect' | 'auto-loading' | 'permission-grant' | 'empty' | 'cards'
+>(() => {
+  if (showDecryptModal.value) return 'decrypt';
+  if (props.reconnectDriveFile && !reconnectDismissed.value) return 'reconnect';
+  if (isLoadingFile.value) return 'auto-loading';
+  if (props.needsPermissionGrant) return 'permission-grant';
+  if (showDriveEmptyState.value) return 'empty';
+  return 'cards';
+});
+
+// LoginPage always supplies the picked family's name; `?? ''` is a defensive
+// floor that never triggers in practice.
+const reconnectHeadline = computed(() =>
+  t('loginV6.reconnectToLoad').replace('{familyName}', props.reconnectDriveFile?.familyName ?? '')
+);
+
+const { reconnectError, reconnect } = useGoogleReconnect();
+// True for the WHOLE reconnect→load sequence (consent + reading/staging the
+// file), so the reconnect button stays disabled + spinning the entire time it's
+// visible — a user can't double-tap it and trigger a second Google consent.
+const isReconnectBusy = ref(false);
+
+/**
+ * Token-aware reconnect: acquire a fresh Google token (popup on desktop, full-
+ * page redirect on iOS/PWA via `useGoogleReconnect`), then load the KNOWN Drive
+ * file directly — no `listGoogleDriveFiles`, no picker. On success it leaves the
+ * reconnect panel immediately so the loading spinner (not a re-tappable button)
+ * covers the read/decrypt-prep. If the known file is gone (404), it falls back
+ * to the existing picker.
+ */
+async function handleReconnectAndLoad() {
+  const file = props.reconnectDriveFile;
+  if (!file) return;
+  formError.value = null;
+  isReconnectBusy.value = true;
+  try {
+    const ok = await reconnect(syncStore.providerAccountEmail ?? undefined);
+
+    // On iOS/PWA `reconnect()` triggered a full-page redirect; the page is
+    // navigating away and LoginPage re-runs the silent auto-load on return.
+    if (shouldUseRedirectAuth()) return;
+
+    if (!ok) {
+      // Stay on the reconnect panel so the user can try again.
+      formError.value = reconnectError.value || t('googleDrive.reconnectFailed');
+      return;
+    }
+
+    // Token in hand. Leave the reconnect panel NOW so the loading spinner — not
+    // the static button — covers the read. `handleDriveFileSelected` flips
+    // `isLoadingFile` synchronously before its first await, so the view goes
+    // reconnect → 'auto-loading' spinner → 'decrypt' with no flash and no
+    // re-tappable button in between.
+    reconnectDismissed.value = true;
+    const result = await handleDriveFileSelected({ fileId: file.fileId, fileName: file.fileName });
+
+    // Known file vanished (404) → picker fallback (reconnect already dismissed;
+    // the Drive "not found" message is on formError).
+    if (result?.reason === 'not-found') {
+      await handleLoadFromGoogleDrive();
+    }
+  } finally {
+    isReconnectBusy.value = false;
+  }
+}
+
 // Tooltip on the disabled Drive card. Branches on which gate is failing so
 // the user gets actionable guidance (set VITE_GOOGLE_CLIENT_ID vs set the
 // OAuth proxy). syncStore.isGoogleDriveAvailable is the canonical "Drive is
@@ -548,7 +635,11 @@ function handleLoadLocalFromEmptyState() {
   selectedSource.value = 'local';
 }
 
-async function handleDriveFileSelected(payload: { fileId: string; fileName: string }) {
+async function handleDriveFileSelected(payload: { fileId: string; fileName: string }): Promise<{
+  success: boolean;
+  needsPassword?: boolean;
+  reason?: 'auth' | 'not-found' | 'error';
+}> {
   showDrivePicker.value = false;
   isLoadingFile.value = true;
   formError.value = null;
@@ -573,8 +664,12 @@ async function handleDriveFileSelected(payload: { fileId: string; fileName: stri
     } else if (syncStore.error) {
       formError.value = syncStore.error;
     }
+    // Return the load result so the reconnect caller can branch on `reason`
+    // (a 404 → picker fallback). The picker `@select` caller ignores it.
+    return result;
   } catch {
     formError.value = syncStore.error || t('googleDrive.loadError');
+    return { success: false, reason: 'error' as const };
   } finally {
     isLoadingFile.value = false;
   }
@@ -609,7 +704,7 @@ async function handleDriveRefresh() {
          Inline Sign-In form (when file is loaded and needs password)
          Replaces the storage cards entirely — no modal overlay.
          ═══════════════════════════════════════════════════════════ -->
-    <template v-if="showDecryptModal">
+    <template v-if="viewState === 'decrypt'">
       <div class="text-center">
         <!-- Beanie icon -->
         <img
@@ -758,14 +853,45 @@ async function handleDriveRefresh() {
         {{ formError }}
       </div>
 
+      <!-- Reconnect-to-known-Drive-file state — the token's gone but we know
+           the exact pod file. One consent, then load it directly (no provider
+           cards, no file picker). Mirrors the permission-grant card below. -->
+      <div v-if="viewState === 'reconnect'" class="space-y-4">
+        <div
+          class="rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center dark:border-slate-600"
+        >
+          <div
+            class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/30"
+          >
+            <svg
+              class="h-7 w-7 text-amber-600 dark:text-amber-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+          </div>
+          <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">{{ reconnectHeadline }}</p>
+          <BaseButton class="w-full" :loading="isReconnectBusy" @click="handleReconnectAndLoad">
+            {{ t('googleDrive.reconnect') }}
+          </BaseButton>
+        </div>
+      </div>
+
       <!-- Loading state (only for auto-load and permission grant) -->
-      <div v-if="isLoadingFile" class="py-12 text-center">
+      <div v-else-if="viewState === 'auto-loading'" class="py-12 text-center">
         <BeanieSpinner size="md" class="mx-auto mb-3" />
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('auth.loadingFile') }}</p>
       </div>
 
       <!-- Permission reconnect state -->
-      <div v-else-if="needsPermissionGrant" class="space-y-4">
+      <div v-else-if="viewState === 'permission-grant'" class="space-y-4">
         <div
           class="rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center dark:border-slate-600"
         >
@@ -801,7 +927,7 @@ async function handleDriveRefresh() {
            place — try Create") rather than an error, and removes the
            magnetic Drive card that fed the original loop. -->
       <NoPodEmptyState
-        v-else-if="showDriveEmptyState"
+        v-else-if="viewState === 'empty'"
         :account-email="getGoogleAccountEmail() ?? undefined"
         @create="emit('request-create')"
         @switch-account="handleDriveSwitchAccount"

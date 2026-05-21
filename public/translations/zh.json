@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-21",
-    "translationCount": 2922
+    "translationCount": 2923
   },
   "translations": {
     "app.name": {
@@ -14614,6 +14614,11 @@
     "settings.adminOnly": {
       "translation": "只有家庭管理员可以更改此设置。询问是否需要更新。",
       "hash": "x4lok",
+      "lastUpdated": "2026-05-21"
+    },
+    "loginV6.reconnectToLoad": {
+      "translation": "重新连接到Google以加载{familyName}",
+      "hash": "r0syqb",
       "lastUpdated": "2026-05-21"
     }
   }

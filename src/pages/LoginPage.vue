@@ -62,6 +62,12 @@ const crossDeviceContext = ref<{
 const forceNewGoogleAccount = ref(false);
 const loadError = ref<string | undefined>();
 const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
+/**
+ * When set, hand `LoadPodView` a known Drive pod to reconnect-and-load directly
+ * (token expired on a Drive family — see `handleFamilySelected`'s `'auth'` branch).
+ * Always cleared via `resetLoadPodState()` so it can't leak across navigations.
+ */
+const reconnectDriveFile = ref<{ fileId: string; fileName: string; familyName?: string }>();
 const isSingleFamilyAutoSelect = ref(false);
 const inviteGateLocked = ref(features.inviteGate);
 
@@ -317,6 +323,30 @@ function providerErrorMessage(hint: 'local' | 'google_drive' | undefined): strin
 }
 
 /**
+ * Clear the whole LoadPodView intent group so no stale mode leaks across a
+ * navigation. The single reset site for `reconnectDriveFile` (the rest are
+ * historically hand-set; routing the new ref through here keeps it honest).
+ * Does NOT touch `forceNewGoogleAccount` — that's an orthogonal "force the
+ * account chooser" flag the caller manages.
+ */
+function resetLoadPodState() {
+  autoLoadPod.value = false;
+  needsPermissionGrant.value = false;
+  biometricDeclined.value = false;
+  loadError.value = undefined;
+  loadErrorProviderHint.value = undefined;
+  reconnectDriveFile.value = undefined;
+}
+
+/** Show LoadPodView's generic provider+file picker with an error for `hint`. */
+function enterGenericLoadFallback(hint: 'local' | 'google_drive' | undefined) {
+  resetLoadPodState();
+  loadError.value = providerErrorMessage(hint);
+  loadErrorProviderHint.value = hint;
+  activeView.value = 'load-pod';
+}
+
+/**
  * Handle family selection from FamilyPickerView.
  * Routes to biometric (if passkeys), attempts auto-load, or falls back to load-pod.
  */
@@ -333,9 +363,8 @@ async function handleFamilySelected(payload: {
     await syncStore.initialize();
   }
 
-  // Reset error state
-  loadError.value = undefined;
-  loadErrorProviderHint.value = undefined;
+  // Clear any stale LoadPodView intent (incl. reconnectDriveFile) before routing.
+  resetLoadPodState();
 
   if (payload.hasPasskeys) {
     // Go to biometric login (pre-load file)
@@ -362,24 +391,24 @@ async function handleFamilySelected(payload: {
           activeView.value = 'load-pod';
         }
       } else {
-        // Load failed for other reasons — fall back with error
-        const hint = toProviderHint(payload.providerConfig);
-        loadError.value = providerErrorMessage(hint);
-        loadErrorProviderHint.value = hint;
-        autoLoadPod.value = false;
-        needsPermissionGrant.value = false;
-        biometricDeclined.value = false;
-        activeView.value = 'load-pod';
+        // Auto-load failed. If the token is gone on a Drive family, offer a
+        // focused reconnect that loads the known file directly (no provider
+        // cards, no file picker); otherwise the generic provider+file picker.
+        const cfg = payload.providerConfig;
+        if (loadResult.reason === 'auth' && cfg?.type === 'google_drive' && cfg.driveFileId) {
+          reconnectDriveFile.value = {
+            fileId: cfg.driveFileId,
+            fileName: cfg.driveFileName ?? `${payload.name}.beanpod`,
+            familyName: payload.name,
+          };
+          activeView.value = 'load-pod';
+        } else {
+          enterGenericLoadFallback(toProviderHint(cfg));
+        }
       }
     } catch {
-      // File moved/deleted/corrupt — fall back with error
-      const hint = toProviderHint(payload.providerConfig);
-      loadError.value = providerErrorMessage(hint);
-      loadErrorProviderHint.value = hint;
-      autoLoadPod.value = false;
-      needsPermissionGrant.value = false;
-      biometricDeclined.value = false;
-      activeView.value = 'load-pod';
+      // Unexpected throw (file moved/deleted/corrupt, etc.) — generic fallback.
+      enterGenericLoadFallback(toProviderHint(payload.providerConfig));
     }
   } else if (syncStore.isConfigured && syncStore.needsPermission) {
     // File configured but needs permission — go to load-pod with permission grant UI
@@ -401,15 +430,13 @@ async function handleFamilySelected(payload: {
  * Forces Google account chooser when loading via Drive.
  */
 function handleLoadDifferentFile() {
+  resetLoadPodState();
   forceNewGoogleAccount.value = true;
-  autoLoadPod.value = false;
-  needsPermissionGrant.value = false;
-  biometricDeclined.value = false;
   activeView.value = 'load-pod';
 }
 
 function handleNavigate(view: 'load-pod' | 'create' | 'join') {
-  biometricDeclined.value = false;
+  resetLoadPodState();
   forceNewGoogleAccount.value = false;
 
   if (view === 'load-pod') {
@@ -420,12 +447,7 @@ function handleNavigate(view: 'load-pod' | 'create' | 'join') {
       return;
     }
     // No families — fall through to load-pod with account chooser
-    autoLoadPod.value = false;
-    needsPermissionGrant.value = false;
     forceNewGoogleAccount.value = true;
-  } else {
-    autoLoadPod.value = false;
-    needsPermissionGrant.value = false;
   }
 
   activeView.value = view;
@@ -532,6 +554,7 @@ async function handleStartOver() {
         :force-new-google-account="forceNewGoogleAccount"
         :load-error="loadError"
         :provider-hint="loadErrorProviderHint"
+        :reconnect-drive-file="reconnectDriveFile"
         :cross-device-context="crossDeviceContext"
         @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
         @file-loaded="handleFileLoaded"

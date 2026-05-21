@@ -3417,6 +3417,10 @@ const STRING_DEFS = {
   'loginV6.wantYourOwn': { en: 'Want your own?', beanie: 'want your own?' },
   'loginV6.createLink': { en: 'Create a new pod', beanie: 'create a new pod' },
   'loginV6.acceptsBeanpod': { en: 'Accepts .beanpod files', beanie: 'accepts .beanpod files' },
+  'loginV6.reconnectToLoad': {
+    en: 'Reconnect to Google to load {familyName}',
+    beanie: 'reconnect to google to load {familyName}',
+  },
   'loginV6.recommended': { en: 'Recommended', beanie: 'recommended' },
   'loginV6.googleDriveCardDesc': {
     en: 'Load from your cloud storage',
