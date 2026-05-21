@@ -49,5 +49,6 @@ infrastructure/**/.terraform/
 *.tfstate
 *.tfstate.backup
 *.tfplan
+tfplan
 tfplan.out
 infrastructure/*.plan
