@@ -4902,9 +4902,9 @@ const STRING_DEFS = {
       'this file looks like a conflict copy from your cloud-storage provider. beanies will merge it on load — you can delete the duplicate after.',
   },
   'storage.localFileBestOnDesktop': {
-    en: "On phones, or in Safari and Firefox, you'll re-pick the file every time you open the app.",
+    en: 'Local files only work in Chrome or Edge on a computer. On a phone, or in Safari or Firefox, choose Google Drive instead.',
     beanie:
-      "on phones, or in safari and firefox, you'll re-pick the file every time you open the app.",
+      'local files only work in chrome or edge on a computer. on a phone, or in safari or firefox, choose google drive instead.',
   },
   'storage.comingSoon': { en: 'Coming Soon', beanie: 'coming soon' },
   'storage.recommended': { en: 'Recommended', beanie: 'recommended' },
