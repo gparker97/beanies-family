@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
+import SettingsAdminOnlyNotice from '@/components/settings/SettingsAdminOnlyNotice.vue';
 import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import ChangePasswordSettings from '@/components/settings/ChangePasswordSettings.vue';
 import ProfileHeader from '@/components/settings/ProfileHeader.vue';
@@ -864,8 +865,11 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         ]"
         :label="t('settings.weekStart')"
         :hint="t('settings.weekStartHint')"
+        :disabled="!canManagePod"
         @update:model-value="settingsStore.setWeekStartDay(Number($event) as 0 | 1)"
       />
+      <!-- Week-start is family-shared config (unlike theme/text-size above) — admins only. -->
+      <SettingsAdminOnlyNotice v-if="!canManagePod" />
     </BeanieFormModal>
 
     <!-- ── Currency & Rates Modal ──────────────────────────────────────── -->
@@ -880,11 +884,14 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       @close="showCurrency = false"
       @save="showCurrency = false"
     >
+      <SettingsAdminOnlyNotice v-if="!canManagePod" class="mb-1" />
+
       <BaseSelect
         :model-value="settingsStore.baseCurrency"
         :options="currencyOptions"
         :label="t('settings.baseCurrency')"
         :hint="t('settings.baseCurrencyHint')"
+        :disabled="!canManagePod"
         @update:model-value="updateCurrency"
       />
 
@@ -908,7 +915,8 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             {{ code }}
             <button
               type="button"
-              class="ml-0.5 cursor-pointer opacity-60 transition-opacity hover:opacity-100"
+              :disabled="!canManagePod"
+              class="ml-0.5 cursor-pointer opacity-60 transition-opacity hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
               @click="togglePreferredCurrency(code)"
             >
               &times;
@@ -916,8 +924,8 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           </span>
         </div>
 
-        <!-- Search to add -->
-        <div v-if="preferredCount < 4" class="relative">
+        <!-- Search to add — admins only (read-only members still see the chips above) -->
+        <div v-if="canManagePod && preferredCount < 4" class="relative">
           <input
             v-model="currencySearch"
             type="text"
@@ -979,7 +987,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
 
       <!-- Exchange Rates (inline, no BaseCard wrapper) -->
       <div class="border-t border-gray-200 pt-4 dark:border-slate-700">
-        <ExchangeRateSettings :standalone="false" />
+        <ExchangeRateSettings :standalone="false" :read-only="!canManagePod" />
       </div>
     </BeanieFormModal>
 
@@ -994,6 +1002,8 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       @close="showCountryHolidays = false"
       @save="showCountryHolidays = false"
     >
+      <SettingsAdminOnlyNotice v-if="!canManagePod" class="mb-1" />
+
       <BaseCombobox
         :model-value="settingsStore.country ?? ''"
         :options="countryOptions"
@@ -1001,6 +1011,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         :hint="t('settings.countryHelp')"
         :placeholder="t('settings.countryNotSet')"
         :search-placeholder="t('settings.country')"
+        :disabled="!canManagePod"
         @update:model-value="onPickCountry"
       />
 
@@ -1022,7 +1033,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         </div>
         <ToggleSwitch
           :model-value="settingsStore.showPublicHolidays"
-          :disabled="!settingsStore.country"
+          :disabled="!settingsStore.country || !canManagePod"
           @update:model-value="settingsStore.setShowPublicHolidays($event)"
         />
       </div>
