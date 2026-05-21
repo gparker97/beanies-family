@@ -2831,6 +2831,11 @@ const STRING_DEFS = {
     en: 'Failed to create file. Please try again.',
     beanie: 'failed to create file. please try again.',
   },
+  'setup.localFileUnsupported': {
+    en: "This browser can't save to a local file. Use Google Drive instead (it works here and syncs to your family), or open beanies.family in Chrome or Edge.",
+    beanie:
+      "this browser can't save to a local file. use google drive instead (it works here and syncs to your family), or open beanies.family in chrome or edge.",
+  },
 
   // Create-pod failures — one key per `CreatePodFailureReason` so the user
   // sees a message they can act on rather than a generic "something broke".
