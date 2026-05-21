@@ -2349,6 +2349,10 @@ const STRING_DEFS = {
     beanie: "you don't have permission to view this page. ask a pod manager to update your access.",
   },
   'noAccess.backToNook': { en: 'Back to the Nook', beanie: 'back to the nook' },
+  'settings.adminOnly': {
+    en: 'Only a family admin can change this. Ask one if it needs updating.',
+    beanie: 'only a family admin can change this. ask one if it needs updating.',
+  },
 
   // Empty states
   'empty.noData': { en: 'No data available', beanie: 'no beans here yet' },
