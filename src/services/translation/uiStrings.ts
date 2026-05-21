@@ -3165,6 +3165,11 @@ const STRING_DEFS = {
     en: 'Failed to load file. Please try again.',
     beanie: 'failed to load file. please try again.',
   },
+  'auth.localFileUnsupported': {
+    en: "This browser can't load a local file. Use Google Drive instead (it works here and syncs to your family), or open beanies.family in Chrome or Edge.",
+    beanie:
+      "this browser can't load a local file. use google drive instead (it works here and syncs to your family), or open beanies.family in chrome or edge.",
+  },
   'auth.password': { en: 'Password', beanie: 'password' },
   'auth.enterYourPassword': { en: 'Enter your password', beanie: 'enter your password' },
   'auth.signInFailed': { en: 'Sign in failed', beanie: 'sign in failed' },

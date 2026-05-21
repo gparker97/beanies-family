@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-21",
-    "translationCount": 2920
+    "translationCount": 2921
   },
   "translations": {
     "app.name": {
@@ -14604,6 +14604,11 @@
     "setup.localFileUnsupported": {
       "translation": "此浏览器无法保存到本地文件。请改用Google云端硬盘（在此处工作并同步到您的家人） ，或在Chrome或Edge中打开beanies.family。",
       "hash": "l1dhkx",
+      "lastUpdated": "2026-05-21"
+    },
+    "auth.localFileUnsupported": {
+      "translation": "此浏览器无法加载本地文件。请改用Google云端硬盘（在此处工作并同步到您的家人） ，或在Chrome或Edge中打开beanies.family。",
+      "hash": "1585a5",
       "lastUpdated": "2026-05-21"
     }
   }
