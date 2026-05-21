@@ -5,6 +5,11 @@ import { useExchangeRates } from '@/composables/useExchangeRates';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { useSettingsStore } from '@/stores/settingsStore';
 
+/**
+ * `readOnly` locks the family-shared *auto-update preference* (a config toggle)
+ * for non-admins. It deliberately does NOT gate the manual Refresh/Fetch buttons —
+ * pulling current rates is a non-destructive utility that any member may use.
+ */
 const props = withDefaults(defineProps<{ standalone?: boolean; readOnly?: boolean }>(), {
   standalone: true,
   readOnly: false,
@@ -74,12 +79,7 @@ function formatRate(rate: number): string {
             Rates may be outdated
           </p>
         </div>
-        <BaseButton
-          variant="secondary"
-          size="sm"
-          :disabled="isUpdating || props.readOnly"
-          @click="handleRefresh"
-        >
+        <BaseButton variant="secondary" size="sm" :disabled="isUpdating" @click="handleRefresh">
           <span v-if="isUpdating" class="flex items-center gap-2">
             <img
               src="/brand/beanies_spinner_transparent_192x192.png"
@@ -182,12 +182,7 @@ function formatRate(rate: number): string {
           />
         </svg>
         <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">No exchange rates loaded yet</p>
-        <BaseButton
-          variant="secondary"
-          size="sm"
-          :disabled="isUpdating || props.readOnly"
-          @click="handleRefresh"
-        >
+        <BaseButton variant="secondary" size="sm" :disabled="isUpdating" @click="handleRefresh">
           Fetch Rates
         </BaseButton>
       </div>

@@ -34,23 +34,24 @@ function autoUpdateToggle(wrapper: VueWrapper) {
 }
 
 describe('ExchangeRateSettings — readOnly gating', () => {
-  it('disables the fetch/refresh buttons and the auto-update toggle when readOnly', () => {
+  it('locks the auto-update toggle when readOnly but keeps manual refresh open (non-destructive)', () => {
     const wrapper = mountWith(true);
 
-    const buttons = wrapper.findAllComponents(BaseButton);
-    expect(buttons.length).toBeGreaterThan(0);
-    buttons.forEach((b) => expect(b.props('disabled')).toBe(true));
-
+    // Auto-update preference (family-shared config) is locked...
     expect(autoUpdateToggle(wrapper).attributes('disabled')).toBeDefined();
-  });
 
-  it('leaves the controls interactive when not readOnly', () => {
-    const wrapper = mountWith(false);
-
+    // ...but the Refresh/Fetch buttons stay usable — any member can pull rates.
     const buttons = wrapper.findAllComponents(BaseButton);
     expect(buttons.length).toBeGreaterThan(0);
     buttons.forEach((b) => expect(b.props('disabled')).toBe(false));
+  });
+
+  it('leaves everything interactive when not readOnly', () => {
+    const wrapper = mountWith(false);
 
     expect(autoUpdateToggle(wrapper).attributes('disabled')).toBeUndefined();
+    const buttons = wrapper.findAllComponents(BaseButton);
+    expect(buttons.length).toBeGreaterThan(0);
+    buttons.forEach((b) => expect(b.props('disabled')).toBe(false));
   });
 });

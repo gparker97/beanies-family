@@ -16,6 +16,8 @@ tags: [permissions, settings, currency, country, holidays, admin, canManagePod, 
 
 **[/beanies-plan]** Wrote up the plan (4-pass discipline); approved.
 
+**[post-implementation]** Looks good, except the manual "Refresh Rates" button should stay open to any member — it's not destructive.
+
 ## Outcome
 
 Implemented on `main`. Plan: `docs/plans/2026-05-21-settings-permission-gating.md`.
@@ -25,7 +27,7 @@ Implemented on `main`. Plan: `docs/plans/2026-05-21-settings-permission-gating.m
 **Implementation (admin-only `canManagePod`, read-only-with-hint):**
 
 - New `src/components/settings/SettingsAdminOnlyNotice.vue` — reusable lock + "only a family admin can change this" line (DRY across 3 placements). New i18n `settings.adminOnly` (en + beanie; zh via `npm run translate`).
-- `src/components/settings/ExchangeRateSettings.vue` — new `readOnly` prop (default `false`, so its sole caller is the only thing affected); disables both `BaseButton`s + the raw auto-update toggle + an early-return guard in `toggleAutoUpdate`.
+- `src/components/settings/ExchangeRateSettings.vue` — new `readOnly` prop (default `false`, so its sole caller is the only thing affected). **Refinement (greg's follow-up):** `readOnly` locks only the family-shared **auto-update preference** (the toggle + an early-return guard in `toggleAutoUpdate`); the manual **Refresh/Fetch buttons stay open to everyone** — pulling current rates is non-destructive, not a config change.
 - `src/pages/SettingsPage.vue` — reuses the already-imported `usePermissions()` (`canManagePod`). Currency modal: notice + base-currency `BaseSelect` disabled + chip-remove disabled + add-search hidden for non-admins + `ExchangeRateSettings :read-only`. Country & Holidays modal: notice + country `BaseCombobox` disabled + holidays `ToggleSwitch` disabled (preserving the existing `!settingsStore.country` guard via `||`). Appearance modal: week-start `BaseSelect` disabled + a notice scoped to that one control (theme/text-size stay open). Cards stay visible (no `v-if`), diverging from the hide-pattern of Data Management / Family Data, so values remain viewable; the `?open=` deep-links are safe (modal opens read-only).
 
 **Verification:** new `SettingsAdminOnlyNotice.test.ts` (1) + `ExchangeRateSettings.test.ts` (2, readOnly disables/enables the buttons + toggle) green; `npm run type-check` + eslint clean (4 pre-existing SettingsPage warnings unrelated); full suite **2538 passed**. Skipped a full SettingsPage mount test (heavy dependency graph, low value vs. the focused unit tests). **Manual check still recommended:** open the app as a read-only member → Currency / Country / Appearance show dimmed controls + the notice + no add-search; as owner/admin → fully editable, no notice.
