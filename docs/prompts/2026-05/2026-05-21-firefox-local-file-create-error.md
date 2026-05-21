@@ -24,6 +24,8 @@ tags:
 
 **[approval]** Chose "Clear error + steer to Drive" over building a Firefox download-based local-file fallback.
 
+**[follow-up]** Let's revisit the local-file copy to make sure it's accurate (re: the `storage.localFileBestOnDesktop` inaccuracy flagged in the fix above).
+
 ## Outcome
 
 Implemented on `main` (not yet deployed).
@@ -36,4 +38,6 @@ Implemented on `main` (not yet deployed).
 
 **Verification:** new `connectStorage.test.ts` (4 tests: unsupported-browser vs cancel vs connected vs thrown-error classification, and "never opens the picker when unsupported") green; zh translation regenerated via `npm run translate`; `npm run type-check` + eslint clean; full suite **2535 passed**.
 
-**Follow-up note (not changed):** the misleading copy `storage.localFileBestOnDesktop` ("On phones, or in Safari and Firefox, you'll re-pick the file every time…") implies local files work-but-degraded in Firefox, which isn't true (they're fully unsupported). Worth revisiting if it's surfaced anywhere prominent.
+**Copy-accuracy follow-up (done):** the warning-modal string `storage.localFileBestOnDesktop` ("On phones, or in Safari and Firefox, you'll re-pick the file every time…") wrongly implied local files work-but-degraded in those browsers — they're fully unsupported. Rewritten to "Local files only work in Chrome or Edge on a computer. On a phone, or in Safari or Firefox, choose Google Drive instead." (shown in `LocalFileSyncWarning.vue:48` to all users, so it now sets accurate expectations before the hard block). Audited the rest of the local-file copy (`storage.localFileWarning*`, `loginV6.storageLocalDesc`, `loginV6.localFileCardDesc`, `setup.localFileUnsupported`) — all accurate; the card descriptions stay neutral (no pre-warn) per the no-predictive-warnings rule. zh regenerated; `LocalFileSyncWarning.test.ts` (5) + type-check green. Key name kept (`…BestOnDesktop` still fits) to avoid touching the component/test.
+
+**Parallel gap noticed (not changed):** loading an _existing_ local file in Firefox/Safari (`showOpenFilePicker`, the `loginV6.localFileCardDesc` path on the sign-in flow) has the same FSA-absence problem — worth giving the same `unsupported-browser` treatment in a follow-up.
