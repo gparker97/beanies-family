@@ -5,6 +5,7 @@ import { useWhatsNew } from '@/composables/useWhatsNew';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { MARKETING_URL } from '@/utils/marketing';
+import { openExternal } from '@/utils/openExternal';
 
 const router = useRouter();
 const settingsStore = useSettingsStore();
@@ -26,7 +27,7 @@ function handleTryIt(route: string) {
 
 function handleSeeAll() {
   dismissModal();
-  window.open(`${MARKETING_URL}/help/whats-new`, '_blank', 'noopener,noreferrer');
+  openExternal(`${MARKETING_URL}/help/whats-new`);
 }
 </script>
 

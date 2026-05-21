@@ -123,7 +123,14 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
          them to app.beanies.family preserving the path. Regular browser
          visits never match (display-mode is 'browser') and see the
          marketing site normally. `is:inline` + placing this at the top of
-         <body> ensures it runs before any other script or content paints. -->
+         <body> ensures it runs before any other script or content paints.
+
+         Loop guard: if `from-stale-pwa=1` is already present, we've already
+         bounced once and the app sent us back (e.g. the app's /help, /privacy,
+         /terms external-redirects point here, and an in-place standalone nav
+         would otherwise ping-pong forever). Render the marketing page instead
+         of redirecting again. The genuine stale-PWA launch hits the apex
+         without the param, so it still bounces exactly once. -->
     <script is:inline>
       (function () {
         try {
@@ -131,7 +138,9 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
             window.matchMedia &&
             window.matchMedia('(display-mode: standalone)').matches;
           var isIOS = window.navigator.standalone === true;
-          if (isStandalone || isIOS) {
+          var alreadyBounced =
+            new URLSearchParams(window.location.search).get('from-stale-pwa') === '1';
+          if ((isStandalone || isIOS) && !alreadyBounced) {
             var url = new URL(
               'https://app.beanies.family' +
                 window.location.pathname +
