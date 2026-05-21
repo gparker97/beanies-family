@@ -19,6 +19,7 @@ import {
 } from '@/services/google/googleAuth';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import * as syncService from '@/services/sync/syncService';
+import { supportsFileSystemAccess } from '@/services/sync/capabilities';
 import { withTimeout } from '@/utils/timing';
 import { FileNameCollisionError } from '@/types/sync';
 
@@ -37,11 +38,16 @@ export interface StorageConnectFailed {
   cancelled?: boolean;
   /**
    * Discriminator for failure classes the caller may want to surface with
-   * a focused message. Currently only `name-collision` (Drive folder already
-   * has a `.beanpod` with this name); other failures pass through with no
-   * `errorKind` set and the caller shows the generic error.
+   * a focused message:
+   * - `name-collision` — Drive folder already has a `.beanpod` with this name.
+   * - `unsupported-browser` — local files need the File System Access API
+   *   (Chromium-only); this browser (e.g. Firefox/Safari) can't do it, so a
+   *   retry is futile. Steer the user to Google Drive (works everywhere) or
+   *   Chrome/Edge instead of showing the generic "try again".
+   * Other failures pass through with no `errorKind` set and the caller shows
+   * the generic error.
    */
-  errorKind?: 'name-collision';
+  errorKind?: 'name-collision' | 'unsupported-browser';
   /** Set when `errorKind === 'name-collision'`. */
   collisionFileId?: string;
 }
@@ -106,9 +112,23 @@ export async function connectDriveStorage(
 /**
  * Connect a local file as the storage for a new pod (the OS save-file
  * picker). Returns `{ status: 'failed', cancelled: true }` when the user
- * dismisses the picker — a normal abort the caller should not report.
+ * dismisses the picker — a normal abort the caller should not report — or
+ * `{ status: 'failed', errorKind: 'unsupported-browser' }` when the browser
+ * lacks the File System Access API (Firefox/Safari), where a retry can never
+ * succeed and the caller should steer to Drive / Chrome / Edge.
  */
 export async function connectLocalStorage(): Promise<StorageConnected | StorageConnectFailed> {
+  // showSaveFilePicker is Chromium-only. In Firefox/Safari it's absent, so
+  // there's no local-file path at all — flag it as its own failure class so
+  // the caller surfaces an actionable message instead of a futile "try again".
+  if (!supportsFileSystemAccess()) {
+    return {
+      status: 'failed',
+      error: 'File System Access API not supported in this browser',
+      errorKind: 'unsupported-browser',
+    };
+  }
+
   try {
     const ok = await syncService.selectSyncFile();
     if (ok) return { status: 'connected', type: 'local' };

@@ -389,7 +389,12 @@ async function handleConnectLocal() {
   try {
     const r = await connectLocalStorage();
     if (r.status === 'failed') {
-      if (!r.cancelled) {
+      if (r.errorKind === 'unsupported-browser') {
+        // Firefox/Safari lack the File System Access API — retrying is futile.
+        // Show an actionable message (use Drive, or Chrome/Edge); no report.
+        console.warn('[ResumePodSetup] local file unsupported in this browser:', r.error);
+        formError.value = t('setup.localFileUnsupported');
+      } else if (!r.cancelled) {
         console.error('[ResumePodSetup] local file selection failed:', r.error);
         reportError({
           surface: 'resumeSetup.selectLocalFile',

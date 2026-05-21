@@ -226,6 +226,12 @@ async function handleChooseLocalStorage() {
     if (r.status === 'connected') {
       storageSaved.value = true;
       storageType.value = 'local';
+    } else if (r.errorKind === 'unsupported-browser') {
+      // Firefox/Safari lack the File System Access API — a retry can never
+      // succeed. Surface an actionable message (Drive works here; or switch
+      // to Chrome/Edge). Not a Slack-worthy error — it's a known browser gap.
+      formError.value = t('setup.localFileUnsupported');
+      console.warn('[CreatePodView] local file unsupported in this browser:', r.error);
     } else if (r.cancelled) {
       // Normal abort (user dismissed the OS picker) — re-prompt, no report.
       formError.value = t('setup.fileCreateFailed');
