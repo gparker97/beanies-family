@@ -2,10 +2,11 @@
  * Browser capability detection for sync features
  */
 
+import { Capacitor } from '@capacitor/core';
 import { features } from '@/config/features';
 
 export interface SyncCapabilities {
-  /** Supports File System Access API (persistent file handles) */
+  /** Local-file `.beanpod` support (web File System Access API, or native @capacitor/filesystem) */
   fileSystemAccess: boolean;
   /** Supports saving files via picker */
   showSaveFilePicker: boolean;
@@ -17,6 +18,10 @@ export interface SyncCapabilities {
   googleDrive: boolean;
   /** Manual export/import always available */
   manualSync: boolean;
+  /** Running inside the native (Capacitor) shell, not a browser/PWA */
+  native: boolean;
+  /** Current platform */
+  platform: 'web' | 'ios' | 'android';
 }
 
 /**
@@ -28,6 +33,34 @@ export function supportsFileSystemAccess(): boolean {
     'showSaveFilePicker' in window &&
     'showOpenFilePicker' in window
   );
+}
+
+/**
+ * Running inside the native (Capacitor) shell (iOS/Android), not a browser/PWA.
+ *
+ * This is the ONE place `Capacitor.isNativePlatform()` is allowed to appear —
+ * every other module consults `isNative()` / `getPlatform()` / the
+ * `SyncCapabilities` object so the native↔web seam stays in a single file
+ * (keeps a future Capacitor major a bounded change). See ADR-029.
+ */
+export function isNative(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
+/** Current platform: 'web' (browser/PWA), 'ios', or 'android'. */
+export function getPlatform(): 'web' | 'ios' | 'android' {
+  return Capacitor.getPlatform() as 'web' | 'ios' | 'android';
+}
+
+/**
+ * Whether this environment can read/write local `.beanpod` files at all — the
+ * web File System Access API (Chromium only) OR the native @capacitor/filesystem
+ * plugin. This is the single predicate the local-file entry points must gate on;
+ * do NOT call `supportsFileSystemAccess()` directly at those sites (it only
+ * answers the narrower "is the web API present" question, false in a WebView).
+ */
+export function canUseLocalFiles(): boolean {
+  return supportsFileSystemAccess() || isNative();
 }
 
 /**
@@ -47,6 +80,11 @@ export function supportsWebCrypto(): boolean {
 export function getSyncCapabilities(): SyncCapabilities {
   const hasFileSystemAccess = supportsFileSystemAccess();
 
+  // NOTE: the local-file flags still derive from the web API here. A3 flips
+  // them (and the direct `supportsFileSystemAccess()` call sites) to
+  // `canUseLocalFiles()` atomically with the `CapacitorFileProvider` landing —
+  // flipping them before the provider exists would offer a local-file option
+  // natively that has no working backend. `native`/`platform` are additive.
   return {
     fileSystemAccess: hasFileSystemAccess,
     showSaveFilePicker: hasFileSystemAccess,
@@ -54,6 +92,8 @@ export function getSyncCapabilities(): SyncCapabilities {
     webCrypto: supportsWebCrypto(),
     googleDrive: features.drive && features.oauthProxy,
     manualSync: true, // Always available via Blob download/upload
+    native: isNative(),
+    platform: getPlatform(),
   };
 }
 
