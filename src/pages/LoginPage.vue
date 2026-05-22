@@ -22,6 +22,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
+import { RESUME_LOAD_DRIVE } from '@/components/login/resumePaths';
 
 const router = useRouter();
 const route = useRoute();
@@ -50,6 +51,12 @@ const props = withDefaults(defineProps<{ initialView?: LoginView }>(), {
 const activeView = ref<LoginView>(props.initialView);
 const needsPermissionGrant = ref(false);
 const autoLoadPod = ref(false);
+/**
+ * Set by the resume dispatcher when returning from a Drive-LOAD OAuth redirect
+ * (`?resume=load-drive`). Handed to `LoadPodView` to re-open the Google Drive
+ * file picker with the now-cached token. See ADR-029.
+ */
+const autoOpenDrivePicker = ref(false);
 const isInitializing = ref(true);
 const biometricFamilyId = ref('');
 const biometricFamilyName = ref<string | undefined>();
@@ -98,6 +105,21 @@ const inviteGateLocked = ref(features.inviteGate);
 let stopResumeWatch: WatchStopHandle = () => {};
 stopResumeWatch = watchEffect(() => {
   if (!authStore.isInitialized) return;
+
+  // Returning from a Drive-LOAD OAuth redirect (`?resume=load-drive`). This can
+  // fire DURING a fresh sign-in: with zero local families the user is NOT yet
+  // authenticated (loading the pod is what produces the family/auth — see
+  // authStore.ts), so it MUST be handled before the `isAuthenticated` gate that
+  // `resume=setup` relies on. The picker lists Drive-wide (family-agnostic), so
+  // it needs no restored family. See ADR-029.
+  if (route.query.resume === RESUME_LOAD_DRIVE) {
+    activeView.value = 'load-pod';
+    autoOpenDrivePicker.value = true;
+    isInitializing.value = false;
+    stopResumeWatch();
+    return;
+  }
+
   if (!authStore.isAuthenticated) return;
   if (route.query.resume !== 'setup') return;
   activeView.value = 'resume-setup';
@@ -550,6 +572,7 @@ async function handleStartOver() {
         v-else-if="activeView === 'load-pod'"
         :needs-permission-grant="needsPermissionGrant"
         :auto-load="autoLoadPod"
+        :auto-open-drive-picker="autoOpenDrivePicker"
         :skip-biometric="biometricDeclined"
         :force-new-google-account="forceNewGoogleAccount"
         :load-error="loadError"

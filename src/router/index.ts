@@ -311,8 +311,11 @@ router.beforeEach((to) => {
   const authStore = useAuthStore();
   if (!authStore.isAuthenticated) return;
   if (!authStore.podCreated) {
-    // Already on the recovery screen — let them stay.
-    if (to.query.resume === 'setup') return;
+    // Already on a resume screen — let them stay. `setup` is the create/recovery
+    // continuation; `load-drive` is the Drive-load OAuth return that re-opens the
+    // file picker (ADR-029). Rewriting the latter to `setup` would strand a
+    // returning-but-podless user on resume-setup instead of the picker.
+    if (to.query.resume === 'setup' || to.query.resume === 'load-drive') return;
     return { name: 'Welcome', query: { resume: 'setup' } };
   }
   return { name: 'Nook' };

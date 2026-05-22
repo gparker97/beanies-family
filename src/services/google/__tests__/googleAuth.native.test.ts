@@ -74,6 +74,27 @@ describe('googleAuth — native (Capacitor) OAuth deep-link (ADR-029 A2)', () =>
     vi.unstubAllEnvs();
   });
 
+  it('shouldUseRedirectAuth() is true on native — the single source of truth for the transport (ADR-029)', () => {
+    expect(googleAuth.shouldUseRedirectAuth()).toBe(true);
+  });
+
+  it('Drive-load redirect round-trips LOAD_DRIVE_PATH: startRedirectAuth → valid deep link → onComplete(LOAD_DRIVE_PATH)', async () => {
+    // The load-picker path now sets `beanies_redirect_auth` (it didn't before —
+    // it used the popup, so the returning deep link was "ignored"). Pin the
+    // round-trip: the picker's returnPath survives and the listener navigates to it.
+    await googleAuth.startRedirectAuth('/welcome?resume=load-drive', 'a@b.com');
+    expect(browserOpen).toHaveBeenCalledOnce();
+    const stored = JSON.parse(sessionStorage.getItem(STATE_KEY)!);
+    expect(stored.returnPath).toBe('/welcome?resume=load-drive');
+
+    const onComplete = vi.fn();
+    await googleAuth.handleNativeAuthRedirect(
+      `${NATIVE_REDIRECT}?code=THE_CODE&state=${stored.state}`,
+      onComplete
+    );
+    expect(onComplete).toHaveBeenCalledWith('/welcome?resume=load-drive');
+  });
+
   it('startRedirectAuth (native) opens the system browser with the App Link redirect_uri + a state param', async () => {
     await googleAuth.startRedirectAuth('/welcome?resume=setup', 'a@b.com');
 

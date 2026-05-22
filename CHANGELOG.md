@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-22
 
+### Fixed
+
+- **Google Drive sign-in now works in the native app and installed PWAs.** Loading an existing pod from Google Drive used a popup-based sign-in that can't complete inside the native Android app (or an installed PWA) — it opened a blank browser tab and then hung for two minutes before timing out. Sign-in now uses the same system-browser/redirect flow the rest of the app already uses on those surfaces: after you pick your Google account and consent, the app re-opens your Drive file list automatically and loads your pod — no second prompt. Desktop sign-in (popup) is unchanged. (See ADR-029.)
+
 ### Added
 
 - **New blog post: "my 10-year-old outclassed me."** A founder story about taking my train-obsessed son to Japan for cherry blossom season — a sold-out museum, a Mt. Fuji we never quite saw, and a 10-year-old who handled disappointment better than his dad did.

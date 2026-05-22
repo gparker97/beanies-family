@@ -20,14 +20,22 @@ vi.mock('@/services/sync/providers/googleDriveProvider', () => ({
   GoogleDriveProvider: { createNew: vi.fn() },
 }));
 
-import { connectLocalStorage } from '../connectStorage';
+import { connectLocalStorage, beginDriveAuthRedirectIfNeeded } from '../connectStorage';
 import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
+import {
+  shouldUseRedirectAuth,
+  startRedirectAuth,
+  isTokenValid,
+} from '@/services/google/googleAuth';
 import * as syncService from '@/services/sync/syncService';
 
 const mockSupports = vi.mocked(supportsFileSystemAccess);
 const mockIsNative = vi.mocked(isNative);
 const mockSelect = vi.mocked(syncService.selectSyncFile);
 const mockSelectNative = vi.mocked(syncService.selectNativeLocalFile);
+const mockShouldRedirect = vi.mocked(shouldUseRedirectAuth);
+const mockStartRedirect = vi.mocked(startRedirectAuth);
+const mockIsTokenValid = vi.mocked(isTokenValid);
 
 describe('connectLocalStorage', () => {
   beforeEach(() => {
@@ -84,5 +92,64 @@ describe('connectLocalStorage', () => {
     expect(r).toMatchObject({ status: 'failed', error: 'boom' });
     expect(r).not.toHaveProperty('cancelled');
     expect(r).not.toHaveProperty('errorKind');
+  });
+});
+
+describe('beginDriveAuthRedirectIfNeeded', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockStartRedirect.mockResolvedValue(undefined);
+  });
+
+  it('redirects (true) on a redirect surface with no valid token, forwarding returnPath + loginHint', async () => {
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(false);
+
+    const result = await beginDriveAuthRedirectIfNeeded('/welcome?resume=load-drive', 'a@b.com');
+
+    expect(result).toBe(true);
+    expect(mockStartRedirect).toHaveBeenCalledWith('/welcome?resume=load-drive', 'a@b.com');
+  });
+
+  it('does NOT redirect (false) when a valid token is already held — caller proceeds inline', async () => {
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(true);
+
+    expect(await beginDriveAuthRedirectIfNeeded('/p')).toBe(false);
+    expect(mockStartRedirect).not.toHaveBeenCalled();
+  });
+
+  it('does NOT redirect (false) on a popup surface (desktop) even with no token — popup path stays', async () => {
+    mockShouldRedirect.mockReturnValue(false);
+    mockIsTokenValid.mockReturnValue(false);
+
+    expect(await beginDriveAuthRedirectIfNeeded('/p')).toBe(false);
+    expect(mockStartRedirect).not.toHaveBeenCalled();
+  });
+
+  it('forceReauth redirects (true) even with a valid token — the switch-account case', async () => {
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(true);
+
+    expect(await beginDriveAuthRedirectIfNeeded('/p', undefined, { forceReauth: true })).toBe(true);
+    expect(mockStartRedirect).toHaveBeenCalledWith('/p', undefined);
+  });
+
+  it('forceReauth on a popup surface still does NOT redirect (transport decision wins)', async () => {
+    mockShouldRedirect.mockReturnValue(false);
+    mockIsTokenValid.mockReturnValue(true);
+
+    expect(await beginDriveAuthRedirectIfNeeded('/p', undefined, { forceReauth: true })).toBe(
+      false
+    );
+    expect(mockStartRedirect).not.toHaveBeenCalled();
+  });
+
+  it('propagates a startRedirectAuth failure to the caller (never swallowed)', async () => {
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(false);
+    mockStartRedirect.mockRejectedValue(new Error('Browser.open rejected'));
+
+    await expect(beginDriveAuthRedirectIfNeeded('/p')).rejects.toThrow('Browser.open rejected');
   });
 });
