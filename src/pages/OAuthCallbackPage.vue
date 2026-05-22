@@ -9,6 +9,7 @@
  *   to the original page so completeRedirectAuth() can finish the exchange.
  */
 import { onMounted } from 'vue';
+import { REDIRECT_AUTH_CODE_KEY } from '@/services/google/googleAuth';
 
 onMounted(() => {
   const params = new URLSearchParams(window.location.search);
@@ -31,7 +32,7 @@ onMounted(() => {
   // Redirect mode — save code and redirect back to the original page
   const stateJson = sessionStorage.getItem('beanies_redirect_auth');
   if (stateJson && code) {
-    sessionStorage.setItem('beanies_redirect_auth_code', code);
+    sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY, code);
     try {
       const state = JSON.parse(stateJson);
       window.location.href = state.returnPath || '/';

@@ -1,0 +1,77 @@
+---
+// OAuth deep-link fallback (ADR-029 A2).
+//
+// When the beanies.family app is installed AND the App Link is verified, Android
+// intercepts https://beanies.family/oauth/native and this page never renders —
+// the redirect goes straight into the app. This page only shows when the link
+// ISN'T intercepted (app not installed, or App Link not yet verified): the
+// marketing site can't complete the OAuth exchange (that's the app's job), so we
+// just tell the user to finish in the app. Kept out of search + sitemap.
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>finishing sign-in — beanies.family</title>
+    <style>
+      :root {
+        --orange: #f15d22;
+        --slate: #2c3e50;
+        --cloud: #f8f9fa;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--cloud);
+        color: var(--slate);
+        font-family:
+          'Inter',
+          system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 1.5rem;
+      }
+      main {
+        max-width: 26rem;
+        text-align: center;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin: 0 0 0.5rem;
+        font-weight: 700;
+      }
+      p {
+        line-height: 1.6;
+        margin: 0 0 1rem;
+        color: #51606f;
+      }
+      .bean {
+        font-size: 2.5rem;
+        margin-bottom: 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="bean" aria-hidden="true">🫘</div>
+      <h1>almost there</h1>
+      <p>
+        open the <strong>beanies.family</strong> app to finish signing in. you can close this
+        page — it's safe to leave.
+      </p>
+      <p>
+        don't have the app yet? you can keep using beanies.family in your browser at
+        <a href="https://app.beanies.family" style="color: var(--orange)">app.beanies.family</a>.
+      </p>
+    </main>
+  </body>
+</html>
