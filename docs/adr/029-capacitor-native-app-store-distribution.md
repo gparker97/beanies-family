@@ -1,7 +1,7 @@
 # ADR-029: Capacitor for native iOS/Android app-store distribution (wrap the existing PWA, don't rewrite)
 
 > Date: 2026-05-22
-> Status: **Proposed** (pending the `spike/capacitor-mobile` validation of the three risk points in "To validate" below; promote to Accepted once the spike confirms the wrap builds, system-browser OAuth round-trips, and Automerge WASM runs in a real WebView).
+> Status: **Accepted** (2026-05-22). Implemented A1–A6 and merged to `main` (the `spike/capacitor-mobile` branch's work; branch deleted). Risk point 1 (the wrap builds → APK) and risk point 3 (Automerge WASM runs in the WebView) are confirmed on a physical Android device, and native local-file pod create/load is on-device-validated. Risk point 2 (system-browser OAuth) is code-complete + unit-tested; its on-device confirmation is gated on the App Link verification (hosted `assetlinks.json` with the release signing fingerprint) — a greg-side infra action. The signed-release Play lane (A6) is dormant until the keystore + Play service account + Org account (D-U-N-S) exist.
 > Related: ADR-026 (iOS redirect OAuth), ADR-012 (responsive mobile layout), ADR-022 (pod architecture).
 
 ## Context
