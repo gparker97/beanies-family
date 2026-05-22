@@ -10,10 +10,14 @@ name: Mobile — Android debug APK
 on:
   push:
     branches: ['spike/capacitor-mobile']
+    # Docs-only changes don't change the build — skip them so ADR edits don't rebuild.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # needed to publish the APK to a rolling prerelease
 
 jobs:
   android-debug-apk:
@@ -56,3 +60,18 @@ jobs:
           name: beanies-android-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # Publish the raw .apk to a rolling prerelease so it installs in one tap
+      # from a phone (release assets download directly, no zip to extract — the
+      # workflow artifact above stays as a desktop/CLI fallback).
+      - name: Publish APK to rolling prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk beanies-family-android-debug.apk
+          gh release delete spike-android-latest --yes --cleanup-tag || true
+          gh release create spike-android-latest beanies-family-android-debug.apk \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "beanies.family — Android spike build (debug, unsigned)" \
+            --notes "Latest Capacitor Android debug APK from \`spike/capacitor-mobile\` (ADR-029). Commit ${GITHUB_SHA}. Debug/unsigned — on-device testing only, not for distribution. Tap \`beanies-family-android-debug.apk\` below to install on Android (allow 'install from unknown sources')."
