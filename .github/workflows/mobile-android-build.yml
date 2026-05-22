@@ -49,6 +49,18 @@ jobs:
 
       - name: Build web app
         run: npm run build
+        env:
+          # Enable Google Drive + OAuth in the debug APK so native Google
+          # sign-in is testable on-device (ADR-029). Same client-side values the
+          # prod web bundle already ships — no new exposure. The token exchange
+          # uses the registry/OAuth-proxy Lambda (api.beanies.family).
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          VITE_REGISTRY_API_URL: ${{ secrets.REGISTRY_API_URL }}
+          VITE_REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
+          # Surface any native OAuth/runtime errors during on-device testing.
+          VITE_BEANIES_ERROR_WEBHOOK_URL: ${{ vars.BEANIES_ERROR_WEBHOOK_URL }}
+          VITE_BEANIES_LOG_INGEST_URL: ${{ vars.BEANIES_LOG_INGEST_URL }}
+          VITE_BEANIES_LOG_INGEST_API_KEY: ${{ secrets.BEANIES_LOG_INGEST_API_KEY }}
 
       - name: Sync Capacitor (Android)
         run: npx cap sync android
