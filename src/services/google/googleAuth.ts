@@ -21,6 +21,9 @@ import {
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
+import { Browser } from '@capacitor/browser';
+import { App as CapacitorApp, type URLOpenListenerEvent } from '@capacitor/app';
+import { isNative } from '@/services/sync/capabilities';
 
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
@@ -30,6 +33,17 @@ const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 
 // Key used to temporarily store a refresh token before a family is active
 const PENDING_FAMILY_KEY = '__pending__';
+
+// Native OAuth redirect — a verified https App Link, NOT a custom scheme. The
+// existing OAuth client is a Web-application type, which rejects custom schemes
+// ("must use either http or https"); the App Link is routed back into the app
+// via a hosted /.well-known/assetlinks.json. See ADR-029.
+const NATIVE_REDIRECT_URI = 'https://beanies.family/oauth/native';
+
+// Shared sessionStorage key for the one-time OAuth code, written by the web
+// callback (OAuthCallbackPage) AND the native deep-link handler, and read+cleared
+// by completeRedirectAuth. One named symbol so the two transports can't drift.
+export const REDIRECT_AUTH_CODE_KEY = 'beanies_redirect_auth_code';
 
 // In-memory token state
 let accessToken: string | null = null;
@@ -240,6 +254,10 @@ function getClientId(): string {
 }
 
 function getRedirectUri(): string {
+  // Native uses the verified App Link (registered on the Web OAuth client);
+  // both buildAuthUrl and the token exchange call this, so they always agree
+  // (a mismatch ⇒ redirect_uri_mismatch). See ADR-029.
+  if (isNative()) return NATIVE_REDIRECT_URI;
   return `${window.location.origin}/oauth/callback`;
 }
 
@@ -1272,7 +1290,8 @@ function buildAuthUrl(
   clientId: string,
   codeChallenge: string,
   prompt: string,
-  loginHint?: string
+  loginHint?: string,
+  state?: string
 ): string {
   const params = new URLSearchParams({
     client_id: clientId,
@@ -1285,6 +1304,9 @@ function buildAuthUrl(
     prompt,
   });
   if (loginHint) params.set('login_hint', loginHint);
+  // CSRF state — set only for the native deep-link transport (web callers pass
+  // none and are unaffected). Validated by the appUrlOpen handler.
+  if (state) params.set('state', state);
   return `${GOOGLE_AUTH_URL}?${params.toString()}`;
 }
 
@@ -1446,6 +1468,8 @@ const REDIRECT_AUTH_KEY = 'beanies_redirect_auth';
 interface RedirectAuthState {
   codeVerifier: string;
   returnPath: string;
+  /** CSRF state — present only for the native deep-link transport (absent on web). */
+  state?: string;
 }
 
 /**
@@ -1462,10 +1486,16 @@ export async function startRedirectAuth(returnPath: string, loginHint?: string):
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
+  // Native opens the system browser and returns via a verified App Link deep
+  // link, so it carries a CSRF `state` (defense-in-depth atop the verified
+  // link; ADR-029). Web returns via a same-origin top-level navigation and
+  // needs none. `generateCodeVerifier()` is a CSPRNG high-entropy string.
+  const state = isNative() ? generateCodeVerifier() : undefined;
+
   // Save state for when we come back
   sessionStorage.setItem(
     REDIRECT_AUTH_KEY,
-    JSON.stringify({ codeVerifier, returnPath } satisfies RedirectAuthState)
+    JSON.stringify({ codeVerifier, returnPath, state } satisfies RedirectAuthState)
   );
 
   // INVARIANT: redirect auth ALWAYS forces `prompt=consent`. Every caller of
@@ -1476,7 +1506,16 @@ export async function startRedirectAuth(returnPath: string, loginHint?: string):
   // the "disconnected" toast on every PWA restart. Do not change to a
   // conditional/'select_account' without an explicit non-offline caller.
   // See docs/plans/2026-05-20-google-refresh-token-persistence-fix.md.
-  const authUrl = buildAuthUrl(clientId, codeChallenge, 'consent', loginHint);
+  const authUrl = buildAuthUrl(clientId, codeChallenge, 'consent', loginHint, state);
+
+  if (isNative()) {
+    // Open the system browser (Custom Tabs / ASWebAuthenticationSession). The
+    // redirect returns via the appUrlOpen listener (installNativeAuthListener),
+    // NOT by navigating this WebView — so this resolves immediately and the
+    // caller treats it as "redirecting", same as web.
+    await Browser.open({ url: authUrl });
+    return;
+  }
   window.location.href = authUrl;
 }
 
@@ -1486,13 +1525,13 @@ export async function startRedirectAuth(returnPath: string, loginHint?: string):
  * was completed, or null if there was no pending auth.
  */
 export async function completeRedirectAuth(): Promise<string | null> {
-  const code = sessionStorage.getItem('beanies_redirect_auth_code');
+  const code = sessionStorage.getItem(REDIRECT_AUTH_CODE_KEY);
   const stateJson = sessionStorage.getItem(REDIRECT_AUTH_KEY);
 
   if (!code || !stateJson) return null;
 
   // Clean up immediately to prevent re-processing
-  sessionStorage.removeItem('beanies_redirect_auth_code');
+  sessionStorage.removeItem(REDIRECT_AUTH_CODE_KEY);
   sessionStorage.removeItem(REDIRECT_AUTH_KEY);
 
   const clientId = getClientId();
@@ -1538,4 +1577,128 @@ export async function completeRedirectAuth(): Promise<string | null> {
 
   console.warn(`[googleAuth] Token acquired via redirect PKCE, expires in ${tokens.expires_in}s`);
   return tokens.access_token;
+}
+
+// ─── Native (Capacitor) deep-link OAuth completion ──────────────────────────
+// On native, startRedirectAuth opens the system browser; Google redirects to
+// the verified App Link (NATIVE_REDIRECT_URI), which the OS routes back into the
+// app as an `appUrlOpen` event. This listener validates the CSRF `state`, hands
+// the code to the shared completeRedirectAuth(), then asks the host (App.vue) to
+// navigate to the stored returnPath — the same resume-setup continuation the web
+// full-page redirect produces. The @capacitor/browser + @capacitor/app plugin
+// usage is confined to this module (ADR-029).
+
+let nativeAuthListenerInstalled = false;
+let nativeAuthListenerHandle: { remove: () => Promise<void> } | null = null;
+
+/**
+ * Install the native OAuth deep-link listener. Idempotent (mirrors
+ * `installAuthWakeListener`'s guard, so a future `App.vue` remount can't stack a
+ * second listener that double-consumes the code). `onComplete(returnPath)` runs
+ * after a successful exchange so the host can navigate — kept out of this
+ * service to avoid a router import / layering cycle. No-op on web.
+ */
+export function installNativeAuthListener(onComplete: (returnPath: string) => void): void {
+  if (nativeAuthListenerInstalled) return;
+  if (!isNative()) return;
+  nativeAuthListenerInstalled = true;
+
+  void CapacitorApp.addListener('appUrlOpen', (event: URLOpenListenerEvent) => {
+    void handleNativeAuthRedirect(event.url, onComplete);
+  }).then((handle) => {
+    nativeAuthListenerHandle = handle;
+  });
+}
+
+/** Handle one `appUrlOpen`. Exported for unit tests; not part of the public API. */
+export async function handleNativeAuthRedirect(
+  url: string,
+  onComplete: (returnPath: string) => void
+): Promise<void> {
+  // Only our OAuth redirect; ignore any other deep link.
+  if (!url.startsWith(NATIVE_REDIRECT_URI)) return;
+
+  let params: URLSearchParams;
+  try {
+    params = new URL(url).searchParams;
+  } catch {
+    return; // malformed URL — nothing actionable
+  }
+  const code = params.get('code');
+  const error = params.get('error');
+  const returnedState = params.get('state');
+
+  const stateJson = sessionStorage.getItem(REDIRECT_AUTH_KEY);
+  // Close the system browser tab (best-effort — it may already be gone).
+  await Browser.close().catch(() => {});
+
+  // No native auth in flight (cold-launch by a stray/duplicate/spoofed link):
+  // benign — never drive an exchange off an unexpected link.
+  if (!stateJson) {
+    logEvent({
+      level: 'info',
+      surface: 'native-oauth',
+      message: 'deep link with no pending auth — ignored',
+    });
+    return;
+  }
+
+  // OAuth error on the redirect (most commonly access_denied = user declined
+  // consent): benign — clear pending state, no reportError.
+  if (error) {
+    await clearGoogleSessionState();
+    logEvent({
+      level: 'info',
+      surface: 'native-oauth',
+      message: `oauth declined/error on deep link: ${error}`,
+    });
+    return;
+  }
+
+  const stored: RedirectAuthState = JSON.parse(stateJson);
+
+  // CSRF: the echoed state must match what we stored. Mismatch ⇒ discard.
+  if (!stored.state || stored.state !== returnedState) {
+    await clearGoogleSessionState();
+    reportError({
+      surface: 'native-oauth-state-mismatch',
+      severity: 'error',
+      message: 'native OAuth deep-link state mismatch — code discarded',
+    });
+    return;
+  }
+
+  if (!code) {
+    await clearGoogleSessionState();
+    reportError({
+      surface: 'native-oauth',
+      severity: 'error',
+      message: 'native OAuth deep link had neither code nor error',
+    });
+    return;
+  }
+
+  // Hand the code to the shared completion (the same exchange the web flow runs).
+  sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY, code);
+  try {
+    await completeRedirectAuth();
+    onComplete(stored.returnPath);
+  } catch (e) {
+    reportError({
+      surface: 'native-oauth',
+      severity: 'error',
+      message: 'native OAuth code exchange failed',
+      error: e,
+    });
+    // Land on the recovery surface so the user can retry — matches web, which
+    // always returns to returnPath after the full-page redirect.
+    onComplete(stored.returnPath);
+  }
+}
+
+/** Test-only — remove the native auth listener + reset install state. */
+export function __resetNativeAuthForTesting(): void {
+  void nativeAuthListenerHandle?.remove();
+  nativeAuthListenerHandle = null;
+  nativeAuthListenerInstalled = false;
 }
