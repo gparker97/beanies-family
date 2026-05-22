@@ -97,6 +97,11 @@ export default [
       'infrastructure/modules/web/functions/**',
       // Astro site has its own ESLint config (or none); handled separately.
       'web/**',
+      // Capacitor native projects are generated and carry the copied web build
+      // (android/app/src/main/assets/public, ios/App/App/public) — not source
+      // to lint. ADR-029.
+      'android/**',
+      'ios/**',
     ],
   },
 ];

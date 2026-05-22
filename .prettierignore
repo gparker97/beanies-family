@@ -12,3 +12,7 @@ docs/mockups
 docs/wireframes
 README.md
 web/.astro
+# Capacitor-generated native projects (ADR-029) — generated config + copied web
+# build; not ours to format.
+android
+ios
