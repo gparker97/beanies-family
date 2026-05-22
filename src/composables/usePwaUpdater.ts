@@ -1,4 +1,5 @@
 import { watch, onScopeDispose, effectScope, type EffectScope } from 'vue';
+import { Capacitor } from '@capacitor/core';
 import { useRegisterSW } from 'virtual:pwa-register/vue';
 import router from '@/router';
 import { useSyncStore } from '@/stores/syncStore';
@@ -104,6 +105,16 @@ function installRouteGuard(updateServiceWorker: (reloadPage?: boolean) => Promis
  */
 export function usePwaUpdater(): void {
   if (initialized) return;
+
+  // In the native (Capacitor) shell the app is served from bundled local
+  // assets, so the web service worker is unnecessary AND its auto-update/reload
+  // machinery fights Capacitor's local asset server. `useRegisterSW` (below) is
+  // the ONLY service-worker registration path — vite-plugin-pwa injects no
+  // registration into index.html (verified) — so returning here keeps the SW
+  // unregistered on iOS/Android. Web behavior is unchanged (`isNativePlatform()`
+  // is false in a browser). See ADR-029.
+  if (Capacitor.isNativePlatform()) return;
+
   initialized = true;
 
   // Detached scope so the poll + watcher live for the app lifetime,

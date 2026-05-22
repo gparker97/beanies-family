@@ -1,0 +1,58 @@
+name: Mobile — Android debug APK
+
+# Spike (ADR-029): build an installable, UNSIGNED debug APK for the Capacitor
+# Android wrapper so we can validate on a real device that the app loads and the
+# Automerge WASM initializes in the WebView. Public repo → free runners; a debug
+# APK needs no signing, so this needs no secrets and no Apple/Google account.
+#
+# Scoped to the spike branch + manual dispatch so it never touches main's CI.
+
+on:
+  push:
+    branches: ['spike/capacitor-mobile']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-debug-apk:
+    name: Build Android debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Sync Capacitor (Android)
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        working-directory: android
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: beanies-android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
