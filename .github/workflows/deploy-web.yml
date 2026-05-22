@@ -43,6 +43,10 @@ jobs:
           name: web-dist
           path: web/dist/
           retention-days: 1
+          # Include dot-folders — upload-artifact excludes hidden files by
+          # default, which silently dropped web/dist/.well-known/ (the Android
+          # App Link `assetlinks.json`) from the S3 sync → 404. See ADR-029.
+          include-hidden-files: true
 
   deploy:
     name: Deploy to production
