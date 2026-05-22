@@ -1,9 +1,9 @@
 ---
 title: 'my 10-year-old outclassed me'
-slug: my-10-year-old-outclassed-me
+slug: japan-trip-with-my-son
 date: 2026-05-22
 category: founder story
-coverEmoji: 🚄
+coverImage: /blog/greg-neil-fushimi-inari-kyoto.webp
 excerpt: "At age 3, my son begged to ride the shinkansen. Seven years later I finally took him to Japan, and when the trip's big plan fell apart, my 10-year-old handled it better than I did."
 subtitle: 'what I learned from our dream vacation together'
 featured: false
@@ -33,7 +33,7 @@ Of course, I wasn't about to hop on a plane with a 3-year-old and a baby bag ful
 
 Neil had turned 10, and I wanted to take him somewhere memorable over his school holiday, instead of watching him sit at my computer playing Roblox all day. I cycled through a few options in my head, and remembered our conversations from years ago about Japan. That was where we were gonna go.
 
-Travel plans had been on my to-build list for a while, and I thought it would be a good way to get Neil engaged in the planning (as if he needed any motivation).
+[Travel plans](/blog/travel-plans-intro) had been on my to-build list for a while, and I thought it would be a good way to get Neil engaged in the planning (as if he needed any motivation).
 
 Like most 10-year-old boys, I stuck the app in front of his face and he understood it _instantly_. Within 5 minutes, travel ideas started popping into the aptly named "Daddy Neily Japan Trip" travel plan.
 
