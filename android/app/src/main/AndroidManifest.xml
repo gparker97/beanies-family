@@ -22,6 +22,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- OAuth deep link (ADR-029 A2): verified https App Link, NOT a
+                 custom scheme. Routes Google's redirect to
+                 https://beanies.family/oauth/native back into the app once
+                 /.well-known/assetlinks.json is hosted + verified. launchMode
+                 singleTask (above) delivers it to the running instance as an
+                 appUrlOpen event. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="beanies.family"
+                    android:pathPrefix="/oauth/native" />
+            </intent-filter>
+
         </activity>
 
         <provider

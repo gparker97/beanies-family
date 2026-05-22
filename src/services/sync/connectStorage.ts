@@ -19,7 +19,7 @@ import {
 } from '@/services/google/googleAuth';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import * as syncService from '@/services/sync/syncService';
-import { supportsFileSystemAccess } from '@/services/sync/capabilities';
+import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
 import { withTimeout } from '@/utils/timing';
 import { FileNameCollisionError } from '@/types/sync';
 
@@ -78,7 +78,12 @@ export async function connectDriveStorage(
   podFileBaseName: string,
   opts: { googleEmail?: string; activeFamilyId?: string | null } = {}
 ): Promise<StorageConnectOutcome> {
-  if (shouldUseRedirectAuth() && !isTokenValid()) {
+  // Native (Capacitor) must also take the redirect-style branch: popups don't
+  // work in a WebView, and `shouldUseRedirectAuth()` keys off iOS-WebKit /
+  // standalone-PWA heuristics that a native shell may not match. On native,
+  // `startRedirectAuth` opens the system browser and the appUrlOpen listener
+  // drives the resume-setup continuation. See ADR-029.
+  if ((shouldUseRedirectAuth() || isNative()) && !isTokenValid()) {
     await startRedirectAuth(RESUME_SETUP_PATH, opts.googleEmail);
     return { status: 'redirecting' };
   }

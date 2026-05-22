@@ -8,6 +8,8 @@ import MobileHamburgerMenu from '@/components/common/MobileHamburgerMenu.vue';
 import OfflineBanner from '@/components/common/OfflineBanner.vue';
 import InstallPrompt from '@/components/common/InstallPrompt.vue';
 import { usePwaUpdater, PWA_POST_UPDATE_ROUTE_KEY } from '@/composables/usePwaUpdater';
+import { installNativeAuthListener } from '@/services/google/googleAuth';
+import { isNative } from '@/services/sync/capabilities';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
@@ -666,45 +668,52 @@ onMounted(async () => {
     // the redirect can resume on the next attempt. No-op if there's no
     // pending redirect. Wrapped in catch so a failed exchange never
     // blocks app boot.
-    try {
-      const { completeRedirectAuth } = await import('@/services/google/googleAuth');
-      // Defense-in-depth: even with the inner fetch timeout in oauthProxy, an
-      // outer race ensures app init never wedges at `isInitializing=true` if
-      // a future code path adds another awaited fetch here. 20s is generous
-      // (the inner fetch already times out at 15s).
-      const redirectToken = await withTimeout(
-        completeRedirectAuth(),
-        20_000,
-        'completeRedirectAuth() timed out after 20000ms — silent refresh failed'
-      );
-      if (redirectToken) {
-        initBreadcrumbs.push('auth: consumed pending redirect-auth token');
-      } else {
-        // No pending redirect to consume — clear any lingering pending-
-        // account-switch flag from sessionStorage. If the user started a
-        // switch on PWA / iOS, then hit the back button instead of
-        // completing the chooser, the flag would otherwise contaminate
-        // the next legitimate token acquisition. Successful redirects
-        // already consume the flag inside the assertion subscriber.
-        const { disarmAccountSwitch } = await import('@/services/auth/googleAccountAssertion');
-        disarmAccountSwitch();
+    //
+    // SKIP on native (Capacitor): there the deep-link `appUrlOpen` listener
+    // (installNativeAuthListener) owns OAuth completion. Running this at boot
+    // too would race the listener to consume the one-time code (whichever
+    // removes the sessionStorage key first wins) and could complete the auth
+    // without the listener's navigation, stranding the user. See ADR-029.
+    if (!isNative())
+      try {
+        const { completeRedirectAuth } = await import('@/services/google/googleAuth');
+        // Defense-in-depth: even with the inner fetch timeout in oauthProxy, an
+        // outer race ensures app init never wedges at `isInitializing=true` if
+        // a future code path adds another awaited fetch here. 20s is generous
+        // (the inner fetch already times out at 15s).
+        const redirectToken = await withTimeout(
+          completeRedirectAuth(),
+          20_000,
+          'completeRedirectAuth() timed out after 20000ms — silent refresh failed'
+        );
+        if (redirectToken) {
+          initBreadcrumbs.push('auth: consumed pending redirect-auth token');
+        } else {
+          // No pending redirect to consume — clear any lingering pending-
+          // account-switch flag from sessionStorage. If the user started a
+          // switch on PWA / iOS, then hit the back button instead of
+          // completing the chooser, the flag would otherwise contaminate
+          // the next legitimate token acquisition. Successful redirects
+          // already consume the flag inside the assertion subscriber.
+          const { disarmAccountSwitch } = await import('@/services/auth/googleAccountAssertion');
+          disarmAccountSwitch();
+        }
+      } catch (e) {
+        // A pending redirect-auth code that fails to exchange is a real
+        // onboarding/reconnect failure — surface it (not just a console.warn).
+        // App boot still continues; the user lands on the welcome/recovery
+        // surface and can retry.
+        const msg = (e as Error).message;
+        console.warn('[App] completeRedirectAuth failed during init:', msg);
+        initBreadcrumbs.push(`auth: redirect-auth completion failed: ${msg}`);
+        reportError({
+          surface: 'app.redirectAuthCompletion',
+          message: `Redirect-auth code exchange failed during app init: ${msg}`,
+          error: e,
+          severity: 'error',
+          context: { route_path: route.path },
+        });
       }
-    } catch (e) {
-      // A pending redirect-auth code that fails to exchange is a real
-      // onboarding/reconnect failure — surface it (not just a console.warn).
-      // App boot still continues; the user lands on the welcome/recovery
-      // surface and can retry.
-      const msg = (e as Error).message;
-      console.warn('[App] completeRedirectAuth failed during init:', msg);
-      initBreadcrumbs.push(`auth: redirect-auth completion failed: ${msg}`);
-      reportError({
-        surface: 'app.redirectAuthCompletion',
-        message: `Redirect-auth code exchange failed during app init: ${msg}`,
-        error: e,
-        severity: 'error',
-        context: { route_path: route.path },
-      });
-    }
 
     // If not authenticated, redirect to the welcome/login gate (unless already on an auth page).
     // The marketing homepage lives at beanies.family; app.beanies.family is always the app surface,
@@ -1072,6 +1081,16 @@ useStaleTabRefresh();
 // confirmation toast. usePwaUpdater drives the update on a quiet moment and
 // sets PWA_POST_UPDATE_ROUTE_KEY; onMounted reads it into `pendingUpdateToast`.
 usePwaUpdater();
+
+// Native (Capacitor) OAuth deep-link completion. On native, Google sign-in
+// returns via a verified App Link `appUrlOpen` event; the listener completes
+// the exchange and asks us to navigate to the stored returnPath (the same
+// resume-setup continuation the web full-page redirect produces). No-op on web.
+// See ADR-029. Router navigation is injected here to keep googleAuth router-free.
+installNativeAuthListener((returnPath) => {
+  void router.replace(returnPath);
+});
+
 // Fire the post-update toast only once the init loader has cleared — info
 // toasts auto-dismiss after 5s, so firing during a cold-load loader would
 // vanish unseen.
