@@ -37,6 +37,9 @@ vi.mock('@/stores/syncStore', () => ({
     error: null,
     providerAccountEmail: null,
     listGoogleDriveFiles: listFilesMock,
+    // Desktop/jsdom: no redirect surface, so the gate is a no-op (returns false)
+    // and the flow proceeds straight to listGoogleDriveFiles.
+    beginDriveAuthRedirect: vi.fn(async () => false),
     loadFromGoogleDrive: vi.fn(),
     loadFromFile: vi.fn(),
     loadFromNewFile: vi.fn(),
@@ -73,6 +76,8 @@ vi.mock('@/stores/familyStore', () => ({
 
 vi.mock('@/services/google/googleAuth', () => ({
   getGoogleAccountEmail: () => 'gpsp2001@gmail.com',
+  shouldUseRedirectAuth: () => false,
+  isTokenValid: () => true,
 }));
 
 vi.mock('@/services/auth/passkeyService', () => ({
