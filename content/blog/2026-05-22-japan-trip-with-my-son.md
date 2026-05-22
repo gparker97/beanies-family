@@ -3,7 +3,7 @@ title: 'my 10-year-old outclassed me'
 slug: japan-trip-with-my-son
 date: 2026-05-22
 category: founder story
-coverImage: /blog/greg-neil-fushimi-inari-kyoto.webp
+coverImage: /blog/greg-neil-fushimi-inari-kyoto-cover.webp
 excerpt: "At age 3, my son begged to ride the shinkansen. Seven years later I finally took him to Japan, and when the trip's big plan fell apart, my 10-year-old handled it better than I did."
 subtitle: 'what I learned from our dream vacation together'
 featured: false
