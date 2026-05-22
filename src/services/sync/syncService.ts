@@ -707,9 +707,13 @@ async function doSave(): Promise<boolean> {
   updateState({ isSyncing: true, lastError: null });
 
   try {
-    // For local provider, verify we have permission before writing
-    if (currentProvider.type === 'local') {
-      const localProvider = currentProvider as LocalStorageProvider;
+    // Only the web (handle-based) LocalStorageProvider needs a file-permission
+    // check before writing. CapacitorFileProvider (native, app-private path-based
+    // storage) has no FileSystemFileHandle and needs no permission gate — gating
+    // on `instanceof` (not `type === 'local'`, which both providers share) skips
+    // it natively and avoids calling the handle-only getHandle(). See ADR-029.
+    if (currentProvider instanceof LocalStorageProvider) {
+      const localProvider = currentProvider;
       const permissionGranted = await verifyPermission(localProvider.getHandle(), 'readwrite');
       if (!permissionGranted) {
         console.warn('[syncService] doSave: file permission denied — save skipped');
@@ -789,9 +793,11 @@ export async function load(): Promise<string | null> {
   updateState({ isSyncing: true, lastError: null });
 
   try {
-    // For local provider, verify permission before reading
-    if (currentProvider.type === 'local') {
-      const localProvider = currentProvider as LocalStorageProvider;
+    // Only the web (handle-based) LocalStorageProvider needs a permission check
+    // before reading; CapacitorFileProvider (native) has no handle and skips it
+    // (see doSave). Gating on `instanceof` avoids the handle-only getHandle().
+    if (currentProvider instanceof LocalStorageProvider) {
+      const localProvider = currentProvider;
       const hasPermission = await verifyPermission(localProvider.getHandle(), 'read');
       if (!hasPermission) {
         updateState({ isSyncing: false, lastError: 'Permission denied' });
