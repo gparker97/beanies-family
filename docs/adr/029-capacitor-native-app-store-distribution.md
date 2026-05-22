@@ -71,7 +71,7 @@ The dev machine is **WSL2 / Linux with no Java, no Android SDK, and (necessarily
 
 ### Open questions (to resolve before/inside the spike)
 
-- **Build & distribution mechanics** (the one fork given WSL + no Mac): cloud CI that builds _both_ platforms (Codemagic / EAS) vs. local Android toolchain in WSL for the first APK + Mac/cloud-Mac for iOS vs. Android Studio on the Windows host. **Pending greg's decision.**
+- **Build & distribution mechanics** (the one fork given WSL + no Mac): **decided 2026-05-22 — cloud CI that builds _both_ platforms** (Codemagic / EAS), so no local Android SDK and no Mac are needed; the pipeline emits a downloadable debug APK and pushes iOS to TestFlight. Service choice (Codemagic vs EAS) + signing-credential setup is the remaining sub-task.
 - **Apple Guideline 4.8 ("Sign in with Apple"):** beanies uses Google as an encrypted-_storage_ provider, not a social identity provider, so 4.8 likely does not apply — but it's a known grey area; adding Sign in with Apple is the safe fallback if review pushes back.
 
 ### To validate (the spike's purpose — gates promotion to Accepted)
@@ -81,6 +81,18 @@ The dev machine is **WSL2 / Linux with no Java, no Android SDK, and (necessarily
 3. **Automerge WASM initializes inside a real WebView** (verify the WebView serves `.wasm` with `application/wasm` and the bundled path resolves).
 
 If any of (1)–(3) fails in a way Capacitor can't bridge, this ADR is revised before committing to a full implementation plan.
+
+## Spike findings (2026-05-22, branch `spike/capacitor-mobile`)
+
+What the first scaffolding pass confirmed (the parts verifiable without a device build):
+
+1. **Capacitor 8.3.4 installs cleanly** into the existing Vue 3 / Vite 6 project — no dependency conflicts, no peer-range fights.
+2. **`cap init` + `cap add android` + `cap add ios` all succeed on Linux/WSL.** iOS scaffolds too because **Capacitor 8 uses Swift Package Manager** (`ios/App/CapApp-SPM`, `App.xcodeproj`), not CocoaPods — so no macOS is needed to _generate_ the iOS project (building it still requires Xcode/macOS, i.e. cloud CI).
+3. **The existing `npm run build` output (192 precache entries, ~16 MB) copies cleanly into both native projects** via `cap sync`. The copied `app/src/main/assets/public` dir is auto-gitignored, so committing the native projects stays lean (CI regenerates assets).
+4. **Risk point 3 — static half PASSES.** The 2.7 MB `automerge_wasm_bg-*.wasm` is physically bundled into the Android assets (`android/app/src/main/assets/public/assets/`). The remaining runtime half — does the Capacitor WebView serve `.wasm` with `application/wasm` so `WebAssembly.instantiateStreaming` succeeds — still needs a device build to confirm (Automerge's non-streaming fallback should cover it even if the MIME map doesn't include `.wasm`).
+5. **New integration point found: the PWA service worker is bundled into the native assets** (`sw.js`, `workbox-*.js`, `manifest.webmanifest`). A web-PWA service worker generally should _not_ run inside a Capacitor WebView (the app is already served from local assets; a SW can interfere with updates/caching). The plan must **guard SW registration off in the native build** (e.g. skip `usePwaUpdater`/registration when `Capacitor.isNativePlatform()`).
+6. **Plugins wired for both platforms:** `@capacitor/app` (deep-link `appUrlOpen`), `@capacitor/browser` (system-browser OAuth), `@capacitor/filesystem` (local `.beanpod`) — detected by both `cap add` runs, ready for the code adaptations.
+7. **Risk points 1 (full Android build → runnable app) and 2 (OAuth round-trip)** remain pending the first cloud-CI build, since both need an actual device/emulator run. The OAuth deep-link code and the filesystem branch are the next code tasks; Codemagic setup + signing credentials are the next ops tasks.
 
 ## Key files (anticipated; spike will confirm)
 
