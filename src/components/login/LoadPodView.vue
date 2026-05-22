@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* global FileSystemFileHandle, FileSystemHandle */
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -13,9 +13,14 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { getGoogleAccountEmail, shouldUseRedirectAuth } from '@/services/google/googleAuth';
+import {
+  getGoogleAccountEmail,
+  shouldUseRedirectAuth,
+  isTokenValid,
+} from '@/services/google/googleAuth';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 import { supportsFileSystemAccess } from '@/services/sync/capabilities';
+import { LOAD_DRIVE_PATH } from './resumePaths';
 import {
   isPlatformAuthenticatorAvailable,
   hasRegisteredPasskeys,
@@ -31,6 +36,14 @@ const familyStore = useFamilyStore();
 const props = defineProps<{
   needsPermissionGrant?: boolean;
   autoLoad?: boolean;
+  /**
+   * Set by `LoginPage` when returning from a Drive-load OAuth redirect
+   * (`?resume=load-drive`). Re-opens the Google Drive file picker with the
+   * now-cached token. Consumed via an `immediate` watch (NOT `onMounted`):
+   * on native the deep-link `router.replace` keeps this component mounted, so
+   * `onMounted` would never re-fire. See ADR-029.
+   */
+  autoOpenDrivePicker?: boolean;
   skipBiometric?: boolean;
   forceNewGoogleAccount?: boolean;
   loadError?: string;
@@ -546,23 +559,72 @@ const driveDisabledTooltipKey = computed(() => {
   return 'selfHost.driveUnavailableNoProxyTooltip';
 });
 
-async function handleLoadFromGoogleDrive() {
+/**
+ * Single entry for "(re)open the Google Drive file picker". The three public
+ * handlers below are thin wrappers differing only in their auth intent.
+ *
+ * On a redirect surface (native / iOS / installed PWA) the popup OAuth transport
+ * can't bridge back into the app, so a first sign-in (no token) — and a
+ * switch-account (`forceNewAccount`) even WITH a token — bounces through the
+ * system browser / full-page redirect via `syncStore.beginDriveAuthRedirect`.
+ * `LoginPage`'s `resume=load-drive` dispatcher then re-enters here with
+ * `isResume: true` once the token is cached. On desktop (popup) or when a token
+ * is already in hand, we list immediately — desktop behaviour is unchanged.
+ * See ADR-029 + docs/plans/2026-05-22-native-pwa-drive-oauth-redirect-unification.md.
+ *
+ * @param opts.forceNewAccount  switch-account intent (forces re-auth on a
+ *   redirect surface; `forceConsent` on the desktop popup path).
+ * @param opts.isResume  true only when invoked by the post-redirect resume. If
+ *   the token is missing then, the upstream exchange failed — surface it rather
+ *   than re-redirecting (which would loop). Never set on a user-initiated tap.
+ */
+async function openDrivePicker(opts: { forceNewAccount?: boolean; isResume?: boolean } = {}) {
   if (!syncStore.isGoogleDriveAvailable) {
-    // Defense-in-depth: the button is disabled in this state, so this branch
-    // shouldn't fire. If it does, log so a dev can spot the regression.
+    // Defense-in-depth: the card is disabled in this state. Hoisted into the
+    // shared body so retry/switch-account inherit the guard too. If it fires,
+    // log so a dev can spot the regression.
     console.warn(
-      '[LoadPodView] Google Drive load handler invoked while isGoogleDriveAvailable is false (features.drive && features.oauthProxy) — check the disabled binding on the card.'
+      '[LoadPodView] openDrivePicker invoked while isGoogleDriveAvailable is false (features.drive && features.oauthProxy) — check the disabled binding on the card.'
     );
     return;
   }
 
-  isDriveLoading.value = true;
   formError.value = null;
+
+  // Resume after the deep link: a failed exchange still routes to LOAD_DRIVE_PATH
+  // (handleNativeAuthRedirect always onComplete()s), so we can land here with no
+  // token. Surface it directly — do NOT fall through to beginDriveAuthRedirect,
+  // which would see `!isTokenValid()` and redirect again (consent loop).
+  if (opts.isResume && !isTokenValid()) {
+    formError.value = t('googleDrive.authFailed');
+    return;
+  }
+
+  // Redirect surface + (no token OR switch-account) → bounce out; the resume
+  // continuation re-enters here with a cached token. A start failure (no client
+  // id, Browser.open rejects) is surfaced, never swallowed.
+  try {
+    if (
+      await syncStore.beginDriveAuthRedirect(
+        LOAD_DRIVE_PATH,
+        syncStore.providerAccountEmail ?? undefined,
+        { forceReauth: opts.forceNewAccount }
+      )
+    ) {
+      return; // redirecting away — nothing more to do here
+    }
+  } catch (e) {
+    console.error('[LoadPodView] Drive auth redirect failed to start:', e);
+    formError.value = (e as Error).message || t('googleDrive.authFailed');
+    return;
+  }
+
+  isDriveLoading.value = true;
   showDriveEmptyState.value = false;
 
   try {
     driveFiles.value = await syncStore.listGoogleDriveFiles({
-      forceNewAccount: props.forceNewGoogleAccount,
+      forceNewAccount: opts.forceNewAccount,
     });
     if (driveFiles.value.length === 0) {
       showDriveEmptyState.value = true;
@@ -572,58 +634,38 @@ async function handleLoadFromGoogleDrive() {
       showDrivePicker.value = true;
     }
   } catch (e) {
-    console.error('[LoadPodView] handleLoadFromGoogleDrive failed:', e);
+    console.error('[LoadPodView] openDrivePicker list failed:', e);
     formError.value = (e as Error).message || t('googleDrive.authFailed');
   } finally {
     isDriveLoading.value = false;
   }
 }
 
-async function handleDriveRetry() {
-  isDriveLoading.value = true;
-  showDriveEmptyState.value = false;
-  formError.value = null;
-
-  try {
-    driveFiles.value = await syncStore.listGoogleDriveFiles();
-    if (driveFiles.value.length === 0) {
-      showDriveEmptyState.value = true;
-      lastDriveCheckEmpty.value = true;
-    } else {
-      lastDriveCheckEmpty.value = false;
-      showDrivePicker.value = true;
-    }
-  } catch (e) {
-    console.error('[LoadPodView] handleDriveRetry failed:', e);
-    formError.value = (e as Error).message || t('googleDrive.authFailed');
-  } finally {
-    isDriveLoading.value = false;
-  }
+function handleLoadFromGoogleDrive() {
+  return openDrivePicker({ forceNewAccount: props.forceNewGoogleAccount });
 }
 
-async function handleDriveSwitchAccount() {
-  isDriveLoading.value = true;
-  showDriveEmptyState.value = false;
-  formError.value = null;
-
-  try {
-    driveFiles.value = await syncStore.listGoogleDriveFiles({
-      forceNewAccount: true,
-    });
-    if (driveFiles.value.length === 0) {
-      showDriveEmptyState.value = true;
-      lastDriveCheckEmpty.value = true;
-    } else {
-      lastDriveCheckEmpty.value = false;
-      showDrivePicker.value = true;
-    }
-  } catch (e) {
-    console.error('[LoadPodView] handleDriveSwitchAccount failed:', e);
-    formError.value = (e as Error).message || t('googleDrive.authFailed');
-  } finally {
-    isDriveLoading.value = false;
-  }
+function handleDriveRetry() {
+  return openDrivePicker();
 }
+
+function handleDriveSwitchAccount() {
+  return openDrivePicker({ forceNewAccount: true });
+}
+
+// Post-redirect resume: re-open the picker once `LoginPage` flags it (we just
+// returned from the Drive-load OAuth redirect with a cached token). `immediate`
+// covers both the web full-page-reload first mount AND the native deep-link
+// `router.replace`, which does NOT remount this component — an `onMounted` here
+// would never re-fire on native. `isResume: true` makes a missing token surface
+// an error instead of re-redirecting (loop guard). See ADR-029.
+watch(
+  () => props.autoOpenDrivePicker,
+  (open) => {
+    if (open) void openDrivePicker({ isResume: true });
+  },
+  { immediate: true }
+);
 
 /**
  * From the NoPodEmptyState panel: switch to the local-file flow.

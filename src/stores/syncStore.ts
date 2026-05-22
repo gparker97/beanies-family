@@ -26,6 +26,7 @@ import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
+import { beginDriveAuthRedirectIfNeeded } from '@/services/sync/connectStorage';
 import { features } from '@/config/features';
 import { downloadAsFile } from '@/services/sync/fileSync';
 import * as registry from '@/services/registry/registryService';
@@ -2455,6 +2456,22 @@ export const useSyncStore = defineStore('sync', () => {
     return searchBeanpodFilesGlobal(token);
   }
 
+  /**
+   * Begin a redirect/deep-link OAuth flow before a Drive read IFF the surface
+   * needs one and no valid token is held. Thin delegate to
+   * `connectStorage.beginDriveAuthRedirectIfNeeded` so `LoadPodView`'s whole
+   * Drive surface stays store-mediated (MVO) rather than the view importing the
+   * service helper directly. Returns `true` when redirecting (caller returns
+   * early), `false` when a token is in hand / popup is fine. See ADR-029.
+   */
+  async function beginDriveAuthRedirect(
+    returnPath: string,
+    loginHint?: string,
+    opts?: { forceReauth?: boolean }
+  ): Promise<boolean> {
+    return beginDriveAuthRedirectIfNeeded(returnPath, loginHint, opts);
+  }
+
   let tokenExpiryUnsub: (() => void) | null = null;
   let tokenAcquiredUnsub: (() => void) | null = null;
 
@@ -2697,6 +2714,7 @@ export const useSyncStore = defineStore('sync', () => {
     attemptResumeFromRegistry,
     completeAutoLoad,
     listGoogleDriveFiles,
+    beginDriveAuthRedirect,
     recoverFromMissingFile,
     decryptPendingFile,
     loadFromPersistenceCache,

@@ -26,6 +26,40 @@ import { FileNameCollisionError } from '@/types/sync';
 /** Path the OAuth redirect returns to — `LoginPage` shows the resume-setup screen here. */
 export const RESUME_SETUP_PATH = '/welcome?resume=setup';
 
+/**
+ * Begin a redirect/deep-link OAuth flow IFF the current surface needs one and we
+ * don't already hold a valid token. Returns `true` when it kicked off the
+ * redirect (the page is navigating away on web / the system browser opened on
+ * native — the caller MUST return early and treat it as "redirecting"); `false`
+ * when a token is already in hand or a popup is acceptable (desktop), in which
+ * case the caller proceeds with its normal token-bearing path.
+ *
+ * `shouldUseRedirectAuth()` is the single source of truth for the transport
+ * decision (it returns true on native + iOS/PWA). `startRedirectAuth` preserves
+ * the `prompt=consent` refresh-token invariant; do not hand-roll an auth URL.
+ *
+ * Return-path-agnostic by design — each caller passes the path it wants to
+ * resume at (create → RESUME_SETUP_PATH; load → the login-flow's LOAD_DRIVE_PATH).
+ * A throw from `startRedirectAuth` (e.g. no client id, Browser.open rejects)
+ * propagates to the caller's try/catch — never swallowed.
+ *
+ * `opts.forceReauth` redirects even when a valid token is held — the
+ * switch-account case on a redirect surface, where the popup `forceConsent`
+ * path can't run. `startRedirectAuth`'s `prompt=consent` re-prompts Google;
+ * the create path never passes this (default false → unchanged).
+ */
+export async function beginDriveAuthRedirectIfNeeded(
+  returnPath: string,
+  loginHint?: string,
+  opts: { forceReauth?: boolean } = {}
+): Promise<boolean> {
+  if (shouldUseRedirectAuth() && (opts.forceReauth || !isTokenValid())) {
+    await startRedirectAuth(returnPath, loginHint);
+    return true;
+  }
+  return false;
+}
+
 /** Provider was installed; caller should now write the pod file. */
 export interface StorageConnected {
   status: 'connected';
@@ -78,13 +112,12 @@ export async function connectDriveStorage(
   podFileBaseName: string,
   opts: { googleEmail?: string; activeFamilyId?: string | null } = {}
 ): Promise<StorageConnectOutcome> {
-  // Native (Capacitor) must also take the redirect-style branch: popups don't
-  // work in a WebView, and `shouldUseRedirectAuth()` keys off iOS-WebKit /
-  // standalone-PWA heuristics that a native shell may not match. On native,
-  // `startRedirectAuth` opens the system browser and the appUrlOpen listener
-  // drives the resume-setup continuation. See ADR-029.
-  if ((shouldUseRedirectAuth() || isNative()) && !isTokenValid()) {
-    await startRedirectAuth(RESUME_SETUP_PATH, opts.googleEmail);
+  // On a redirect surface (native / iOS / installed PWA) with no valid token,
+  // bounce through the system browser / full-page redirect; the appUrlOpen
+  // listener (native) or OAuthCallbackPage (web) drives the resume-setup
+  // continuation on return. `shouldUseRedirectAuth()` already covers native
+  // (ADR-029), so no separate `isNative()` check is needed here.
+  if (await beginDriveAuthRedirectIfNeeded(RESUME_SETUP_PATH, opts.googleEmail)) {
     return { status: 'redirecting' };
   }
 

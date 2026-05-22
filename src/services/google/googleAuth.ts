@@ -219,6 +219,12 @@ export function isUserCancellation(e: unknown): boolean {
  */
 export function shouldUseRedirectAuth(): boolean {
   if (typeof window === 'undefined') return false;
+  // Native (Capacitor): popups can't bridge postMessage back into the WebView,
+  // and Google redirects to the verified App Link which the OS routes into the
+  // app (appUrlOpen) — never to a popup. The deep-link transport is the only
+  // one that works. This is the single source of truth for "use redirect auth";
+  // callers must not re-test `isNative()` separately. See ADR-029.
+  if (isNative()) return true;
   const nav = window.navigator as
     | (Navigator & { standalone?: boolean; maxTouchPoints?: number })
     | undefined;
