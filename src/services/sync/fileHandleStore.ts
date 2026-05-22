@@ -13,6 +13,12 @@ export interface PersistedProviderConfig {
   driveFileId?: string;
   driveFileName?: string;
   driveAccountEmail?: string;
+  /**
+   * Native (Capacitor) local-file path, relative to Directory.Data. Set only by
+   * `CapacitorFileProvider` — the native local-file restore pointer (the web
+   * local provider restores from a `FileSystemFileHandle` instead). See ADR-029.
+   */
+  localPath?: string;
 }
 
 interface HandleDB {
