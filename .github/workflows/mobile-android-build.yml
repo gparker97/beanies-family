@@ -5,12 +5,15 @@ name: Mobile — Android debug APK
 # Automerge WASM initializes in the WebView. Public repo → free runners; a debug
 # APK needs no signing, so this needs no secrets and no Apple/Google account.
 #
-# Scoped to the spike branch + manual dispatch so it never touches main's CI.
+# Builds on pushes to main (the Capacitor work merged from spike/capacitor-mobile)
+# + manual dispatch. Docs-only pushes are skipped. This is a free, unsigned
+# debug-APK lane for on-device dev testing; the signed Play release lives in
+# mobile-android-release.yml (manual-only).
 
 on:
   push:
-    branches: ['spike/capacitor-mobile']
-    # Docs-only changes don't change the build — skip them so ADR edits don't rebuild.
+    branches: ['main']
+    # Docs-only changes don't change the build — skip them so doc edits don't rebuild.
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
