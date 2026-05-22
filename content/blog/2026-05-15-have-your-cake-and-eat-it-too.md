@@ -6,7 +6,7 @@ category: use-case
 coverImage: /blog/beanies-privacy-security-infographic.webp
 excerpt: "how to manage your family's precious data without giving it away."
 subtitle: "how to manage your family's precious data without giving it away"
-featured: true
+featured: false
 author: greg
 ---
 
