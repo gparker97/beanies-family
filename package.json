@@ -46,6 +46,12 @@
   "dependencies": {
     "@automerge/automerge": "^3.2.6",
     "@beanies/brand": "*",
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/browser": "^8.0.3",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/ios": "^8.3.4",
     "chart.js": "^4.5.1",
     "idb": "^8.0.3",
     "pinia": "^3.0.4",
@@ -57,6 +63,7 @@
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1049.0",
     "@aws-sdk/util-dynamodb": "^3.996.2",
+    "@capacitor/cli": "^8.3.4",
     "@eslint/js": "^9.39.2",
     "@heroicons/vue": "^2.2.0",
     "@microsoft/eslint-plugin-sdl": "^1.1.0",
