@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-22
+
+### Added
+
+- **New blog post: "my 10-year-old outclassed me."** A founder story about taking my train-obsessed son to Japan for cherry blossom season — a sold-out museum, a Mt. Fuji we never quite saw, and a 10-year-old who handled disappointment better than his dad did.
+
 ## 2026-05-21
 
 ### Changed
