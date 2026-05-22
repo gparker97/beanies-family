@@ -10,6 +10,7 @@ import InstallPrompt from '@/components/common/InstallPrompt.vue';
 import { usePwaUpdater, PWA_POST_UPDATE_ROUTE_KEY } from '@/composables/usePwaUpdater';
 import { installNativeAuthListener } from '@/services/google/googleAuth';
 import { isNative } from '@/services/sync/capabilities';
+import { useLocalNotifications } from '@/composables/useLocalNotifications';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
@@ -1090,6 +1091,12 @@ usePwaUpdater();
 installNativeAuthListener((returnPath) => {
   void router.replace(returnPath);
 });
+
+// On-device reminders for today's briefing (native only). Schedules a local
+// notification for each timed pickup/dropoff/activity/due-to-do at its time —
+// generated on-device from already-decrypted data (no server sees the schedule).
+// No-op on web. See ADR-029.
+useLocalNotifications();
 
 // Fire the post-update toast only once the init loader has cleared — info
 // toasts auto-dismiss after 5s, so firing during a cold-load loader would
