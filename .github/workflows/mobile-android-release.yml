@@ -1,0 +1,94 @@
+name: Mobile — Android release (Play)
+
+# Manual-only (ADR-029 A6). Builds a SIGNED release AAB and uploads it to a
+# Google Play track. It has NO push/PR trigger, so it can never fail a push or
+# block a build — it stays dormant until you trigger it AND the signing + Play
+# secrets exist:
+#   secrets: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+#            ANDROID_KEY_PASSWORD, PLAY_SERVICE_ACCOUNT_JSON
+# The preflight step below fails fast with instructions if they're not set, so a
+# premature run gives a clear message instead of an obscure Gradle error. Gradle
+# release signing is conditional on ANDROID_KEYSTORE_PATH (android/app/build.gradle),
+# so the debug lane is completely unaffected.
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Google Play track'
+        type: choice
+        default: internal
+        options: [internal, alpha, beta, production]
+
+permissions:
+  contents: read
+
+jobs:
+  release-aab:
+    name: Build + upload signed AAB
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight — require signing + Play secrets
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          missing=""
+          [ -z "$KEYSTORE" ] && missing="$missing ANDROID_KEYSTORE_BASE64"
+          [ -z "$SA" ] && missing="$missing PLAY_SERVICE_ACCOUNT_JSON"
+          if [ -n "$missing" ]; then
+            echo "::error::Release lane not configured — missing repo secrets:$missing. Set up the release keystore + a Google Play service account first (see ADR-029 A6 and web/public/.well-known/README.md), then re-run."
+            exit 1
+          fi
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Sync Capacitor (Android)
+        run: npx cap sync android
+
+      - name: Decode release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+      - name: Build signed release AAB
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # Monotonic versionCode from the run number; versionName is informational.
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
+        run: ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Upload to Google Play (${{ inputs.track }})
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: family.beanies.app
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: ${{ inputs.track }}
+          status: completed
