@@ -11,6 +11,7 @@ import { usePwaUpdater, PWA_POST_UPDATE_ROUTE_KEY } from '@/composables/usePwaUp
 import { installNativeAuthListener } from '@/services/google/googleAuth';
 import { isNative } from '@/services/sync/capabilities';
 import { useLocalNotifications } from '@/composables/useLocalNotifications';
+import { useNativeShell } from '@/composables/useNativeShell';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
@@ -1097,6 +1098,11 @@ installNativeAuthListener((returnPath) => {
 // generated on-device from already-decrypted data (no server sees the schedule).
 // No-op on web. See ADR-029.
 useLocalNotifications();
+
+// Native shell: hide the splash, set the status-bar style, and wire the Android
+// hardware back button (cooperates with the existing overlay-close mechanism).
+// No-op on web. See ADR-029.
+useNativeShell();
 
 // Fire the post-update toast only once the init loader has cleared — info
 // toasts auto-dismiss after 5s, so firing during a cold-load loader would
