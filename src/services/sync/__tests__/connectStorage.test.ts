@@ -4,9 +4,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // module imports cleanly (these tests only exercise connectLocalStorage).
 vi.mock('@/services/sync/capabilities', () => ({
   supportsFileSystemAccess: vi.fn(),
+  isNative: vi.fn(() => false),
 }));
 vi.mock('@/services/sync/syncService', () => ({
   selectSyncFile: vi.fn(),
+  selectNativeLocalFile: vi.fn(),
   setProvider: vi.fn(),
 }));
 vi.mock('@/services/google/googleAuth', () => ({
@@ -19,11 +21,13 @@ vi.mock('@/services/sync/providers/googleDriveProvider', () => ({
 }));
 
 import { connectLocalStorage } from '../connectStorage';
-import { supportsFileSystemAccess } from '@/services/sync/capabilities';
+import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
 import * as syncService from '@/services/sync/syncService';
 
 const mockSupports = vi.mocked(supportsFileSystemAccess);
+const mockIsNative = vi.mocked(isNative);
 const mockSelect = vi.mocked(syncService.selectSyncFile);
+const mockSelectNative = vi.mocked(syncService.selectNativeLocalFile);
 
 describe('connectLocalStorage', () => {
   beforeEach(() => {
@@ -48,6 +52,17 @@ describe('connectLocalStorage', () => {
     mockSelect.mockResolvedValue(true);
 
     expect(await connectLocalStorage()).toEqual({ status: 'connected', type: 'local' });
+  });
+
+  it('on native, writes to an app-private file (no picker, no unsupported-browser) — ADR-029 A3', async () => {
+    mockIsNative.mockReturnValue(true);
+    mockSupports.mockReturnValue(false); // FSA absent in a WebView — must NOT matter
+    mockSelectNative.mockResolvedValue(true);
+
+    expect(await connectLocalStorage('the-smiths')).toEqual({ status: 'connected', type: 'local' });
+    expect(mockSelectNative).toHaveBeenCalledWith('the-smiths');
+    // The web FSA picker is never consulted on native.
+    expect(mockSelect).not.toHaveBeenCalled();
   });
 
   it('reports a dismissed picker as cancelled (not unsupported-browser) in a capable browser', async () => {

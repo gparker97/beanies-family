@@ -122,7 +122,23 @@ export async function connectDriveStorage(
  * lacks the File System Access API (Firefox/Safari), where a retry can never
  * succeed and the caller should steer to Drive / Chrome / Edge.
  */
-export async function connectLocalStorage(): Promise<StorageConnected | StorageConnectFailed> {
+export async function connectLocalStorage(
+  baseName?: string
+): Promise<StorageConnected | StorageConnectFailed> {
+  // Native (Capacitor): no File System Access API and no save picker — the pod
+  // is written to an app-private file via @capacitor/filesystem (app-managed
+  // location, persisted for cold-boot restore). See ADR-029.
+  if (isNative()) {
+    try {
+      const ok = await syncService.selectNativeLocalFile(baseName);
+      return ok
+        ? { status: 'connected', type: 'local' }
+        : { status: 'failed', error: 'Could not set up local file storage' };
+    } catch (e) {
+      return { status: 'failed', error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
   // showSaveFilePicker is Chromium-only. In Firefox/Safari it's absent, so
   // there's no local-file path at all — flag it as its own failure class so
   // the caller surfaces an actionable message instead of a futile "try again".

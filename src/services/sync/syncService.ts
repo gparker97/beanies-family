@@ -9,7 +9,7 @@
  * encryption at the sync layer. The syncStore manages the family key lifecycle.
  */
 
-import { supportsFileSystemAccess } from './capabilities';
+import { supportsFileSystemAccess, isNative } from './capabilities';
 import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
 import {
@@ -26,6 +26,7 @@ import { onDocPersistNeeded } from '@/services/automerge/docService';
 import { persistDoc, persistEnvelope, isCacheReady } from '@/services/automerge/persistenceService';
 import type { StorageProvider, StorageProviderType } from './storageProvider';
 import { LocalStorageProvider } from './providers/localProvider';
+import { CapacitorFileProvider } from './providers/capacitorFileProvider';
 import { DriveApiError } from '@/services/google/driveService';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import { preserveLocalKeyDicts } from './envelopeMerge';
@@ -455,6 +456,21 @@ export async function initialize(): Promise<boolean> {
         });
         return true;
       }
+      // Native (Capacitor) local file restores from the persisted path (no
+      // FileSystemFileHandle on native — that's the web provider's mechanism).
+      // See ADR-029.
+      if (config?.type === 'local' && config.localPath && isNative()) {
+        currentProvider = CapacitorFileProvider.fromPath(config.localPath);
+        currentProviderFamilyId = familyId;
+        startPollingIfApplicable(currentProvider);
+        updateState({
+          isInitialized: true,
+          isConfigured: true,
+          fileName: currentProvider.getDisplayName(),
+          lastError: null,
+        });
+        return true;
+      }
     } catch (e) {
       console.warn('Failed to restore provider config:', e);
     }
@@ -550,6 +566,35 @@ export async function selectSyncFile(): Promise<boolean> {
     if ((e as Error).name === 'AbortError') {
       return false;
     }
+    updateState({ lastError: (e as Error).message });
+    return false;
+  }
+}
+
+/**
+ * Configure a native (Capacitor) app-private local file as the sync target —
+ * the native counterpart to `selectSyncFile`. There's no save picker on native,
+ * so the location is app-managed (`Directory.Data`); the file itself is created
+ * on the first write (syncStore.createNewFile). Persists the path for cold-boot
+ * restore. See ADR-029.
+ */
+export async function selectNativeLocalFile(baseName = 'my-family'): Promise<boolean> {
+  try {
+    const provider = new CapacitorFileProvider(`${baseName}.beanpod`);
+    const familyId = getActiveFamilyId();
+    if (familyId) {
+      await provider.persist(familyId);
+    }
+    currentProvider = provider;
+    currentProviderFamilyId = familyId;
+    startPollingIfApplicable(provider);
+    updateState({
+      isConfigured: true,
+      fileName: provider.getDisplayName(),
+      lastError: null,
+    });
+    return true;
+  } catch (e) {
     updateState({ lastError: (e as Error).message });
     return false;
   }
