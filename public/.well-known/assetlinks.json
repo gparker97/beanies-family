@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.get_login_creds"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "family.beanies.app",
+      "sha256_cert_fingerprints": [
+        "19:E4:E6:85:03:E2:59:C7:34:2D:BE:1E:CC:6B:9E:97:31:50:1B:D6:BA:52:7E:33:12:AF:F3:40:C0:B1:18:88"
+      ]
+    }
+  }
+]

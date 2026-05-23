@@ -3126,8 +3126,8 @@ const STRING_DEFS = {
     beanie: 'no biometric logins registered yet.',
   },
   'passkey.unsupported': {
-    en: 'Your browser does not support biometric login (WebAuthn).',
-    beanie: 'your browser does not support biometric login (webauthn).',
+    en: "Biometric unlock isn't available on this device. Use your password to sign in.",
+    beanie: "biometric unlock isn't available on this device. use your password to sign in.",
   },
   'passkey.rename': { en: 'Rename', beanie: 'rename' },
   'passkey.renameLabel': { en: 'Device name', beanie: 'device name' },

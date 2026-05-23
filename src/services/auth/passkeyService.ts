@@ -21,8 +21,33 @@ import type { PasskeyRegistration, PasskeySecret } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 import { getGlobalSettings } from '@/services/indexeddb/repositories/globalSettingsRepository';
 import { importFamilyKey } from '@/services/crypto/familyKeyService';
+import { isNative, getPlatform } from '@/services/sync/capabilities';
+import { reportError } from '@/utils/errorReporter';
 
 const RP_NAME = 'beanies.family';
+
+// Fixed WebAuthn Relying Party ID for native apps. The native WebView serves
+// from `https://localhost`, which is NOT a usable RP ID and doesn't match the
+// PWA's credentials — so on native we assert against the production app domain,
+// authorized by the Digital-Asset-Links (Android) / AASA (iOS) association we
+// host at `https://app.beanies.family/.well-known/`. This MUST equal the host
+// the existing PWA passkeys were registered under (`window.location.hostname`
+// on the live PWA) or those credentials would be orphaned. It is fixed product
+// infrastructure tied to the hosted association files — not a per-deploy knob,
+// and deliberately NOT sourced from `features.ts` (deployment-mode gating). See
+// ADR-029 and docs/plans/2026-05-23-native-pwa-biometric-login.md.
+const WEBAUTHN_RP_ID = 'app.beanies.family';
+
+/**
+ * Resolve the WebAuthn Relying Party ID for the current surface.
+ * - Web/PWA/dev/self-host: the current origin's hostname (unchanged behavior —
+ *   `app.beanies.family` in prod, `localhost` in dev, the self-hoster's domain).
+ * - Native (Capacitor): the fixed `WEBAUTHN_RP_ID`, since the WebView origin
+ *   (`localhost`) is not the RP ID — the platform association supplies the trust.
+ */
+export function getRpId(): string {
+  return isNative() ? WEBAUTHN_RP_ID : window.location.hostname;
+}
 
 // --- Feature detection ---
 
@@ -81,7 +106,7 @@ export async function registerPasskeyForMember(
   // Generate client-side challenge
   const challenge = crypto.getRandomValues(new Uint8Array(32));
 
-  const rpId = window.location.hostname;
+  const rpId = getRpId();
   const prfExtension = buildPRFExtension();
 
   const publicKeyOptions: PublicKeyCredentialCreationOptions = {
@@ -215,7 +240,7 @@ export async function authenticateWithPasskey(
   }
 
   const challenge = crypto.getRandomValues(new Uint8Array(32));
-  const rpId = window.location.hostname;
+  const rpId = getRpId();
   const prfExtension = buildPRFExtension();
 
   // Discoverable credential mode: omit allowCredentials entirely.
@@ -441,7 +466,7 @@ export async function signalCredentialsRemoved(credentialIds: string[]): Promise
     return;
   }
 
-  const rpId = window.location.hostname;
+  const rpId = getRpId();
   const signal = (
     PublicKeyCredential as unknown as {
       signalUnknownCredential: (opts: { rpId: string; credentialId: string }) => Promise<void>;
@@ -618,6 +643,21 @@ function formatCredentialManagerError(err: unknown): string {
       return 'A security error occurred. Please make sure you are using a secure (HTTPS) connection.';
     }
   }
+  // Unrecognized passkey failure — surface a friendly string to the user AND a
+  // developer breadcrumb (the only reportError in this service). `warning`, not
+  // `error`: the caller still falls back to password, so it's not user-blocking.
+  // Known/cancelled cases never reach here (handled upstream + de-noised,
+  // triage 2026-05-02). errorReporter's reentry-guard + 60s dedup cover floods.
+  reportError({
+    surface: 'passkey-assertion',
+    message: err instanceof Error ? err.message : 'unknown passkey error',
+    error: err,
+    severity: 'warning',
+    context: {
+      domException: err instanceof DOMException ? err.name : null,
+      platform: getPlatform(),
+    },
+  });
   return err instanceof Error
     ? err.message
     : 'An unexpected error occurred during passkey operation';

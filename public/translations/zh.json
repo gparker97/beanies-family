@@ -2,7 +2,7 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-21",
+    "lastUpdated": "2026-05-23",
     "translationCount": 2923
   },
   "translations": {
@@ -3212,9 +3212,9 @@
       "lastUpdated": "2026-02-25"
     },
     "passkey.unsupported": {
-      "translation": "您的浏览器不支持生物识别登录(WebAuthn)。",
-      "hash": "e5z6v4",
-      "lastUpdated": "2026-02-25"
+      "translation": "生物识别解锁在此设备上不可用。使用您的密码登录。",
+      "hash": "wi17rr",
+      "lastUpdated": "2026-05-23"
     },
     "passkey.rename": {
       "translation": "重命名",
