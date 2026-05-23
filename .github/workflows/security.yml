@@ -132,12 +132,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # MPL-2.0 is permitted: it is file-level (weak) copyleft — safe to link into
+      # the app without affecting our own source (the same model Firefox ships under),
+      # and beanies is itself open-source. Pulled in by @capgo/capacitor-passkey, the
+      # native passkey plugin (ADR-029).
       - name: Audit production dependency licenses
         run: |
           npx license-checker \
             --production \
             --excludePrivatePackages \
-            --onlyAllow 'MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;CC-BY-4.0;Unlicense;BlueOak-1.0.0;Python-2.0'
+            --onlyAllow 'MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;CC-BY-4.0;Unlicense;BlueOak-1.0.0;Python-2.0;MPL-2.0'
 
       - name: Write license summary
         if: always()
