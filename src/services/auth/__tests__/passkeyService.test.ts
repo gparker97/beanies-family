@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { PasskeyRegistration } from '@/types/models';
 
 // --- Mock passkeyRepository ---
@@ -39,6 +39,14 @@ vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
   getGlobalSettings: vi.fn(async () => mockGlobalSettings),
 }));
 
+// --- Mock capabilities (native seam) + errorReporter ---
+const { isNativeMock } = vi.hoisted(() => ({ isNativeMock: vi.fn(() => false) }));
+vi.mock('@/services/sync/capabilities', () => ({
+  isNative: isNativeMock,
+  getPlatform: vi.fn(() => 'web'),
+}));
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
+
 // Imports must come after vi.mock calls
 import {
   bufferToBase64url,
@@ -48,6 +56,7 @@ import {
   guessAuthenticatorLabel,
   authenticateWithPasskey,
   registerPasskeyForMember,
+  getRpId,
 } from '../passkeyService';
 import * as passkeyRepo from '@/services/indexeddb/repositories/passkeyRepository';
 
@@ -90,6 +99,20 @@ function makeFakeAssertion(opts: {
 }
 
 // --- Tests ---
+
+describe('getRpId — WebAuthn Relying Party ID (ADR-029)', () => {
+  afterEach(() => isNativeMock.mockReturnValue(false));
+
+  it('returns the fixed app domain on native (WebView origin is localhost; association supplies trust)', () => {
+    isNativeMock.mockReturnValue(true);
+    expect(getRpId()).toBe('app.beanies.family');
+  });
+
+  it('returns the current origin hostname on web/PWA — unchanged behavior, so existing passkeys are not orphaned', () => {
+    isNativeMock.mockReturnValue(false);
+    expect(getRpId()).toBe(window.location.hostname);
+  });
+});
 
 describe('Encoding utilities', () => {
   it('bufferToBase64url / base64urlToBuffer roundtrip preserves bytes', () => {

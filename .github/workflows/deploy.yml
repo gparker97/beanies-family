@@ -178,6 +178,12 @@ jobs:
         with:
           name: dist
           path: dist/
+          # Include dotfiles so dist/.well-known/ (assetlinks.json for native
+          # WebAuthn association + apple-app-site-association) survives the
+          # artifact round-trip and reaches S3. upload-artifact strips hidden
+          # files by default; aws s3 sync itself preserves them. Same fix as
+          # deploy-web.yml for the apex. See ADR-029.
+          include-hidden-files: true
           retention-days: 1
 
   deploy:
