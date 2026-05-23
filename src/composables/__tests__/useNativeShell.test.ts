@@ -5,15 +5,16 @@ vi.mock('@capacitor/core', () => ({
   Capacitor: { isNativePlatform, getPlatform: () => 'android' },
 }));
 
-const { hide, setStyle, addListener, exitApp } = vi.hoisted(() => ({
+const { hide, setStyle, setOverlaysWebView, addListener, exitApp } = vi.hoisted(() => ({
   hide: vi.fn(),
   setStyle: vi.fn(),
+  setOverlaysWebView: vi.fn(),
   addListener: vi.fn(),
   exitApp: vi.fn(),
 }));
 vi.mock('@capacitor/splash-screen', () => ({ SplashScreen: { hide } }));
 vi.mock('@capacitor/status-bar', () => ({
-  StatusBar: { setStyle },
+  StatusBar: { setStyle, setOverlaysWebView },
   Style: { Default: 'DEFAULT', Dark: 'DARK', Light: 'LIGHT' },
 }));
 vi.mock('@capacitor/app', () => ({ App: { addListener, exitApp } }));
@@ -26,8 +27,11 @@ describe('useNativeShell (ADR-029 A5)', () => {
     isNativePlatform.mockReturnValue(true);
     hide.mockResolvedValue(undefined);
     setStyle.mockResolvedValue(undefined);
+    setOverlaysWebView.mockResolvedValue(undefined);
     addListener.mockResolvedValue({ remove: vi.fn() });
     exitApp.mockResolvedValue(undefined);
+    document.documentElement.classList.remove('dark');
+    document.querySelectorAll('meta[name="viewport"]').forEach((m) => m.remove());
     __resetNativeShellForTesting();
   });
 
@@ -38,11 +42,31 @@ describe('useNativeShell (ADR-029 A5)', () => {
     expect(addListener).not.toHaveBeenCalled();
   });
 
-  it('on native: hides the splash, sets a status-bar style, registers a backButton listener', () => {
+  it('on native: hides the splash, goes edge-to-edge, sets icon contrast, registers a backButton listener', () => {
     useNativeShell();
     expect(hide).toHaveBeenCalled();
-    expect(setStyle).toHaveBeenCalledWith({ style: 'DEFAULT' });
+    expect(setOverlaysWebView).toHaveBeenCalledWith({ overlay: true });
+    // Light mode (no `dark` class): dark icons.
+    expect(setStyle).toHaveBeenCalledWith({ style: 'LIGHT' });
     expect(addListener).toHaveBeenCalledWith('backButton', expect.any(Function));
+  });
+
+  it('on native: dark mode uses light status-bar icons (Style.Dark)', () => {
+    document.documentElement.classList.add('dark');
+    useNativeShell();
+    expect(setStyle).toHaveBeenCalledWith({ style: 'DARK' });
+    document.documentElement.classList.remove('dark');
+  });
+
+  it('on native: opts the viewport into safe-area insets (viewport-fit=cover)', () => {
+    const meta = document.createElement('meta');
+    meta.setAttribute('name', 'viewport');
+    meta.setAttribute('content', 'width=device-width, initial-scale=1.0');
+    document.head.appendChild(meta);
+
+    useNativeShell();
+
+    expect(meta.getAttribute('content')).toContain('viewport-fit=cover');
   });
 
   it('is idempotent (registers the backButton listener at most once)', () => {
