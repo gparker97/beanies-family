@@ -138,6 +138,16 @@ As a member, I want to unlock my pod with device biometrics (Face ID / Touch ID 
 - **Pass 3 (Sustainability)**: decoupled native RP-ID host from `features.ts` into a self-owned `WEBAUTHN_RP_ID` constant; removed stale rejected artifacts (`webauthnConfig.ts`, `VITE_WEBAUTHN_RP_ID`); corrected the impossible `zh:` instruction ({en, beanie?} + auto-gen); pinned "tiers are docs, not a class"; added two-origin fingerprint-sync discipline + iOS team-ID placeholder guard.
 - **Pass 4 (Fresh-eyes sweep)**: verdict ready-with-minor-edits; verified security-correct (RP-ID unchanged ⇒ no orphaned passkeys, app-scoped WebView WebAuthn, two distinct-origin assetlinks); brought Files-Affected/Approach/Testing text into line with Pass-3 decisions; pinned breadcrumb severity/context, AASA placeholder lifecycle, fingerprint-sync README.
 
+## Outcome (2026-05-23) — native biometric DEFERRED to the Play build
+
+The web/PWA hardening parts of this plan landed cleanly. The native part hit a platform wall and was deferred. Full record in **ADR-029 → "Native auth follow-ups (2026-05-23)"** and **STATUS (2026-05-23)**; summary:
+
+- **The plan's chosen approach (WebView-WebAuthn) proved unworkable on-device** — exactly the failure the plan's own "revisit only if WebView-WebAuthn proves unworkable" escape hatch anticipated. `setWebAuthenticationSupport(FOR_APP)` → opaque `CreateCredentialUnknownException`; `FOR_BROWSER` → hard Chromium WebView crash. Shipped as `a30fa0c`, now superseded (`MainActivity` reverted to bare `BridgeActivity`).
+- **Pivoted to the plan's rejected alternative — a native Capacitor passkey plugin** (`@capgo/capacitor-passkey`, `autoShimWebAuthn()` in `main.ts`, `isNative()`-gated). The plan's **core reuse principle held**: the PRF/family-key/`passkeyWrappedKeys` stack is reused unchanged; only `getRpId()` + the shim install were added. The plugin reaches Google's native FIDO `RegistrationActivity`.
+- **Final blocker: GMS `[50152] "RP ID cannot be validated"` on the sideloaded debug build**, despite cert confirmed `19:E4` (`pm get-app-links`) and the `get_login_creds` assetlinks validated by Google's checker (`linked:true`) — the known murky DAL failure for debug/sideloaded apps.
+- **Decision: defer native biometric to the Play-signed internal-testing build** (real Play App Signing cert in assetlinks; reliable GMS DAL there; required for launch anyway). **Requirement 3 (PWA/browser zero-regression) and the RP-ID-unchanged constraint were met** — `getRpId()` is a no-op on web and existing passkeys are untouched. iOS biometric also deferred (plugin returns empty `clientExtensionResults` / no PRF; no iOS build yet).
+- **Foundation consolidated into `main`** (squash of `trial/native-passkey-plugin`), ready to validate on the Play build with no rework.
+
 ## Prompt Log
 
 - **Initial (/beanies-plan)**: "make a plan to implement biometric login on the native app while ensuring biometric login remains clean and robust on the PWA and browser, and ensure biometric login should work seamlessly across all platforms, including android, iOS, and other relevant platforms. also please ensure that biometric login should work across both newer and older devices ensuring the necessary code paths, polyfills, etc are in place to ensure biometric login works consistently across all android and iOS devices, both newer and older."

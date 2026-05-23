@@ -1,50 +1,25 @@
 package family.beanies.app;
 
-import android.os.Bundle;
-import android.util.Log;
-import android.webkit.WebSettings;
-
-import androidx.webkit.WebSettingsCompat;
-import androidx.webkit.WebViewFeature;
-
 import com.getcapacitor.BridgeActivity;
 
-public class MainActivity extends BridgeActivity {
-    private static final String TAG = "beanies";
-
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        enableWebAuthnIfSupported();
-    }
-
-    /**
-     * Enable WebAuthn (passkeys / biometric login) inside the Capacitor WebView,
-     * routed through the Android Credential Manager. App-scoped — passkeys for the
-     * app's associated domain only (see the WebAuthn Digital Asset Links at
-     * https://app.beanies.family/.well-known/assetlinks.json), NOT browser-scoped.
-     *
-     * Feature-detected: older System WebViews lack WEB_AUTHENTICATION, in which case
-     * window.PublicKeyCredential stays undefined in JS and biometric unlock falls
-     * back to password (Tier 3). Never crash the Activity over this. See ADR-029 and
-     * docs/plans/2026-05-23-native-pwa-biometric-login.md.
-     */
-    private void enableWebAuthnIfSupported() {
-        try {
-            if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_AUTHENTICATION)) {
-                Log.w(TAG, "WebView WEB_AUTHENTICATION feature unsupported on this System WebView; "
-                        + "biometric unlock falls back to password (ADR-029).");
-                return;
-            }
-            WebSettings settings = getBridge().getWebView().getSettings();
-            WebSettingsCompat.setWebAuthenticationSupport(
-                    settings,
-                    WebSettingsCompat.WEB_AUTHENTICATION_SUPPORT_FOR_APP
-            );
-        } catch (Exception e) {
-            // Developer breadcrumb — JS can't observe native enablement state.
-            Log.w(TAG, "Failed to enable WebView WebAuthn; biometric unlock falls back to password "
-                    + "(ADR-029).", e);
-        }
-    }
-}
+/**
+ * WebView-based WebAuthn (WebSettingsCompat.setWebAuthenticationSupport) was tried
+ * for native biometric/passkeys and is a dead end on this stack (ADR-029):
+ *   - WEB_AUTHENTICATION_SUPPORT_FOR_APP  → GMS returns an opaque
+ *     CreateCredentialUnknownException ("unknown error talking to the credential
+ *     manager") even though Digital-Asset-Links validate (Google's own checker
+ *     reports linked:true) and the chooser/biometric/RegistrationActivity all fire.
+ *   - WEB_AUTHENTICATION_SUPPORT_FOR_BROWSER → hard native crash inside the
+ *     Chromium WebView (org.chromium.base.JniAndroid$UncaughtExceptionException)
+ *     the instant navigator.credentials.create() runs.
+ *
+ * The device itself creates passkeys fine via Chrome and the installed PWA, so the
+ * limitation is specifically the Capacitor WebView ↔ Credential Manager bridge.
+ * With no setWebAuthenticationSupport call, the WebView leaves
+ * window.PublicKeyCredential undefined, so isWebAuthnSupported() is false and the
+ * app cleanly shows "biometric unavailable on this device — use your password"
+ * (no crash, password sign-in unaffected). Native biometric, if pursued, will go
+ * through a native Capacitor passkey plugin (own Credential Manager / ASAuthorization
+ * calls), NOT this WebView path — see docs/plans/2026-05-23-native-pwa-biometric-login.md.
+ */
+public class MainActivity extends BridgeActivity {}

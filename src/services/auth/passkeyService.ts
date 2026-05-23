@@ -109,6 +109,16 @@ export async function registerPasskeyForMember(
   const rpId = getRpId();
   const prfExtension = buildPRFExtension();
 
+  // Discoverable (resident) credentials let the assertion flow omit
+  // `allowCredentials` (see authenticateWithPasskey). Web requires them and works
+  // fine. On native, the Android WebView Credential Manager has been observed to
+  // reject discoverable-credential CREATION with a generic NotReadableError ("an
+  // unknown error occurred while talking to the credential manager"), so we
+  // request 'preferred' there — modern platform authenticators (Google Password
+  // Manager / iCloud Keychain) still create a discoverable passkey in practice,
+  // so the discoverable-mode assertion keeps working. See ADR-029.
+  const requireDiscoverable = !isNative();
+
   const publicKeyOptions: PublicKeyCredentialCreationOptions = {
     challenge,
     rp: { name: RP_NAME, id: rpId },
@@ -124,8 +134,8 @@ export async function registerPasskeyForMember(
     authenticatorSelection: {
       authenticatorAttachment: 'platform',
       userVerification: 'required',
-      residentKey: 'required',
-      requireResidentKey: true,
+      residentKey: requireDiscoverable ? 'required' : 'preferred',
+      requireResidentKey: requireDiscoverable,
     },
     timeout: 60000,
     attestation: 'none',
@@ -136,19 +146,37 @@ export async function registerPasskeyForMember(
 
   // Progressive registration: try platform-attached first (ensures "save on this device"
   // prompt), then fall back without it for Android OEMs that can't handle the constraint.
+  // `attemptErrors` captures each attempt's RAW DOMException so a total failure surfaces
+  // the real Android Credential Manager cause (the friendly string hides it, and the
+  // fallback attempts were previously swallowed entirely).
   let credential: PublicKeyCredential | null;
+  const attemptErrors: string[] = [];
   try {
     credential = (await navigator.credentials.create(createOptions)) as PublicKeyCredential | null;
   } catch (err) {
     if (err instanceof DOMException && err.name === 'NotAllowedError') {
       return { success: false, cancelled: true, error: 'Registration was cancelled' };
     }
+    attemptErrors.push(`1·platform+prf: ${describeAuthError(err)}`);
 
     // Platform constraint or PRF extension failed — retry progressively:
     // 1. Remove authenticatorAttachment, use hints instead (Chrome 128+)
     // 2. If still failing, also remove PRF extension
-    credential = await retryRegistrationWithFallbacks(createOptions, publicKeyOptions);
+    credential = await retryRegistrationWithFallbacks(
+      createOptions,
+      publicKeyOptions,
+      attemptErrors
+    );
     if (credential === null) {
+      // Surface the raw per-attempt causes to #beanies-errors + the firehose.
+      // `warning`, not `error`: the user can still sign in with their password.
+      reportError({
+        surface: 'passkey-register',
+        message: `passkey registration failed (all attempts): ${attemptErrors.join(' || ').slice(0, 600)}`,
+        error: err,
+        severity: 'warning',
+        context: { platform: getPlatform() },
+      });
       return { success: false, error: formatCredentialManagerError(err) };
     }
   }
@@ -498,7 +526,8 @@ export async function renamePasskey(credentialId: string, label: string): Promis
  */
 async function retryRegistrationWithFallbacks(
   createOptions: CredentialCreationOptions,
-  publicKeyOptions: PublicKeyCredentialCreationOptions
+  publicKeyOptions: PublicKeyCredentialCreationOptions,
+  attemptErrors: string[]
 ): Promise<PublicKeyCredential | null> {
   // Fallback 1: drop authenticatorAttachment, use hints instead
   delete publicKeyOptions.authenticatorSelection!.authenticatorAttachment;
@@ -510,6 +539,7 @@ async function retryRegistrationWithFallbacks(
     if (err1 instanceof DOMException && err1.name === 'NotAllowedError') {
       return null; // User cancelled
     }
+    attemptErrors.push(`2·hints+prf: ${describeAuthError(err1)}`);
 
     // Fallback 2: also remove PRF extension (some credential managers choke on it)
     if (publicKeyOptions.extensions) {
@@ -520,12 +550,19 @@ async function retryRegistrationWithFallbacks(
         if (err2 instanceof DOMException && err2.name === 'NotAllowedError') {
           return null; // User cancelled
         }
+        attemptErrors.push(`3·no-prf: ${describeAuthError(err2)}`);
         // All retries exhausted — return null, caller will use originalError for message
       }
     }
   }
 
   return null;
+}
+
+/** Compact raw-error descriptor for diagnostics — `Name: message` (no PII). */
+function describeAuthError(e: unknown): string {
+  if (e instanceof DOMException || e instanceof Error) return `${e.name}: ${e.message}`;
+  return String(e);
 }
 
 // --- Helpers ---

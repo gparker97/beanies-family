@@ -14,10 +14,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **No more clickable buttons during the "finding your pod" moment after Google sign-in.** When you return from the Google consent screen, beanies.family takes a second or two to fetch your Drive files before showing them. Previously the "Google Drive" and "local file" buttons stayed visible and tappable during that gap, which was confusing. Now you see the "counting beans…" spinner for that whole moment — on every device — until your pod files appear.
 
-### Added
-
-- **Biometric unlock now works in the native app, not just the browser.** Face ID, fingerprint, and device-PIN sign-in (passkeys) now work inside the native Android app — using the same passkeys you set up on the website, with no re-enrollment. Under the hood the app's WebView now supports WebAuthn and is associated with `app.beanies.family` so your existing passkeys are recognized. On older devices that can't do passkeys, sign-in cleanly falls back to your password (and the app no longer shows a confusing "your browser doesn't support…" message). Biometrics never leave your device, and your family password always remains the master key. iOS support is configured and ships when the iOS app is built. (See ADR-029.)
-
 ## 2026-05-22
 
 ### Fixed
