@@ -1588,7 +1588,11 @@ watch(
       <!-- Desktop sidebar -->
       <AppSidebar v-if="isDesktop" />
 
-      <div class="flex min-w-0 flex-1 flex-col">
+      <!-- padding-top clears the status bar in the native edge-to-edge layout
+           (useNativeShell sets viewport-fit=cover on native, so env() is non-zero
+           there; 0 on web/PWA — no effect). The root bg paints behind the
+           transparent bar and blends. -->
+      <div class="flex min-w-0 flex-1 flex-col" style="padding-top: env(safe-area-inset-top)">
         <!--
           Inline-flow banner at the top of the column. Renders above
           AppHeader so it pushes the header down rather than overlapping
