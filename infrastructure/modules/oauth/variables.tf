@@ -30,7 +30,16 @@ variable "cors_origins" {
   default = [
     "https://beanies.family",     # apex (legacy / pre-cutover)
     "https://app.beanies.family", # PWA subdomain (post-cutover primary)
+    "https://localhost",          # Capacitor Android native WebView (ADR-029)
     "http://localhost:5173",      # Vite dev server
     "http://localhost:4173",      # Vite preview server
+  ]
+}
+
+variable "native_redirect_uris" {
+  description = "Fixed native App Link / Universal Link OAuth redirect URIs (Capacitor). Not derivable from cors_origins — the native WebView origin is not the redirect host. See ADR-029."
+  type        = list(string)
+  default = [
+    "https://beanies.family/oauth/native", # verified Android App Link
   ]
 }

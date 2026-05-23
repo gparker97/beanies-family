@@ -19,12 +19,24 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'https://beanies.family')
 
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 
-// Allowed redirect URIs derived from CORS_ORIGIN — every SPA install uses
-// `<origin>/oauth/callback` (hardcoded route in src/router/), so one env
-// var is the single source of truth and self-hosters never edit code.
-const ALLOWED_REDIRECT_URIS = new Set(
-  ALLOWED_ORIGINS.map((origin) => `${origin.replace(/\/+$/, '')}/oauth/callback`)
-);
+// Native apps (Capacitor) redirect to a fixed verified App Link / Universal
+// Link — e.g. `https://beanies.family/oauth/native` — NOT `<origin>/oauth/callback`.
+// The WebView origin (`https://localhost`) is not the redirect host, so the
+// derivation below can't produce these. Allow them explicitly via the optional
+// NATIVE_REDIRECT_URIS env (comma-separated). Unset ⇒ web-only, unchanged for
+// self-hosters without a native app. See ADR-029.
+const NATIVE_REDIRECT_URIS = (process.env.NATIVE_REDIRECT_URIS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+// Allowed redirect URIs: the per-origin `<origin>/oauth/callback` web convention
+// (hardcoded route in src/router/ — one env var is the single source of truth so
+// self-hosters never edit code) PLUS any explicit native App Link redirects.
+const ALLOWED_REDIRECT_URIS = new Set([
+  ...ALLOWED_ORIGINS.map((origin) => `${origin.replace(/\/+$/, '')}/oauth/callback`),
+  ...NATIVE_REDIRECT_URIS,
+]);
 
 const SUPPORTED_PROVIDERS = ['google'];
 
