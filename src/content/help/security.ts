@@ -259,4 +259,82 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'biometric-login',
+    category: 'security',
+    title: 'Unlock With Biometrics (Face ID, Fingerprint, Device PIN)',
+    excerpt:
+      'Sign back in with a tap using your device biometrics — in the app and the browser. A convenience layer over your family password, never a replacement.',
+    icon: '\u{1F441}️',
+    readTime: 4,
+    updatedDate: '2026-05-23',
+    sections: [
+      {
+        type: 'heading',
+        content: 'What biometric unlock does',
+        level: 2,
+        id: 'what-it-does',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Biometric unlock lets you reopen your pod with <strong>Face ID, a fingerprint, or your device PIN</strong> instead of typing your family password every time. It uses <strong>passkeys</strong> (WebAuthn) — the same passwordless standard your bank and Google use — and works in the installed app and in your browser.',
+      },
+      {
+        type: 'callout',
+        content:
+          'Biometric unlock is a convenience layer <em>over</em> your family password — not a replacement for it. Your password always works, and losing or replacing your device never locks you out of your pod. Keep your password somewhere safe.',
+        title: 'Your password is still the master key',
+        icon: '\u{1F511}',
+      },
+      {
+        type: 'heading',
+        content: 'How to turn it on',
+        level: 2,
+        id: 'turn-it-on',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>Settings → Account</strong>.',
+          'Under <strong>Biometric login</strong>, tap <strong>Set up</strong> and confirm with your device biometrics.',
+          "That's it — next time you sign in on that device, you'll be offered a one-tap biometric unlock.",
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'How it stays private',
+        level: 2,
+        id: 'privacy',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'Your <strong>biometrics never leave your device</strong> — Face ID / fingerprint data is handled by your phone or computer’s secure hardware, and beanies.family never sees it.',
+          'The passkey unwraps your family key <strong>on your device</strong>; beanies only ever stores the <em>wrapped</em> (encrypted) key. See <a href="/help/security/how-your-data-is-encrypted">How Your Data Is Encrypted</a>.',
+          'A passkey you create on one device can sync to your other devices on the <strong>same platform</strong> (iCloud Keychain for Apple, Google Password Manager for Android/Chrome) — but not across ecosystems.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Which devices support it',
+        level: 2,
+        id: 'device-support',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Biometric unlock needs a reasonably recent device: <strong>iOS 16+</strong>, a modern <strong>Android</strong> with the system passkey/credential manager, or an up-to-date desktop browser. On older devices — or any device without biometric hardware set up — beanies.family simply asks for your password instead. Nothing breaks; you just sign in the usual way.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'If a device can’t use biometrics, you’ll see a short note and the password field instead of a dead end. You can always fall back to your password on any device, anytime.',
+        title: 'No supported device? No problem',
+        icon: '\u{1F50F}',
+      },
+    ],
+  },
 ];
