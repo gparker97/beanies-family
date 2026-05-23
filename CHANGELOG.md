@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-23
+
+### Added
+
+- **Biometric unlock now works in the native app, not just the browser.** Face ID, fingerprint, and device-PIN sign-in (passkeys) now work inside the native Android app — using the same passkeys you set up on the website, with no re-enrollment. Under the hood the app's WebView now supports WebAuthn and is associated with `app.beanies.family` so your existing passkeys are recognized. On older devices that can't do passkeys, sign-in cleanly falls back to your password (and the app no longer shows a confusing "your browser doesn't support…" message). Biometrics never leave your device, and your family password always remains the master key. iOS support is configured and ships when the iOS app is built. (See ADR-029.)
+
 ## 2026-05-22
 
 ### Fixed
