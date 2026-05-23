@@ -47,6 +47,7 @@ resource "aws_lambda_function" "oauth" {
     variables = {
       GOOGLE_CLIENT_SECRET = var.google_client_secret
       CORS_ORIGIN          = join(",", var.cors_origins)
+      NATIVE_REDIRECT_URIS = join(",", var.native_redirect_uris)
     }
   }
 
