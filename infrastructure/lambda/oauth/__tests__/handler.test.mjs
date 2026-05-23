@@ -423,6 +423,100 @@ describe('OAuth Lambda handler', () => {
     });
   });
 
+  // Native (Capacitor) Google sign-in (ADR-029): the WebView origin is
+  // `https://localhost` and the redirect is a fixed App Link, not
+  // `<origin>/oauth/callback`. Both must be allowlisted server-side.
+  describe('native (Capacitor) — ADR-029', () => {
+    const NATIVE_ORIGIN = 'https://localhost';
+    const NATIVE_REDIRECT = 'https://beanies.family/oauth/native';
+    let nativeHandler;
+
+    beforeEach(async () => {
+      process.env.GOOGLE_CLIENT_SECRET = 'test-secret';
+      process.env.CORS_ORIGIN = 'https://beanies.family,https://localhost';
+      process.env.NATIVE_REDIRECT_URIS = NATIVE_REDIRECT;
+      const mod = await import(`../index.mjs?t=${Date.now()}-${Math.random()}-native`);
+      nativeHandler = mod.handler;
+    });
+
+    afterEach(() => {
+      delete process.env.NATIVE_REDIRECT_URIS;
+    });
+
+    it('emits CORS headers for the native WebView origin (https://localhost)', async () => {
+      const res = await nativeHandler(makeEvent({ method: 'OPTIONS', origin: NATIVE_ORIGIN }));
+      assert.equal(res.statusCode, 204);
+      assert.equal(res.headers['Access-Control-Allow-Origin'], NATIVE_ORIGIN);
+    });
+
+    it('does NOT 403 a token POST from the native origin', async () => {
+      globalThis.fetch = mock.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'a', expires_in: 3600, token_type: 'Bearer' }),
+      }));
+      const res = parseResponse(
+        await nativeHandler(
+          makeEvent({
+            origin: NATIVE_ORIGIN,
+            body: {
+              code: 'c',
+              code_verifier: 'v',
+              redirect_uri: NATIVE_REDIRECT,
+              client_id: 'cid',
+            },
+          })
+        )
+      );
+      assert.notEqual(res.statusCode, 403);
+      assert.equal(res.statusCode, 200);
+    });
+
+    it('accepts the native App Link redirect_uri', async () => {
+      globalThis.fetch = mock.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'a', refresh_token: 'r', expires_in: 3600 }),
+      }));
+      const res = parseResponse(
+        await nativeHandler(
+          makeEvent({
+            origin: NATIVE_ORIGIN,
+            body: {
+              code: 'c',
+              code_verifier: 'v',
+              redirect_uri: NATIVE_REDIRECT,
+              client_id: 'cid',
+            },
+          })
+        )
+      );
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.parsedBody.access_token, 'a');
+    });
+
+    it('still rejects the native redirect_uri when NATIVE_REDIRECT_URIS is unset (web-only self-host unchanged)', async () => {
+      process.env.CORS_ORIGIN = 'https://beanies.family,https://localhost';
+      delete process.env.NATIVE_REDIRECT_URIS;
+      const mod = await import(`../index.mjs?t=${Date.now()}-${Math.random()}-noNative`);
+      const res = parseResponse(
+        await mod.handler(
+          makeEvent({
+            origin: NATIVE_ORIGIN,
+            body: {
+              code: 'c',
+              code_verifier: 'v',
+              redirect_uri: NATIVE_REDIRECT,
+              client_id: 'cid',
+            },
+          })
+        )
+      );
+      assert.equal(res.statusCode, 400);
+      assert.match(res.parsedBody.error, /redirect_uri/);
+    });
+  });
+
   describe('error handling', () => {
     it('returns 400 for invalid JSON body', async () => {
       const event = {
