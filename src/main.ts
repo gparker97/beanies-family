@@ -3,6 +3,7 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
 import { initAnalytics } from './services/analytics/plausible';
+import { isNative } from './services/sync/capabilities';
 import { reportError } from './utils/errorReporter';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from './utils/hardReload';
 import { isIdbTransientError } from './utils/idbTransient';
@@ -97,5 +98,31 @@ if (import.meta.env.DEV) {
   import('./services/e2e/dataBridge').then((m) => m.initDataBridge());
 }
 
-// Mount app
-app.mount('#app');
+// Mount app. On native, first install the passkey shim so the app's existing
+// WebAuthn calls (navigator.credentials.create/get + window.PublicKeyCredential)
+// route to the native Android Credential Manager / iOS ASAuthorization instead of
+// the WebView's own WebAuthn (which dead-ended — FOR_APP errored, FOR_BROWSER
+// crashed; see ADR-029). PRF round-trips on Android (Credential Manager + Google
+// Password Manager), keeping the local family-key unwrap intact. The shim is
+// native-only (dynamic import gated on isNative), so web/PWA use the real browser
+// WebAuthn untouched. Origin/domains come from capacitor.config. A failed install
+// is non-fatal — biometric just falls back to password.
+async function bootstrap(): Promise<void> {
+  if (isNative()) {
+    try {
+      const { CapacitorPasskey } = await import('@capgo/capacitor-passkey');
+      await CapacitorPasskey.autoShimWebAuthn();
+    } catch (e) {
+      console.warn('[main] native passkey shim init failed; biometric → password fallback', e);
+      reportError({
+        surface: 'passkey-shim-init',
+        message: 'native passkey shim install failed',
+        error: e,
+        severity: 'warning',
+      });
+    }
+  }
+  app.mount('#app');
+}
+
+void bootstrap();

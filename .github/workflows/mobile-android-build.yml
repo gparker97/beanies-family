@@ -61,13 +61,25 @@ jobs:
           VITE_BEANIES_ERROR_WEBHOOK_URL: ${{ vars.BEANIES_ERROR_WEBHOOK_URL }}
           VITE_BEANIES_LOG_INGEST_URL: ${{ vars.BEANIES_LOG_INGEST_URL }}
           VITE_BEANIES_LOG_INGEST_API_KEY: ${{ secrets.BEANIES_LOG_INGEST_API_KEY }}
+          # Stamp the build so the diagnostic firehose (build_sha) identifies
+          # exactly which APK is running on-device — otherwise every debug build
+          # reports "dev" and we can't tell a stale install from a fresh one.
+          VITE_BUILD_SHA: ${{ github.sha }}
 
       - name: Sync Capacitor (Android)
         run: npx cap sync android
 
       - name: Build debug APK
+        # Unique, monotonically increasing versionCode per build so a new APK
+        # always installs cleanly over the previous one. Without this every
+        # debug build is versionCode 1, and Android may refuse to update —
+        # leaving a stale APK on the device (the cause of "nothing changed"
+        # across rebuilds). versionName carries the short SHA for at-a-glance ID.
         run: ./gradlew assembleDebug --no-daemon --stacktrace
         working-directory: android
+        env:
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: 0.0.0-debug.${{ github.run_number }}+${{ github.sha }}
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

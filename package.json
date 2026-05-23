@@ -55,6 +55,7 @@
     "@capacitor/local-notifications": "^8.2.0",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
+    "@capgo/capacitor-passkey": "^8.3.2",
     "chart.js": "^4.5.1",
     "idb": "^8.0.3",
     "pinia": "^3.0.4",
