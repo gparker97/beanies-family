@@ -473,7 +473,10 @@ const showDriveEmptyState = ref(false);
 // points; this only consolidates *which one wins* so the template reads one
 // value instead of a fragile overlapping v-if chain. Precedence reproduces the
 // pre-refactor render order exactly: outer decrypt > (reconnect) > the inner
-// chain isLoadingFile → needsPermissionGrant → showDriveEmptyState → cards.
+// chain (isLoadingFile | isDriveLoading) → needsPermissionGrant → showDriveEmptyState → cards.
+// `isDriveLoading` (the Drive *listing* round-trip) shows the spinner too, so the
+// storage cards aren't left clickable during the ~2s listing — notably after the
+// OAuth redirect returns and re-opens the picker (ADR-029).
 // NOTE: `decrypt` keys off `showDecryptModal` ALONE, never `hasPendingEncryptedFile`
 // — several flows stage a pending file with the modal closed so the biometric
 // handoff can take over; deriving decrypt from the pending file would render the
@@ -488,7 +491,7 @@ const viewState = computed<
 >(() => {
   if (showDecryptModal.value) return 'decrypt';
   if (props.reconnectDriveFile && !reconnectDismissed.value) return 'reconnect';
-  if (isLoadingFile.value) return 'auto-loading';
+  if (isLoadingFile.value || isDriveLoading.value) return 'auto-loading';
   if (props.needsPermissionGrant) return 'permission-grant';
   if (showDriveEmptyState.value) return 'empty';
   return 'cards';
