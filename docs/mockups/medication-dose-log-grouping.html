@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mockup — Medication dose log grouping + over-limit warnings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --orange: #f15d22;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --sky: #aed6f1;
+        --cloud: #f8f9fa;
+        --tint-slate-5: rgb(44 62 80 / 5%);
+        --tint-slate-8: rgb(44 62 80 / 8%);
+        --tint-orange-8: rgb(241 93 34 / 8%);
+        --tint-orange-12: rgb(241 93 34 / 12%);
+        --tint-orange-15: rgb(241 93 34 / 15%);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #e9ecef;
+        font-family: 'Inter', sans-serif;
+        color: var(--slate);
+        padding: 32px 24px 64px;
+      }
+      h1.page {
+        font-family: 'Outfit', sans-serif;
+        font-size: 22px;
+        margin: 0 0 4px;
+      }
+      p.sub {
+        margin: 0 0 28px;
+        color: rgb(44 62 80 / 60%);
+        font-size: 14px;
+        max-width: 760px;
+        line-height: 1.5;
+      }
+      .stage {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 40px;
+        align-items: flex-start;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .col h2 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgb(44 62 80 / 55%);
+        margin: 0 0 2px;
+      }
+      .col .w {
+        font-size: 11px;
+        color: rgb(44 62 80 / 45%);
+        margin-bottom: 8px;
+      }
+
+      /* ── Drawer shell ───────────────────────────────────────── */
+      .drawer {
+        background: #fff;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgb(44 62 80 / 18%);
+        overflow: hidden;
+      }
+      .drawer.narrow {
+        width: 390px;
+      }
+      .drawer.wide {
+        width: 460px;
+      }
+      .drawer-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 16px 20px;
+        border-bottom: 1px solid rgb(44 62 80 / 8%);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 17px;
+      }
+      .drawer-head .x {
+        margin-left: auto;
+        color: rgb(44 62 80 / 35%);
+        font-size: 20px;
+      }
+      .hero-img {
+        height: 92px;
+        background: linear-gradient(
+          135deg,
+          rgb(174 214 241 / 35%) 0%,
+          rgb(248 249 250 / 100%) 55%,
+          rgb(230 126 34 / 14%) 100%
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 38px;
+      }
+      .for-ribbon {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--tint-slate-5);
+        padding: 10px 20px;
+      }
+      .for-ribbon .av {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: var(--sky);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+      }
+      .for-ribbon .lab {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgb(44 62 80 / 55%);
+      }
+      .for-ribbon .nm {
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .body {
+        padding: 16px 20px 20px;
+      }
+      .title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 24px;
+        font-weight: 800;
+        line-height: 1.1;
+        margin: 0 0 4px;
+      }
+      .dose-line {
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        color: rgb(44 62 80 / 70%);
+        margin: 0 0 4px;
+      }
+      .dose-line b {
+        color: var(--orange);
+      }
+      .last-dose {
+        font-size: 12px;
+        color: rgb(44 62 80 / 55%);
+        margin: 6px 0 0;
+      }
+      .hero-cta {
+        width: 100%;
+        border: 0;
+        margin: 16px 0 20px;
+        padding: 15px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #f15d22 0%, #e67e22 100%);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgb(241 93 34 / 25%);
+      }
+      .section-h {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgb(44 62 80 / 55%);
+        margin: 0 0 10px;
+      }
+
+      /* ── Day group ──────────────────────────────────────────── */
+      .day-group {
+        margin-bottom: 16px;
+      }
+      .day-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .day-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: rgb(44 62 80 / 55%);
+      }
+      .day-rule {
+        flex: 1;
+        height: 1px;
+        background: rgb(44 62 80 / 8%);
+      }
+      .count-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        background: var(--tint-slate-8);
+        color: rgb(44 62 80 / 70%);
+      }
+      .count-pill.over {
+        background: var(--tint-orange-15);
+        color: var(--orange);
+      }
+      /* over-limit inline note */
+      .over-note {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        background: var(--tint-orange-8);
+        border-radius: 12px;
+        padding: 7px 11px;
+        margin-bottom: 8px;
+        font-size: 12px;
+        color: #b8451a;
+        line-height: 1.35;
+      }
+      .over-note .ic {
+        flex-shrink: 0;
+        font-size: 13px;
+      }
+
+      .log-row {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        background: var(--tint-slate-5);
+        border-radius: 14px;
+        padding: 8px 11px;
+        margin-bottom: 7px;
+      }
+      .log-row .av {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--sky);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        flex-shrink: 0;
+      }
+      .log-row .av.dad {
+        background: #ffd9a0;
+      }
+      .log-row .who {
+        font-family: 'Outfit', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .log-row .when {
+        font-size: 11px;
+        color: rgb(44 62 80 / 55%);
+      }
+      .log-row .trash {
+        margin-left: auto;
+        color: rgb(44 62 80 / 25%);
+        font-size: 14px;
+      }
+      .view-all {
+        width: 100%;
+        border: 0;
+        background: none;
+        color: var(--orange);
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px;
+        cursor: pointer;
+      }
+
+      /* ── Confirm modal ──────────────────────────────────────── */
+      .modal {
+        width: 390px;
+        background: #fff;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgb(44 62 80 / 18%);
+        overflow: hidden;
+      }
+      .modal-head {
+        padding: 16px 20px;
+        border-bottom: 1px solid rgb(44 62 80 / 8%);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+      }
+      .modal-body {
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      /* The dismissable, informative over-limit warning */
+      .warn-card {
+        position: relative;
+        background: var(--tint-orange-8);
+        border: 1px solid var(--tint-orange-15);
+        border-radius: 14px;
+        padding: 13px 14px;
+        display: flex;
+        gap: 11px;
+      }
+      .warn-card .ic {
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--tint-orange-15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+      }
+      .warn-card .ttl {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 13.5px;
+        color: #b8451a;
+        margin: 1px 0 3px;
+      }
+      .warn-card .msg {
+        font-size: 12.5px;
+        line-height: 1.45;
+        color: rgb(44 62 80 / 78%);
+      }
+      .warn-card .dismiss {
+        position: absolute;
+        top: 9px;
+        right: 10px;
+        border: 0;
+        background: none;
+        color: rgb(44 62 80 / 35%);
+        font-size: 16px;
+        cursor: pointer;
+        line-height: 1;
+      }
+      .field-h {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgb(44 62 80 / 55%);
+        margin: 0 0 9px;
+      }
+      .pickers {
+        display: flex;
+        gap: 9px;
+      }
+      .pick {
+        flex: 1;
+        border: 1px solid rgb(44 62 80 / 14%);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-size: 13px;
+        color: rgb(44 62 80 / 75%);
+        background: #fff;
+      }
+      .pick.now {
+        flex: 0 0 auto;
+        background: var(--tint-orange-8);
+        color: var(--orange);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        border: 0;
+        display: flex;
+        align-items: center;
+      }
+      .modal-foot {
+        border-top: 1px solid rgb(44 62 80 / 8%);
+        padding: 14px 20px;
+        display: flex;
+        gap: 10px;
+      }
+      .btn-ghost {
+        flex: 1;
+        border: 1px solid rgb(44 62 80 / 14%);
+        background: #fff;
+        border-radius: 14px;
+        padding: 12px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--slate);
+        cursor: pointer;
+      }
+      .btn-orange {
+        flex: 1;
+        border: 0;
+        border-radius: 14px;
+        padding: 12px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        color: #fff;
+        background: linear-gradient(135deg, #f15d22 0%, #e67e22 100%);
+        cursor: pointer;
+      }
+      .note {
+        font-size: 12px;
+        color: rgb(44 62 80 / 55%);
+        margin: 14px 0 0;
+        font-style: italic;
+      }
+      .callout {
+        background: #fff;
+        border-left: 3px solid var(--orange);
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 6px 0 22px;
+        max-width: 760px;
+        box-shadow: 0 2px 8px rgb(44 62 80 / 6%);
+      }
+      .callout b {
+        font-family: 'Outfit', sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="page">💊 Medication dose log — date grouping + over-limit warnings</h1>
+    <p class="sub">
+      Two changes. <b>(A)</b> The "Recent doses" list in the medication drawer is now grouped by day,
+      each day showing how many doses were given and flagging days that went over the medication's
+      recommended doses-per-day. <b>(B)</b> When logging a dose that would exceed the recommended
+      daily count, the confirm dialog shows a gentle, dismissable, informative heads-up — never
+      blocking, never alarming.
+    </p>
+
+    <div class="callout">
+      <b>Example medication:</b> Calpol (Paracetamol) — 5ml, every 4–6 hours, recommended
+      <b>3 doses/day</b>. The "Today" group below has 4 doses logged → 1 over the recommendation.
+    </div>
+
+    <div class="stage">
+      <!-- ───────────────── A — Drawer, grouped log (narrow / mobile) ───────────────── -->
+      <div class="col">
+        <h2>A · Drawer — grouped dose log</h2>
+        <div class="w">narrow drawer · 390px (mobile / installed app)</div>
+        <div class="drawer narrow">
+          <div class="drawer-head">💊 Calpol <span class="x">✕</span></div>
+          <div class="hero-img">💊</div>
+          <div class="for-ribbon">
+            <div class="av">🧒</div>
+            <div>
+              <div class="lab">For</div>
+              <div class="nm">Leo · Child</div>
+            </div>
+          </div>
+          <div class="body">
+            <h3 class="title">Calpol</h3>
+            <p class="dose-line"><b>5ml</b> · Every 4–6 hours</p>
+            <p class="last-dose">last dose: 2h ago · 4 today</p>
+
+            <button class="hero-cta">💊 Log a dose →</button>
+
+            <p class="section-h">Recent doses</p>
+
+            <!-- TODAY — over limit -->
+            <div class="day-group">
+              <div class="day-head">
+                <span class="day-label">Today</span>
+                <span class="day-rule"></span>
+                <span class="count-pill over">⚠ 4 doses</span>
+              </div>
+              <div class="over-note">
+                <span class="ic">⚠️</span>
+                <span>1 more than the recommended <b>3 a day</b> for Calpol.</span>
+              </div>
+              <div class="log-row">
+                <div class="av dad">👨</div>
+                <div>
+                  <div class="who">Dad</div>
+                  <div class="when">2h ago</div>
+                </div>
+                <span class="trash">🗑</span>
+              </div>
+              <div class="log-row">
+                <div class="av">🧒</div>
+                <div>
+                  <div class="who">Mum</div>
+                  <div class="when">6h ago</div>
+                </div>
+                <span class="trash">🗑</span>
+              </div>
+              <div class="log-row">
+                <div class="av dad">👨</div>
+                <div>
+                  <div class="who">Dad</div>
+                  <div class="when">9h ago</div>
+                </div>
+                <span class="trash">🗑</span>
+              </div>
+              <div class="log-row">
+                <div class="av">🧒</div>
+                <div>
+                  <div class="who">Mum</div>
+                  <div class="when">just now</div>
+                </div>
+                <span class="trash">🗑</span>
+              </div>
+            </div>
+
+            <!-- YESTERDAY — within limit -->
+            <div class="day-group">
+              <div class="day-head">
+                <span class="day-label">Yesterday</span>
+                <span class="day-rule"></span>
+                <span class="count-pill">3 doses</span>
+              </div>
+              <div class="log-row">
+                <div class="av dad">👨</div>
+                <div>
+                  <div class="who">Dad</div>
+                  <div class="when">Yesterday at 8:30 PM</div>
+                </div>
+                <span class="trash">🗑</span>
+              </div>
+              <div class="log-row">
+                <div class="av">🧒</div>
+                <div>
+                  <div class="who">Mum</div>
+                  <div class="when">Yesterday at 2:15 PM</div>
+                </div>
+                <span class="trash">🗑</span>
+              </div>
+              <div class="log-row">
+                <div class="av dad">👨</div>
+                <div>
+                  <div class="who">Dad</div>
+                  <div class="when">Yesterday at 8:00 AM</div>
+                </div>
+                <span class="trash">🗑</span>
+              </div>
+            </div>
+
+            <!-- OLDER -->
+            <div class="day-group">
+              <div class="day-head">
+                <span class="day-label">Mon, 21 Apr</span>
+                <span class="day-rule"></span>
+                <span class="count-pill">2 doses</span>
+              </div>
+              <div class="log-row">
+                <div class="av">🧒</div>
+                <div>
+                  <div class="who">Mum</div>
+                  <div class="when">Mon, 21 Apr at 7:00 PM</div>
+                </div>
+                <span class="trash">🗑</span>
+              </div>
+            </div>
+
+            <button class="view-all">View all →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ───────────────── B — Confirm modal with dismissable warning ───────────────── -->
+      <div class="col">
+        <h2>B · Confirm dialog — over-limit heads-up</h2>
+        <div class="w">shown when this dose would exceed the recommended daily count</div>
+        <div class="modal">
+          <div class="modal-head">💊 Log a dose of Calpol</div>
+          <div class="modal-body">
+            <!-- the new dismissable, informative warning -->
+            <div class="warn-card">
+              <span class="ic">💡</span>
+              <div>
+                <div class="ttl">This would be the 4th dose today</div>
+                <div class="msg">
+                  Calpol's recommended limit is <b>3 doses a day</b>. Double-check the spacing since
+                  the last dose (2h ago) — you can still log it if that's right.
+                </div>
+              </div>
+              <button class="dismiss">✕</button>
+            </div>
+
+            <div>
+              <p class="field-h">Given today</p>
+              <div class="log-row">
+                <div class="av dad">👨</div>
+                <div>
+                  <div class="who">Dad</div>
+                  <div class="when">2h ago</div>
+                </div>
+              </div>
+              <div class="log-row">
+                <div class="av">🧒</div>
+                <div>
+                  <div class="who">Mum</div>
+                  <div class="when">6h ago</div>
+                </div>
+              </div>
+              <div class="log-row">
+                <div class="av dad">👨</div>
+                <div>
+                  <div class="who">Dad</div>
+                  <div class="when">9h ago</div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p class="field-h">When was this dose given?</p>
+              <div class="pickers">
+                <span class="pick">24 May 2026</span>
+                <span class="pick">3:45 PM</span>
+                <span class="pick now">Now</span>
+              </div>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button class="btn-ghost">Cancel</button>
+            <button class="btn-orange">Log dose</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ───────────────── A2 — wider width variant ───────────────── -->
+      <div class="col">
+        <h2>A · same, wider</h2>
+        <div class="w">wider drawer · 460px (tablet / desktop)</div>
+        <div class="drawer wide">
+          <div class="drawer-head">💊 Calpol <span class="x">✕</span></div>
+          <div class="body" style="padding-top: 18px">
+            <p class="section-h">Recent doses</p>
+            <div class="day-group">
+              <div class="day-head">
+                <span class="day-label">Today</span>
+                <span class="day-rule"></span>
+                <span class="count-pill over">⚠ 4 doses</span>
+              </div>
+              <div class="over-note">
+                <span class="ic">⚠️</span>
+                <span>1 more than the recommended <b>3 a day</b> for Calpol.</span>
+              </div>
+              <div class="log-row">
+                <div class="av dad">👨</div>
+                <div>
+                  <div class="who">Dad</div>
+                  <div class="when">2h ago</div>
+                </div>
+                <span class="trash">🗑</span>
+              </div>
+              <div class="log-row">
+                <div class="av">🧒</div>
+                <div>
+                  <div class="who">Mum</div>
+                  <div class="when">6h ago</div>
+                </div>
+                <span class="trash">🗑</span>
+              </div>
+            </div>
+            <div class="day-group">
+              <div class="day-head">
+                <span class="day-label">Yesterday</span>
+                <span class="day-rule"></span>
+                <span class="count-pill">1 dose</span>
+              </div>
+              <div class="log-row">
+                <div class="av dad">👨</div>
+                <div>
+                  <div class="who">Dad</div>
+                  <div class="when">Yesterday at 8:30 PM</div>
+                </div>
+                <span class="trash">🗑</span>
+              </div>
+            </div>
+            <p class="note">
+              "As needed" medications (no recommended doses/day set) show the daily count but never a
+              warning.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

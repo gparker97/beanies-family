@@ -254,6 +254,45 @@ describe('medicationsStore — dosesToday (timezone-sensitive)', () => {
   });
 });
 
+describe('medicationsStore — dosesOnDate', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it('counts only logs for the given medication on the given local date', () => {
+    const store = useMedicationsStore();
+    store.medicationLogs.push(
+      log({ medicationId: 'med-1', administeredOn: new Date(2026, 3, 21, 8, 0).toISOString() }),
+      log({ medicationId: 'med-1', administeredOn: new Date(2026, 3, 21, 20, 0).toISOString() }),
+      log({ medicationId: 'med-1', administeredOn: new Date(2026, 3, 22, 8, 0).toISOString() }),
+      log({ medicationId: 'med-other', administeredOn: new Date(2026, 3, 21, 9, 0).toISOString() })
+    );
+    expect(store.dosesOnDate('med-1', '2026-04-21')).toBe(2);
+    expect(store.dosesOnDate('med-1', '2026-04-22')).toBe(1);
+  });
+
+  it('returns 0 for a date with no matching logs', () => {
+    const store = useMedicationsStore();
+    store.medicationLogs.push(
+      log({ medicationId: 'med-1', administeredOn: new Date(2026, 3, 21, 8, 0).toISOString() })
+    );
+    expect(store.dosesOnDate('med-1', '2026-04-20')).toBe(0);
+  });
+
+  it('buckets by LOCAL calendar day across the midnight boundary', () => {
+    const store = useMedicationsStore();
+    store.medicationLogs.push(
+      // 23:30 local on the 20th → belongs to the 20th
+      log({ medicationId: 'med-1', administeredOn: new Date(2026, 3, 20, 23, 30).toISOString() }),
+      // 00:30 local on the 21st → belongs to the 21st
+      log({ medicationId: 'med-1', administeredOn: new Date(2026, 3, 21, 0, 30).toISOString() })
+    );
+    expect(store.dosesOnDate('med-1', '2026-04-20')).toBe(1);
+    expect(store.dosesOnDate('med-1', '2026-04-21')).toBe(1);
+  });
+});
+
 describe('medicationsStore — deleteMedication cascade', () => {
   beforeEach(() => {
     setActivePinia(createPinia());

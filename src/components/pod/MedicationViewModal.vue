@@ -23,8 +23,11 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import MedicationLogRow from '@/components/pod/MedicationLogRow.vue';
+import MedicationDayHeader from '@/components/pod/MedicationDayHeader.vue';
+import ShowMoreToggle from '@/components/ui/ShowMoreToggle.vue';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { useAttentionPulse } from '@/composables/useAttentionPulse';
+import { useExpandableList } from '@/composables/useExpandableList';
 import { useGiveDose } from '@/composables/useGiveDose';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -32,7 +35,9 @@ import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { confirm } from '@/composables/useConfirm';
 import { getMemberRoleLabel } from '@/composables/useMemberInfo';
-import { formatLogEntryTime } from '@/utils/date';
+import { formatLogEntryTime, relativeDayLabel, toDateInputValue } from '@/utils/date';
+import { groupByDate } from '@/utils/groupByDate';
+import { getDailyDoseStatus } from '@/utils/doseLimit';
 import type { AvatarVariant } from '@/constants/avatars';
 import type { Medication } from '@/types/models';
 
@@ -82,20 +87,37 @@ const dosesTodayCount = computed(() =>
   props.medication ? medicationsStore.dosesToday(props.medication.id) : 0
 );
 
-// Visible window: show 5 by default, expand to all
-const INITIAL_VISIBLE = 5;
-const showAll = ref(false);
-const visibleLogs = computed(() =>
-  showAll.value ? logs.value : logs.value.slice(0, INITIAL_VISIBLE)
-);
-const hasMoreLogs = computed(() => logs.value.length > INITIAL_VISIBLE);
+// Recent doses grouped by calendar day (newest first — `logs` is already
+// desc-sorted). Each group carries its true daily count + over-limit status
+// (via the shared `getDailyDoseStatus`) so the count stays accurate even when
+// older groups are collapsed.
+const dayGroups = computed(() => {
+  const dosesPerDay = props.medication?.dosesPerDay;
+  const groups = groupByDate(
+    logs.value,
+    (l) => toDateInputValue(new Date(l.administeredOn)),
+    (d) => relativeDayLabel(d, t)
+  );
+  return groups.map((g) => ({
+    ...g,
+    count: g.items.length,
+    status: getDailyDoseStatus(g.items.length, dosesPerDay),
+  }));
+});
 
-// Reset expanded state when the medication changes
+// Window by whole day-groups (never split a day) via the standard primitive.
+const {
+  visible: visibleGroups,
+  canShowMore,
+  canShowLess,
+  showMore,
+  showLess,
+} = useExpandableList(dayGroups, { initial: 3 });
+
+// Collapse back to the first groups when switching medications.
 watch(
   () => props.medication?.id,
-  () => {
-    showAll.value = false;
-  }
+  () => showLess()
 );
 
 // Auto-close if the medication is deleted while the drawer is open
@@ -308,21 +330,27 @@ const scheduleMeta = computed(() => {
             {{ t('medicationLog.empty') }}
           </p>
         </div>
-        <div v-else ref="logListEl" class="space-y-2">
-          <MedicationLogRow
-            v-for="entry in visibleLogs"
-            :key="entry.id"
-            :entry="entry"
-            @delete="handleDeleteLog"
+        <div v-else ref="logListEl" class="space-y-4">
+          <div v-for="group in visibleGroups" :key="group.date" class="space-y-2">
+            <MedicationDayHeader :label="group.label" :count="group.count" :status="group.status" />
+            <div class="space-y-2">
+              <MedicationLogRow
+                v-for="entry in group.items"
+                :key="entry.id"
+                :entry="entry"
+                @delete="handleDeleteLog"
+              />
+            </div>
+          </div>
+          <ShowMoreToggle
+            :can-show-more="canShowMore"
+            :can-show-less="canShowLess"
+            :more-label="t('medicationLog.viewAll')"
+            :less-label="t('medicationLog.showLess')"
+            tone="on-light"
+            @show-more="showMore"
+            @show-less="showLess"
           />
-          <button
-            v-if="hasMoreLogs"
-            type="button"
-            class="font-outfit w-full rounded-xl py-2 text-xs font-semibold text-[#F15D22] underline-offset-2 transition-colors hover:underline focus:underline focus:outline-none"
-            @click="showAll = !showAll"
-          >
-            {{ showAll ? t('medicationLog.showLess') : t('medicationLog.viewAll') }}
-          </button>
         </div>
       </div>
     </template>

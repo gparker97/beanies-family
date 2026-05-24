@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-23",
-    "translationCount": 2923
+    "lastUpdated": "2026-05-24",
+    "translationCount": 2927
   },
   "translations": {
     "app.name": {
@@ -11263,8 +11263,8 @@
     },
     "medicationLog.viewAll": {
       "translation": "查看全部",
-      "hash": "m9neiw",
-      "lastUpdated": "2026-04-20"
+      "hash": "ktjao6",
+      "lastUpdated": "2026-05-24"
     },
     "medicationLog.showLess": {
       "translation": "收起",
@@ -14620,6 +14620,26 @@
       "translation": "重新连接到Google以加载{familyName}",
       "hash": "r0syqb",
       "lastUpdated": "2026-05-21"
+    },
+    "medicationLog.overNote": {
+      "translation": "每天超出建议的{limit} {over}。",
+      "hash": "juzno2",
+      "lastUpdated": "2026-05-24"
+    },
+    "medicationLog.overWarning.title": {
+      "translation": "单日{count}剂",
+      "hash": "7bwebn",
+      "lastUpdated": "2026-05-24"
+    },
+    "medicationLog.overWarning.body": {
+      "translation": "{name}的建议上限为每天{limit}。值得仔细检查自上次给药以来的间隔—如果正确，您仍然可以将其记录下来。",
+      "hash": "j7dkbi",
+      "lastUpdated": "2026-05-24"
+    },
+    "action.dismiss": {
+      "translation": "忽略",
+      "hash": "fur0k6",
+      "lastUpdated": "2026-05-24"
     }
   }
 }

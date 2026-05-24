@@ -702,8 +702,8 @@ const STRING_DEFS = {
     beanie: 'today',
   },
   'medicationLog.viewAll': {
-    en: 'View all →',
-    beanie: 'view all →',
+    en: 'View all',
+    beanie: 'view all',
   },
   'medicationLog.showLess': {
     en: 'Show less',
@@ -730,6 +730,22 @@ const STRING_DEFS = {
     beanie: 'sign in as the bean giving the dose so we know who to credit.',
   },
   'medicationLog.someone': { en: 'someone', beanie: 'someone' },
+  // Over-limit copy. Heritage Orange, informative — never alarming. `{over}`,
+  // `{limit}`, `{count}`, `{name}` are interpolated via `.replace()` in the
+  // component (the translation layer has no built-in interpolation).
+  'medicationLog.overNote': {
+    en: '{over} more than the recommended {limit} a day.',
+    beanie: '{over} more than the recommended {limit} a day.',
+  },
+  'medicationLog.overWarning.title': {
+    en: '{count} doses in a single day',
+    beanie: '{count} doses in a single day',
+  },
+  'medicationLog.overWarning.body': {
+    en: "{name}'s recommended limit is {limit} a day. It's worth double-checking the spacing since the last dose — you can still log it if that's right.",
+    beanie:
+      "{name}'s recommended limit is {limit} a day. it's worth double-checking the spacing since the last dose — you can still log it if that's right.",
+  },
   'family.discardChanges.title': {
     en: 'Discard your changes?',
     beanie: 'discard your changes?',
@@ -1043,6 +1059,7 @@ const STRING_DEFS = {
   'action.cancel': { en: 'Cancel', beanie: 'cancel' },
   'action.confirm': { en: 'Confirm', beanie: 'confirm' },
   'action.close': { en: 'Close', beanie: 'close' },
+  'action.dismiss': { en: 'Dismiss', beanie: 'dismiss' },
   'action.done': { en: 'Done', beanie: 'done' },
   'action.view': { en: 'View', beanie: 'view' },
   'action.back': { en: 'Back', beanie: 'back' },

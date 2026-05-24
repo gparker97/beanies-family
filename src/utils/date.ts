@@ -1,4 +1,5 @@
 import type { DateOfBirth, ISODateString } from '@/types/models';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { reportError } from '@/utils/errorReporter';
 
 // ── Shared month abbreviations (dd MMM yyyy standard) ──────────────────────
@@ -448,6 +449,30 @@ export function toDateInputValue(date: Date): string {
  */
 export function localToday(): string {
   return toDateInputValue(new Date());
+}
+
+/**
+ * Relative day label for grouped chronological lists: "Today" / "Tomorrow" /
+ * "Yesterday", falling back to `formatNookDate` ("Wed, 6 Mar") for any other
+ * day. Used by the activity log and the medication dose log so their date
+ * headers read the same.
+ *
+ * "Today" is derived one-shot from the system clock at call time (via
+ * `localToday()`), NOT from the reactive `useToday()`. This matches the
+ * original `EntityActivityLog` behavior exactly — do not wire reactive today
+ * in here, or open surfaces would relabel their groups mid-session and diverge
+ * from every other caller. Takes `t` as a param to keep this module free of
+ * translation-store coupling (same convention as the other pure helpers here).
+ */
+export function relativeDayLabel(dateStr: string, t: (key: UIStringKey) => string): string {
+  if (dateStr === localToday()) return t('date.today');
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (dateStr === toDateInputValue(tomorrow)) return t('date.tomorrow');
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (dateStr === toDateInputValue(yesterday)) return t('date.yesterday');
+  return formatNookDate(dateStr);
 }
 
 /**
