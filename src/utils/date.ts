@@ -520,6 +520,19 @@ export function formatTime12(time: string): string {
 }
 
 /**
+ * Absolute "created on" timestamp for view drawers: "21 Apr 2026 at 8:30am".
+ * The standard convention for showing when a to-do or activity was created —
+ * full date + local time. Both parts are local-time (matches `formatDate` and
+ * `toTimeInputValue`). Returns '' for an unparseable input so a corrupt
+ * `createdAt` degrades to nothing rather than rendering "NaN".
+ */
+export function formatCreatedAt(isoString: ISODateString): string {
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return '';
+  return `${formatDate(isoString)} at ${formatTime12(toTimeInputValue(date))}`;
+}
+
+/**
  * Returns `occurredOn` if it parses as a date, otherwise `fallback`.
  * Used by date-anchored items (milestones) to keep feeds + timelines
  * rendering even when an item has a corrupt or missing date — without
