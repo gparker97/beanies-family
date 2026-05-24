@@ -59,18 +59,26 @@ export const useMedicationsStore = defineStore('medications', () => {
   }
 
   /**
+   * Count of log entries for a medication whose administeredOn falls on
+   * `dateStr` (a YYYY-MM-DD local-date string). Pure linear scan over a
+   * single family's logs — small enough that no per-date index is warranted.
+   */
+  function dosesOnDate(medicationId: string, dateStr: string): number {
+    let count = 0;
+    for (const log of medicationLogs.value) {
+      if (log.medicationId !== medicationId) continue;
+      if (toDateInputValue(new Date(log.administeredOn)) === dateStr) count++;
+    }
+    return count;
+  }
+
+  /**
    * Count of log entries whose administeredOn is TODAY in the local
    * timezone. Drives the "Nth dose today" confirmation prompt before
    * creating a new log. Returns 0 for medications with no logs.
    */
   function dosesToday(medicationId: string): number {
-    const todayStr = today.value;
-    let count = 0;
-    for (const log of medicationLogs.value) {
-      if (log.medicationId !== medicationId) continue;
-      if (toDateInputValue(new Date(log.administeredOn)) === todayStr) count++;
-    }
-    return count;
+    return dosesOnDate(medicationId, today.value);
   }
 
   /**
@@ -158,6 +166,7 @@ export const useMedicationsStore = defineStore('medications', () => {
     byMember,
     active,
     logsForMedication,
+    dosesOnDate,
     dosesToday,
     lastDoseAt,
     loadMedications,

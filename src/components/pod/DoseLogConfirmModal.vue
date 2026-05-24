@@ -28,6 +28,7 @@ import MedicationLogRow from '@/components/pod/MedicationLogRow.vue';
 import { useDoseConfirm } from '@/composables/useDoseConfirm';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { getDailyDoseStatus } from '@/utils/doseLimit';
 import { toDateInputValue, toTimeInputValue } from '@/utils/date';
 import { useToday } from '@/composables/useToday';
 import type { MedicationLogEntry } from '@/types/models';
@@ -76,10 +77,37 @@ const todaysDoses = computed<MedicationLogEntry[]>(() => {
     .value.filter((l) => toDateInputValue(new Date(l.administeredOn)) === today);
 });
 
+// Over-limit heads-up. Counts doses on the SELECTED date (so it's correct for
+// back-dated entries) and asks the shared status helper whether THIS dose would
+// push that day over the recommendation. Advisory only — never blocks Save, and
+// dismissible. `dismissed` is reset whenever the dialog opens (so the heads-up
+// re-shows next time), but intentionally persists across date changes within a
+// single open session.
+const dismissed = ref(false);
+const prospectiveCount = computed(() => {
+  const med = state.value.medication;
+  return med ? medicationsStore.dosesOnDate(med.id, dateValue.value) + 1 : 0;
+});
+const overStatus = computed(() =>
+  getDailyDoseStatus(prospectiveCount.value, state.value.medication?.dosesPerDay)
+);
+const showOverWarning = computed(() => !dismissed.value && overStatus.value.isOver);
+const overWarningTitle = computed(() =>
+  t('medicationLog.overWarning.title').replace('{count}', String(prospectiveCount.value))
+);
+const overWarningBody = computed(() =>
+  t('medicationLog.overWarning.body')
+    .replace('{name}', state.value.medication?.name ?? '')
+    .replace('{limit}', String(overStatus.value.limit))
+);
+
 watch(
   () => state.value.open,
   (open) => {
-    if (open) resetToNow();
+    if (open) {
+      resetToNow();
+      dismissed.value = false;
+    }
   }
 );
 
@@ -105,6 +133,40 @@ function onSave(): void {
     @save="onSave"
   >
     <div v-if="state.medication" class="space-y-5">
+      <!-- ── Over-limit heads-up (gentle, informative, dismissable) ──
+           Shown only when logging this dose would exceed the medication's
+           recommended doses for the selected day. Heritage Orange (never
+           Alert Red) — it informs, it never blocks Save. -->
+      <section
+        v-if="showOverWarning"
+        class="relative flex gap-3 rounded-2xl bg-[var(--tint-orange-8)] px-4 py-3.5"
+        role="status"
+      >
+        <span
+          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--tint-orange-15)] text-base"
+          aria-hidden="true"
+          >💡</span
+        >
+        <div class="min-w-0 flex-1 pr-5">
+          <p class="font-outfit text-sm font-bold text-[#F15D22]">{{ overWarningTitle }}</p>
+          <p class="font-inter mt-1 text-xs leading-relaxed text-[#2C3E50]/75 dark:text-gray-300">
+            {{ overWarningBody }}
+          </p>
+        </div>
+        <button
+          type="button"
+          :aria-label="t('action.dismiss')"
+          class="absolute top-2.5 right-2.5 rounded-lg p-1 text-[#2C3E50]/40 transition-colors hover:bg-[var(--tint-orange-15)] hover:text-[#F15D22] focus:bg-[var(--tint-orange-15)] focus:text-[#F15D22] focus:outline-none dark:text-gray-400"
+          @click="dismissed = true"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path
+              d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"
+            />
+          </svg>
+        </button>
+      </section>
+
       <!-- ── Today's doses for this medication ────────────────── -->
       <section>
         <h3

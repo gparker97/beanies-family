@@ -17,7 +17,7 @@ import { computed } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { groupByDate } from '@/utils/groupByDate';
-import { toDateInputValue, formatNookDate } from '@/utils/date';
+import { relativeDayLabel } from '@/utils/date';
 import type { CurrencyCode } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -69,19 +69,13 @@ const { t } = useTranslation();
 const visible = computed(() => props.entries.slice(0, props.visibleCap));
 const hasMore = computed(() => props.entries.length > props.visibleCap);
 
-function dateLabel(dateStr: string): string {
-  const today = toDateInputValue(new Date());
-  if (dateStr === today) return t('date.today');
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  if (dateStr === toDateInputValue(tomorrow)) return t('date.tomorrow');
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (dateStr === toDateInputValue(yesterday)) return t('date.yesterday');
-  return formatNookDate(dateStr);
-}
-
-const grouped = computed(() => groupByDate(visible.value, (e) => e.date, dateLabel));
+const grouped = computed(() =>
+  groupByDate(
+    visible.value,
+    (e) => e.date,
+    (d) => relativeDayLabel(d, t)
+  )
+);
 </script>
 
 <template>

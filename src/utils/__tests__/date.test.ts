@@ -7,9 +7,12 @@ import {
   formatDayLong,
   formatLogEntryTime,
   formatBirthdayShort,
+  formatNookDate,
+  relativeDayLabel,
   getWeekdayOrdinalInMonth,
   nthWeekdayOfMonth,
 } from '../date';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 describe('toDateInputValue', () => {
   it('returns YYYY-MM-DD format', () => {
@@ -325,5 +328,45 @@ describe('nthWeekdayOfMonth', () => {
     expect(() => nthWeekdayOfMonth(new Date(2026, 5, 1), 1, 7)).toThrow();
     expect(() => nthWeekdayOfMonth(new Date(2026, 5, 1), 1, -1)).toThrow();
     expect(() => nthWeekdayOfMonth(new Date(2026, 5, 1), 0 as 1, 3)).toThrow();
+  });
+});
+
+describe('relativeDayLabel', () => {
+  // Stub translator: returns the relative-day words, passes anything else through.
+  const t = (key: UIStringKey): string =>
+    (
+      ({
+        'date.today': 'Today',
+        'date.tomorrow': 'Tomorrow',
+        'date.yesterday': 'Yesterday',
+      }) as Record<string, string>
+    )[key] ?? key;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 21, 12, 0, 0)); // Tue 21 Apr 2026, local noon
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('labels today / tomorrow / yesterday relative to the system clock', () => {
+    expect(relativeDayLabel('2026-04-21', t)).toBe('Today');
+    expect(relativeDayLabel('2026-04-22', t)).toBe('Tomorrow');
+    expect(relativeDayLabel('2026-04-20', t)).toBe('Yesterday');
+  });
+
+  it('falls back to formatNookDate for any other day', () => {
+    expect(relativeDayLabel('2026-04-10', t)).toBe(formatNookDate('2026-04-10'));
+  });
+
+  it('derives "today" one-shot from the clock at call time (non-reactive)', () => {
+    // 2026-04-21 is "today" right now…
+    expect(relativeDayLabel('2026-04-21', t)).toBe('Today');
+    // …advance the clock a day; the SAME date must now read as "Yesterday",
+    // proving the helper re-reads the system clock on each call rather than
+    // capturing a fixed or reactive "today".
+    vi.setSystemTime(new Date(2026, 3, 22, 12, 0, 0));
+    expect(relativeDayLabel('2026-04-21', t)).toBe('Yesterday');
   });
 });
