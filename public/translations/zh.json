@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-24",
-    "translationCount": 2927
+    "translationCount": 2928
   },
   "translations": {
     "app.name": {
@@ -14639,6 +14639,11 @@
     "action.dismiss": {
       "translation": "忽略",
       "hash": "fur0k6",
+      "lastUpdated": "2026-05-24"
+    },
+    "common.createdBy": {
+      "translation": "创建者：",
+      "hash": "fethe9",
       "lastUpdated": "2026-05-24"
     }
   }

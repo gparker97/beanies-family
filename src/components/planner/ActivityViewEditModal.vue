@@ -18,6 +18,7 @@ import { getCurrencyInfo } from '@/constants/currencies';
 import { getActivityCategoryName } from '@/constants/activityCategories';
 import { formatActivityRecurrence } from '@/utils/format';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
+import CreatedMeta from '@/components/common/CreatedMeta.vue';
 import {
   formatDate,
   addHourToTime,
@@ -1372,12 +1373,8 @@ async function confirmReschedule() {
           </button>
         </div>
 
-        <!-- Created by — subtle footer -->
-        <div class="border-t border-gray-100 pt-2 dark:border-slate-700">
-          <span class="text-xs text-[var(--color-text-muted)]">
-            {{ t('planner.createdBy') }}: {{ getMemberName(activity.createdBy) }}
-          </span>
-        </div>
+        <!-- Created by + when — shared subtle footer (standard convention) -->
+        <CreatedMeta :created-by="activity.createdBy" :created-at="activity.createdAt" />
       </div>
       <!-- /reschedule dim wrapper -->
     </div>

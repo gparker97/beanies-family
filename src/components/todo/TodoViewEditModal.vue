@@ -12,6 +12,7 @@ import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
+import CreatedMeta from '@/components/common/CreatedMeta.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import { extractUrls, getUrlDomain, getUrlLabel, getFaviconUrl } from '@/utils/url';
@@ -154,11 +155,6 @@ const viewAssigneeIds = computed(() => (todo.value ? normalizeAssignees(todo.val
 const viewCompletedBy = computed(() => {
   if (!todo.value?.completedBy) return null;
   return familyStore.members.find((m) => m.id === todo.value!.completedBy);
-});
-
-const viewCreatedBy = computed(() => {
-  if (!todo.value?.createdBy) return null;
-  return familyStore.members.find((m) => m.id === todo.value!.createdBy);
 });
 
 const viewIsOverdue = computed(() => (todo.value ? isTodoOverdue(todo.value) : false));
@@ -577,20 +573,15 @@ async function handleDelete() {
         </div>
       </FormFieldGroup>
 
-      <!-- Created by / Completed by — non-editable -->
-      <div class="grid grid-cols-2 gap-4">
-        <FormFieldGroup :label="t('todo.createdBy')">
-          <span v-if="viewCreatedBy" class="text-sm text-[var(--color-text)] dark:text-gray-300">
-            {{ viewCreatedBy.name }}
-          </span>
-          <span v-else class="text-sm text-[var(--color-text-muted)]">&mdash;</span>
-        </FormFieldGroup>
-        <FormFieldGroup v-if="todo.completed && viewCompletedBy" :label="t('todo.doneBy')">
-          <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
-            {{ viewCompletedBy.name }}
-          </span>
-        </FormFieldGroup>
-      </div>
+      <!-- Done by — non-editable (only once completed) -->
+      <FormFieldGroup v-if="todo.completed && viewCompletedBy" :label="t('todo.doneBy')">
+        <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+          {{ viewCompletedBy.name }}
+        </span>
+      </FormFieldGroup>
+
+      <!-- Created by + when — shared subtle footer (standard convention) -->
+      <CreatedMeta :created-by="todo.createdBy" :created-at="todo.createdAt" />
     </div>
 
     <!-- Complete / Reopen button in the footer, next to close -->

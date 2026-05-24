@@ -8,6 +8,7 @@ import {
   formatLogEntryTime,
   formatBirthdayShort,
   formatNookDate,
+  formatCreatedAt,
   relativeDayLabel,
   getWeekdayOrdinalInMonth,
   nthWeekdayOfMonth,
@@ -328,6 +329,24 @@ describe('nthWeekdayOfMonth', () => {
     expect(() => nthWeekdayOfMonth(new Date(2026, 5, 1), 1, 7)).toThrow();
     expect(() => nthWeekdayOfMonth(new Date(2026, 5, 1), 1, -1)).toThrow();
     expect(() => nthWeekdayOfMonth(new Date(2026, 5, 1), 0 as 1, 3)).toThrow();
+  });
+});
+
+describe('formatCreatedAt', () => {
+  it('formats an ISO timestamp as "D Mon YYYY at h:mm(am|pm)" in local time', () => {
+    // Constructed via the local Date ctor + read back via local getters, so
+    // the assertion is independent of the runner's timezone.
+    const iso = new Date(2026, 3, 21, 8, 30).toISOString(); // 21 Apr 2026, 08:30 local
+    expect(formatCreatedAt(iso)).toBe('21 Apr 2026 at 8:30am');
+  });
+
+  it('omits minutes when the time is on the hour', () => {
+    const iso = new Date(2026, 0, 5, 15, 0).toISOString(); // 5 Jan 2026, 15:00 local
+    expect(formatCreatedAt(iso)).toBe('5 Jan 2026 at 3pm');
+  });
+
+  it('returns an empty string for an unparseable input', () => {
+    expect(formatCreatedAt('not-a-date')).toBe('');
   });
 });
 

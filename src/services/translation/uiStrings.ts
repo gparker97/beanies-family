@@ -87,6 +87,9 @@ const STRING_DEFS = {
   'common.loanOutstanding': { en: 'Loan Outstanding', beanie: 'loan outstanding' },
   'common.purchaseValue': { en: 'Purchase Value', beanie: 'what you paid' },
   'common.currentValue': { en: 'Current Value', beanie: 'worth today' },
+  // Standard "created by + when" drawer footer (see CreatedMeta.vue). Reads as
+  // a phrase ("Created by Greg · 21 Apr 2026 at 8:30am") so en uses Sentence case.
+  'common.createdBy': { en: 'Created by', beanie: 'created by' },
   'common.purchased': { en: 'Purchased', beanie: 'purchased' },
   'common.save': { en: 'Save', beanie: 'save' },
   'common.cancel': { en: 'Cancel', beanie: 'cancel' },
