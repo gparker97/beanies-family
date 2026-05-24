@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-24
+
+### Changed
+
+- **The medication dose log now groups by day, so you can see how many doses were given each day at a glance.** Instead of one long list, doses are bucketed under day headers (Today / Yesterday / dates), each showing a count (e.g. "3 doses"). If a day went over the medication's recommended doses-per-day, that day is gently flagged in orange with a short note (e.g. "1 more than the recommended 3 a day"). "As needed" medications show counts but are never flagged.
+- **A friendly heads-up when you log more than the recommended doses in a day.** When the dose you're about to record would push that day over the medication's recommended daily count, the "Log a dose" dialog shows a calm, informative note — it never blocks you, and you can dismiss it and log the dose anyway.
+
 ## 2026-05-23
 
 ### Fixed
