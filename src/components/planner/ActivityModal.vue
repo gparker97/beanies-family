@@ -235,12 +235,24 @@ watch(category, (newCategory) => {
   color.value = getActivityCategoryColor(newCategory);
 });
 
-// Auto-set daysOfWeek from date if empty (only relevant for recurring kinds
-// that respect daysOfWeek — currently just weekly).
-watch(date, (newDate) => {
-  if (newDate && daysOfWeek.value.length === 0 && isRecurring.value) {
-    const d = new Date(newDate + 'T00:00:00');
-    daysOfWeek.value = [d.getDay()];
+// Keep the weekly day-of-week anchored to the start date's weekday while the
+// user hasn't customized the selection. Without this, opening the modal on a
+// Monday auto-fills `[Mon]`, and then picking a Tuesday start date would leave
+// the recurrence on Mondays — so the chosen start date (and every occurrence
+// before the next Monday) never renders on the calendar.
+//
+// "Untouched" = empty (initial), or still exactly the previous start date's
+// single weekday. A multi-day pick, or a single day the user switched to a
+// different weekday, counts as customized and is preserved across date edits.
+watch(date, (newDate, oldDate) => {
+  if (!newDate || !isRecurring.value) return;
+  const newWeekday = new Date(newDate + 'T00:00:00').getDay();
+  const oldWeekday = oldDate ? new Date(oldDate + 'T00:00:00').getDay() : null;
+  const untouched =
+    daysOfWeek.value.length === 0 ||
+    (daysOfWeek.value.length === 1 && oldWeekday !== null && daysOfWeek.value[0] === oldWeekday);
+  if (untouched) {
+    daysOfWeek.value = [newWeekday];
   }
 });
 
