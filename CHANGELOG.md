@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-25
+
+### Changed
+
+- **Your to-do list now sorts by due date by default — and remembers how you like it sorted.** Tasks with the nearest due dates appear first (undated tasks sit at the bottom), so the most time-sensitive things are always on top. The sort control is now a clear **Sort: …** button instead of an easy-to-miss dropdown, and whichever order you pick — Due date, Newest, or Oldest — is remembered the next time you open the page (per device).
+
 ## 2026-05-24
 
 ### Changed

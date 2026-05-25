@@ -14,9 +14,11 @@ import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import QuickAddBar from '@/components/todo/QuickAddBar.vue';
 import TodoSection from '@/components/todo/TodoSection.vue';
-import type { TodoSort } from '@/components/todo/FilterBar.vue';
+import TodoSortMenu from '@/components/todo/TodoSortMenu.vue';
 import type { TodoItem } from '@/types/models';
 import { useBreakpoint } from '@/composables/useBreakpoint';
+import { useTodoSort } from '@/composables/useTodoSort';
+import { sortTodos } from '@/utils/todo';
 
 const route = useRoute();
 const router = useRouter();
@@ -29,8 +31,9 @@ const authStore = useAuthStore();
 
 const currentMemberId = computed(() => authStore.currentUser?.memberId ?? '');
 
-// Local filter state
-const sortBy = ref<TodoSort>('newest');
+// Local filter state — sort is a persisted, device-local preference (default
+// 'dueDate'); member filter is page-local.
+const { sortBy } = useTodoSort();
 const memberFilter = ref('all');
 const completedCollapsed = ref(true);
 
@@ -56,7 +59,7 @@ function withMemberFilterAndSort(items: TodoItem[]): TodoItem[] {
     memberFilter.value === 'all'
       ? items
       : items.filter((t) => normalizeAssignees(t).includes(memberFilter.value));
-  return applySorting(filtered);
+  return sortTodos(filtered, sortBy.value);
 }
 
 const displayedOpenTodos = computed(() => withMemberFilterAndSort(todoStore.filteredActiveTodos));
@@ -79,25 +82,6 @@ const displayedCompletedTodos = computed(() => {
 });
 
 const hasAnyTodos = computed(() => todoStore.todos.length > 0);
-
-function applySorting(items: TodoItem[]): TodoItem[] {
-  const sorted = [...items];
-  switch (sortBy.value) {
-    case 'newest':
-      return sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    case 'oldest':
-      return sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    case 'dueDate':
-      return sorted.sort((a, b) => {
-        if (!a.dueDate && !b.dueDate) return 0;
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return a.dueDate.localeCompare(b.dueDate);
-      });
-    default:
-      return sorted;
-  }
-}
 
 // Actions
 async function handleQuickAdd(payload: {
@@ -181,19 +165,7 @@ async function handleDelete(id: string) {
       <p class="text-sm text-[var(--color-text-muted)]">
         {{ t('todo.subtitle') }}
       </p>
-      <div v-if="hasAnyTodos" class="flex items-center gap-1.5">
-        <span class="font-outfit text-xs font-medium text-[var(--color-text)] opacity-50">
-          {{ t('todo.sortLabel') }}
-        </span>
-        <select
-          v-model="sortBy"
-          class="beanies-input font-outfit cursor-pointer rounded-lg border-gray-200 py-1.5 pr-7 pl-2 text-xs font-semibold text-[var(--color-text)] dark:border-slate-600"
-        >
-          <option value="newest">{{ t('todo.sort.newest') }}</option>
-          <option value="oldest">{{ t('todo.sort.oldest') }}</option>
-          <option value="dueDate">{{ t('todo.sort.dueDate') }}</option>
-        </select>
-      </div>
+      <TodoSortMenu v-if="hasAnyTodos" v-model:sort-by="sortBy" />
     </div>
 
     <!-- Quick add bar -->

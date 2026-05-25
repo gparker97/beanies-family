@@ -383,6 +383,9 @@ export interface TodoItem {
 export type CreateTodoInput = Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateTodoInput = Partial<Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>>;
 
+/** User-selectable sort order for the Family To-Do list (page-level). */
+export type TodoSort = 'newest' | 'oldest' | 'dueDate';
+
 // Family Activity — The Treehouse planner's central entity
 //
 // IMPORTANT: This union must stay in sync with ACTIVITY_CATEGORIES in

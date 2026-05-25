@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>beanies.family — To-Do sort control treatments</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ─────────────────────────────────────────────────────────────
+         Authentic beanies.family tokens (mirrored from src/style.css +
+         packages/brand/theme.css). rem-based sizing throughout so what
+         you see maps 1:1 onto buildable Tailwind classes (text-xs = 0.75rem).
+         ───────────────────────────────────────────────────────────── */
+      :root {
+        --orange: #f15d22;
+        --orange-deep: #d14d1a;
+        --terracotta: #e67e22;
+        --purple-400: #9b59b6;
+        --purple-500: #8e44ad;
+        --slate: #2c3e50;
+        --slate-soft: #3d5368;
+        --green: #27ae60;
+
+        /* gradients */
+        --grad-orange: linear-gradient(135deg, #f15d22, #e67e22);
+        --grad-purple: linear-gradient(135deg, #9b59b6, #8e44ad);
+        --grad-slate: linear-gradient(135deg, #2c3e50, #3d5368);
+      }
+
+      html[data-theme='light'] {
+        --bg: #f8f9fa;
+        --bg-tint: radial-gradient(120% 120% at 80% 0%, rgb(241 93 34 / 4%) 0%, transparent 55%);
+        --card: #ffffff;
+        --text: #2c3e50;
+        --text-muted: #64748b;
+        --border: #e2e8f0;
+        --tint-slate-5: rgb(44 62 80 / 5%);
+        --tint-slate-10: rgb(44 62 80 / 10%);
+        --tint-purple-12: rgb(155 89 182 / 12%);
+        --tint-orange-8: rgb(241 93 34 / 8%);
+        --tint-orange-15: rgb(241 93 34 / 15%);
+        --card-shadow: 0 4px 20px rgb(44 62 80 / 5%);
+        --soft-shadow: 0 8px 40px rgb(44 62 80 / 8%);
+        --active-shadow: 0 4px 14px rgb(241 93 34 / 28%);
+        --active-shadow-purple: 0 4px 14px rgb(142 68 173 / 30%);
+      }
+
+      html[data-theme='dark'] {
+        --bg: #1a252f;
+        --bg-tint: radial-gradient(120% 120% at 80% 0%, rgb(241 93 34 / 8%) 0%, transparent 55%);
+        --card: #243342;
+        --text: #ecf0f1;
+        --text-muted: #bdc3c7;
+        --border: #4a6274;
+        --tint-slate-5: rgb(255 255 255 / 5%);
+        --tint-slate-10: rgb(255 255 255 / 10%);
+        --tint-purple-12: rgb(155 89 182 / 22%);
+        --tint-orange-8: rgb(241 93 34 / 14%);
+        --tint-orange-15: rgb(241 93 34 / 24%);
+        --card-shadow: 0 4px 20px rgb(0 0 0 / 25%);
+        --soft-shadow: 0 8px 40px rgb(0 0 0 / 35%);
+        --active-shadow: 0 4px 14px rgb(0 0 0 / 35%);
+        --active-shadow-purple: 0 4px 14px rgb(0 0 0 / 40%);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: 'Inter', sans-serif;
+        background: var(--bg);
+        background-image: var(--bg-tint);
+        color: var(--text);
+        min-height: 100vh;
+        padding: 2.5rem 1.5rem 4rem;
+        transition:
+          background 0.3s ease,
+          color 0.3s ease;
+      }
+
+      .page {
+        max-width: 60rem;
+        margin: 0 auto;
+      }
+
+      /* ── Page chrome ──────────────────────────────────────────── */
+      .topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 2.25rem;
+      }
+      .topbar h1 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 1.5rem;
+        letter-spacing: -0.01em;
+      }
+      .topbar h1 .dot {
+        color: var(--orange);
+      }
+      .topbar p {
+        font-size: 0.8125rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+        max-width: 34rem;
+        line-height: 1.5;
+      }
+      .theme-toggle {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.75rem;
+        color: var(--text);
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.5rem 0.9rem;
+        cursor: pointer;
+        white-space: nowrap;
+        box-shadow: var(--card-shadow);
+        transition: transform 0.15s ease;
+      }
+      .theme-toggle:hover {
+        transform: translateY(-1px);
+      }
+
+      /* ── Treatment card ───────────────────────────────────────── */
+      .treatment {
+        background: var(--card);
+        border-radius: var(--sq, 24px);
+        box-shadow: var(--card-shadow);
+        padding: 1.5rem 1.5rem 1.75rem;
+        margin-bottom: 1.5rem;
+        border: 1px solid transparent;
+      }
+      html[data-theme='dark'] .treatment {
+        border-color: rgb(255 255 255 / 4%);
+      }
+      .treatment-head {
+        display: flex;
+        align-items: baseline;
+        gap: 0.6rem;
+        margin-bottom: 1.25rem;
+      }
+      .treatment-tag {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 0.75rem;
+        color: #fff;
+        background: var(--slate);
+        border-radius: 999px;
+        width: 1.5rem;
+        height: 1.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .treatment-name {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 1.0625rem;
+      }
+      .treatment-sub {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      /* preview frames */
+      .previews {
+        display: grid;
+        grid-template-columns: 1fr 22rem;
+        gap: 1rem;
+      }
+      @media (max-width: 48rem) {
+        .previews {
+          grid-template-columns: 1fr;
+        }
+      }
+      .frame {
+        border: 1px dashed var(--border);
+        border-radius: 1rem;
+        padding: 1rem 1rem 1.1rem;
+        background: var(--bg);
+        position: relative;
+      }
+      .frame-label {
+        position: absolute;
+        top: -0.55rem;
+        left: 0.9rem;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.625rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        background: var(--card);
+        padding: 0 0.45rem;
+      }
+      .frame.mobile {
+        max-width: 22rem;
+      }
+
+      /* mock To-Do page header context */
+      .todo-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+      .frame.mobile .todo-head {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.85rem;
+      }
+      .todo-subtitle {
+        font-size: 0.8125rem;
+        color: var(--text-muted);
+      }
+
+      .caption {
+        margin-top: 1.1rem;
+        font-size: 0.8125rem;
+        line-height: 1.55;
+        color: var(--text-muted);
+      }
+      .caption strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .pros {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 0.75rem;
+      }
+      .chip {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        background: var(--tint-slate-5);
+        color: var(--text-muted);
+      }
+      .chip.good {
+        background: var(--tint-orange-8);
+        color: var(--orange);
+      }
+
+      /* small shared icon glyphs */
+      .ic {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+      }
+      .arrow {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+      }
+
+      /* ════════════════════════════════════════════════════════════
+         TREATMENT A — Segmented track (always-visible, sliding feel)
+         ════════════════════════════════════════════════════════════ */
+      .seg-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .seg-eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.625rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        opacity: 0.75;
+      }
+      .seg-track {
+        display: inline-flex;
+        background: var(--tint-slate-5);
+        border-radius: 999px;
+        padding: 0.25rem;
+        gap: 0.15rem;
+      }
+      .seg-opt {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        background: transparent;
+        border: none;
+        border-radius: 999px;
+        padding: 0.4rem 0.8rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        white-space: nowrap;
+        transition:
+          color 0.2s ease,
+          background 0.25s ease,
+          box-shadow 0.25s ease;
+      }
+      .seg-opt .ic {
+        font-size: 0.8125rem;
+      }
+      .seg-opt:hover:not(.is-active) {
+        color: var(--text);
+      }
+      .seg-opt.is-active {
+        color: #fff;
+        background: var(--grad-purple);
+        box-shadow: var(--active-shadow-purple);
+      }
+      .frame.mobile .seg-wrap {
+        display: flex;
+        width: 100%;
+      }
+      .frame.mobile .seg-track {
+        flex: 1;
+        justify-content: space-between;
+      }
+      .frame.mobile .seg-opt {
+        flex: 1;
+        justify-content: center;
+        padding: 0.45rem 0.5rem;
+      }
+
+      /* ════════════════════════════════════════════════════════════
+         TREATMENT B — Labeled dropdown button + popover
+         ════════════════════════════════════════════════════════════ */
+      .dd {
+        position: relative;
+        display: inline-block;
+      }
+      .dd-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        font-family: 'Outfit', sans-serif;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        padding: 0.45rem 0.7rem 0.45rem 0.5rem;
+        cursor: pointer;
+        color: var(--text);
+        box-shadow: var(--card-shadow);
+        transition:
+          transform 0.15s ease,
+          border-color 0.15s ease;
+      }
+      .dd-trigger:hover {
+        transform: translateY(-1px);
+        border-color: var(--orange);
+      }
+      .dd-icbox {
+        width: 1.6rem;
+        height: 1.6rem;
+        border-radius: 0.6rem;
+        background: var(--tint-orange-8);
+        color: var(--orange);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+      }
+      .dd-text {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--text-muted);
+      }
+      .dd-text strong {
+        font-weight: 700;
+        color: var(--text);
+        font-size: 0.8125rem;
+        margin-left: 0.2rem;
+      }
+      .dd-chev {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        transition: transform 0.2s ease;
+      }
+      .dd.open .dd-chev {
+        transform: rotate(180deg);
+      }
+      .dd-menu {
+        position: absolute;
+        top: calc(100% + 0.4rem);
+        right: 0;
+        min-width: 12rem;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        box-shadow: var(--soft-shadow);
+        padding: 0.4rem;
+        z-index: 20;
+        opacity: 0;
+        transform: translateY(-6px) scale(0.98);
+        pointer-events: none;
+        transition:
+          opacity 0.18s ease,
+          transform 0.18s ease;
+      }
+      .dd.open .dd-menu {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+      }
+      .dd-item {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        width: 100%;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.8125rem;
+        color: var(--text);
+        background: transparent;
+        border: none;
+        border-radius: 0.7rem;
+        padding: 0.55rem 0.65rem;
+        cursor: pointer;
+        text-align: left;
+        transition: background 0.15s ease;
+      }
+      .dd-item .ic {
+        font-size: 0.9rem;
+        width: 1.1rem;
+        text-align: center;
+      }
+      .dd-item:hover {
+        background: var(--tint-slate-5);
+      }
+      .dd-item.is-active {
+        background: var(--tint-orange-8);
+        color: var(--orange);
+      }
+      .dd-item .check {
+        margin-left: auto;
+        color: var(--orange);
+        font-weight: 800;
+        opacity: 0;
+      }
+      .dd-item.is-active .check {
+        opacity: 1;
+      }
+
+      /* ════════════════════════════════════════════════════════════
+         TREATMENT C — Standalone pill row (member-chip sibling)
+         ════════════════════════════════════════════════════════════ */
+      .pillrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .pillrow-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.625rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        opacity: 0.75;
+        margin-right: 0.1rem;
+      }
+      .pill {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        background: var(--tint-slate-5);
+        border: none;
+        border-radius: 999px;
+        padding: 0.4rem 0.85rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        white-space: nowrap;
+        transition:
+          color 0.2s ease,
+          background 0.25s ease,
+          box-shadow 0.25s ease,
+          transform 0.15s ease;
+      }
+      .pill .ic {
+        font-size: 0.8125rem;
+      }
+      .pill:hover:not(.is-active) {
+        transform: translateY(-1px);
+        color: var(--text);
+      }
+      .pill.is-active {
+        color: #fff;
+        background: var(--grad-orange);
+        box-shadow: var(--active-shadow);
+      }
+      .frame.mobile .pillrow {
+        width: 100%;
+      }
+
+      .footnote {
+        margin-top: 1.5rem;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-align: center;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="topbar">
+        <div>
+          <h1>To-Do sort control <span class="dot">·</span> treatments</h1>
+          <p>
+            Three on-brand ways to make the Family To-Do sort obvious and tappable. Default option
+            is <strong>Due date</strong> (earliest first, undated items at the bottom). Each shows a
+            desktop and a mobile rendering. Tap an option to feel the active state; toggle dark mode
+            top-right.
+          </p>
+        </div>
+        <button class="theme-toggle" id="themeToggle">🌙 Dark</button>
+      </div>
+
+      <!-- ════════════ TREATMENT A ════════════ -->
+      <div class="treatment">
+        <div class="treatment-head">
+          <span class="treatment-tag">A</span>
+          <div>
+            <div class="treatment-name">Segmented track</div>
+            <div class="treatment-sub">
+              All three options always visible · purple (the To-Do accent) active · sliding-pill feel
+            </div>
+          </div>
+        </div>
+        <div class="previews">
+          <div class="frame">
+            <span class="frame-label">Desktop</span>
+            <div class="todo-head">
+              <span class="todo-subtitle">what needs doing</span>
+              <div class="seg-wrap" data-group="a">
+                <span class="seg-eyebrow">Sort</span>
+                <div class="seg-track">
+                  <button class="seg-opt is-active">
+                    <span class="ic">📅</span>Due date
+                  </button>
+                  <button class="seg-opt"><span class="ic arrow">↓</span>Newest</button>
+                  <button class="seg-opt"><span class="ic arrow">↑</span>Oldest</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="frame mobile">
+            <span class="frame-label">Mobile</span>
+            <div class="todo-head">
+              <span class="todo-subtitle">what needs doing</span>
+              <div class="seg-wrap" data-group="a-m">
+                <div class="seg-track">
+                  <button class="seg-opt is-active"><span class="ic">📅</span>Due</button>
+                  <button class="seg-opt"><span class="ic arrow">↓</span>Newest</button>
+                  <button class="seg-opt"><span class="ic arrow">↑</span>Oldest</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">
+          <strong>Most discoverable</strong> — every option is on screen, zero taps to see what's
+          available, and the filled pill makes the current sort unmistakable. Reads as a modern
+          "view toggle." On mobile the label shortens to "Due" and the track stretches full-width.
+          <div class="pros">
+            <span class="chip good">zero-tap discovery</span>
+            <span class="chip">compact</span>
+            <span class="chip">matches FilterBar idiom</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════ TREATMENT B ════════════ -->
+      <div class="treatment">
+        <div class="treatment-head">
+          <span class="treatment-tag">B</span>
+          <div>
+            <div class="treatment-name">Labeled dropdown button</div>
+            <div class="treatment-sub">
+              Bordered, icon-led trigger shows the current sort · options on tap · scales to more
+              options later
+            </div>
+          </div>
+        </div>
+        <div class="previews">
+          <div class="frame">
+            <span class="frame-label">Desktop</span>
+            <div class="todo-head">
+              <span class="todo-subtitle">what needs doing</span>
+              <div class="dd" data-dd>
+                <button class="dd-trigger" data-dd-trigger>
+                  <span class="dd-icbox">⇅</span>
+                  <span class="dd-text">Sort:<strong data-dd-value>Due date</strong></span>
+                  <span class="dd-chev">▾</span>
+                </button>
+                <div class="dd-menu">
+                  <button class="dd-item is-active" data-val="Due date">
+                    <span class="ic">📅</span>Due date<span class="check">✓</span>
+                  </button>
+                  <button class="dd-item" data-val="Newest">
+                    <span class="ic arrow">↓</span>Newest<span class="check">✓</span>
+                  </button>
+                  <button class="dd-item" data-val="Oldest">
+                    <span class="ic arrow">↑</span>Oldest<span class="check">✓</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="frame mobile">
+            <span class="frame-label">Mobile</span>
+            <div class="todo-head">
+              <span class="todo-subtitle">what needs doing</span>
+              <div class="dd" data-dd style="align-self: flex-end">
+                <button class="dd-trigger" data-dd-trigger>
+                  <span class="dd-icbox">⇅</span>
+                  <span class="dd-text">Sort:<strong data-dd-value>Due date</strong></span>
+                  <span class="dd-chev">▾</span>
+                </button>
+                <div class="dd-menu">
+                  <button class="dd-item is-active" data-val="Due date">
+                    <span class="ic">📅</span>Due date<span class="check">✓</span>
+                  </button>
+                  <button class="dd-item" data-val="Newest">
+                    <span class="ic arrow">↓</span>Newest<span class="check">✓</span>
+                  </button>
+                  <button class="dd-item" data-val="Oldest">
+                    <span class="ic arrow">↑</span>Oldest<span class="check">✓</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">
+          <strong>Most compact &amp; scalable</strong> — one tidy button that always names the
+          current sort, so it's discoverable without taking a whole row. The orange-tinted ⇅ icon
+          box signals "this does something." Best choice if more sort options (e.g. priority,
+          assignee) get added later. Costs one tap to see the choices.
+          <div class="pros">
+            <span class="chip good">always shows current sort</span>
+            <span class="chip">tiny footprint</span>
+            <span class="chip">future-proof</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════ TREATMENT C ════════════ -->
+      <div class="treatment">
+        <div class="treatment-head">
+          <span class="treatment-tag">C</span>
+          <div>
+            <div class="treatment-name">Standalone pill row</div>
+            <div class="treatment-sub">
+              Separate pills like the member filter · Heritage Orange active · reads as a sibling
+              control
+            </div>
+          </div>
+        </div>
+        <div class="previews">
+          <div class="frame">
+            <span class="frame-label">Desktop</span>
+            <div class="todo-head">
+              <span class="todo-subtitle">what needs doing</span>
+              <div class="pillrow" data-group="c">
+                <span class="pillrow-label">Sort by</span>
+                <button class="pill is-active"><span class="ic">📅</span>Due date</button>
+                <button class="pill"><span class="ic arrow">↓</span>Newest</button>
+                <button class="pill"><span class="ic arrow">↑</span>Oldest</button>
+              </div>
+            </div>
+          </div>
+          <div class="frame mobile">
+            <span class="frame-label">Mobile</span>
+            <div class="todo-head">
+              <span class="todo-subtitle">what needs doing</span>
+              <div class="pillrow" data-group="c-m">
+                <span class="pillrow-label">Sort</span>
+                <button class="pill is-active"><span class="ic">📅</span>Due date</button>
+                <button class="pill"><span class="ic arrow">↓</span>Newest</button>
+                <button class="pill"><span class="ic arrow">↑</span>Oldest</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">
+          <strong>Most consistent with this page</strong> — uses the exact pill idiom already on the
+          To-Do page (the member-chip filter), so it feels native. Heritage Orange active
+          distinguishes "sort" from the slate "member" chips. Fully discoverable, but on small
+          screens three pills + a label can wrap to a second line.
+          <div class="pros">
+            <span class="chip good">page-native look</span>
+            <span class="chip">zero-tap discovery</span>
+            <span class="chip">may wrap on mobile</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="footnote">
+        Mockup only — no app source changed. Tokens mirror <code>src/style.css</code> +
+        <code>packages/brand/theme.css</code>. Icons: 📅 due date, ↓ newest-first, ↑ oldest-first
+        (final glyphs TBD in build).
+      </p>
+    </div>
+
+    <script>
+      // Theme toggle
+      const root = document.documentElement;
+      const btn = document.getElementById('themeToggle');
+      btn.addEventListener('click', () => {
+        const dark = root.getAttribute('data-theme') === 'dark';
+        root.setAttribute('data-theme', dark ? 'light' : 'dark');
+        btn.textContent = dark ? '🌙 Dark' : '☀️ Light';
+      });
+
+      // Treatments A & C: click an option to make it active within its group
+      document.querySelectorAll('[data-group]').forEach((group) => {
+        const opts = group.querySelectorAll('.seg-opt, .pill');
+        opts.forEach((opt) => {
+          opt.addEventListener('click', () => {
+            opts.forEach((o) => o.classList.remove('is-active'));
+            opt.classList.add('is-active');
+          });
+        });
+      });
+
+      // Treatment B: dropdown open/close + selection
+      document.querySelectorAll('[data-dd]').forEach((dd) => {
+        const trigger = dd.querySelector('[data-dd-trigger]');
+        const valueEl = dd.querySelector('[data-dd-value]');
+        const items = dd.querySelectorAll('.dd-item');
+        trigger.addEventListener('click', (e) => {
+          e.stopPropagation();
+          document.querySelectorAll('[data-dd]').forEach((o) => {
+            if (o !== dd) o.classList.remove('open');
+          });
+          dd.classList.toggle('open');
+        });
+        items.forEach((item) => {
+          item.addEventListener('click', () => {
+            items.forEach((i) => i.classList.remove('is-active'));
+            item.classList.add('is-active');
+            valueEl.textContent = item.getAttribute('data-val');
+            dd.classList.remove('open');
+          });
+        });
+      });
+      document.addEventListener('click', () => {
+        document.querySelectorAll('[data-dd]').forEach((dd) => dd.classList.remove('open'));
+      });
+    </script>
+  </body>
+</html>

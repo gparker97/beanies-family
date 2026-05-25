@@ -1,4 +1,4 @@
-import type { TodoItem } from '@/types/models';
+import type { TodoItem, TodoSort } from '@/types/models';
 import { localToday } from './date';
 import { parseIsoDateSafely } from './safeDate';
 
@@ -30,4 +30,35 @@ export function isTodoDueToday(todo: TodoItem): boolean {
   if (todo.completed || !todo.dueDate) return false;
   if (isTodoOverdue(todo)) return false;
   return todo.dueDate.slice(0, 10) === localToday();
+}
+
+/**
+ * Sort a list of to-dos for display. Pure — returns a NEW array and never
+ * mutates the input. Semantics match the Family To-Do page's historical order:
+ * - `newest` / `oldest`: by `createdAt`.
+ * - `dueDate`: earliest due date first, with undated items pushed to the end.
+ *
+ * `dueDate` is a date-only `ISODateString` (the time of day lives in the
+ * separate `dueTime` field), so a plain string `localeCompare` is correct and
+ * faithful — no `Date` parsing. `Array.prototype.sort` is stable, so ties
+ * (equal `createdAt`, equal `dueDate`, or two undated items) preserve input
+ * order, matching the prior behaviour exactly. Add no secondary tie-breaker.
+ */
+export function sortTodos(items: TodoItem[], sort: TodoSort): TodoItem[] {
+  const sorted = [...items];
+  switch (sort) {
+    case 'newest':
+      return sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    case 'oldest':
+      return sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    case 'dueDate':
+      return sorted.sort((a, b) => {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return a.dueDate.localeCompare(b.dueDate);
+      });
+    default:
+      return sorted;
+  }
 }
