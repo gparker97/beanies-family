@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { isTodoOverdue, isTodoDueToday } from '../todo';
+import { isTodoOverdue, isTodoDueToday, sortTodos } from '../todo';
 import type { TodoItem } from '@/types/models';
 
 function todo(overrides: Partial<TodoItem> = {}): TodoItem {
@@ -87,5 +87,64 @@ describe('todo helpers', () => {
     it('handles full ISO datetime values (slices the date portion)', () => {
       expect(isTodoDueToday(todo({ dueDate: '2026-05-16T22:00:00.000Z' }))).toBe(true);
     });
+  });
+});
+
+// Sibling describe — no fake timers needed (sortTodos is timezone/now-agnostic).
+describe('sortTodos', () => {
+  it('newest: orders by createdAt descending', () => {
+    const a = todo({ id: 'a', createdAt: '2026-05-01T00:00:00.000Z' });
+    const b = todo({ id: 'b', createdAt: '2026-05-03T00:00:00.000Z' });
+    const c = todo({ id: 'c', createdAt: '2026-05-02T00:00:00.000Z' });
+    expect(sortTodos([a, b, c], 'newest').map((t) => t.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('oldest: orders by createdAt ascending', () => {
+    const a = todo({ id: 'a', createdAt: '2026-05-01T00:00:00.000Z' });
+    const b = todo({ id: 'b', createdAt: '2026-05-03T00:00:00.000Z' });
+    const c = todo({ id: 'c', createdAt: '2026-05-02T00:00:00.000Z' });
+    expect(sortTodos([a, b, c], 'oldest').map((t) => t.id)).toEqual(['a', 'c', 'b']);
+  });
+
+  it('dueDate: earliest first, with undated items pushed to the end', () => {
+    const undated = todo({ id: 'u' });
+    const later = todo({ id: 'l', dueDate: '2026-06-10' });
+    const sooner = todo({ id: 's', dueDate: '2026-06-01' });
+    expect(sortTodos([undated, later, sooner], 'dueDate').map((t) => t.id)).toEqual([
+      's',
+      'l',
+      'u',
+    ]);
+  });
+
+  it('dueDate: equal due dates preserve input order (stable sort)', () => {
+    const first = todo({ id: 'first', dueDate: '2026-06-01' });
+    const second = todo({ id: 'second', dueDate: '2026-06-01' });
+    expect(sortTodos([first, second], 'dueDate').map((t) => t.id)).toEqual(['first', 'second']);
+  });
+
+  it('dueDate: two undated items preserve input order (stable sort)', () => {
+    const first = todo({ id: 'first' });
+    const second = todo({ id: 'second' });
+    expect(sortTodos([first, second], 'dueDate').map((t) => t.id)).toEqual(['first', 'second']);
+  });
+
+  it('newest: equal createdAt preserves input order (stable sort)', () => {
+    const first = todo({ id: 'first', createdAt: '2026-05-01T00:00:00.000Z' });
+    const second = todo({ id: 'second', createdAt: '2026-05-01T00:00:00.000Z' });
+    expect(sortTodos([first, second], 'newest').map((t) => t.id)).toEqual(['first', 'second']);
+  });
+
+  it('returns a new array and does not mutate the input', () => {
+    const a = todo({ id: 'a', createdAt: '2026-05-01T00:00:00.000Z' });
+    const b = todo({ id: 'b', createdAt: '2026-05-03T00:00:00.000Z' });
+    const input = [a, b];
+    const result = sortTodos(input, 'newest');
+    expect(result).not.toBe(input);
+    expect(input.map((t) => t.id)).toEqual(['a', 'b']); // input untouched
+  });
+
+  it('handles an empty list', () => {
+    expect(sortTodos([], 'dueDate')).toEqual([]);
   });
 });
