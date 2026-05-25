@@ -1,0 +1,112 @@
+name: Mobile — iOS simulator build
+
+# Step 1 of the iOS lane (ADR-029): compile the Capacitor iOS wrapper for the
+# iOS Simulator, UNSIGNED. The point is to validate that the wrap builds on iOS
+# and to catch iOS-specific breakage early — long before we have an Apple
+# Developer account.
+#
+# Why this needs no Apple account, no DUNS, no Mac of our own:
+#   - The repo is PUBLIC, so GitHub's macOS runners are free (the 2026 per-minute
+#     Actions charge excludes public repos) — Xcode only runs on macOS, which is
+#     why iOS can't build on our Linux/WSL box or the ubuntu-latest CI lane.
+#   - A SIMULATOR build needs no code-signing certificate or provisioning
+#     profile (CODE_SIGNING_ALLOWED=NO), so it needs no Apple Developer Program
+#     membership and no D-U-N-S number. Those only gate device testing,
+#     TestFlight, and App Store distribution (the later steps of the iOS lane).
+#
+# This produces a `.app` that boots in the iOS Simulator (downloadable as an
+# artifact for anyone with a Mac) — NOT an installable .ipa. There is no free
+# on-device sideload on iOS; running on a real iPhone or TestFlight comes later,
+# once the paid Apple account + Fastlane signing exist (see ADR-029).
+#
+# Mirrors mobile-android-build.yml: runs on pushes to main (docs-only changes
+# skipped) + manual dispatch.
+
+on:
+  push:
+    branches: ['main']
+    # Docs-only changes don't change the build — skip them so doc edits don't rebuild.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios-simulator-build:
+    name: Build iOS app (simulator, unsigned)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Show toolchain versions
+        # Surface the runner's Xcode/SDK so a future build break that's actually
+        # an Xcode-version bump on the runner is obvious from the logs.
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+        env:
+          # Same client-side values the prod web bundle + the Android debug APK
+          # already ship — no new exposure — so the bundled app in the simulator
+          # matches what ships. NOTE: native Google sign-in won't actually
+          # complete on an unsigned simulator build (it returns via a verified
+          # Universal Link, which needs signing); these just keep the JS bundle
+          # identical for UI smoke-testing.
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          VITE_REGISTRY_API_URL: ${{ secrets.REGISTRY_API_URL }}
+          VITE_REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
+          VITE_BEANIES_ERROR_WEBHOOK_URL: ${{ vars.BEANIES_ERROR_WEBHOOK_URL }}
+          VITE_BEANIES_LOG_INGEST_URL: ${{ vars.BEANIES_LOG_INGEST_URL }}
+          VITE_BEANIES_LOG_INGEST_API_KEY: ${{ secrets.BEANIES_LOG_INGEST_API_KEY }}
+          # Stamp the build so the diagnostic firehose identifies which build is
+          # running, matching the Android lane.
+          VITE_BUILD_SHA: ${{ github.sha }}
+
+      - name: Sync Capacitor (iOS)
+        # Copies the freshly built dist/ into ios/App/App/public and updates the
+        # native SPM dependencies.
+        run: npx cap sync ios
+
+      - name: List Xcode schemes
+        # Diagnostic: if Capacitor ever renames the default `App` scheme, the
+        # build step below would fail with an opaque error — this makes the
+        # available schemes visible in the log.
+        run: xcodebuild -list -project ios/App/App.xcodeproj
+
+      - name: Build for iOS Simulator (unsigned)
+        # `-destination 'generic/platform=iOS Simulator'` builds for the simulator
+        # without booting a specific device. CODE_SIGNING_ALLOWED=NO skips signing
+        # entirely (no cert/profile needed). Output lands in ios/build via
+        # -derivedDataPath for a predictable artifact path.
+        run: |
+          xcodebuild build \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload simulator .app artifact
+        # The .app is a simulator bundle — it boots in the iOS Simulator on any
+        # Mac (drag it onto a booted simulator, or `xcrun simctl install`). It is
+        # NOT installable on a physical iPhone (that needs a signed .ipa).
+        uses: actions/upload-artifact@v4
+        with:
+          name: beanies-ios-simulator-app
+          path: ios/build/Build/Products/Debug-iphonesimulator/App.app
+          if-no-files-found: error
