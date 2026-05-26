@@ -105,7 +105,7 @@ jobs:
         # The .app is a simulator bundle — it boots in the iOS Simulator on any
         # Mac (drag it onto a booted simulator, or `xcrun simctl install`). It is
         # NOT installable on a physical iPhone (that needs a signed .ipa).
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: beanies-ios-simulator-app
           path: ios/build/Build/Products/Debug-iphonesimulator/App.app
