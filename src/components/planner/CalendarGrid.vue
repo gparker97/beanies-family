@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { extractDatePart, formatMonthYear, formatNookDate } from '@/utils/date';
+import { extractDatePart, formatNookDate } from '@/utils/date';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { tripTypeEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
-import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
+import { relativeWeekLabelKey, type RelativeWeekLabelKey } from '@/utils/calendarWeek';
 import MonthDayCard, {
   type MonthDayCellData,
   type CellAllDayItem,
@@ -21,6 +21,9 @@ import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import type { FamilyActivity, HolidayOccurrence } from '@/types/models';
 
 const props = defineProps<{
+  /** Controlled period — the page owns the canonical date; the grid derives
+   *  its displayed month from it (props down, no internal nav state). */
+  referenceDate: Date;
   selectedDate?: string;
 }>();
 
@@ -30,8 +33,9 @@ const emit = defineEmits<{
   'view-segment': [vacationId: string, segmentIndex: number];
   'view-activity': [activityId: string, date: string];
   'holiday-click': [holiday: HolidayOccurrence];
-  /** Fired when the displayed month changes (prev / next / today / swipe). */
-  navigated: [];
+  /** Swipe navigation — the page advances the shared reference date. */
+  prev: [];
+  next: [];
 }>();
 
 const { t } = useTranslation();
@@ -42,8 +46,8 @@ const holidayStore = useHolidayStore();
 const familyStore = useFamilyStore();
 
 const today = new Date();
-const currentYear = ref(today.getFullYear());
-const currentMonth = ref(today.getMonth());
+const currentYear = computed(() => props.referenceDate.getFullYear());
+const currentMonth = computed(() => props.referenceDate.getMonth());
 
 // Visible caps for each cell row. Cells grow naturally with content but
 // `+N more` overflow keeps any one day from ballooning a whole row's
@@ -64,10 +68,6 @@ const allDayLabels = [
 const dayLabels = computed(() => {
   const start = settingsStore.weekStartDay;
   return Array.from({ length: 7 }, (_, i) => allDayLabels[(i + start) % 7]!());
-});
-
-const monthLabel = computed(() => {
-  return formatMonthYear(new Date(currentYear.value, currentMonth.value, 1));
 });
 
 const todayStr = computed(() => formatDate(today));
@@ -162,6 +162,7 @@ const calendarDays = computed<MonthDayCellData[]>(() => {
         name: v.name,
         emoji,
         isStart: dateStr === vStart,
+        isEnd: dateStr === vEnd,
       });
     }
   }
@@ -304,10 +305,6 @@ function cellBgClass(cell: { date: string; weekRow: number; isCurrentMonth: bool
   return 'md:hover:bg-gray-50 md:dark:hover:bg-slate-700/50';
 }
 
-const activityCount = computed(() => {
-  return activityStore.monthActivities(currentYear.value, currentMonth.value).length;
-});
-
 /**
  * Set of indexes in `calendarDays` that should be preceded by a mobile-only
  * week separator. A separator appears before the first current-month cell
@@ -333,7 +330,10 @@ const weekSeparatorIndexes = computed(() => {
  * range ("May 18 – 24") + a flag for whether this is the current week.
  */
 const weekRangeByRow = computed(() => {
-  const map = new Map<number, { range: string; isCurrent: boolean; isNext: boolean }>();
+  const map = new Map<
+    number,
+    { range: string; labelKey: RelativeWeekLabelKey; isCurrent: boolean }
+  >();
   const days = calendarDays.value;
   const todayStrVal = todayStr.value;
   for (let row = 0; row < Math.ceil(days.length / 7); row++) {
@@ -341,62 +341,41 @@ const weekRangeByRow = computed(() => {
     if (rowDays.length === 0) continue;
     const startCell = rowDays[0]!;
     const endCell = rowDays[rowDays.length - 1]!;
-    const isCurrent = startCell.date <= todayStrVal && todayStrVal <= endCell.date;
+    // Shared 5-way classifier (this/next/last/upcoming/earlier) — single
+    // source of truth with the week-strip navigator's row labels.
+    const labelKey = relativeWeekLabelKey(startCell.date, endCell.date, todayStrVal);
     map.set(row, {
       range: `${formatNookDate(startCell.date)} – ${formatNookDate(endCell.date)}`,
-      isCurrent,
-      isNext: !isCurrent && startCell.date > todayStrVal,
+      labelKey,
+      isCurrent: labelKey === 'planner.weekThis',
     });
   }
   return map;
 });
-
-function prevMonth() {
-  if (currentMonth.value === 0) {
-    currentMonth.value = 11;
-    currentYear.value--;
-  } else {
-    currentMonth.value--;
-  }
-  emit('navigated');
-}
-
-function nextMonth() {
-  if (currentMonth.value === 11) {
-    currentMonth.value = 0;
-    currentYear.value++;
-  } else {
-    currentMonth.value++;
-  }
-  emit('navigated');
-}
-
-async function goToToday() {
-  const movedMonth =
-    currentYear.value !== today.getFullYear() || currentMonth.value !== today.getMonth();
-  if (movedMonth) {
-    currentYear.value = today.getFullYear();
-    currentMonth.value = today.getMonth();
-    emit('navigated');
-  }
-  // Always scroll to today's card on mobile, whether or not we changed
-  // months — the button is a no-op visually otherwise (today's card may
-  // still be far below the viewport). `force` overrides the "user has
-  // already scrolled" guard since they explicitly asked to jump.
-  await nextTick();
-  scrollMobileToToday({ force: true });
-}
 
 function handleDayClick(date: string) {
   emit('selectDate', date);
 }
 
 // ── Swipe gesture ──────────────────────────────────────────────────────────
+// Swipe emits the navigation intent; the page advances the shared reference
+// date (one-way data flow — the grid never mutates the date itself).
 const swipeRef = ref<HTMLElement | null>(null);
 useCalendarSlide(swipeRef, {
-  onNext: nextMonth,
-  onPrev: prevMonth,
+  onNext: () => emit('next'),
+  onPrev: () => emit('prev'),
 });
+
+// When the page jumps the reference date to today (the command bar's "Today"),
+// scroll the mobile day-stack to today's card. Plain month prev/next lands on
+// the 1st of another month, so this only fires for the genuine "Today" action.
+watch(
+  () => props.referenceDate,
+  (d) => {
+    if (formatDate(d) !== todayStr.value) return;
+    void nextTick().then(() => scrollMobileToToday({ force: true }));
+  }
+);
 
 /**
  * Mobile scroll-to-today helper. Used in two ways:
@@ -439,8 +418,6 @@ onMounted(async () => {
   await nextTick();
   scrollMobileToToday();
 });
-
-defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
 </script>
 
 <template>
@@ -449,8 +426,6 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
     class="rounded-3xl bg-white p-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)] md:p-5 dark:bg-slate-800"
     style="touch-action: pan-y; will-change: transform"
   >
-    <CalendarNavBar :label="monthLabel" @prev="prevMonth" @next="nextMonth" @today="goToToday" />
-
     <!-- Mobile-only avatar legend strip — one row of dots, never wraps.
          The avatars themselves carry the color grammar of the chips below,
          so this IS the legend (no name labels needed at this size). -->
@@ -505,13 +480,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
           "
         >
           <span class="font-outfit text-[0.625rem] font-bold tracking-[0.14em] uppercase">
-            {{
-              weekRangeByRow.get(cell.weekRow)?.isCurrent
-                ? t('planner.weekThis')
-                : weekRangeByRow.get(cell.weekRow)?.isNext
-                  ? t('planner.weekNext')
-                  : t('planner.weekUpcoming')
-            }}
+            {{ t(weekRangeByRow.get(cell.weekRow)?.labelKey ?? 'planner.weekUpcoming') }}
           </span>
           <span
             class="font-outfit text-[0.625rem] font-medium normal-case"

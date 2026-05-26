@@ -82,7 +82,7 @@ describe('CalendarGrid travel-segment chips', () => {
     const store = useVacationStore();
     store.vacations = [makeVacation([flightSegment()])];
 
-    const wrapper = mount(CalendarGrid);
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
     const html = wrapper.html();
 
     // Direction-aware emoji disambiguates the two markers without reading the time
@@ -101,7 +101,7 @@ describe('CalendarGrid travel-segment chips', () => {
     const store = useVacationStore();
     store.vacations = [makeVacation([flightSegment()])];
 
-    const wrapper = mount(CalendarGrid);
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
     // Find any chip — direction-aware emoji means we look for the takeoff one
     const chips = wrapper.findAll('span').filter((el) => el.text().includes('🛫'));
     expect(chips.length).toBeGreaterThanOrEqual(1);
@@ -117,7 +117,7 @@ describe('CalendarGrid travel-segment chips', () => {
     const store = useVacationStore();
     store.vacations = [makeVacation([flightSegment({ status: 'pending' })])];
 
-    const wrapper = mount(CalendarGrid);
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
     const html = wrapper.html();
     // Pending → travel-chip-pending class. Scoped CSS in TravelSegmentChip.vue
     // supplies the dashed border + italic styles; the test checks the class
@@ -134,7 +134,7 @@ describe('CalendarGrid travel-segment chips', () => {
     );
     store.vacations = [makeVacation(segs)];
 
-    const wrapper = mount(CalendarGrid);
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
     const html = wrapper.html();
     // Should show overflow indicator
     expect(html).toMatch(/\+\d+/);
@@ -161,7 +161,7 @@ describe('CalendarGrid all-day lane', () => {
     const a = allDayActivity({ id: 'a-single', date: '2026-04-14', title: "Beau's birthday" });
     mockActivityOccurrences.push({ activity: a, date: '2026-04-14' });
 
-    const wrapper = mount(CalendarGrid);
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
     const chips = wrapper.findAll('[data-testid="all-day-activity-chip"]');
     expect(chips.length).toBe(1);
     expect(chips[0]!.text()).toContain("Beau's birthday");
@@ -181,7 +181,7 @@ describe('CalendarGrid all-day lane', () => {
       { activity: a, date: '2026-04-16' }
     );
 
-    const wrapper = mount(CalendarGrid);
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
     const chips = wrapper.findAll('[data-testid="all-day-activity-chip"]');
     expect(chips.length).toBe(3);
     // Title rendered exactly once across the run (start cell only)
@@ -196,7 +196,7 @@ describe('CalendarGrid all-day lane', () => {
       mockActivityOccurrences.push({ activity: a, date: '2026-04-14' });
     }
 
-    const wrapper = mount(CalendarGrid);
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
     const html = wrapper.html();
     // Should show "+1" overflow somewhere in the all-day lane region
     expect(html).toMatch(/\+1/);
@@ -206,7 +206,7 @@ describe('CalendarGrid all-day lane', () => {
     const a = allDayActivity({ id: 'a-click', date: '2026-04-14', title: 'Birthday' });
     mockActivityOccurrences.push({ activity: a, date: '2026-04-14' });
 
-    const wrapper = mount(CalendarGrid);
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
     const chip = wrapper.find('[data-testid="all-day-activity-chip"]');
     expect(chip.exists()).toBe(true);
 
@@ -262,7 +262,7 @@ describe('CalendarGrid timed-chip row', () => {
       }
     );
 
-    const wrapper = mount(CalendarGrid);
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
     const chips = wrapper.findAll('[data-testid="month-chip"]');
     expect(chips.length).toBe(2);
     const text = wrapper.text();
@@ -294,7 +294,7 @@ describe('CalendarGrid timed-chip row', () => {
       });
     }
 
-    const wrapper = mount(CalendarGrid);
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
     const chips = wrapper.findAll('[data-testid="month-chip"]');
     expect(chips.length).toBe(4);
     expect(wrapper.text()).toContain('+2');

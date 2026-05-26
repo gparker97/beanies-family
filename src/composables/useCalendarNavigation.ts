@@ -48,6 +48,26 @@ export interface WeekDay {
   isToday: boolean;
 }
 
+/**
+ * Format a week's span as a human label, e.g. "18 – 24 May, 2026",
+ * "28 May – 3 Jun, 2026", or "30 Dec, 2025 – 5 Jan, 2026". Pure — shared
+ * by `useWeekNavigation.weekLabel` and the page-level `usePlannerNavigation`
+ * so the command-bar period label and the week view never drift apart.
+ */
+export function formatWeekRange(first: Date, last: Date): string {
+  const sameMonth = first.getMonth() === last.getMonth();
+  const sameYear = first.getFullYear() === last.getFullYear();
+  const fmtDay = (d: Date) => formatDateShort(toDateInputValue(d));
+
+  if (sameMonth) {
+    return `${fmtDay(first)} – ${last.getDate()}, ${first.getFullYear()}`;
+  }
+  if (sameYear) {
+    return `${fmtDay(first)} – ${fmtDay(last)}, ${first.getFullYear()}`;
+  }
+  return `${fmtDay(first)}, ${first.getFullYear()} – ${fmtDay(last)}, ${last.getFullYear()}`;
+}
+
 export function useWeekNavigation(referenceDate: Ref<Date>) {
   const settingsStore = useSettingsStore();
   const { today } = useToday();
@@ -70,20 +90,7 @@ export function useWeekNavigation(referenceDate: Ref<Date>) {
 
   const weekLabel = computed(() => {
     const days = weekDays.value;
-    const first = days[0]!.date;
-    const last = days[6]!.date;
-    const sameMonth = first.getMonth() === last.getMonth();
-    const sameYear = first.getFullYear() === last.getFullYear();
-
-    const fmtDay = (d: Date) => formatDateShort(toDateInputValue(d));
-
-    if (sameMonth) {
-      return `${fmtDay(first)} – ${last.getDate()}, ${first.getFullYear()}`;
-    }
-    if (sameYear) {
-      return `${fmtDay(first)} – ${fmtDay(last)}, ${first.getFullYear()}`;
-    }
-    return `${fmtDay(first)}, ${first.getFullYear()} – ${fmtDay(last)}, ${last.getFullYear()}`;
+    return formatWeekRange(days[0]!.date, days[6]!.date);
   });
 
   function prevWeek() {

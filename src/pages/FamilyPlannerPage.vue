@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import ViewToggle from '@/components/planner/ViewToggle.vue';
-import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
+import CalendarCommandBar from '@/components/planner/CalendarCommandBar.vue';
 import { useMemberFilterChips } from '@/composables/useMemberFilterChips';
-import { useFamilyStore } from '@/stores/familyStore';
+import { usePlannerNavigation, type PlannerView } from '@/composables/usePlannerNavigation';
 import CalendarGrid from '@/components/planner/CalendarGrid.vue';
 import WeeklyCalendarView from '@/components/planner/WeeklyCalendarView.vue';
 import DailyCalendarView from '@/components/planner/DailyCalendarView.vue';
@@ -29,9 +28,7 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { getActivityFallbackEmoji, getActivityCategoryName } from '@/constants/activityCategories';
-import { formatDateFull } from '@/utils/date';
-import VacationSidebarCard from '@/components/vacation/VacationSidebarCard.vue';
-import NookSectionCard from '@/components/nook/NookSectionCard.vue';
+import { formatDateFull, parseLocalDate, toDateInputValue } from '@/utils/date';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
 import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
@@ -52,7 +49,6 @@ const activityStore = useActivityStore();
 const accountsStore = useAccountsStore();
 const recurringStore = useRecurringStore();
 const transactionsStore = useTransactionsStore();
-const familyStore = useFamilyStore();
 const vacationStore = useVacationStore();
 // Instantiating the holiday store wires its self-loading watchers (country +
 // online) — the calendar views just call holidaysInRange / holidayForDate.
@@ -83,9 +79,11 @@ watch(
   }
 );
 
-const activeView = ref('month');
+const activeView = ref<PlannerView>('month');
+// Single source of truth for the calendar's period — the views are controlled
+// off this (props down); navigation intents flow back up (events).
+const { referenceDate, label, goPrev, goNext, goToday } = usePlannerNavigation(activeView);
 const showInactive = ref(false);
-const showMemberFilterMobile = ref(false);
 const showModal = ref(false);
 const editingActivity = ref<FamilyActivity | null>(null);
 const editingOccurrenceDate = ref<string | undefined>(undefined);
@@ -128,9 +126,6 @@ function handleCreateAnother() {
   openAddModal(date);
 }
 
-const calendarGridRef = ref<InstanceType<typeof CalendarGrid> | null>(null);
-const weeklyViewRef = ref<InstanceType<typeof WeeklyCalendarView> | null>(null);
-const dailyViewRef = ref<InstanceType<typeof DailyCalendarView> | null>(null);
 const defaultAssigneeId = ref<string | undefined>(undefined);
 
 // Vacation wizard state
@@ -198,22 +193,6 @@ watch(editingSegmentValue, (next, prev) => {
   }
 });
 
-const headerSubtitle = computed(() => {
-  if (activeView.value === 'day') {
-    const label = dailyViewRef.value?.dayLabel ?? '';
-    const count = dailyViewRef.value?.activityCount ?? 0;
-    return t('planner.subtitle').replace('{month}', label).replace('{count}', String(count));
-  }
-  if (activeView.value === 'week') {
-    const label = weeklyViewRef.value?.weekLabel ?? '';
-    const count = weeklyViewRef.value?.activityCount ?? 0;
-    return t('planner.subtitle').replace('{month}', label).replace('{count}', String(count));
-  }
-  const month = calendarGridRef.value?.monthLabel ?? '';
-  const count = calendarGridRef.value?.activityCount ?? 0;
-  return t('planner.subtitle').replace('{month}', month).replace('{count}', String(count));
-});
-
 function openAddModal(date?: string, time?: string, memberId?: string) {
   sidebarDate.value = null;
   editingActivity.value = null;
@@ -231,14 +210,40 @@ useQuickAddIntent((action) => {
 
 function handleCalendarDateClick(date: string) {
   // Clicking a day in the monthly/weekly grid drills into that day's
-  // timeline instead of popping the agenda drawer — the agenda stays
-  // reachable via the button in the daily nav bar (see handleOpenAgenda).
+  // timeline. Sets the shared reference date so the Day view opens on it.
   focusedDate.value = date;
+  referenceDate.value = parseLocalDate(date);
   activeView.value = 'day';
 }
 
-function handleOpenAgenda(date: string) {
-  sidebarDate.value = date;
+// Mobile week-strip day pick — change the focused day but STAY in week view.
+function handleSelectDay(date: string) {
+  focusedDate.value = date;
+  referenceDate.value = parseLocalDate(date);
+}
+
+// Period navigation (command bar + view swipe). Clearing focusedDate drops the
+// drilled-in day highlight when the user explicitly pages the period.
+function handlePrev() {
+  goPrev();
+  focusedDate.value = null;
+}
+function handleNext() {
+  goNext();
+  focusedDate.value = null;
+}
+function handleToday() {
+  goToday();
+  focusedDate.value = null;
+}
+function setView(view: string) {
+  activeView.value = view as PlannerView;
+}
+
+function handleOpenAgenda() {
+  // Day-view agenda action lives in the command bar now — the open day is the
+  // shared reference date.
+  sidebarDate.value = toDateInputValue(referenceDate.value);
 }
 
 function handleSidebarAdd() {
@@ -446,152 +451,48 @@ function handleActivitySwapped(newId: string) {
 
 <template>
   <div class="space-y-6">
-    <!-- Header row: subtitle + mobile filter + add button -->
-    <div class="flex items-center justify-between gap-2">
-      <p class="text-secondary-500/40 hidden text-sm sm:block dark:text-gray-500">
-        {{ headerSubtitle }}
-      </p>
-      <!-- Mobile: compact member filter button -->
-      <div class="flex items-center gap-2 sm:hidden">
-        <div class="relative">
-          <button
-            type="button"
-            class="font-outfit inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 text-sm font-medium transition-all"
-            :class="
-              isAllActive
-                ? 'bg-[var(--tint-slate-5)] text-[var(--color-text)]/65 dark:bg-slate-700 dark:text-gray-400'
-                : 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
-            "
-            @click="showMemberFilterMobile = !showMemberFilterMobile"
-          >
-            <span class="text-base">👨‍👩‍👧</span>
-            {{
-              isAllActive
-                ? t('filter.allMembers')
-                : activeMemberNames.length === 1
-                  ? activeMemberNames[0]
-                  : `${activeMemberNames.length} ${t('filter.members' as any)}`
-            }}
-            <span class="text-xs opacity-60">▾</span>
-          </button>
-          <!-- Mobile dropdown backdrop -->
-          <div
-            v-if="showMemberFilterMobile"
-            class="fixed inset-0 z-20"
-            @click="showMemberFilterMobile = false"
-          />
-          <!-- Mobile dropdown -->
-          <Transition
-            enter-active-class="transition-all duration-150"
-            enter-from-class="opacity-0 -translate-y-1"
-            leave-active-class="transition-all duration-100"
-            leave-to-class="opacity-0 -translate-y-1"
-          >
-            <div
-              v-if="showMemberFilterMobile"
-              class="absolute top-full left-0 z-30 mt-1.5 min-w-[200px] rounded-2xl border border-gray-200/60 bg-white p-2 shadow-lg dark:border-slate-600 dark:bg-slate-800"
-            >
-              <button
-                type="button"
-                class="font-outfit flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
-                :class="
-                  isAllActive
-                    ? 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
-                    : 'text-[var(--color-text)] hover:bg-[var(--tint-slate-5)] dark:text-gray-300 dark:hover:bg-slate-700'
-                "
-                @click="
-                  onSelectAll();
-                  showMemberFilterMobile = false;
-                "
-              >
-                <span class="text-base">👨‍👩‍👧</span>
-                {{ t('filter.allMembers') }}
-              </button>
-              <button
-                v-for="member in familyStore.humans"
-                :key="member.id"
-                type="button"
-                class="font-outfit flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
-                :class="
-                  isMemberActive(member.id)
-                    ? 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
-                    : 'text-[var(--color-text)] hover:bg-[var(--tint-slate-5)] dark:text-gray-300 dark:hover:bg-slate-700'
-                "
-                @click="onSelectMember(member.id)"
-              >
-                <span
-                  class="inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-white"
-                  :style="{
-                    backgroundColor: member.color,
-                  }"
-                >
-                  {{ member.name.charAt(0).toUpperCase() }}
-                </span>
-                {{ member.name }}
-              </button>
-            </div>
-          </Transition>
-        </div>
-      </div>
-      <button
-        v-if="canEditActivities"
-        type="button"
-        class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
-        @click="openAddModal()"
-      >
-        {{ t('planner.addActivity') }}
-      </button>
-    </div>
+    <!-- Sticky command bar — period hero + nav + view toggle + filter + Add
+         + trip ribbon. The calendar is the page hero; nothing above it. -->
+    <CalendarCommandBar
+      :label="label"
+      :active-view="activeView"
+      :can-add="canEditActivities"
+      :is-all-active="isAllActive"
+      :is-member-active="isMemberActive"
+      :active-member-names="activeMemberNames"
+      @prev="handlePrev"
+      @next="handleNext"
+      @today="handleToday"
+      @update:active-view="setView"
+      @add="openAddModal()"
+      @open-agenda="handleOpenAgenda"
+      @select-all="onSelectAll"
+      @select-member="onSelectMember"
+      @vacation-click="handleVacationClick"
+    />
 
-    <!-- Desktop member filter (below header) -->
-    <div class="hidden sm:flex">
-      <MemberChipFilter
-        :is-all-active="isAllActive"
-        :is-member-active="isMemberActive"
-        @select-all="onSelectAll"
-        @select-member="onSelectMember"
-      />
-    </div>
-
-    <!-- Upcoming vacations — prominent card above calendar -->
-    <NookSectionCard
-      v-if="vacationStore.upcomingVacations.length > 0"
-      :title="t('vacation.upcoming')"
-    >
-      <div
-        class="flex snap-x gap-3 overflow-x-auto pb-1 sm:grid sm:snap-none sm:grid-cols-2 sm:overflow-visible sm:pb-0"
-      >
-        <VacationSidebarCard
-          v-for="vacation in vacationStore.upcomingVacations"
-          :key="vacation.id"
-          class="w-[280px] shrink-0 snap-start sm:w-auto sm:shrink"
-          :vacation="vacation"
-          @click="handleVacationClick(vacation.id)"
-        />
-      </div>
-    </NookSectionCard>
-
-    <!-- View toggle (compact, directly above calendar) -->
-    <ViewToggle :active-view="activeView" @update:active-view="activeView = $event" />
-
-    <!-- Calendar views (conditional on activeView) -->
+    <!-- Calendar views (conditional on activeView), controlled by referenceDate -->
     <CalendarGrid
       v-if="activeView === 'month'"
-      ref="calendarGridRef"
+      :reference-date="referenceDate"
       :selected-date="focusedDate ?? undefined"
       @select-date="handleCalendarDateClick"
+      @prev="handlePrev"
+      @next="handleNext"
       @vacation-click="handleVacationClick"
       @view-segment="handleViewSegment"
       @view-activity="(id: string, date: string) => openViewModal(id, date)"
       @holiday-click="handleHolidayClick"
-      @navigated="focusedDate = null"
     />
 
     <WeeklyCalendarView
       v-else-if="activeView === 'week'"
-      ref="weeklyViewRef"
+      :reference-date="referenceDate"
       :selected-date="focusedDate ?? undefined"
       @select-date="handleCalendarDateClick"
+      @select-day="handleSelectDay"
+      @prev="handlePrev"
+      @next="handleNext"
       @add-activity="(date: string, time?: string) => openAddModal(date, time)"
       @view-activity="(id: string, date: string) => openViewModal(id, date)"
       @view-todo="openTodoViewModal"
@@ -602,10 +503,10 @@ function handleActivitySwapped(newId: string) {
 
     <DailyCalendarView
       v-else-if="activeView === 'day'"
-      ref="dailyViewRef"
-      :selected-date="focusedDate ?? undefined"
+      :reference-date="referenceDate"
       @select-date="handleCalendarDateClick"
-      @open-agenda="handleOpenAgenda"
+      @prev="handlePrev"
+      @next="handleNext"
       @add-activity="
         (date: string, time?: string, memberId?: string) => openAddModal(date, time, memberId)
       "
