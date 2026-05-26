@@ -28,7 +28,7 @@ jobs:
     name: Build + upload signed AAB
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Preflight — require signing + Play secrets
         env:
