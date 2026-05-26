@@ -56,10 +56,30 @@ describe('WeekStripNav', () => {
         ],
       },
     });
-    // 14 pills across the two rows
-    expect(wrapper.findAll('button').length).toBe(14);
+    // 14 day pills across the two rows (the peek toggle has no day aria-label)
+    expect(wrapper.findAll('button[aria-label]').length).toBe(14);
     expect(wrapper.text()).toContain('planner.weekThis');
     expect(wrapper.text()).toContain('planner.weekNext');
+  });
+
+  it('collapsed → shows only the focused week, and the peek toggle emits', async () => {
+    const wrapper = mount(WeekStripNav, {
+      props: {
+        collapsed: true,
+        weeks: [
+          makeWeek({ labelKey: 'planner.weekThis', isFocused: true }),
+          makeWeek({ labelKey: 'planner.weekNext', isFocused: false }),
+        ],
+      },
+    });
+    // Only the focused (this) week's 7 day pills render when collapsed.
+    expect(wrapper.findAll('button[aria-label]').length).toBe(7);
+    expect(wrapper.text()).toContain('planner.weekThis');
+    expect(wrapper.text()).not.toContain('planner.weekNext');
+    // The peek toggle (the one button without a day aria-label) emits.
+    const peek = wrapper.findAll('button').find((b) => !b.attributes('aria-label'));
+    await peek!.trigger('click');
+    expect(wrapper.emitted('toggle-peek')).toBeTruthy();
   });
 
   it('marks today with the primary-500 styling', () => {

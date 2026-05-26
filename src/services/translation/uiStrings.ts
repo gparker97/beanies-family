@@ -5011,6 +5011,13 @@ const STRING_DEFS = {
   'planner.view.week': { en: 'Week', beanie: 'week' },
   'planner.view.day': { en: 'Day', beanie: 'day' },
   'planner.view.agenda': { en: 'Agenda', beanie: 'agenda' },
+  'planner.nothingPlanned': { en: 'Nothing planned', beanie: 'nothing planned' },
+  'planner.tripRibbonLabel': { en: 'Coming up', beanie: 'coming up' },
+  'planner.tripRibbonHide': { en: 'Hide upcoming trips', beanie: 'hide trips' },
+  'planner.tripRibbonShow': { en: 'Show upcoming trips', beanie: 'show trips' },
+  'planner.tripsOne': { en: '1 trip', beanie: '1 trip' },
+  'planner.tripsMany': { en: '{n} trips', beanie: '{n} trips' },
+  'planner.peekNextWeek': { en: 'Peek next week', beanie: 'peek next week' },
 
   // Planner — Activity Category Groups
   'planner.group.school': { en: 'School', beanie: 'school beans' },
@@ -6039,6 +6046,8 @@ const STRING_DEFS = {
 
   // Sidebar
   'vacation.upcoming': { en: 'Upcoming Vacations', beanie: 'upcoming vacations' },
+  'vacation.inDays': { en: '{n}d', beanie: '{n}d' },
+  'vacation.onNow': { en: 'now', beanie: 'now' },
   'vacation.daysAway': { en: 'Days Away', beanie: 'days away' },
   'vacation.inProgress': { en: 'In Progress', beanie: 'in progress' },
   'vacation.itemsNeedBooking': {

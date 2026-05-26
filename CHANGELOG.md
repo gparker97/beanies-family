@@ -8,6 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-26
+
+### Changed
+
+- **The family calendar is now the star of the Activities page.** A bar pinned to the top always shows which month, week, or day you're viewing — with the date, prev/next arrows, a Today button, the Month/Week/Day switch, the family filter, and Add, all in one place that stays put as you scroll. The calendar fills the full width and is the first thing you see. The weekday columns (week view) and the per-person columns (day view) now stay pinned under that bar too, so you never lose track of which day or person a column belongs to.
+- **Upcoming trips no longer crowd out the calendar.** The big vacation cards are gone; trips now show as a slim "coming up" countdown ribbon in the top bar (tap one to open it) and as a coloured band on their real dates in the calendar. On phones the trips fold into a single tappable "trips" pill, and countdowns read sensibly for trips that start today ("today") or are already underway ("now").
+- **The month view on phones is easier to scan.** Days are a clean day-by-day agenda, and days with nothing on them fold down to a thin "nothing planned" line so the busy days stand out.
+- **The weekly view on phones gives your day more room.** The date strip now shows just the current week by default (pinned in place as you scroll), with a "Peek next week" toggle to glance at the fortnight when you want it.
+
 ## 2026-05-25
 
 ### Changed

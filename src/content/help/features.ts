@@ -499,7 +499,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Plan family trips from start to finish \u2014 flights, hotels, transport, activities, and ideas \u2014 all in one place.',
     icon: '\u2708\uFE0F',
     readTime: 5,
-    updatedDate: '2026-03-27',
+    updatedDate: '2026-05-26',
     sections: [
       {
         type: 'heading',
@@ -670,7 +670,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'callout',
         content:
-          'Upcoming vacations also appear on the <strong>Family Nook</strong> homepage and in the <strong>Family Planner</strong> sidebar, so the whole family can see what\u2019s coming up.',
+          'Upcoming trips also appear on the <strong>Family Nook</strong> homepage and across the <strong>Family Planner</strong> \u2014 as a countdown ribbon in the calendar\u2019s top bar and as a coloured band on the trip\u2019s actual dates in the calendar grid. Tap either one to jump to the full trip.',
         title: 'Nook and Planner integration',
         icon: '\u{1F3E0}',
       },
@@ -851,7 +851,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Schedule lessons, appointments, and recurring activities for your family with calendar views and smart recurrence.',
     icon: '\u{1F4C5}',
     readTime: 4,
-    updatedDate: '2026-03-09',
+    updatedDate: '2026-05-26',
     sections: [
       {
         type: 'heading',
@@ -961,15 +961,16 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'paragraph',
-        content: 'The planner offers multiple ways to view your schedule:',
+        content:
+          'A bar at the top of the planner stays with you as you scroll, so you always know which month, week, or day you\u2019re looking at. It has arrows and a <strong>Today</strong> button to move around, the Month / Week / Day switch, the family filter, and the <strong>+ Add</strong> button \u2014 all in one place.',
       },
       {
         type: 'list',
         content: '',
         items: [
-          '<strong>Month view</strong> \u2014 A calendar grid showing activity dots on each day. Click a day to open the day agenda sidebar.',
-          '<strong>Day agenda</strong> \u2014 A sidebar showing all activities for a selected day, sorted by time.',
-          '<strong>Upcoming activities</strong> \u2014 A list of the next 30 activities across all family members.',
+          '<strong>Month</strong> \u2014 A full-month grid. Each day shows colour-coded chips so you can see who\u2019s got what on at a glance. Tap a day to open it in Day view. On phones the month becomes a tidy day-by-day agenda, and quiet days fold down to a thin line so the busy ones stand out.',
+          '<strong>Week</strong> \u2014 A timeline of the week. On phones a two-week strip across the top lets you hop between days at a glance; it tucks down to a single week as you scroll into the timeline so your events get more room.',
+          '<strong>Day</strong> \u2014 A single day in detail, with a column for each family member so you can see who\u2019s doing what. The <strong>Agenda</strong> button opens a tidy, time-sorted list for that day.',
         ],
       },
       {
