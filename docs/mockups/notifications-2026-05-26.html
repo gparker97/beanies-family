@@ -1,0 +1,1414 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family — Notifications mockup (2026-05-26)</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --slate: #2c3e50;
+        --slate-dark: #1a252f;
+        --orange: #f15d22;
+        --orange-dark: #d14d1a;
+        --silk: #aed6f1;
+        --terracotta: #e67e22;
+        --cloud: #f8f9fa;
+        --purple: #9b59b6;
+        --green: #27ae60;
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+        --hover-shadow: 0 8px 32px rgba(44, 62, 80, 0.1);
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-purple-12: rgba(155, 89, 182, 0.12);
+        --tint-silk-20: rgba(174, 214, 241, 0.2);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #eaeef2;
+        font-family: 'Inter', sans-serif;
+        color: var(--slate);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1,
+      h2,
+      h3,
+      h4,
+      .outfit {
+        font-family: 'Outfit', sans-serif;
+      }
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 40px 24px 120px;
+      }
+
+      /* ---- page header ---- */
+      .doc-head {
+        background: #fff;
+        border-radius: 24px;
+        padding: 28px 32px;
+        box-shadow: var(--card-shadow);
+        margin-bottom: 40px;
+      }
+      .doc-head h1 {
+        margin: 0 0 6px;
+        font-size: 28px;
+        font-weight: 800;
+      }
+      .doc-head h1 .fam {
+        color: var(--orange);
+      }
+      .doc-head .sub {
+        color: rgba(44, 62, 80, 0.6);
+        font-size: 14px;
+        margin: 0 0 18px;
+      }
+      .note {
+        background: var(--tint-orange-8);
+        border-left: 3px solid var(--orange);
+        border-radius: 12px;
+        padding: 12px 16px;
+        font-size: 13px;
+        color: rgba(44, 62, 80, 0.85);
+        margin-top: 10px;
+      }
+      .note strong {
+        color: var(--orange-dark);
+      }
+
+      /* ---- section ---- */
+      .section {
+        margin: 56px 0 0;
+      }
+      .section > .label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: rgba(44, 62, 80, 0.45);
+        margin-bottom: 6px;
+      }
+      .section > .label .pill {
+        display: inline-block;
+        background: var(--slate);
+        color: #fff;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        margin-left: 8px;
+        vertical-align: middle;
+      }
+      .section > .label .pill.rec {
+        background: var(--orange);
+      }
+      .section > .desc {
+        font-size: 14px;
+        color: rgba(44, 62, 80, 0.65);
+        max-width: 720px;
+        margin: 0 0 22px;
+      }
+
+      /* ---- device frames ---- */
+      .frames {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 32px;
+        align-items: flex-start;
+      }
+      .frame {
+        background: #fff;
+        border-radius: 22px;
+        box-shadow: var(--soft-shadow);
+        overflow: hidden;
+        position: relative;
+      }
+      .frame .caption {
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(44, 62, 80, 0.55);
+        font-family: 'Outfit', sans-serif;
+        margin: 0 0 10px;
+      }
+      .stage {
+        background: var(--cloud);
+        position: relative;
+      }
+
+      /* ===== HEADER CHROME (matches real AppHeader squircle controls) ===== */
+      .appheader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        background: var(--cloud);
+        border-bottom: 1px solid rgba(44, 62, 80, 0.05);
+      }
+      .appheader .greeting {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 20px;
+      }
+      .appheader .greeting .day {
+        display: block;
+        font-size: 12px;
+        font-weight: 500;
+        color: rgba(44, 62, 80, 0.45);
+        font-family: 'Inter', sans-serif;
+      }
+      .ctrls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .sq {
+        height: 40px;
+        width: 40px;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(44, 62, 80, 0.06);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+        position: relative;
+        cursor: pointer;
+        border: none;
+        transition:
+          box-shadow 0.15s,
+          transform 0.15s;
+      }
+      .sq:hover {
+        box-shadow: var(--hover-shadow);
+        transform: translateY(-1px);
+      }
+      .sq.bell.active {
+        background: var(--tint-orange-8);
+      }
+      .pdot {
+        position: absolute;
+        height: 8px;
+        width: 8px;
+        border-radius: 50%;
+        background: var(--green);
+        bottom: 6px;
+        right: 6px;
+      }
+      /* unread badge on the bell */
+      .bell .unread-dot {
+        position: absolute;
+        top: 7px;
+        right: 7px;
+        height: 9px;
+        width: 9px;
+        border-radius: 50%;
+        background: var(--orange);
+        box-shadow: 0 0 0 2px #fff;
+      }
+      .bell .unread-count {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        border-radius: 9px;
+        background: var(--orange);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 0 2px #fff;
+      }
+      .avatar {
+        height: 40px;
+        width: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6c8ebf, #4a6fa5);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 15px;
+        box-shadow: inset 0 0 0 2px #fff;
+        outline: 2px solid rgba(174, 214, 241, 0.6);
+        outline-offset: 1px;
+      }
+      .hamburger {
+        height: 40px;
+        width: 40px;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(44, 62, 80, 0.06);
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        align-items: flex-start;
+        justify-content: center;
+        padding-left: 11px;
+      }
+      .hamburger span {
+        height: 2px;
+        border-radius: 2px;
+        background: rgba(44, 62, 80, 0.5);
+      }
+      .hamburger span:nth-child(1),
+      .hamburger span:nth-child(2) {
+        width: 18px;
+      }
+      .hamburger span:nth-child(3) {
+        width: 11px;
+        background: var(--orange);
+      }
+
+      /* ===== DROPDOWN PANEL (Treatment A) ===== */
+      .dropdown {
+        position: absolute;
+        top: 64px;
+        right: 18px;
+        width: 380px;
+        background: #fff;
+        border-radius: 22px;
+        box-shadow: var(--soft-shadow);
+        overflow: hidden;
+        z-index: 5;
+      }
+      .dropdown::before {
+        content: '';
+        position: absolute;
+        top: -7px;
+        right: 92px;
+        width: 14px;
+        height: 14px;
+        background: #fff;
+        transform: rotate(45deg);
+        box-shadow: -2px -2px 6px rgba(44, 62, 80, 0.04);
+      }
+      .dd-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 18px 12px;
+      }
+      .dd-head h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .dd-head .markall {
+        background: none;
+        border: none;
+        color: var(--orange);
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 6px 10px;
+        border-radius: 10px;
+        transition: background 0.15s;
+      }
+      .dd-head .markall:hover {
+        background: var(--tint-orange-8);
+      }
+      .dd-group {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(44, 62, 80, 0.4);
+        padding: 8px 18px 4px;
+      }
+      .dd-list {
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .dd-foot {
+        border-top: 1px solid rgba(44, 62, 80, 0.06);
+        text-align: center;
+        padding: 12px;
+      }
+      .dd-foot button {
+        background: none;
+        border: none;
+        color: rgba(44, 62, 80, 0.55);
+        font-size: 13px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .dd-foot button:hover {
+        color: var(--orange);
+      }
+
+      /* notification row */
+      .nrow {
+        display: flex;
+        gap: 12px;
+        padding: 12px 18px;
+        cursor: pointer;
+        position: relative;
+        transition: background 0.12s;
+        align-items: flex-start;
+      }
+      .nrow:hover {
+        background: var(--cloud);
+      }
+      .nrow.unread {
+        background: rgba(241, 93, 34, 0.04);
+      }
+      .nrow.unread:hover {
+        background: rgba(241, 93, 34, 0.07);
+      }
+      .nrow .lead {
+        flex-shrink: 0;
+        height: 38px;
+        width: 38px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+      }
+      .lead.todo {
+        background: var(--tint-purple-12);
+      }
+      .lead.activity {
+        background: var(--tint-orange-8);
+      }
+      .lead.assigned {
+        background: var(--tint-silk-20);
+      }
+      .lead.whatsnew {
+        background: linear-gradient(135deg, rgba(241, 93, 34, 0.14), rgba(230, 126, 34, 0.14));
+      }
+      .nrow .body {
+        min-width: 0;
+        flex: 1;
+      }
+      .nrow .ntitle {
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--slate);
+        margin: 0 0 2px;
+      }
+      .nrow.read .ntitle {
+        font-weight: 500;
+        color: rgba(44, 62, 80, 0.72);
+      }
+      .nrow .nsub {
+        font-size: 12.5px;
+        color: rgba(44, 62, 80, 0.55);
+        margin: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+      }
+      .nrow .ntime {
+        font-size: 11px;
+        color: rgba(44, 62, 80, 0.4);
+        font-family: 'Outfit', sans-serif;
+        margin-top: 4px;
+        font-weight: 500;
+      }
+      .nrow .udot {
+        position: absolute;
+        left: 7px;
+        top: 50%;
+        transform: translateY(-50%);
+        height: 8px;
+        width: 8px;
+        border-radius: 50%;
+        background: var(--orange);
+      }
+      .nrow.read {
+        opacity: 0.92;
+      }
+
+      /* ===== DRAWER (BaseSidePanel) ===== */
+      .drawerstage {
+        position: relative;
+        height: 640px;
+        background: linear-gradient(135deg, #e9eef3, #dfe6ee);
+        overflow: hidden;
+      }
+      .backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+      }
+      .drawer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 420px;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        box-shadow: -12px 0 40px rgba(44, 62, 80, 0.18);
+      }
+      .drawer .dhead {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 18px 22px;
+        border-bottom: 1px solid rgba(44, 62, 80, 0.07);
+      }
+      .drawer .dhead .back {
+        background: rgba(44, 62, 80, 0.05);
+        border: none;
+        height: 32px;
+        width: 32px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 15px;
+        color: rgba(44, 62, 80, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .drawer .dhead h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+        flex: 1;
+      }
+      .drawer .dhead .x {
+        background: rgba(44, 62, 80, 0.05);
+        border: none;
+        height: 32px;
+        width: 32px;
+        border-radius: 10px;
+        cursor: pointer;
+        color: rgba(44, 62, 80, 0.5);
+      }
+      .drawer .dbody {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px 22px;
+      }
+      .drawer .dfoot {
+        border-top: 1px solid rgba(44, 62, 80, 0.07);
+        background: var(--cloud);
+        padding: 16px 22px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      /* detail body content */
+      .det-iconrow {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        margin-bottom: 18px;
+      }
+      .det-iconrow .lead {
+        height: 48px;
+        width: 48px;
+        border-radius: 14px;
+        font-size: 22px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .det-kicker {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--purple);
+        margin: 2px 0 3px;
+      }
+      .det-kicker.act {
+        color: var(--orange);
+      }
+      .det-kicker.asg {
+        color: #5a8fb5;
+      }
+      .det-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 19px;
+        font-weight: 700;
+        margin: 0;
+        line-height: 1.25;
+      }
+      .det-when {
+        font-size: 13px;
+        color: rgba(44, 62, 80, 0.5);
+        font-family: 'Outfit', sans-serif;
+        margin-top: 6px;
+      }
+      .det-card {
+        background: var(--cloud);
+        border-radius: 16px;
+        padding: 16px;
+        margin-top: 6px;
+      }
+      .det-card .line {
+        display: flex;
+        justify-content: space-between;
+        padding: 7px 0;
+        font-size: 13.5px;
+        border-bottom: 1px dashed rgba(44, 62, 80, 0.08);
+      }
+      .det-card .line:last-child {
+        border-bottom: none;
+      }
+      .det-card .line .k {
+        color: rgba(44, 62, 80, 0.5);
+      }
+      .det-card .line .v {
+        font-weight: 600;
+        font-family: 'Outfit', sans-serif;
+      }
+      .det-meta {
+        font-size: 12px;
+        color: rgba(44, 62, 80, 0.42);
+        margin-top: 18px;
+        font-family: 'Outfit', sans-serif;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: var(--tint-silk-20);
+        border-radius: 20px;
+        padding: 3px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: 'Outfit', sans-serif;
+      }
+      .chip .av {
+        height: 16px;
+        width: 16px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #f6a96b, #e67e22);
+        display: inline-block;
+      }
+
+      /* buttons */
+      .btn-primary {
+        flex: 1;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        color: #fff;
+        border: none;
+        border-radius: 16px;
+        padding: 13px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 4px 16px rgba(241, 93, 34, 0.25);
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s;
+      }
+      .btn-primary.purple {
+        background: linear-gradient(135deg, var(--purple), #b07cc6);
+        box-shadow: 0 4px 16px rgba(155, 89, 182, 0.25);
+      }
+      .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 24px rgba(241, 93, 34, 0.35);
+      }
+      .btn-ghost {
+        background: rgba(44, 62, 80, 0.05);
+        color: rgba(44, 62, 80, 0.7);
+        border: none;
+        border-radius: 14px;
+        padding: 13px 16px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s;
+      }
+      .btn-ghost:hover {
+        background: rgba(44, 62, 80, 0.1);
+      }
+
+      /* whats-new content inside drawer */
+      .wn-strip {
+        height: 3px;
+        background: linear-gradient(90deg, var(--orange), var(--terracotta));
+        margin: -24px -22px 18px;
+      }
+      .wn-month {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        color: rgba(44, 62, 80, 0.42);
+        margin-bottom: 16px;
+      }
+      .wn-feat {
+        background: var(--cloud);
+        border-radius: 16px;
+        padding: 14px 16px;
+        margin-bottom: 14px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .wn-feat .ft {
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 3px;
+      }
+      .wn-feat .fd {
+        font-size: 13px;
+        color: rgba(44, 62, 80, 0.6);
+        margin: 0;
+      }
+      .wn-tryit {
+        background: var(--tint-orange-8);
+        color: var(--orange);
+        border: none;
+        border-radius: 10px;
+        padding: 6px 12px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .wn-fixes {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        color: rgba(44, 62, 80, 0.4);
+        margin: 18px 0 8px;
+        border-top: 1px dashed rgba(44, 62, 80, 0.12);
+        padding-top: 16px;
+      }
+      .wn-fixes + ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .wn-fixes + ul li {
+        font-size: 12.5px;
+        color: rgba(44, 62, 80, 0.5);
+        margin-bottom: 5px;
+      }
+      .wn-sig {
+        text-align: right;
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-style: italic;
+        color: rgba(44, 62, 80, 0.4);
+        margin-top: 16px;
+      }
+
+      /* empty state */
+      .empty {
+        text-align: center;
+        padding: 50px 24px;
+      }
+      .empty .bean {
+        font-size: 46px;
+      }
+      .empty h4 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 17px;
+        margin: 12px 0 4px;
+      }
+      .empty p {
+        font-size: 13px;
+        color: rgba(44, 62, 80, 0.5);
+        margin: 0;
+      }
+
+      /* mobile sheet */
+      .phone {
+        width: 340px;
+        border-radius: 36px;
+        background: #fff;
+        box-shadow: var(--soft-shadow);
+        overflow: hidden;
+        border: 8px solid #20303f;
+      }
+      .phone .screen {
+        height: 640px;
+        background: var(--cloud);
+        position: relative;
+        overflow: hidden;
+      }
+      .sheet {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: 54px;
+        background: #fff;
+        border-radius: 24px 24px 0 0;
+        box-shadow: 0 -8px 30px rgba(44, 62, 80, 0.15);
+        display: flex;
+        flex-direction: column;
+      }
+      .sheet .grab {
+        width: 40px;
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(44, 62, 80, 0.15);
+        margin: 10px auto 4px;
+      }
+
+      /* legend */
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        background: #fff;
+        border-radius: 20px;
+        padding: 22px 26px;
+        box-shadow: var(--card-shadow);
+      }
+      .legend .item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+      }
+      .legend .lead {
+        height: 34px;
+        width: 34px;
+        border-radius: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+      }
+      .legend .item .meta b {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        display: block;
+      }
+      .legend .item .meta span {
+        font-size: 11.5px;
+        color: rgba(44, 62, 80, 0.5);
+      }
+      .swatch {
+        height: 16px;
+        width: 16px;
+        border-radius: 50%;
+        display: inline-block;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
+
+      /* pwa icon */
+      .pwa-icon {
+        position: relative;
+        height: 76px;
+        width: 76px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, #fff, #f1f4f7);
+        box-shadow: var(--card-shadow);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36px;
+      }
+      .pwa-icon .badge {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        height: 24px;
+        min-width: 24px;
+        padding: 0 6px;
+        border-radius: 12px;
+        background: var(--orange);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 0 3px #eaeef2;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="doc-head">
+        <h1>Notifications — <span class="fam">beanies.family</span></h1>
+        <p class="sub">
+          Mockup · 2026-05-26 · in-app notifications only (push is a later phase). Derived list +
+          synced read-state. Shown at desktop and mobile widths.
+        </p>
+        <div class="note">
+          <strong>Colour note:</strong> the brand rule (and the design-system spec for this exact
+          element) says the unread indicator is <strong>Heritage Orange</strong>, not Alert Red —
+          red is reserved for destructive confirmations. This mockup uses Heritage Orange
+          throughout. If you truly want red, it's a one-token swap, but it would break the
+          "warmth-not-alarm" rule.
+        </div>
+        <div class="note" style="background: var(--tint-silk-20); border-left-color: #5a8fb5">
+          <strong>Two interaction treatments below.</strong> Treatment A = bell → dropdown list →
+          detail drawer (exactly as you described). Treatment B = bell → one drawer that slides
+          list → detail (single primitive, identical on mobile). My recommendation is noted at
+          Treatment B.
+        </div>
+      </div>
+
+      <!-- ============ HEADER + BADGE STATES ============ -->
+      <div class="section">
+        <div class="label">1 · The header bell + badge</div>
+        <p class="desc">
+          A new squircle bell joins the existing header controls (privacy · search · profile), per
+          the design-system header spec. Two badge styles shown: a simple unread <em>dot</em>
+          (recommended — calm) and an unread <em>count</em>. The PWA / installed-app icon carries
+          the same orange badge via the Badging API.
+        </p>
+        <div class="frames">
+          <div>
+            <p class="caption">Desktop header — unread dot</p>
+            <div class="frame" style="width: 560px">
+              <div class="appheader">
+                <div class="greeting">
+                  Good morning, Greg <span class="day">Tuesday, 26 May</span>
+                </div>
+                <div class="ctrls">
+                  <button class="sq" title="Privacy">
+                    👁️ <span class="pdot"></span>
+                  </button>
+                  <button class="sq" title="Search">🔍</button>
+                  <button class="sq bell" title="Notifications">
+                    🔔 <span class="unread-dot"></span>
+                  </button>
+                  <div class="avatar">G</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <p class="caption">Desktop header — unread count</p>
+            <div class="frame" style="width: 560px">
+              <div class="appheader">
+                <div class="greeting">
+                  Good morning, Greg <span class="day">Tuesday, 26 May</span>
+                </div>
+                <div class="ctrls">
+                  <button class="sq" title="Privacy">👁️ <span class="pdot"></span></button>
+                  <button class="sq" title="Search">🔍</button>
+                  <button class="sq bell" title="Notifications">
+                    🔔 <span class="unread-count">3</span>
+                  </button>
+                  <div class="avatar">G</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="frames" style="margin-top: 28px; align-items: center">
+          <div>
+            <p class="caption">PWA / installed-app icon badge</p>
+            <div style="display: flex; gap: 30px; padding: 10px 6px">
+              <div class="pwa-icon">🫘<span class="badge">3</span></div>
+              <div class="pwa-icon" style="font-size: 0">
+                <img
+                  alt=""
+                  width="44"
+                  src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44'><circle cx='16' cy='24' r='11' fill='%232C3E50'/><circle cx='30' cy='28' r='8' fill='%23F15D22'/></svg>"
+                />
+                <span class="badge"></span>
+              </div>
+            </div>
+          </div>
+          <div style="flex: 1; min-width: 280px">
+            <p class="caption">Badge clears when everything is read</p>
+            <p class="desc" style="margin: 0">
+              The orange dot/count appears whenever ≥1 notification is unread, and is removed from
+              the bell <em>and</em> the app icon the moment the last one is read (or "mark all
+              read" is used). Because read-state syncs through the family file, clearing on your
+              phone also clears it on your laptop.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TREATMENT A: DROPDOWN ============ -->
+      <div class="section">
+        <div class="label">2 · Treatment A — bell dropdown (the list) <span class="pill">as you described</span></div>
+        <p class="desc">
+          Clicking the bell opens an anchored dropdown of notification summaries, grouped by recency
+          and styled unread-vs-read. Top-right: <strong>Mark all read</strong>. A row click opens
+          the detail drawer (section 3).
+        </p>
+        <div class="frame" style="width: 600px">
+          <div class="stage" style="height: 540px">
+            <div class="appheader">
+              <div class="greeting">Good morning, Greg <span class="day">Tuesday, 26 May</span></div>
+              <div class="ctrls">
+                <button class="sq" title="Privacy">👁️ <span class="pdot"></span></button>
+                <button class="sq" title="Search">🔍</button>
+                <button class="sq bell active" title="Notifications">
+                  🔔 <span class="unread-dot"></span>
+                </button>
+                <div class="avatar">G</div>
+              </div>
+            </div>
+
+            <div class="dropdown">
+              <div class="dd-head">
+                <h3>Notifications</h3>
+                <button class="markall">Mark all read</button>
+              </div>
+              <div class="dd-list">
+                <div class="dd-group">Today</div>
+
+                <div class="nrow unread">
+                  <span class="udot"></span>
+                  <div class="lead whatsnew">🌱</div>
+                  <div class="body">
+                    <p class="ntitle">What's new — May 2026</p>
+                    <p class="nsub">Notifications have arrived, plus a smarter to-do sort. Tap to see what's new.</p>
+                    <p class="ntime">Just now</p>
+                  </div>
+                </div>
+
+                <div class="nrow unread">
+                  <span class="udot"></span>
+                  <div class="lead todo">✅</div>
+                  <div class="body">
+                    <p class="ntitle">"Pick up the boys from camp" is due today</p>
+                    <p class="nsub">Your to-do is due by 4:00pm today.</p>
+                    <p class="ntime">8:00am · due 4:00pm</p>
+                  </div>
+                </div>
+
+                <div class="nrow unread">
+                  <span class="udot"></span>
+                  <div class="lead activity">📅</div>
+                  <div class="body">
+                    <p class="ntitle">Swimming lesson starts in 30 min</p>
+                    <p class="nsub">Lucas · 5:00pm at Bukit Timah Pool. You're on drop-off.</p>
+                    <p class="ntime">in 30 min</p>
+                  </div>
+                </div>
+
+                <div class="dd-group">Earlier</div>
+
+                <div class="nrow read">
+                  <div class="lead assigned">🤝</div>
+                  <div class="body">
+                    <p class="ntitle">Sophia assigned you "Buy groceries"</p>
+                    <p class="nsub">No due date — added to your to-do list.</p>
+                    <p class="ntime">Yesterday, 7:12pm</p>
+                  </div>
+                </div>
+
+                <div class="nrow read">
+                  <div class="lead todo">✅</div>
+                  <div class="body">
+                    <p class="ntitle">"Renew passports" is overdue</p>
+                    <p class="nsub">Was due 24 May.</p>
+                    <p class="ntime">2 days ago</p>
+                  </div>
+                </div>
+              </div>
+              <div class="dd-foot"><button>See all notifications</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TREATMENT A: DETAIL DRAWER ============ -->
+      <div class="section">
+        <div class="label">3 · Detail drawer — a task notification</div>
+        <p class="desc">
+          Tapping a summary opens the shared <code>BaseSidePanel</code> drawer from the right with
+          full detail, a deep-link to the source item, and read-state controls. The primary button
+          carries you straight to the item in its home screen (here, Family To-Do).
+        </p>
+        <div class="frame" style="width: 720px">
+          <div class="drawerstage">
+            <div class="backdrop"></div>
+            <div class="drawer">
+              <div class="dhead">
+                <h3>Notification</h3>
+                <button class="x">✕</button>
+              </div>
+              <div class="dbody">
+                <div class="det-iconrow">
+                  <div class="lead todo" style="background: var(--tint-purple-12)">✅</div>
+                  <div>
+                    <div class="det-kicker">To-do · due today</div>
+                    <h2 class="det-title">Pick up the boys from camp</h2>
+                    <div class="det-when">Due today · 4:00pm</div>
+                  </div>
+                </div>
+
+                <div class="det-card">
+                  <div class="line"><span class="k">Due</span><span class="v">Tue 26 May · 4:00pm</span></div>
+                  <div class="line"><span class="k">Assigned to</span><span class="v"><span class="chip"><span class="av"></span>You</span></span></div>
+                  <div class="line"><span class="k">Added by</span><span class="v">Sophia · 24 May</span></div>
+                  <div class="line"><span class="k">List</span><span class="v">Family To-Do</span></div>
+                </div>
+
+                <p class="det-meta">
+                  You'll get this reminder the morning it's due, and it escalates if it slips
+                  overdue.
+                </p>
+              </div>
+              <div class="dfoot">
+                <button class="btn-primary purple">Open in Family To-Do →</button>
+                <button class="btn-ghost">Mark unread</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ WHATS NEW AS A NOTIFICATION ============ -->
+      <div class="section">
+        <div class="label">4 · "What's new" — now a notification, not a modal</div>
+        <p class="desc">
+          On login, if there's an unseen release, the drawer auto-opens to the What's New
+          notification (replacing the old centre modal). The full rich content — feature cards with
+          "Try it →", the "also fixed" list, and the signature — renders inside the drawer. It can
+          be closed or marked unread like any other notification, and you can always re-open it from
+          your list later.
+        </p>
+        <div class="frame" style="width: 720px">
+          <div class="drawerstage">
+            <div class="backdrop"></div>
+            <div class="drawer">
+              <div class="dhead">
+                <h3>What's new</h3>
+                <button class="x">✕</button>
+              </div>
+              <div class="dbody">
+                <div class="wn-strip"></div>
+                <div class="wn-month">may 2026</div>
+
+                <div class="wn-feat">
+                  <div>
+                    <p class="ft">🔔 Notifications are here</p>
+                    <p class="fd">
+                      A new bell in your header keeps track of what's coming due, what's been
+                      assigned to you, and your upcoming events — all in one place.
+                    </p>
+                  </div>
+                  <button class="wn-tryit">Try it →</button>
+                </div>
+
+                <div class="wn-feat">
+                  <div>
+                    <p class="ft">↕️ Smarter to-do sorting</p>
+                    <p class="fd">
+                      Your to-do list now leads with what's due soonest, and remembers how you like
+                      it sorted.
+                    </p>
+                  </div>
+                  <button class="wn-tryit">Try it →</button>
+                </div>
+
+                <div class="wn-fixes">also fixed</div>
+                <ul>
+                  <li>Weekly activities now repeat on the day you actually picked.</li>
+                  <li>Google sign-in works smoothly in the installed app.</li>
+                </ul>
+
+                <p class="wn-sig">— greg, head beanie developer 🫘</p>
+              </div>
+              <div class="dfoot">
+                <button class="btn-primary">Got it, thanks!</button>
+                <button class="btn-ghost">Mark unread</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TREATMENT B ============ -->
+      <div class="section">
+        <div class="label">5 · Treatment B — one drawer, list → detail <span class="pill rec">my recommendation</span></div>
+        <p class="desc">
+          Instead of a dropdown + a separate drawer, the bell opens a single
+          <code>BaseSidePanel</code> showing the list; tapping a row slides the same drawer to the
+          detail with a back arrow. One primitive, one mental model, and it behaves identically on
+          mobile (where a dropdown is cramped). Left = list state, right = detail state of the
+          <em>same</em> drawer.
+        </p>
+        <div class="frames">
+          <!-- list state -->
+          <div class="frame" style="width: 360px">
+            <div class="drawerstage" style="height: 600px; background: #dfe6ee">
+              <div class="drawer" style="width: 360px; box-shadow: none">
+                <div class="dhead">
+                  <h3>Notifications</h3>
+                  <button class="markall" style="margin-right: 4px">Mark all read</button>
+                  <button class="x">✕</button>
+                </div>
+                <div class="dbody" style="padding: 8px 0">
+                  <div class="dd-group">Today</div>
+                  <div class="nrow unread">
+                    <span class="udot"></span>
+                    <div class="lead whatsnew">🌱</div>
+                    <div class="body">
+                      <p class="ntitle">What's new — May 2026</p>
+                      <p class="nsub">Notifications have arrived, plus smarter sorting.</p>
+                      <p class="ntime">Just now</p>
+                    </div>
+                  </div>
+                  <div class="nrow unread">
+                    <span class="udot"></span>
+                    <div class="lead todo">✅</div>
+                    <div class="body">
+                      <p class="ntitle">"Pick up the boys" is due today</p>
+                      <p class="nsub">Due by 4:00pm.</p>
+                      <p class="ntime">due 4:00pm</p>
+                    </div>
+                  </div>
+                  <div class="nrow unread">
+                    <span class="udot"></span>
+                    <div class="lead activity">📅</div>
+                    <div class="body">
+                      <p class="ntitle">Swimming starts in 30 min</p>
+                      <p class="nsub">Lucas · drop-off.</p>
+                      <p class="ntime">in 30 min</p>
+                    </div>
+                  </div>
+                  <div class="dd-group">Earlier</div>
+                  <div class="nrow read">
+                    <div class="lead assigned">🤝</div>
+                    <div class="body">
+                      <p class="ntitle">Sophia assigned you "Buy groceries"</p>
+                      <p class="ntime">Yesterday</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- detail state -->
+          <div class="frame" style="width: 360px">
+            <div class="drawerstage" style="height: 600px; background: #dfe6ee">
+              <div class="drawer" style="width: 360px; box-shadow: none">
+                <div class="dhead">
+                  <button class="back">←</button>
+                  <h3>Notification</h3>
+                  <button class="x">✕</button>
+                </div>
+                <div class="dbody">
+                  <div class="det-iconrow">
+                    <div class="lead activity" style="height: 48px; width: 48px; border-radius: 14px; font-size: 22px">📅</div>
+                    <div>
+                      <div class="det-kicker act">Activity · in 30 min</div>
+                      <h2 class="det-title">Swimming lesson</h2>
+                      <div class="det-when">Today · 5:00pm</div>
+                    </div>
+                  </div>
+                  <div class="det-card">
+                    <div class="line"><span class="k">For</span><span class="v"><span class="chip"><span class="av"></span>Lucas</span></span></div>
+                    <div class="line"><span class="k">Where</span><span class="v">Bukit Timah Pool</span></div>
+                    <div class="line"><span class="k">Your duty</span><span class="v">Drop-off</span></div>
+                    <div class="line"><span class="k">Reminder</span><span class="v">30 min before</span></div>
+                  </div>
+                  <p class="det-meta">Reminder timing comes from this activity's own reminder setting.</p>
+                </div>
+                <div class="dfoot">
+                  <button class="btn-primary">Open in Planner →</button>
+                  <button class="btn-ghost">Mark unread</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ MOBILE ============ -->
+      <div class="section">
+        <div class="label">6 · Mobile</div>
+        <p class="desc">
+          Mobile header stays minimal (hamburger · greeting · bell, per spec). The bell opens a
+          bottom-anchored sheet for the list; a row opens the detail sheet. (Treatment B's single
+          drawer maps cleanly to these sheets.)
+        </p>
+        <div class="frames">
+          <!-- mobile list -->
+          <div>
+            <p class="caption">List sheet</p>
+            <div class="phone">
+              <div class="screen">
+                <div class="appheader" style="padding: 12px 16px">
+                  <div class="hamburger"><span></span><span></span><span></span></div>
+                  <div class="greeting" style="font-size: 16px">Hi, Greg</div>
+                  <button class="sq bell active" title="Notifications">
+                    🔔 <span class="unread-dot"></span>
+                  </button>
+                </div>
+                <div class="sheet">
+                  <div class="grab"></div>
+                  <div class="dd-head">
+                    <h3>Notifications</h3>
+                    <button class="markall">Mark all read</button>
+                  </div>
+                  <div class="dd-list" style="max-height: none">
+                    <div class="dd-group">Today</div>
+                    <div class="nrow unread">
+                      <span class="udot"></span>
+                      <div class="lead whatsnew">🌱</div>
+                      <div class="body">
+                        <p class="ntitle">What's new — May 2026</p>
+                        <p class="ntime">Just now</p>
+                      </div>
+                    </div>
+                    <div class="nrow unread">
+                      <span class="udot"></span>
+                      <div class="lead todo">✅</div>
+                      <div class="body">
+                        <p class="ntitle">"Pick up the boys" is due today</p>
+                        <p class="ntime">due 4:00pm</p>
+                      </div>
+                    </div>
+                    <div class="nrow unread">
+                      <span class="udot"></span>
+                      <div class="lead activity">📅</div>
+                      <div class="body">
+                        <p class="ntitle">Swimming starts in 30 min</p>
+                        <p class="ntime">in 30 min</p>
+                      </div>
+                    </div>
+                    <div class="nrow read">
+                      <div class="lead assigned">🤝</div>
+                      <div class="body">
+                        <p class="ntitle">Sophia assigned you a task</p>
+                        <p class="ntime">Yesterday</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- mobile detail -->
+          <div>
+            <p class="caption">Detail sheet</p>
+            <div class="phone">
+              <div class="screen">
+                <div class="sheet" style="top: 30px">
+                  <div class="dhead" style="padding: 16px 18px">
+                    <button class="back">←</button>
+                    <h3>Notification</h3>
+                    <button class="x">✕</button>
+                  </div>
+                  <div class="dbody">
+                    <div class="det-iconrow">
+                      <div class="lead todo" style="height: 48px; width: 48px; border-radius: 14px; font-size: 22px; background: var(--tint-purple-12)">✅</div>
+                      <div>
+                        <div class="det-kicker">To-do · due today</div>
+                        <h2 class="det-title" style="font-size: 18px">Pick up the boys from camp</h2>
+                        <div class="det-when">Due today · 4:00pm</div>
+                      </div>
+                    </div>
+                    <div class="det-card">
+                      <div class="line"><span class="k">Due</span><span class="v">Today · 4:00pm</span></div>
+                      <div class="line"><span class="k">Assigned to</span><span class="v"><span class="chip"><span class="av"></span>You</span></span></div>
+                      <div class="line"><span class="k">Added by</span><span class="v">Sophia</span></div>
+                    </div>
+                  </div>
+                  <div class="dfoot" style="flex-direction: column; align-items: stretch">
+                    <button class="btn-primary purple">Open in Family To-Do →</button>
+                    <button class="btn-ghost" style="text-align: center">Mark unread</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- empty -->
+          <div>
+            <p class="caption">Empty state</p>
+            <div class="phone">
+              <div class="screen">
+                <div class="appheader" style="padding: 12px 16px">
+                  <div class="hamburger"><span></span><span></span><span></span></div>
+                  <div class="greeting" style="font-size: 16px">Hi, Greg</div>
+                  <button class="sq bell" title="Notifications">🔔</button>
+                </div>
+                <div class="sheet">
+                  <div class="grab"></div>
+                  <div class="dd-head"><h3>Notifications</h3></div>
+                  <div class="empty">
+                    <div class="bean">🫘</div>
+                    <h4>You're all caught up</h4>
+                    <p>No notifications right now. We'll let you know when something needs you.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ LEGEND ============ -->
+      <div class="section">
+        <div class="label">7 · Notification types &amp; read-state styling</div>
+        <p class="desc">Four sources this round. Each has a tinted squircle icon + accent.</p>
+        <div class="legend">
+          <div class="item">
+            <div class="lead todo">✅</div>
+            <div class="meta"><b>Task due / overdue</b><span>to-do accent (purple)</span></div>
+          </div>
+          <div class="item">
+            <div class="lead assigned">🤝</div>
+            <div class="meta"><b>Task assigned to me</b><span>sky-silk accent</span></div>
+          </div>
+          <div class="item">
+            <div class="lead activity">📅</div>
+            <div class="meta"><b>Activity coming up</b><span>heritage-orange accent</span></div>
+          </div>
+          <div class="item">
+            <div class="lead whatsnew">🌱</div>
+            <div class="meta"><b>What's new</b><span>orange→terracotta strip</span></div>
+          </div>
+          <div class="item" style="margin-left: auto">
+            <div class="meta">
+              <b><span class="swatch" style="background: var(--orange)"></span>Unread</b>
+              <span>orange dot + bold title + tinted row</span>
+            </div>
+          </div>
+          <div class="item">
+            <div class="meta">
+              <b><span class="swatch" style="background: rgba(44, 62, 80, 0.2)"></span>Read</b>
+              <span>muted, no dot</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
