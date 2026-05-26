@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
-import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import {
@@ -37,17 +36,28 @@ import WeekStripNav, {
   type WeekStripWeek,
 } from '@/components/planner/WeekStripNav.vue';
 import { useActivityChipClass } from '@/composables/useActivityChipClass';
+import { relativeWeekLabelKey } from '@/utils/calendarWeek';
 import type { FamilyActivity, TodoItem, HolidayOccurrence } from '@/types/models';
 
-defineProps<{ selectedDate?: string }>();
+const props = defineProps<{
+  /** Controlled period — the page owns the canonical date (props down). */
+  referenceDate: Date;
+  selectedDate?: string;
+}>();
 const emit = defineEmits<{
+  /** Desktop day-header click → drill into Day view (page switches view). */
   'select-date': [date: string];
+  /** Mobile strip day-pill tap → change the focused day, staying in Week view. */
+  'select-day': [date: string];
   'add-activity': [date: string, time?: string];
   'view-activity': [id: string, date: string];
   'view-todo': [todo: TodoItem];
   'vacation-click': [vacationId: string];
   'view-segment': [vacationId: string, segmentIndex: number];
   'holiday-click': [holiday: HolidayOccurrence];
+  /** Swipe navigation — the page advances the shared reference date. */
+  prev: [];
+  next: [];
 }>();
 
 const { t } = useTranslation();
@@ -59,54 +69,32 @@ const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
 const holidayStore = useHolidayStore();
 
-const referenceDate = ref(new Date());
-const { weekDays, weekLabel } = useWeekNavigation(referenceDate);
+// Controlled period — the page owns the canonical date; we derive the
+// timeline week + label from it and never mutate it (one-way data flow).
+const referenceDate = computed(() => props.referenceDate);
+const { weekDays } = useWeekNavigation(referenceDate);
 
 /**
  * Strip-anchor date — the date whose week is the FIRST row of the 2-week
- * navigator strip. Independent of `referenceDate` (which controls the
- * timeline below) so the strip stays static when the user clicks a day
- * inside it. Moves only via the prev/next nav arrows or the "today"
- * button (both wired through `advanceBoth` / `goToToday` below).
- *
- * Defaults to today so the strip opens showing "this week" + "next week".
+ * navigator strip. Internal + independent of the page-owned `referenceDate`
+ * so the strip stays STATIC when the user taps a day inside it. It re-anchors
+ * (via the watcher below) ONLY when the focused day leaves the visible
+ * fortnight — i.e. on prev/next/today that pages beyond the two shown weeks.
  */
-const stripAnchorDate = ref(new Date());
-
-/** Move both refs by `delta` weeks. Used by prev/next nav + swipe. */
-function advanceBoth(delta: number) {
-  const days = delta * 7;
-  referenceDate.value = addDays(referenceDate.value, days);
-  stripAnchorDate.value = addDays(stripAnchorDate.value, days);
-}
-
-function prevWeek() {
-  advanceBoth(-1);
-}
-
-function nextWeek() {
-  advanceBoth(1);
-}
-
-function goToToday() {
-  const now = new Date();
-  referenceDate.value = now;
-  stripAnchorDate.value = now;
-  selectedMobileDay.value = toDateInputValue(now);
-}
+const stripAnchorDate = ref<Date>(props.referenceDate);
 
 // ── Swipe gesture ──────────────────────────────────────────────────────────
-// Horizontal swipe on the calendar surface advances/retreats by one week,
-// moving the strip + timeline together (consistent with arrow nav).
+// Horizontal swipe emits the navigation intent; the page advances the shared
+// reference date (the view never mutates the date itself).
 const swipeRef = ref<HTMLElement | null>(null);
 useCalendarSlide(swipeRef, {
-  onNext: nextWeek,
-  onPrev: prevWeek,
+  onNext: () => emit('next'),
+  onPrev: () => emit('prev'),
 });
 
-// Mobile: selected day within the week. Also drives which pill in the
-// strip gets the strongest "selected" highlight.
-const selectedMobileDay = ref(toDateInputValue(new Date()));
+// Mobile: the focused day within the week (drives the single-day timeline +
+// the strip's strongest "selected" pill). Derived from the page-owned date.
+const selectedMobileDay = computed(() => toDateInputValue(props.referenceDate));
 
 // Public holidays in the visible week, keyed by date (read-only reference data;
 // empty when no country is set or holidays are hidden). Almost always ≤1/day.
@@ -160,12 +148,6 @@ const weekTodos = computed(() => {
     if (dateSet.has(dueDate)) map.get(dueDate)!.push(todo);
   }
   return map;
-});
-
-const activityCount = computed(() => {
-  let count = 0;
-  for (const arr of weekActivities.value.values()) count += arr.length;
-  return count;
 });
 
 // Travel-segment occurrences for the visible week (flights, trains, etc).
@@ -422,6 +404,30 @@ const { classify: classifyStripChip } = useActivityChipClass();
  */
 const { weekDays: stripWeek1Days } = useWeekNavigation(stripAnchorDate);
 
+// Re-anchor the 2-week strip only when the focused day leaves the visible
+// fortnight — day-pill taps within view never shuffle the strip (a deliberate,
+// regression-guarded behaviour), while prev/next/today that pages beyond the
+// two shown weeks scrolls the window.
+watch(
+  () => props.referenceDate,
+  (d) => {
+    const dayStr = toDateInputValue(d);
+    const winStart = stripWeek1Days.value[0]?.dateStr;
+    if (!winStart) {
+      stripAnchorDate.value = d;
+      return;
+    }
+    const winEnd = toDateInputValue(addDays(parseLocalDate(winStart), 13));
+    if (dayStr < winStart || dayStr > winEnd) stripAnchorDate.value = d;
+  }
+);
+
+// The sticky mobile strip defaults to a single (this) week to save space;
+// the user reveals the next week on demand via the strip's peek toggle.
+// (Chosen over a scroll-driven collapse, which fought the "keep it to just
+// this week" goal.) Render-only — never feeds any date computation.
+const peeked = ref(false);
+
 /**
  * Density map covering 14 days from the strip's anchor week — distinct
  * from the timeline below which only renders the focused week.
@@ -529,20 +535,13 @@ const weekStripData = computed<WeekStripWeek[]>(() => {
    * last day to today gives a clean past/future split.
    */
   function labelFor(rowDays: WeekStripDay[]): WeekStripWeek['labelKey'] {
-    if (rowDays.some((d) => d.isToday)) return 'planner.weekThis';
-    const today = todayDateStr.value;
-    const rowFirstStr = rowDays[0]!.dateStr;
-    const rowLastStr = rowDays[rowDays.length - 1]!.dateStr;
-    const dayMs = 24 * 60 * 60 * 1000;
-    if (rowFirstStr > today) {
-      // Row is fully in the future.
-      const days =
-        (parseLocalDate(rowFirstStr).getTime() - parseLocalDate(today).getTime()) / dayMs;
-      return days <= 7 ? 'planner.weekNext' : 'planner.weekUpcoming';
-    }
-    // Row is fully in the past (rowLast < today, since today isn't in the row).
-    const days = (parseLocalDate(today).getTime() - parseLocalDate(rowLastStr).getTime()) / dayMs;
-    return days <= 7 ? 'planner.weekLast' : 'planner.weekEarlier';
+    // Shared 5-way classifier — single source of truth with the month-view
+    // week dividers (see utils/calendarWeek).
+    return relativeWeekLabelKey(
+      rowDays[0]!.dateStr,
+      rowDays[rowDays.length - 1]!.dateStr,
+      todayDateStr.value
+    );
   }
 
   const week1FocusedDateStr = stripWeek1Days.value[0]?.dateStr ?? '';
@@ -575,11 +574,12 @@ const weekStripData = computed<WeekStripWeek[]>(() => {
  * open the agenda, the user clicks an event chip directly.
  */
 function onStripDayClick(dateStr: string) {
-  referenceDate.value = parseLocalDate(dateStr);
-  selectedMobileDay.value = dateStr;
+  // Picking a day in the strip changes the focused day but STAYS in week view
+  // (distinct from a desktop day-header click, which drills into Day view).
+  // The page sets the shared reference date; the strip stays static unless the
+  // new day leaves the visible fortnight (see the watcher above).
+  emit('select-day', dateStr);
 }
-
-defineExpose({ weekLabel, activityCount });
 </script>
 
 <template>
@@ -588,8 +588,6 @@ defineExpose({ weekLabel, activityCount });
     class="rounded-3xl bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
     style="touch-action: pan-y; will-change: transform"
   >
-    <CalendarNavBar :label="weekLabel" @prev="prevWeek" @next="nextWeek" @today="goToToday" />
-
     <!-- 2-week date navigator — MOBILE ONLY. Desktop already shows the
          full week in the time grid below + has prev/next arrows for week
          navigation, so the strip is redundant there. Stays static when
@@ -597,48 +595,62 @@ defineExpose({ weekLabel, activityCount });
          move it. The orange "selected" pill follows `selectedMobileDay`
          so the user sees which day's events are showing in the timeline
          below. -->
-    <WeekStripNav
+    <div
       v-if="isMobile"
-      :weeks="weekStripData"
-      :selected-date="selectedMobileDay"
-      @select-date="onStripDayClick"
-    />
+      class="sticky z-20 -mx-5 bg-white px-5 dark:bg-slate-800"
+      style="top: var(--planner-cmdbar-h, 0)"
+    >
+      <WeekStripNav
+        :weeks="weekStripData"
+        :selected-date="selectedMobileDay"
+        :collapsed="!peeked"
+        @select-date="onStripDayClick"
+        @toggle-peek="peeked = !peeked"
+      />
+    </div>
 
     <!-- ── Desktop: Time Grid ──────────────────────────────────────────── -->
     <template v-if="!isMobile">
-      <!-- Day headers -->
-      <div class="mb-1 grid grid-cols-[56px_repeat(7,1fr)] gap-px">
-        <div />
-        <button
-          v-for="day in weekDays"
-          :key="day.dateStr"
-          type="button"
-          class="cursor-pointer rounded-xl py-2 text-center transition-colors"
-          :class="[
-            holidayForDay(day.dateStr)
-              ? 'bg-[var(--holiday-clay-tint)]'
-              : 'hover:bg-gray-50 dark:hover:bg-slate-700/50',
-            selectedDate === day.dateStr ? 'ring-primary-500 ring-2 ring-inset' : '',
-          ]"
-          :title="holidayForDay(day.dateStr)?.name"
-          @click="emit('select-date', day.dateStr)"
-        >
-          <span
-            class="font-outfit text-secondary-500/50 block text-xs font-semibold uppercase dark:text-gray-500"
+      <!-- Day headers — sticky just beneath the command bar so the weekday +
+           date context never scrolls away. Wrapper bleeds over the card
+           padding (bg) while the inner grid stays aligned with the timeline. -->
+      <div
+        class="sticky z-20 -mx-5 bg-white px-5 dark:bg-slate-800"
+        style="top: var(--planner-cmdbar-h, 0)"
+      >
+        <div class="mb-1 grid grid-cols-[56px_repeat(7,1fr)] gap-px">
+          <div />
+          <button
+            v-for="day in weekDays"
+            :key="day.dateStr"
+            type="button"
+            class="cursor-pointer rounded-xl py-2 text-center transition-colors"
+            :class="[
+              holidayForDay(day.dateStr)
+                ? 'bg-[var(--holiday-clay-tint)]'
+                : 'hover:bg-gray-50 dark:hover:bg-slate-700/50',
+              selectedDate === day.dateStr ? 'ring-primary-500 ring-2 ring-inset' : '',
+            ]"
+            :title="holidayForDay(day.dateStr)?.name"
+            @click="emit('select-date', day.dateStr)"
           >
-            {{ dayAbbrev(day.date) }}
-          </span>
-          <span
-            class="font-outfit mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold"
-            :class="
-              day.isToday
-                ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white shadow-[0_2px_6px_rgba(241,93,34,0.3)]'
-                : 'text-secondary-500 dark:text-gray-200'
-            "
-          >
-            {{ day.date.getDate() }}
-          </span>
-        </button>
+            <span
+              class="font-outfit text-secondary-500/50 block text-xs font-semibold uppercase dark:text-gray-500"
+            >
+              {{ dayAbbrev(day.date) }}
+            </span>
+            <span
+              class="font-outfit mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold"
+              :class="
+                day.isToday
+                  ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white shadow-[0_2px_6px_rgba(241,93,34,0.3)]'
+                  : 'text-secondary-500 dark:text-gray-200'
+              "
+            >
+              {{ day.date.getDate() }}
+            </span>
+          </button>
+        </div>
       </div>
 
       <!-- Untimed / all-day items row -->

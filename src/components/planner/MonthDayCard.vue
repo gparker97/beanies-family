@@ -36,7 +36,11 @@ export interface CellVacation {
   id: string;
   name: string;
   emoji: string;
+  /** First covered day of the trip — renders the name + rounds the left edge. */
   isStart: boolean;
+  /** Last covered day of the trip — rounds the right edge so a multi-day trip
+   *  reads as one connected band across its cells. */
+  isEnd: boolean;
 }
 
 export interface CellTimedOccurrence {
@@ -112,6 +116,17 @@ const allDayOverflow = computed(() =>
 
 const visibleAllDayItems = computed(() =>
   props.cell.allDayItems.slice(0, Math.max(0, props.allDayCap - props.cell.holidays.length))
+);
+
+/** A day with nothing on it — collapsed to a thin "nothing planned" line on
+ *  mobile (today is never collapsed; it keeps its anchor + "TODAY" caption). */
+const isEmptyDay = computed(
+  () =>
+    props.cell.timedOccurrences.length === 0 &&
+    props.cell.allDayItems.length === 0 &&
+    props.cell.holidays.length === 0 &&
+    props.cell.segments.length === 0 &&
+    props.cell.vacations.length === 0
 );
 
 function onCellClick() {
@@ -255,18 +270,38 @@ function onMoreClick(event: MouseEvent) {
         </span>
       </div>
 
-      <!-- Vacation indicators (anchored to bottom of cell on desktop, inline on mobile) -->
+      <!-- Empty-day collapse (mobile only): a thin "nothing planned" line so
+           busy days stand out in the agenda. Today is never collapsed. -->
+      <span
+        v-if="isEmptyDay && !cell.isToday"
+        class="font-inter text-secondary-500/40 self-start text-xs italic md:hidden dark:text-gray-600"
+      >
+        {{ t('planner.nothingPlanned') }}
+      </span>
+
+      <!-- Vacation band (anchored to bottom of cell on desktop, inline on mobile).
+           Rounds only the trip's outer ends so a multi-day trip reads as one
+           connected band across its cells. -->
       <div class="hidden flex-1 md:block" />
       <div
         v-for="vac in cell.vacations"
         :key="vac.id"
-        class="w-full cursor-pointer overflow-hidden rounded-sm px-0.5"
+        class="w-full cursor-pointer overflow-hidden"
+        :class="
+          vac.isStart && vac.isEnd
+            ? 'rounded-md'
+            : vac.isStart
+              ? 'rounded-l-md'
+              : vac.isEnd
+                ? 'rounded-r-md'
+                : 'rounded-none'
+        "
         style="background: rgb(0 180 216 / 12%)"
         @click.stop="emit('vacation-click', vac.id)"
       >
         <span
           v-if="vac.isStart"
-          class="font-outfit block truncate text-[0.625rem] leading-tight font-bold text-[#0077B6] dark:text-[#00B4D8]"
+          class="font-outfit block truncate px-1 text-[0.625rem] leading-tight font-bold text-[#0077B6] dark:text-[#00B4D8]"
         >
           {{ vac.emoji }} {{ vac.name }}
         </span>

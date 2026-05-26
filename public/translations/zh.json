@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-24",
-    "translationCount": 2928
+    "lastUpdated": "2026-05-26",
+    "translationCount": 2937
   },
   "translations": {
     "app.name": {
@@ -14645,6 +14645,51 @@
       "translation": "创建者：",
       "hash": "fethe9",
       "lastUpdated": "2026-05-24"
+    },
+    "planner.nothingPlanned": {
+      "translation": "未计划",
+      "hash": "5bdvm9",
+      "lastUpdated": "2026-05-26"
+    },
+    "planner.tripRibbonLabel": {
+      "translation": "上升",
+      "hash": "6nm33u",
+      "lastUpdated": "2026-05-26"
+    },
+    "planner.tripRibbonHide": {
+      "translation": "即将开始的行程",
+      "hash": "l8q9ns",
+      "lastUpdated": "2026-05-26"
+    },
+    "planner.tripRibbonShow": {
+      "translation": "即将开始的行程",
+      "hash": "logl9v",
+      "lastUpdated": "2026-05-26"
+    },
+    "planner.tripsOne": {
+      "translation": "1趟行程",
+      "hash": "nqxdx0",
+      "lastUpdated": "2026-05-26"
+    },
+    "planner.tripsMany": {
+      "translation": "{n}趟行程",
+      "hash": "43b1go",
+      "lastUpdated": "2026-05-26"
+    },
+    "vacation.inDays": {
+      "translation": "{n}天",
+      "hash": "28w0q",
+      "lastUpdated": "2026-05-26"
+    },
+    "vacation.onNow": {
+      "translation": "现在",
+      "hash": "2cba",
+      "lastUpdated": "2026-05-26"
+    },
+    "planner.peekNextWeek": {
+      "translation": "下周窥视",
+      "hash": "h7tp44",
+      "lastUpdated": "2026-05-26"
     }
   }
 }

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
-import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import {
@@ -25,14 +24,11 @@ import HolidayBanner from '@/components/planner/HolidayBanner.vue';
 import type { FamilyActivity, FamilyMember, TodoItem, HolidayOccurrence } from '@/types/models';
 
 /**
- * `selectedDate` lets the parent jump the daily view to a specific day —
- * used when the user clicks a cell in the monthly/weekly grid and we
- * switch views. Watched (not just used on mount) so repeat clicks from
- * the same parent re-navigate correctly. Prev/next/today buttons still
- * drive the internal `referenceDate`; the prop only fires when the
- * parent deliberately sets it.
+ * Controlled period — the page owns the canonical date. The day view derives
+ * `currentDay`/`dayLabel` from it and never mutates it (one-way data flow);
+ * prev/next come from swipe (emitted up) and the command bar.
  */
-const props = defineProps<{ selectedDate?: string }>();
+const props = defineProps<{ referenceDate: Date }>();
 
 const emit = defineEmits<{
   'select-date': [date: string];
@@ -41,8 +37,10 @@ const emit = defineEmits<{
   'view-todo': [todo: TodoItem];
   'vacation-click': [vacationId: string];
   'view-segment': [vacationId: string, segmentIndex: number];
-  'open-agenda': [date: string];
   'holiday-click': [holiday: HolidayOccurrence];
+  /** Swipe navigation — the page advances the shared reference date. */
+  prev: [];
+  next: [];
 }>();
 
 const { t } = useTranslation();
@@ -54,20 +52,10 @@ const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
 const holidayStore = useHolidayStore();
 
-const referenceDate = ref(
-  props.selectedDate ? new Date(props.selectedDate + 'T00:00:00') : new Date()
-);
-const { currentDay, dayLabel, prevDay, nextDay, goToToday } = useDayNavigation(referenceDate);
-
-// Parent-driven date changes (e.g. user clicked a day in the monthly grid
-// while we were already on day view). `immediate: false` — initial state
-// is handled above.
-watch(
-  () => props.selectedDate,
-  (newDate) => {
-    if (newDate) referenceDate.value = new Date(newDate + 'T00:00:00');
-  }
-);
+const referenceDate = computed(() => props.referenceDate);
+// Read-only derivations only — the mutating nav functions are intentionally
+// not destructured (the page owns the date; we never write a prop-derived ref).
+const { currentDay } = useDayNavigation(referenceDate);
 
 // ── Members (sorted, filtered) ─────────────────────────────────────────────
 
@@ -97,8 +85,6 @@ const mobileDayActivities = computed<Occurrence[]>(() => {
     normalizeAssignees(o.activity).some((id) => memberFilterStore.isMemberSelected(id))
   );
 });
-
-const activityCount = computed(() => dayActivities.value.length);
 
 // Activities for a specific member
 function memberActivities(memberId: string): Occurrence[] {
@@ -201,28 +187,45 @@ const gridRef = ref<HTMLElement | null>(null);
 // while horizontal pans reach our pointer-event handler.
 const swipeRef = ref<HTMLElement | null>(null);
 useCalendarSlide(swipeRef, {
-  onNext: nextDay,
-  onPrev: prevDay,
+  onNext: () => emit('next'),
+  onPrev: () => emit('prev'),
 });
 
-onMounted(async () => {
+// Auto-scroll the timeline to the current hour. On first mount only when the
+// user is near the top (don't disturb a deliberate scroll); `force` (the
+// command bar's "Today") always re-centres on now.
+async function scrollToNow(opts: { force?: boolean } = {}) {
+  await nextTick();
+  const mainEl = document.querySelector('main');
+  if (!gridRef.value || !currentDay.value.isToday || !mainEl) return;
+  if (!opts.force && mainEl.scrollTop >= 100) return;
+  const scrollHour = Math.max(0, Math.floor(nowMinutes.value / 60) - 1);
+  const start = hours.value[0] ?? 7;
+  // ROW_HEIGHT is in rem (so the grid participates in Large text-size mode);
+  // convert to px here because scrollTop wants pixels.
+  const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const offsetWithinGrid = Math.max(0, (scrollHour - start) * ROW_HEIGHT * rootPx);
+  const gridTop = gridRef.value.getBoundingClientRect().top + window.scrollY;
+  mainEl.scrollTo({
+    top: gridTop - mainEl.getBoundingClientRect().top + offsetWithinGrid - 80,
+    behavior: opts.force ? 'smooth' : 'auto',
+  });
+}
+
+onMounted(() => {
   updateNow();
   nowTimer = setInterval(updateNow, 60000);
-  await nextTick();
-  // Only auto-scroll to current time on fresh page load (scrollTop near top).
-  // Skip when switching views to avoid jarring scroll jumps.
-  const mainEl = document.querySelector('main');
-  if (gridRef.value && currentDay.value.isToday && mainEl && mainEl.scrollTop < 100) {
-    const scrollHour = Math.max(0, Math.floor(nowMinutes.value / 60) - 1);
-    const start = hours.value[0] ?? 7;
-    // ROW_HEIGHT is in rem units (so calendar cells participate in the Large
-    // text-size mode); convert to px here because scrollTop wants pixels.
-    const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const offsetWithinGrid = Math.max(0, (scrollHour - start) * ROW_HEIGHT * rootPx);
-    const gridTop = gridRef.value.getBoundingClientRect().top + window.scrollY;
-    mainEl.scrollTop = gridTop - mainEl.getBoundingClientRect().top + offsetWithinGrid - 80;
-  }
+  void scrollToNow();
 });
+
+// When the page jumps the reference date to today (command bar "Today"),
+// re-centre the timeline on now.
+watch(
+  () => props.referenceDate,
+  () => {
+    if (currentDay.value.isToday) void scrollToNow({ force: true });
+  }
+);
 
 onUnmounted(() => {
   if (nowTimer) clearInterval(nowTimer);
@@ -236,8 +239,6 @@ function handleSlotClick(memberId: string, hour: number) {
 
 // Grid template columns (dynamic based on member count)
 const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr)`);
-
-defineExpose({ dayLabel, activityCount });
 </script>
 
 <template>
@@ -246,30 +247,6 @@ defineExpose({ dayLabel, activityCount });
     class="rounded-3xl bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
     style="touch-action: pan-y; will-change: transform"
   >
-    <CalendarNavBar :label="dayLabel" @prev="prevDay" @next="nextDay" @today="goToToday">
-      <template #actions>
-        <button
-          type="button"
-          class="text-secondary-500/70 hover:text-primary-500 font-outfit inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-sm font-semibold transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
-          :title="t('planner.openAgenda')"
-          :aria-label="t('planner.openAgenda')"
-          @click="emit('open-agenda', currentDay.dateStr)"
-        >
-          <svg
-            class="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            stroke-width="2"
-            aria-hidden="true"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-          <span class="hidden sm:inline">{{ t('planner.agenda') }}</span>
-        </button>
-      </template>
-    </CalendarNavBar>
-
     <!-- Public holiday banner (desktop — mobile gets it via DayTimeline) -->
     <HolidayBanner
       v-if="!isMobile && holidayForCurrentDay"
@@ -281,30 +258,37 @@ defineExpose({ dayLabel, activityCount });
 
     <!-- ── Desktop: Member Column Grid ──────────────────────────────────── -->
     <template v-if="!isMobile">
-      <!-- Member headers -->
-      <div class="mb-0" :style="{ display: 'grid', gridTemplateColumns: gridCols }">
-        <div />
-        <div
-          v-for="member in visibleMembers"
-          :key="'header-' + member.id"
-          class="relative flex flex-col items-center gap-1 py-2.5"
-        >
-          <span
-            class="inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold text-white"
-            :style="{ backgroundColor: member.color }"
-          >
-            {{ member.name.charAt(0).toUpperCase() }}
-          </span>
-          <span
-            class="font-outfit text-secondary-500/55 text-xs font-semibold lowercase dark:text-gray-400"
-          >
-            {{ member.name }}
-          </span>
-          <!-- Colored accent bar -->
+      <!-- Member headers — sticky beneath the command bar so you never lose
+           which person each column belongs to. Wrapper bleeds over the card
+           padding (bg); the inner grid stays aligned with the timeline. -->
+      <div
+        class="sticky z-20 -mx-5 bg-white px-5 dark:bg-slate-800"
+        style="top: var(--planner-cmdbar-h, 0)"
+      >
+        <div class="mb-0" :style="{ display: 'grid', gridTemplateColumns: gridCols }">
+          <div />
           <div
-            class="absolute right-2 bottom-0 left-2 h-0.5 rounded-full opacity-50"
-            :style="{ backgroundColor: member.color }"
-          />
+            v-for="member in visibleMembers"
+            :key="'header-' + member.id"
+            class="relative flex flex-col items-center gap-1 py-2.5"
+          >
+            <span
+              class="inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold text-white"
+              :style="{ backgroundColor: member.color }"
+            >
+              {{ member.name.charAt(0).toUpperCase() }}
+            </span>
+            <span
+              class="font-outfit text-secondary-500/55 text-xs font-semibold lowercase dark:text-gray-400"
+            >
+              {{ member.name }}
+            </span>
+            <!-- Colored accent bar -->
+            <div
+              class="absolute right-2 bottom-0 left-2 h-0.5 rounded-full opacity-50"
+              :style="{ backgroundColor: member.color }"
+            />
+          </div>
         </div>
       </div>
 
