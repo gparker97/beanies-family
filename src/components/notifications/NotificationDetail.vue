@@ -6,20 +6,10 @@
  * link beneath it (read/unread is primarily a row-level toggle now, so the two
  * never compete).
  */
-import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { useNotificationsStore } from '@/stores/notificationsStore';
-import { getReleaseNote } from '@/content/release-notes';
-import {
-  NOTIFICATION_KIND_PRESENTATION,
-  ACCENT_TINT_CLASS,
-  kindLabelKey,
-  notificationTitle,
-  notificationSummary,
-  notificationWhen,
-  dutyRoleLabelKey,
-} from '@/components/notifications/notificationKinds';
+import { useNotificationPresentation } from '@/composables/useNotificationPresentation';
 import type { AppNotification } from '@/types/notifications';
 
 const props = defineProps<{ notification: AppNotification }>();
@@ -27,22 +17,8 @@ const props = defineProps<{ notification: AppNotification }>();
 const router = useRouter();
 const { t } = useTranslation();
 const store = useNotificationsStore();
-
-const presentation = computed(() => NOTIFICATION_KIND_PRESENTATION[props.notification.kind]);
-const tintClass = computed(() => ACCENT_TINT_CLASS[presentation.value.accent]);
-const labelKey = computed(() => kindLabelKey(props.notification.kind, props.notification.overdue));
-const title = computed(() => notificationTitle(props.notification, t));
-const summary = computed(() => notificationSummary(props.notification, t));
-const when = computed(() => notificationWhen(props.notification, t));
-const roleLabel = computed(() =>
-  props.notification.dutyRole ? t(dutyRoleLabelKey(props.notification.dutyRole)) : ''
-);
-const release = computed(() =>
-  props.notification.kind === 'whats-new' && props.notification.sourceId
-    ? getReleaseNote(props.notification.sourceId)
-    : undefined
-);
-const showCustomBody = computed(() => Boolean(presentation.value.detailBody && release.value));
+const { presentation, tintClass, labelKey, release, hasRichBody, title, summary, when, roleLabel } =
+  useNotificationPresentation(() => props.notification);
 
 function handleOpen() {
   if (!props.notification.route) return;
@@ -58,7 +34,7 @@ function handleMarkUnread() {
 <template>
   <div class="space-y-5">
     <!-- Custom per-kind body (whats-new) — or the default meta card -->
-    <component :is="presentation.detailBody" v-if="showCustomBody" :release="release" />
+    <component :is="presentation.detailBody" v-if="hasRichBody" :release="release" />
     <div v-else class="flex items-start gap-3">
       <span
         class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[16px] text-2xl"

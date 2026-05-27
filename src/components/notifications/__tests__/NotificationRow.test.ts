@@ -6,6 +6,11 @@ import type { AppNotification } from '@/types/notifications';
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
+// Mock the en/beanie picker so the row test needs no Pinia (the real one reads
+// settingsStore); none of these cases use a release `summary` anyway.
+vi.mock('@/composables/useBeanieText', () => ({
+  useBeanieText: () => ({ txt: (v: { en: string; beanie: string }) => v.en }),
+}));
 
 import NotificationRow from '../NotificationRow.vue';
 

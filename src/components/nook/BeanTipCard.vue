@@ -2,22 +2,19 @@
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useBeanTips } from '@/composables/useBeanTips';
-import { useSettingsStore } from '@/stores/settingsStore';
+import { useBeanieText } from '@/composables/useBeanieText';
 import { useTranslation } from '@/composables/useTranslation';
 import { getCategoryImage } from '@/content/tips';
 
 const router = useRouter();
-const settingsStore = useSettingsStore();
+const { txt } = useBeanieText();
 const { t } = useTranslation();
 const { currentTip, isDismissing, dismissTip, muteAllTips } = useBeanTips();
 
 const tip = computed(() => currentTip.value);
 const categoryClass = computed(() => (tip.value ? `cat-${tip.value.category}` : ''));
 const characterSrc = computed(() => (tip.value ? getCategoryImage(tip.value.category) : ''));
-const message = computed(() => {
-  if (!tip.value) return '';
-  return settingsStore.beanieMode ? tip.value.message.beanie : tip.value.message.en;
-});
+const message = computed(() => (tip.value ? txt(tip.value.message) : ''));
 
 function handleGotIt() {
   if (tip.value) dismissTip(tip.value.id);

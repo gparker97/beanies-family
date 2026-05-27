@@ -16,7 +16,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { changeDoc, docVersion, getDoc, isDocLoaded } from '@/services/automerge/docService';
-import { getAllReleaseNotes } from '@/content/release-notes';
+import { getAllReleaseNotes, getReleaseNote, isSpotlightRelease } from '@/content/release-notes';
 import { reportError } from '@/utils/errorReporter';
 import {
   deriveNotifications,
@@ -114,8 +114,15 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const selected = computed(
     () => notifications.value.find((n) => n.id === selectedId.value) ?? null
   );
-  const latestUnseenWhatsNew = computed(
-    () => notifications.value.find((n) => n.kind === 'whats-new' && !n.read) ?? null
+  // Auto-open only SPOTLIGHT (significant) releases; minor per-deploy notes
+  // ("fixes & improvements") just badge the bell — they don't interrupt.
+  const latestUnseenSpotlight = computed(
+    () =>
+      notifications.value.find((n) => {
+        if (n.kind !== 'whats-new' || n.read || !n.sourceId) return false;
+        const rel = getReleaseNote(n.sourceId);
+        return rel ? isSpotlightRelease(rel) : false;
+      }) ?? null
   );
 
   // ── Read-state mutations (the ONLY writers of notificationReads) ────────────
@@ -202,10 +209,13 @@ export const useNotificationsStore = defineStore('notifications', () => {
       close();
     }
   }
-  /** Login auto-open — idempotent via the session latch; no-op if nothing unseen. */
+  /**
+   * Login auto-open — idempotent via the session latch; no-op unless there's an
+   * unseen SPOTLIGHT release (minor per-deploy notes never auto-open).
+   */
   function openToLatestWhatsNew(): void {
     if (autoOpenedThisSession) return;
-    const latest = latestUnseenWhatsNew.value;
+    const latest = latestUnseenSpotlight.value;
     if (!latest) return;
     autoOpenedThisSession = true;
     openTo(latest.id);
@@ -221,7 +231,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     notifications,
     unreadCount,
     hasUnread,
-    latestUnseenWhatsNew,
+    latestUnseenSpotlight,
     markRead,
     markUnread,
     markAllRead,
