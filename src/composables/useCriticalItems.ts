@@ -5,14 +5,14 @@ import { useActivityStore } from '@/stores/activityStore';
 import { isMedicationActive, useMedicationsStore } from '@/stores/medicationsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { isAdultMember, useMemberInfo } from '@/composables/useMemberInfo';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatTime12, formatDateShort, addDays, toISODateString } from '@/utils/date';
 import { useToday } from '@/composables/useToday';
 import { normalizeAssignees, formatNameList } from '@/utils/assignees';
 import { isTodoOverdue } from '@/utils/todo';
+import { classifyAudience, isDutyDone } from '@/utils/audience';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
-import type { DutyCompletion, FamilyMember } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export interface CriticalItem {
@@ -31,45 +31,10 @@ export interface CriticalItem {
 /** How many briefing items show before the "Show all N" disclosure appears. */
 export const CRITICAL_ITEMS_INITIAL_VISIBLE = 5;
 
-/** Check whether a duty has been completed for a given occurrence date. */
-function isDutyDone(completions: DutyCompletion[] | undefined, date: string): boolean {
-  return completions?.some((c) => c.date === date) ?? false;
-}
-
-// ── Daily-briefing visibility rule ──────────────────────────────────────────
-// `classifyAudience` is *the* canonical statement of "who sees a briefing item",
-// used by both the activity loop and the to-do loop below. The rule:
-//   • You're directly assigned                  → it's yours ('assignee').
-//   • No adult is assigned, but ≥1 child is      → every adult sees it, framed by
-//     the child's name ("Neil: …") ('forChild'); the assigned child still sees it
-//     as their own via the 'assignee' branch. Other children don't see it.
-//   • Nobody (resolvable, non-pet) is assigned   → everyone non-pet sees it
-//     ("… (anyone can do this)") ('unassigned') — also where truly-unassigned,
-//     all-stale-ID, and pet-only items land, all degrading gracefully.
-//   • Anything else                              → 'hidden' for this viewer.
-// Pets never get a briefing. Mirrored in the "Your Daily Briefing" help article.
-type BriefingAudience =
-  | { kind: 'assignee' }
-  | { kind: 'forChild'; childNames: string[] }
-  | { kind: 'unassigned' }
-  | { kind: 'hidden' };
-
-function classifyAudience(
-  assigneeIds: string[],
-  viewer: FamilyMember,
-  resolveMember: (id: string) => FamilyMember | undefined
-): BriefingAudience {
-  const known = assigneeIds.map(resolveMember).filter((m): m is FamilyMember => m !== undefined);
-  if (known.some((m) => m.id === viewer.id)) return { kind: 'assignee' };
-  if (known.some(isAdultMember)) return { kind: 'hidden' }; // a parent owns it → only assignees see it
-  const kids = known.filter((m) => !m.isPet); // already non-adult — any adult would have returned above
-  if (kids.length > 0) {
-    return isAdultMember(viewer)
-      ? { kind: 'forChild', childNames: kids.map((m) => m.name) }
-      : { kind: 'hidden' }; // other children don't get this kid's item
-  }
-  return viewer.isPet ? { kind: 'hidden' } : { kind: 'unassigned' }; // none / all-stale / pet-only
-}
+// The canonical "who sees what" audience rule (`classifyAudience` + `isDutyDone`
+// + `BriefingAudience`) now lives in `@/utils/audience` — shared verbatim with
+// the in-app notification deriver so the two can't drift. Mirrored in the "Your
+// Daily Briefing" help article.
 
 type DateState = 'overdue' | 'today' | 'noDue';
 

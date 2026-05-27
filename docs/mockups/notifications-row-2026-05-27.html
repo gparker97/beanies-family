@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family · notification row + mark-unread · 2026-05-27</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================
+         Refines the per-row design + the mark-read/unread affordance
+         from notifications-2026-05-26.html (Treatment B).
+         Two fixes from greg's review:
+           1. Each row is useful AT A GLANCE: emoji · bold title ·
+              summary (who/where/your role) · date+time.
+           2. read/unread is a ROW-level toggle (tap the dot), so the
+              detail's "Open" is the clean, sole primary action — the
+              two no longer compete.
+         ============================================================ */
+      :root {
+        --orange: #f15d22;
+        --orange-ink: #c84612;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --slate-soft: #5d6d7e;
+        --sky: #aed6f1;
+        --cloud: #f8f9fa;
+        --paper: #fff;
+        --line: #ecf0f2;
+        --purple: #9b59b6;
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-12: rgba(241, 93, 34, 0.12);
+        --tint-purple-12: rgba(155, 89, 182, 0.12);
+        --tint-silk-20: rgba(174, 214, 241, 0.2);
+        --r-md: 12px;
+        --r-lg: 16px;
+        --r-xl: 22px;
+        --lift-2: 0 4px 20px rgba(44, 62, 80, 0.06);
+        --lift-3: 0 14px 38px -14px rgba(44, 62, 80, 0.2);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Inter', system-ui, sans-serif;
+        background:
+          radial-gradient(1200px 600px at 80% -10%, rgba(174, 214, 241, 0.18), transparent 60%),
+          var(--cloud);
+        color: var(--slate);
+        -webkit-font-smoothing: antialiased;
+        padding: 36px 24px 90px;
+      }
+      h1,
+      h2,
+      h3,
+      h4 {
+        font-family: 'Outfit', sans-serif;
+        margin: 0;
+      }
+      .head {
+        max-width: 1100px;
+        margin: 0 auto 26px;
+      }
+      .head .kick {
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--orange);
+      }
+      .head h1 {
+        font-size: 24px;
+        font-weight: 800;
+        margin-top: 4px;
+      }
+      .head p {
+        color: var(--slate-soft);
+        font-size: 14px;
+        margin: 8px 0 0;
+        max-width: 760px;
+      }
+      .stage {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        gap: 34px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: center;
+      }
+      .col {
+        flex: 0 0 auto;
+      }
+      .col-cap {
+        text-align: center;
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 13px;
+        color: var(--slate-soft);
+        margin-bottom: 11px;
+      }
+      .col-cap .tag {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--orange-ink);
+        background: var(--tint-orange-8);
+        border-radius: 999px;
+        padding: 3px 9px;
+        margin-left: 6px;
+      }
+      .bezel {
+        background: #1a232c;
+        border-radius: 40px;
+        padding: 11px;
+        box-shadow: var(--lift-3);
+        width: 372px;
+      }
+      .device {
+        background: var(--paper);
+        border-radius: 30px;
+        overflow: hidden;
+        height: 720px;
+        display: flex;
+        flex-direction: column;
+      }
+      .statusbar {
+        height: 26px;
+        background: var(--slate);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        color: #fff;
+        font-family: 'Outfit';
+        font-size: 11px;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+      .dhead {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        flex-shrink: 0;
+      }
+      .dhead h3 {
+        font-size: 18px;
+        font-weight: 700;
+        flex: 1;
+      }
+      .dhead .back,
+      .dhead .x {
+        border: none;
+        background: none;
+        font-size: 18px;
+        color: var(--slate-soft);
+        cursor: pointer;
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+      }
+      .dhead .markall {
+        border: none;
+        background: none;
+        font-family: 'Outfit';
+        font-weight: 600;
+        font-size: 12px;
+        color: var(--orange);
+        cursor: pointer;
+        padding: 5px 8px;
+        border-radius: 8px;
+      }
+      .dbody {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 0;
+      }
+      .dgroup {
+        font-family: 'Outfit';
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(44, 62, 80, 0.4);
+        padding: 10px 18px 4px;
+      }
+
+      /* ===== THE ROW ===== */
+      .nrow {
+        display: flex;
+        gap: 12px;
+        padding: 12px 14px 12px 18px;
+        cursor: pointer;
+        position: relative;
+        align-items: flex-start;
+        transition: background 0.12s;
+      }
+      .nrow:hover {
+        background: var(--cloud);
+      }
+      .nrow.unread {
+        background: rgba(241, 93, 34, 0.045);
+      }
+      .nrow.unread:hover {
+        background: rgba(241, 93, 34, 0.075);
+      }
+      .nrow .lead {
+        flex-shrink: 0;
+        height: 40px;
+        width: 40px;
+        border-radius: 13px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 19px;
+      }
+      .lead.todo {
+        background: var(--tint-purple-12);
+      }
+      .lead.activity {
+        background: var(--tint-silk-20);
+      }
+      .lead.assigned {
+        background: var(--tint-purple-12);
+      }
+      .lead.whatsnew {
+        background: linear-gradient(135deg, rgba(241, 93, 34, 0.14), rgba(230, 126, 34, 0.14));
+      }
+      .nrow .body {
+        min-width: 0;
+        flex: 1;
+      }
+      /* title (bold) */
+      .nrow .ntitle {
+        font-family: 'Outfit';
+        font-size: 14.5px;
+        font-weight: 700;
+        color: var(--slate);
+        margin: 0 0 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .nrow.read .ntitle {
+        font-weight: 500;
+        color: rgba(44, 62, 80, 0.68);
+      }
+      /* summary (who · where · your role) */
+      .nrow .nsub {
+        font-size: 12.5px;
+        color: rgba(44, 62, 80, 0.62);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        line-height: 1.35;
+      }
+      .nrow.read .nsub {
+        color: rgba(44, 62, 80, 0.45);
+      }
+      .nsub .role {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-family: 'Outfit';
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--orange-ink);
+        background: var(--tint-orange-12);
+        border-radius: 999px;
+        padding: 2px 8px;
+        white-space: nowrap;
+      }
+      /* date + time line */
+      .nrow .ntime {
+        font-family: 'Outfit';
+        font-size: 11.5px;
+        font-weight: 600;
+        color: rgba(44, 62, 80, 0.5);
+        margin-top: 5px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .nrow .ntime.over {
+        color: var(--orange-ink);
+      }
+      .nrow .ntime .dot {
+        opacity: 0.4;
+      }
+
+      /* ===== read/unread TOGGLE (right edge) — the new affordance ===== */
+      .toggle {
+        flex-shrink: 0;
+        align-self: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: none;
+        background: none;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        transition: background 0.12s;
+      }
+      .toggle:hover {
+        background: rgba(44, 62, 80, 0.06);
+      }
+      .toggle .pip {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        transition: all 0.15s;
+      }
+      /* unread → solid orange (tap to mark read) */
+      .nrow.unread .toggle .pip {
+        background: var(--orange);
+        box-shadow: 0 0 0 4px rgba(241, 93, 34, 0.14);
+      }
+      /* read → hollow ring (tap to mark unread) */
+      .nrow.read .toggle .pip {
+        background: transparent;
+        border: 2px solid rgba(44, 62, 80, 0.25);
+        width: 10px;
+        height: 10px;
+      }
+      .toggle .tip {
+        position: absolute;
+        right: 40px;
+        background: var(--slate);
+        color: #fff;
+        font-family: 'Outfit';
+        font-size: 10px;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 7px;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.14s;
+      }
+      .toggle:hover .tip {
+        opacity: 1;
+      }
+
+      /* ===== DETAIL ===== */
+      .det-iconrow {
+        display: flex;
+        gap: 12px;
+        padding: 18px;
+        align-items: flex-start;
+      }
+      .det-iconrow .lead {
+        height: 48px;
+        width: 48px;
+        border-radius: 15px;
+        font-size: 23px;
+      }
+      .det-kicker {
+        font-family: 'Outfit';
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--sky);
+        color: #6aa3c8;
+      }
+      .det-title {
+        font-size: 20px;
+        font-weight: 800;
+        margin: 2px 0 3px;
+      }
+      .det-when {
+        font-family: 'Outfit';
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--slate-soft);
+      }
+      .det-card {
+        margin: 4px 18px 0;
+        background: var(--cloud);
+        border-radius: var(--r-lg);
+        padding: 4px 14px;
+      }
+      .det-card .line {
+        display: flex;
+        justify-content: space-between;
+        padding: 11px 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 13px;
+      }
+      .det-card .line:last-child {
+        border-bottom: none;
+      }
+      .det-card .k {
+        color: rgba(44, 62, 80, 0.5);
+        font-family: 'Outfit';
+        font-weight: 600;
+      }
+      .det-card .v {
+        color: var(--slate);
+        font-weight: 500;
+      }
+      .det-foot {
+        padding: 16px 18px 20px;
+        flex-shrink: 0;
+        border-top: 1px solid var(--line);
+      }
+      .btn-open {
+        width: 100%;
+        border: none;
+        cursor: pointer;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        color: #fff;
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 14px;
+        padding: 14px;
+        border-radius: var(--r-lg);
+        box-shadow: 0 4px 14px rgba(241, 93, 34, 0.28);
+      }
+      /* mark-unread demoted to a quiet text link UNDER the primary (or omitted —
+         it now lives on the row). Shown faint so it never competes. */
+      .link-unread {
+        display: block;
+        margin: 12px auto 0;
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-family: 'Outfit';
+        font-size: 12px;
+        font-weight: 500;
+        color: rgba(44, 62, 80, 0.4);
+      }
+      .link-unread:hover {
+        color: var(--slate-soft);
+      }
+
+      .notes {
+        max-width: 1100px;
+        margin: 26px auto 0;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .note {
+        flex: 1 1 260px;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--r-lg);
+        padding: 14px 16px;
+        box-shadow: 0 1px 2px rgba(44, 62, 80, 0.05);
+      }
+      .note .n {
+        display: inline-flex;
+        width: 24px;
+        height: 24px;
+        border-radius: 8px;
+        background: var(--tint-orange-12);
+        color: var(--orange-ink);
+        font-family: 'Outfit';
+        font-weight: 800;
+        font-size: 12px;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 8px;
+      }
+      .note h4 {
+        font-size: 13.5px;
+        margin-bottom: 4px;
+      }
+      .note p {
+        font-size: 12.5px;
+        color: var(--slate-soft);
+        margin: 0;
+        line-height: 1.5;
+      }
+      .note code {
+        font-size: 11px;
+        background: var(--cloud);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 1px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="head">
+      <div class="kick">Notifications · row + mark-unread refinement</div>
+      <h1>Useful at a glance — and read/unread lives on the row</h1>
+      <p>
+        Each row now answers <em>what · who/where · your part · when</em> without opening it. And
+        read/unread becomes a one-tap dot on the row (tap the orange pip to mark read; tap a read
+        row's hollow ring to mark it unread again) — so the detail's <strong>Open</strong> is the
+        single, uncontested primary action.
+      </p>
+    </div>
+
+    <div class="stage">
+      <!-- ===== LIST ===== -->
+      <div class="col">
+        <div class="col-cap">List — at a glance<span class="tag">tap pip = read/unread</span></div>
+        <div class="bezel">
+          <div class="device">
+            <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+            <div class="dhead">
+              <h3>Notifications</h3>
+              <button class="markall">Mark all read</button>
+              <button class="x">✕</button>
+            </div>
+            <div class="dbody">
+              <div class="dgroup">Today</div>
+
+              <!-- activity reminder -->
+              <div class="nrow unread">
+                <div class="lead activity">📅</div>
+                <div class="body">
+                  <p class="ntitle">Swimming lesson</p>
+                  <p class="nsub">
+                    Lucas · Bukit Timah Pool
+                    <span class="role">🚗 you're on drop-off</span>
+                  </p>
+                  <p class="ntime">Today <span class="dot">·</span> 5:00pm</p>
+                </div>
+                <button class="toggle" title="Mark as read">
+                  <span class="pip"></span><span class="tip">mark read</span>
+                </button>
+              </div>
+
+              <!-- todo due -->
+              <div class="nrow unread">
+                <div class="lead todo">✅</div>
+                <div class="body">
+                  <p class="ntitle">Pick up the boys</p>
+                  <p class="nsub">Your task</p>
+                  <p class="ntime over">Due today <span class="dot">·</span> 4:00pm</p>
+                </div>
+                <button class="toggle" title="Mark as read">
+                  <span class="pip"></span><span class="tip">mark read</span>
+                </button>
+              </div>
+
+              <!-- todo assigned -->
+              <div class="nrow unread">
+                <div class="lead assigned">📌</div>
+                <div class="body">
+                  <p class="ntitle">Buy groceries</p>
+                  <p class="nsub">Sophia assigned this to you</p>
+                  <p class="ntime">Today <span class="dot">·</span> 8:30am</p>
+                </div>
+                <button class="toggle" title="Mark as read">
+                  <span class="pip"></span><span class="tip">mark read</span>
+                </button>
+              </div>
+
+              <div class="dgroup">Earlier</div>
+
+              <!-- read row — hollow ring -->
+              <div class="nrow read">
+                <div class="lead activity">📅</div>
+                <div class="body">
+                  <p class="ntitle">Piano lesson</p>
+                  <p class="nsub">Oren · Roxy Square <span class="role">🚗 pick-up</span></p>
+                  <p class="ntime">Yesterday <span class="dot">·</span> 1:15pm</p>
+                </div>
+                <button class="toggle" title="Mark as unread">
+                  <span class="pip"></span><span class="tip">mark unread</span>
+                </button>
+              </div>
+
+              <!-- whats new (read) -->
+              <div class="nrow read">
+                <div class="lead whatsnew">🌱</div>
+                <div class="body">
+                  <p class="ntitle">What's new</p>
+                  <p class="nsub">May 2026 — notifications have arrived</p>
+                  <p class="ntime">2 days ago</p>
+                </div>
+                <button class="toggle" title="Mark as unread">
+                  <span class="pip"></span><span class="tip">mark unread</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== DETAIL ===== -->
+      <div class="col">
+        <div class="col-cap">Detail — one clear action<span class="tag">Open, uncontested</span></div>
+        <div class="bezel">
+          <div class="device">
+            <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+            <div class="dhead">
+              <button class="back">←</button>
+              <h3>Swimming lesson</h3>
+              <button class="x">✕</button>
+            </div>
+            <div class="dbody">
+              <div class="det-iconrow">
+                <div class="lead activity">📅</div>
+                <div>
+                  <div class="det-kicker">Coming up · in 30 min</div>
+                  <h2 class="det-title">Swimming lesson</h2>
+                  <div class="det-when">Today · 5:00pm</div>
+                </div>
+              </div>
+              <div class="det-card">
+                <div class="line"><span class="k">For</span><span class="v">Lucas</span></div>
+                <div class="line"><span class="k">Where</span><span class="v">Bukit Timah Pool</span></div>
+                <div class="line"><span class="k">Your part</span><span class="v">Drop-off 🚗</span></div>
+                <div class="line"><span class="k">Reminder</span><span class="v">30 min before</span></div>
+              </div>
+            </div>
+            <div class="det-foot">
+              <button class="btn-open">Open in Planner →</button>
+              <button class="link-unread">Mark as unread</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note">
+        <span class="n">1</span>
+        <h4>At-a-glance row</h4>
+        <p>
+          Emoji (kind) · <strong>bold title</strong> (the thing) · summary (who · where · a chip for
+          your drop-off / pick-up duty) · the real date + time. Overdue tasks turn the time line
+          Heritage Orange.
+        </p>
+      </div>
+      <div class="note">
+        <span class="n">2</span>
+        <h4>Read/unread on the row</h4>
+        <p>
+          The right-edge pip is the toggle: solid orange = unread (tap → read), hollow ring = read
+          (tap → unread). Tapping the row body still opens the detail (and marks read). No need to
+          open something just to change its read-state.
+        </p>
+      </div>
+      <div class="note">
+        <span class="n">3</span>
+        <h4>Detail = one action</h4>
+        <p>
+          <strong>Open</strong> is the sole primary button. "Mark as unread" is demoted to a faint
+          text link beneath it (or dropped entirely, since the row's pip covers it) — it never
+          competes with Open again.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

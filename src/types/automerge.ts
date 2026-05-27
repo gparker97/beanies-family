@@ -51,6 +51,13 @@ export interface FamilyDocument {
   recipes: Record<string, Recipe>;
   cookLogs: Record<string, CookLogEntry>;
   emergencyContacts: Record<string, EmergencyContact>;
+  /**
+   * Per-member in-app notification read-state: memberId → (notificationId →
+   * ISO readAt). The ONLY persisted notification state — notifications
+   * themselves are derived (see types/notifications.ts). Nested maps merge
+   * cleanly in Automerge, so reading on one device clears the badge on another.
+   */
+  notificationReads: Record<string, Record<string, string>>;
   settings: Settings | null;
 }
 

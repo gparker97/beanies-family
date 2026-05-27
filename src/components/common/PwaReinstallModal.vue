@@ -18,7 +18,8 @@ const platform = computed<Platform>(() => {
   return 'desktop';
 });
 
-// Suppress modal during E2E runs (same guard WhatsNewModal uses)
+// Suppress modal during E2E runs (the same `e2e_auto_auth` guard the
+// notifications auto-open uses — see useNotifications)
 const openModal = computed(() => {
   if (!shouldShow.value) return false;
   try {

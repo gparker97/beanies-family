@@ -19,6 +19,7 @@ import MemberFilterMobileMenu from '@/components/planner/MemberFilterMobileMenu.
 import CalendarTripRibbon from '@/components/planner/CalendarTripRibbon.vue';
 import HamburgerButton from '@/components/common/HamburgerButton.vue';
 import SearchButton from '@/components/common/SearchButton.vue';
+import NotificationsBell from '@/components/notifications/NotificationsBell.vue';
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMobileMenu, useHeaderReclaimed } from '@/composables/useMobileMenu';
@@ -154,10 +155,12 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <!-- Mobile only: search (re-homed from the hidden AppHeader). The member
+        <!-- Mobile only: notification bell + search (re-homed from the hidden
+             AppHeader, which is suppressed on the mobile planner). The member
              filter lives on the controls row below so this identity row stays
              uncrowded and the period label never truncates. -->
-        <div v-if="headerReclaimed" class="flex-shrink-0">
+        <div v-if="headerReclaimed" class="flex flex-shrink-0 items-center gap-1.5">
+          <NotificationsBell />
           <SearchButton />
         </div>
       </div>

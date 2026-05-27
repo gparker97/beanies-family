@@ -5771,6 +5771,32 @@ const STRING_DEFS = {
   'whatsNew.alsoFixed': { en: 'Also Fixed', beanie: 'also fixed' },
   'whatsNew.tryIt': { en: 'Try It', beanie: 'try it' },
 
+  // In-app notifications (the header bell + drawer)
+  'notifications.title': { en: 'Notifications', beanie: 'notifications' },
+  'notifications.empty': { en: "You're all caught up", beanie: "you're all caught up" },
+  'notifications.emptyHint': {
+    en: "We'll let you know when something needs you.",
+    beanie: "we'll let you know when something needs you.",
+  },
+  'notifications.markAllRead': { en: 'Mark all read', beanie: 'mark all read' },
+  'notifications.markUnread': { en: 'Mark unread', beanie: 'mark unread' },
+  'notifications.open': { en: 'Open', beanie: 'open' },
+  'notifications.back': { en: 'Back', beanie: 'back' },
+  'notifications.unread': { en: 'unread', beanie: 'unread' },
+  'notifications.kindTodoDue': { en: 'Coming due', beanie: 'coming due' },
+  'notifications.kindTodoDueOverdue': { en: 'Overdue', beanie: 'overdue' },
+  'notifications.kindTodoAssigned': { en: 'Assigned to you', beanie: 'assigned to you' },
+  'notifications.kindActivityReminder': { en: 'Coming up', beanie: 'coming up' },
+  'notifications.kindWhatsNew': { en: "What's new", beanie: "what's new" },
+  'notifications.due': { en: 'Due', beanie: 'due' },
+  'notifications.yourTask': { en: 'Your task', beanie: 'your task' },
+  'notifications.assignedByYou': {
+    en: '{name} assigned this to you',
+    beanie: '{name} assigned this to you',
+  },
+  'notifications.youDropoff': { en: "you're on drop-off", beanie: "you're on drop-off" },
+  'notifications.youPickup': { en: "you're on pick-up", beanie: "you're on pick-up" },
+
   // Navigation
   'nav.beanstalk': { en: 'Beanie Beanstalk', beanie: 'beanie beanstalk' },
   'nav.help': { en: 'Help', beanie: 'help' },

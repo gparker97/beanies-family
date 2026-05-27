@@ -23,6 +23,7 @@ const stubs = {
     template: '<button class="stub-hamburger" @click="$emit(\'click\')" />',
   },
   SearchButton: { name: 'SearchButton', template: '<button class="stub-search" />' },
+  NotificationsBell: { name: 'NotificationsBell', template: '<button class="stub-bell" />' },
   ViewToggle: { name: 'ViewToggle', template: '<div class="stub-viewtoggle" />' },
   MemberChipFilter: { name: 'MemberChipFilter', template: '<div class="stub-chipfilter" />' },
   MemberFilterMobileMenu: {
