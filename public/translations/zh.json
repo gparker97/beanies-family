@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-26",
-    "translationCount": 2937
+    "lastUpdated": "2026-05-27",
+    "translationCount": 2935
   },
   "translations": {
     "app.name": {
@@ -14549,16 +14549,6 @@
     "planner.moreEventsShort": {
       "translation": "更多",
       "hash": "1zyol",
-      "lastUpdated": "2026-05-19"
-    },
-    "planner.legendShow": {
-      "translation": "顯示",
-      "hash": "1j7rx",
-      "lastUpdated": "2026-05-19"
-    },
-    "planner.legendFamily": {
-      "translation": "家庭活动",
-      "hash": "m9mfuz",
       "lastUpdated": "2026-05-19"
     },
     "planner.weekThis": {
