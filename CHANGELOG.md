@@ -15,6 +15,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **More room for your events on the calendar.** The calendar now sits flush at the top of the page — the dead gap that used to appear above it (where events briefly scrolled through a too-small, unusable band) is gone, on both desktop and phones. The bar showing the month/week/day and the controls is now solid, so events scroll cleanly _underneath_ it instead of faintly showing through. On phones, the separate app header is folded into that calendar bar as two tidy rows: the day/month/week you're viewing (always shown in full — never cut off to "May…") with a menu button and search on top, and the Month/Week/Day switch, family filter, and Add below. The family filter stays visible at all times — compact when you're viewing everyone, and showing the name when you've filtered to one person — so it's always clear whose plans you're looking at.
 - **Less clutter on the month view.** Removed the small non-interactive strip of family-member avatars at the top of the month calendar — it duplicated the family filter that's already in the bar, and dropping it gives your days more room. Each event still shows whose it is via its colour and avatar.
 
+### Fixed
+
+- **"Today" now always jumps to today.** Tapping **Today** while you were already looking at the current month did nothing; it now reliably scrolls to today's date (it already worked from other months).
+- **Switching to the month view lands on today.** Coming from the week or day view, the month now focuses today's date instead of sometimes opening scrolled to a different day — matching what the calendar tab in the bottom bar already does.
+- **Calendar arrows are correctly labelled for screen readers.** The previous/next arrows in the calendar bar were both announced as "Today"; they now read "Previous period" / "Next period".
+
 ## 2026-05-26
 
 ### Changed

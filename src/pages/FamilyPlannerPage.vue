@@ -232,9 +232,14 @@ function handleNext() {
   goNext();
   focusedDate.value = null;
 }
+// Bumped on every "Today" tap so the views always re-scroll to today — even
+// when the reference date doesn't change (already on the current month/day),
+// where a plain `watch(referenceDate)` would never fire.
+const todayTick = ref(0);
 function handleToday() {
   goToday();
   focusedDate.value = null;
+  todayTick.value++;
 }
 function setView(view: string) {
   activeView.value = view as PlannerView;
@@ -480,6 +485,7 @@ function handleActivitySwapped(newId: string) {
       v-if="activeView === 'month'"
       :reference-date="referenceDate"
       :selected-date="focusedDate ?? undefined"
+      :today-tick="todayTick"
       @select-date="handleCalendarDateClick"
       @prev="handlePrev"
       @next="handleNext"
@@ -493,6 +499,7 @@ function handleActivitySwapped(newId: string) {
       v-else-if="activeView === 'week'"
       :reference-date="referenceDate"
       :selected-date="focusedDate ?? undefined"
+      :today-tick="todayTick"
       @select-date="handleCalendarDateClick"
       @select-day="handleSelectDay"
       @prev="handlePrev"
@@ -508,6 +515,7 @@ function handleActivitySwapped(newId: string) {
     <DailyCalendarView
       v-else-if="activeView === 'day'"
       :reference-date="referenceDate"
+      :today-tick="todayTick"
       @select-date="handleCalendarDateClick"
       @prev="handlePrev"
       @next="handleNext"

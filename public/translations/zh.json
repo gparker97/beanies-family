@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-27",
-    "translationCount": 2935
+    "translationCount": 2937
   },
   "translations": {
     "app.name": {
@@ -14680,6 +14680,16 @@
       "translation": "下周窥视",
       "hash": "h7tp44",
       "lastUpdated": "2026-05-26"
+    },
+    "planner.prevPeriod": {
+      "translation": "前一周期",
+      "hash": "7o7h7u",
+      "lastUpdated": "2026-05-27"
+    },
+    "planner.nextPeriod": {
+      "translation": "下一个时期",
+      "hash": "liryc2",
+      "lastUpdated": "2026-05-27"
     }
   }
 }

@@ -43,6 +43,10 @@ const props = defineProps<{
   /** Controlled period — the page owns the canonical date (props down). */
   referenceDate: Date;
   selectedDate?: string;
+  /** Bumped by the page on every "Today" tap — re-scrolls the timeline to the
+   *  current hour even when the reference date is unchanged (already on this
+   *  week), which a `watch(referenceDate)` alone would miss. */
+  todayTick?: number;
 }>();
 const emit = defineEmits<{
   /** Desktop day-header click → drill into Day view (page switches view). */
@@ -217,24 +221,40 @@ const showNowIndicator = computed(() => {
 // Auto-scroll to current time
 const gridRef = ref<HTMLElement | null>(null);
 
+// Scroll the timeline so the current hour sits near the top. On first mount
+// (no `force`) only when the user hasn't already scrolled (don't disturb a
+// deliberate scroll / view switch); `force` (the command bar's "Today")
+// always re-centres on now.
+async function scrollToCurrentHour(opts: { force?: boolean } = {}) {
+  await nextTick();
+  const mainEl = document.querySelector('main');
+  if (!gridRef.value || !mainEl) return;
+  if (!opts.force && mainEl.scrollTop >= 100) return;
+  const scrollHour = Math.max(0, Math.floor(nowMinutes.value / 60) - 1);
+  const start = hours.value[0] ?? 7;
+  // ROW_HEIGHT is in rem units (so calendar cells participate in the Large
+  // text-size mode); convert to px here because scrollTop wants pixels.
+  const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const offsetWithinGrid = Math.max(0, (scrollHour - start) * ROW_HEIGHT * rootPx);
+  const gridTop = gridRef.value.getBoundingClientRect().top + window.scrollY;
+  const top = gridTop - mainEl.getBoundingClientRect().top + offsetWithinGrid - 80;
+  mainEl.scrollTo({ top, behavior: opts.force ? 'smooth' : 'auto' });
+}
+
 onMounted(async () => {
   updateNow();
   nowTimer = setInterval(updateNow, 60000);
-  await nextTick();
-  // Only auto-scroll to current time on fresh page load (scrollTop near top).
-  // Skip when switching views to avoid jarring scroll jumps.
-  const mainEl = document.querySelector('main');
-  if (gridRef.value && mainEl && mainEl.scrollTop < 100) {
-    const scrollHour = Math.max(0, Math.floor(nowMinutes.value / 60) - 1);
-    const start = hours.value[0] ?? 7;
-    // ROW_HEIGHT is in rem units (so calendar cells participate in the Large
-    // text-size mode); convert to px here because scrollTop wants pixels.
-    const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const offsetWithinGrid = Math.max(0, (scrollHour - start) * ROW_HEIGHT * rootPx);
-    const gridTop = gridRef.value.getBoundingClientRect().top + window.scrollY;
-    mainEl.scrollTop = gridTop - mainEl.getBoundingClientRect().top + offsetWithinGrid - 80;
-  }
+  await scrollToCurrentHour();
 });
+
+// Re-centre on now on every command-bar "Today" tap, even when already on the
+// current week (reference date unchanged, so a `watch(referenceDate)` wouldn't
+// fire). The mobile single-day timeline follows `referenceDate`, which the
+// page resets to today alongside this tick.
+watch(
+  () => props.todayTick,
+  () => void scrollToCurrentHour({ force: true })
+);
 
 onUnmounted(() => {
   if (nowTimer) clearInterval(nowTimer);

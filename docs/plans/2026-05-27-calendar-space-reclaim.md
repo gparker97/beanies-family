@@ -168,6 +168,15 @@ greg reviewed the first Phase-1 push on localhost and caught three issues; the f
 
 **Scope note:** the header reclaim is **phone-only** (`isMobile`, ≤767px) — tablet keeps its standard AppHeader (the command bar's `sm:` 640px layout would otherwise collide with a tablet reclaim). The Phase-2 "member filter stays pinned" requirement is satisfied by keeping the filter outside the collapsible controls sub-group (it currently lives on row 2; Phase 2 will pin it there). All fixes verified with real-app Playwright screenshots (desktop + mobile month/week/day, default + filtered).
 
+### Follow-up 2 — scroll-to-today regressions (greg)
+
+A second localhost review surfaced two scroll-to-today bugs (the 2026-05-26 controlled-view redesign had disconnected the 2026-05-19 `79ca5cd` fix):
+
+1. **"Today" was a no-op on the current month.** The views scrolled to today via `watch(referenceDate)`, which never fires when you're already on today (reference date unchanged). Added a `todayTick` counter the page bumps on every "Today" tap; the views scroll on the tick, not on `referenceDate`. Wired to month (`CalendarGrid`), day, and week views.
+2. **Switching to month view didn't focus today.** `CalendarGrid`'s mount scroll used the no-force `scrollTop > 100` guard, which the carried-over scroll position from the previous view tripped. Now forces on mount. Two robustness fixes were needed: resolve the scroll container via `root.closest('main')` (`document.querySelector('main')` was null during the route transition), and wait for the agenda layout to **settle** (`scrollHeight` stable across two frames, with a 1.5s fallback) before scrolling — the day-stack renders progressively, so scrolling mid-render landed on a stale (0) position.
+
+Also fixed a pre-existing a11y bug spotted in passing: the command bar's prev/next arrows were both `aria-label="today"` → now `planner.prevPeriod` / `planner.nextPeriod` (new i18n keys, zh added). Verified with real-app Playwright screenshots (today-tap on current month scrolls 0→1559; week/day→month focuses today's card, "WED 27 · TODAY" centred).
+
 ## Prompt Log
 
 <details>
