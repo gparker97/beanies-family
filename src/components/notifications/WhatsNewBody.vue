@@ -7,9 +7,9 @@
  * the release from the notification's version and passes it here).
  */
 import { useRouter } from 'vue-router';
-import { useSettingsStore } from '@/stores/settingsStore';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useBeanieText } from '@/composables/useBeanieText';
 import { MARKETING_URL } from '@/utils/marketing';
 import { openExternal } from '@/utils/openExternal';
 import type { ReleaseNote } from '@/content/release-notes';
@@ -17,13 +17,9 @@ import type { ReleaseNote } from '@/content/release-notes';
 defineProps<{ release: ReleaseNote }>();
 
 const router = useRouter();
-const settingsStore = useSettingsStore();
 const store = useNotificationsStore();
 const { t } = useTranslation();
-
-function txt(val: { en: string; beanie: string }): string {
-  return settingsStore.beanieMode ? val.beanie : val.en;
-}
+const { txt } = useBeanieText();
 
 function handleTryIt(route: string) {
   store.close();
@@ -44,8 +40,16 @@ function handleSeeAll() {
       {{ release.month }}
     </div>
 
-    <!-- Feature entries -->
-    <div v-for="(feature, i) in release.features" :key="i" class="wn-feature-card">
+    <!-- Brief per-deploy note: just the message (no feature cards) -->
+    <p
+      v-if="release.summary && !release.features?.length"
+      class="text-secondary-500/75 text-[0.9375rem] leading-relaxed dark:text-gray-300"
+    >
+      {{ txt(release.summary) }}
+    </p>
+
+    <!-- Feature entries (curated releases) -->
+    <div v-for="(feature, i) in release.features ?? []" :key="i" class="wn-feature-card">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
           <div

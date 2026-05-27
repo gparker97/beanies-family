@@ -6,21 +6,27 @@
  */
 
 import type { HelpArticle, ArticleSection } from './types';
-import { getAllReleaseNotes, type ReleaseNote } from '@/content/release-notes';
+import { getAllReleaseNotes, isSpotlightRelease, type ReleaseNote } from '@/content/release-notes';
 
 function releaseNoteToArticle(note: ReleaseNote): HelpArticle {
   const sections: ArticleSection[] = [];
+  const features = note.features ?? [];
 
   // Opening paragraph — what changed and why it matters
   sections.push({
     type: 'paragraph',
-    content: `Here's what's new in beanies.family for <strong>${note.month}</strong> — features to help your family plan, track, and stay organised.`,
+    content: `Here's what's new in beanies.family for <strong>${note.month}</strong> — improvements to help your family plan, track, and stay organised.`,
   });
 
+  // Brief per-deploy note — the authored one-liner
+  if (note.summary) {
+    sections.push({ type: 'paragraph', content: note.summary.en });
+  }
+
   // Features
-  if (note.features.length > 0) {
+  if (features.length > 0) {
     sections.push({ type: 'heading', content: 'New features', level: 2, id: 'features' });
-    for (const f of note.features) {
+    for (const f of features) {
       sections.push({
         type: 'heading',
         content: f.title.en,
@@ -41,19 +47,28 @@ function releaseNoteToArticle(note: ReleaseNote): HelpArticle {
     });
   }
 
+  const excerpt = features.length
+    ? features
+        .slice(0, 3)
+        .map((f) => f.title.en)
+        .join(', ')
+    : (note.summary?.en ?? `Updates for ${note.month}`);
+
   return {
-    slug: note.version.replace('.', '-'), // '2026.03' → '2026-03'
+    slug: note.version.replace(/\./g, '-'), // '2026.03' → '2026-03', '2026.05.27' → '2026-05-27'
     category: 'whats-new',
     title: `What's New — ${note.month}`,
-    excerpt: note.features
-      .slice(0, 3)
-      .map((f) => f.title.en)
-      .join(', '),
-    icon: '\u{1F331}',
+    excerpt,
+    icon: '✨',
     readTime: 2,
     updatedDate: note.date,
     sections,
   };
 }
 
-export const WHATS_NEW_ARTICLES: HelpArticle[] = getAllReleaseNotes().map(releaseNoteToArticle);
+// Only the significant (spotlight) releases become standalone help articles —
+// the steady stream of brief per-deploy notes lives in the notification bell,
+// not as a "what's new" article each. Keeps this a curated highlights view.
+export const WHATS_NEW_ARTICLES: HelpArticle[] = getAllReleaseNotes()
+  .filter(isSpotlightRelease)
+  .map(releaseNoteToArticle);

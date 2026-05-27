@@ -8,30 +8,16 @@
  * Two separate actions: tapping the row body opens the detail (`select`);
  * tapping the right-edge pip toggles read/unread without opening (`toggle-read`).
  */
-import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
-import {
-  NOTIFICATION_KIND_PRESENTATION,
-  ACCENT_TINT_CLASS,
-  notificationTitle,
-  notificationSummary,
-  notificationWhen,
-  dutyRoleLabelKey,
-} from '@/components/notifications/notificationKinds';
+import { useNotificationPresentation } from '@/composables/useNotificationPresentation';
 import type { AppNotification } from '@/types/notifications';
 
 const props = defineProps<{ notification: AppNotification }>();
 const emit = defineEmits<{ select: [id: string]; 'toggle-read': [id: string] }>();
 
 const { t } = useTranslation();
-
-const presentation = computed(() => NOTIFICATION_KIND_PRESENTATION[props.notification.kind]);
-const tintClass = computed(() => ACCENT_TINT_CLASS[presentation.value.accent]);
-const title = computed(() => notificationTitle(props.notification, t));
-const summary = computed(() => notificationSummary(props.notification, t));
-const when = computed(() => notificationWhen(props.notification, t));
-const roleLabel = computed(() =>
-  props.notification.dutyRole ? t(dutyRoleLabelKey(props.notification.dutyRole)) : ''
+const { presentation, tintClass, title, summary, when, roleLabel } = useNotificationPresentation(
+  () => props.notification
 );
 </script>
 
