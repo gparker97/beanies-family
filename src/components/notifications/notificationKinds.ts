@@ -8,6 +8,7 @@
 import type { AppNotification, NotificationKind, KindPresentation } from '@/types/notifications';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { formatTime12, relativeDayLabel, timeAgo } from '@/utils/date';
+import { getReleaseNote, isSpotlightRelease } from '@/content/release-notes';
 import WhatsNewBody from '@/components/notifications/WhatsNewBody.vue';
 
 type T = (key: UIStringKey) => string;
@@ -74,4 +75,15 @@ export function notificationWhen(n: AppNotification, t: T): string {
 
 export function dutyRoleLabelKey(role: 'dropoff' | 'pickup'): UIStringKey {
   return role === 'dropoff' ? 'notifications.youDropoff' : 'notifications.youPickup';
+}
+
+/**
+ * Whether a notification gets the celebratory "gift card" row + hero detail —
+ * a spotlight (significant) what's-new. Minor what's-new notes stay a quiet flat
+ * row (the ✨ gradient chip) so the list never becomes a wall of gradient cards.
+ */
+export function isCelebratoryWhatsNew(n: AppNotification): boolean {
+  if (n.kind !== 'whats-new' || !n.sourceId) return false;
+  const rel = getReleaseNote(n.sourceId);
+  return rel ? isSpotlightRelease(rel) : false;
 }

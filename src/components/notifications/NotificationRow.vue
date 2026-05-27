@@ -36,7 +36,11 @@ const { presentation, tintClass, title, summary, when, roleLabel } = useNotifica
     >
       <span
         class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[13px] text-lg"
-        :class="tintClass"
+        :class="
+          notification.kind === 'whats-new'
+            ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br'
+            : tintClass
+        "
         aria-hidden="true"
       >
         {{ presentation.icon }}
