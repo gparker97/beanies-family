@@ -16,6 +16,17 @@
 import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
+  {
+    version: '2026.05.27',
+    date: '2026-05-27',
+    month: '27 may 2026',
+    spotlight: true,
+    summary: {
+      en: 'Notifications are here! The notifications bell in the header now gives you a timely reminder of what you need to do, when you need to do it - so you can be sure that nothing slips through the cracks',
+      beanie:
+        'notifications are here! the notifications bell in the header now gives you a timely reminder of what you need to do, when you need to do it - so you can be sure that nothing slips through the cracks',
+    },
+  },
   // Newest first. The deploy skill prepends new entries here, e.g.:
   // {
   //   version: '2026.05.27',
