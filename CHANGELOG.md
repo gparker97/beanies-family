@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - **Notifications — a bell that keeps track of what needs you.** A new notification bell joins the header (and the calendar's top bar on phones) with a soft Heritage Orange dot when something's unread. It gathers, in one place: **tasks coming due** (morning-of for all-day tasks, ~30 min before for timed ones, gently flagged when overdue), **tasks a family member assigns you**, **events you're part of** (going, dropping off, or picking up), and **What's new** updates (which now live in the bell instead of popping up over your screen). Each row is useful at a glance — the thing in bold, who · where with a chip for your drop-off / pick-up duty, and the real date and time. Tap a row to open it (and mark it read); tap the dot to toggle read/unread without opening; "Mark all read" clears everything. Your read-state syncs across your own devices via your family file. (In-app for now — push notifications are a later update.)
+- **Every update now leaves a note in the bell.** When the app updates ("fresh beans loaded"), a ✨ note tells you what we just shipped and why it helps — written in plain language, not a changelog dump. Big improvements gently open the bell so you don't miss them; small fixes just wait quietly with a dot.
 
 ### Changed
 

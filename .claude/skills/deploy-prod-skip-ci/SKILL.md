@@ -76,6 +76,34 @@ WEB: yes|no
 
 Record `VUE` and `WEB` flags. If both are `no`, report "no runtime changes since last deploy — nothing to ship" and stop.
 
+## Step 4b: Author the release note (only if `VUE: yes`)
+
+Every Vue-app deploy ships a brief, user-facing release note — it becomes the
+in-app `whats-new` notification (the bell) when clients update. **Follow
+`scripts/deploy/release-note-guide.md` in full**: judge significance, draft the
+message in greg's voice (no em-dashes; en + lowercase beanie), compute the
+`YYYY.MM.DD[.N]` version, and **propose it to greg for approval**.
+
+> **The one allowed pause.** This skill is otherwise no-pause, but greg has
+> explicitly asked to approve the wording before it ships. Present the drafted
+> note (✨, version, month, en + beanie lines, spotlight?, one-line rationale)
+> and wait for approval / edits before continuing.
+
+On approval, prepend the entry to `src/content/release-notes/deploys.ts` (Edit
+tool), then commit it on its own and push so it rides this deploy:
+```
+git add src/content/release-notes/deploys.ts
+```
+```
+git commit -m "docs(release): note <version> for prod deploy" -m "<the en summary>" -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+```
+git push
+```
+The pre-push hook runs `npm run test:run`; on failure, fix the root cause (never
+`--no-verify`) and re-push. Since the CI gate is skipped, Step 5 then deploys
+this commit directly. Skip this entire step if `VUE: no`.
+
 ## Step 5: Deploy (skip-CI gate)
 
 Fire each matching workflow, wait, list, watch. `skip_gate=true` only applies to `deploy.yml` — `deploy-web.yml` has no external CI gate by design.
@@ -118,6 +146,7 @@ Summarise:
 - Deployed commit SHA
 - Which workflows ran
 - Deploy durations (from `gh run view --json startedAt,updatedAt`)
+- The release note that shipped (if `VUE: yes`) — the `en` line + version
 - Production URL(s) — `https://app.beanies.family` (Vue) and/or `https://beanies.family` (Astro)
 
 **Note:** The CI and Security workflows still run in the background (triggered by the push). They are not awaited here, but if they fail, investigate on the next deploy cycle.
@@ -129,7 +158,8 @@ Summarise:
 - **Never use `--no-verify` or `--force`** on any git command.
 - **Never amend published commits** — always create new fix commits.
 - **Never inline `$(...)` / `$?` / `;` / `&&` / heredocs** in Bash commands run through the tool — they trigger permission prompts. If you need compound logic, add a script under `scripts/deploy/` and invoke it.
-- **Stop and ask the user only** if there is an unrecoverable failure after 3 fix attempts, or something truly unexpected (merge conflicts, unknown infrastructure failures).
+- **Stop and ask the user only** if there is an unrecoverable failure after 3 fix attempts, or something truly unexpected (merge conflicts, unknown infrastructure failures) — **plus the one deliberate pause in Step 4b** to get greg's approval of the release-note wording before it ships.
+- **Release note on every Vue deploy.** When `VUE: yes`, author + ship a release note per `scripts/deploy/release-note-guide.md` (Step 4b). The deploy emoji is always ✨.
 - The Vue deploy workflow name is exactly `deploy.yml` (display name: "Deploy beanies PROD").
 - The Astro deploy workflow name is exactly `deploy-web.yml`.
 - The `skip_gate` flag only bypasses the CI/Security wait — the build and S3 deploy still run normally.

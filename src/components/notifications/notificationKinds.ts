@@ -16,7 +16,7 @@ export const NOTIFICATION_KIND_PRESENTATION: Record<NotificationKind, KindPresen
   'todo-due': { accent: 'todo', icon: '✅' },
   'todo-assigned': { accent: 'assigned', icon: '📌' },
   'activity-reminder': { accent: 'activity', icon: '📅' },
-  'whats-new': { accent: 'whats-new', icon: '🌱', detailBody: WhatsNewBody },
+  'whats-new': { accent: 'whats-new', icon: '✨', detailBody: WhatsNewBody },
 };
 
 /** Tinted lead-icon background per accent (Nook-UI tints). */
