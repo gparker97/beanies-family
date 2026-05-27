@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-27",
-    "translationCount": 2955
+    "translationCount": 2956
   },
   "translations": {
     "app.name": {
@@ -14779,6 +14779,11 @@
     "notifications.youPickup": {
       "translation": "由您负责接",
       "hash": "hvmogl",
+      "lastUpdated": "2026-05-27"
+    },
+    "whatsNew.updateCount": {
+      "translation": "{n}个更新",
+      "hash": "bx8gcs",
       "lastUpdated": "2026-05-27"
     }
   }

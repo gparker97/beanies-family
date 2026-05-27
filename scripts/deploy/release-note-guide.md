@@ -34,26 +34,40 @@ diff, and the top of `CHANGELOG.md` (the granular record for this deploy).
   notable fix users felt, a privacy/security-relevant change. → a clear,
   benefit-led message and `spotlight: true` (auto-opens the drawer once).
 
-## 2. Write the message (in greg's voice)
+## 2. Write the note (in greg's voice)
 
-Two variants, both required:
+Every visible string needs both an `en` (sentence case, warm and plain) and a
+`beanie` variant (the same line, all lowercase — usually just the lowercased
+`en`).
 
-- `en` — sentence case, warm and plain.
-- `beanie` — the same line, all lowercase (the cosmetic overlay; usually just
-  the lowercased `en`).
+**Shape — the general rule:**
+
+- **Significant note** = a one-line `summary` (the at-a-glance bell row) **plus
+  `features`**: one **headline + detail** block per new thing.
+  - `summary` — a short, punchy one-liner ("Notifications are here!").
+  - each `features[]` entry — a `title` (the **short bold headline**, what the
+    new thing is) and a `description` (a **concise sentence on what it is and why
+    it helps the family**). Optional `icon` (a lead emoji, shown for a
+    single-feature note) and `tryItRoute` (a "try it →" deep-link).
+  - **List several blocks for a multi-feature deploy** — the body renders them as
+    a clean "beanstalk" list; a single block renders as one centred headline +
+    reason. This is the same renderer either way.
+- **Minor note** = `summary` only (no `features`, `spotlight` omitted — badge
+  only, never auto-opens). Default line:
+  - `en`: `Minor bug fixes and improvements.`
+  - `beanie`: `minor bug fixes and improvements.`
 
 Rules:
 
-- **No em-dashes.** Use hyphens (`-`). (greg's voice; em-dash reads as an AI tell.)
-- **Concise** — one or two sentences. The row shows it at a glance.
-- **Significant notes lead with the benefit / the _why_** — how it helps the
-  family, not the implementation. ("See everyone's day side by side, so nobody's
-  lesson gets missed.") Not: "Refactored the calendar grid component."
-- **Minor notes** use a generic line. Default:
-  - `en`: `Minor bug fixes and improvements.`
-  - `beanie`: `minor bug fixes and improvements.`
+- **No em-dashes.** Use hyphens (`-`) or a colon. (greg's voice; em-dash reads as
+  an AI tell.)
+- **Concise.** The `title` is a few words; the `description` is one or two
+  sentences. The `summary` is one short line.
+- **Lead with the benefit / the _why_** — how it helps the family, not the
+  implementation. ("See everyone's day side by side, so nobody's lesson gets
+  missed.") Not: "Refactored the calendar grid component."
 - **PUBLIC + safe.** The repo is public and this ships in the JS bundle, so the
-  message is effectively public. NEVER name security-fix specifics or internals.
+  text is effectively public. NEVER name security-fix specifics or internals.
   A security deploy gets a generic line (e.g. `Security and privacy
 improvements.`); the real detail stays in commits / `CHANGELOG.md`.
 
@@ -70,13 +84,14 @@ improvements.`); the real detail stays in commits / `CHANGELOG.md`.
 ## 4. Propose to greg, then add the entry
 
 1. **Present the drafted note for approval** — this is the ONE allowed pause in
-   the auto skill. Show: emoji ✨, version, `month`, the `en` line, the `beanie`
-   line, whether it is `spotlight`, and a one-line significance rationale. Wait
-   for greg's approval or edits. (The deploy emoji is always ✨ — set on the
-   `whats-new` notification kind, not per entry, so it is not a field here.)
+   the auto skill. Show: emoji ✨, version, `month`, the `summary` line, each
+   feature's `title` + `description` (both `en` and `beanie`), whether it is
+   `spotlight`, and a one-line significance rationale. Wait for greg's approval or
+   edits. (The deploy emoji is always ✨ — set on the `whats-new` notification
+   kind, not per entry, so it is not a field here.)
 2. On approval, **prepend** the entry to the `DEPLOY_NOTES` array in
    `src/content/release-notes/deploys.ts` (use the Edit tool; do not hand-munge
-   via shell). A minor entry:
+   via shell). A minor entry (summary only):
 
    ```ts
    {
@@ -90,9 +105,33 @@ improvements.`); the real detail stays in commits / `CHANGELOG.md`.
    },
    ```
 
-   A significant entry adds `spotlight: true` and a benefit-led `summary`.
-   (Reserve rich `features` cards for big curated releases authored in their own
-   `YYYY-MM.ts` file — most deploys only need a `summary`.)
+   A significant entry adds `spotlight: true`, a one-line `summary`, and a
+   `features` block per new thing (headline + detail):
+
+   ```ts
+   {
+     version: '2026.05.27',
+     date: '2026-05-27',
+     month: '27 may 2026',
+     spotlight: true,
+     summary: { en: 'A short, warm one-liner.', beanie: 'a short, warm one-liner.' },
+     features: [
+       {
+         title: { en: 'Short bold headline', beanie: 'short bold headline' },
+         description: {
+           en: 'A concise sentence on what it is and why it helps the family.',
+           beanie: 'a concise sentence on what it is and why it helps the family.',
+         },
+         // icon: '✨',          // optional lead emoji (single-feature note)
+         // tryItRoute: '/path', // optional "try it →" deep-link
+       },
+       // ...one block per additional new thing
+     ],
+   },
+   ```
+
+   (The bigger curated monthly releases live in their own `YYYY-MM.ts` file and
+   also add a `fixes` list — the per-deploy stream rarely needs that.)
 
 3. **Commit the note on its own** (it must be in the deployed commit):
 

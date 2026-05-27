@@ -5770,6 +5770,7 @@ const STRING_DEFS = {
   'whatsNew.seeAll': { en: 'See All Release Notes', beanie: 'see all release notes' },
   'whatsNew.alsoFixed': { en: 'Also Fixed', beanie: 'also fixed' },
   'whatsNew.tryIt': { en: 'Try It', beanie: 'try it' },
+  'whatsNew.updateCount': { en: '{n} updates', beanie: '{n} updates' },
 
   // In-app notifications (the header bell + drawer)
   'notifications.title': { en: 'Notifications', beanie: 'notifications' },
