@@ -11,6 +11,7 @@ import { usePwaUpdater, PWA_POST_UPDATE_ROUTE_KEY } from '@/composables/usePwaUp
 import { installNativeAuthListener } from '@/services/google/googleAuth';
 import { isNative } from '@/services/sync/capabilities';
 import { useLocalNotifications } from '@/composables/useLocalNotifications';
+import { useNotifications } from '@/composables/useNotifications';
 import { useNativeShell } from '@/composables/useNativeShell';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
@@ -21,7 +22,7 @@ import QuickAddSheet from '@/components/common/QuickAddSheet.vue';
 import RecurringEditScopeModal from '@/components/ui/RecurringEditScopeModal.vue';
 import TrustDeviceModal from '@/components/common/TrustDeviceModal.vue';
 import PasskeyPromptModal from '@/components/common/PasskeyPromptModal.vue';
-import WhatsNewModal from '@/components/common/WhatsNewModal.vue';
+import NotificationsDrawer from '@/components/notifications/NotificationsDrawer.vue';
 import PwaReinstallModal from '@/components/common/PwaReinstallModal.vue';
 import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
@@ -1111,6 +1112,10 @@ installNativeAuthListener((returnPath) => {
 // No-op on web. See ADR-029.
 useLocalNotifications();
 
+// In-app notifications: poll tick, app-badge sync, What's-New migration,
+// auto-open on login. Owns no business state — see useNotifications.
+useNotifications();
+
 // Native shell: hide the splash, set the status-bar style, and wire the Android
 // hardware back button (cooperates with the existing overlay-close mechanism).
 // No-op on web. See ADR-029.
@@ -1593,7 +1598,7 @@ watch(
       @enable="handleEnablePasskey"
       @decline="handleDeclinePasskey"
     />
-    <WhatsNewModal />
+    <NotificationsDrawer />
     <PwaReinstallModal />
 
     <div v-if="showLayout" class="flex h-screen overflow-hidden">

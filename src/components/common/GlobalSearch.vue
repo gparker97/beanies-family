@@ -14,6 +14,7 @@ import { getActivityCategoryById } from '@/constants/activityCategories';
 import { tripTypeEmoji } from '@/utils/vacation';
 import { formatDateShort } from '@/utils/date';
 import { getTransactionVisual } from '@/utils/transactionLabel';
+import { entityDeepLink } from '@/utils/entityDeepLink';
 
 type ResultType =
   | 'activity'
@@ -244,32 +245,8 @@ const groupedResults = computed(() => {
 
 function selectResult(result: SearchResult) {
   emit('close');
-  switch (result.type) {
-    case 'activity':
-      router.push({ path: '/activities', query: { activity: result.id } });
-      break;
-    case 'vacation':
-      router.push({ path: '/travel', query: { vacation: result.id } });
-      break;
-    case 'todo':
-      router.push({ path: '/todo', query: { view: result.id } });
-      break;
-    case 'account':
-      router.push({ path: '/accounts', query: { view: result.id } });
-      break;
-    case 'transaction':
-      router.push({ path: '/transactions', query: { view: result.id } });
-      break;
-    case 'goal':
-      router.push({ path: '/goals', query: { view: result.id } });
-      break;
-    case 'asset':
-      router.push({ path: '/assets', query: { view: result.id } });
-      break;
-    case 'member':
-      router.push({ path: '/family', query: { edit: result.id } });
-      break;
-  }
+  // Path/query map shared with notification "Open" — see utils/entityDeepLink.
+  router.push(entityDeepLink(result.type, result.id));
 }
 
 const resultCount = computed(() => results.value.length);

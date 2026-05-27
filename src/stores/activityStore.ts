@@ -315,6 +315,21 @@ export const useActivityStore = defineStore('activities', () => {
   }
 
   /**
+   * All occurrences for a month over the UNFILTERED `activeActivities` source
+   * (same source as `activitiesForDate`) — so drop-off/pick-up duty-only
+   * occurrences are never dropped by the global member filter. Used by the
+   * notification deriver's month-bucketed window pass; do NOT use the
+   * member-filtered `monthActivities` there.
+   */
+  function activeActivitiesForMonth(year: number, month: number) {
+    const all: { activity: FamilyActivity; date: string }[] = [];
+    for (const a of activeActivities.value) {
+      all.push(...expandRecurring(a, year, month));
+    }
+    return all;
+  }
+
+  /**
    * Get upcoming activities from today, limited to `limit` items.
    * Excludes vacation-linked activities (they appear as sidebar cards instead).
    *
@@ -567,6 +582,7 @@ export const useActivityStore = defineStore('activities', () => {
     upcomingActivities,
     // Methods
     monthActivities,
+    activeActivitiesForMonth,
     activitiesForDate,
     // Actions
     loadActivities,
