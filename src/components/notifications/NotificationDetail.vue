@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * Notification detail view. Renders the per-kind `detailBody` from the table
- * (whats-new → WhatsNewBody) or a default meta card — no per-kind `v-if` ladder.
- * `Open` is the SOLE prominent primary action; `Mark unread` is a quiet text
- * link beneath it (read/unread is primarily a row-level toggle now, so the two
- * never compete).
+ * Notification detail view. For whats-new it hands the WHOLE detail area to
+ * `WhatsNewBody` (a full celebratory hero + content + footer that manages its
+ * own layout — no meta card, no Open/mark-unread). For task/activity kinds it
+ * renders the default meta card with `Open` as the sole prominent primary and a
+ * quiet `Mark unread` link beneath (read/unread is primarily a row-level toggle).
  */
 import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
@@ -32,10 +32,12 @@ function handleMarkUnread() {
 </script>
 
 <template>
-  <div class="space-y-5">
-    <!-- Custom per-kind body (whats-new) — or the default meta card -->
-    <component :is="presentation.detailBody" v-if="hasRichBody" :release="release" />
-    <div v-else class="flex items-start gap-3">
+  <!-- whats-new: the full celebratory layout (manages its own hero + footer) -->
+  <component :is="presentation.detailBody" v-if="hasRichBody" :release="release" />
+
+  <!-- every other kind: meta card + actions -->
+  <div v-else class="space-y-5">
+    <div class="flex items-start gap-3">
       <span
         class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[16px] text-2xl"
         :class="tintClass"
