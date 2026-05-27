@@ -19,7 +19,9 @@ import { computed, toRef } from 'vue';
 import BaseSidePanel from '@/components/ui/BaseSidePanel.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import NotificationRow from '@/components/notifications/NotificationRow.vue';
+import WhatsNewGiftCard from '@/components/notifications/WhatsNewGiftCard.vue';
 import NotificationDetail from '@/components/notifications/NotificationDetail.vue';
+import { isCelebratoryWhatsNew } from '@/components/notifications/notificationKinds';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useBackGestureClose } from '@/composables/useBackGestureClose';
@@ -50,6 +52,13 @@ const groups = computed(() => {
 
 const isEmpty = computed(() => store.notifications.length === 0);
 
+/** Detail header title — whats-new reads "what's new" (the hero carries the date). */
+const detailTitle = computed(() => {
+  const n = store.selected;
+  if (!n) return t('notifications.title');
+  return n.kind === 'whats-new' ? t('notifications.kindWhatsNew') : n.title;
+});
+
 /** Row pip → flip read-state without opening the detail. */
 function onToggleRead(id: string) {
   const n = store.notifications.find((x) => x.id === id);
@@ -75,7 +84,7 @@ function onToggleRead(id: string) {
         <h2
           class="font-outfit text-secondary-500 truncate text-lg font-semibold dark:text-gray-100"
         >
-          {{ store.selected?.title ?? t('notifications.title') }}
+          {{ detailTitle }}
         </h2>
       </div>
       <div v-else class="flex min-w-0 flex-1 items-center justify-between gap-2 pr-2">
@@ -124,13 +133,21 @@ function onToggleRead(id: string) {
           >
             {{ group.label }}
           </div>
-          <NotificationRow
-            v-for="n in group.items"
-            :key="n.id"
-            :notification="n"
-            @select="store.openTo($event)"
-            @toggle-read="onToggleRead"
-          />
+          <template v-for="n in group.items" :key="n.id">
+            <!-- spotlight what's-new → the celebratory gift card; everything else → a row -->
+            <WhatsNewGiftCard
+              v-if="isCelebratoryWhatsNew(n)"
+              :notification="n"
+              @select="store.openTo($event)"
+              @toggle-read="onToggleRead"
+            />
+            <NotificationRow
+              v-else
+              :notification="n"
+              @select="store.openTo($event)"
+              @toggle-read="onToggleRead"
+            />
+          </template>
         </div>
       </div>
     </template>

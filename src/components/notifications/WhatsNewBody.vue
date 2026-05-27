@@ -1,10 +1,18 @@
 <script setup lang="ts">
 /**
- * Rich "what's new" release content — feature cards, "try it →", "also fixed",
- * signature. Extracted VERBATIM from the retired `WhatsNewModal` body (styles +
- * the `txt()` beanie/en switch included) so nothing is lost; it now renders
- * inside the notifications drawer's detail view (`NotificationDetail` resolves
- * the release from the notification's version and passes it here).
+ * The celebratory "what's new" detail. Every other notification detail is a
+ * utilitarian card; this one is a CELEBRATION — a gradient hero with the
+ * celebrating beanies + sparkles, the white body emerging beneath, the Pod, and
+ * greg's handwritten sign-off. Renders inside `NotificationDetail` for whats-new
+ * (which hands it the whole detail area).
+ *
+ * Handles BOTH shapes: a brief per-deploy note shows its `summary` message; a
+ * curated release shows `features` cards (+ "also fixed"). Same hero + footer.
+ *
+ * Layout note: it breaks out of `BaseSidePanel`'s `p-6` body via `-mx-6 -my-6`
+ * (the house pattern, cf. BeanieFormModal) so the hero is full-bleed; the
+ * `min-h-[calc(100%+3rem)]` reclaims that 3rem so the column fills the panel and
+ * the footer pins to the bottom.
  */
 import { useRouter } from 'vue-router';
 import { useNotificationsStore } from '@/stores/notificationsStore';
@@ -14,12 +22,14 @@ import { MARKETING_URL } from '@/utils/marketing';
 import { openExternal } from '@/utils/openExternal';
 import type { ReleaseNote } from '@/content/release-notes';
 
-defineProps<{ release: ReleaseNote }>();
+const props = defineProps<{ release: ReleaseNote }>();
 
 const router = useRouter();
 const store = useNotificationsStore();
 const { t } = useTranslation();
 const { txt } = useBeanieText();
+
+const isBrief = !props.release.features?.length;
 
 function handleTryIt(route: string) {
   store.close();
@@ -32,124 +42,275 @@ function handleSeeAll() {
 </script>
 
 <template>
-  <div>
-    <!-- Version label -->
-    <div
-      class="font-outfit mb-5 text-xs font-semibold tracking-[0.08em] text-gray-400/45 dark:text-gray-500/50"
-    >
-      {{ release.month }}
-    </div>
-
-    <!-- Brief per-deploy note: just the message (no feature cards) -->
-    <p
-      v-if="release.summary && !release.features?.length"
-      class="text-secondary-500/75 text-[0.9375rem] leading-relaxed dark:text-gray-300"
-    >
-      {{ txt(release.summary) }}
-    </p>
-
-    <!-- Feature entries (curated releases) -->
-    <div v-for="(feature, i) in release.features ?? []" :key="i" class="wn-feature-card">
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0 flex-1">
-          <div
-            class="font-outfit text-secondary-500 mb-1 text-sm font-semibold tracking-[0.02em] dark:text-gray-200"
-          >
-            {{ txt(feature.title) }}
-          </div>
-          <div class="text-secondary-500/55 text-[0.8125rem] leading-relaxed dark:text-gray-400/80">
-            {{ txt(feature.description) }}
-          </div>
-        </div>
-        <button
-          v-if="feature.tryItRoute"
-          class="wn-tryit"
-          @click="handleTryIt(feature.tryItRoute!)"
-        >
-          {{ t('whatsNew.tryIt') }}
-          <span class="wn-tryit-arrow">→</span>
-        </button>
+  <div class="wn-detail -mx-6 -my-6 flex min-h-[calc(100%+3rem)] flex-col">
+    <!-- ===== HERO ===== -->
+    <div class="wn-hero">
+      <span class="hspark a" aria-hidden="true">✦</span>
+      <span class="hspark b" aria-hidden="true">✨</span>
+      <span class="hspark c" aria-hidden="true">✦</span>
+      <div class="wn-medallion">
+        <img src="/brand/beanies_celebrating_circle_transparent_400x400.png" alt="" />
       </div>
+      <div class="wn-kick">✨ {{ t('notifications.kindWhatsNew') }}</div>
+      <div class="wn-datepill">{{ release.month }}</div>
     </div>
 
-    <!-- Fixes -->
-    <template v-if="release.fixes?.length">
-      <hr class="border-secondary-500/10 my-5 border-t border-dashed dark:border-white/6" />
-      <div
-        class="font-outfit mb-2.5 text-xs font-semibold tracking-[0.06em] text-gray-400/40 dark:text-gray-500/45"
-      >
-        {{ t('whatsNew.alsoFixed') }}
+    <!-- ===== CONTENT ===== -->
+    <div class="wn-content">
+      <div class="wn-region" :class="{ 'wn-region-center': isBrief }">
+        <!-- brief per-deploy note: just the message -->
+        <p v-if="isBrief && release.summary" class="wn-message">
+          {{ txt(release.summary) }}
+        </p>
+
+        <!-- curated release: feature cards (+ also fixed) -->
+        <template v-else>
+          <div v-for="(feature, i) in release.features ?? []" :key="i" class="wn-feature-card">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0 flex-1">
+                <div class="wn-feat-title">{{ txt(feature.title) }}</div>
+                <div class="wn-feat-desc">{{ txt(feature.description) }}</div>
+              </div>
+              <button
+                v-if="feature.tryItRoute"
+                class="wn-tryit"
+                @click="handleTryIt(feature.tryItRoute!)"
+              >
+                {{ t('whatsNew.tryIt') }}<span class="wn-tryit-arrow">→</span>
+              </button>
+            </div>
+          </div>
+
+          <template v-if="release.fixes?.length">
+            <div class="wn-fixes-label">{{ t('whatsNew.alsoFixed') }}</div>
+            <ul class="wn-fixes">
+              <li v-for="(fix, i) in release.fixes" :key="i">{{ txt(fix.text) }}</li>
+            </ul>
+          </template>
+        </template>
       </div>
-      <ul class="flex flex-col gap-1.5">
-        <li
-          v-for="(fix, i) in release.fixes"
-          :key="i"
-          class="text-secondary-500/45 relative pl-4 text-xs dark:text-gray-400/50"
-        >
-          <span class="absolute left-1 text-base leading-none font-extrabold">·</span>
-          {{ txt(fix.text) }}
-        </li>
-      </ul>
-    </template>
 
-    <!-- Signature -->
-    <div class="font-outfit mt-5 text-right text-xs text-gray-400/45 italic dark:text-gray-500/35">
-      {{ release.signature ?? '— greg, head beanie developer 🫘' }}
+      <!-- The Pod (slate · terracotta · orange · sky — never reordered) -->
+      <div class="wn-pod" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="wn-sign">{{ release.signature ?? '— greg, head beanie developer 🫘' }}</div>
     </div>
 
-    <!-- See all release notes -->
-    <div class="mt-4 text-center">
-      <button
-        class="hover:text-primary-500 dark:hover:text-primary-400 text-[0.8125rem] text-gray-400/60 transition-all dark:text-gray-500/50"
-        @click="handleSeeAll"
-      >
-        {{ t('whatsNew.seeAll') }}
-      </button>
+    <!-- ===== FOOTER ===== -->
+    <div class="wn-foot">
+      <button class="wn-seeall" @click="handleSeeAll">{{ t('whatsNew.seeAll') }} →</button>
+      <div class="wn-tagline">{{ t('app.tagline') }}</div>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* ===== HERO ===== */
+.wn-hero {
+  background:
+    radial-gradient(130% 100% at 15% 0%, rgb(255 255 255 / 28%), transparent 55%),
+    linear-gradient(135deg, #f15d22 0%, #e67e22 100%);
+  flex-shrink: 0;
+  overflow: hidden;
+  padding: 1.75rem 1.5rem 2.75rem;
+  position: relative;
+  text-align: center;
+}
+
+.wn-medallion {
+  background: radial-gradient(circle, rgb(255 255 255 / 95%), rgb(255 255 255 / 72%));
+  border-radius: 50%;
+  box-shadow: 0 10px 30px -8px rgb(44 62 80 / 35%);
+  display: grid;
+  height: 7rem;
+  margin: 0.25rem auto 0.875rem;
+  place-items: center;
+  width: 7rem;
+}
+
+.wn-medallion img {
+  height: 5.5rem;
+  object-fit: contain;
+  width: 5.5rem;
+}
+
+.wn-kick {
+  color: rgb(255 255 255 / 95%);
+  font-family: Outfit, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.wn-datepill {
+  background: rgb(255 255 255 / 22%);
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 999px;
+  color: #fff;
+  display: inline-block;
+  font-family: Outfit, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  padding: 0.25rem 0.75rem;
+}
+
+/* sparkles — decorative, motion-safe */
+.hspark {
+  color: #fff;
+  pointer-events: none;
+  position: absolute;
+}
+
+.hspark.a {
+  font-size: 0.8125rem;
+  left: 1.9rem;
+  top: 1.4rem;
+}
+
+.hspark.b {
+  font-size: 1.125rem;
+  right: 2.1rem;
+  top: 3.4rem;
+}
+
+.hspark.c {
+  font-size: 0.625rem;
+  left: 2.9rem;
+  top: 7.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hspark {
+    animation: wn-twinkle 2.6s ease-in-out infinite;
+  }
+
+  .hspark.b {
+    animation-delay: 0.6s;
+  }
+
+  .hspark.c {
+    animation-delay: 1.2s;
+  }
+
+  .wn-medallion {
+    animation: wn-floaty 4s ease-in-out infinite;
+  }
+}
+
+@keyframes wn-twinkle {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes wn-floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-0.375rem);
+  }
+}
+
+/* ===== CONTENT — white body emerges over the hero ===== */
+.wn-content {
+  background: #fff;
+  border-radius: 1.625rem 1.625rem 0 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  margin-top: -1.5rem;
+  padding: 1.625rem 1.5rem 1.25rem;
+  position: relative;
+  z-index: 2;
+}
+
+:global(.dark) .wn-content {
+  background: #1e293b;
+}
+
+.wn-region {
+  flex: 1;
+}
+
+.wn-region-center {
+  display: grid;
+  place-items: center;
+}
+
+.wn-message {
+  color: #2c3e50;
+  font-family: Inter, sans-serif;
+  font-size: 0.9375rem;
+  line-height: 1.62;
+  margin: 0 0.25rem;
+  text-align: center;
+}
+
+:global(.dark) .wn-message {
+  color: #e2e8f0;
+}
+
+/* feature cards (curated releases) */
 .wn-feature-card {
   background: var(--cloud-white, #f8f9fa);
-  border-radius: 16px;
-  margin-bottom: 16px;
-  padding: 14px 16px;
-  transition: background 0.15s;
-}
-
-.wn-feature-card:hover {
-  background: #f0f2f4;
-}
-
-.wn-feature-card:last-of-type {
-  margin-bottom: 0;
+  border-radius: 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0.875rem 1rem;
 }
 
 :global(.dark) .wn-feature-card {
   background: rgb(255 255 255 / 4%);
 }
 
-:global(.dark) .wn-feature-card:hover {
-  background: rgb(255 255 255 / 7%);
+.wn-feat-title {
+  color: #2c3e50;
+  font-family: Outfit, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.25rem;
+}
+
+:global(.dark) .wn-feat-title {
+  color: #e2e8f0;
+}
+
+.wn-feat-desc {
+  color: rgb(44 62 80 / 55%);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+:global(.dark) .wn-feat-desc {
+  color: rgb(226 232 240 / 70%);
 }
 
 .wn-tryit {
   align-items: center;
+  align-self: center;
   background: var(--tint-orange-8, rgb(241 93 34 / 8%));
   border: none;
-  border-radius: 10px;
-  color: var(--heritage-orange, #f15d22);
+  border-radius: 0.625rem;
+  color: #f15d22;
   cursor: pointer;
   display: inline-flex;
   flex-shrink: 0;
   font-family: Outfit, sans-serif;
   font-size: 0.75rem;
   font-weight: 600;
-  gap: 5px;
-  margin-top: 2px;
-  padding: 6px 12px;
-  transition: all 0.15s;
+  gap: 0.3125rem;
+  padding: 0.375rem 0.6875rem;
   white-space: nowrap;
 }
 
@@ -159,20 +320,125 @@ function handleSeeAll() {
 
 .wn-tryit-arrow {
   /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative arrow glyph paired with adjacent button text */
-  font-size: 14px;
-  transition: transform 0.15s;
+  font-size: 0.875rem;
 }
 
-.wn-tryit:hover .wn-tryit-arrow {
-  transform: translateX(2px);
+.wn-fixes-label {
+  color: rgb(44 62 80 / 40%);
+  font-family: Outfit, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  margin: 0.75rem 0 0.5rem;
 }
 
-:global(.dark) .wn-tryit {
-  background: rgb(241 93 34 / 10%);
+.wn-fixes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin: 0;
+  padding-left: 1rem;
+}
+
+.wn-fixes li {
+  color: rgb(44 62 80 / 50%);
+  font-size: 0.75rem;
+}
+
+:global(.dark) .wn-fixes li {
+  color: rgb(226 232 240 / 55%);
+}
+
+/* The Pod divider */
+.wn-pod {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.4375rem;
+  justify-content: center;
+  margin: 1.375rem 0 1.125rem;
+}
+
+.wn-pod i {
+  border-radius: 50% 50% 48% 48%;
+  height: 0.6875rem;
+  width: 0.5625rem;
+}
+
+.wn-pod i:nth-child(1) {
+  background: #2c3e50;
+}
+
+.wn-pod i:nth-child(2) {
+  background: #e67e22;
+}
+
+.wn-pod i:nth-child(3) {
+  background: #f15d22;
+}
+
+.wn-pod i:nth-child(4) {
+  background: #aed6f1;
+}
+
+.wn-sign {
+  color: #5d6d7e;
+  flex-shrink: 0;
+  font-family: Caveat, Outfit, cursive;
+  font-size: 1.3125rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+:global(.dark) .wn-sign {
+  color: #94a3b8;
+}
+
+/* ===== FOOTER ===== */
+.wn-foot {
+  background: #fff;
+  border-top: 1px solid #ecf0f2;
+  flex-shrink: 0;
+  padding: 0.875rem 1.5rem 1.5rem;
+  text-align: center;
+}
+
+:global(.dark) .wn-foot {
+  background: #1e293b;
+  border-top-color: rgb(255 255 255 / 8%);
+}
+
+.wn-seeall {
+  background: #fff;
+  border: 1.5px solid rgb(241 93 34 / 25%);
+  border-radius: 0.875rem;
   color: #f15d22;
+  cursor: pointer;
+  font-family: Outfit, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  padding: 0.6875rem 1.125rem;
+  transition: background 0.15s;
+  width: 100%;
 }
 
-:global(.dark) .wn-tryit:hover {
-  background: rgb(241 93 34 / 18%);
+.wn-seeall:hover {
+  background: var(--tint-orange-8, rgb(241 93 34 / 8%));
+}
+
+:global(.dark) .wn-seeall {
+  background: transparent;
+}
+
+.wn-tagline {
+  color: rgb(44 62 80 / 30%);
+  font-family: Outfit, sans-serif;
+  font-size: 0.625rem;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  margin-top: 0.6875rem;
+}
+
+:global(.dark) .wn-tagline {
+  color: rgb(226 232 240 / 30%);
 }
 </style>
