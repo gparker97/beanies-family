@@ -585,7 +585,7 @@ function onStripDayClick(dateStr: string) {
 <template>
   <div
     ref="swipeRef"
-    class="rounded-3xl bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
+    class="rounded-3xl bg-white p-5 pt-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
     style="touch-action: pan-y; will-change: transform"
   >
     <!-- 2-week date navigator — MOBILE ONLY. Desktop already shows the

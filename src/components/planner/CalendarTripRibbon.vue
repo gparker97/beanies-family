@@ -25,6 +25,17 @@ import { tripTypeEmoji, daysUntilTrip, tripCountdownKey, isValidISODate } from '
 import { extractDatePart } from '@/utils/date';
 import type { FamilyVacation } from '@/types/models';
 
+defineProps<{
+  /**
+   * Compact single-chip mode for the planner command bar's controls row (mobile
+   * reclaim). Renders just a tappable "✈️ {countdown} ›" chip for the soonest
+   * trip (tap → open it on /travel, where the rest are reachable) instead of the
+   * summary-pill / labelled-row layouts. Independent of the breakpoint so it
+   * works wherever the command bar places it.
+   */
+  inline?: boolean;
+}>();
+
 const emit = defineEmits<{ 'vacation-click': [id: string] }>();
 
 const { t } = useTranslation();
@@ -119,9 +130,30 @@ const toggleAria = computed(() =>
 
 <template>
   <div v-if="hasTrips" class="font-inter">
+    <!-- Inline chip (planner command-bar controls row): the soonest trip's
+         countdown as a single tappable chip; tap opens it on /travel. -->
+    <button
+      v-if="inline"
+      type="button"
+      class="flex flex-shrink-0 items-center gap-1.5 rounded-full border border-[var(--vacation-teal-15)] py-1.5 pr-2 pl-2.5 transition-colors hover:border-[var(--vacation-teal)] dark:border-slate-600"
+      style="background: linear-gradient(135deg, rgb(0 180 216 / 6%), rgb(255 217 61 / 5%))"
+      :aria-label="
+        soonest ? `${soonest.name}, ${soonest.ariaCountdown}` : t('planner.tripRibbonShow')
+      "
+      @click="soonest && emit('vacation-click', soonest.id)"
+    >
+      <span aria-hidden="true" class="text-sm leading-none">✈️</span>
+      <span
+        v-if="soonest"
+        class="font-outfit text-secondary-500 text-xs font-bold dark:text-gray-100"
+        >{{ soonest.countdownText }}</span
+      >
+      <span aria-hidden="true" class="text-xs font-bold text-[var(--vacation-teal)]">&rsaquo;</span>
+    </button>
+
     <!-- Mobile, collapsed: a single tappable summary pill -->
     <button
-      v-if="isMobile && !mobileExpanded"
+      v-else-if="isMobile && !mobileExpanded"
       type="button"
       class="flex w-full items-center gap-2 rounded-full border border-[var(--vacation-teal-15)] px-3 py-2 text-left transition-colors hover:border-[var(--vacation-teal)] dark:border-slate-600"
       style="background: linear-gradient(135deg, rgb(0 180 216 / 6%), rgb(255 217 61 / 5%))"

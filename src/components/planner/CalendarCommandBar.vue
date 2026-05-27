@@ -17,8 +17,11 @@ import ViewToggle from '@/components/planner/ViewToggle.vue';
 import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
 import MemberFilterMobileMenu from '@/components/planner/MemberFilterMobileMenu.vue';
 import CalendarTripRibbon from '@/components/planner/CalendarTripRibbon.vue';
+import HamburgerButton from '@/components/common/HamburgerButton.vue';
+import SearchButton from '@/components/common/SearchButton.vue';
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useMobileMenu, useHeaderReclaimed } from '@/composables/useMobileMenu';
 import type { PlannerView } from '@/composables/usePlannerNavigation';
 
 defineProps<{
@@ -44,6 +47,13 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 
+// On the mobile/tablet planner, the global AppHeader is hidden (App.vue) and
+// this bar IS the top bar — so it hosts its own hamburger (opens the same
+// MobileHamburgerMenu) and search. `headerReclaimed` is the single shared
+// predicate (see useMobileMenu) so App.vue and this bar can't disagree.
+const { toggle: toggleMenu } = useMobileMenu();
+const headerReclaimed = useHeaderReclaimed();
+
 // Publish this bar's rendered height as a CSS var so the views can dock their
 // own column headers (weekday row / member row) right beneath it via
 // `sticky; top: var(--planner-cmdbar-h)`. A ResizeObserver keeps it correct as
@@ -54,10 +64,16 @@ let ro: ResizeObserver | null = null;
 
 function publishHeight(): void {
   if (typeof document === 'undefined' || !rootEl.value) return;
-  document.documentElement.style.setProperty(
-    '--planner-cmdbar-h',
-    `${rootEl.value.offsetHeight}px`
-  );
+  // Measurement must never throw out of the ResizeObserver callback — a single
+  // failure would kill the observer and freeze the docking offset for the views.
+  try {
+    document.documentElement.style.setProperty(
+      '--planner-cmdbar-h',
+      `${rootEl.value.offsetHeight}px`
+    );
+  } catch (err) {
+    console.warn('[CalendarCommandBar] failed to publish --planner-cmdbar-h', err);
+  }
 }
 
 onMounted(() => {
@@ -80,13 +96,17 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="rootEl"
-    class="sticky top-0 z-30 -mx-4 -mt-4 mb-1 border-b border-gray-200/70 bg-white/85 px-4 pt-4 pb-3 backdrop-blur-md md:-mx-6 md:-mt-6 md:px-6 md:pt-6 dark:border-slate-700 dark:bg-slate-900/85"
+    class="sticky top-0 z-30 -mx-4 -mt-4 mb-1 border-b border-gray-200/70 bg-white px-4 pt-4 pb-2.5 shadow-[0_4px_16px_-12px_rgba(44,62,80,0.18)] md:-mx-6 md:-mt-6 md:px-6 md:pt-6 md:pb-3 dark:border-slate-700 dark:bg-slate-900"
   >
-    <!-- Top row: period hero + nav, then the controls cluster -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-      <div class="flex items-center justify-between gap-2 sm:justify-start">
+    <!-- Top row: period hero + nav (+ mobile menu / pinned filter / search), then controls -->
+    <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
+      <div class="flex items-center gap-2 sm:justify-start">
+        <!-- Mobile only: the planner reclaims the top bar, so the hamburger that
+             opens the shared MobileHamburgerMenu lives here (AppHeader is hidden). -->
+        <HamburgerButton v-if="headerReclaimed" @click="toggleMenu" />
+
         <h1
-          class="font-outfit text-secondary-500 truncate text-xl font-extrabold sm:text-2xl dark:text-gray-100"
+          class="font-outfit text-secondary-500 min-w-0 truncate text-xl font-extrabold sm:text-2xl dark:text-gray-100"
         >
           {{ label }}
         </h1>
@@ -133,9 +153,25 @@ onBeforeUnmount(() => {
             </svg>
           </button>
         </div>
+
+        <!-- Mobile only: the pinned member filter (always visible so member
+             context is never lost, even when the controls row auto-hides in
+             Phase 2) + search (re-homed from the hidden AppHeader). -->
+        <div v-if="headerReclaimed" class="ml-auto flex flex-shrink-0 items-center gap-2">
+          <MemberFilterMobileMenu
+            :is-all-active="isAllActive"
+            :is-member-active="isMemberActive"
+            :active-member-names="activeMemberNames"
+            @select-all="emit('select-all')"
+            @select-member="emit('select-member', $event)"
+          />
+          <SearchButton />
+        </div>
       </div>
 
-      <!-- Controls: view toggle + agenda (day) on the left, filter + Add on the right -->
+      <!-- Secondary controls — view toggle + agenda (day) + inline trip chip
+           (mobile) + Add. Kept as one wrapper so Phase 2 can collapse it on
+           scroll-down while the pinned member filter above stays visible. -->
       <div class="flex items-center justify-between gap-2 sm:ml-auto sm:justify-end">
         <div class="flex items-center gap-2">
           <button
@@ -166,13 +202,11 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="flex items-center gap-2">
-          <MemberFilterMobileMenu
-            class="sm:hidden"
-            :is-all-active="isAllActive"
-            :is-member-active="isMemberActive"
-            :active-member-names="activeMemberNames"
-            @select-all="emit('select-all')"
-            @select-member="emit('select-member', $event)"
+          <!-- Mobile inline trip chip; desktop keeps the labelled ribbon row below -->
+          <CalendarTripRibbon
+            v-if="headerReclaimed"
+            inline
+            @vacation-click="emit('vacation-click', $event)"
           />
 
           <button
@@ -189,8 +223,8 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Desktop member chips on their own row (avoids crowding the top row) -->
-    <div class="mt-3 hidden sm:flex">
+    <!-- Desktop member chips on their own row (mobile uses the pinned filter above) -->
+    <div v-if="!headerReclaimed" class="mt-3 hidden sm:flex">
       <MemberChipFilter
         :is-all-active="isAllActive"
         :is-member-active="isMemberActive"
@@ -199,7 +233,11 @@ onBeforeUnmount(() => {
       />
     </div>
 
-    <!-- Trip ribbon (A) — own store read + collapse state -->
-    <CalendarTripRibbon class="mt-3" @vacation-click="emit('vacation-click', $event)" />
+    <!-- Desktop trip ribbon on its own row (mobile uses the inline chip above) -->
+    <CalendarTripRibbon
+      v-if="!headerReclaimed"
+      class="mt-3"
+      @vacation-click="emit('vacation-click', $event)"
+    />
   </div>
 </template>

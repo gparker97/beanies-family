@@ -423,7 +423,7 @@ onMounted(async () => {
 <template>
   <div
     ref="swipeRef"
-    class="rounded-3xl bg-white p-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)] md:p-5 dark:bg-slate-800"
+    class="rounded-3xl bg-white p-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)] md:p-5 md:pt-3 dark:bg-slate-800"
     style="touch-action: pan-y; will-change: transform"
   >
     <!-- Mobile-only avatar legend strip — one row of dots, never wraps.
