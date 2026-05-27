@@ -47,22 +47,23 @@ function selectMember(id: string) {
   <div class="relative">
     <button
       type="button"
-      class="font-outfit inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 text-sm font-medium transition-all"
+      class="font-outfit inline-flex items-center gap-1.5 rounded-2xl px-2.5 py-2 text-sm font-medium transition-all"
       :class="
         props.isAllActive
           ? 'bg-[var(--tint-slate-5)] text-[var(--color-text)]/65 dark:bg-slate-700 dark:text-gray-400'
           : 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
       "
+      :aria-label="t('filter.allMembers')"
       @click="open = !open"
     >
       <span class="text-base">👨‍👩‍👧</span>
-      {{
-        props.isAllActive
-          ? t('filter.allMembers')
-          : props.activeMemberNames.length === 1
-            ? props.activeMemberNames[0]
-            : `${props.activeMemberNames.length} ${t('filter.members')}`
-      }}
+      <!-- "All" is the default/no-filter state — show just the icon to save space.
+           When actually filtered, show who, since that's the context that matters. -->
+      <span v-if="!props.isAllActive" class="max-w-[7rem] truncate">{{
+        props.activeMemberNames.length === 1
+          ? props.activeMemberNames[0]
+          : `${props.activeMemberNames.length} ${t('filter.members')}`
+      }}</span>
       <span class="text-xs opacity-60">▾</span>
     </button>
 

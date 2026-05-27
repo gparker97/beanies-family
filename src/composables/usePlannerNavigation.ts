@@ -1,7 +1,14 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
-import { addDays, formatDayLong, formatMonthYear, toDateInputValue } from '@/utils/date';
+import {
+  addDays,
+  formatDayLong,
+  formatMonthYear,
+  formatTodayCaption,
+  toDateInputValue,
+} from '@/utils/date';
 import { useToday } from '@/composables/useToday';
 import { useWeekNavigation } from '@/composables/useCalendarNavigation';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 export type PlannerView = 'month' | 'week' | 'day';
 
@@ -33,6 +40,7 @@ export function usePlannerNavigation(activeView: Ref<PlannerView>): {
   goToday: () => void;
 } {
   const { startOfToday } = useToday();
+  const { isMobile } = useBreakpoint();
   const referenceDate = ref<Date>(startOfToday.value);
   const { weekLabel } = useWeekNavigation(referenceDate);
 
@@ -41,7 +49,12 @@ export function usePlannerNavigation(activeView: Ref<PlannerView>): {
       case 'week':
         return weekLabel.value;
       case 'day':
-        return formatDayLong(toDateInputValue(referenceDate.value));
+        // Phones have little horizontal room in the reclaimed command bar, so
+        // drop the year ("Wed, 27 May") — it's implicit once you're on the day.
+        // Desktop keeps the full "Wednesday, 27 May 2026".
+        return isMobile.value
+          ? formatTodayCaption(toDateInputValue(referenceDate.value))
+          : formatDayLong(toDateInputValue(referenceDate.value));
       default:
         return formatMonthYear(referenceDate.value);
     }

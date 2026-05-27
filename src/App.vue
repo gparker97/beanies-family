@@ -150,6 +150,13 @@ watch(
 // hides the global AppHeader on the mobile/tablet Activities route.
 const { isOpen: isMenuOpen, close: closeMenu } = useMobileMenu();
 const headerReclaimed = useHeaderReclaimed();
+
+// On the planner, the calendar's sticky command bar must sit at the very top of
+// the scroll container with nothing scrolling above it. `<main>`'s top padding
+// would otherwise leave a band where events scroll visibly above the pinned bar
+// (sticky `top:0` rests at the padding edge), so we drop ONLY the top padding on
+// that route — both breakpoints. The command bar supplies its own top spacing.
+const isPlannerRoute = computed(() => route.name === 'Activities');
 const showTrustPrompt = ref(false);
 const showPasskeyPrompt = ref(false);
 const passkeyPromptDismissed = ref(false);
@@ -1616,8 +1623,11 @@ watch(
         <AppHeader v-if="!headerReclaimed" />
 
         <main
-          class="flex-1 overflow-auto overscroll-y-contain p-4 md:p-6"
-          :class="{ 'pb-24': isMobile }"
+          class="flex-1 overflow-auto overscroll-y-contain"
+          :class="[
+            isPlannerRoute ? 'px-4 pb-4 md:px-6 md:pb-6' : 'p-4 md:p-6',
+            { 'pb-24': isMobile },
+          ]"
         >
           <ContentSkeleton v-if="isLoadingData" />
           <router-view v-show="!isLoadingData" data-testid="app-content" />

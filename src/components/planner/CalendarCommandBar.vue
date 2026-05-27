@@ -96,7 +96,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="rootEl"
-    class="sticky top-0 z-30 -mx-4 -mt-4 mb-1 border-b border-gray-200/70 bg-white px-4 pt-4 pb-2.5 shadow-[0_4px_16px_-12px_rgba(44,62,80,0.18)] md:-mx-6 md:-mt-6 md:px-6 md:pt-6 md:pb-3 dark:border-slate-700 dark:bg-slate-900"
+    class="sticky top-0 z-30 -mx-4 mb-1 border-b border-gray-200/70 bg-white px-4 pt-3 pb-2.5 shadow-[0_4px_16px_-12px_rgba(44,62,80,0.18)] md:-mx-6 md:px-6 md:pt-4 md:pb-3 dark:border-slate-700 dark:bg-slate-900"
   >
     <!-- Top row: period hero + nav (+ mobile menu / pinned filter / search), then controls -->
     <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
@@ -106,7 +106,7 @@ onBeforeUnmount(() => {
         <HamburgerButton v-if="headerReclaimed" @click="toggleMenu" />
 
         <h1
-          class="font-outfit text-secondary-500 min-w-0 truncate text-xl font-extrabold sm:text-2xl dark:text-gray-100"
+          class="font-outfit text-secondary-500 min-w-0 flex-1 truncate text-xl font-extrabold sm:flex-none sm:text-2xl dark:text-gray-100"
         >
           {{ label }}
         </h1>
@@ -154,17 +154,10 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <!-- Mobile only: the pinned member filter (always visible so member
-             context is never lost, even when the controls row auto-hides in
-             Phase 2) + search (re-homed from the hidden AppHeader). -->
-        <div v-if="headerReclaimed" class="ml-auto flex flex-shrink-0 items-center gap-2">
-          <MemberFilterMobileMenu
-            :is-all-active="isAllActive"
-            :is-member-active="isMemberActive"
-            :active-member-names="activeMemberNames"
-            @select-all="emit('select-all')"
-            @select-member="emit('select-member', $event)"
-          />
+        <!-- Mobile only: search (re-homed from the hidden AppHeader). The member
+             filter lives on the controls row below so this identity row stays
+             uncrowded and the period label never truncates. -->
+        <div v-if="headerReclaimed" class="flex-shrink-0">
           <SearchButton />
         </div>
       </div>
@@ -197,7 +190,20 @@ onBeforeUnmount(() => {
 
           <ViewToggle
             :active-view="activeView"
+            :compact="headerReclaimed"
             @update:active-view="emit('update:activeView', $event)"
+          />
+
+          <!-- Mobile member filter — kept compact (icon-only when "all"; shows
+               the member name(s) when filtered) so "whose plans" stays explicit
+               without crowding the row. Pinned in Phase 2 (won't auto-hide). -->
+          <MemberFilterMobileMenu
+            v-if="headerReclaimed"
+            :is-all-active="isAllActive"
+            :is-member-active="isMemberActive"
+            :active-member-names="activeMemberNames"
+            @select-all="emit('select-all')"
+            @select-member="emit('select-member', $event)"
           />
         </div>
 

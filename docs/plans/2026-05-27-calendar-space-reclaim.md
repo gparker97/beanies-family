@@ -158,6 +158,16 @@ greg approved a three-lever fix from the mockup:
 - **Pass 3 (Sustainability):** Hardened against long-term coupling: search is re-homed as a **shared `SearchButton.vue`** (not copied `AppHeader` markup) so the reclaimed mobile bar can't become a drifting second header; the `(isMobile||isTablet) && route==='Activities'` reclaim predicate is **defined once** (`headerReclaimed` in `useMobileMenu`) so `App.vue` and the command bar can't disagree (stranded-menu / double-header bug); the command-bar primary row composes named child components only (no new deeply-nested `v-if` markup) and Phase 1 isolates the controls row so Phase 2 is purely additive; and Phase 2's auto-hide **severs the ResizeObserver ↔ `--planner-cmdbar-h` feedback path** (dock the strip to the stable pinned region) with the observer kept ignorant of `controlsHidden` so the composable stays independently removable.
 - **Pass 4 (Fresh-eyes sweep):** Verified every claim against `src/` (no test asserts the `bg-white/85`/`backdrop-blur` classes; `header-avatar*` testids are AppHeader-internal with no external dependents; route is `name: 'Activities'`; safe-area inset is on the App.vue column wrapper; `useReducedMotion`/`useBreakpoint`/`useHorizontalSwipe` shapes confirmed; the new files truly absent). Fixed one real a11y defect — Phase 2's collapsed controls row must be **`:inert`** (not a bare `aria-hidden`) since it holds focusable view-toggle/filter/Add controls (WCAG 4.1.2); named the deliberate route-scoped loss of the AppHeader avatar's **Edit Profile / Help / Refresh-all** on mobile planner (only Settings + Sign-out are required and the menu has them); corrected the acceptance criterion so mobile **day**-view member clarity is verified via `DayTimeline` per-event `MemberChip`s + the pinned filter (no mobile day column header exists); flagged the Phase 2 member-filter-hides-on-autohide clarity trade-off for greg; clarified that root `space-y-6`'s only real consumers are the command-bar→view boundary and the month-only inactive-activities `<div>` (modals are out-of-flow); and trimmed Phase 2 over-engineering by committing to "dock the strip to the stable pinned region" and dropping the rAF/`transitionend` fallback.
 
+## As-built refinements (post-Phase-1 review)
+
+greg reviewed the first Phase-1 push on localhost and caught three issues; the fixes (still Phase 1) refined the plan's approach:
+
+1. **Dead space above the bar** (both platforms): root-caused to `<main>`'s top padding — `sticky; top:0` rests at the scroll container's _padding_ edge, so content scrolled visibly above the bar (the `-mt` bleed didn't cover it). Fix: drop **only** `<main>`'s top padding on the `Activities` route (`isPlannerRoute` in App.vue) and remove the command bar's `-mt-4 md:-mt-6`; the bar now sits at the true scrollport top with its own internal `pt`.
+2. **Period label truncation on mobile** ("May…", "Wed…"): the plan put the member filter on row 1, which crowded the period. **Moved the member filter to row 2** (per the original mockup); row 1 is now `hamburger + period(flex-1) + nav + search`. Added a `compact` mode to `ViewToggle` (single-letter M/W/D via the label's initial grapheme, works for en/beanie/zh) and made the day label breakpoint-aware in `usePlannerNavigation` (`formatTodayCaption` "Wed, 27 May" on mobile, full `formatDayLong` on desktop). `MemberFilterMobileMenu` is now icon-only when "all", showing the member name(s) only when actually filtered.
+3. **Redundant month-view legend**: removed `CalendarGrid`'s mobile "SHOW" avatar legend strip (non-interactive, duplicated the command-bar filter) + its now-orphaned `MemberChip`/`useFamilyStore` imports and the `planner.legendShow`/`planner.legendFamily` i18n keys (zh pruned via `npm run translate`).
+
+**Scope note:** the header reclaim is **phone-only** (`isMobile`, ≤767px) — tablet keeps its standard AppHeader (the command bar's `sm:` 640px layout would otherwise collide with a tablet reclaim). The Phase-2 "member filter stays pinned" requirement is satisfied by keeping the filter outside the collapsible controls sub-group (it currently lives on row 2; Phase 2 will pin it there). All fixes verified with real-app Playwright screenshots (desktop + mobile month/week/day, default + filtered).
+
 ## Prompt Log
 
 <details>
@@ -180,5 +190,14 @@ Greg asked for a revised mockup proposing options to reclaim vertical space on t
 - **Scope:** One plan, A+C+B (B as Phase 2).
 - **Auto-hide behavior:** Hide only the controls row; keep period + nav pinned (day strip pinned in all cases).
 - **Platforms:** "I'd like to update desktop also to remove the scroll behind and above the header, which is a strange feel for desktop - since we're not starved for space, shouldn't the header be pinned and the events just scroll below the header? we could also make the header more compact, as we're doing for mobile, but i don't think we need the auto-hide features, and we can keep the consistent app header (our activities) - that type of space saving is not required for desktop, but some tweaks to improve the UI and remove the events being shown above the header would help on desktop."
+- **Phase-2 sub-decision (filter):** "let's pin the filter chip, as per the direction to ensure what we're looking at is always explicit, and avoid confusion."
+
+### Follow-up — Phase 1 localhost review (greg)
+
+> - There still appears to be some dead space above the header where I can see calendar items scroll above the header... I am seeing this on BOTH desktop and mobile. I don't think this space is usable at all.
+> - The day/week/month is being truncated, making it impossible to see where you are on mobile.
+> - on the monthly calendar, there is a strip at the top called "show" which lists chips for each family member, but we already have a family member filter/dropdown in the header bar... is this duplicated functionality?... can we remove it to provide more space?
+
+(See **As-built refinements** above for the fixes.)
 
 </details>

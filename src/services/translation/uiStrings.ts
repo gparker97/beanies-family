@@ -4998,8 +4998,6 @@ const STRING_DEFS = {
   // Planner — Month grid chip overflow + mobile legend + week separators
   'planner.moreEvents': { en: '{count} more activities', beanie: '{count} more activities' },
   'planner.moreEventsShort': { en: 'more', beanie: 'more' },
-  'planner.legendShow': { en: 'Show', beanie: 'show' },
-  'planner.legendFamily': { en: 'Family events', beanie: 'family events' },
   'planner.weekThis': { en: 'This week', beanie: 'this week' },
   'planner.weekNext': { en: 'Next week', beanie: 'next week' },
   'planner.weekUpcoming': { en: 'Upcoming', beanie: 'upcoming' },
