@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-27
+
+### Changed
+
+- **More room for your events on the calendar.** The calendar now sits flush at the top of the page — the dead gap that used to appear above it (where events would briefly peek through in a too-small band) is gone. The bar showing the month/week and the view controls is now solid, so events scroll cleanly underneath it instead of faintly showing through. On phones, the separate app header is folded into that calendar bar: the month/week label, a menu button, your family filter, and search all share one compact row, giving noticeably more height to actually see and tap your days. The family filter stays put at all times so it's always clear whose plans you're looking at.
+
 ## 2026-05-26
 
 ### Changed

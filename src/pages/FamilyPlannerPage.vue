@@ -450,7 +450,11 @@ function handleActivitySwapped(newId: string) {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <!-- No `space-y-*` here: the calendar view must butt flush against the sticky
+       command bar (its docked header sits at `top: var(--planner-cmdbar-h)`).
+       The only in-flow gap we want is below the view, handled by `mt-*` on the
+       inactive-activities block; everything else here is a Teleport/overlay. -->
+  <div>
     <!-- Sticky command bar — period hero + nav + view toggle + filter + Add
          + trip ribbon. The calendar is the page hero; nothing above it. -->
     <CalendarCommandBar
@@ -518,7 +522,7 @@ function handleActivitySwapped(newId: string) {
     />
 
     <!-- Inactive activities toggle (month view only) -->
-    <div v-if="activeView === 'month' && activityStore.inactiveActivities.length > 0">
+    <div v-if="activeView === 'month' && activityStore.inactiveActivities.length > 0" class="mt-4">
       <button
         type="button"
         class="text-secondary-500/50 hover:text-secondary-500 flex items-center gap-2 text-sm transition-colors dark:text-gray-500 dark:hover:text-gray-300"

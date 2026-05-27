@@ -244,7 +244,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
 <template>
   <div
     ref="swipeRef"
-    class="rounded-3xl bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
+    class="rounded-3xl bg-white p-5 pt-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
     style="touch-action: pan-y; will-change: transform"
   >
     <!-- Public holiday banner (desktop — mobile gets it via DayTimeline) -->

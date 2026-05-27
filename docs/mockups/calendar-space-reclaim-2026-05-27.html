@@ -1,0 +1,1863 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family · calendar space-reclaim · 2026-05-27</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* ============================================================
+         beanies.family · Calendar — reclaim vertical space · 2026-05-27
+
+         Follow-up to the 2026-05-26 "first-class calendar" redesign.
+         That redesign made the calendar the hero, but on mobile the
+         stacked sticky chrome (app header + page padding + command bar
+         + a SECOND sticky sub-header) eats ~380px before the first
+         event row — and the docked sub-header sits ~16px below the
+         command bar, so events flicker through a dead gap.
+
+         This file proposes three COMBINABLE levers to give events the
+         maximum possible room while keeping every piece of information:
+
+           A · FLUSH + ONE-ROW   — kill the 16px gap, drop the page
+                                    greeting on this page, collapse the
+                                    command bar from 3 rows to 1.
+           B · AUTO-HIDE         — chrome slides away as you scroll DOWN
+                                    through events, returns on scroll UP.
+           C · UNIFIED HEADER    — fold the separate weekday/member row
+                                    INTO the strip, so there's one sticky
+                                    layer instead of two.
+
+         The "space budget" bars are the headline: they show, to scale,
+         how much of the screen each layout spends on chrome vs events.
+         ============================================================ */
+
+      :root {
+        /* brand palette */
+        --orange: #f15d22;
+        --orange-ink: #c84612;
+        --orange-deep: #d14d1a;
+        --orange-glow: rgba(241, 93, 34, 0.14);
+        --orange-8: rgba(241, 93, 34, 0.08);
+        --orange-12: rgba(241, 93, 34, 0.12);
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --slate-soft: #5d6d7e;
+        --slate-mute: #8b97a3;
+        --slate-faint: #aab4bd;
+        --sky: #aed6f1;
+        --sky-soft: #e1f0f9;
+        --cloud: #f8f9fa;
+        --paper: #ffffff;
+        --line: #ecf0f2;
+        --line-strong: #dfe5e9;
+
+        /* trip accent */
+        --teal: #00b4d8;
+        --teal-deep: #0096c7;
+        --teal-tint: rgba(0, 180, 216, 0.1);
+        --gold-tint: rgba(255, 217, 61, 0.16);
+
+        /* family member palette */
+        --m-greg: #2c3e50;
+        --m-greg-soft: #e0e5ea;
+        --m-mira: #e84393;
+        --m-mira-soft: #fbe2ee;
+        --m-aria: #6aa84f;
+        --m-aria-soft: #e6f0df;
+        --m-oren: #4a90c2;
+        --m-oren-soft: #e0ecf5;
+
+        /* space-budget swatches */
+        --b-chrome: #d7dde2;
+        --b-gap: #f6c6a8;
+        --b-cmd: var(--slate);
+        --b-sub: #7d8b97;
+        --b-events: var(--orange);
+        --b-nav: #b9c2ca;
+
+        --lift-1: 0 1px 2px rgba(44, 62, 80, 0.05);
+        --lift-2: 0 4px 20px rgba(44, 62, 80, 0.06);
+        --lift-3: 0 14px 38px -14px rgba(44, 62, 80, 0.2);
+        --lift-stuck: 0 9px 22px -16px rgba(44, 62, 80, 0.3);
+
+        --r-sm: 8px;
+        --r-md: 12px;
+        --r-lg: 16px;
+        --r-xl: 22px;
+        --r-pill: 999px;
+
+        --switcher-h: 54px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background:
+          radial-gradient(1200px 600px at 82% -12%, rgba(174, 214, 241, 0.2), transparent 60%),
+          var(--cloud);
+        color: var(--slate);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        padding-top: var(--switcher-h);
+      }
+      h1,
+      h2,
+      h3,
+      h4 {
+        font-family: 'Outfit', sans-serif;
+        margin: 0;
+      }
+      button {
+        font-family: inherit;
+        cursor: pointer;
+        border: none;
+        background: none;
+      }
+
+      /* ============================================================
+         SCREEN SWITCHER
+         ============================================================ */
+      .switcher {
+        position: fixed;
+        inset: 0 0 auto 0;
+        height: var(--switcher-h);
+        background: linear-gradient(180deg, var(--slate), #243240);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 16px;
+        z-index: 200;
+        overflow-x: auto;
+        box-shadow: 0 6px 20px -8px rgba(0, 0, 0, 0.4);
+      }
+      .switcher .brand {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 14px;
+        margin-right: 10px;
+        white-space: nowrap;
+      }
+      .switcher .brand .dot {
+        color: var(--orange);
+      }
+      .switcher button {
+        color: rgba(255, 255, 255, 0.62);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        padding: 7px 14px;
+        border-radius: var(--r-pill);
+        white-space: nowrap;
+        transition: all 0.16s;
+      }
+      .switcher button:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .switcher button.active {
+        color: #fff;
+        background: var(--orange);
+        box-shadow: 0 4px 12px rgba(241, 93, 34, 0.4);
+      }
+
+      /* ============================================================
+         STAGE + SCREENS
+         ============================================================ */
+      .stage {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 30px 22px 110px;
+      }
+      .screen {
+        display: none;
+        animation: fade 0.3s ease;
+      }
+      .screen.active {
+        display: block;
+      }
+      @keyframes fade {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .screen-head {
+        margin-bottom: 22px;
+        max-width: 880px;
+      }
+      .screen-head .kicker {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--orange);
+      }
+      .screen-head h2 {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--slate);
+        margin-top: 4px;
+      }
+      .screen-head p {
+        font-size: 14px;
+        color: var(--slate-soft);
+        margin: 8px 0 0;
+      }
+      .screen-head p b {
+        color: var(--slate);
+        font-weight: 700;
+      }
+
+      /* annotation callouts */
+      .notes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 22px;
+      }
+      .note {
+        flex: 1 1 240px;
+        min-width: 220px;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--r-lg);
+        padding: 14px 16px;
+        box-shadow: var(--lift-1);
+      }
+      .note .n {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 8px;
+        background: var(--orange-12);
+        color: var(--orange-ink);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 12px;
+        margin-bottom: 9px;
+      }
+      .note.keep .n {
+        background: rgba(106, 168, 79, 0.16);
+        color: #4a7a33;
+      }
+      .note h4 {
+        font-size: 13.5px;
+        font-weight: 700;
+        color: var(--slate);
+        margin-bottom: 4px;
+      }
+      .note p {
+        font-size: 12.5px;
+        color: var(--slate-soft);
+        margin: 0;
+        line-height: 1.5;
+      }
+      .note p + p {
+        margin-top: 6px;
+      }
+      .note code {
+        font-family: 'SF Mono', ui-monospace, monospace;
+        font-size: 11px;
+        background: var(--cloud);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 1px 5px;
+        color: var(--orange-ink);
+      }
+
+      /* ============================================================
+         SPACE-BUDGET COMPARISON BARS
+         ============================================================ */
+      .budgets {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--r-xl);
+        padding: 22px 24px 20px;
+        box-shadow: var(--lift-2);
+      }
+      .budget {
+        flex: 1 1 150px;
+        min-width: 140px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      .budget .bar {
+        width: 100%;
+        max-width: 168px;
+        height: 360px;
+        border-radius: var(--r-md);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--line);
+        box-shadow: var(--lift-1);
+      }
+      .seg {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 10px;
+        color: #fff;
+        text-align: center;
+        line-height: 1.15;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      .seg.s-chrome {
+        background: var(--b-chrome);
+        color: var(--slate-soft);
+      }
+      .seg.s-gap {
+        background: repeating-linear-gradient(
+          45deg,
+          var(--b-gap),
+          var(--b-gap) 5px,
+          #f9d6bf 5px,
+          #f9d6bf 10px
+        );
+        color: var(--orange-ink);
+      }
+      .seg.s-cmd {
+        background: var(--b-cmd);
+      }
+      .seg.s-sub {
+        background: var(--b-sub);
+      }
+      .seg.s-events {
+        background: linear-gradient(160deg, var(--orange), var(--terracotta));
+        flex-direction: column;
+        gap: 2px;
+        font-size: 13px;
+      }
+      .seg.s-events .px {
+        font-size: 10px;
+        font-weight: 600;
+        opacity: 0.92;
+      }
+      .seg.s-nav {
+        background: var(--b-nav);
+        color: var(--slate-soft);
+      }
+      .budget .cap {
+        text-align: center;
+      }
+      .budget .cap .name {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 14px;
+        color: var(--slate);
+      }
+      .budget .cap .gain {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 12px;
+        margin-top: 2px;
+      }
+      .budget .cap .gain.up {
+        color: #4a7a33;
+      }
+      .budget .cap .gain.flat {
+        color: var(--slate-mute);
+      }
+      .budget.hero .bar {
+        outline: 3px solid var(--orange);
+        outline-offset: 2px;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        margin-top: 16px;
+        padding: 0 4px;
+      }
+      .legend .lk {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        color: var(--slate-soft);
+        font-weight: 500;
+      }
+      .legend .sw {
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        flex-shrink: 0;
+      }
+
+      /* ============================================================
+         PHONE FRAMES
+         ============================================================ */
+      .phones {
+        display: flex;
+        gap: 34px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .phone {
+        width: 360px;
+        flex-shrink: 0;
+      }
+      .phone-cap {
+        text-align: center;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        color: var(--slate-soft);
+        margin-bottom: 11px;
+      }
+      .phone-cap .tag {
+        display: inline-block;
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--orange-ink);
+        background: var(--orange-8);
+        border-radius: var(--r-pill);
+        padding: 3px 10px;
+        margin-left: 6px;
+        vertical-align: middle;
+      }
+      .bezel {
+        background: #1a232c;
+        border-radius: 42px;
+        padding: 11px;
+        box-shadow: var(--lift-3);
+      }
+      .device {
+        background: var(--cloud);
+        border-radius: 31px;
+        overflow: hidden;
+        height: 740px;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+      .statusbar {
+        height: 28px;
+        background: var(--slate);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 22px;
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+
+      /* current full app header (hamburger + greeting + bell) */
+      .mhead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        background: var(--paper);
+        border-bottom: 1px solid var(--line);
+        flex-shrink: 0;
+      }
+      .burger {
+        width: 36px;
+        height: 36px;
+        border-radius: 11px;
+        background: var(--cloud);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 3px;
+      }
+      .burger i {
+        height: 2px;
+        border-radius: 2px;
+        background: var(--slate);
+        opacity: 0.5;
+      }
+      .burger i:nth-child(1),
+      .burger i:nth-child(2) {
+        width: 17px;
+      }
+      .burger i:nth-child(3) {
+        width: 10px;
+        background: var(--orange);
+        opacity: 1;
+      }
+      .mhead .greet {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 15px;
+        color: var(--slate);
+      }
+      .bell {
+        width: 36px;
+        height: 36px;
+        border-radius: 11px;
+        background: var(--cloud);
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+        position: relative;
+      }
+      .bell::after {
+        content: '';
+        position: absolute;
+        top: 7px;
+        right: 8px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--orange);
+        border: 1.5px solid var(--paper);
+      }
+
+      /* slim merged header (Option A) — hamburger + bell tucked beside the
+         period label so we drop the dedicated greeting row entirely */
+      .slimhead {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 13px;
+        background: rgba(255, 255, 255, 0.93);
+        backdrop-filter: saturate(140%) blur(8px);
+        border-bottom: 1px solid var(--line);
+        flex-shrink: 0;
+        box-shadow: var(--lift-stuck);
+      }
+      .slimhead .burger {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+      }
+      .slimhead .bell {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+        background: transparent;
+      }
+
+      /* ---- command bar pieces (shared across treatments) ---- */
+      .period {
+        display: flex;
+        align-items: baseline;
+        gap: 7px;
+        min-width: 0;
+      }
+      .period .label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 21px;
+        line-height: 1;
+        color: var(--slate);
+        letter-spacing: -0.2px;
+        white-space: nowrap;
+      }
+      .period .label .yr {
+        color: var(--slate-faint);
+        font-weight: 700;
+      }
+      .nav-mini {
+        display: flex;
+        align-items: center;
+        gap: 1px;
+        flex-shrink: 0;
+      }
+      .nav-mini .arrow {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: var(--slate-soft);
+        font-size: 15px;
+      }
+      .nav-mini .arrow:hover {
+        background: var(--cloud);
+        color: var(--slate);
+      }
+      .dotnav {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: var(--orange-ink);
+        background: var(--orange-8);
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+      .seg-toggle {
+        display: inline-flex;
+        gap: 2px;
+        background: var(--cloud);
+        padding: 3px;
+        border-radius: var(--r-pill);
+        flex-shrink: 0;
+      }
+      .seg-toggle button {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 11.5px;
+        color: var(--slate-mute);
+        padding: 5px 11px;
+        border-radius: var(--r-pill);
+      }
+      .seg-toggle button.active {
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        color: #fff;
+      }
+      .filter-av {
+        display: inline-flex;
+        align-items: center;
+        flex-shrink: 0;
+        background: var(--cloud);
+        border-radius: var(--r-pill);
+        padding: 4px 9px 4px 5px;
+        gap: 5px;
+      }
+      .filter-av .stack {
+        display: flex;
+      }
+      .filter-av .stack i {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 1.5px solid var(--paper);
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-size: 9px;
+        font-weight: 700;
+      }
+      .filter-av .stack i + i {
+        margin-left: -7px;
+      }
+      .filter-av .chev {
+        font-size: 9px;
+        color: var(--slate-mute);
+      }
+      .add-mini {
+        flex-shrink: 0;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 18px;
+        line-height: 1;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 3px 10px rgba(241, 93, 34, 0.3);
+      }
+
+      /* ===== CURRENT mobile command bar (3 stacked rows) ===== */
+      .mcmd {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: saturate(140%) blur(8px);
+        border-bottom: 1px solid var(--line);
+        padding: 11px 14px 10px;
+        flex-shrink: 0;
+        box-shadow: var(--lift-stuck);
+      }
+      .mcmd .row1 {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .mcmd .row2 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .mcmd .row2 .filter-av {
+        margin-left: auto;
+      }
+      .mtrip {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 9px;
+        background: linear-gradient(135deg, var(--teal-tint), var(--gold-tint));
+        border: 1px solid rgba(0, 180, 216, 0.18);
+        border-radius: var(--r-pill);
+        padding: 7px 11px;
+      }
+      .mtrip .emo {
+        font-size: 14px;
+      }
+      .mtrip .txt {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 12px;
+        color: var(--slate);
+      }
+      .mtrip .sub {
+        font-size: 11px;
+        color: var(--slate-soft);
+        font-weight: 500;
+      }
+      .mtrip .chev {
+        margin-left: auto;
+        color: var(--teal-deep);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      /* ===== ONE-ROW command bar (Options A / B / C) ===== */
+      .mcmd1 {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        background: rgba(255, 255, 255, 0.93);
+        backdrop-filter: saturate(140%) blur(8px);
+        border-bottom: 1px solid var(--line);
+        padding: 8px 12px;
+        flex-shrink: 0;
+        box-shadow: var(--lift-stuck);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .mcmd1 .add-mini,
+      .mcmd1 .seg-toggle {
+        margin-left: auto;
+      }
+      .mcmd1 .seg-toggle + .add-mini {
+        margin-left: 0;
+      }
+      /* trip is now a tiny inline chip living in the one-row bar */
+      .trip-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        flex-shrink: 0;
+        background: var(--teal-tint);
+        border: 1px solid rgba(0, 180, 216, 0.2);
+        border-radius: var(--r-pill);
+        padding: 4px 9px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 11px;
+        color: var(--teal-deep);
+      }
+
+      /* auto-hide demo (Option B): the bar lifts above the viewport */
+      .device.scrolled .mcmd1.hideable {
+        transform: translateY(-100%);
+      }
+      .device.scrolled .scrollhint {
+        opacity: 1;
+      }
+      .scrollhint {
+        position: absolute;
+        left: 50%;
+        bottom: 86px;
+        transform: translateX(-50%);
+        background: var(--slate);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 11px;
+        padding: 7px 14px;
+        border-radius: var(--r-pill);
+        box-shadow: var(--lift-2);
+        opacity: 0;
+        transition: opacity 0.25s;
+        z-index: 40;
+        white-space: nowrap;
+      }
+
+      .mscroll {
+        flex: 1;
+        overflow: hidden;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ===== WEEK strip (current: separate from weekday header) ===== */
+      .strip {
+        background: var(--paper);
+        border-bottom: 1px solid var(--line);
+        padding: 8px 10px 7px;
+        flex-shrink: 0;
+        box-shadow: var(--lift-1);
+      }
+      .strip .lblrow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 2px 5px;
+      }
+      .strip .lblrow .a {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--slate-mute);
+      }
+      .strip .lblrow .rng {
+        font-size: 10.5px;
+        color: var(--slate-faint);
+      }
+      .wkrow {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 3px;
+      }
+      .pill {
+        text-align: center;
+        padding: 4px 0 3px;
+        border-radius: var(--r-md);
+      }
+      .pill .wd {
+        font-family: 'Outfit', sans-serif;
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--slate-mute);
+      }
+      .pill .dn {
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--slate-soft);
+        margin-top: 1px;
+      }
+      .pill .dots {
+        display: flex;
+        gap: 2px;
+        justify-content: center;
+        margin-top: 3px;
+        height: 5px;
+      }
+      .pill .dots i {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+      }
+      .pill.sel {
+        background: var(--orange);
+      }
+      .pill.sel .wd,
+      .pill.sel .dn {
+        color: #fff;
+      }
+      .pill.today:not(.sel) {
+        box-shadow: inset 0 0 0 1.5px var(--orange);
+      }
+      .pill.today:not(.sel) .dn {
+        color: var(--orange-ink);
+      }
+      .peekbtn {
+        width: 100%;
+        margin-top: 6px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 10.5px;
+        color: var(--slate-mute);
+        padding: 4px;
+        border-radius: var(--r-sm);
+        background: var(--cloud);
+      }
+
+      /* current separate weekday header row (the SECOND sticky layer) */
+      .dowhead {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        background: var(--paper);
+        border-bottom: 1px solid var(--line);
+        padding: 7px 10px;
+        flex-shrink: 0;
+      }
+      .dowhead span {
+        font-family: 'Outfit', sans-serif;
+        font-size: 9.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--slate-mute);
+        text-align: center;
+      }
+
+      /* ===== day timeline (events canvas) ===== */
+      .selday {
+        display: flex;
+        align-items: baseline;
+        gap: 7px;
+        padding: 9px 14px 6px;
+        flex-shrink: 0;
+        background: var(--cloud);
+      }
+      .selday .big {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 16px;
+        color: var(--slate);
+      }
+      .selday .sub {
+        font-size: 11.5px;
+        color: var(--slate-mute);
+      }
+      .tlwrap {
+        flex: 1;
+        overflow: auto;
+        padding: 4px 14px 14px;
+      }
+      .tl {
+        position: relative;
+        padding-left: 50px;
+      }
+      .tl .h {
+        height: 58px;
+        border-top: 1px solid var(--line);
+        position: relative;
+      }
+      .tl .h .lab {
+        position: absolute;
+        left: -48px;
+        top: -7px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--slate-faint);
+        width: 42px;
+        text-align: right;
+      }
+      .te {
+        position: absolute;
+        left: 4px;
+        right: 8px;
+        border-radius: var(--r-md);
+        border-left: 3px solid var(--m-greg);
+        background: var(--m-greg-soft);
+        padding: 7px 10px;
+        box-shadow: var(--lift-1);
+      }
+      .te .tt {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 10.5px;
+        color: var(--slate-soft);
+      }
+      .te .nn {
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--slate);
+      }
+      .te.fam {
+        border-left-color: var(--orange);
+        background: var(--orange-12);
+      }
+      .te.aria {
+        border-left-color: var(--m-aria);
+        background: var(--m-aria-soft);
+      }
+      .te.oren {
+        border-left-color: var(--m-oren);
+        background: var(--m-oren-soft);
+      }
+      .te.mira {
+        border-left-color: var(--m-mira);
+        background: var(--m-mira-soft);
+      }
+
+      /* ===== UNIFIED strip (Option C): DOW label lives ON the pill ===== */
+      .ustrip {
+        background: var(--paper);
+        border-bottom: 1px solid var(--line);
+        padding: 7px 10px 6px;
+        flex-shrink: 0;
+        box-shadow: var(--lift-1);
+      }
+      .ustrip .wkrow .pill .wd {
+        font-size: 9.5px;
+      }
+
+      /* bottom nav */
+      .botnav {
+        flex-shrink: 0;
+        background: var(--paper);
+        border-top: 1px solid var(--line);
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-around;
+        padding: 7px 6px 9px;
+        position: relative;
+      }
+      .botnav .tab {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 9.5px;
+        font-weight: 600;
+        color: var(--slate-mute);
+        flex: 1;
+      }
+      .botnav .tab .ic {
+        font-size: 18px;
+      }
+      .botnav .tab.calendar {
+        color: var(--orange-ink);
+        font-weight: 700;
+      }
+      .botnav .hero {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        display: grid;
+        place-items: center;
+        font-size: 21px;
+        margin-top: -22px;
+        box-shadow: 0 6px 16px rgba(241, 93, 34, 0.4);
+        border: 3px solid var(--paper);
+        color: #fff;
+      }
+
+      /* a measuring caliper drawn down the side of a phone */
+      .caliper {
+        position: absolute;
+        right: 6px;
+        width: 30px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        pointer-events: none;
+        z-index: 60;
+      }
+      .caliper .seg2 {
+        width: 3px;
+        border-radius: 3px;
+        position: relative;
+      }
+      .caliper .seg2.chrome {
+        background: rgba(44, 62, 80, 0.45);
+      }
+      .caliper .seg2.events {
+        background: var(--orange);
+      }
+      .caliper .tagpx {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 10px;
+        white-space: nowrap;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 2px 6px;
+        box-shadow: var(--lift-1);
+      }
+      .caliper .seg2.events .tagpx {
+        color: var(--orange-ink);
+        border-color: var(--orange);
+      }
+
+      @media (max-width: 820px) {
+        .budget .bar {
+          height: 280px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ============================================================ SWITCHER -->
+    <div class="switcher">
+      <span class="brand">beanies<span class="dot">.</span>family · space-reclaim</span>
+      <button data-s="now" class="active">The problem</button>
+      <button data-s="budget">Space budget</button>
+      <button data-s="a">A · Flush + 1-row</button>
+      <button data-s="b">B · Auto-hide</button>
+      <button data-s="c">C · Unified header</button>
+      <button data-s="rec">★ Recommendation</button>
+    </div>
+
+    <div class="stage">
+      <!-- ======================================================== THE PROBLEM -->
+      <section class="screen active" data-screen="now">
+        <div class="screen-head">
+          <div class="kicker">Where we are after yesterday</div>
+          <h2>The calendar is the hero — but mobile chrome eats ~380px before event one</h2>
+          <p>
+            Yesterday's redesign was the right move: the sticky command bar keeps you oriented and
+            the calendar fills the width. The side effect is a <b>tall stack of fixed chrome</b> on
+            phones. From the top: the app header (hamburger · greeting · bell), then the page's
+            <code>16px</code> top padding, then the 3-row command bar, then a
+            <b>second</b> sticky layer (the week strip + a separate weekday row). The docked
+            sub-header sits ~16px below the command bar, so events flicker through a dead gap that's
+            too short to read or tap.
+          </p>
+        </div>
+
+        <div class="phones">
+          <!-- CURRENT week view -->
+          <div class="phone">
+            <div class="phone-cap">Today — week view<span class="tag">shipped</span></div>
+            <div class="bezel">
+              <div class="device">
+                <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+
+                <!-- app header -->
+                <div class="mhead">
+                  <div class="burger"><i></i><i></i><i></i></div>
+                  <div class="greet">Hi, greg 👋</div>
+                  <div class="bell">🔔</div>
+                </div>
+
+                <!-- 3-row command bar -->
+                <div class="mcmd">
+                  <div class="row1">
+                    <div class="period">
+                      <span class="label">May 18&ndash;24</span>
+                    </div>
+                    <div class="nav-mini">
+                      <span class="arrow">‹</span>
+                      <span class="dotnav" title="Today">•</span>
+                      <span class="arrow">›</span>
+                    </div>
+                  </div>
+                  <div class="row2">
+                    <div class="seg-toggle">
+                      <button>Month</button>
+                      <button class="active">Week</button>
+                      <button>Day</button>
+                    </div>
+                    <div class="filter-av">
+                      <span class="stack"
+                        ><i style="background: var(--m-greg)">G</i
+                        ><i style="background: var(--m-mira)">M</i
+                        ><i style="background: var(--m-aria)">A</i></span
+                      >
+                      <span class="chev">▾</span>
+                    </div>
+                    <div class="add-mini">+</div>
+                  </div>
+                  <div class="mtrip">
+                    <span class="emo">✈️</span>
+                    <span class="txt">2 trips</span>
+                    <span class="sub">· Phuket · 12d</span>
+                    <span class="chev">›</span>
+                  </div>
+                </div>
+
+                <!-- second sticky layer: week strip -->
+                <div class="strip">
+                  <div class="lblrow"><span class="a">This week</span><span class="rng">May 18 – 24</span></div>
+                  <div class="wkrow">
+                    <div class="pill"><div class="wd">Sun</div><div class="dn">18</div><div class="dots"></div></div>
+                    <div class="pill"><div class="wd">Mon</div><div class="dn">19</div><div class="dots"><i style="background: var(--m-aria)"></i></div></div>
+                    <div class="pill today sel"><div class="wd">Tue</div><div class="dn">20</div><div class="dots"><i style="background: #fff"></i><i style="background: #fff"></i></div></div>
+                    <div class="pill"><div class="wd">Wed</div><div class="dn">21</div><div class="dots"><i style="background: var(--m-oren)"></i></div></div>
+                    <div class="pill"><div class="wd">Thu</div><div class="dn">22</div><div class="dots"></div></div>
+                    <div class="pill"><div class="wd">Fri</div><div class="dn">23</div><div class="dots"><i style="background: var(--orange)"></i></div></div>
+                    <div class="pill"><div class="wd">Sat</div><div class="dn">24</div><div class="dots"></div></div>
+                  </div>
+                  <button class="peekbtn">Peek next week ▾</button>
+                </div>
+
+                <!-- selected-day timeline (what little is left) -->
+                <div class="selday"><span class="big">Tuesday 20</span><span class="sub">3 things</span></div>
+                <div class="tlwrap">
+                  <div class="tl">
+                    <div class="h"><span class="lab">8 AM</span></div>
+                    <div class="h"><span class="lab">9 AM</span>
+                      <div class="te aria" style="top: 4px"><div class="tt">8:30 AM</div><div class="nn">Aria · swim squad</div></div>
+                    </div>
+                    <div class="h"><span class="lab">10 AM</span></div>
+                  </div>
+                </div>
+
+                <div class="botnav">
+                  <div class="tab"><span class="ic">🏡</span>Nook</div>
+                  <div class="tab"><span class="ic">🌳</span>Plan</div>
+                  <div class="tab calendar"><span class="hero">📅</span>Calendar</div>
+                  <div class="tab"><span class="ic">🐷</span>Money</div>
+                  <div class="tab"><span class="ic">👨‍👩‍👦</span>Pod</div>
+                </div>
+
+                <!-- caliper showing chrome vs events to scale (740 device - 28 status) -->
+                <div class="caliper" style="top: 28px; bottom: 0">
+                  <div class="seg2 chrome" style="height: 360px"><span class="tagpx">chrome · ~380px</span></div>
+                  <div class="seg2 events" style="flex: 1"><span class="tagpx">events · ~268px</span></div>
+                  <div class="seg2 chrome" style="height: 64px"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notes">
+          <div class="note">
+            <span class="n">!</span>
+            <h4>Three sticky things, stacked</h4>
+            <p>
+              Command bar (<code>top:0</code>) + week strip + weekday row each claim their own band.
+              On week view that's the command bar <b>plus</b> a second sticky layer beneath it.
+            </p>
+          </div>
+          <div class="note">
+            <span class="n">!</span>
+            <h4>The 16px dead gap</h4>
+            <p>
+              <code>&lt;main&gt;</code> has <code>p-4</code> all round; the command bar bleeds up
+              with <code>-mt-4</code> but the docked sub-headers don't, so they land 16px low and
+              events peek through a slot too short to use.
+            </p>
+          </div>
+          <div class="note">
+            <span class="n">!</span>
+            <h4>Greeting earns nothing here</h4>
+            <p>
+              &ldquo;Hi, greg 👋&rdquo; is lovely on the Nook but pure overhead on the calendar —
+              ~58px that tells you nothing about your week.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== SPACE BUDGET -->
+      <section class="screen" data-screen="budget">
+        <div class="screen-head">
+          <div class="kicker">The headline · drawn to scale</div>
+          <h2>How each layout spends the screen</h2>
+          <p>
+            Same phone, same week view, same status bar and bottom nav. The only thing that changes
+            is the chrome between them. <b>Orange = room for your events.</b> The three levers stack:
+            the recommendation applies all of them.
+          </p>
+        </div>
+
+        <div class="budgets">
+          <!-- NOW -->
+          <div class="budget">
+            <div class="bar">
+              <div class="seg s-chrome" style="height: 26px">status</div>
+              <div class="seg s-chrome" style="height: 38px">app header</div>
+              <div class="seg s-gap" style="height: 14px">gap</div>
+              <div class="seg s-cmd" style="height: 70px">command bar<br />(3 rows)</div>
+              <div class="seg s-sub" style="height: 64px">strip + weekday</div>
+              <div class="seg s-events" style="flex: 1">events<span class="px">~268px</span></div>
+              <div class="seg s-nav" style="height: 40px">bottom nav</div>
+            </div>
+            <div class="cap"><div class="name">Now</div><div class="gain flat">baseline</div></div>
+          </div>
+
+          <!-- A -->
+          <div class="budget">
+            <div class="bar">
+              <div class="seg s-chrome" style="height: 26px">status</div>
+              <div class="seg s-cmd" style="height: 42px">slim bar (1 row)</div>
+              <div class="seg s-sub" style="height: 64px">strip + weekday</div>
+              <div class="seg s-events" style="flex: 1">events<span class="px">~360px</span></div>
+              <div class="seg s-nav" style="height: 40px">bottom nav</div>
+            </div>
+            <div class="cap"><div class="name">A · Flush + 1-row</div><div class="gain up">+~92px · +34%</div></div>
+          </div>
+
+          <!-- C -->
+          <div class="budget">
+            <div class="bar">
+              <div class="seg s-chrome" style="height: 26px">status</div>
+              <div class="seg s-cmd" style="height: 42px">slim bar (1 row)</div>
+              <div class="seg s-sub" style="height: 40px">unified strip</div>
+              <div class="seg s-events" style="flex: 1">events<span class="px">~384px</span></div>
+              <div class="seg s-nav" style="height: 40px">bottom nav</div>
+            </div>
+            <div class="cap"><div class="name">A + C</div><div class="gain up">+~116px · +43%</div></div>
+          </div>
+
+          <!-- REC / B -->
+          <div class="budget hero">
+            <div class="bar">
+              <div class="seg s-chrome" style="height: 26px">status</div>
+              <div class="seg s-events" style="flex: 1">events<span class="px">~474px scrolling</span></div>
+              <div class="seg s-nav" style="height: 40px">bottom nav</div>
+            </div>
+            <div class="cap"><div class="name">★ A + C + B</div><div class="gain up">+~206px · +77%</div></div>
+          </div>
+        </div>
+
+        <div class="legend">
+          <span class="lk"><span class="sw" style="background: var(--b-chrome)"></span>status / fixed</span>
+          <span class="lk"><span class="sw" style="background: var(--b-gap)"></span>dead 16px gap</span>
+          <span class="lk"><span class="sw" style="background: var(--b-cmd)"></span>command bar</span>
+          <span class="lk"><span class="sw" style="background: var(--b-sub)"></span>sub-header</span>
+          <span class="lk"><span class="sw" style="background: var(--orange)"></span>events</span>
+          <span class="lk"><span class="sw" style="background: var(--b-nav)"></span>bottom nav</span>
+        </div>
+
+        <div class="notes">
+          <div class="note keep">
+            <span class="n">✓</span>
+            <h4>Nothing is removed</h4>
+            <p>
+              Period label, prev/next, Today, Month/Week/Day, the family filter, Add, the trip
+              countdown, and the day strip all survive — they're just laid out tighter and the
+              redundant greeting + dead gap are reclaimed.
+            </p>
+          </div>
+          <div class="note">
+            <span class="n">A</span>
+            <h4>Always-on win</h4>
+            <p>Flush-to-top + one-row bar is a static reclaim — no interaction needed, applies to every view.</p>
+          </div>
+          <div class="note">
+            <span class="n">B</span>
+            <h4>Browsing win</h4>
+            <p>Auto-hide gives the bar's height back the moment you scroll into events; it returns on the first upward flick.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== OPTION A -->
+      <section class="screen" data-screen="a">
+        <div class="screen-head">
+          <div class="kicker">Option A · the always-on reclaim</div>
+          <h2>Flush to the top, command bar folded into one row</h2>
+          <p>
+            Drop the page greeting on the calendar (tuck the hamburger + bell beside the period
+            label), delete the <code>16px</code> page padding so the bar is truly flush, and
+            collapse the three command-bar rows into one: <b>‹ May 18–24 › · Today</b> on the left,
+            <b>Week toggle · filter · + · ✈️12d</b> on the right. The trip ribbon becomes a single
+            tappable countdown chip. <b>~92px back, on every view, with zero interaction.</b>
+          </p>
+        </div>
+
+        <div class="phones">
+          <div class="phone">
+            <div class="phone-cap">A — week view<span class="tag">+34% events</span></div>
+            <div class="bezel">
+              <div class="device">
+                <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+
+                <!-- slim merged header: nav controls flank the period, no greeting row -->
+                <div class="slimhead">
+                  <div class="burger"><i></i><i></i><i></i></div>
+                  <div class="period"><span class="label">May 18&ndash;24</span></div>
+                  <div class="nav-mini">
+                    <span class="arrow">‹</span><span class="dotnav">•</span><span class="arrow">›</span>
+                  </div>
+                  <div class="bell" style="margin-left: 4px">🔔</div>
+                </div>
+
+                <!-- one-row command bar -->
+                <div class="mcmd1">
+                  <div class="seg-toggle">
+                    <button>M</button><button class="active">W</button><button>D</button>
+                  </div>
+                  <div class="filter-av">
+                    <span class="stack"
+                      ><i style="background: var(--m-greg)">G</i
+                      ><i style="background: var(--m-mira)">M</i
+                      ><i style="background: var(--m-aria)">A</i></span
+                    ><span class="chev">▾</span>
+                  </div>
+                  <span class="trip-chip">✈️ 12d ›</span>
+                  <div class="add-mini">+</div>
+                </div>
+
+                <!-- still a separate strip + weekday here (C fixes that) -->
+                <div class="strip">
+                  <div class="lblrow"><span class="a">This week</span><span class="rng">May 18 – 24</span></div>
+                  <div class="wkrow">
+                    <div class="pill"><div class="wd">Sun</div><div class="dn">18</div><div class="dots"></div></div>
+                    <div class="pill"><div class="wd">Mon</div><div class="dn">19</div><div class="dots"><i style="background: var(--m-aria)"></i></div></div>
+                    <div class="pill today sel"><div class="wd">Tue</div><div class="dn">20</div><div class="dots"><i style="background: #fff"></i><i style="background: #fff"></i></div></div>
+                    <div class="pill"><div class="wd">Wed</div><div class="dn">21</div><div class="dots"><i style="background: var(--m-oren)"></i></div></div>
+                    <div class="pill"><div class="wd">Thu</div><div class="dn">22</div><div class="dots"></div></div>
+                    <div class="pill"><div class="wd">Fri</div><div class="dn">23</div><div class="dots"><i style="background: var(--orange)"></i></div></div>
+                    <div class="pill"><div class="wd">Sat</div><div class="dn">24</div><div class="dots"></div></div>
+                  </div>
+                </div>
+
+                <div class="selday"><span class="big">Tuesday 20</span><span class="sub">3 things</span></div>
+                <div class="tlwrap">
+                  <div class="tl">
+                    <div class="h"><span class="lab">8 AM</span>
+                      <div class="te aria" style="top: 28px"><div class="tt">8:30 AM</div><div class="nn">Aria · swim squad</div></div>
+                    </div>
+                    <div class="h"><span class="lab">9 AM</span></div>
+                    <div class="h"><span class="lab">10 AM</span>
+                      <div class="te fam" style="top: 12px"><div class="tt">10:30 AM</div><div class="nn">Family · brunch w/ gran</div></div>
+                    </div>
+                    <div class="h"><span class="lab">11 AM</span></div>
+                    <div class="h"><span class="lab">12 PM</span></div>
+                    <div class="h"><span class="lab">1 PM</span>
+                      <div class="te oren" style="top: 6px"><div class="tt">1:15 PM</div><div class="nn">Oren · piano</div></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="botnav">
+                  <div class="tab"><span class="ic">🏡</span>Nook</div>
+                  <div class="tab"><span class="ic">🌳</span>Plan</div>
+                  <div class="tab calendar"><span class="hero">📅</span>Calendar</div>
+                  <div class="tab"><span class="ic">🐷</span>Money</div>
+                  <div class="tab"><span class="ic">👨‍👩‍👦</span>Pod</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notes">
+          <div class="note keep">
+            <span class="n">✓</span>
+            <h4>Hamburger + bell stay</h4>
+            <p>They just move beside the title. Tapping the bean logo / hamburger still opens the menu; the bell still shows unread dots.</p>
+          </div>
+          <div class="note">
+            <span class="n">1</span>
+            <h4>Trip ribbon → chip</h4>
+            <p>The soonest trip's countdown becomes a single <code>✈️ 12d ›</code> chip; tap opens the same trips sheet. Multiple trips still reachable.</p>
+          </div>
+          <div class="note">
+            <span class="n">2</span>
+            <h4>Low risk</h4>
+            <p>Pure layout + a page-scoped padding override. No nav-state rewrite. Ships independently of B and C.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== OPTION B -->
+      <section class="screen" data-screen="b">
+        <div class="screen-head">
+          <div class="kicker">Option B · the browsing reclaim</div>
+          <h2>The command bar steps aside while you scroll</h2>
+          <p>
+            Borrowed from mobile Safari and Google Calendar: scrolling <b>down</b> into your events
+            slides the command bar up out of the way; the first upward flick brings it straight
+            back. The day strip can stay pinned (so you never lose your bearings) or hide with the
+            bar — your call. <b>Tap a frame to toggle scrolled state.</b> Reclaims the bar's full
+            height — but only while you're actively reading, so it pairs with A rather than replacing it.
+          </p>
+        </div>
+
+        <div class="phones">
+          <!-- at rest -->
+          <div class="phone">
+            <div class="phone-cap">B — at the top<span class="tag">chrome shown</span></div>
+            <div class="bezel">
+              <div class="device" id="devB" onclick="this.classList.toggle('scrolled')">
+                <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+                <div class="slimhead">
+                  <div class="burger"><i></i><i></i><i></i></div>
+                  <div class="period"><span class="label">May 18&ndash;24</span></div>
+                  <div class="nav-mini"><span class="arrow">‹</span><span class="dotnav">•</span><span class="arrow">›</span></div>
+                  <div class="bell" style="margin-left: 4px">🔔</div>
+                </div>
+                <div class="mcmd1 hideable">
+                  <div class="seg-toggle"><button>M</button><button class="active">W</button><button>D</button></div>
+                  <div class="filter-av"><span class="stack"><i style="background: var(--m-greg)">G</i><i style="background: var(--m-aria)">A</i></span><span class="chev">▾</span></div>
+                  <span class="trip-chip">✈️ 12d ›</span>
+                  <div class="add-mini">+</div>
+                </div>
+                <!-- strip stays pinned -->
+                <div class="ustrip">
+                  <div class="wkrow">
+                    <div class="pill"><div class="wd">S</div><div class="dn">18</div><div class="dots"></div></div>
+                    <div class="pill"><div class="wd">M</div><div class="dn">19</div><div class="dots"><i style="background: var(--m-aria)"></i></div></div>
+                    <div class="pill today sel"><div class="wd">T</div><div class="dn">20</div><div class="dots"><i style="background: #fff"></i></div></div>
+                    <div class="pill"><div class="wd">W</div><div class="dn">21</div><div class="dots"><i style="background: var(--m-oren)"></i></div></div>
+                    <div class="pill"><div class="wd">T</div><div class="dn">22</div><div class="dots"></div></div>
+                    <div class="pill"><div class="wd">F</div><div class="dn">23</div><div class="dots"><i style="background: var(--orange)"></i></div></div>
+                    <div class="pill"><div class="wd">S</div><div class="dn">24</div><div class="dots"></div></div>
+                  </div>
+                </div>
+                <div class="tlwrap">
+                  <div class="tl">
+                    <div class="h"><span class="lab">8 AM</span><div class="te aria" style="top: 28px"><div class="tt">8:30 AM</div><div class="nn">Aria · swim squad</div></div></div>
+                    <div class="h"><span class="lab">9 AM</span></div>
+                    <div class="h"><span class="lab">10 AM</span><div class="te fam" style="top: 12px"><div class="tt">10:30 AM</div><div class="nn">Family · brunch</div></div></div>
+                    <div class="h"><span class="lab">11 AM</span></div>
+                  </div>
+                </div>
+                <div class="botnav">
+                  <div class="tab"><span class="ic">🏡</span>Nook</div>
+                  <div class="tab"><span class="ic">🌳</span>Plan</div>
+                  <div class="tab calendar"><span class="hero">📅</span>Calendar</div>
+                  <div class="tab"><span class="ic">🐷</span>Money</div>
+                  <div class="tab"><span class="ic">👨‍👩‍👦</span>Pod</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- scrolled -->
+          <div class="phone">
+            <div class="phone-cap">B — scrolling down<span class="tag">bar stepped away</span></div>
+            <div class="bezel">
+              <div class="device scrolled" onclick="this.classList.toggle('scrolled')">
+                <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+                <div class="slimhead">
+                  <div class="burger"><i></i><i></i><i></i></div>
+                  <div class="period"><span class="label">May 18&ndash;24</span></div>
+                  <div class="nav-mini"><span class="arrow">‹</span><span class="dotnav">•</span><span class="arrow">›</span></div>
+                  <div class="bell" style="margin-left: 4px">🔔</div>
+                </div>
+                <div class="mcmd1 hideable">
+                  <div class="seg-toggle"><button>M</button><button class="active">W</button><button>D</button></div>
+                  <div class="filter-av"><span class="stack"><i style="background: var(--m-greg)">G</i><i style="background: var(--m-aria)">A</i></span><span class="chev">▾</span></div>
+                  <span class="trip-chip">✈️ 12d ›</span>
+                  <div class="add-mini">+</div>
+                </div>
+                <div class="ustrip">
+                  <div class="wkrow">
+                    <div class="pill"><div class="wd">S</div><div class="dn">18</div><div class="dots"></div></div>
+                    <div class="pill"><div class="wd">M</div><div class="dn">19</div><div class="dots"><i style="background: var(--m-aria)"></i></div></div>
+                    <div class="pill today sel"><div class="wd">T</div><div class="dn">20</div><div class="dots"><i style="background: #fff"></i></div></div>
+                    <div class="pill"><div class="wd">W</div><div class="dn">21</div><div class="dots"><i style="background: var(--m-oren)"></i></div></div>
+                    <div class="pill"><div class="wd">T</div><div class="dn">22</div><div class="dots"></div></div>
+                    <div class="pill"><div class="wd">F</div><div class="dn">23</div><div class="dots"><i style="background: var(--orange)"></i></div></div>
+                    <div class="pill"><div class="wd">S</div><div class="dn">24</div><div class="dots"></div></div>
+                  </div>
+                </div>
+                <div class="tlwrap">
+                  <div class="tl">
+                    <div class="h"><span class="lab">10 AM</span><div class="te fam" style="top: 12px"><div class="tt">10:30 AM</div><div class="nn">Family · brunch w/ gran</div></div></div>
+                    <div class="h"><span class="lab">11 AM</span></div>
+                    <div class="h"><span class="lab">12 PM</span><div class="te oren" style="top: 8px"><div class="tt">12:30 PM</div><div class="nn">Oren · piano</div></div></div>
+                    <div class="h"><span class="lab">1 PM</span></div>
+                    <div class="h"><span class="lab">2 PM</span><div class="te mira" style="top: 6px"><div class="tt">2:00 PM</div><div class="nn">Mira · dentist</div></div></div>
+                    <div class="h"><span class="lab">3 PM</span></div>
+                  </div>
+                </div>
+                <div class="scrollhint">↑ flick up to bring it back</div>
+                <div class="botnav">
+                  <div class="tab"><span class="ic">🏡</span>Nook</div>
+                  <div class="tab"><span class="ic">🌳</span>Plan</div>
+                  <div class="tab calendar"><span class="hero">📅</span>Calendar</div>
+                  <div class="tab"><span class="ic">🐷</span>Money</div>
+                  <div class="tab"><span class="ic">👨‍👩‍👦</span>Pod</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notes">
+          <div class="note">
+            <span class="n">1</span>
+            <h4>Threshold + direction</h4>
+            <p>Hide only after ~24px of downward scroll; reveal on any upward delta. Never hide within the first screen, so it doesn't twitch on tiny scrolls.</p>
+          </div>
+          <div class="note keep">
+            <span class="n">✓</span>
+            <h4>Strip can stay pinned</h4>
+            <p>The day-of-week strip is your orientation anchor — leave it pinned while the heavier bar hides, or hide both. Toggle in the plan.</p>
+          </div>
+          <div class="note">
+            <span class="n">2</span>
+            <h4>Honour reduced-motion</h4>
+            <p>Slide transition respects <code>prefers-reduced-motion</code> — snaps instead of animating. Re-uses the existing visibility-poll pattern, no new scroll listener leak.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== OPTION C -->
+      <section class="screen" data-screen="c">
+        <div class="screen-head">
+          <div class="kicker">Option C · collapse two layers into one</div>
+          <h2>Fold the weekday/member labels into the strip</h2>
+          <p>
+            Today the week view stacks the <b>strip</b> (Sun 18 · Mon 19 …) and then a
+            <b>separate sticky weekday row</b> (S M T W T F S) — the same seven columns labelled
+            twice. Put the weekday letter <b>on each strip pill</b> and the second row disappears.
+            Same trick on day view: the per-person avatars become a slim single strip instead of a
+            tall member header. <b>~24px back and one less seam.</b>
+          </p>
+        </div>
+
+        <div class="phones">
+          <!-- C week -->
+          <div class="phone">
+            <div class="phone-cap">C — week view<span class="tag">one header</span></div>
+            <div class="bezel">
+              <div class="device">
+                <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+                <div class="slimhead">
+                  <div class="burger"><i></i><i></i><i></i></div>
+                  <div class="period"><span class="label">May 18&ndash;24</span></div>
+                  <div class="nav-mini"><span class="arrow">‹</span><span class="dotnav">•</span><span class="arrow">›</span></div>
+                  <div class="bell" style="margin-left: 4px">🔔</div>
+                </div>
+                <div class="mcmd1">
+                  <div class="seg-toggle"><button>M</button><button class="active">W</button><button>D</button></div>
+                  <div class="filter-av"><span class="stack"><i style="background: var(--m-greg)">G</i><i style="background: var(--m-aria)">A</i></span><span class="chev">▾</span></div>
+                  <span class="trip-chip">✈️ 12d ›</span>
+                  <div class="add-mini">+</div>
+                </div>
+                <!-- ONE unified strip — weekday letter lives on the pill -->
+                <div class="ustrip">
+                  <div class="wkrow">
+                    <div class="pill"><div class="wd">Sun</div><div class="dn">18</div><div class="dots"></div></div>
+                    <div class="pill"><div class="wd">Mon</div><div class="dn">19</div><div class="dots"><i style="background: var(--m-aria)"></i></div></div>
+                    <div class="pill today sel"><div class="wd">Tue</div><div class="dn">20</div><div class="dots"><i style="background: #fff"></i><i style="background: #fff"></i></div></div>
+                    <div class="pill"><div class="wd">Wed</div><div class="dn">21</div><div class="dots"><i style="background: var(--m-oren)"></i></div></div>
+                    <div class="pill"><div class="wd">Thu</div><div class="dn">22</div><div class="dots"></div></div>
+                    <div class="pill"><div class="wd">Fri</div><div class="dn">23</div><div class="dots"><i style="background: var(--orange)"></i></div></div>
+                    <div class="pill"><div class="wd">Sat</div><div class="dn">24</div><div class="dots"></div></div>
+                  </div>
+                </div>
+                <div class="selday"><span class="big">Tuesday 20</span><span class="sub">3 things</span></div>
+                <div class="tlwrap">
+                  <div class="tl">
+                    <div class="h"><span class="lab">8 AM</span><div class="te aria" style="top: 28px"><div class="tt">8:30 AM</div><div class="nn">Aria · swim squad</div></div></div>
+                    <div class="h"><span class="lab">9 AM</span></div>
+                    <div class="h"><span class="lab">10 AM</span><div class="te fam" style="top: 12px"><div class="tt">10:30 AM</div><div class="nn">Family · brunch w/ gran</div></div></div>
+                    <div class="h"><span class="lab">11 AM</span></div>
+                    <div class="h"><span class="lab">12 PM</span></div>
+                    <div class="h"><span class="lab">1 PM</span><div class="te oren" style="top: 6px"><div class="tt">1:15 PM</div><div class="nn">Oren · piano</div></div></div>
+                  </div>
+                </div>
+                <div class="botnav">
+                  <div class="tab"><span class="ic">🏡</span>Nook</div>
+                  <div class="tab"><span class="ic">🌳</span>Plan</div>
+                  <div class="tab calendar"><span class="hero">📅</span>Calendar</div>
+                  <div class="tab"><span class="ic">🐷</span>Money</div>
+                  <div class="tab"><span class="ic">👨‍👩‍👦</span>Pod</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- C month for contrast -->
+          <div class="phone">
+            <div class="phone-cap">C — month agenda<span class="tag">already lean</span></div>
+            <div class="bezel">
+              <div class="device">
+                <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+                <div class="slimhead">
+                  <div class="burger"><i></i><i></i><i></i></div>
+                  <div class="period"><span class="label">May <span class="yr">2026</span></span></div>
+                  <div class="nav-mini"><span class="arrow">‹</span><span class="dotnav">•</span><span class="arrow">›</span></div>
+                  <div class="bell" style="margin-left: 4px">🔔</div>
+                </div>
+                <div class="mcmd1">
+                  <div class="seg-toggle"><button class="active">M</button><button>W</button><button>D</button></div>
+                  <div class="filter-av"><span class="stack"><i style="background: var(--m-greg)">G</i><i style="background: var(--m-aria)">A</i></span><span class="chev">▾</span></div>
+                  <span class="trip-chip">✈️ 12d ›</span>
+                  <div class="add-mini">+</div>
+                </div>
+                <!-- month agenda needs no column header at all -->
+                <div class="tlwrap" style="padding-top: 10px">
+                  <div style="display: flex; align-items: center; gap: 8px; margin: 2px 0 8px">
+                    <span style="font-family: 'Outfit'; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--orange-ink)">This week</span>
+                    <span style="flex: 1; height: 1px; background: var(--line-strong)"></span>
+                    <span style="font-size: 10.5px; color: var(--slate-mute)">May 18 – 24</span>
+                  </div>
+                  <!-- a couple of agenda day-rows -->
+                  <div style="display: flex; gap: 11px; padding: 9px; background: var(--paper); border-radius: var(--r-lg); margin-bottom: 8px; box-shadow: var(--lift-1); box-shadow: inset 0 0 0 2px var(--orange)">
+                    <div style="flex-shrink: 0; width: 42px; text-align: center">
+                      <div style="font-family: 'Outfit'; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--slate-mute)">Tue</div>
+                      <div style="font-family: 'Outfit'; font-size: 19px; font-weight: 800; color: #fff; width: 34px; height: 34px; line-height: 34px; margin: 2px auto 0; border-radius: 50%; background: var(--orange)">20</div>
+                    </div>
+                    <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; padding-top: 2px">
+                      <div style="display: flex; align-items: center; gap: 7px; border-left: 3px solid var(--m-aria); background: var(--m-aria-soft); border-radius: 8px; padding: 6px 9px"><span>🏊</span><span style="font-family: 'Outfit'; font-weight: 700; font-size: 11px; color: var(--slate-soft); min-width: 42px">8:30a</span><span style="font-weight: 600; font-size: 13px">Aria · swim squad</span></div>
+                      <div style="display: flex; align-items: center; gap: 7px; border-left: 3px solid var(--orange); background: var(--orange-12); border-radius: 8px; padding: 6px 9px"><span>🥐</span><span style="font-family: 'Outfit'; font-weight: 700; font-size: 11px; color: var(--slate-soft); min-width: 42px">10:30a</span><span style="font-weight: 600; font-size: 13px">Family · brunch</span></div>
+                    </div>
+                  </div>
+                  <div style="display: flex; gap: 11px; padding: 5px 9px; align-items: center; margin-bottom: 8px">
+                    <div style="flex-shrink: 0; width: 42px; text-align: center"><div style="font-family: 'Outfit'; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--slate-mute)">Wed</div><div style="font-family: 'Outfit'; font-size: 19px; font-weight: 800; color: var(--slate-soft)">21</div></div>
+                    <span style="font-size: 12px; color: var(--slate-faint); font-style: italic">nothing planned</span>
+                  </div>
+                  <div style="display: flex; gap: 11px; padding: 9px; background: var(--paper); border-radius: var(--r-lg); margin-bottom: 8px; box-shadow: var(--lift-1)">
+                    <div style="flex-shrink: 0; width: 42px; text-align: center"><div style="font-family: 'Outfit'; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--slate-mute)">Fri</div><div style="font-family: 'Outfit'; font-size: 19px; font-weight: 800; color: var(--slate)">23</div></div>
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 5px; padding-top: 2px"><div style="display: flex; align-items: center; gap: 7px; border-left: 3px solid var(--orange); background: var(--orange-12); border-radius: 8px; padding: 6px 9px"><span>🎂</span><span style="font-family: 'Outfit'; font-weight: 700; font-size: 11px; color: var(--slate-soft); min-width: 42px">all day</span><span style="font-weight: 600; font-size: 13px">Gran's birthday</span></div></div>
+                  </div>
+                </div>
+                <div class="botnav">
+                  <div class="tab"><span class="ic">🏡</span>Nook</div>
+                  <div class="tab"><span class="ic">🌳</span>Plan</div>
+                  <div class="tab calendar"><span class="hero">📅</span>Calendar</div>
+                  <div class="tab"><span class="ic">🐷</span>Money</div>
+                  <div class="tab"><span class="ic">👨‍👩‍👦</span>Pod</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notes">
+          <div class="note keep">
+            <span class="n">✓</span>
+            <h4>No info lost</h4>
+            <p>The weekday letter was always on the strip pills too — we just stop printing the second copy. Density dots and the selected/today states are untouched.</p>
+          </div>
+          <div class="note">
+            <span class="n">1</span>
+            <h4>Day view too</h4>
+            <p>The tall member-avatar header becomes a slim single-row avatar strip; the colour bar under each name moves onto the column edge.</p>
+          </div>
+          <div class="note">
+            <span class="n">2</span>
+            <h4>Retires <code>--planner-cmdbar-h</code> math</h4>
+            <p>With one sticky block the fragile "dock the second header at the bar's measured height" dance mostly goes away — fewer ResizeObserver edge-cases.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== RECOMMENDATION -->
+      <section class="screen" data-screen="rec">
+        <div class="screen-head">
+          <div class="kicker">★ Recommendation</div>
+          <h2>Ship A now; layer C with it; add B as the finishing move</h2>
+          <p>
+            <b>A + C</b> together are the safe, always-on win — one slim flush row, one unified
+            header, every view, no interaction, <b>~+43% event height</b> and nothing removed. Add
+            <b>B</b> (auto-hide on scroll) on top and an actively-scrolling user sees
+            <b>~+77%</b>. I'd build A and C as one change (they touch the same components), validate
+            on a real phone, then add B as a follow-up once the static layout feels right.
+          </p>
+        </div>
+
+        <div class="phones">
+          <div class="phone">
+            <div class="phone-cap">Recommended — A + C, at rest<span class="tag">+43% events</span></div>
+            <div class="bezel">
+              <div class="device" onclick="this.classList.toggle('scrolled')">
+                <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+                <div class="slimhead">
+                  <div class="burger"><i></i><i></i><i></i></div>
+                  <div class="period"><span class="label">May 18&ndash;24</span></div>
+                  <div class="nav-mini"><span class="arrow">‹</span><span class="dotnav">•</span><span class="arrow">›</span></div>
+                  <div class="bell" style="margin-left: 4px">🔔</div>
+                </div>
+                <div class="mcmd1 hideable">
+                  <div class="seg-toggle"><button>M</button><button class="active">W</button><button>D</button></div>
+                  <div class="filter-av"><span class="stack"><i style="background: var(--m-greg)">G</i><i style="background: var(--m-mira)">M</i><i style="background: var(--m-aria)">A</i></span><span class="chev">▾</span></div>
+                  <span class="trip-chip">✈️ 12d ›</span>
+                  <div class="add-mini">+</div>
+                </div>
+                <div class="ustrip">
+                  <div class="wkrow">
+                    <div class="pill"><div class="wd">Sun</div><div class="dn">18</div><div class="dots"></div></div>
+                    <div class="pill"><div class="wd">Mon</div><div class="dn">19</div><div class="dots"><i style="background: var(--m-aria)"></i></div></div>
+                    <div class="pill today sel"><div class="wd">Tue</div><div class="dn">20</div><div class="dots"><i style="background: #fff"></i><i style="background: #fff"></i></div></div>
+                    <div class="pill"><div class="wd">Wed</div><div class="dn">21</div><div class="dots"><i style="background: var(--m-oren)"></i></div></div>
+                    <div class="pill"><div class="wd">Thu</div><div class="dn">22</div><div class="dots"></div></div>
+                    <div class="pill"><div class="wd">Fri</div><div class="dn">23</div><div class="dots"><i style="background: var(--orange)"></i></div></div>
+                    <div class="pill"><div class="wd">Sat</div><div class="dn">24</div><div class="dots"></div></div>
+                  </div>
+                </div>
+                <div class="selday"><span class="big">Tuesday 20</span><span class="sub">3 things · tap to demo B</span></div>
+                <div class="tlwrap">
+                  <div class="tl">
+                    <div class="h"><span class="lab">8 AM</span><div class="te aria" style="top: 28px"><div class="tt">8:30 AM</div><div class="nn">Aria · swim squad</div></div></div>
+                    <div class="h"><span class="lab">9 AM</span></div>
+                    <div class="h"><span class="lab">10 AM</span><div class="te fam" style="top: 12px"><div class="tt">10:30 AM</div><div class="nn">Family · brunch w/ gran</div></div></div>
+                    <div class="h"><span class="lab">11 AM</span></div>
+                    <div class="h"><span class="lab">12 PM</span></div>
+                    <div class="h"><span class="lab">1 PM</span><div class="te oren" style="top: 6px"><div class="tt">1:15 PM</div><div class="nn">Oren · piano</div></div></div>
+                    <div class="h"><span class="lab">2 PM</span><div class="te mira" style="top: 20px"><div class="tt">2:30 PM</div><div class="nn">Mira · dentist</div></div></div>
+                  </div>
+                </div>
+                <div class="scrollhint">↑ flick up to bring it back</div>
+                <div class="botnav">
+                  <div class="tab"><span class="ic">🏡</span>Nook</div>
+                  <div class="tab"><span class="ic">🌳</span>Plan</div>
+                  <div class="tab calendar"><span class="hero">📅</span>Calendar</div>
+                  <div class="tab"><span class="ic">🐷</span>Money</div>
+                  <div class="tab"><span class="ic">👨‍👩‍👦</span>Pod</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notes">
+          <div class="note keep">
+            <span class="n">✓</span>
+            <h4>Phase 1 — A + C (one PR)</h4>
+            <p>
+              Slim flush header, one-row command bar, trip chip, unified strip. Touches
+              <code>CalendarCommandBar</code>, <code>WeekStripNav</code>, the week/day views, and a
+              page-scoped padding override. Mockup-first → <code>/beanies-plan</code> 4-pass.
+            </p>
+          </div>
+          <div class="note">
+            <span class="n">2</span>
+            <h4>Phase 2 — B (follow-up)</h4>
+            <p>
+              Auto-hide-on-scroll composable, reduced-motion aware, reusing the visibility-poll
+              pattern. Decide then whether the strip hides with the bar or stays pinned.
+            </p>
+          </div>
+          <div class="note">
+            <span class="n">?</span>
+            <h4>Two calls for you</h4>
+            <p>
+              (1) On the calendar page, fully drop the greeting header, or keep a 1px bean-logo tap
+              target? (2) For B: hide the strip too, or pin it as the orientation anchor?
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const tabs = document.querySelectorAll('.switcher button');
+      const screens = document.querySelectorAll('.screen');
+      tabs.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          tabs.forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+          const s = btn.dataset.s;
+          screens.forEach((sc) =>
+            sc.classList.toggle('active', sc.dataset.screen === s)
+          );
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      });
+    </script>
+  </body>
+</html>

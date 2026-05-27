@@ -6,8 +6,10 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
-import GlobalSearch from '@/components/common/GlobalSearch.vue';
+import HamburgerButton from '@/components/common/HamburgerButton.vue';
+import SearchButton from '@/components/common/SearchButton.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
+import { useMobileMenu } from '@/composables/useMobileMenu';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
@@ -34,7 +36,9 @@ import { hardReload } from '@/utils/hardReload';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
-const emit = defineEmits<{ toggleMenu: [] }>();
+// Menu open-state is the shared singleton (so the planner command bar can toggle
+// the same menu); the hamburger here just calls toggle().
+const { toggle: toggleMenu } = useMobileMenu();
 
 const route = useRoute();
 const router = useRouter();
@@ -82,7 +86,6 @@ const pageTitle = computed(() => {
 const { isUnlocked, toggle: togglePrivacy } = usePrivacyMode();
 const { playBlink } = useSounds();
 const currentMember = computed(() => familyStore.currentMember);
-const showSearch = ref(false);
 const showLanguageDropdown = ref(false);
 const showProfileDropdown = ref(false);
 const showCurrencyDropdown = ref(false);
@@ -230,16 +233,7 @@ async function confirmSignOutAndClearData() {
     <!-- ═══ MOBILE / TABLET HEADER ═══ -->
     <template v-if="!isDesktop">
       <!-- Left: Hamburger -->
-      <button
-        type="button"
-        class="flex h-10 w-10 cursor-pointer flex-col items-start justify-center gap-[5px] rounded-[14px] bg-white pl-3 shadow-[0_2px_8px_rgba(44,62,80,0.06)] dark:bg-slate-800 dark:shadow-none"
-        :aria-label="t('mobile.menu')"
-        @click="emit('toggleMenu')"
-      >
-        <span class="bg-secondary-500/50 h-[2px] w-[14px] rounded-full dark:bg-gray-400/50" />
-        <span class="bg-secondary-500/50 h-[2px] w-[14px] rounded-full dark:bg-gray-400/50" />
-        <span class="bg-primary-500 h-[2px] w-[10px] rounded-full" />
-      </button>
+      <HamburgerButton @click="toggleMenu" />
 
       <!-- Center: Greeting or page title (truncated) -->
       <div class="mx-3 min-w-0 flex-1 text-center">
@@ -283,23 +277,7 @@ async function confirmSignOutAndClearData() {
         </button>
 
         <!-- Search -->
-        <button
-          type="button"
-          class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:shadow-none"
-          :aria-label="t('search.placeholder')"
-          @click="showSearch = true"
-        >
-          <svg
-            class="h-[18px] w-[18px] text-gray-400 dark:text-gray-500"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-        </button>
+        <SearchButton />
 
         <!-- Profile avatar dropdown -->
         <div class="relative">
@@ -644,23 +622,7 @@ async function confirmSignOutAndClearData() {
         </button>
 
         <!-- Search -->
-        <button
-          type="button"
-          class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors hover:bg-gray-50 dark:bg-slate-800 dark:shadow-none dark:hover:bg-slate-700"
-          :aria-label="t('search.placeholder')"
-          @click="showSearch = true"
-        >
-          <svg
-            class="h-[18px] w-[18px] text-gray-400 dark:text-gray-500"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-        </button>
+        <SearchButton />
 
         <!-- Profile dropdown (avatar + chevron) -->
         <div class="relative">
@@ -909,8 +871,5 @@ async function confirmSignOutAndClearData() {
         </template>
       </BaseModal>
     </Teleport>
-
-    <!-- Global search overlay -->
-    <GlobalSearch :open="showSearch" @close="showSearch = false" />
   </header>
 </template>

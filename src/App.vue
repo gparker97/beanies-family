@@ -35,6 +35,7 @@ import ContentSkeleton from '@/components/ui/ContentSkeleton.vue';
 import BackgroundSyncBar from '@/components/common/BackgroundSyncBar.vue';
 import { isPlatformAuthenticatorAvailable } from '@/services/auth/passkeyService';
 import { useBreakpoint } from '@/composables/useBreakpoint';
+import { useMobileMenu, useHeaderReclaimed } from '@/composables/useMobileMenu';
 import { updateRatesIfStale, forceUpdateRates } from '@/services/exchangeRate';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
@@ -144,7 +145,11 @@ watch(
     }
   }
 );
-const isMenuOpen = ref(false);
+// Mobile hamburger menu state is a shared singleton so the planner's reclaimed
+// command bar can toggle the same menu (see useMobileMenu). `headerReclaimed`
+// hides the global AppHeader on the mobile/tablet Activities route.
+const { isOpen: isMenuOpen, close: closeMenu } = useMobileMenu();
+const headerReclaimed = useHeaderReclaimed();
 const showTrustPrompt = ref(false);
 const showPasskeyPrompt = ref(false);
 const passkeyPromptDismissed = ref(false);
@@ -1608,7 +1613,7 @@ watch(
           @reconnected="handleGoogleReconnected"
         />
 
-        <AppHeader @toggle-menu="isMenuOpen = !isMenuOpen" />
+        <AppHeader v-if="!headerReclaimed" />
 
         <main
           class="flex-1 overflow-auto overscroll-y-contain p-4 md:p-6"
@@ -1623,7 +1628,7 @@ watch(
       <MobileBottomNav v-if="isMobile" />
 
       <!-- Mobile hamburger menu -->
-      <MobileHamburgerMenu :open="isMenuOpen" @close="isMenuOpen = false" />
+      <MobileHamburgerMenu :open="isMenuOpen" @close="closeMenu" />
     </div>
 
     <div v-else>
