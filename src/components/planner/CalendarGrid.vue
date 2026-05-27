@@ -4,7 +4,6 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { extractDatePart, formatNookDate } from '@/utils/date';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
@@ -16,7 +15,6 @@ import MonthDayCard, {
   type CellTimedOccurrence,
   type CellVacation,
 } from '@/components/planner/MonthDayCard.vue';
-import MemberChip from '@/components/ui/MemberChip.vue';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import type { FamilyActivity, HolidayOccurrence } from '@/types/models';
 
@@ -43,7 +41,6 @@ const activityStore = useActivityStore();
 const vacationStore = useVacationStore();
 const settingsStore = useSettingsStore();
 const holidayStore = useHolidayStore();
-const familyStore = useFamilyStore();
 
 const today = new Date();
 const currentYear = computed(() => props.referenceDate.getFullYear());
@@ -426,33 +423,6 @@ onMounted(async () => {
     class="rounded-3xl bg-white p-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)] md:p-5 md:pt-3 dark:bg-slate-800"
     style="touch-action: pan-y; will-change: transform"
   >
-    <!-- Mobile-only avatar legend strip — one row of dots, never wraps.
-         The avatars themselves carry the color grammar of the chips below,
-         so this IS the legend (no name labels needed at this size). -->
-    <div
-      v-if="familyStore.humans.length > 0"
-      class="mt-1 mb-3 flex items-center gap-2 overflow-x-auto pb-1 md:hidden"
-    >
-      <span
-        class="font-outfit text-secondary-500/50 flex-shrink-0 text-[0.625rem] font-bold tracking-[0.14em] uppercase dark:text-gray-500"
-      >
-        {{ t('planner.legendShow') }}
-      </span>
-      <MemberChip
-        v-for="m in familyStore.humans"
-        :key="m.id"
-        :member-id="m.id"
-        size="dot"
-        class="!h-7 !w-7 !text-xs"
-      />
-      <span
-        class="from-primary-500 to-terracotta-400 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-bold text-white"
-        :title="t('planner.legendFamily')"
-      >
-        ★
-      </span>
-    </div>
-
     <!-- Desktop-only day-of-week column headers -->
     <div class="hidden md:mb-1 md:grid md:grid-cols-7 md:gap-0">
       <div

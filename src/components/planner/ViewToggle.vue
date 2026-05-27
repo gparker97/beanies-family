@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
 
-defineProps<{ activeView: string }>();
+// `compact` shrinks each segment to its initial letter (M / W / D — or the
+// single-char equivalent in other languages) + tighter padding, for the
+// space-constrained mobile command bar. Desktop stays full-word.
+defineProps<{ activeView: string; compact?: boolean }>();
 const emit = defineEmits<{ 'update:activeView': [view: string] }>();
 const { t } = useTranslation();
 
@@ -10,6 +13,12 @@ const views = [
   { id: 'week', labelKey: 'planner.view.week' as const },
   { id: 'day', labelKey: 'planner.view.day' as const },
 ];
+
+// Initial grapheme of the translated label — works across en (M/W/D), the
+// lowercase beanie overlay (m/w/d), and zh single chars (月/周/日).
+function shortLabel(labelKey: (typeof views)[number]['labelKey']): string {
+  return [...t(labelKey)][0] ?? '';
+}
 </script>
 
 <template>
@@ -20,15 +29,17 @@ const views = [
       v-for="view in views"
       :key="view.id"
       type="button"
-      class="font-outfit cursor-pointer rounded-xl px-4 py-2 text-sm font-semibold transition-all"
-      :class="
+      class="font-outfit cursor-pointer rounded-xl py-2 text-sm font-semibold transition-all"
+      :class="[
+        compact ? 'w-9' : 'px-4',
         view.id === activeView
           ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
-          : 'text-secondary-500/50 hover:text-secondary-500/70 dark:text-gray-400 dark:hover:text-gray-300'
-      "
+          : 'text-secondary-500/50 hover:text-secondary-500/70 dark:text-gray-400 dark:hover:text-gray-300',
+      ]"
+      :aria-label="compact ? t(view.labelKey) : undefined"
       @click="emit('update:activeView', view.id)"
     >
-      {{ t(view.labelKey) }}
+      {{ compact ? shortLabel(view.labelKey) : t(view.labelKey) }}
     </button>
   </div>
 </template>
