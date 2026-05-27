@@ -116,7 +116,7 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="text-secondary-500/50 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
-            :aria-label="t('planner.today')"
+            :aria-label="t('planner.prevPeriod')"
             @click="emit('prev')"
           >
             <svg
@@ -139,7 +139,7 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="text-secondary-500/50 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
-            :aria-label="t('planner.today')"
+            :aria-label="t('planner.nextPeriod')"
             @click="emit('next')"
           >
             <svg

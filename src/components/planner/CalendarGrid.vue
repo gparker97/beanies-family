@@ -23,6 +23,10 @@ const props = defineProps<{
    *  its displayed month from it (props down, no internal nav state). */
   referenceDate: Date;
   selectedDate?: string;
+  /** Bumped by the page on every "Today" tap — force-scrolls the mobile
+   *  day-stack to today even when `referenceDate` is unchanged (already on the
+   *  current month), which a `watch(referenceDate)` alone would miss. */
+  todayTick?: number;
 }>();
 
 const emit = defineEmits<{
@@ -363,39 +367,42 @@ useCalendarSlide(swipeRef, {
   onPrev: () => emit('prev'),
 });
 
-// When the page jumps the reference date to today (the command bar's "Today"),
-// scroll the mobile day-stack to today's card. Plain month prev/next lands on
-// the 1st of another month, so this only fires for the genuine "Today" action.
+// Scroll the mobile day-stack to today's card on every command-bar "Today" tap.
+// Keyed off `todayTick` (not `referenceDate`) so it ALSO fires when the user is
+// already on the current month — there the reference date doesn't change, so a
+// `watch(referenceDate)` would never run. `scrollMobileToToday` no-ops if today
+// isn't in the displayed month, so a stray tick can't scroll the wrong month.
 watch(
-  () => props.referenceDate,
-  (d) => {
-    if (formatDate(d) !== todayStr.value) return;
-    void nextTick().then(() => scrollMobileToToday({ force: true }));
+  () => props.todayTick,
+  () => {
+    void nextTick().then(() => scrollMobileToToday({ force: true, smooth: true }));
   }
 );
 
 /**
- * Mobile scroll-to-today helper. Used in two ways:
- *  - **On first mount** (no `force`): scrolls only when the user hasn't
- *    already scrolled past ~100px. Mirrors `WeeklyCalendarView.vue`'s
- *    scroll-to-current-hour behaviour — don't disturb a user who's
- *    deliberately landed somewhere mid-month.
- *  - **From `goToToday()`** (`force: true`): always scrolls, since the
- *    user explicitly tapped "today" and expects to land on it whether
- *    or not they were already scrolled somewhere else.
+ * Mobile scroll-to-today helper.
+ *  - `force` ignores the "user already scrolled" guard. We always force on
+ *    mount (a fresh mount = first load OR a switch INTO month view, where any
+ *    leftover `<main>.scrollTop` belongs to the previous view, not a deliberate
+ *    scroll here) and on the command-bar "Today" tap.
+ *  - `smooth` animates the jump (user-initiated "Today"); mount lands instantly.
  *
- * Today's MonthDayCard carries a `data-date` attribute we can query.
- * `<main>` is the scroll container in `App.vue` / `FamilyPlannerPage`.
- * Skipped on desktop (`md+`) where the 7-column grid keeps today visible.
+ * Today's MonthDayCard carries a `data-date` attribute we can query. `<main>`
+ * is the scroll container. No-ops on desktop (`md+`, the 7-col grid keeps today
+ * visible) and when today isn't in the displayed month (period continuity — a
+ * switch from another month's week stays at that month rather than jumping).
  */
-function scrollMobileToToday(options: { force?: boolean } = {}) {
+function scrollMobileToToday(options: { force?: boolean; smooth?: boolean } = {}) {
   if (typeof window === 'undefined') return;
   if (window.matchMedia('(min-width: 768px)').matches) return; // md+ = desktop
   if (today.getMonth() !== currentMonth.value || today.getFullYear() !== currentYear.value) {
-    return;
+    return; // today isn't in the displayed month (period continuity)
   }
   const root = swipeRef.value;
-  const mainEl = document.querySelector('main');
+  // Resolve the scroll container by walking up from our own (attached) root —
+  // `document.querySelector('main')` can be null during the route transition
+  // on the first mount tick, which silently aborted the scroll.
+  const mainEl = root?.closest('main');
   if (!root || !mainEl) return;
   if (!options.force && mainEl.scrollTop > 100) return; // first-mount guard
   const card = root.querySelector<HTMLElement>(`[data-date="${todayStr.value}"]`);
@@ -403,17 +410,48 @@ function scrollMobileToToday(options: { force?: boolean } = {}) {
   const cardOffsetWithinMain =
     card.getBoundingClientRect().top - mainEl.getBoundingClientRect().top + mainEl.scrollTop;
   // 80px headroom so today's card has breathing room under the topbar.
-  // Smooth-scroll on force (user-initiated) so the jump is visible;
-  // instant on first mount so the page lands at today without animation.
   mainEl.scrollTo({
     top: Math.max(0, cardOffsetWithinMain - 80),
-    behavior: options.force ? 'smooth' : 'auto',
+    behavior: options.smooth ? 'smooth' : 'auto',
   });
 }
 
-onMounted(async () => {
-  await nextTick();
-  scrollMobileToToday();
+/**
+ * Run `scrollMobileToToday` once the mobile agenda has finished laying out.
+ * The day-stack renders progressively after a route nav / view switch — its
+ * `scrollHeight` grows over several frames, and scrolling mid-render lands on a
+ * stale (often 0) position. So we wait until `scrollHeight` is stable across two
+ * consecutive frames (layout settled), then scroll — falling back after a short
+ * deadline so we never loop forever.
+ */
+function scrollToTodayWhenSettled() {
+  if (typeof window === 'undefined') return;
+  const deadline = performance.now() + 1500;
+  let lastHeight = -1;
+  let stableFrames = 0;
+  const tick = () => {
+    const mainEl = swipeRef.value?.closest('main');
+    const h = mainEl?.scrollHeight ?? -1;
+    if (h === lastHeight) stableFrames += 1;
+    else {
+      stableFrames = 0;
+      lastHeight = h;
+    }
+    if (stableFrames >= 2 || performance.now() >= deadline) {
+      scrollMobileToToday({ force: true });
+      return;
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+// Force on mount so switching INTO month view (or first load) always lands on
+// today — the carried-over scroll position from the previous view must not
+// suppress it (the no-force guard would). Waits for the agenda layout to settle
+// first (see scrollToTodayWhenSettled).
+onMounted(() => {
+  void nextTick().then(scrollToTodayWhenSettled);
 });
 </script>
 
