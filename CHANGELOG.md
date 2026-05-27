@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-28
+
+### Changed
+
+- **What's-new updates now read like a tidy list of headlines.** Each new thing in an update gets a short bold headline with a one-line explanation of what it is and why it helps - and when a single update ships more than one new thing, they're laid out as a clean list instead of one long paragraph.
+
 ## 2026-05-27
 
 ### Added

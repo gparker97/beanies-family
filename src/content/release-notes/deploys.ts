@@ -21,21 +21,50 @@ export const DEPLOY_NOTES: ReleaseNote[] = [
     date: '2026-05-27',
     month: '27 may 2026',
     spotlight: true,
+    // `summary` = the at-a-glance bell-row line. `features` = the headline +
+    // detail block(s) in the note body (one here; list more for a multi-feature
+    // deploy). See `scripts/deploy/release-note-guide.md`.
     summary: {
-      en: 'Notifications are here! The notifications bell in the header now gives you a timely reminder of what you need to do, when you need to do it - so you can be sure that nothing slips through the cracks',
-      beanie:
-        'notifications are here! the notifications bell in the header now gives you a timely reminder of what you need to do, when you need to do it - so you can be sure that nothing slips through the cracks',
+      en: 'Notifications are here!',
+      beanie: 'notifications are here!',
     },
+    features: [
+      {
+        icon: '🔔',
+        title: {
+          en: 'Notifications are here!',
+          beanie: 'notifications are here!',
+        },
+        description: {
+          en: "A friendly bell in the header now keeps track of what needs you: tasks coming due, things a family member assigns you, events you're part of, and what's new. Nothing slips through the cracks.",
+          beanie:
+            "a friendly bell in the header now keeps track of what needs you: tasks coming due, things a family member assigns you, events you're part of, and what's new. nothing slips through the cracks.",
+        },
+      },
+    ],
   },
-  // Newest first. The deploy skill prepends new entries here, e.g.:
+  // Newest first. The deploy skill prepends new entries here. A significant note
+  // pairs a one-line `summary` (the bell row) with `features` (headline + detail
+  // block per new thing — list several for a multi-feature deploy), e.g.:
   // {
   //   version: '2026.05.27',
   //   date: '2026-05-27',
   //   month: '27 may 2026',
   //   spotlight: true, // omit/false for minor "fixes & improvements" notes
-  //   summary: {
-  //     en: 'A short, warm, benefit-led line in sentence case.',
-  //     beanie: 'a short, warm, benefit-led line, all lowercase.',
-  //   },
+  //   summary: { en: 'A short, warm one-liner.', beanie: 'a short, warm one-liner.' },
+  //   features: [
+  //     {
+  //       title: { en: 'Short bold headline', beanie: 'short bold headline' },
+  //       description: {
+  //         en: 'A concise sentence on what it is and why it helps the family.',
+  //         beanie: 'a concise sentence on what it is and why it helps the family.',
+  //       },
+  //       // icon: '✨',          // optional lead emoji (shown for a single-feature note)
+  //       // tryItRoute: '/path', // optional "try it →" deep-link
+  //     },
+  //   ],
   // },
+  //
+  // A minor "fixes & improvements" deploy stays summary-only (no `features`,
+  // `spotlight` omitted): { ..., summary: { en: '...', beanie: '...' } }.
 ];
