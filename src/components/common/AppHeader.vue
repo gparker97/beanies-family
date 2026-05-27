@@ -8,6 +8,7 @@ import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import HamburgerButton from '@/components/common/HamburgerButton.vue';
 import SearchButton from '@/components/common/SearchButton.vue';
+import NotificationsBell from '@/components/notifications/NotificationsBell.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useMobileMenu } from '@/composables/useMobileMenu';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
@@ -242,8 +243,11 @@ async function confirmSignOutAndClearData() {
         </h1>
       </div>
 
-      <!-- Right: Privacy toggle + Search + Profile avatar -->
+      <!-- Right: Notifications + Privacy toggle + Search + Profile avatar -->
       <div class="flex items-center gap-2">
+        <!-- Notification bell -->
+        <NotificationsBell />
+
         <!-- Privacy mode toggle -->
         <button
           type="button"
@@ -585,6 +589,9 @@ async function confirmSignOutAndClearData() {
             </button>
           </div>
         </div>
+
+        <!-- Notification bell -->
+        <NotificationsBell />
 
         <!-- Privacy mode toggle (white-bg squircle) -->
         <button

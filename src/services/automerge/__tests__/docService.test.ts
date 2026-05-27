@@ -221,6 +221,7 @@ describe('docService', () => {
         recipes: {},
         cookLogs: {},
         emergencyContacts: {},
+        notificationReads: {},
         settings: null,
       };
       const newDoc = Automerge.from(

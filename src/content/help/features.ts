@@ -2,6 +2,69 @@ import type { HelpArticle } from './types';
 
 export const FEATURES_ARTICLES: HelpArticle[] = [
   {
+    slug: 'notifications',
+    category: 'features',
+    title: 'Notifications — staying on top of what needs you',
+    excerpt:
+      "The bell in your header quietly keeps track of what's coming due, what's been assigned to you, and what's coming up — so you don't have to.",
+    icon: '\u{1F514}',
+    readTime: 3,
+    updatedDate: '2026-05-27',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          "Family life has a lot of moving parts. The notification bell in the top bar gathers the things that need <em>you</em> into one calm place, with a soft orange dot when there's something unread. Tap it to open your notifications.",
+      },
+      {
+        type: 'heading',
+        content: 'What the bell shows',
+        level: 2,
+        id: 'what-it-shows',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          "<strong>Tasks coming due</strong> — a to-do that's yours, with a due date: in the morning for all-day tasks, or about 30 minutes before for tasks with a time. If it slips past due, it's gently flagged as overdue.",
+          '<strong>Tasks assigned to you</strong> — when a family member gives you something to do (and for your own no-deadline reminders, so they’re never lost).',
+          "<strong>Events coming up</strong> — activities you're part of — whether you're going, dropping off, or picking up — around their reminder time.",
+          "<strong>What's new</strong> — each beanies.family update now lives in the bell instead of popping up over your screen.",
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Reading, clearing, and re-opening',
+        level: 2,
+        id: 'reading',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Tap the <strong>bell</strong> to see your list, grouped by day.',
+          'Tap any notification to open its details — that marks it read.',
+          'From the details, tap <strong>Open</strong> to jump straight to the task or event, or <strong>Mark unread</strong> if you want to come back to it.',
+          'Tap <strong>Mark all read</strong> to clear everything at once — the dot disappears everywhere.',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          "Reading a notification on one device clears the dot on your others — your read-state travels with your family file. (Your family already shares the underlying tasks and events; only which ones you've read is added.)",
+        title: 'It follows you across devices',
+        icon: '\u{1F4F1}',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'For now, notifications appear while the app is open (and catch up the next time you open it). Push notifications — the kind that reach you when the app is closed — are coming in a later update.',
+        title: 'In-app for now',
+        icon: '\u{1F331}',
+      },
+    ],
+  },
+  {
     slug: 'managing-accounts',
     category: 'features',
     title: 'Managing Accounts',

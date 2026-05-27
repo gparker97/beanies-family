@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-27",
-    "translationCount": 2937
+    "translationCount": 2955
   },
   "translations": {
     "app.name": {
@@ -14689,6 +14689,96 @@
     "planner.nextPeriod": {
       "translation": "下一个时期",
       "hash": "liryc2",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.title": {
+      "translation": "消息",
+      "hash": "y97he0",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.empty": {
+      "translation": "你们都赶上了！",
+      "hash": "y5obol",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.emptyHint": {
+      "translation": "如有需要，我们会通知您。",
+      "hash": "oaipt6",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.markAllRead": {
+      "translation": "标记全部阅读",
+      "hash": "59p54",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.markUnread": {
+      "translation": "标记未读",
+      "hash": "eoewjm",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.open": {
+      "translation": "打开",
+      "hash": "1gtii",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.back": {
+      "translation": "返回",
+      "hash": "187if",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.unread": {
+      "translation": "未读",
+      "hash": "dw9ys1",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.kindTodoDue": {
+      "translation": "即将到期",
+      "hash": "6rbu17",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.kindTodoDueOverdue": {
+      "translation": "超期",
+      "hash": "9hd20w",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.kindTodoAssigned": {
+      "translation": "分配给您",
+      "hash": "4kvpuc",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.kindActivityReminder": {
+      "translation": "即将开始",
+      "hash": "6nm33u",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.kindWhatsNew": {
+      "translation": "最新消息",
+      "hash": "9c4ygg",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.due": {
+      "translation": "截止时间：",
+      "hash": "1has",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.yourTask": {
+      "translation": "您的任务",
+      "hash": "x93gem",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.assignedByYou": {
+      "translation": "{name}已将此指派给您",
+      "hash": "23gst",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.youDropoff": {
+      "translation": "由您负责送",
+      "hash": "j32pt9",
+      "lastUpdated": "2026-05-27"
+    },
+    "notifications.youPickup": {
+      "translation": "由您负责接",
+      "hash": "hvmogl",
       "lastUpdated": "2026-05-27"
     }
   }

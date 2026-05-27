@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-27
 
+### Added
+
+- **Notifications — a bell that keeps track of what needs you.** A new notification bell joins the header (and the calendar's top bar on phones) with a soft Heritage Orange dot when something's unread. It gathers, in one place: **tasks coming due** (morning-of for all-day tasks, ~30 min before for timed ones, gently flagged when overdue), **tasks a family member assigns you**, **events you're part of** (going, dropping off, or picking up), and **What's new** updates (which now live in the bell instead of popping up over your screen). Each row is useful at a glance — the thing in bold, who · where with a chip for your drop-off / pick-up duty, and the real date and time. Tap a row to open it (and mark it read); tap the dot to toggle read/unread without opening; "Mark all read" clears everything. Your read-state syncs across your own devices via your family file. (In-app for now — push notifications are a later update.)
+
 ### Changed
 
 - **More room for your events on the calendar.** The calendar now sits flush at the top of the page — the dead gap that used to appear above it (where events briefly scrolled through a too-small, unusable band) is gone, on both desktop and phones. The bar showing the month/week/day and the controls is now solid, so events scroll cleanly _underneath_ it instead of faintly showing through. On phones, the separate app header is folded into that calendar bar as two tidy rows: the day/month/week you're viewing (always shown in full — never cut off to "May…") with a menu button and search on top, and the Month/Week/Day switch, family filter, and Add below. The family filter stays visible at all times — compact when you're viewing everyone, and showing the name when you've filtered to one person — so it's always clear whose plans you're looking at.
