@@ -81,4 +81,20 @@ describe('CalendarTripRibbon countdown branches', () => {
     expect(html).not.toContain('NaN');
     expect(html).not.toContain('Someday');
   });
+
+  it('inline variant: renders one compact chip and taps through to the soonest trip', async () => {
+    upcoming.value = [
+      makeVac('future', 'Phuket', '2026-06-07', '2026-06-14'), // soonest (+12d)
+      makeVac('later', 'Tokyo', '2026-07-01', '2026-07-10'),
+    ];
+    const wrapper = mount(CalendarTripRibbon, { props: { inline: true } });
+
+    // Exactly one button (the chip) — not the summary pill or the labelled row.
+    const buttons = wrapper.findAll('button');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].attributes('aria-label')).toContain('Phuket');
+
+    await buttons[0].trigger('click');
+    expect(wrapper.emitted('vacation-click')?.[0]).toEqual(['future']);
+  });
 });
