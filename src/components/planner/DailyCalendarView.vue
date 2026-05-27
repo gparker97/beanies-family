@@ -28,7 +28,13 @@ import type { FamilyActivity, FamilyMember, TodoItem, HolidayOccurrence } from '
  * `currentDay`/`dayLabel` from it and never mutates it (one-way data flow);
  * prev/next come from swipe (emitted up) and the command bar.
  */
-const props = defineProps<{ referenceDate: Date }>();
+const props = defineProps<{
+  referenceDate: Date;
+  /** Bumped by the page on every "Today" tap — re-centres on now even when the
+   *  reference date is unchanged (already on today), which a
+   *  `watch(referenceDate)` alone would miss. */
+  todayTick?: number;
+}>();
 
 const emit = defineEmits<{
   'select-date': [date: string];
@@ -218,10 +224,12 @@ onMounted(() => {
   void scrollToNow();
 });
 
-// When the page jumps the reference date to today (command bar "Today"),
-// re-centre the timeline on now.
+// Re-centre the timeline on now on every command-bar "Today" tap. Keyed off
+// `todayTick` (not `referenceDate`) so it ALSO fires when already on today,
+// where the reference date doesn't change. `scrollToNow` no-ops when the open
+// day isn't today, so a stray tick can't scroll a non-today column.
 watch(
-  () => props.referenceDate,
+  () => props.todayTick,
   () => {
     if (currentDay.value.isToday) void scrollToNow({ force: true });
   }

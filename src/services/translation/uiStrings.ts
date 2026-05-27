@@ -4982,6 +4982,8 @@ const STRING_DEFS = {
     beanie: 'add your first family activity to get started!',
   },
   'planner.today': { en: 'Today', beanie: 'today' },
+  'planner.prevPeriod': { en: 'Previous period', beanie: 'previous period' },
+  'planner.nextPeriod': { en: 'Next period', beanie: 'next period' },
   'planner.openAgenda': { en: 'Open agenda view', beanie: 'open agenda view' },
   'planner.inactiveActivities': { en: 'Inactive Activities', beanie: 'inactive activities' },
   'planner.noInactive': { en: 'No inactive activities', beanie: 'no inactive activities' },
