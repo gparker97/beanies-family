@@ -14,6 +14,7 @@
  * `min-h-[calc(100%+3rem)]` reclaims that 3rem so the column fills the panel and
  * the footer pins to the bottom.
  */
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -29,7 +30,15 @@ const store = useNotificationsStore();
 const { t } = useTranslation();
 const { txt } = useBeanieText();
 
-const isBrief = !props.release.features?.length;
+/**
+ * The note's headline + detail blocks (the general rule for per-deploy notes AND
+ * curated releases). One block reads as a focused announcement; several hang off
+ * a "beanstalk" stalk. A note with no blocks (a legacy / minor summary-only note)
+ * falls back to its centred `summary` message.
+ */
+const blocks = computed(() => props.release.features ?? []);
+const isMulti = computed(() => blocks.value.length > 1);
+const isSingle = computed(() => blocks.value.length === 1);
 
 function handleTryIt(route: string) {
   store.close();
@@ -51,26 +60,32 @@ function handleSeeAll() {
       <div class="wn-medallion">
         <img src="/brand/beanies_celebrating_circle_transparent_400x400.png" alt="" />
       </div>
-      <div class="wn-kick">✨ {{ t('notifications.kindWhatsNew') }}</div>
+      <div class="wn-kick">
+        ✨ {{ t('notifications.kindWhatsNew')
+        }}<span v-if="isMulti">
+          · {{ t('whatsNew.updateCount').replace('{n}', String(blocks.length)) }}</span
+        >
+      </div>
       <div class="wn-datepill">{{ release.month }}</div>
     </div>
 
     <!-- ===== CONTENT ===== -->
     <div class="wn-content">
-      <div class="wn-region" :class="{ 'wn-region-center': isBrief }">
-        <!-- brief per-deploy note: just the message -->
-        <p v-if="isBrief && release.summary" class="wn-message">
+      <div class="wn-region" :class="{ 'wn-region-center': blocks.length === 0 }">
+        <!-- legacy / minor summary-only note: just the centred message -->
+        <p v-if="blocks.length === 0 && release.summary" class="wn-message">
           {{ txt(release.summary) }}
         </p>
 
-        <!-- curated release: feature cards (+ also fixed) -->
+        <!-- the general rule: headline + detail blocks (single = centred; many = beanstalk) -->
         <template v-else>
-          <div v-for="(feature, i) in release.features ?? []" :key="i" class="wn-feature-card">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0 flex-1">
-                <div class="wn-feat-title">{{ txt(feature.title) }}</div>
-                <div class="wn-feat-desc">{{ txt(feature.description) }}</div>
-              </div>
+          <div class="wn-list" :class="{ single: isSingle }">
+            <div v-for="(feature, i) in blocks" :key="i" class="wn-item">
+              <span v-if="isSingle && feature.icon" class="wn-item-emoji" aria-hidden="true">
+                {{ feature.icon }}
+              </span>
+              <h4 class="wn-item-title">{{ txt(feature.title) }}</h4>
+              <p class="wn-item-desc">{{ txt(feature.description) }}</p>
               <button
                 v-if="feature.tryItRoute"
                 class="wn-tryit"
@@ -261,55 +276,127 @@ function handleSeeAll() {
   color: #e2e8f0;
 }
 
-/* feature cards (curated releases) */
-.wn-feature-card {
-  background: var(--cloud-white, #f8f9fa);
-  border-radius: 1rem;
-  margin-bottom: 0.75rem;
-  padding: 0.875rem 1rem;
+/* headline + detail blocks — the "beanstalk list" (Treatment B).
+   Rules are ordered base → single-variant → multi-variant so specificity
+   never descends (stylelint no-descending-specificity). */
+.wn-list {
+  position: relative;
 }
 
-:global(.dark) .wn-feature-card {
-  background: rgb(255 255 255 / 4%);
+.wn-item {
+  position: relative;
 }
 
-.wn-feat-title {
+.wn-item-emoji {
+  display: block;
+  font-size: 1.625rem;
+  margin-bottom: 0.375rem;
+  text-align: center;
+}
+
+.wn-item-title {
   color: #2c3e50;
   font-family: Outfit, sans-serif;
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  margin-bottom: 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0 0 0.25rem;
 }
 
-:global(.dark) .wn-feat-title {
+.wn-item-desc {
+  color: rgb(44 62 80 / 62%);
+  font-family: Inter, sans-serif;
+  font-size: 0.8125rem;
+  line-height: 1.58;
+  margin: 0;
+}
+
+:global(.dark) .wn-item-title {
   color: #e2e8f0;
 }
 
-.wn-feat-desc {
-  color: rgb(44 62 80 / 55%);
-  font-size: 0.8125rem;
-  line-height: 1.5;
+:global(.dark) .wn-item-desc {
+  color: rgb(226 232 240 / 70%);
 }
 
-:global(.dark) .wn-feat-desc {
-  color: rgb(226 232 240 / 70%);
+/* single block: a focused, centred headline + reason (no stalk) */
+.wn-list.single .wn-item {
+  text-align: center;
+}
+
+.wn-list.single .wn-item-title {
+  font-size: 1.0625rem;
+  margin-bottom: 0.5rem;
+}
+
+.wn-list.single .wn-item-desc {
+  font-size: 0.875rem;
+  margin: 0 0.25rem;
+}
+
+/* the stalk + bean nodes only appear when there are several blocks */
+.wn-list:not(.single) {
+  padding-left: 1.875rem;
+}
+
+.wn-list:not(.single)::before {
+  background: linear-gradient(
+    180deg,
+    rgb(241 93 34 / 55%),
+    rgb(230 126 34 / 35%) 70%,
+    rgb(230 126 34 / 0%)
+  );
+  border-radius: 2px;
+  bottom: 0.4375rem;
+  content: '';
+  left: 0.5625rem;
+  position: absolute;
+  top: 0.4375rem;
+  width: 2px;
+}
+
+.wn-list:not(.single) .wn-item {
+  padding-bottom: 1.125rem;
+}
+
+.wn-list:not(.single) .wn-item:last-child {
+  padding-bottom: 0;
+}
+
+/* the bean node on the stalk */
+.wn-list:not(.single) .wn-item::before {
+  background: linear-gradient(135deg, #f15d22, #e67e22);
+  border-radius: 50% 50% 48% 48%;
+  box-shadow:
+    0 0 0 4px #fff,
+    0 3px 8px -3px rgb(241 93 34 / 70%);
+  content: '';
+  height: 0.875rem;
+  left: -1.6875rem;
+  position: absolute;
+  top: 0.25rem;
+  width: 0.75rem;
+}
+
+:global(.dark) .wn-list:not(.single) .wn-item::before {
+  box-shadow:
+    0 0 0 4px #1e293b,
+    0 3px 8px -3px rgb(241 93 34 / 70%);
 }
 
 .wn-tryit {
   align-items: center;
-  align-self: center;
   background: var(--tint-orange-8, rgb(241 93 34 / 8%));
   border: none;
   border-radius: 0.625rem;
   color: #f15d22;
   cursor: pointer;
   display: inline-flex;
-  flex-shrink: 0;
   font-family: Outfit, sans-serif;
   font-size: 0.75rem;
   font-weight: 600;
   gap: 0.3125rem;
+  margin-top: 0.625rem;
   padding: 0.375rem 0.6875rem;
   white-space: nowrap;
 }
