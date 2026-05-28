@@ -11,6 +11,7 @@ import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useBeanieText } from '@/composables/useBeanieText';
 import { getReleaseNote } from '@/content/release-notes';
+import { getAnnouncement } from '@/content/announcements';
 import {
   NOTIFICATION_KIND_PRESENTATION,
   ACCENT_TINT_CLASS,
@@ -35,13 +36,27 @@ export function useNotificationPresentation(notification: MaybeRefOrGetter<AppNo
   const release = computed(() =>
     n.value.kind === 'whats-new' && n.value.sourceId ? getReleaseNote(n.value.sourceId) : undefined
   );
-  /** Whether the detail should render the rich `WhatsNewBody` card. */
-  const hasRichBody = computed(() => Boolean(release.value && presentation.value.detailBody));
-
-  const title = computed(() => notificationTitle(n.value, t));
-  const summary = computed(() =>
-    release.value?.summary ? txt(release.value.summary) : notificationSummary(n.value, t)
+  /** The backing announcement for an announcement note (undefined otherwise). */
+  const announcement = computed(() =>
+    n.value.kind === 'announcement' && n.value.sourceId
+      ? getAnnouncement(n.value.sourceId)
+      : undefined
   );
+  /** Whether the detail should render a rich celebratory body (whats-new / announcement). */
+  const hasRichBody = computed(() =>
+    Boolean((release.value || announcement.value) && presentation.value.detailBody)
+  );
+
+  // whats-new is framed by its kind label; an announcement shows its own (bilingual)
+  // title; everything else shows the entity name.
+  const title = computed(() =>
+    announcement.value ? txt(announcement.value.title) : notificationTitle(n.value, t)
+  );
+  const summary = computed(() => {
+    if (release.value?.summary) return txt(release.value.summary);
+    if (announcement.value) return announcement.value.kicker ? txt(announcement.value.kicker) : '';
+    return notificationSummary(n.value, t);
+  });
   const when = computed(() => notificationWhen(n.value, t));
   const roleLabel = computed(() => (n.value.dutyRole ? t(dutyRoleLabelKey(n.value.dutyRole)) : ''));
 
@@ -50,6 +65,7 @@ export function useNotificationPresentation(notification: MaybeRefOrGetter<AppNo
     tintClass,
     labelKey,
     release,
+    announcement,
     hasRichBody,
     title,
     summary,

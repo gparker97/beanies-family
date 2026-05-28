@@ -14,7 +14,12 @@
  */
 import type { Component } from 'vue';
 
-export type NotificationKind = 'todo-due' | 'todo-assigned' | 'activity-reminder' | 'whats-new';
+export type NotificationKind =
+  | 'todo-due'
+  | 'todo-assigned'
+  | 'activity-reminder'
+  | 'whats-new'
+  | 'announcement';
 
 export interface AppNotification {
   /** Deterministic stable id (e.g. `todo-due:<todoId>:<dueDate>`). */
@@ -51,7 +56,7 @@ export interface AppNotification {
 
 /** Per-kind presentation — the single edit surface when adding a kind. */
 export interface KindPresentation {
-  accent: 'todo' | 'activity' | 'assigned' | 'whats-new';
+  accent: 'todo' | 'activity' | 'assigned' | 'whats-new' | 'announcement';
   /** Emoji shown in the row's tinted lead icon. */
   icon: string;
   /** Custom detail body component; undefined ⇒ the default meta card. */

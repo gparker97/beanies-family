@@ -1,11 +1,13 @@
 import { mount } from '@vue/test-utils';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { ReleaseNote } from '@/content/release-notes';
+import type { AppNotification } from '@/types/notifications';
 
-const { push, close, openExternal } = vi.hoisted(() => ({
+const { push, close, openExternal, getReleaseNote } = vi.hoisted(() => ({
   push: vi.fn(),
   close: vi.fn(),
   openExternal: vi.fn(),
+  getReleaseNote: vi.fn(),
 }));
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }));
@@ -18,6 +20,7 @@ vi.mock('@/composables/useBeanieText', () => ({
 }));
 vi.mock('@/utils/openExternal', () => ({ openExternal }));
 vi.mock('@/utils/marketing', () => ({ MARKETING_URL: 'https://beanies.family' }));
+vi.mock('@/content/release-notes', () => ({ getReleaseNote }));
 
 import WhatsNewBody from '../WhatsNewBody.vue';
 
@@ -50,9 +53,21 @@ const multi: ReleaseNote = {
   ],
 };
 
+const note: AppNotification = {
+  id: 'whats-new:2026.05.27',
+  kind: 'whats-new',
+  title: '27 may 2026',
+  occurredAt: '2026-05-27T00:00:00.000Z',
+  sourceId: '2026.05.27',
+  read: false,
+};
+
+beforeEach(() => getReleaseNote.mockReset());
+
 describe('WhatsNewBody — headline + detail blocks', () => {
   it('single feature: centred block with lead emoji, headline + detail, no update count', () => {
-    const w = mount(WhatsNewBody, { props: { release: single } });
+    getReleaseNote.mockReturnValue(single);
+    const w = mount(WhatsNewBody, { props: { notification: note } });
     expect(w.find('.wn-list.single').exists()).toBe(true);
     expect(w.find('.wn-item-emoji').text()).toBe('🔔');
     expect(w.find('.wn-item-title').text()).toBe('Notifications are here!');
@@ -62,26 +77,29 @@ describe('WhatsNewBody — headline + detail blocks', () => {
   });
 
   it('multiple features: a beanstalk list (no single class), one block each, with the update count', () => {
-    const w = mount(WhatsNewBody, { props: { release: multi } });
+    getReleaseNote.mockReturnValue(multi);
+    const w = mount(WhatsNewBody, { props: { notification: note } });
     const list = w.find('.wn-list');
     expect(list.exists()).toBe(true);
     expect(list.classes()).not.toContain('single');
     expect(w.findAll('.wn-item')).toHaveLength(3);
-    // multi blocks have no centred lead emoji
     expect(w.find('.wn-item-emoji').exists()).toBe(false);
     expect(w.find('.wn-kick').text()).toContain('whatsNew.updateCount');
   });
 
-  it('summary-only note (no features): falls back to the centred message', () => {
-    const w = mount(WhatsNewBody, {
-      props: { release: { ...base, summary: bilingual('Minor fixes and improvements.') } },
+  it('summary-only release (no features): falls back to the centred message', () => {
+    getReleaseNote.mockReturnValue({
+      ...base,
+      summary: bilingual('Minor fixes and improvements.'),
     });
+    const w = mount(WhatsNewBody, { props: { notification: note } });
     expect(w.find('.wn-message').text()).toBe('Minor fixes and improvements.');
     expect(w.find('.wn-list').exists()).toBe(false);
   });
 
   it('a feature with tryItRoute renders "try it" and navigates + closes the drawer on click', async () => {
-    const w = mount(WhatsNewBody, { props: { release: multi } });
+    getReleaseNote.mockReturnValue(multi);
+    const w = mount(WhatsNewBody, { props: { notification: note } });
     const tryIt = w.find('.wn-tryit');
     expect(tryIt.exists()).toBe(true);
     await tryIt.trigger('click');
@@ -90,7 +108,8 @@ describe('WhatsNewBody — headline + detail blocks', () => {
   });
 
   it('"see all updates" opens the marketing whats-new page externally', async () => {
-    const w = mount(WhatsNewBody, { props: { release: single } });
+    getReleaseNote.mockReturnValue(single);
+    const w = mount(WhatsNewBody, { props: { notification: note } });
     await w.find('.wn-seeall').trigger('click');
     expect(openExternal).toHaveBeenCalledWith('https://beanies.family/help/whats-new');
   });

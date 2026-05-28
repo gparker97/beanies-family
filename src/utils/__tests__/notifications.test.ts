@@ -9,10 +9,12 @@ import {
   todoAssignedId,
   activityReminderId,
   whatsNewId,
+  announcementId,
   type DeriveInput,
 } from '@/utils/notifications';
 import type { FamilyMember, TodoItem, FamilyActivity } from '@/types/models';
 import type { ReleaseNote } from '@/content/release-notes';
+import type { Announcement } from '@/content/announcements';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 function member(
@@ -75,6 +77,7 @@ function derive(overrides: Partial<DeriveInput>, now: Date = NOW) {
     members: MEMBERS,
     currentMember: viewer,
     releaseNotes: [],
+    announcements: [],
     readState: {},
     windowDays: 30,
     occurrencesByDate: {},
@@ -278,6 +281,35 @@ describe('deriveNotifications — whats-new', () => {
   });
 });
 
+describe('deriveNotifications — announcements', () => {
+  const ann = (over: Partial<Announcement> = {}): Announcement => ({
+    id: 'a1',
+    date: '2026-05-28',
+    month: '28 may 2026',
+    title: { en: 'T', beanie: 't' },
+    message: { en: 'M', beanie: 'm' },
+    ...over,
+  });
+
+  it('emits one announcement notification, window-exempt, read resolved', () => {
+    const out = derive({
+      announcements: [ann()],
+      readState: { [announcementId('a1')]: '2026-05-28T00:00:00.000Z' },
+    });
+    const n = byId(out, announcementId('a1'));
+    expect(n?.kind).toBe('announcement');
+    expect(n?.sourceId).toBe('a1');
+    expect(n?.read).toBe(true);
+  });
+
+  it('honours startsAt (future) and expiresAt (past) — not derived outside the window', () => {
+    const future = derive({ announcements: [ann({ startsAt: '2030-01-01' })] });
+    expect(byId(future, announcementId('a1'))).toBeUndefined();
+    const expired = derive({ announcements: [ann({ expiresAt: '2020-01-01' })] });
+    expect(byId(expired, announcementId('a1'))).toBeUndefined();
+  });
+});
+
 describe('deriveNotifications — totality', () => {
   it('never throws on malformed records; skips them', () => {
     expect(() =>
@@ -324,14 +356,19 @@ describe('read-state reducers', () => {
     expect(m).toEqual({ a: 'old', b: 'new' });
   });
 
-  it('pruneReadState drops stale ids but ALWAYS keeps whats-new:*', () => {
+  it('pruneReadState drops stale ids but ALWAYS keeps whats-new:* and announcement:*', () => {
     const m = {
       'todo-due:t1:2026-05-27': 'r',
       'todo-due:gone:2026-01-01': 'r',
       'whats-new:2026.01': 'r',
+      'announcement:discord-community-2026-05': 'r',
     };
     const pruned = pruneReadState(m, ['todo-due:t1:2026-05-27']);
-    expect(pruned).toEqual({ 'todo-due:t1:2026-05-27': 'r', 'whats-new:2026.01': 'r' });
+    expect(pruned).toEqual({
+      'todo-due:t1:2026-05-27': 'r',
+      'whats-new:2026.01': 'r',
+      'announcement:discord-community-2026-05': 'r',
+    });
   });
 });
 

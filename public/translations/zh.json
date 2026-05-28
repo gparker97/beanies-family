@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-27",
-    "translationCount": 2956
+    "lastUpdated": "2026-05-28",
+    "translationCount": 2957
   },
   "translations": {
     "app.name": {
@@ -14785,6 +14785,11 @@
       "translation": "{n}个更新",
       "hash": "bx8gcs",
       "lastUpdated": "2026-05-27"
+    },
+    "notifications.kindAnnouncement": {
+      "translation": "公告",
+      "hash": "5b6c13",
+      "lastUpdated": "2026-05-28"
     }
   }
 }

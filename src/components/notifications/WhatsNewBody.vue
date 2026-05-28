@@ -1,18 +1,14 @@
 <script setup lang="ts">
 /**
- * The celebratory "what's new" detail. Every other notification detail is a
- * utilitarian card; this one is a CELEBRATION — a gradient hero with the
- * celebrating beanies + sparkles, the white body emerging beneath, the Pod, and
- * greg's handwritten sign-off. Renders inside `NotificationDetail` for whats-new
- * (which hands it the whole detail area).
+ * The celebratory "what's new" detail body. Renders inside the shared
+ * `CelebrationDetail` shell (hero + Pod + greg's sign-off + footer); this
+ * component owns only the CONTENT: the headline + detail blocks (the general
+ * rule — single = centred, several = a "beanstalk" list), an optional "also
+ * fixed" list, and the see-all footer.
  *
- * Handles BOTH shapes: a brief per-deploy note shows its `summary` message; a
- * curated release shows `features` cards (+ "also fixed"). Same hero + footer.
- *
- * Layout note: it breaks out of `BaseSidePanel`'s `p-6` body via `-mx-6 -my-6`
- * (the house pattern, cf. BeanieFormModal) so the hero is full-bleed; the
- * `min-h-[calc(100%+3rem)]` reclaims that 3rem so the column fills the panel and
- * the footer pins to the bottom.
+ * Resolves its own `release` from the notification's `sourceId` (like
+ * `AnnouncementBody`), so `NotificationDetail` hands every rich body the same
+ * `:notification` prop.
  */
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
@@ -21,24 +17,31 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useBeanieText } from '@/composables/useBeanieText';
 import { MARKETING_URL } from '@/utils/marketing';
 import { openExternal } from '@/utils/openExternal';
-import type { ReleaseNote } from '@/content/release-notes';
+import { getReleaseNote } from '@/content/release-notes';
+import CelebrationDetail from '@/components/notifications/CelebrationDetail.vue';
+import type { AppNotification } from '@/types/notifications';
 
-const props = defineProps<{ release: ReleaseNote }>();
+const props = defineProps<{ notification: AppNotification }>();
 
 const router = useRouter();
 const store = useNotificationsStore();
 const { t } = useTranslation();
 const { txt } = useBeanieText();
 
+const release = computed(() =>
+  props.notification.sourceId ? getReleaseNote(props.notification.sourceId) : undefined
+);
+
 /**
- * The note's headline + detail blocks (the general rule for per-deploy notes AND
- * curated releases). One block reads as a focused announcement; several hang off
- * a "beanstalk" stalk. A note with no blocks (a legacy / minor summary-only note)
- * falls back to its centred `summary` message.
+ * The note's headline + detail blocks. One block reads as a focused
+ * announcement; several hang off a "beanstalk" stalk. No blocks (a legacy /
+ * minor summary-only note) falls back to its centred `summary` message.
  */
-const blocks = computed(() => props.release.features ?? []);
+const blocks = computed(() => release.value?.features ?? []);
 const isMulti = computed(() => blocks.value.length > 1);
 const isSingle = computed(() => blocks.value.length === 1);
+const fixes = computed(() => release.value?.fixes ?? []);
+const summaryText = computed(() => (release.value?.summary ? txt(release.value.summary) : ''));
 
 function handleTryIt(route: string) {
   store.close();
@@ -51,224 +54,59 @@ function handleSeeAll() {
 </script>
 
 <template>
-  <div class="wn-detail -mx-6 -my-6 flex min-h-[calc(100%+3rem)] flex-col">
-    <!-- ===== HERO ===== -->
-    <div class="wn-hero">
-      <span class="hspark a" aria-hidden="true">✦</span>
-      <span class="hspark b" aria-hidden="true">✨</span>
-      <span class="hspark c" aria-hidden="true">✦</span>
-      <div class="wn-medallion">
-        <img src="/brand/beanies_celebrating_circle_transparent_400x400.png" alt="" />
-      </div>
-      <div class="wn-kick">
-        ✨ {{ t('notifications.kindWhatsNew')
-        }}<span v-if="isMulti">
-          · {{ t('whatsNew.updateCount').replace('{n}', String(blocks.length)) }}</span
-        >
-      </div>
-      <div class="wn-datepill">{{ release.month }}</div>
-    </div>
+  <CelebrationDetail v-if="release" :date-label="release.month" :signature="release.signature">
+    <template #kick>
+      ✨ {{ t('notifications.kindWhatsNew')
+      }}<span v-if="isMulti">
+        · {{ t('whatsNew.updateCount').replace('{n}', String(blocks.length)) }}</span
+      >
+    </template>
 
-    <!-- ===== CONTENT ===== -->
-    <div class="wn-content">
-      <div class="wn-region" :class="{ 'wn-region-center': blocks.length === 0 }">
-        <!-- legacy / minor summary-only note: just the centred message -->
-        <p v-if="blocks.length === 0 && release.summary" class="wn-message">
-          {{ txt(release.summary) }}
-        </p>
+    <!-- legacy / minor summary-only note: just the centred message -->
+    <p v-if="blocks.length === 0 && summaryText" class="wn-message">{{ summaryText }}</p>
 
-        <!-- the general rule: headline + detail blocks (single = centred; many = beanstalk) -->
-        <template v-else>
-          <div class="wn-list" :class="{ single: isSingle }">
-            <div v-for="(feature, i) in blocks" :key="i" class="wn-item">
-              <span v-if="isSingle && feature.icon" class="wn-item-emoji" aria-hidden="true">
-                {{ feature.icon }}
-              </span>
-              <h4 class="wn-item-title">{{ txt(feature.title) }}</h4>
-              <p class="wn-item-desc">{{ txt(feature.description) }}</p>
-              <button
-                v-if="feature.tryItRoute"
-                class="wn-tryit"
-                @click="handleTryIt(feature.tryItRoute!)"
-              >
-                {{ t('whatsNew.tryIt') }}<span class="wn-tryit-arrow">→</span>
-              </button>
-            </div>
-          </div>
-
-          <template v-if="release.fixes?.length">
-            <div class="wn-fixes-label">{{ t('whatsNew.alsoFixed') }}</div>
-            <ul class="wn-fixes">
-              <li v-for="(fix, i) in release.fixes" :key="i">{{ txt(fix.text) }}</li>
-            </ul>
-          </template>
-        </template>
+    <!-- the general rule: headline + detail blocks (single = centred; many = beanstalk) -->
+    <template v-else>
+      <div class="wn-list" :class="{ single: isSingle }">
+        <div v-for="(feature, i) in blocks" :key="i" class="wn-item">
+          <span v-if="isSingle && feature.icon" class="wn-item-emoji" aria-hidden="true">
+            {{ feature.icon }}
+          </span>
+          <h4 class="wn-item-title">{{ txt(feature.title) }}</h4>
+          <p class="wn-item-desc">{{ txt(feature.description) }}</p>
+          <button
+            v-if="feature.tryItRoute"
+            class="wn-tryit"
+            @click="handleTryIt(feature.tryItRoute!)"
+          >
+            {{ t('whatsNew.tryIt') }}<span class="wn-tryit-arrow">→</span>
+          </button>
+        </div>
       </div>
 
-      <!-- The Pod (slate · terracotta · orange · sky — never reordered) -->
-      <div class="wn-pod" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-      <div class="wn-sign">{{ release.signature ?? '— greg, head beanie developer 🫘' }}</div>
-    </div>
+      <template v-if="fixes.length">
+        <div class="wn-fixes-label">{{ t('whatsNew.alsoFixed') }}</div>
+        <ul class="wn-fixes">
+          <li v-for="(fix, i) in fixes" :key="i">{{ txt(fix.text) }}</li>
+        </ul>
+      </template>
+    </template>
 
-    <!-- ===== FOOTER ===== -->
-    <div class="wn-foot">
+    <template #footer>
       <button class="wn-seeall" @click="handleSeeAll">{{ t('whatsNew.seeAll') }} →</button>
       <div class="wn-tagline">{{ t('app.tagline') }}</div>
-    </div>
-  </div>
+    </template>
+  </CelebrationDetail>
 </template>
 
 <style scoped>
-/* ===== HERO ===== */
-.wn-hero {
-  background:
-    radial-gradient(130% 100% at 15% 0%, rgb(255 255 255 / 28%), transparent 55%),
-    linear-gradient(135deg, #f15d22 0%, #e67e22 100%);
-  flex-shrink: 0;
-  overflow: hidden;
-  padding: 1.75rem 1.5rem 2.75rem;
-  position: relative;
-  text-align: center;
-}
-
-.wn-medallion {
-  background: radial-gradient(circle, rgb(255 255 255 / 95%), rgb(255 255 255 / 72%));
-  border-radius: 50%;
-  box-shadow: 0 10px 30px -8px rgb(44 62 80 / 35%);
-  display: grid;
-  height: 7rem;
-  margin: 0.25rem auto 0.875rem;
-  place-items: center;
-  width: 7rem;
-}
-
-.wn-medallion img {
-  height: 5.5rem;
-  object-fit: contain;
-  width: 5.5rem;
-}
-
-.wn-kick {
-  color: rgb(255 255 255 / 95%);
-  font-family: Outfit, sans-serif;
-  font-size: 0.6875rem;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.wn-datepill {
-  background: rgb(255 255 255 / 22%);
-  border: 1px solid rgb(255 255 255 / 35%);
-  border-radius: 999px;
-  color: #fff;
-  display: inline-block;
-  font-family: Outfit, sans-serif;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  margin-top: 0.75rem;
-  padding: 0.25rem 0.75rem;
-}
-
-/* sparkles — decorative, motion-safe */
-.hspark {
-  color: #fff;
-  pointer-events: none;
-  position: absolute;
-}
-
-.hspark.a {
-  font-size: 0.8125rem;
-  left: 1.9rem;
-  top: 1.4rem;
-}
-
-.hspark.b {
-  font-size: 1.125rem;
-  right: 2.1rem;
-  top: 3.4rem;
-}
-
-.hspark.c {
-  font-size: 0.625rem;
-  left: 2.9rem;
-  top: 7.5rem;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .hspark {
-    animation: wn-twinkle 2.6s ease-in-out infinite;
-  }
-
-  .hspark.b {
-    animation-delay: 0.6s;
-  }
-
-  .hspark.c {
-    animation-delay: 1.2s;
-  }
-
-  .wn-medallion {
-    animation: wn-floaty 4s ease-in-out infinite;
-  }
-}
-
-@keyframes wn-twinkle {
-  0%,
-  100% {
-    opacity: 0.3;
-    transform: scale(0.8);
-  }
-
-  50% {
-    opacity: 1;
-    transform: scale(1.15);
-  }
-}
-
-@keyframes wn-floaty {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-0.375rem);
-  }
-}
-
-/* ===== CONTENT — white body emerges over the hero ===== */
-.wn-content {
-  background: #fff;
-  border-radius: 1.625rem 1.625rem 0 0;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  margin-top: -1.5rem;
-  padding: 1.625rem 1.5rem 1.25rem;
-  position: relative;
-  z-index: 2;
-}
-
-:global(.dark) .wn-content {
-  background: #1e293b;
-}
-
-.wn-region {
-  flex: 1;
-}
-
-.wn-region-center {
-  display: grid;
-  place-items: center;
-}
-
+/* the message (legacy / minor summary-only note) — centred in the flex region */
 .wn-message {
   color: #2c3e50;
   font-family: Inter, sans-serif;
   font-size: 0.9375rem;
   line-height: 1.62;
-  margin: 0 0.25rem;
+  margin: auto 0.25rem;
   text-align: center;
 }
 
@@ -276,7 +114,7 @@ function handleSeeAll() {
   color: #e2e8f0;
 }
 
-/* headline + detail blocks — the "beanstalk list" (Treatment B).
+/* headline + detail blocks — the "beanstalk list".
    Rules are ordered base → single-variant → multi-variant so specificity
    never descends (stylelint no-descending-specificity). */
 .wn-list {
@@ -434,64 +272,6 @@ function handleSeeAll() {
 
 :global(.dark) .wn-fixes li {
   color: rgb(226 232 240 / 55%);
-}
-
-/* The Pod divider */
-.wn-pod {
-  display: flex;
-  flex-shrink: 0;
-  gap: 0.4375rem;
-  justify-content: center;
-  margin: 1.375rem 0 1.125rem;
-}
-
-.wn-pod i {
-  border-radius: 50% 50% 48% 48%;
-  height: 0.6875rem;
-  width: 0.5625rem;
-}
-
-.wn-pod i:nth-child(1) {
-  background: #2c3e50;
-}
-
-.wn-pod i:nth-child(2) {
-  background: #e67e22;
-}
-
-.wn-pod i:nth-child(3) {
-  background: #f15d22;
-}
-
-.wn-pod i:nth-child(4) {
-  background: #aed6f1;
-}
-
-.wn-sign {
-  color: #5d6d7e;
-  flex-shrink: 0;
-  font-family: Caveat, Outfit, cursive;
-  font-size: 1.3125rem;
-  font-weight: 700;
-  text-align: right;
-}
-
-:global(.dark) .wn-sign {
-  color: #94a3b8;
-}
-
-/* ===== FOOTER ===== */
-.wn-foot {
-  background: #fff;
-  border-top: 1px solid #ecf0f2;
-  flex-shrink: 0;
-  padding: 0.875rem 1.5rem 1.5rem;
-  text-align: center;
-}
-
-:global(.dark) .wn-foot {
-  background: #1e293b;
-  border-top-color: rgb(255 255 255 / 8%);
 }
 
 .wn-seeall {
