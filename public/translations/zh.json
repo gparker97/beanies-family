@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-05-28",
-    "translationCount": 2957
+    "translationCount": 2958
   },
   "translations": {
     "app.name": {
@@ -14789,6 +14789,11 @@
     "notifications.kindAnnouncement": {
       "translation": "公告",
       "hash": "5b6c13",
+      "lastUpdated": "2026-05-28"
+    },
+    "pwa.whatChanged": {
+      "translation": "有什么变化？",
+      "hash": "b96bpj",
       "lastUpdated": "2026-05-28"
     }
   }

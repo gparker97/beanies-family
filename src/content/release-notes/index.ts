@@ -66,6 +66,21 @@ export function isSpotlightRelease(note: ReleaseNote): boolean {
   return note.spotlight ?? (note.features?.length ?? 0) > 0;
 }
 
+/**
+ * Whether a post-update toast should offer a "what changed?" link to `note`.
+ * True only when the note is a spotlight (non-trivial) release AND it is newer
+ * than the version the user was last toasted about — so a minor "fixes &
+ * improvements" note, OR a deploy that shipped no new note (version unchanged),
+ * shows no link. `note` is the current latest release note.
+ */
+export function isWhatChangedRelease(
+  note: ReleaseNote | undefined,
+  lastToastedVersion: string
+): boolean {
+  if (!note || note.version === lastToastedVersion) return false;
+  return isSpotlightRelease(note);
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 export function getLatestVersion(): string {

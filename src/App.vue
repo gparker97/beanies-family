@@ -63,9 +63,12 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
+import { useNotificationsStore } from '@/stores/notificationsStore';
 import { setSoundEnabled } from '@/composables/useSounds';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
+import { getLatestReleaseNote, isWhatChangedRelease } from '@/content/release-notes';
+import { whatsNewId } from '@/utils/notifications';
 import { useToday } from '@/composables/useToday';
 import { useStaleTabRefresh } from '@/composables/useStaleTabRefresh';
 import { attemptSilentReconnect } from '@/utils/silentReconnect';
@@ -112,6 +115,7 @@ const recurringStore = useRecurringStore();
 const translationStore = useTranslationStore();
 const memberFilterStore = useMemberFilterStore();
 const authStore = useAuthStore();
+const notificationsStore = useNotificationsStore();
 const { t } = useTranslation();
 const { isMobile, isDesktop } = useBreakpoint();
 
@@ -126,6 +130,27 @@ const isInitializing = ref(true);
 // update; the watcher below fires the confirmation toast once the init loader
 // has cleared. Declared here so the onMounted closure can reference it.
 let pendingUpdateToast = false;
+
+// The latest release version the post-update toast last pointed at (per device).
+// Lets the "what changed?" link appear ONLY when a new spotlight note shipped in
+// this update (vs a minor note or a note-less deploy). Read/write are guarded —
+// a blocked localStorage just means the link may show once more, never a crash.
+const LAST_TOASTED_RELEASE_KEY = 'beanies-lastToastedRelease';
+function readLastToastedRelease(): string {
+  try {
+    return localStorage.getItem(LAST_TOASTED_RELEASE_KEY) ?? '';
+  } catch (e) {
+    console.warn('[pwa] could not read last-toasted release', e);
+    return '';
+  }
+}
+function writeLastToastedRelease(version: string): void {
+  try {
+    localStorage.setItem(LAST_TOASTED_RELEASE_KEY, version);
+  } catch (e) {
+    console.warn('[pwa] could not persist last-toasted release', e);
+  }
+}
 const isLoadingData = ref(true);
 const initError = ref<string | null>(null);
 const initErrorDetail = ref<string | null>(null);
@@ -1130,7 +1155,22 @@ watch(
     if (initializing || !pendingUpdateToast) return;
     pendingUpdateToast = false;
     try {
-      showToast('info', t('pwa.updated'), t('pwa.updatedMessage'));
+      // Offer a "what changed?" link ONLY when this update shipped a new
+      // non-trivial (spotlight) release note — not a minor "fixes" note, and
+      // not a note-less deploy (version unchanged since the last toast). The
+      // per-device marker is what makes "since this update" work.
+      const latest = getLatestReleaseNote();
+      const showWhatChanged = isWhatChangedRelease(latest, readLastToastedRelease());
+      const options =
+        showWhatChanged && latest
+          ? {
+              actionLabel: t('pwa.whatChanged'),
+              actionFn: () => notificationsStore.openTo(whatsNewId(latest.version)),
+              durationMs: 8000, // longer than the 5s default so the link can be tapped
+            }
+          : undefined;
+      showToast('info', t('pwa.updated'), t('pwa.updatedMessage'), options);
+      if (latest) writeLastToastedRelease(latest.version);
     } catch (e) {
       console.warn('[pwa] post-update toast failed', e);
     }
