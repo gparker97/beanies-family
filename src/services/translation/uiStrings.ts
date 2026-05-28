@@ -4041,6 +4041,7 @@ const STRING_DEFS = {
     en: "We're always improving your beanies.family experience",
     beanie: "you're on the latest version - we're always improving",
   },
+  'pwa.whatChanged': { en: 'What changed?', beanie: 'what changed?' },
   'settings.installApp': { en: 'Install App', beanie: 'install app' },
   'settings.installAppDesc': {
     en: 'Install beanies.family on this device for quick access',
