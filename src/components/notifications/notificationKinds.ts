@@ -9,6 +9,7 @@ import type { AppNotification, NotificationKind, KindPresentation } from '@/type
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { formatTime12, relativeDayLabel, timeAgo } from '@/utils/date';
 import { getReleaseNote, isSpotlightRelease } from '@/content/release-notes';
+import { getAnnouncement } from '@/content/announcements';
 import WhatsNewBody from '@/components/notifications/WhatsNewBody.vue';
 import AnnouncementBody from '@/components/notifications/AnnouncementBody.vue';
 
@@ -93,4 +94,15 @@ export function isCelebratoryWhatsNew(n: AppNotification): boolean {
   if (n.kind !== 'whats-new' || !n.sourceId) return false;
   const rel = getReleaseNote(n.sourceId);
   return rel ? isSpotlightRelease(rel) : false;
+}
+
+/**
+ * Whether a notification gets the "letter card" row — an announcement whose
+ * content resolves in the registry. Sits at the same impact tier as the gift
+ * card but with the calmer "addressed message" treatment. An announcement with
+ * no resolvable content falls through to the standard `NotificationRow`.
+ */
+export function isAnnouncementCard(n: AppNotification): boolean {
+  if (n.kind !== 'announcement' || !n.sourceId) return false;
+  return getAnnouncement(n.sourceId) !== undefined;
 }
