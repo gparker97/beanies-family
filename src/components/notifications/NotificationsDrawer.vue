@@ -20,8 +20,12 @@ import BaseSidePanel from '@/components/ui/BaseSidePanel.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import NotificationRow from '@/components/notifications/NotificationRow.vue';
 import WhatsNewGiftCard from '@/components/notifications/WhatsNewGiftCard.vue';
+import AnnouncementCard from '@/components/notifications/AnnouncementCard.vue';
 import NotificationDetail from '@/components/notifications/NotificationDetail.vue';
-import { isCelebratoryWhatsNew } from '@/components/notifications/notificationKinds';
+import {
+  isCelebratoryWhatsNew,
+  isAnnouncementCard,
+} from '@/components/notifications/notificationKinds';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useBackGestureClose } from '@/composables/useBackGestureClose';
@@ -154,9 +158,16 @@ function onToggleRead(id: string) {
                 {{ group.label }}
               </div>
               <template v-for="n in group.items" :key="n.id">
-                <!-- spotlight what's-new → the celebratory gift card; everything else → a row -->
+                <!-- spotlight what's-new → gift card; announcement → letter card;
+                     everything else (incl. orphan whats-new / announcement) → a row -->
                 <WhatsNewGiftCard
                   v-if="isCelebratoryWhatsNew(n)"
+                  :notification="n"
+                  @select="store.openTo($event)"
+                  @toggle-read="onToggleRead"
+                />
+                <AnnouncementCard
+                  v-else-if="isAnnouncementCard(n)"
                   :notification="n"
                   @select="store.openTo($event)"
                   @toggle-read="onToggleRead"
