@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **What's-new updates now read like a tidy list of headlines.** Each new thing in an update gets a short bold headline with a one-line explanation of what it is and why it helps - and when a single update ships more than one new thing, they're laid out as a clean list instead of one long paragraph.
 - **The update confirmation can now show you what changed.** When a new version brings a notable new feature, the "you're on the latest version" toast now offers a "what changed?" link that opens the release note - shown only for real updates, not routine bug-fix releases.
+- **Opening a notification now glides instead of flashing.** Tapping a notification slides smoothly into its details (and back), like moving through a drawer, rather than snapping open.
 
 ## 2026-05-27
 

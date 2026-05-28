@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family · notification detail push transition · 2026-05-28</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Replicates the NotificationsDrawer list⇄detail transition (out-in
+         directional push) with the EXACT CSS shipped to the component, so the
+         motion captured here is what users get. */
+      :root {
+        --orange: #f15d22;
+        --slate: #2c3e50;
+        --cloud: #f8f9fa;
+        --line: #ecf0f2;
+        --grad: linear-gradient(135deg, #f15d22 0%, #e67e22 100%);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Inter', sans-serif;
+        background: #e7ebef;
+        color: var(--slate);
+        -webkit-font-smoothing: antialiased;
+        padding: 28px;
+      }
+      .wrap {
+        max-width: 420px;
+        margin: 0 auto;
+      }
+      .cap {
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 13px;
+        color: #5d6d7e;
+        text-align: center;
+        margin-bottom: 12px;
+      }
+      .panel {
+        background: #fff;
+        border-radius: 22px;
+        box-shadow: 0 24px 60px -20px rgba(44, 62, 80, 0.4);
+        height: 640px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .phead {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--line);
+        flex-shrink: 0;
+      }
+      .phead .back {
+        border: none;
+        background: none;
+        font-size: 20px;
+        color: #5d6d7e;
+        cursor: pointer;
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+      }
+      .phead h2 {
+        font-family: 'Outfit';
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0;
+        flex: 1;
+      }
+      .pbody {
+        flex: 1;
+        overflow-y: auto;
+        padding: 18px;
+      }
+
+      /* rows */
+      .row {
+        display: flex;
+        gap: 12px;
+        padding: 12px 10px;
+        border-radius: 14px;
+        cursor: pointer;
+        align-items: flex-start;
+      }
+      .row:hover {
+        background: var(--cloud);
+      }
+      .row .lead {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        border-radius: 13px;
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        background: rgba(155, 89, 182, 0.12);
+      }
+      .row .lead.wn {
+        background: var(--grad);
+      }
+      .row .t {
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 14.5px;
+        margin: 0;
+      }
+      .row .s {
+        font-size: 12.5px;
+        color: rgba(44, 62, 80, 0.6);
+        margin: 2px 0 0;
+      }
+      .grp {
+        font-family: 'Outfit';
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(44, 62, 80, 0.4);
+        padding: 6px 10px 4px;
+      }
+
+      /* detail card */
+      .detail .dcard {
+        background: var(--cloud);
+        border-radius: 16px;
+        padding: 18px;
+      }
+      .detail .dlead {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        background: rgba(174, 214, 241, 0.3);
+        margin-bottom: 12px;
+      }
+      .detail h3 {
+        font-family: 'Outfit';
+        font-size: 20px;
+        font-weight: 800;
+        margin: 0 0 4px;
+      }
+      .detail p {
+        font-size: 14px;
+        line-height: 1.5;
+        color: rgba(44, 62, 80, 0.7);
+        margin: 0;
+      }
+      .detail .open {
+        margin-top: 16px;
+        width: 100%;
+        padding: 13px;
+        border: none;
+        border-radius: 14px;
+        background: var(--grad);
+        color: #fff;
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      /* ===== the shipped transition CSS (verbatim) ===== */
+      .nd-view {
+        will-change: transform, opacity;
+        height: 100%;
+      }
+      .nav-forward-enter-active,
+      .nav-back-enter-active {
+        transition:
+          transform 0.24s ease-out,
+          opacity 0.22s ease-out;
+      }
+      .nav-forward-leave-active,
+      .nav-back-leave-active {
+        transition:
+          transform 0.16s ease-in,
+          opacity 0.16s ease-in;
+      }
+      .nav-forward-enter-from {
+        opacity: 0;
+        transform: translateX(1.75rem);
+      }
+      .nav-forward-leave-to {
+        opacity: 0;
+        transform: translateX(-1.25rem);
+      }
+      .nav-back-enter-from {
+        opacity: 0;
+        transform: translateX(-1.75rem);
+      }
+      .nav-back-leave-to {
+        opacity: 0;
+        transform: translateX(1.25rem);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="cap">tap a notification → detail pushes in · back → pops out</div>
+      <div class="panel">
+        <div class="phead">
+          <button class="back" id="backBtn" style="display: none">←</button>
+          <h2 id="title">Notifications</h2>
+        </div>
+        <div class="pbody" id="stage"></div>
+      </div>
+    </div>
+
+    <script>
+      const LIST = `
+        <div class="nd-view" data-view="list">
+          <div class="grp">Today</div>
+          <div class="row" onclick="go('detail')">
+            <div class="lead">📅</div>
+            <div><p class="t">Swimming lesson</p><p class="s">Lucas · Bukit Timah Pool · Today 5:00pm</p></div>
+          </div>
+          <div class="row" onclick="go('detail')">
+            <div class="lead wn">💬</div>
+            <div><p class="t">join us on discord!</p><p class="s">a note from greg</p></div>
+          </div>
+          <div class="row" onclick="go('detail')">
+            <div class="lead">✅</div>
+            <div><p class="t">Pick up the boys</p><p class="s">Your task · Today 4:00pm</p></div>
+          </div>
+        </div>`;
+      const DETAIL = `
+        <div class="nd-view detail" data-view="detail">
+          <div class="dcard">
+            <div class="dlead">📅</div>
+            <h3>Swimming lesson</h3>
+            <p>Lucas · Bukit Timah Pool. Today at 5:00pm. Drop-off is yours today.</p>
+            <button class="open" onclick="go('list')">Open →</button>
+          </div>
+        </div>`;
+
+      const stage = document.getElementById('stage');
+      const backBtn = document.getElementById('backBtn');
+      const title = document.getElementById('title');
+      let view = 'list';
+      let animating = false;
+      stage.innerHTML = LIST;
+
+      function nextFrame() {
+        return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      }
+      // Faithful out-in: leave current, then enter next.
+      async function go(target) {
+        if (animating || target === view) return;
+        animating = true;
+        const name = target === 'detail' ? 'nav-forward' : 'nav-back';
+        const cur = stage.firstElementChild;
+        // leave
+        cur.classList.add(name + '-leave-active', name + '-leave-from');
+        await nextFrame();
+        cur.classList.remove(name + '-leave-from');
+        cur.classList.add(name + '-leave-to');
+        await new Promise((r) => setTimeout(r, 170));
+        // swap
+        stage.innerHTML = target === 'detail' ? DETAIL : LIST;
+        view = target;
+        backBtn.style.display = view === 'detail' ? 'block' : 'none';
+        title.textContent = view === 'detail' ? 'Swimming lesson' : 'Notifications';
+        const nextEl = stage.firstElementChild;
+        nextEl.classList.add(name + '-enter-active', name + '-enter-from');
+        await nextFrame();
+        nextEl.classList.remove(name + '-enter-from');
+        await new Promise((r) => setTimeout(r, 260));
+        nextEl.classList.remove(name + '-enter-active');
+        animating = false;
+      }
+      backBtn.onclick = () => go('list');
+      window.go = go;
+    </script>
+  </body>
+</html>
