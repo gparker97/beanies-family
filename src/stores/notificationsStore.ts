@@ -17,6 +17,11 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { changeDoc, docVersion, getDoc, isDocLoaded } from '@/services/automerge/docService';
 import { getAllReleaseNotes, getReleaseNote, isSpotlightRelease } from '@/content/release-notes';
+import {
+  getAllAnnouncements,
+  getAnnouncement,
+  isAutoOpenAnnouncement,
+} from '@/content/announcements';
 import { reportError } from '@/utils/errorReporter';
 import {
   deriveNotifications,
@@ -86,6 +91,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       members: familyStore.members,
       currentMember,
       releaseNotes: getAllReleaseNotes(),
+      announcements: getAllAnnouncements(),
       readState,
       windowDays: WINDOW_DAYS,
       occurrencesByDate,
@@ -114,14 +120,24 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const selected = computed(
     () => notifications.value.find((n) => n.id === selectedId.value) ?? null
   );
-  // Auto-open only SPOTLIGHT (significant) releases; minor per-deploy notes
+  // Auto-open the newest unread item that opts in: a SPOTLIGHT (significant)
+  // what's-new release OR an auto-open announcement. Minor per-deploy notes
   // ("fixes & improvements") just badge the bell — they don't interrupt.
-  const latestUnseenSpotlight = computed(
+  // Notifications sort newest-first, so a fresh announcement outranks an older
+  // release.
+  const latestUnseenAutoOpen = computed(
     () =>
       notifications.value.find((n) => {
-        if (n.kind !== 'whats-new' || n.read || !n.sourceId) return false;
-        const rel = getReleaseNote(n.sourceId);
-        return rel ? isSpotlightRelease(rel) : false;
+        if (n.read || !n.sourceId) return false;
+        if (n.kind === 'whats-new') {
+          const rel = getReleaseNote(n.sourceId);
+          return rel ? isSpotlightRelease(rel) : false;
+        }
+        if (n.kind === 'announcement') {
+          const ann = getAnnouncement(n.sourceId);
+          return ann ? isAutoOpenAnnouncement(ann) : false;
+        }
+        return false;
       }) ?? null
   );
 
@@ -211,11 +227,11 @@ export const useNotificationsStore = defineStore('notifications', () => {
   }
   /**
    * Login auto-open — idempotent via the session latch; no-op unless there's an
-   * unseen SPOTLIGHT release (minor per-deploy notes never auto-open).
+   * unseen auto-open item (a spotlight release or an auto-open announcement).
    */
-  function openToLatestWhatsNew(): void {
+  function openToLatestAutoOpen(): void {
     if (autoOpenedThisSession) return;
-    const latest = latestUnseenSpotlight.value;
+    const latest = latestUnseenAutoOpen.value;
     if (!latest) return;
     autoOpenedThisSession = true;
     openTo(latest.id);
@@ -231,7 +247,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     notifications,
     unreadCount,
     hasUnread,
-    latestUnseenSpotlight,
+    latestUnseenAutoOpen,
     markRead,
     markUnread,
     markAllRead,
@@ -240,6 +256,6 @@ export const useNotificationsStore = defineStore('notifications', () => {
     close,
     openTo,
     back,
-    openToLatestWhatsNew,
+    openToLatestAutoOpen,
   };
 });

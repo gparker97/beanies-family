@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-28
 
+### Added
+
+- **Announcements - a friendly way to hear about important news.** A new kind of in-app notification for occasional announcements (the first one: an invite to join the beanies Discord community). It appears in the notification bell and gently opens once on your next visit - never more than one pop-up per visit, and each one only the first time. Read it on one device and it clears on your others.
+
 ### Changed
 
 - **What's-new updates now read like a tidy list of headlines.** Each new thing in an update gets a short bold headline with a one-line explanation of what it is and why it helps - and when a single update ships more than one new thing, they're laid out as a clean list instead of one long paragraph.

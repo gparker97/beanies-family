@@ -56,7 +56,9 @@ const isEmpty = computed(() => store.notifications.length === 0);
 const detailTitle = computed(() => {
   const n = store.selected;
   if (!n) return t('notifications.title');
-  return n.kind === 'whats-new' ? t('notifications.kindWhatsNew') : n.title;
+  if (n.kind === 'whats-new') return t('notifications.kindWhatsNew');
+  if (n.kind === 'announcement') return t('notifications.kindAnnouncement');
+  return n.title;
 });
 
 /** Row pip → flip read-state without opening the detail. */

@@ -17,7 +17,7 @@ const props = defineProps<{ notification: AppNotification }>();
 const router = useRouter();
 const { t } = useTranslation();
 const store = useNotificationsStore();
-const { presentation, tintClass, labelKey, release, hasRichBody, title, summary, when, roleLabel } =
+const { presentation, tintClass, labelKey, hasRichBody, title, summary, when, roleLabel } =
   useNotificationPresentation(() => props.notification);
 
 function handleOpen() {
@@ -32,8 +32,8 @@ function handleMarkUnread() {
 </script>
 
 <template>
-  <!-- whats-new: the full celebratory layout (manages its own hero + footer) -->
-  <component :is="presentation.detailBody" v-if="hasRichBody" :release="release" />
+  <!-- whats-new / announcement: a full celebratory body (manages its own hero + footer) -->
+  <component :is="presentation.detailBody" v-if="hasRichBody" :notification="notification" />
 
   <!-- every other kind: meta card + actions -->
   <div v-else class="space-y-5">

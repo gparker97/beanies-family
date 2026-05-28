@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family · announcement — join us on Discord · 2026-05-28</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Caveat:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Faithful reproduction of CelebrationDetail (shell) + AnnouncementBody
+         (content) + the NotificationRow, with the real Discord copy. Verifies
+         the actual component output. */
+      :root {
+        --orange: #f15d22;
+        --orange-ink: #c84612;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --slate-soft: #5d6d7e;
+        --cloud: #f8f9fa;
+        --line: #ecf0f2;
+        --grad: linear-gradient(135deg, #f15d22 0%, #e67e22 100%);
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Inter', system-ui, sans-serif;
+        background:
+          radial-gradient(1200px 600px at 80% -10%, rgba(174, 214, 241, 0.18), transparent 60%),
+          var(--cloud);
+        color: var(--slate);
+        -webkit-font-smoothing: antialiased;
+        padding: 36px 24px 90px;
+      }
+      h1,
+      h3,
+      h4 {
+        font-family: 'Outfit', sans-serif;
+        margin: 0;
+      }
+      .head {
+        max-width: 900px;
+        margin: 0 auto 26px;
+      }
+      .head .kick {
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--orange);
+      }
+      .head h1 {
+        font-size: 24px;
+        font-weight: 800;
+        margin-top: 4px;
+      }
+      .head p {
+        color: var(--slate-soft);
+        font-size: 14px;
+        margin: 8px 0 0;
+        max-width: 760px;
+        line-height: 1.55;
+      }
+      .stage {
+        max-width: 900px;
+        margin: 0 auto;
+        display: flex;
+        gap: 34px;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: flex-start;
+      }
+      .col-cap {
+        text-align: center;
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 13px;
+        color: var(--slate-soft);
+        margin-bottom: 11px;
+      }
+      .bezel {
+        background: #1a232c;
+        border-radius: 40px;
+        padding: 11px;
+        box-shadow: 0 14px 38px -14px rgba(44, 62, 80, 0.2);
+        width: 372px;
+      }
+      .device {
+        background: #fff;
+        border-radius: 30px;
+        overflow: hidden;
+        height: 760px;
+        display: flex;
+        flex-direction: column;
+      }
+      .statusbar {
+        height: 26px;
+        background: var(--slate);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        color: #fff;
+        font-family: 'Outfit';
+        font-size: 11px;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+      .dhead {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        flex-shrink: 0;
+        background: #fff;
+      }
+      .dhead h3 {
+        font-size: 18px;
+        font-weight: 600;
+        flex: 1;
+      }
+      .dhead .back,
+      .dhead .x {
+        border: none;
+        background: none;
+        font-size: 18px;
+        color: var(--slate-soft);
+        cursor: pointer;
+      }
+      .pad {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+      }
+
+      /* ===== CelebrationDetail shell ===== */
+      .wn-detail {
+        display: flex;
+        flex-direction: column;
+        min-height: calc(100% + 48px);
+        margin: -24px;
+      }
+      .wn-hero {
+        position: relative;
+        background:
+          radial-gradient(130% 100% at 15% 0%, rgba(255, 255, 255, 0.28), transparent 55%),
+          var(--grad);
+        padding: 28px 24px 44px;
+        text-align: center;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+      .hspark {
+        position: absolute;
+        color: #fff;
+        pointer-events: none;
+        animation: tw 2.6s ease-in-out infinite;
+      }
+      .hspark.a {
+        font-size: 13px;
+        left: 30px;
+        top: 22px;
+      }
+      .hspark.b {
+        font-size: 18px;
+        right: 34px;
+        top: 54px;
+        animation-delay: 0.6s;
+      }
+      .hspark.c {
+        font-size: 10px;
+        left: 46px;
+        top: 120px;
+        animation-delay: 1.2s;
+      }
+      @keyframes tw {
+        0%,
+        100% {
+          opacity: 0.3;
+          transform: scale(0.8);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.15);
+        }
+      }
+      .wn-medallion {
+        width: 112px;
+        height: 112px;
+        margin: 4px auto 14px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.72));
+        display: grid;
+        place-items: center;
+        box-shadow: 0 10px 30px -8px rgba(44, 62, 80, 0.35);
+        animation: fl 4s ease-in-out infinite;
+      }
+      @keyframes fl {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-6px);
+        }
+      }
+      .wn-medallion img {
+        width: 88px;
+        height: 88px;
+        object-fit: contain;
+      }
+      .wn-medallion .fallback {
+        font-size: 46px;
+      }
+      .wn-kick {
+        font-family: 'Outfit';
+        font-weight: 800;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.95);
+      }
+      .wn-datepill {
+        display: inline-block;
+        margin-top: 12px;
+        font-family: 'Outfit';
+        font-weight: 600;
+        font-size: 11px;
+        color: #fff;
+        background: rgba(255, 255, 255, 0.22);
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        border-radius: 999px;
+        padding: 4px 12px;
+      }
+      .wn-content {
+        position: relative;
+        z-index: 2;
+        margin-top: -24px;
+        background: #fff;
+        border-radius: 26px 26px 0 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 26px 24px 20px;
+      }
+      .wn-region {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .pod {
+        display: flex;
+        gap: 7px;
+        justify-content: center;
+        margin: 22px 0 18px;
+        flex-shrink: 0;
+      }
+      .pod i {
+        width: 9px;
+        height: 11px;
+        border-radius: 50% 50% 48% 48%;
+      }
+      .pod i:nth-child(1) {
+        background: var(--slate);
+      }
+      .pod i:nth-child(2) {
+        background: var(--terracotta);
+      }
+      .pod i:nth-child(3) {
+        background: var(--orange);
+      }
+      .pod i:nth-child(4) {
+        background: #aed6f1;
+      }
+      .wn-sign {
+        font-family: 'Caveat', cursive;
+        font-size: 21px;
+        font-weight: 700;
+        color: var(--slate-soft);
+        text-align: right;
+        flex-shrink: 0;
+      }
+      .wn-foot {
+        flex-shrink: 0;
+        padding: 14px 24px 20px;
+        background: #fff;
+        border-top: 1px solid var(--line);
+        text-align: center;
+      }
+
+      /* ===== AnnouncementBody content ===== */
+      .ann-title {
+        font-size: 20px;
+        font-weight: 800;
+        line-height: 1.2;
+        text-align: center;
+        margin: 0 0 12px;
+        color: var(--slate);
+      }
+      .ann-message {
+        font-family: 'Inter';
+        font-size: 15px;
+        line-height: 1.62;
+        color: rgba(44, 62, 80, 0.78);
+        margin: 0;
+      }
+      .ann-note {
+        background: var(--tint-orange-8);
+        border-radius: 14px;
+        color: rgba(200, 70, 18, 0.9);
+        font-family: 'Inter';
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 14px 0 0;
+        padding: 10px 14px;
+      }
+      .ann-cta {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        width: 100%;
+        margin-top: 18px;
+        padding: 13px 18px;
+        border: none;
+        border-radius: 14px;
+        background: var(--grad);
+        color: #fff;
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 15px;
+        box-shadow: 0 4px 14px rgba(241, 93, 34, 0.28);
+        cursor: pointer;
+      }
+      .ann-tagline {
+        font-family: 'Outfit';
+        font-style: italic;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        color: rgba(44, 62, 80, 0.3);
+      }
+
+      /* ===== a list row (for context) ===== */
+      .nrow {
+        display: flex;
+        gap: 12px;
+        padding: 12px 14px;
+        align-items: flex-start;
+        background: rgba(241, 93, 34, 0.045);
+      }
+      .nrow .lead {
+        flex-shrink: 0;
+        height: 40px;
+        width: 40px;
+        border-radius: 13px;
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        background: var(--grad);
+      }
+      .nrow .ntitle {
+        font-family: 'Outfit';
+        font-size: 14.5px;
+        font-weight: 700;
+        margin: 0;
+      }
+      .nrow .nsub {
+        font-size: 12.5px;
+        color: rgba(44, 62, 80, 0.6);
+        margin: 2px 0 0;
+      }
+      .nrow .ntime {
+        font-family: 'Outfit';
+        font-size: 11px;
+        font-weight: 600;
+        color: rgba(44, 62, 80, 0.45);
+        margin-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="head">
+      <div class="kick">Adhoc announcement · Model A (bundled)</div>
+      <h1>"Join us on Discord!" — auto-opens for every user on next login</h1>
+      <p>
+        The actual component output: the shared CelebrationDetail shell (now used by both what's-new
+        and announcements) with the AnnouncementBody content — kicker, headline, greg's note, a
+        beanie-note caveat, and a prominent CTA to the invite. Medallion = the hugging-family art.
+        Read/dismiss state syncs per-member; it never auto-opens again once read.
+      </p>
+    </div>
+
+    <div class="stage">
+      <!-- detail -->
+      <div>
+        <div class="col-cap">Detail — auto-opened on login</div>
+        <div class="bezel">
+          <div class="device">
+            <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+            <div class="dhead">
+              <button class="back">←</button>
+              <h3>Announcement</h3>
+              <button class="x">✕</button>
+            </div>
+            <div class="pad">
+              <div class="wn-detail">
+                <div class="wn-hero">
+                  <span class="hspark a">✦</span>
+                  <span class="hspark b">✨</span>
+                  <span class="hspark c">✦</span>
+                  <div class="wn-medallion">
+                    <img
+                      src="../../public/brand/beanies_family_hugging_transparent_512x512.png"
+                      alt="beanies hugging"
+                      onerror="this.style.display='none';this.parentNode.insertAdjacentHTML('beforeend','<span class=fallback>🫂</span>')"
+                    />
+                  </div>
+                  <div class="wn-kick">💬 a note from greg</div>
+                  <div class="wn-datepill">28 may 2026</div>
+                </div>
+                <div class="wn-content">
+                  <div class="wn-region">
+                    <h3 class="ann-title">join us on discord!</h3>
+                    <p class="ann-message">
+                      there's nothing i love more than my super precious early adopter beanies. you
+                      are a key part of the evolution of beanies, and i'd love to know what you like
+                      (or hate) about our lovely app so i can make it better. join me on discord -
+                      i'm there all the time, so if you see anything good, bad, or ugly about the
+                      platform you can report it to me directly. feedback, bugs, error reports, etc -
+                      it's all good. hope to see you there!
+                    </p>
+                    <p class="ann-note">
+                      the link below will expire after a certain number of uses, so get in now before
+                      my early adopter community is full!!
+                    </p>
+                    <button class="ann-cta">join us on discord <span>→</span></button>
+                  </div>
+                  <div class="pod"><i></i><i></i><i></i><i></i></div>
+                  <div class="wn-sign">— greg, head beanie developer 🫘</div>
+                </div>
+                <div class="wn-foot">
+                  <div class="ann-tagline">every bean counts</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- list row -->
+      <div>
+        <div class="col-cap">In the bell list afterwards</div>
+        <div class="bezel">
+          <div class="device">
+            <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+            <div class="dhead">
+              <h3 style="font-weight: 600">Notifications</h3>
+              <button class="x">✕</button>
+            </div>
+            <div class="pad" style="padding: 8px 0">
+              <div
+                style="
+                  font-family: 'Outfit';
+                  font-size: 10.5px;
+                  font-weight: 700;
+                  text-transform: uppercase;
+                  letter-spacing: 0.08em;
+                  color: rgba(44, 62, 80, 0.4);
+                  padding: 12px 18px 6px;
+                "
+              >
+                Today
+              </div>
+              <div class="nrow">
+                <div class="lead">💬</div>
+                <div>
+                  <p class="ntitle">join us on discord!</p>
+                  <p class="nsub">a note from greg</p>
+                  <p class="ntime">just now</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

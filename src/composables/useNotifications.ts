@@ -5,7 +5,8 @@
  *   1. Poll → `store.tick()` so time-based items activate while open + on wake.
  *   2. PWA app-icon badge synced to `store.unreadCount` (the ONLY badge writer).
  *   3. One-time What's-New localStorage→synced read-state migration + prune.
- *   4. Auto-open the drawer to the latest unseen release on login (store latch).
+ *   4. Auto-open the drawer to the latest unseen auto-open item (a spotlight
+ *      release or an auto-open announcement) on login (store latch).
  */
 import { watch } from 'vue';
 import { useNotificationsStore } from '@/stores/notificationsStore';
@@ -90,7 +91,7 @@ export function useNotifications(): void {
       if (!ready) return;
       if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('e2e_auto_auth')) return;
       runWhatsNewMigrationOnce();
-      store.openToLatestWhatsNew();
+      store.openToLatestAutoOpen();
     },
     { immediate: true }
   );

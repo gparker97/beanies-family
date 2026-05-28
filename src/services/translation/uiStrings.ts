@@ -5789,6 +5789,7 @@ const STRING_DEFS = {
   'notifications.kindTodoAssigned': { en: 'Assigned to you', beanie: 'assigned to you' },
   'notifications.kindActivityReminder': { en: 'Coming up', beanie: 'coming up' },
   'notifications.kindWhatsNew': { en: "What's new", beanie: "what's new" },
+  'notifications.kindAnnouncement': { en: 'Announcement', beanie: 'announcement' },
   'notifications.due': { en: 'Due', beanie: 'due' },
   'notifications.yourTask': { en: 'Your task', beanie: 'your task' },
   'notifications.assignedByYou': {
