@@ -71,13 +71,13 @@ describe('notificationsStore — drawer state machine', () => {
     expect(s.isOpen).toBe(false); // second back closes
   });
 
-  it('openToLatestWhatsNew is idempotent (latches after the first call)', () => {
+  it('openToLatestAutoOpen is idempotent (latches after the first call)', () => {
     const s = useNotificationsStore();
-    s.openToLatestWhatsNew();
+    s.openToLatestAutoOpen();
     expect(s.isOpen).toBe(true);
     expect(s.view).toBe('detail');
     s.close();
-    s.openToLatestWhatsNew(); // latched — no re-open
+    s.openToLatestAutoOpen(); // latched — no re-open
     expect(s.isOpen).toBe(false);
   });
 });

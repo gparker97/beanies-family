@@ -13,6 +13,7 @@
  */
 import type { TodoItem, FamilyActivity, FamilyMember } from '@/types/models';
 import type { ReleaseNote } from '@/content/release-notes';
+import type { Announcement } from '@/content/announcements';
 import type { AppNotification } from '@/types/notifications';
 import { normalizeAssignees } from '@/utils/assignees';
 import { classifyAudience } from '@/utils/audience';
@@ -23,8 +24,9 @@ const MS_PER_DAY = 86_400_000;
 const DUE_LEAD_MINUTES = 30;
 /** Reminder lead used when an activity has no explicit `reminderMinutes`. */
 const DEFAULT_REMINDER_MINUTES = 30;
-/** Prefix used by the prune exemption (whats-new is window-exempt). */
+/** Prefixes used by the prune exemption (both are window-exempt). */
 const WHATS_NEW_PREFIX = 'whats-new:';
+const ANNOUNCEMENT_PREFIX = 'announcement:';
 
 export interface NotificationOccurrence {
   activity: FamilyActivity;
@@ -36,6 +38,8 @@ export interface DeriveInput {
   members: FamilyMember[];
   currentMember: FamilyMember;
   releaseNotes: readonly ReleaseNote[];
+  /** Adhoc announcements (window-exempt; honour their own startsAt/expiresAt). */
+  announcements: readonly Announcement[];
   /** The current member's id→readAt slice of `notificationReads`. */
   readState: Record<string, string>;
   /** Rolling history window (days) for time-based kinds; whats-new is exempt. */
@@ -55,6 +59,7 @@ export const todoAssignedId = (todoId: string): string => `todo-assigned:${todoI
 export const activityReminderId = (activityId: string, occurrenceDate: string): string =>
   `activity-reminder:${activityId}:${occurrenceDate}`;
 export const whatsNewId = (version: string): string => `${WHATS_NEW_PREFIX}${version}`;
+export const announcementId = (id: string): string => `${ANNOUNCEMENT_PREFIX}${id}`;
 
 // ── Internal pure date helpers (LOCAL time — avoids the UTC-midnight trap of
 //    `new Date('YYYY-MM-DD')`) ─────────────────────────────────────────────────
@@ -94,8 +99,16 @@ function localTimeStr(d: Date): string {
  * Derive the current member's notifications from a plain snapshot. Pure + total.
  */
 export function deriveNotifications(input: DeriveInput, now: Date): AppNotification[] {
-  const { todos, members, currentMember, releaseNotes, readState, windowDays, occurrencesByDate } =
-    input;
+  const {
+    todos,
+    members,
+    currentMember,
+    releaseNotes,
+    announcements,
+    readState,
+    windowDays,
+    occurrencesByDate,
+  } = input;
   const resolveMember = (id: string): FamilyMember | undefined => members.find((m) => m.id === id);
   const displayNames = (ids: string[]): string[] =>
     ids
@@ -252,6 +265,29 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
     }
   }
 
+  // ── announcements (window-exempt; honour their own startsAt/expiresAt) ───────
+  for (const ann of announcements) {
+    try {
+      if (!ann?.id) continue;
+      if (ann.startsAt && nowMs < new Date(ann.startsAt).getTime()) continue;
+      if (ann.expiresAt && nowMs > new Date(ann.expiresAt).getTime()) continue;
+      const id = announcementId(ann.id);
+      const annMs = new Date(ann.date).getTime();
+      out.push({
+        id,
+        kind: 'announcement',
+        // Language-agnostic fallback; the bilingual title is resolved in the
+        // presentation layer (useNotificationPresentation) like whats-new.
+        title: ann.month,
+        occurredAt: Number.isNaN(annMs) ? ann.date : new Date(annMs).toISOString(),
+        sourceId: ann.id,
+        read: isRead(id),
+      });
+    } catch (err) {
+      console.warn(`[deriveNotifications] skipped announcement ${ann?.id ?? '?'}:`, err);
+    }
+  }
+
   // Newest-active first (ISO strings sort lexicographically by time).
   out.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
   return out;
@@ -286,9 +322,9 @@ export function markAllReadIn(
 }
 
 /**
- * Drop read-state entries whose id is no longer derivable, with ONE exemption:
- * any `whats-new:*` id is always kept (whats-new is window-exempt; pruning it
- * would resurface old releases as unread).
+ * Drop read-state entries whose id is no longer derivable, with exemptions: any
+ * `whats-new:*` or `announcement:*` id is always kept (both are window-exempt and
+ * bounded by content count; pruning would resurface old items as unread).
  */
 export function pruneReadState(
   map: Record<string, string>,
@@ -297,7 +333,8 @@ export function pruneReadState(
   const keep = new Set(keepIds);
   const next: Record<string, string> = {};
   for (const [id, readAt] of Object.entries(map)) {
-    if (keep.has(id) || id.startsWith(WHATS_NEW_PREFIX)) next[id] = readAt;
+    if (keep.has(id) || id.startsWith(WHATS_NEW_PREFIX) || id.startsWith(ANNOUNCEMENT_PREFIX))
+      next[id] = readAt;
   }
   return next;
 }
