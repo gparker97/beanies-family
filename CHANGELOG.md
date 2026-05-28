@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-29
+
+### Changed
+
+- **Mobile header has room to breathe.** Removed the peek-a-boo beanie eyes from the mobile header — the greeting no longer truncates when you add up the notification bell, privacy toggle, search, and avatar on a small phone. The beanie eyes are still in the hamburger drawer (and every figure on screen blurs/reveals there), so nothing's lost.
+
 ## 2026-05-28
 
 ### Added
