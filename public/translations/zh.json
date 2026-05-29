@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-28",
-    "translationCount": 2958
+    "lastUpdated": "2026-05-29",
+    "translationCount": 2963
   },
   "translations": {
     "app.name": {
@@ -14795,6 +14795,31 @@
       "translation": "有什么变化？",
       "hash": "b96bpj",
       "lastUpdated": "2026-05-28"
+    },
+    "settings.dailyTips": {
+      "translation": "每日提示",
+      "hash": "ds923l",
+      "lastUpdated": "2026-05-29"
+    },
+    "settings.dailyTipsDescription": {
+      "translation": "每天在通知铃中添加一条小费",
+      "hash": "1ny6mf",
+      "lastUpdated": "2026-05-29"
+    },
+    "tips.mutedConfirm": {
+      "translation": "提示已静音。您可以在“设置”中重新启用它们。",
+      "hash": "7wzamt",
+      "lastUpdated": "2026-05-29"
+    },
+    "tips.unavailable": {
+      "translation": "此测验不再可用。",
+      "hash": "3zknt8",
+      "lastUpdated": "2026-05-29"
+    },
+    "notifications.kindTip": {
+      "translation": "今日小费",
+      "hash": "oc1eyw",
+      "lastUpdated": "2026-05-29"
     }
   }
 }
