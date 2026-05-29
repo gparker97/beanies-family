@@ -9,7 +9,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       "The bell in your header quietly keeps track of what's coming due, what's been assigned to you, and what's coming up — so you don't have to.",
     icon: '\u{1F514}',
     readTime: 3,
-    updatedDate: '2026-05-27',
+    updatedDate: '2026-05-29',
     sections: [
       {
         type: 'paragraph',
@@ -30,6 +30,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           '<strong>Tasks assigned to you</strong> — when a family member gives you something to do (and for your own no-deadline reminders, so they’re never lost).',
           "<strong>Events coming up</strong> — activities you're part of — whether you're going, dropping off, or picking up — around their reminder time.",
           "<strong>What's new</strong> — each beanies.family update now lives in the bell instead of popping up over your screen.",
+          "<strong>Today's tip</strong> — one small tip a day from the beanies, with a 💡 icon. Tap to read the full tip and try the feature it points to.",
         ],
       },
       {
@@ -47,6 +48,29 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'From the details, tap <strong>Open</strong> to jump straight to the task or event, or <strong>Mark unread</strong> if you want to come back to it.',
           'Tap <strong>Mark all read</strong> to clear everything at once — the dot disappears everywhere.',
         ],
+      },
+      {
+        type: 'heading',
+        content: 'A daily tip from the beanies',
+        level: 2,
+        id: 'daily-tip',
+      },
+      {
+        type: 'paragraph',
+        content:
+          "Once a day, the beanies drop a small tip in the bell: a feature you might've missed, a habit that helps, a corner of the app worth exploring. Each tip has a 💡 icon and a <strong>try it →</strong> link to the spot it talks about.",
+      },
+      {
+        type: 'paragraph',
+        content:
+          "Tips stay in the bell after you've read them, so you can always scroll back to one you liked. If you'd rather not see new ones, turn them off in <strong>Settings → Appearance → Daily Tips</strong>. The tips already in your bell stay there; only future ones stop appearing.",
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Tips are per-device: you may see a different tip on your phone than on your laptop. That keeps them light, just a small daily nudge wherever you happen to open the app.',
+        title: 'One tip per device, per day',
+        icon: '\u{1F4A1}',
       },
       {
         type: 'infoBox',

@@ -7,6 +7,7 @@
  *   3. One-time What's-New localStorage→synced read-state migration + prune.
  *   4. Auto-open the drawer to the latest unseen auto-open item (a spotlight
  *      release or an auto-open announcement) on login (store latch).
+ *   5. Daily tip issuance — one bell entry per local day from `useBeanTips`.
  */
 import { watch } from 'vue';
 import { useNotificationsStore } from '@/stores/notificationsStore';
@@ -14,6 +15,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { usePollWhileVisible } from '@/composables/usePollWhileVisible';
+import { useBeanTips } from '@/composables/useBeanTips';
+import { useToday } from '@/composables/useToday';
 import { isDocLoaded } from '@/services/automerge/docService';
 import { getAllReleaseNotes } from '@/content/release-notes';
 import { whatsNewId } from '@/utils/notifications';
@@ -31,6 +34,15 @@ export function useNotifications(): void {
   const authStore = useAuthStore();
   const settingsStore = useSettingsStore();
   const familyStore = useFamilyStore();
+  const beanTips = useBeanTips();
+  const { today } = useToday();
+
+  // Shared session-ready gate — both the migration/auto-open watcher (#4) and
+  // the daily-tip watcher (#5) consult it, so neither inlines the conjunction.
+  const ready = (): boolean =>
+    authStore.isAuthenticated &&
+    settingsStore.onboardingCompleted &&
+    Boolean(familyStore.currentMember);
 
   // 1. Advance the derive-clock so time-based notifications activate while open
   //    and immediately on tab wake. The poll catches + reports a throwing tick.
@@ -82,17 +94,27 @@ export function useNotifications(): void {
   // 4. Gate: once signed-in + onboarded + a member is known, run the one-time
   //    migration and auto-open to the latest unseen release. Suppressed in E2E
   //    (the drawer would block test interactions; mirrors the old WhatsNew gate).
+  //    Also issues today's tip alongside the migration — both are session-ready
+  //    side-effects that need the same gate.
   watch(
-    () =>
-      authStore.isAuthenticated &&
-      settingsStore.onboardingCompleted &&
-      Boolean(familyStore.currentMember),
-    (ready) => {
-      if (!ready) return;
+    () => ready(),
+    (isReady) => {
+      if (!isReady) return;
       if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('e2e_auto_auth')) return;
       runWhatsNewMigrationOnce();
       store.openToLatestAutoOpen();
+      beanTips.ensureTodayTipIssued();
     },
     { immediate: true }
   );
+
+  // 5. Daily tip issuance — runs on every local-day roll while ready.
+  //    `ensureTodayTipIssued()` no-ops when `lastTipShownDate === today`, so
+  //    same-flush double-fires (session-ready + day-roll) are safely idempotent.
+  //    NOT `immediate: true` — the first call comes from the session-ready
+  //    watcher above; this watcher only handles day-roll while the tab is open.
+  watch(today, () => {
+    if (!ready()) return;
+    beanTips.ensureTodayTipIssued();
+  });
 }

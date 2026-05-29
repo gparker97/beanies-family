@@ -1,56 +1,73 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+/**
+ * Tip detail body — the rich content shown when a tip notification is opened
+ * in the drawer. Lifts the inner content of the deleted `BeanTipCard.vue`
+ * (floating beanie character + category-tinted backdrop + tip message +
+ * try-it / got-it / don't-show-tips actions) so the bell preserves the tip's
+ * personality even though the closed row is intentionally subtle.
+ *
+ * Resolution: consumes `tip` from `useNotificationPresentation` — no second
+ * `getTip()` call site. When the tip has been removed from `tips.ts` since
+ * issuance, renders a quiet "no longer available" fallback (matches the
+ * deriver's missing-tip skip discipline — never throws).
+ *
+ * UX contract:
+ *   - "got it" → close drawer (markRead already happened on open via openTo).
+ *   - "try it →" → router push + close drawer.
+ *   - "don't show tips" → muteAllTips() + success toast + close drawer.
+ */
 import { useRouter } from 'vue-router';
+import { useNotificationsStore } from '@/stores/notificationsStore';
+import { useNotificationPresentation } from '@/composables/useNotificationPresentation';
 import { useBeanTips } from '@/composables/useBeanTips';
-import { useBeanieText } from '@/composables/useBeanieText';
 import { useTranslation } from '@/composables/useTranslation';
+import { useBeanieText } from '@/composables/useBeanieText';
+import { showToast } from '@/composables/useToast';
 import { getCategoryImage } from '@/content/tips';
+import type { AppNotification } from '@/types/notifications';
+
+const props = defineProps<{ notification: AppNotification }>();
 
 const router = useRouter();
-const { txt } = useBeanieText();
+const store = useNotificationsStore();
 const { t } = useTranslation();
-const { currentTip, isDismissing, dismissTip, muteAllTips } = useBeanTips();
-
-const tip = computed(() => currentTip.value);
-const categoryClass = computed(() => (tip.value ? `cat-${tip.value.category}` : ''));
-const characterSrc = computed(() => (tip.value ? getCategoryImage(tip.value.category) : ''));
-const message = computed(() => (tip.value ? txt(tip.value.message) : ''));
-
-function handleGotIt() {
-  if (tip.value) dismissTip(tip.value.id);
-}
+const { txt } = useBeanieText();
+const { tip } = useNotificationPresentation(() => props.notification);
+const beanTips = useBeanTips();
 
 function handleTryIt() {
-  if (!tip.value?.tryItRoute) return;
-  const route = tip.value.tryItRoute;
-  dismissTip(tip.value.id);
-  // Navigate after dismiss animation
-  setTimeout(() => router.push(route), 360);
+  if (!props.notification.route) return;
+  store.close();
+  router.push({ path: props.notification.route, query: props.notification.query });
+}
+
+function handleGotIt() {
+  // markRead already happened on `openTo`; just dismiss the drawer.
+  store.back();
 }
 
 function handleMute() {
-  muteAllTips();
+  beanTips.muteAllTips();
+  // Drawer dismissal mirrors the "got it" path — tips no longer show going
+  // forward but the history remains in the bell.
+  store.back();
+  showToast('success', t('tips.mutedConfirm'), undefined, { durationMs: 4000 });
 }
 </script>
 
 <template>
-  <div
-    v-if="tip"
-    class="beanie-tip"
-    :class="[categoryClass, { dismissing: isDismissing }]"
-    role="complementary"
-    :aria-label="t('tips.label')"
-  >
-    <!-- Accent stripe (::before) and dot pattern (::after) via CSS -->
+  <!-- Resolved tip — the rich content -->
+  <div v-if="tip" class="beanie-tip" :class="`cat-${tip.category}`" role="complementary">
+    <!-- Accent stripe (::before) + dot pattern (::after) via CSS -->
     <div class="beanie-tip-inner">
-      <!-- Character image -->
+      <!-- Floating beanie character -->
       <div class="beanie-tip-character">
-        <img :src="characterSrc" alt="" class="beanie-tip-img" />
+        <img :src="getCategoryImage(tip.category)" alt="" class="beanie-tip-img" />
       </div>
 
       <!-- Content -->
       <div class="beanie-tip-content">
-        <!-- Header: label + close -->
+        <!-- Header: kicker -->
         <div class="beanie-tip-header">
           <div class="beanie-tip-label">
             <span class="beanie-tip-bulb">💡</span>
@@ -58,25 +75,19 @@ function handleMute() {
               {{ t('tips.label') }}
             </span>
           </div>
-          <button class="beanie-tip-close" :aria-label="t('tips.gotIt')" @click="handleGotIt">
-            ✕
-          </button>
         </div>
 
         <!-- Message -->
         <p class="text-secondary-500/75 text-sm leading-relaxed dark:text-gray-300/80">
-          {{ message }}
+          {{ txt(tip.message) }}
         </p>
 
         <!-- Actions -->
-        <div class="mt-3 flex items-center justify-end gap-2.5">
-          <button
-            class="text-[0.6875rem] text-gray-400/35 transition-opacity hover:opacity-65 dark:text-gray-500/40"
-            @click="handleMute"
-          >
+        <div class="mt-3 flex flex-wrap items-center justify-end gap-2.5">
+          <button class="beanie-tip-mute" @click="handleMute">
             {{ t('tips.dontShowTips') }}
           </button>
-          <button v-if="tip.tryItRoute" class="beanie-tip-tryit" @click="handleTryIt">
+          <button v-if="notification.route" class="beanie-tip-tryit" @click="handleTryIt">
             {{ t('tips.tryIt') }}
             <span class="beanie-tip-tryit-arrow">→</span>
           </button>
@@ -86,6 +97,17 @@ function handleMute() {
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Missing-tip fallback — tip was removed from tips.ts since issuance. -->
+  <!-- The deriver already console.warned the skip; no second log here. -->
+  <div v-else class="tip-missing space-y-4">
+    <p class="text-secondary-500/70 text-sm dark:text-gray-300">
+      {{ t('tips.unavailable') }}
+    </p>
+    <button class="beanie-tip-gotit" @click="handleGotIt">
+      {{ t('tips.gotIt') }}
+    </button>
   </div>
 </template>
 
@@ -102,7 +124,6 @@ function handleMute() {
   position: relative;
 }
 
-/* Accent stripe */
 .beanie-tip::before {
   background: linear-gradient(
     90deg,
@@ -119,7 +140,6 @@ function handleMute() {
   top: 0;
 }
 
-/* Dot pattern */
 .beanie-tip::after {
   background: radial-gradient(circle, rgb(174 214 241 / 12%) 1px, transparent 1px);
   background-size: 16px 16px;
@@ -186,26 +206,6 @@ function handleMute() {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-.dismissing {
-  animation: tip-dismiss 0.35s cubic-bezier(0.55, 0, 1, 0.45) forwards;
-}
-
-@keyframes tip-dismiss {
-  from {
-    max-height: 300px;
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  to {
-    margin-bottom: -20px;
-    max-height: 0;
-    opacity: 0;
-    padding: 0;
-    transform: translateY(-8px);
   }
 }
 
@@ -283,29 +283,25 @@ function handleMute() {
   font-size: 15px;
 }
 
-.beanie-tip-close {
-  align-items: center;
-  background: rgb(44 62 80 / 4%);
-  border: none;
-  border-radius: 8px;
-  color: #6b7b8d;
-  cursor: pointer;
-  display: flex;
-  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative close glyph in fixed-size container */
-  font-size: 13px;
-  height: 26px;
-  justify-content: center;
-  opacity: 0.4;
-  transition: all 0.15s;
-  width: 26px;
-}
-
-.beanie-tip-close:hover {
-  background: rgb(44 62 80 / 8%);
-  opacity: 0.8;
-}
-
 /* ───── Action buttons ───── */
+.beanie-tip-mute {
+  background: transparent;
+  border: none;
+  color: rgb(156 163 175 / 60%);
+  cursor: pointer;
+  font-family: Inter, sans-serif;
+  font-size: 0.6875rem;
+  transition: opacity 0.15s;
+}
+
+.beanie-tip-mute:hover {
+  opacity: 0.85;
+}
+
+:global(.dark) .beanie-tip-mute {
+  color: rgb(107 114 128 / 70%);
+}
+
 .beanie-tip-tryit {
   align-items: center;
   background: var(--tint-orange-8, rgb(241 93 34 / 8%));
@@ -356,16 +352,6 @@ function handleMute() {
   transform: translateY(-1px);
 }
 
-/* ───── Dark mode (interactive elements) ───── */
-:global(.dark) .beanie-tip-close {
-  background: rgb(255 255 255 / 5%);
-  color: rgb(255 255 255 / 35%);
-}
-
-:global(.dark) .beanie-tip-close:hover {
-  background: rgb(255 255 255 / 8%);
-}
-
 :global(.dark) .beanie-tip-tryit {
   background: rgb(241 93 34 / 10%);
   color: #f15d22;
@@ -379,10 +365,19 @@ function handleMute() {
   box-shadow: 0 3px 12px rgb(241 93 34 / 15%);
 }
 
+/* ───── Missing-tip fallback ───── */
+.tip-missing {
+  padding: 1rem 0.25rem;
+  text-align: center;
+}
+
+.tip-missing .beanie-tip-gotit {
+  margin: 0 auto;
+}
+
 /* ───── Reduced motion ───── */
 @media (prefers-reduced-motion: reduce) {
-  .beanie-tip,
-  .dismissing {
+  .beanie-tip {
     animation: none;
   }
 

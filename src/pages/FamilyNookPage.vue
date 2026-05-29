@@ -20,7 +20,6 @@ import TransactionModal from '@/components/transactions/TransactionModal.vue';
 import MedicationViewModal from '@/components/pod/MedicationViewModal.vue';
 import MedicationFormModal from '@/components/pod/MedicationFormModal.vue';
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard.vue';
-import BeanTipCard from '@/components/nook/BeanTipCard.vue';
 import { usePermissions } from '@/composables/usePermissions';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -231,8 +230,8 @@ async function handleTransactionDelete(id: string) {
       @complete-todo="handleTodoComplete"
     />
 
-    <!-- Beanie tip of the day -->
-    <BeanTipCard />
+    <!-- Tip of the day moved to the notification bell (2026-05-29) — see
+         TipBody.vue. Frees this slot for family signals. -->
 
     <!-- Your Beans row — tapping a bean now opens the Meet-This-Bean
          overview page. Add Bean still routes to the Add drawer on

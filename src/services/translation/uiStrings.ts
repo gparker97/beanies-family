@@ -2104,6 +2104,11 @@ const STRING_DEFS = {
     en: 'Play fun sounds for actions and celebrations',
     beanie: 'play fun sounds for actions and celebrations',
   },
+  'settings.dailyTips': { en: 'Daily Tips', beanie: 'daily tips' },
+  'settings.dailyTipsDescription': {
+    en: 'One small tip per day in your notification bell',
+    beanie: 'one small tip per day in your notification bell',
+  },
   'settings.sync': { en: 'Sync', beanie: 'sync' },
   'settings.fileSync': { en: 'File Sync', beanie: 'file sync' },
   'settings.syncToFile': { en: 'Sync to a File', beanie: 'sync to a file' },
@@ -5764,6 +5769,14 @@ const STRING_DEFS = {
   'tips.gotIt': { en: 'Got It', beanie: 'got it' },
   'tips.tryIt': { en: 'Try It', beanie: 'try it' },
   'tips.dontShowTips': { en: "Don't Show Tips", beanie: "don't show tips" },
+  'tips.mutedConfirm': {
+    en: 'Tips muted. You can re-enable them in Settings.',
+    beanie: 'tips muted. you can re-enable them in settings.',
+  },
+  'tips.unavailable': {
+    en: 'This tip is no longer available.',
+    beanie: 'this tip is no longer available.',
+  },
 
   // What's New modal
   'whatsNew.title': { en: "What's New", beanie: "what's new" },
@@ -5791,6 +5804,7 @@ const STRING_DEFS = {
   'notifications.kindActivityReminder': { en: 'Coming up', beanie: 'coming up' },
   'notifications.kindWhatsNew': { en: "What's new", beanie: "what's new" },
   'notifications.kindAnnouncement': { en: 'Announcement', beanie: 'announcement' },
+  'notifications.kindTip': { en: "Today's tip", beanie: "today's tip" },
   'notifications.due': { en: 'Due', beanie: 'due' },
   'notifications.yourTask': { en: 'Your task', beanie: 'your task' },
   'notifications.assignedByYou': {

@@ -104,6 +104,7 @@
   --tint-green-10: rgb(39 174 96 / 10%);
   --tint-terracotta-5: rgb(230 126 34 / 5%);
   --tint-orange-4: rgb(241 93 34 / 4%);
+  --tint-amber-10: rgb(245 188 80 / 10%);
 }
 
 /* Dark mode variables */
@@ -141,6 +142,7 @@
   --tint-green-10: rgb(39 174 96 / 15%);
   --tint-terracotta-5: rgb(230 126 34 / 8%);
   --tint-orange-4: rgb(241 93 34 / 6%);
+  --tint-amber-10: rgb(245 188 80 / 14%);
 }
 
 /* ─── Micro-animation keyframes ────────────────────────────────────────── */

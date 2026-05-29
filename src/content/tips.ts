@@ -44,6 +44,14 @@ export function getCategoryImage(category: TipCategory): string {
   return CATEGORY_IMAGES[category];
 }
 
+// ── Resolver: tip id → BeanTip ────────────────────────────────────────────────
+// Single module-level Map (rebuilt from ALL_TIPS on HMR — fully derived, no
+// stale-cache concern). Consumed by the notification deriver (via the snapshot)
+// and `useNotificationPresentation` (via `getTip`). No ad-hoc `ALL_TIPS.find()`
+// allowed elsewhere — this is the single resolver point.
+
+// Note: TIPS_BY_ID is initialised at the bottom of the file, after ALL_TIPS.
+
 // ── Tips ─────────────────────────────────────────────────────────────────────
 
 export const ALL_TIPS: BeanTip[] = [
@@ -264,3 +272,15 @@ export const ALL_TIPS: BeanTip[] = [
     },
   },
 ];
+
+// ── Resolver implementation (declared at bottom so ALL_TIPS exists) ──────────
+
+export const TIPS_BY_ID: ReadonlyMap<string, BeanTip> = new Map(
+  ALL_TIPS.map((tip) => [tip.id, tip])
+);
+
+/** Resolve a tip by its `BeanTip.id`. Returns undefined when the tip has been
+ *  removed from `ALL_TIPS` since issuance — callers must handle that. */
+export function getTip(id: string): BeanTip | undefined {
+  return TIPS_BY_ID.get(id);
+}
