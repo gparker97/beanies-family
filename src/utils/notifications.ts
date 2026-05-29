@@ -14,6 +14,7 @@
 import type { TodoItem, FamilyActivity, FamilyMember } from '@/types/models';
 import type { ReleaseNote } from '@/content/release-notes';
 import type { Announcement } from '@/content/announcements';
+import type { BeanTip } from '@/content/tips';
 import type { AppNotification } from '@/types/notifications';
 import { normalizeAssignees } from '@/utils/assignees';
 import { classifyAudience } from '@/utils/audience';
@@ -24,9 +25,12 @@ const MS_PER_DAY = 86_400_000;
 const DUE_LEAD_MINUTES = 30;
 /** Reminder lead used when an activity has no explicit `reminderMinutes`. */
 const DEFAULT_REMINDER_MINUTES = 30;
-/** Prefixes used by the prune exemption (both are window-exempt). */
+/** Prefixes used by the prune exemption (all window-exempt kinds). Adding a
+ *  new exempt kind = one entry here + the kind's own deriver block. */
 const WHATS_NEW_PREFIX = 'whats-new:';
 const ANNOUNCEMENT_PREFIX = 'announcement:';
+const TIP_PREFIX = 'tip:';
+const PRUNE_EXEMPT_PREFIXES = [WHATS_NEW_PREFIX, ANNOUNCEMENT_PREFIX, TIP_PREFIX] as const;
 
 export interface NotificationOccurrence {
   activity: FamilyActivity;
@@ -40,6 +44,10 @@ export interface DeriveInput {
   releaseNotes: readonly ReleaseNote[];
   /** Adhoc announcements (window-exempt; honour their own startsAt/expiresAt). */
   announcements: readonly Announcement[];
+  /** Per-device daily tip issuance log (window-exempt; persists for re-read). */
+  issuedTips: readonly { tipId: string; issuedAt: string }[];
+  /** Resolver for issuedTips — module-level Map from `tips.ts`. */
+  tipsById: ReadonlyMap<string, BeanTip>;
   /** The current member's id→readAt slice of `notificationReads`. */
   readState: Record<string, string>;
   /** Rolling history window (days) for time-based kinds; whats-new is exempt. */
@@ -60,6 +68,7 @@ export const activityReminderId = (activityId: string, occurrenceDate: string): 
   `activity-reminder:${activityId}:${occurrenceDate}`;
 export const whatsNewId = (version: string): string => `${WHATS_NEW_PREFIX}${version}`;
 export const announcementId = (id: string): string => `${ANNOUNCEMENT_PREFIX}${id}`;
+export const tipId = (id: string): string => `${TIP_PREFIX}${id}`;
 
 // ── Internal pure date helpers (LOCAL time — avoids the UTC-midnight trap of
 //    `new Date('YYYY-MM-DD')`) ─────────────────────────────────────────────────
@@ -105,6 +114,8 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
     currentMember,
     releaseNotes,
     announcements,
+    issuedTips,
+    tipsById,
     readState,
     windowDays,
     occurrencesByDate,
@@ -288,7 +299,45 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
     }
   }
 
+  // ── tips (window-exempt; per-device issuance log) ────────────────────────────
+  // Mirrors the announcement block: missing tip ids and malformed entries are
+  // skipped with a single console.warn — the deriver never throws.
+  for (const issued of issuedTips) {
+    try {
+      if (!issued?.tipId) {
+        console.warn('[deriveNotifications] skipped issued tip — missing tipId', issued);
+        continue;
+      }
+      const tip = tipsById.get(issued.tipId);
+      if (!tip) {
+        // Tip was removed from tips.ts since issuance — quiet skip.
+        console.warn(`[deriveNotifications] skipped tip — no longer in catalogue: ${issued.tipId}`);
+        continue;
+      }
+      const id = tipId(tip.id);
+      const issuedMs = new Date(issued.issuedAt).getTime();
+      out.push({
+        id,
+        kind: 'tip',
+        // Language-agnostic fallback; the bilingual line is resolved by
+        // useNotificationPresentation (txt(tip.message)) like announcements.
+        title: tip.id,
+        occurredAt: Number.isNaN(issuedMs) ? issued.issuedAt : new Date(issuedMs).toISOString(),
+        // tryItRoute may be undefined; AppNotification.route is optional and
+        // both NotificationDetail and TipBody gate their Open button on it.
+        route: tip.tryItRoute,
+        sourceId: tip.id,
+        read: isRead(id),
+      });
+    } catch (err) {
+      console.warn(`[deriveNotifications] skipped tip ${issued?.tipId ?? '?'}:`, err);
+    }
+  }
+
   // Newest-active first (ISO strings sort lexicographically by time).
+  // Array.prototype.sort is guaranteed stable since ECMAScript 2019, so ties
+  // (e.g. a tip issued at the same instant as a whats-new note) retain
+  // insertion order.
   out.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
   return out;
 }
@@ -322,9 +371,11 @@ export function markAllReadIn(
 }
 
 /**
- * Drop read-state entries whose id is no longer derivable, with exemptions: any
- * `whats-new:*` or `announcement:*` id is always kept (both are window-exempt and
- * bounded by content count; pruning would resurface old items as unread).
+ * Drop read-state entries whose id is no longer derivable, with exemptions:
+ * any id matching a prefix in `PRUNE_EXEMPT_PREFIXES` is always kept. All
+ * exempt kinds are window-exempt and bounded by content count (whats-new by
+ * release catalogue, announcement by registry, tip by ALL_TIPS); pruning
+ * would resurface old items as unread.
  */
 export function pruneReadState(
   map: Record<string, string>,
@@ -333,8 +384,7 @@ export function pruneReadState(
   const keep = new Set(keepIds);
   const next: Record<string, string> = {};
   for (const [id, readAt] of Object.entries(map)) {
-    if (keep.has(id) || id.startsWith(WHATS_NEW_PREFIX) || id.startsWith(ANNOUNCEMENT_PREFIX))
-      next[id] = readAt;
+    if (keep.has(id) || PRUNE_EXEMPT_PREFIXES.some((p) => id.startsWith(p))) next[id] = readAt;
   }
   return next;
 }
