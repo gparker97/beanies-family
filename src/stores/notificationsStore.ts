@@ -15,6 +15,7 @@ import { computed, ref } from 'vue';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useBeanTips } from '@/composables/useBeanTips';
 import { changeDoc, docVersion, getDoc, isDocLoaded } from '@/services/automerge/docService';
 import { getAllReleaseNotes, getReleaseNote, isSpotlightRelease } from '@/content/release-notes';
 import {
@@ -22,6 +23,7 @@ import {
   getAnnouncement,
   isAutoOpenAnnouncement,
 } from '@/content/announcements';
+import { TIPS_BY_ID } from '@/content/tips';
 import { reportError } from '@/utils/errorReporter';
 import {
   deriveNotifications,
@@ -53,6 +55,9 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const todoStore = useTodoStore();
   const activityStore = useActivityStore();
   const familyStore = useFamilyStore();
+  // Bound ONCE at store-setup scope (mirrors the other store bindings above);
+  // the snapshot reads `issuedTips.value` on each recompute — no re-instantiation.
+  const beanTips = useBeanTips();
 
   // ── Derive-clock — advanced ONLY by tick() (the poll). Nothing else writes it.
   const now = ref<Date>(new Date());
@@ -92,6 +97,8 @@ export const useNotificationsStore = defineStore('notifications', () => {
       currentMember,
       releaseNotes: getAllReleaseNotes(),
       announcements: getAllAnnouncements(),
+      issuedTips: beanTips.issuedTips.value,
+      tipsById: TIPS_BY_ID,
       readState,
       windowDays: WINDOW_DAYS,
       occurrencesByDate,

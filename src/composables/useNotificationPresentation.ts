@@ -12,6 +12,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useBeanieText } from '@/composables/useBeanieText';
 import { getReleaseNote } from '@/content/release-notes';
 import { getAnnouncement } from '@/content/announcements';
+import { getTip } from '@/content/tips';
 import {
   NOTIFICATION_KIND_PRESENTATION,
   ACCENT_TINT_CLASS,
@@ -42,9 +43,14 @@ export function useNotificationPresentation(notification: MaybeRefOrGetter<AppNo
       ? getAnnouncement(n.value.sourceId)
       : undefined
   );
-  /** Whether the detail should render a rich celebratory body (whats-new / announcement). */
+  /** The backing tip for a tip note (undefined for other kinds, or when the tip
+   *  has been removed from tips.ts since issuance). */
+  const tip = computed(() =>
+    n.value.kind === 'tip' && n.value.sourceId ? getTip(n.value.sourceId) : undefined
+  );
+  /** Whether the detail should render a rich celebratory body (whats-new / announcement / tip). */
   const hasRichBody = computed(() =>
-    Boolean((release.value || announcement.value) && presentation.value.detailBody)
+    Boolean((release.value || announcement.value || tip.value) && presentation.value.detailBody)
   );
 
   // whats-new is framed by its kind label; an announcement shows its own (bilingual)
@@ -55,6 +61,7 @@ export function useNotificationPresentation(notification: MaybeRefOrGetter<AppNo
   const summary = computed(() => {
     if (release.value?.summary) return txt(release.value.summary);
     if (announcement.value) return announcement.value.kicker ? txt(announcement.value.kicker) : '';
+    if (tip.value) return txt(tip.value.message);
     return notificationSummary(n.value, t);
   });
   const when = computed(() => notificationWhen(n.value, t));
@@ -66,6 +73,7 @@ export function useNotificationPresentation(notification: MaybeRefOrGetter<AppNo
     labelKey,
     release,
     announcement,
+    tip,
     hasRichBody,
     title,
     summary,

@@ -12,6 +12,7 @@ import { getReleaseNote, isSpotlightRelease } from '@/content/release-notes';
 import { getAnnouncement } from '@/content/announcements';
 import WhatsNewBody from '@/components/notifications/WhatsNewBody.vue';
 import AnnouncementBody from '@/components/notifications/AnnouncementBody.vue';
+import TipBody from '@/components/notifications/TipBody.vue';
 
 type T = (key: UIStringKey) => string;
 
@@ -21,6 +22,7 @@ export const NOTIFICATION_KIND_PRESENTATION: Record<NotificationKind, KindPresen
   'activity-reminder': { accent: 'activity', icon: '📅' },
   'whats-new': { accent: 'whats-new', icon: '✨', detailBody: WhatsNewBody },
   announcement: { accent: 'announcement', icon: '📣', detailBody: AnnouncementBody },
+  tip: { accent: 'tip', icon: '💡', detailBody: TipBody },
 };
 
 /** Tinted lead-icon background per accent (Nook-UI tints). */
@@ -30,6 +32,7 @@ export const ACCENT_TINT_CLASS: Record<KindPresentation['accent'], string> = {
   activity: 'bg-[var(--tint-silk-20,rgba(174,214,241,0.2))]',
   'whats-new': 'bg-[var(--tint-orange-8,rgba(241,93,34,0.08))]',
   announcement: 'bg-[var(--tint-orange-8,rgba(241,93,34,0.08))]',
+  tip: 'bg-[var(--tint-amber-10,rgba(245,188,80,0.10))]',
 };
 
 /** The framing label shown on a row/detail, by kind (overdue is a `todo-due` variant). */
@@ -45,12 +48,17 @@ export function kindLabelKey(kind: NotificationKind, overdue?: boolean): UIStrin
       return 'notifications.kindWhatsNew';
     case 'announcement':
       return 'notifications.kindAnnouncement';
+    case 'tip':
+      return 'notifications.kindTip';
   }
 }
 
-/** Bold row title — the entity name, except whats-new which is framed by its kind. */
+/** Bold row title — the entity name, except whats-new and tip which are framed
+ *  by their kind label (the actual content renders below in the summary). */
 export function notificationTitle(n: AppNotification, t: T): string {
-  return n.kind === 'whats-new' ? t('notifications.kindWhatsNew') : n.title;
+  if (n.kind === 'whats-new') return t('notifications.kindWhatsNew');
+  if (n.kind === 'tip') return t('notifications.kindTip');
+  return n.title;
 }
 
 /** At-a-glance summary line (who · where, or who-assigned-it), localised. */
@@ -68,6 +76,8 @@ export function notificationSummary(n: AppNotification, t: T): string {
       return n.title; // the release month (e.g. "may 2026")
     case 'announcement':
       return ''; // the bilingual kicker is resolved in useNotificationPresentation
+    case 'tip':
+      return ''; // the bilingual tip line is resolved in useNotificationPresentation
   }
 }
 

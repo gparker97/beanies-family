@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   deriveNotifications,
   markReadIn,
@@ -10,11 +10,13 @@ import {
   activityReminderId,
   whatsNewId,
   announcementId,
+  tipId,
   type DeriveInput,
 } from '@/utils/notifications';
 import type { FamilyMember, TodoItem, FamilyActivity } from '@/types/models';
 import type { ReleaseNote } from '@/content/release-notes';
 import type { Announcement } from '@/content/announcements';
+import type { BeanTip } from '@/content/tips';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 function member(
@@ -78,6 +80,8 @@ function derive(overrides: Partial<DeriveInput>, now: Date = NOW) {
     currentMember: viewer,
     releaseNotes: [],
     announcements: [],
+    issuedTips: [],
+    tipsById: new Map<string, BeanTip>(),
     readState: {},
     windowDays: 30,
     occurrencesByDate: {},
@@ -310,6 +314,89 @@ describe('deriveNotifications — announcements', () => {
   });
 });
 
+describe('deriveNotifications — tip', () => {
+  const tipA: BeanTip = {
+    id: 'tip-a',
+    category: 'finance',
+    tryItRoute: '/transactions',
+    message: { en: 'A message', beanie: 'a message' },
+  };
+  const tipB: BeanTip = {
+    id: 'tip-b',
+    category: 'family',
+    message: { en: 'B message', beanie: 'b message' },
+  };
+  const tipsById = new Map<string, BeanTip>([
+    [tipA.id, tipA],
+    [tipB.id, tipB],
+  ]);
+
+  it('emits one tip per issuedTips entry, with route from tryItRoute', () => {
+    const out = derive({
+      issuedTips: [
+        { tipId: 'tip-a', issuedAt: '2026-05-27T09:00:00.000Z' },
+        { tipId: 'tip-b', issuedAt: '2026-05-28T09:00:00.000Z' },
+      ],
+      tipsById,
+    });
+    const a = byId(out, tipId('tip-a'));
+    const b = byId(out, tipId('tip-b'));
+    expect(a?.kind).toBe('tip');
+    expect(a?.sourceId).toBe('tip-a');
+    expect(a?.route).toBe('/transactions');
+    expect(b?.route).toBeUndefined(); // tipB has no tryItRoute
+  });
+
+  it('is window-exempt — a 60-day-old issuance still produces a notification', () => {
+    const old = '2026-03-28T09:00:00.000Z'; // ~60 days before NOW
+    const out = derive({
+      issuedTips: [{ tipId: 'tip-a', issuedAt: old }],
+      tipsById,
+    });
+    expect(byId(out, tipId('tip-a'))).toBeDefined();
+  });
+
+  it('skips a tip whose id is no longer in the catalogue (no throw, console.warn)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const out = derive({
+      issuedTips: [{ tipId: 'tip-gone', issuedAt: '2026-05-27T09:00:00.000Z' }],
+      tipsById,
+    });
+    expect(byId(out, tipId('tip-gone'))).toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('malformed issuedAt falls back to the raw string in occurredAt', () => {
+    const out = derive({
+      issuedTips: [{ tipId: 'tip-a', issuedAt: 'not-a-date' }],
+      tipsById,
+    });
+    expect(byId(out, tipId('tip-a'))?.occurredAt).toBe('not-a-date');
+  });
+
+  it('read-state resolves against the tip: prefixed id', () => {
+    const out = derive({
+      issuedTips: [{ tipId: 'tip-a', issuedAt: '2026-05-27T09:00:00.000Z' }],
+      tipsById,
+      readState: { [tipId('tip-a')]: '2026-05-27T10:00:00.000Z' },
+    });
+    expect(byId(out, tipId('tip-a'))?.read).toBe(true);
+  });
+
+  it('an entry missing tipId is skipped (no throw, console.warn)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() =>
+      derive({
+        issuedTips: [{ tipId: '', issuedAt: '2026-05-27T09:00:00.000Z' }],
+        tipsById,
+      })
+    ).not.toThrow();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
 describe('deriveNotifications — totality', () => {
   it('never throws on malformed records; skips them', () => {
     expect(() =>
@@ -356,18 +443,20 @@ describe('read-state reducers', () => {
     expect(m).toEqual({ a: 'old', b: 'new' });
   });
 
-  it('pruneReadState drops stale ids but ALWAYS keeps whats-new:* and announcement:*', () => {
+  it('pruneReadState drops stale ids but ALWAYS keeps whats-new:* / announcement:* / tip:*', () => {
     const m = {
       'todo-due:t1:2026-05-27': 'r',
       'todo-due:gone:2026-01-01': 'r',
       'whats-new:2026.01': 'r',
       'announcement:discord-community-2026-05': 'r',
+      'tip:tip-link-txn': 'r',
     };
     const pruned = pruneReadState(m, ['todo-due:t1:2026-05-27']);
     expect(pruned).toEqual({
       'todo-due:t1:2026-05-27': 'r',
       'whats-new:2026.01': 'r',
       'announcement:discord-community-2026-05': 'r',
+      'tip:tip-link-txn': 'r',
     });
   });
 });

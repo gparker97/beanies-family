@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **Tip of the day lives in the bell now.** Every day a small 💡 tip from the beanies shows up in your notification bell. Tap it to read the full tip and try the feature it points to. The big tip card has left the Nook page (more room for family signals), and "got it" no longer means "lose this tip forever." Tips stay in the bell so you can scroll back to one you liked. Mute new ones in **Settings → Appearance → Daily Tips**; the ones already in your bell stay readable.
 - **Mobile header has room to breathe.** Removed the peek-a-boo beanie eyes from the mobile header — the greeting no longer truncates when you add up the notification bell, privacy toggle, search, and avatar on a small phone. The beanie eyes are still in the hamburger drawer (and every figure on screen blurs/reveals there), so nothing's lost.
 
 ## 2026-05-28

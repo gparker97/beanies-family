@@ -45,6 +45,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useHolidayStore } from '@/stores/holidayStore';
+import { useBeanTips } from '@/composables/useBeanTips';
 import { resetAllAppStores } from '@/utils/resetStores';
 import type { CountryCode } from '@/types/models';
 
@@ -54,6 +55,7 @@ const authStore = useAuthStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
+const beanTips = useBeanTips();
 const familyStore = useFamilyStore();
 const holidayStore = useHolidayStore();
 const { t } = useTranslation();
@@ -734,7 +736,9 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           />
         </div>
         <!-- Sound Effects -->
-        <div class="flex items-center justify-between py-3.5">
+        <div
+          class="flex items-center justify-between border-b border-[var(--tint-slate-05)] py-3.5 dark:border-slate-700"
+        >
           <div>
             <p class="text-[0.8rem] font-semibold text-[var(--deep-slate)] dark:text-slate-200">
               {{ t('settings.soundEffects') }}
@@ -747,6 +751,23 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             data-testid="sound-toggle"
             :model-value="settingsStore.soundEnabled"
             @update:model-value="settingsStore.setSoundEnabled($event)"
+          />
+        </div>
+        <!-- Daily Tips — one bell entry per day; mute keeps existing tips
+             readable, just stops new ones (see TipBody/useBeanTips). -->
+        <div class="flex items-center justify-between py-3.5">
+          <div>
+            <p class="text-[0.8rem] font-semibold text-[var(--deep-slate)] dark:text-slate-200">
+              {{ t('settings.dailyTips') }}
+            </p>
+            <p class="text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500">
+              {{ t('settings.dailyTipsDescription') }}
+            </p>
+          </div>
+          <ToggleSwitch
+            data-testid="daily-tips-toggle"
+            :model-value="beanTips.tipsEnabled.value"
+            @update:model-value="(v) => (v ? beanTips.enableTips() : beanTips.muteAllTips())"
           />
         </div>
       </div>
