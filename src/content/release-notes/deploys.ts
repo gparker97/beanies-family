@@ -17,6 +17,40 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.05.29',
+    date: '2026-05-29',
+    month: '29 may 2026',
+    spotlight: true,
+    summary: {
+      en: "Today's tip lives in the bell.",
+      beanie: "today's tip lives in the bell.",
+    },
+    features: [
+      {
+        title: {
+          en: "Today's tip lives in the bell",
+          beanie: "today's tip lives in the bell",
+        },
+        description: {
+          en: "Each day brings a small tip from the beanies in your notification bell. Tap to read the full tip and try the feature it points to. Tips stay in your bell after you've read them, so you can always scroll back to one you liked. Turn them off in Settings if you'd rather not.",
+          beanie:
+            "each day brings a small tip from the beanies in your notification bell. tap to read the full tip and try the feature it points to. tips stay in your bell after you've read them, so you can always scroll back to one you liked. turn them off in settings if you'd rather not.",
+        },
+      },
+      {
+        title: {
+          en: 'Mobile header has room to breathe',
+          beanie: 'mobile header has room to breathe',
+        },
+        description: {
+          en: 'The greeting on smaller phones no longer gets cut off. The peek-a-boo beanie eyes are still in the side menu and on every figure you tap.',
+          beanie:
+            'the greeting on smaller phones no longer gets cut off. the peek-a-boo beanie eyes are still in the side menu and on every figure you tap.',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.05.27',
     date: '2026-05-27',
     month: '27 may 2026',
