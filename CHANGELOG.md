@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-05-29
 
+### Added
+
+- **New blog post: "my dog's ear infection."** A use-case story about the new family medications feature - track meds for yourself, your kids, and your pets (in this case, a toy poodle with an ear infection and 5 boxes of medications). Also announces the [beanies.family Discord community](https://discord.com/invite/NE4grWzjxV).
+
 ### Changed
 
 - **Tip of the day lives in the bell now.** Every day a small 💡 tip from the beanies shows up in your notification bell. Tap it to read the full tip and try the feature it points to. The big tip card has left the Nook page (more room for family signals), and "got it" no longer means "lose this tip forever." Tips stay in the bell so you can scroll back to one you liked. Mute new ones in **Settings → Appearance → Daily Tips**; the ones already in your bell stay readable.
