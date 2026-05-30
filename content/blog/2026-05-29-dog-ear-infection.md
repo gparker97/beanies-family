@@ -4,7 +4,7 @@ slug: dog-ear-infection
 date: 2026-05-29
 category: use-case
 coverEmoji: 💊
-coverImage: /blog/beanies-medications-dog-ear-infection.webp
+coverImage: /blog/neily-beanies-soda.jpg
 excerpt: 'We left the vet with 5 boxes of different medications, each given several times a day, in very specific ways, for several weeks. My wife and I both work full time. There was no way we were keeping track of all this without help.'
 subtitle: "keeping track of your family's (or your pet's) medications"
 featured: false
@@ -39,6 +39,10 @@ As I walked out of the vet's office, rapidly forgetting everything I just heard,
 So my glorious claude-bot and I built **_family medications_**.
 
 You can now (finally) keep track of your family's medications - for yourself, your children, and even your pets. Know what to give, when to give it, and how much. You can even store pictures of the medication bottle or label, just to be 100% sure we're using the right pills. Because we all have trouble reading those tiny labels sometimes.
+
+![two of greg's boys hugging soda, their toy poodle, after she healed from her ear infection](/blog/neily-beanies-soda.jpg)
+
+_2 of the original beanies with our happy and fully healed doggie_
 
 To access family medications, simply open up your family pod (meet your beans) and tap any beanie (or pet beanie), and find the **medications** tab. You can even log doses, and view when your family members gave that last steroid pill to your doggy.
 
