@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-05-30
+
+### Changed
+
+- **"My dog's ear infection" blog now leads with the family photo.** Replaced the post's cover with a shot of two of the original beanies hugging Soda, our happy and fully healed poodle, and embedded the same photo near the top of the post with its caption.
+
 ## 2026-05-29
 
 ### Added
