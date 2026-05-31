@@ -22,8 +22,6 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useVacationStore } from '@/stores/vacationStore';
-import { useToday } from '@/composables/useToday';
-import { parseIsoDateSafely } from '@/utils/safeDate';
 import {
   getBadgeKeyForPath,
   MOBILE_TAGGED_NAV_ITEMS,
@@ -41,37 +39,28 @@ export type NavBadge =
  *  semantic ("this is the attention-dot variant") is self-documenting. */
 export const ATTENTION_DOT: NavBadge = { kind: 'dot', severity: 'attention', active: true };
 
-const UPCOMING_TRAVEL_WINDOW_DAYS = 30;
-
 /**
- * Count open ideas on the most-immediate qualifying trip — ongoing right
- * now or starting within the upcoming window. "Open" = an idea that's
- * neither marked planned nor skipped for this trip. Returns 0 when no
- * trip qualifies (so the count badge naturally hides), and 0 when the
- * trip has nothing left to decide (the satisfying "all-planned" state).
+ * Sum of open ideas across every upcoming-or-active trip — i.e. every
+ * vacation that hasn't ended yet. "Open" = an idea that's neither marked
+ * planned nor skipped. Caller should pass `vacationStore.upcomingVacations`
+ * (already filtered to not-ended) so this just unfolds the ideas.
  *
- * Picks ONE trip — the earliest-starting qualifying one. Vacations are
- * already sorted ascending by startDate, so an ongoing trip (start <=
- * today) is iterated before any future trip in the same window.
+ * Returns 0 when there are no upcoming trips (badge hides naturally) and
+ * 0 when every idea on every upcoming trip is decided (the satisfying
+ * "all planned" state).
  *
- * Date parsing is defensive — corrupt startDate/endDate is logged and
- * the vacation excluded, never silently dropped without trace.
+ * Note: no time-window filter. A trip 6 months out with 8 open ideas
+ * still contributes 8 — the user is actively planning it, and clamping
+ * the badge to a 30-day horizon would silently hide that work.
  */
-export function openIdeasOnUpcomingTrip(vacations: FamilyVacation[], todayIso: string): number {
-  const today = parseIsoDateSafely(todayIso, 'useNavBadges.today');
-  if (!today) return 0;
-  const windowEnd = new Date(today);
-  windowEnd.setDate(windowEnd.getDate() + UPCOMING_TRAVEL_WINDOW_DAYS);
+export function openIdeasOnUpcomingTrips(vacations: FamilyVacation[]): number {
+  let total = 0;
   for (const v of vacations) {
-    const start = parseIsoDateSafely(v.startDate, `vacation ${v.id}.startDate`);
-    if (!start) continue;
-    const end = parseIsoDateSafely(v.endDate, `vacation ${v.id}.endDate`);
-    const isOngoing = start <= today && (!end || end >= today);
-    const isUpcomingInWindow = start > today && start <= windowEnd;
-    if (!isOngoing && !isUpcomingInWindow) continue;
-    return v.ideas.filter((i) => !i.isPlanned && !i.isSkipped).length;
+    for (const i of v.ideas) {
+      if (!i.isPlanned && !i.isSkipped) total += 1;
+    }
   }
-  return 0;
+  return total;
 }
 
 export function useNavBadges() {
@@ -79,7 +68,6 @@ export function useNavBadges() {
   const goalsStore = useGoalsStore();
   const budgetStore = useBudgetStore();
   const vacationStore = useVacationStore();
-  const { today } = useToday();
 
   const badges = computed<Record<KnownBadgeKey, NavBadge>>(() => ({
     overdueTodos: {
@@ -93,7 +81,7 @@ export function useNavBadges() {
     overdueGoals: { kind: 'count', count: goalsStore.overdueGoals.length },
     openTravelIdeas: {
       kind: 'count',
-      count: openIdeasOnUpcomingTrip(vacationStore.upcomingVacations, today.value),
+      count: openIdeasOnUpcomingTrips(vacationStore.upcomingVacations),
     },
   }));
 

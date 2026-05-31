@@ -6,8 +6,8 @@
  *   1. To-Do count = overdue + today (no future-dated)
  *   2. Budget count = only status === 'over' (not 'warning')
  *   3. Goals count = overdueGoals only (not all activeGoals)
- *   4. Travel count = open ideas (!isPlanned && !isSkipped) on the most
- *      immediate ongoing OR upcoming-within-30d trip
+ *   4. Travel count = sum of open ideas (!isPlanned && !isSkipped) across
+ *      every upcoming-or-active trip (anything not ended yet)
  *   5. categoryAttention escalation rule: count > 0 OR attention-dot
  *      active; informational dots do NOT escalate
  *   6. Corrupt deadline on a goal → logged + excluded (no silent drop)
@@ -200,7 +200,7 @@ describe('useNavBadges', () => {
     expect(categoryAttention.value.planning).toBe(true);
   });
 
-  it('travel count: open ideas on a trip starting within 30 days', () => {
+  it('travel count: open ideas on a trip starting next month', () => {
     const vacationStore = useVacationStore();
     vacationStore.vacations = [
       makeVacation({
@@ -214,7 +214,7 @@ describe('useNavBadges', () => {
     expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 2 });
   });
 
-  it('travel count: 0 when the next trip is more than 30 days out', () => {
+  it('travel count: open ideas on a trip months out still count (no horizon)', () => {
     const vacationStore = useVacationStore();
     vacationStore.vacations = [
       makeVacation({
@@ -225,10 +225,10 @@ describe('useNavBadges', () => {
     ];
 
     const { badges } = useNavBadges();
-    expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 0 });
+    expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 1 });
   });
 
-  it('travel count: 0 when all trips have ended', () => {
+  it('travel count: 0 when all trips have ended (upcomingVacations is empty)', () => {
     const vacationStore = useVacationStore();
     vacationStore.vacations = [
       makeVacation({
@@ -242,7 +242,7 @@ describe('useNavBadges', () => {
     expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 0 });
   });
 
-  it('travel count: 0 when every idea on the upcoming trip is planned or skipped', () => {
+  it('travel count: 0 when every idea on every upcoming trip is planned or skipped', () => {
     const vacationStore = useVacationStore();
     vacationStore.vacations = [
       makeVacation({
@@ -256,26 +256,38 @@ describe('useNavBadges', () => {
     expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 0 });
   });
 
-  it('travel count: picks the earliest qualifying trip when multiple exist', () => {
+  it('travel count: sums open ideas across all upcoming trips, ignores ended ones', () => {
     const vacationStore = useVacationStore();
     vacationStore.vacations = [
       makeVacation({
-        id: 'soon',
-        startDate: '2026-05-20',
-        endDate: '2026-05-25',
-        ideas: [makeIdea({ id: 's1' }), makeIdea({ id: 's2' })], // 2 open
+        id: 'ended',
+        startDate: '2026-04-01',
+        endDate: '2026-04-10',
+        ideas: [makeIdea({ id: 'e1' }), makeIdea({ id: 'e2' })], // excluded — past trip
       }),
       makeVacation({
-        id: 'later',
+        id: 'ongoing',
+        startDate: '2026-05-10',
+        endDate: '2026-05-25',
+        ideas: [makeIdea({ id: 'o1' }), makeIdea({ id: 'o2', isPlanned: true })], // 1 open
+      }),
+      makeVacation({
+        id: 'soon',
         startDate: '2026-06-05',
         endDate: '2026-06-10',
-        ideas: [makeIdea({ id: 'l1' }), makeIdea({ id: 'l2' }), makeIdea({ id: 'l3' })], // 3 open
+        ideas: [makeIdea({ id: 's1' }), makeIdea({ id: 's2' }), makeIdea({ id: 's3' })], // 3 open
+      }),
+      makeVacation({
+        id: 'far',
+        startDate: '2026-09-01',
+        endDate: '2026-09-07',
+        ideas: [makeIdea({ id: 'f1' }), makeIdea({ id: 'f2', isSkipped: true })], // 1 open
       }),
     ];
 
     const { badges } = useNavBadges();
-    // Picks the soon trip (2 open), not the later one.
-    expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 2 });
+    // Sum across all upcoming trips: 1 (ongoing) + 3 (soon) + 1 (far) = 5.
+    expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 5 });
   });
 
   it('corrupt goal deadline: logs via safeDate + excludes from overdue count', () => {

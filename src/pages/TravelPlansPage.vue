@@ -261,6 +261,14 @@ function vacationAssignees(v: FamilyVacation) {
     .filter(Boolean) as Array<{ id: string; name: string; color: string }>;
 }
 
+/** Count of ideas on this trip that the family hasn't decided on yet —
+ *  neither marked planned nor skipped. Matches the sidebar's
+ *  `openTravelIdeas` semantics so the per-trip badges add up to the
+ *  sidebar total across all upcoming trips. */
+function vacationOpenIdeas(v: FamilyVacation): number {
+  return v.ideas.filter((i) => !i.isPlanned && !i.isSkipped).length;
+}
+
 // ── Navigation ───────────────────────────────────────────────────────────────
 
 function selectTrip(id: string) {
@@ -630,6 +638,15 @@ function addQuickIdea() {
                 ⏳
                 {{ vacationProgress(vacation).total - vacationProgress(vacation).booked }}
                 {{ t('travel.needsBooking').toLowerCase() }}
+              </span>
+            </div>
+
+            <!-- Open ideas badge — count of ideas still to decide on -->
+            <div v-if="vacationOpenIdeas(vacation) > 0" class="mt-1.5">
+              <span
+                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--vacation-teal-15)] px-2.5 py-0.5 text-[0.5625rem] font-semibold text-[var(--vacation-teal)]"
+              >
+                💡 {{ vacationOpenIdeas(vacation) }} {{ t('travel.openIdeas') }}
               </span>
             </div>
 

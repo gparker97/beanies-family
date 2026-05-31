@@ -6201,6 +6201,7 @@ const STRING_DEFS = {
   'travel.allTrips': { en: 'All Trips', beanie: 'all trips' },
   'travel.bookingProgress': { en: 'Booking Progress', beanie: 'booking progress' },
   'travel.needsBooking': { en: 'Needs Booking', beanie: 'needs booking' },
+  'travel.openIdeas': { en: 'open ideas', beanie: 'open ideas' },
   'travel.editDetails': { en: 'Edit Details', beanie: 'edit details' },
   'travel.editTravelPlans': { en: 'Edit Travel Plans', beanie: 'edit travel plans' },
   'travel.addSegment': { en: '+ Add', beanie: '+ add' },
