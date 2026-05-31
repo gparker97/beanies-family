@@ -5,6 +5,7 @@ import { gotoRoot } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
 import { dismissActivityCreatedConfirm } from '../helpers/activity-modal';
 import { selectBeanieDate } from '../helpers/date-picker';
+import { tomorrowOrTodayStr } from '../helpers/test-dates';
 
 /**
  * E2E tests for the Family Planner page.
@@ -40,11 +41,10 @@ test.describe('Family Planner', () => {
       .click();
   }
 
-  /** Helper to get tomorrow's date string in YYYY-MM-DD format. */
+  /** Tomorrow's YYYY-MM-DD, clamped to today on month-end so the activity
+   *  stays in the visible calendar month. See `tomorrowOrTodayStr` for why. */
   function getTomorrowStr(): string {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+    return tomorrowOrTodayStr();
   }
 
   /** Helper to create a recurring activity starting tomorrow and dismiss the confirmation. */
@@ -85,10 +85,9 @@ test.describe('Family Planner', () => {
     // Switch to one-off mode
     await page.getByRole('button', { name: /one-time/i }).click();
 
-    // Fill date (use tomorrow so it appears in upcoming)
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+    // Fill date — tomorrow when in-month, clamped to today on month-end so the
+    // activity chip stays in the visible calendar grid.
+    const tomorrowStr = tomorrowOrTodayStr();
     await selectBeanieDate(page.locator('div[role="dialog"]'), tomorrowStr);
 
     // Save
@@ -288,13 +287,13 @@ test.describe('Family Planner', () => {
   test('Recurring: reschedule single occurrence', async ({ page }) => {
     await setupPlanner(page);
 
-    // Create a weekly recurring activity starting tomorrow
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+    // Create a weekly recurring activity starting tomorrow (clamped to today
+    // on month-end so the first occurrence is in the visible calendar grid).
+    const tomorrowStr = tomorrowOrTodayStr();
+    const startDate = new Date(`${tomorrowStr}T00:00:00`);
 
-    // Calculate a reschedule target date (3 days after tomorrow)
-    const rescheduleTarget = new Date(tomorrow);
+    // Calculate a reschedule target date (3 days after the start)
+    const rescheduleTarget = new Date(startDate);
     rescheduleTarget.setDate(rescheduleTarget.getDate() + 3);
     const rescheduleStr = `${rescheduleTarget.getFullYear()}-${String(rescheduleTarget.getMonth() + 1).padStart(2, '0')}-${String(rescheduleTarget.getDate()).padStart(2, '0')}`;
 

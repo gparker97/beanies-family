@@ -7,6 +7,7 @@ import { gotoRoot } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
 import { dismissActivityCreatedConfirm } from '../helpers/activity-modal';
 import { selectBeanieDate } from '../helpers/date-picker';
+import { tomorrowOrTodayStr } from '../helpers/test-dates';
 
 // ---------------------------------------------------------------------------
 // Institution Combobox
@@ -433,11 +434,11 @@ test.describe('Loan & Activity Linking', () => {
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Guitar Lesson');
     await selectAssignee(page);
     await page.getByRole('button', { name: /one-time/i }).click();
-    // Use tomorrow so the activity appears in the Upcoming list — the only
-    // surface on /activities that renders the title as searchable text.
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+    // Pick a date that's guaranteed to appear in the visible calendar grid:
+    // tomorrow when in-month, clamped to today on month-end. (The planner's
+    // month view only renders chips for the visible month — see
+    // tomorrowOrTodayStr for the full reason.)
+    const tomorrowStr = tomorrowOrTodayStr();
     await selectBeanieDate(page.locator('div[role="dialog"]'), tomorrowStr);
 
     // Save without cost
