@@ -44,28 +44,34 @@ export const ATTENTION_DOT: NavBadge = { kind: 'dot', severity: 'attention', act
 const UPCOMING_TRAVEL_WINDOW_DAYS = 30;
 
 /**
- * Does any vacation start within the upcoming window OR ongoing right now?
- * "Ongoing" = started, not ended. Open-ended vacations (no endDate) count
- * as ongoing once started.
+ * Count open ideas on the most-immediate qualifying trip — ongoing right
+ * now or starting within the upcoming window. "Open" = an idea that's
+ * neither marked planned nor skipped for this trip. Returns 0 when no
+ * trip qualifies (so the count badge naturally hides), and 0 when the
+ * trip has nothing left to decide (the satisfying "all-planned" state).
+ *
+ * Picks ONE trip — the earliest-starting qualifying one. Vacations are
+ * already sorted ascending by startDate, so an ongoing trip (start <=
+ * today) is iterated before any future trip in the same window.
  *
  * Date parsing is defensive — corrupt startDate/endDate is logged and
  * the vacation excluded, never silently dropped without trace.
  */
-function hasActiveOrSoonVacation(vacations: FamilyVacation[], todayIso: string): boolean {
+export function openIdeasOnUpcomingTrip(vacations: FamilyVacation[], todayIso: string): number {
   const today = parseIsoDateSafely(todayIso, 'useNavBadges.today');
-  if (!today) return false;
+  if (!today) return 0;
   const windowEnd = new Date(today);
   windowEnd.setDate(windowEnd.getDate() + UPCOMING_TRAVEL_WINDOW_DAYS);
   for (const v of vacations) {
     const start = parseIsoDateSafely(v.startDate, `vacation ${v.id}.startDate`);
     if (!start) continue;
     const end = parseIsoDateSafely(v.endDate, `vacation ${v.id}.endDate`);
-    // Ongoing: started, not ended.
-    if (start <= today && (!end || end >= today)) return true;
-    // Upcoming within window: starts in (today, today+30d].
-    if (start > today && start <= windowEnd) return true;
+    const isOngoing = start <= today && (!end || end >= today);
+    const isUpcomingInWindow = start > today && start <= windowEnd;
+    if (!isOngoing && !isUpcomingInWindow) continue;
+    return v.ideas.filter((i) => !i.isPlanned && !i.isSkipped).length;
   }
-  return false;
+  return 0;
 }
 
 export function useNavBadges() {
@@ -85,10 +91,9 @@ export function useNavBadges() {
       count: budgetStore.categoryBudgetStatus.filter((c) => c.status === 'over').length,
     },
     overdueGoals: { kind: 'count', count: goalsStore.overdueGoals.length },
-    activeTravel: {
-      kind: 'dot',
-      severity: 'info',
-      active: hasActiveOrSoonVacation(vacationStore.upcomingVacations, today.value),
+    openTravelIdeas: {
+      kind: 'count',
+      count: openIdeasOnUpcomingTrip(vacationStore.upcomingVacations, today.value),
     },
   }));
 

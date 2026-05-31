@@ -6,9 +6,10 @@
  *   1. To-Do count = overdue + today (no future-dated)
  *   2. Budget count = only status === 'over' (not 'warning')
  *   3. Goals count = overdueGoals only (not all activeGoals)
- *   4. Travel dot active iff ongoing OR upcoming-within-30d
+ *   4. Travel count = open ideas (!isPlanned && !isSkipped) on the most
+ *      immediate ongoing OR upcoming-within-30d trip
  *   5. categoryAttention escalation rule: count > 0 OR attention-dot
- *      active; informational dots (travel) do NOT escalate
+ *      active; informational dots do NOT escalate
  *   6. Corrupt deadline on a goal → logged + excluded (no silent drop)
  *   7. badgeFor(path) resolves via the nav registry
  */
@@ -39,7 +40,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useVacationStore } from '@/stores/vacationStore';
-import type { TodoItem, Goal, FamilyVacation } from '@/types/models';
+import type { TodoItem, Goal, FamilyVacation, VacationIdea } from '@/types/models';
 
 // Pin "today" to a deterministic date so the time-window assertions are
 // stable. The vacation tests assume today = 2026-05-16.
@@ -92,6 +93,17 @@ function makeVacation(overrides: Partial<FamilyVacation>): FamilyVacation {
   } as FamilyVacation;
 }
 
+function makeIdea(overrides: Partial<VacationIdea>): VacationIdea {
+  return {
+    id: overrides.id ?? `idea-${Math.random()}`,
+    title: 'Test idea',
+    votes: [],
+    createdBy: 'm-1',
+    createdAt: '2026-01-01',
+    ...overrides,
+  } as VacationIdea;
+}
+
 describe('useNavBadges', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -108,7 +120,7 @@ describe('useNavBadges', () => {
     expect(badges.value.overdueTodos).toEqual({ kind: 'count', count: 0 });
     expect(badges.value.overBudgets).toEqual({ kind: 'count', count: 0 });
     expect(badges.value.overdueGoals).toEqual({ kind: 'count', count: 0 });
-    expect(badges.value.activeTravel).toEqual({ kind: 'dot', severity: 'info', active: false });
+    expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 0 });
     expect(categoryAttention.value).toEqual({
       nook: false,
       planning: false,
@@ -167,57 +179,103 @@ describe('useNavBadges', () => {
     expect(categoryAttention.value.money).toBe(true);
   });
 
-  it('travel dot: active when a trip is ongoing', () => {
+  it('travel count: open ideas on an ongoing trip', () => {
     const vacationStore = useVacationStore();
     vacationStore.vacations = [
-      makeVacation({ startDate: '2026-05-10', endDate: '2026-05-20' }), // ongoing
+      makeVacation({
+        startDate: '2026-05-10',
+        endDate: '2026-05-20',
+        ideas: [
+          makeIdea({ id: 'i1' }),
+          makeIdea({ id: 'i2' }),
+          makeIdea({ id: 'i3', isPlanned: true }),
+          makeIdea({ id: 'i4', isSkipped: true }),
+        ],
+      }),
     ];
 
     const { badges, categoryAttention } = useNavBadges();
-    expect(badges.value.activeTravel).toEqual({
-      kind: 'dot',
-      severity: 'info',
-      active: true,
-    });
-    // Travel dot is INFORMATIONAL; the Planning tab attention should NOT
-    // escalate just because of an upcoming trip.
-    expect(categoryAttention.value.planning).toBe(false);
+    expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 2 });
+    // Count badges always escalate the mobile tab.
+    expect(categoryAttention.value.planning).toBe(true);
   });
 
-  it('travel dot: active when a trip starts within 30 days', () => {
+  it('travel count: open ideas on a trip starting within 30 days', () => {
     const vacationStore = useVacationStore();
     vacationStore.vacations = [
-      makeVacation({ startDate: '2026-06-01', endDate: '2026-06-07' }), // 16 days out
+      makeVacation({
+        startDate: '2026-06-01',
+        endDate: '2026-06-07',
+        ideas: [makeIdea({ id: 'i1' }), makeIdea({ id: 'i2' })],
+      }),
     ];
 
     const { badges } = useNavBadges();
-    if (badges.value.activeTravel.kind === 'dot') {
-      expect(badges.value.activeTravel.active).toBe(true);
-    }
+    expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 2 });
   });
 
-  it('travel dot: inactive when a trip is more than 30 days out', () => {
+  it('travel count: 0 when the next trip is more than 30 days out', () => {
     const vacationStore = useVacationStore();
     vacationStore.vacations = [
-      makeVacation({ startDate: '2026-08-01', endDate: '2026-08-07' }), // ~80 days out
+      makeVacation({
+        startDate: '2026-08-01',
+        endDate: '2026-08-07',
+        ideas: [makeIdea({ id: 'i1' })],
+      }),
     ];
 
     const { badges } = useNavBadges();
-    if (badges.value.activeTravel.kind === 'dot') {
-      expect(badges.value.activeTravel.active).toBe(false);
-    }
+    expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 0 });
   });
 
-  it('travel dot: inactive when all trips have ended', () => {
+  it('travel count: 0 when all trips have ended', () => {
     const vacationStore = useVacationStore();
     vacationStore.vacations = [
-      makeVacation({ startDate: '2026-04-01', endDate: '2026-04-10' }), // ended
+      makeVacation({
+        startDate: '2026-04-01',
+        endDate: '2026-04-10',
+        ideas: [makeIdea({ id: 'i1' })],
+      }),
     ];
 
     const { badges } = useNavBadges();
-    if (badges.value.activeTravel.kind === 'dot') {
-      expect(badges.value.activeTravel.active).toBe(false);
-    }
+    expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 0 });
+  });
+
+  it('travel count: 0 when every idea on the upcoming trip is planned or skipped', () => {
+    const vacationStore = useVacationStore();
+    vacationStore.vacations = [
+      makeVacation({
+        startDate: '2026-05-10',
+        endDate: '2026-05-20',
+        ideas: [makeIdea({ id: 'i1', isPlanned: true }), makeIdea({ id: 'i2', isSkipped: true })],
+      }),
+    ];
+
+    const { badges } = useNavBadges();
+    expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 0 });
+  });
+
+  it('travel count: picks the earliest qualifying trip when multiple exist', () => {
+    const vacationStore = useVacationStore();
+    vacationStore.vacations = [
+      makeVacation({
+        id: 'soon',
+        startDate: '2026-05-20',
+        endDate: '2026-05-25',
+        ideas: [makeIdea({ id: 's1' }), makeIdea({ id: 's2' })], // 2 open
+      }),
+      makeVacation({
+        id: 'later',
+        startDate: '2026-06-05',
+        endDate: '2026-06-10',
+        ideas: [makeIdea({ id: 'l1' }), makeIdea({ id: 'l2' }), makeIdea({ id: 'l3' })], // 3 open
+      }),
+    ];
+
+    const { badges } = useNavBadges();
+    // Picks the soon trip (2 open), not the later one.
+    expect(badges.value.openTravelIdeas).toEqual({ kind: 'count', count: 2 });
   });
 
   it('corrupt goal deadline: logs via safeDate + excludes from overdue count', () => {
@@ -250,16 +308,32 @@ describe('useNavBadges', () => {
     expect(badgeFor('/nook')).toBeNull(); // nook has no badgeKey
   });
 
-  it('categoryAttention: planning lights up on overdue todos only, not on travel dot', () => {
+  it('categoryAttention: planning lights up on travel ideas OR overdue todos', () => {
     const todoStore = useTodoStore();
     const vacationStore = useVacationStore();
-    vacationStore.vacations = [makeVacation({ startDate: '2026-05-10', endDate: '2026-05-20' })];
 
-    // Travel dot active but no overdue todos → planning should NOT escalate.
+    // No trips, no todos → planning quiet.
     let badges = useNavBadges();
     expect(badges.categoryAttention.value.planning).toBe(false);
 
-    // Add an overdue todo → planning DOES escalate.
+    // Ongoing trip with no open ideas → still quiet (count is 0).
+    vacationStore.vacations = [makeVacation({ startDate: '2026-05-10', endDate: '2026-05-20' })];
+    badges = useNavBadges();
+    expect(badges.categoryAttention.value.planning).toBe(false);
+
+    // Ongoing trip WITH open ideas → planning escalates (count > 0).
+    vacationStore.vacations = [
+      makeVacation({
+        startDate: '2026-05-10',
+        endDate: '2026-05-20',
+        ideas: [makeIdea({ id: 'i1' })],
+      }),
+    ];
+    badges = useNavBadges();
+    expect(badges.categoryAttention.value.planning).toBe(true);
+
+    // Or via an overdue todo with no trip ideas.
+    vacationStore.vacations = [];
     todoStore.todos = [makeTodo({ id: 't', dueDate: '2026-05-10' })];
     badges = useNavBadges();
     expect(badges.categoryAttention.value.planning).toBe(true);

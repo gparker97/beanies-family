@@ -759,6 +759,7 @@ export interface VacationIdea {
   duration?: '30min' | '1hr' | '2hrs' | 'half_day' | 'full_day';
   needsBooking?: boolean;
   isPlanned?: boolean;
+  isSkipped?: boolean;
   link?: string;
   linkPreview?: {
     title?: string;
