@@ -41,6 +41,17 @@ const estimatedCostCurrency = ref<CurrencyCode>('USD');
 const duration = ref<string>('');
 const needsBooking = ref<boolean | undefined>(undefined);
 const isPlanned = ref(false);
+const isSkipped = ref(false);
+
+function togglePlanned() {
+  isPlanned.value = !isPlanned.value;
+  if (isPlanned.value) isSkipped.value = false;
+}
+
+function toggleSkipped() {
+  isSkipped.value = !isSkipped.value;
+  if (isSkipped.value) isPlanned.value = false;
+}
 const link = ref('');
 const linkPreview = ref<LinkPreview | null>(null);
 const linkPreviewLoading = ref(false);
@@ -63,6 +74,7 @@ const { isEditing } = useFormModal(
       duration.value = idea.duration ?? '';
       needsBooking.value = idea.needsBooking;
       isPlanned.value = idea.isPlanned ?? false;
+      isSkipped.value = idea.isSkipped ?? false;
       link.value = idea.link ?? '';
       linkPreview.value = idea.linkPreview ?? null;
       notes.value = idea.notes ?? '';
@@ -79,6 +91,7 @@ const { isEditing } = useFormModal(
       duration.value = '';
       needsBooking.value = undefined;
       isPlanned.value = false;
+      isSkipped.value = false;
       link.value = '';
       linkPreview.value = null;
       notes.value = '';
@@ -153,6 +166,7 @@ function handleSave() {
     duration: (duration.value as VacationIdea['duration']) || undefined,
     needsBooking: needsBooking.value,
     isPlanned: isPlanned.value || undefined,
+    isSkipped: isSkipped.value || undefined,
     link: normalizedLink.value || undefined,
     linkPreview: linkPreview.value ?? undefined,
     notes: notes.value || undefined,
@@ -368,18 +382,32 @@ function handleSave() {
           </div>
         </FormFieldGroup>
         <FormFieldGroup :label="t('vacation.ideas.planned')">
-          <button
-            type="button"
-            class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
-            :class="
-              isPlanned
-                ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
-                : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
-            "
-            @click="isPlanned = !isPlanned"
-          >
-            {{ isPlanned ? '✓ planned' : 'mark as planned' }}
-          </button>
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+              :class="
+                isPlanned
+                  ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
+                  : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+              "
+              @click="togglePlanned"
+            >
+              {{ isPlanned ? t('vacation.ideas.plannedPill') : t('vacation.ideas.markPlanned') }}
+            </button>
+            <button
+              type="button"
+              class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+              :class="
+                isSkipped
+                  ? 'border-gray-400 bg-gray-100 text-gray-600 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-300'
+                  : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+              "
+              @click="toggleSkipped"
+            >
+              {{ isSkipped ? t('vacation.ideas.skippedPill') : t('vacation.ideas.markSkipped') }}
+            </button>
+          </div>
         </FormFieldGroup>
       </div>
 

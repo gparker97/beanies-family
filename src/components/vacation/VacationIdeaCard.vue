@@ -143,7 +143,13 @@ function patch(fields: Partial<VacationIdea>) {
             v-if="idea.isPlanned"
             class="rounded-full bg-[rgba(39,174,96,0.08)] px-2 py-0.5 text-[0.5625rem] font-semibold text-[#27AE60]"
           >
-            ✓ planned
+            {{ t('vacation.ideas.plannedPill') }}
+          </span>
+          <span
+            v-if="idea.isSkipped"
+            class="rounded-full bg-gray-100 px-2 py-0.5 text-[0.5625rem] font-semibold text-gray-600 dark:bg-slate-700 dark:text-slate-300"
+          >
+            {{ t('vacation.ideas.skippedPill') }}
           </span>
           <a
             v-if="idea.link"

@@ -6018,6 +6018,10 @@ const STRING_DEFS = {
   'vacation.ideas.bookingNeeded': { en: 'Booking Needed?', beanie: 'booking needed?' },
   'vacation.ideas.planned': { en: 'Status', beanie: 'status' },
   'vacation.ideas.plannedSection': { en: 'Planned', beanie: 'planned' },
+  'vacation.ideas.markPlanned': { en: 'mark as planned', beanie: 'mark as planned' },
+  'vacation.ideas.plannedPill': { en: '✓ planned', beanie: '✓ planned' },
+  'vacation.ideas.markSkipped': { en: 'skip for this trip', beanie: 'skip for this trip' },
+  'vacation.ideas.skippedPill': { en: '✗ skipped', beanie: '✗ skipped' },
   'vacation.ideas.addedBy': { en: 'Added by', beanie: 'added by' },
 
   // Segment statuses

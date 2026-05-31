@@ -123,7 +123,7 @@ describe('navigation: badge registry', () => {
 
   it('getBadgeKeyForPath returns the registered key for the 4 wired surfaces', () => {
     expect(getBadgeKeyForPath('/todo')).toBe('overdueTodos');
-    expect(getBadgeKeyForPath('/travel')).toBe('activeTravel');
+    expect(getBadgeKeyForPath('/travel')).toBe('openTravelIdeas');
     expect(getBadgeKeyForPath('/budgets')).toBe('overBudgets');
     expect(getBadgeKeyForPath('/goals')).toBe('overdueGoals');
   });
