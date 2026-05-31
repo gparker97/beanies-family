@@ -70,6 +70,25 @@ vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
   })),
 }));
 
+// Mock useToday so its `today` ref reflects whatever time is set via
+// `vi.setSystemTime` at the moment useToday() is invoked. The real
+// composable initialises a module-scoped singleton at import time, which
+// captures the real system date before vi.useFakeTimers() runs in
+// beforeEach — breaking projection-window tests that pivot on "today".
+vi.mock('@/composables/useToday', async () => {
+  const { ref, computed } = await import('vue');
+  const { toDateInputValue, getStartOfDay } = await import('@/utils/date');
+  return {
+    useToday: () => ({
+      today: ref(toDateInputValue(new Date())),
+      startOfToday: computed(() => getStartOfDay(new Date())),
+      isVisible: ref(true),
+      lastVisibleAt: ref(0),
+      lastHiddenAt: ref(0),
+    }),
+  };
+});
+
 // Mock translation composable
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
@@ -182,6 +201,13 @@ describe('TransactionsPage — Unified Ledger', () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
 
+    // Pin "today" to a mid-month, mid-year date so month-arithmetic tests are
+    // deterministic. Native Date.setMonth() overflows on month-end days (e.g.
+    // 2026-05-31 - 1 month yields 2026-05-01 because April has 30 days),
+    // which silently flips "last month" back to "this month" in these tests.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-15T00:00:00.000Z'));
+
     transactionsStore = useTransactionsStore();
     accountsStore = useAccountsStore();
     settingsStore = useSettingsStore();
@@ -190,6 +216,10 @@ describe('TransactionsPage — Unified Ledger', () => {
 
     familyStore.members.push(createMember());
     accountsStore.accounts.push(createAccount());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('Month Navigation', () => {
