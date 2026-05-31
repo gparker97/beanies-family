@@ -88,7 +88,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     path: '/travel',
     emoji: '✈️',
     section: 'treehouse',
-    badgeKey: 'activeTravel',
+    badgeKey: 'openTravelIdeas',
     mobileCategory: 'planning',
   },
   {
@@ -221,7 +221,7 @@ export const KNOWN_BADGE_KEYS = [
   'overdueTodos',
   'overBudgets',
   'overdueGoals',
-  'activeTravel',
+  'openTravelIdeas',
 ] as const;
 export type KnownBadgeKey = (typeof KNOWN_BADGE_KEYS)[number];
 const KNOWN_BADGE_KEY_SET: ReadonlySet<string> = new Set(KNOWN_BADGE_KEYS);
