@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-29",
-    "translationCount": 2963
+    "lastUpdated": "2026-05-31",
+    "translationCount": 2968
   },
   "translations": {
     "app.name": {
@@ -14820,6 +14820,31 @@
       "translation": "今日小费",
       "hash": "oc1eyw",
       "lastUpdated": "2026-05-29"
+    },
+    "vacation.ideas.markPlanned": {
+      "translation": "按计划。",
+      "hash": "5uj9iv",
+      "lastUpdated": "2026-05-31"
+    },
+    "vacation.ideas.plannedPill": {
+      "translation": "计划",
+      "hash": "la4erb",
+      "lastUpdated": "2026-05-31"
+    },
+    "vacation.ideas.markSkipped": {
+      "translation": "跳过此行程",
+      "hash": "ae7lyn",
+      "lastUpdated": "2026-05-31"
+    },
+    "vacation.ideas.skippedPill": {
+      "translation": "已跳过",
+      "hash": "gfda1z",
+      "lastUpdated": "2026-05-31"
+    },
+    "travel.openIdeas": {
+      "translation": "开放创意",
+      "hash": "ik1zay",
+      "lastUpdated": "2026-05-31"
     }
   }
 }
