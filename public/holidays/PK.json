@@ -1,0 +1,328 @@
+{
+  "meta": {
+    "country": "PK",
+    "name": "Pakistan",
+    "generatedAt": "2026-06-01",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.30.1",
+    "primaryLanguage": "ur",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-02-05",
+      "name": "Kashmir Day",
+      "type": "public",
+      "name_local": "یومِ یکجہتیِ کشمیر"
+    },
+    {
+      "date": "2025-03-23",
+      "name": "Pakistan Day",
+      "type": "public",
+      "name_local": "یومِ پاکستان"
+    },
+    {
+      "date": "2025-03-30",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2025-05-28",
+      "name": "Youm-e-Takbeer",
+      "type": "public",
+      "name_local": "یومِ تکبیر"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2025-07-04",
+      "name": "Ashura",
+      "type": "public",
+      "name_local": "عاشورہ"
+    },
+    {
+      "date": "2025-08-14",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "یومِ آزادی"
+    },
+    {
+      "date": "2025-09-04",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public"
+    },
+    {
+      "date": "2025-11-09",
+      "name": "Iqbal Day",
+      "type": "public",
+      "name_local": "یومِ اقبال"
+    },
+    {
+      "date": "2025-12-25",
+      "name": "Quaid-e-Azam Day",
+      "type": "public",
+      "name_local": "یومِ قائدِاعظم"
+    },
+    {
+      "date": "2026-02-05",
+      "name": "Kashmir Day",
+      "type": "public",
+      "name_local": "یومِ یکجہتیِ کشمیر"
+    },
+    {
+      "date": "2026-03-20",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2026-03-23",
+      "name": "Pakistan Day",
+      "type": "public",
+      "name_local": "یومِ پاکستان"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2026-05-28",
+      "name": "Youm-e-Takbeer",
+      "type": "public",
+      "name_local": "یومِ تکبیر"
+    },
+    {
+      "date": "2026-06-24",
+      "name": "Ashura",
+      "type": "public",
+      "name_local": "عاشورہ"
+    },
+    {
+      "date": "2026-08-14",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "یومِ آزادی"
+    },
+    {
+      "date": "2026-08-25",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public"
+    },
+    {
+      "date": "2026-11-09",
+      "name": "Iqbal Day",
+      "type": "public",
+      "name_local": "یومِ اقبال"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Quaid-e-Azam Day",
+      "type": "public",
+      "name_local": "یومِ قائدِاعظم"
+    },
+    {
+      "date": "2027-02-05",
+      "name": "Kashmir Day",
+      "type": "public",
+      "name_local": "یومِ یکجہتیِ کشمیر"
+    },
+    {
+      "date": "2027-03-09",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2027-03-23",
+      "name": "Pakistan Day",
+      "type": "public",
+      "name_local": "یومِ پاکستان"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2027-05-28",
+      "name": "Youm-e-Takbeer",
+      "type": "public",
+      "name_local": "یومِ تکبیر"
+    },
+    {
+      "date": "2027-06-14",
+      "name": "Ashura",
+      "type": "public",
+      "name_local": "عاشورہ"
+    },
+    {
+      "date": "2027-08-14",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public"
+    },
+    {
+      "date": "2027-08-14",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "یومِ آزادی"
+    },
+    {
+      "date": "2027-11-09",
+      "name": "Iqbal Day",
+      "type": "public",
+      "name_local": "یومِ اقبال"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Quaid-e-Azam Day",
+      "type": "public",
+      "name_local": "یومِ قائدِاعظم"
+    },
+    {
+      "date": "2028-02-05",
+      "name": "Kashmir Day",
+      "type": "public",
+      "name_local": "یومِ یکجہتیِ کشمیر"
+    },
+    {
+      "date": "2028-02-26",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2028-03-23",
+      "name": "Pakistan Day",
+      "type": "public",
+      "name_local": "یومِ پاکستان"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2028-05-28",
+      "name": "Youm-e-Takbeer",
+      "type": "public",
+      "name_local": "یومِ تکبیر"
+    },
+    {
+      "date": "2028-06-02",
+      "name": "Ashura",
+      "type": "public",
+      "name_local": "عاشورہ"
+    },
+    {
+      "date": "2028-08-03",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public"
+    },
+    {
+      "date": "2028-08-14",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "یومِ آزادی"
+    },
+    {
+      "date": "2028-11-09",
+      "name": "Iqbal Day",
+      "type": "public",
+      "name_local": "یومِ اقبال"
+    },
+    {
+      "date": "2028-12-25",
+      "name": "Quaid-e-Azam Day",
+      "type": "public",
+      "name_local": "یومِ قائدِاعظم"
+    },
+    {
+      "date": "2029-02-05",
+      "name": "Kashmir Day",
+      "type": "public",
+      "name_local": "یومِ یکجہتیِ کشمیر"
+    },
+    {
+      "date": "2029-02-14",
+      "name": "End of Ramadan (Eid al-Fitr)",
+      "type": "public"
+    },
+    {
+      "date": "2029-03-23",
+      "name": "Pakistan Day",
+      "type": "public",
+      "name_local": "یومِ پاکستان"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Feast of the Sacrifice (Eid al-Adha)",
+      "type": "public"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "Labour Day",
+      "type": "public"
+    },
+    {
+      "date": "2029-05-22",
+      "name": "Ashura",
+      "type": "public",
+      "name_local": "عاشورہ"
+    },
+    {
+      "date": "2029-05-28",
+      "name": "Youm-e-Takbeer",
+      "type": "public",
+      "name_local": "یومِ تکبیر"
+    },
+    {
+      "date": "2029-07-24",
+      "name": "Birthday of Muhammad (Mawlid)",
+      "type": "public"
+    },
+    {
+      "date": "2029-08-14",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "یومِ آزادی"
+    },
+    {
+      "date": "2029-11-09",
+      "name": "Iqbal Day",
+      "type": "public",
+      "name_local": "یومِ اقبال"
+    },
+    {
+      "date": "2029-12-25",
+      "name": "Quaid-e-Azam Day",
+      "type": "public",
+      "name_local": "یومِ قائدِاعظم"
+    }
+  ]
+}

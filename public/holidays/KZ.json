@@ -1,0 +1,594 @@
+{
+  "meta": {
+    "country": "KZ",
+    "name": "Kazakhstan",
+    "generatedAt": "2026-06-01",
+    "yearRange": [
+      2025,
+      2029
+    ],
+    "source": "date-holidays@3.30.1",
+    "primaryLanguage": "kk",
+    "types": [
+      "public"
+    ]
+  },
+  "holidays": [
+    {
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2025-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2025-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Рождество Христово"
+    },
+    {
+      "date": "2025-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Халықаралық әйелдер күні"
+    },
+    {
+      "date": "2025-03-10",
+      "name": "International Women's Day (substitute day)",
+      "type": "public",
+      "name_local": "Халықаралық әйелдер күні"
+    },
+    {
+      "date": "2025-03-21",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2025-03-22",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2025-03-23",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2025-03-24",
+      "name": "Nauryz (substitute day)",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2025-03-25",
+      "name": "Nauryz (substitute day)",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2025-05-01",
+      "name": "People's Unity Day",
+      "type": "public",
+      "name_local": "Қазақстан халқының бірлігі күні"
+    },
+    {
+      "date": "2025-05-07",
+      "name": "Defender of the Fatherland Day",
+      "type": "public",
+      "name_local": "Отан Қорғаушы күні"
+    },
+    {
+      "date": "2025-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Жеңіс күні"
+    },
+    {
+      "date": "2025-06-06",
+      "name": "Eid al-Adha",
+      "type": "public",
+      "name_local": "Құрбан айт"
+    },
+    {
+      "date": "2025-07-06",
+      "name": "Capital City Day",
+      "type": "public",
+      "name_local": "Астана күні"
+    },
+    {
+      "date": "2025-07-07",
+      "name": "Capital City Day (substitute day)",
+      "type": "public",
+      "name_local": "Астана күні"
+    },
+    {
+      "date": "2025-08-30",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Конституция күні"
+    },
+    {
+      "date": "2025-09-01",
+      "name": "Constitution Day (substitute day)",
+      "type": "public",
+      "name_local": "Конституция күні"
+    },
+    {
+      "date": "2025-10-25",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Республика күні"
+    },
+    {
+      "date": "2025-10-27",
+      "name": "Republic Day (substitute day)",
+      "type": "public",
+      "name_local": "Республика күні"
+    },
+    {
+      "date": "2025-12-16",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Тәуелсіздік күні"
+    },
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2026-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2026-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Рождество Христово"
+    },
+    {
+      "date": "2026-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Халықаралық әйелдер күні"
+    },
+    {
+      "date": "2026-03-09",
+      "name": "International Women's Day (substitute day)",
+      "type": "public",
+      "name_local": "Халықаралық әйелдер күні"
+    },
+    {
+      "date": "2026-03-15",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Конституция күні"
+    },
+    {
+      "date": "2026-03-16",
+      "name": "Constitution Day (substitute day)",
+      "type": "public",
+      "name_local": "Конституция күні"
+    },
+    {
+      "date": "2026-03-21",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2026-03-22",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2026-03-23",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2026-03-23",
+      "name": "Nauryz (substitute day)",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2026-03-24",
+      "name": "Nauryz (substitute day)",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "People's Unity Day",
+      "type": "public",
+      "name_local": "Қазақстан халқының бірлігі күні"
+    },
+    {
+      "date": "2026-05-07",
+      "name": "Defender of the Fatherland Day",
+      "type": "public",
+      "name_local": "Отан Қорғаушы күні"
+    },
+    {
+      "date": "2026-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Жеңіс күні"
+    },
+    {
+      "date": "2026-05-11",
+      "name": "Victory Day (substitute day)",
+      "type": "public",
+      "name_local": "Жеңіс күні"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "Eid al-Adha",
+      "type": "public",
+      "name_local": "Құрбан айт"
+    },
+    {
+      "date": "2026-07-06",
+      "name": "Capital City Day",
+      "type": "public",
+      "name_local": "Астана күні"
+    },
+    {
+      "date": "2026-10-25",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Республика күні"
+    },
+    {
+      "date": "2026-10-26",
+      "name": "Republic Day (substitute day)",
+      "type": "public",
+      "name_local": "Республика күні"
+    },
+    {
+      "date": "2026-12-16",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Тәуелсіздік күні"
+    },
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2027-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2027-01-04",
+      "name": "New Year's Day (substitute day)",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2027-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Рождество Христово"
+    },
+    {
+      "date": "2027-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Халықаралық әйелдер күні"
+    },
+    {
+      "date": "2027-03-15",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Конституция күні"
+    },
+    {
+      "date": "2027-03-21",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2027-03-22",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2027-03-23",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2027-03-23",
+      "name": "Nauryz (substitute day)",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "People's Unity Day",
+      "type": "public",
+      "name_local": "Қазақстан халқының бірлігі күні"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "People's Unity Day (substitute day)",
+      "type": "public",
+      "name_local": "Қазақстан халқының бірлігі күні"
+    },
+    {
+      "date": "2027-05-07",
+      "name": "Defender of the Fatherland Day",
+      "type": "public",
+      "name_local": "Отан Қорғаушы күні"
+    },
+    {
+      "date": "2027-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Жеңіс күні"
+    },
+    {
+      "date": "2027-05-10",
+      "name": "Victory Day (substitute day)",
+      "type": "public",
+      "name_local": "Жеңіс күні"
+    },
+    {
+      "date": "2027-05-16",
+      "name": "Eid al-Adha",
+      "type": "public",
+      "name_local": "Құрбан айт"
+    },
+    {
+      "date": "2027-07-06",
+      "name": "Capital City Day",
+      "type": "public",
+      "name_local": "Астана күні"
+    },
+    {
+      "date": "2027-10-25",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Республика күні"
+    },
+    {
+      "date": "2027-12-16",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Тәуелсіздік күні"
+    },
+    {
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2028-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2028-01-03",
+      "name": "New Year's Day (substitute day)",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2028-01-04",
+      "name": "New Year's Day (substitute day)",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2028-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Рождество Христово"
+    },
+    {
+      "date": "2028-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Халықаралық әйелдер күні"
+    },
+    {
+      "date": "2028-03-15",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Конституция күні"
+    },
+    {
+      "date": "2028-03-21",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2028-03-22",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2028-03-23",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2028-05-01",
+      "name": "People's Unity Day",
+      "type": "public",
+      "name_local": "Қазақстан халқының бірлігі күні"
+    },
+    {
+      "date": "2028-05-05",
+      "name": "Eid al-Adha",
+      "type": "public",
+      "name_local": "Құрбан айт"
+    },
+    {
+      "date": "2028-05-07",
+      "name": "Defender of the Fatherland Day",
+      "type": "public",
+      "name_local": "Отан Қорғаушы күні"
+    },
+    {
+      "date": "2028-05-08",
+      "name": "Defender of the Fatherland Day (substitute day)",
+      "type": "public",
+      "name_local": "Отан Қорғаушы күні"
+    },
+    {
+      "date": "2028-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Жеңіс күні"
+    },
+    {
+      "date": "2028-07-06",
+      "name": "Capital City Day",
+      "type": "public",
+      "name_local": "Астана күні"
+    },
+    {
+      "date": "2028-10-25",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Республика күні"
+    },
+    {
+      "date": "2028-12-16",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Тәуелсіздік күні"
+    },
+    {
+      "date": "2028-12-18",
+      "name": "Independence Day (substitute day)",
+      "type": "public",
+      "name_local": "Тәуелсіздік күні"
+    },
+    {
+      "date": "2029-01-01",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2029-01-02",
+      "name": "New Year's Day",
+      "type": "public",
+      "name_local": "Жаңа жыл"
+    },
+    {
+      "date": "2029-01-07",
+      "name": "Orthodox Christmas",
+      "type": "public",
+      "name_local": "Рождество Христово"
+    },
+    {
+      "date": "2029-03-08",
+      "name": "International Women's Day",
+      "type": "public",
+      "name_local": "Халықаралық әйелдер күні"
+    },
+    {
+      "date": "2029-03-15",
+      "name": "Constitution Day",
+      "type": "public",
+      "name_local": "Конституция күні"
+    },
+    {
+      "date": "2029-03-21",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2029-03-22",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2029-03-23",
+      "name": "Nauryz",
+      "type": "public",
+      "name_local": "Наурыз мейрамы"
+    },
+    {
+      "date": "2029-04-24",
+      "name": "Eid al-Adha",
+      "type": "public",
+      "name_local": "Құрбан айт"
+    },
+    {
+      "date": "2029-05-01",
+      "name": "People's Unity Day",
+      "type": "public",
+      "name_local": "Қазақстан халқының бірлігі күні"
+    },
+    {
+      "date": "2029-05-07",
+      "name": "Defender of the Fatherland Day",
+      "type": "public",
+      "name_local": "Отан Қорғаушы күні"
+    },
+    {
+      "date": "2029-05-09",
+      "name": "Victory Day",
+      "type": "public",
+      "name_local": "Жеңіс күні"
+    },
+    {
+      "date": "2029-07-06",
+      "name": "Capital City Day",
+      "type": "public",
+      "name_local": "Астана күні"
+    },
+    {
+      "date": "2029-10-25",
+      "name": "Republic Day",
+      "type": "public",
+      "name_local": "Республика күні"
+    },
+    {
+      "date": "2029-12-16",
+      "name": "Independence Day",
+      "type": "public",
+      "name_local": "Тәуелсіздік күні"
+    },
+    {
+      "date": "2029-12-18",
+      "name": "Independence Day (substitute day)",
+      "type": "public",
+      "name_local": "Тәуелсіздік күні"
+    }
+  ]
+}

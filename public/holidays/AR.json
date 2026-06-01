@@ -2,12 +2,12 @@
   "meta": {
     "country": "AR",
     "name": "Argentina",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-06-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.28.0",
+    "source": "date-holidays@3.30.1",
     "primaryLanguage": "es",
     "types": [
       "public"
@@ -58,21 +58,21 @@
     },
     {
       "date": "2025-05-25",
-      "name": "Day of the First National Government",
+      "name": "Day of the May Revolution",
       "type": "public",
-      "name_local": "Primer Gobierno Patrio"
+      "name_local": "Día de la Revolución de Mayo"
     },
     {
       "date": "2025-06-16",
       "name": "Anniversary of the Passing to Immortality of General Martín Miguel de Güemes",
       "type": "public",
-      "name_local": "Día Paso a la Inmortalidad del General Martín Miguel de Güemes"
+      "name_local": "Paso a la Inmortalidad del General Don Martín Miguel de Güemes"
     },
     {
       "date": "2025-06-20",
-      "name": "National Flag Day",
+      "name": "Anniversary of the Passing to Immortality of General Manuel Belgrano",
       "type": "public",
-      "name_local": "Día de la Bandera"
+      "name_local": "Paso a la Inmortalidad del General D. Manuel Belgrano"
     },
     {
       "date": "2025-07-09",
@@ -100,9 +100,9 @@
     },
     {
       "date": "2025-12-08",
-      "name": "Immaculate Conception",
+      "name": "Immaculate Conception of Mary",
       "type": "public",
-      "name_local": "La inmaculada concepción"
+      "name_local": "Inmaculada Concepción de María"
     },
     {
       "date": "2025-12-25",
@@ -154,21 +154,21 @@
     },
     {
       "date": "2026-05-25",
-      "name": "Day of the First National Government",
+      "name": "Day of the May Revolution",
       "type": "public",
-      "name_local": "Primer Gobierno Patrio"
+      "name_local": "Día de la Revolución de Mayo"
     },
     {
       "date": "2026-06-15",
       "name": "Anniversary of the Passing to Immortality of General Martín Miguel de Güemes",
       "type": "public",
-      "name_local": "Día Paso a la Inmortalidad del General Martín Miguel de Güemes"
+      "name_local": "Paso a la Inmortalidad del General Don Martín Miguel de Güemes"
     },
     {
       "date": "2026-06-20",
-      "name": "National Flag Day",
+      "name": "Anniversary of the Passing to Immortality of General Manuel Belgrano",
       "type": "public",
-      "name_local": "Día de la Bandera"
+      "name_local": "Paso a la Inmortalidad del General D. Manuel Belgrano"
     },
     {
       "date": "2026-07-09",
@@ -196,9 +196,9 @@
     },
     {
       "date": "2026-12-08",
-      "name": "Immaculate Conception",
+      "name": "Immaculate Conception of Mary",
       "type": "public",
-      "name_local": "La inmaculada concepción"
+      "name_local": "Inmaculada Concepción de María"
     },
     {
       "date": "2026-12-25",
@@ -250,21 +250,21 @@
     },
     {
       "date": "2027-05-25",
-      "name": "Day of the First National Government",
+      "name": "Day of the May Revolution",
       "type": "public",
-      "name_local": "Primer Gobierno Patrio"
+      "name_local": "Día de la Revolución de Mayo"
     },
     {
       "date": "2027-06-20",
-      "name": "National Flag Day",
+      "name": "Anniversary of the Passing to Immortality of General Manuel Belgrano",
       "type": "public",
-      "name_local": "Día de la Bandera"
+      "name_local": "Paso a la Inmortalidad del General D. Manuel Belgrano"
     },
     {
       "date": "2027-06-21",
       "name": "Anniversary of the Passing to Immortality of General Martín Miguel de Güemes",
       "type": "public",
-      "name_local": "Día Paso a la Inmortalidad del General Martín Miguel de Güemes"
+      "name_local": "Paso a la Inmortalidad del General Don Martín Miguel de Güemes"
     },
     {
       "date": "2027-07-09",
@@ -292,9 +292,9 @@
     },
     {
       "date": "2027-12-08",
-      "name": "Immaculate Conception",
+      "name": "Immaculate Conception of Mary",
       "type": "public",
-      "name_local": "La inmaculada concepción"
+      "name_local": "Inmaculada Concepción de María"
     },
     {
       "date": "2027-12-25",
@@ -346,21 +346,21 @@
     },
     {
       "date": "2028-05-25",
-      "name": "Day of the First National Government",
+      "name": "Day of the May Revolution",
       "type": "public",
-      "name_local": "Primer Gobierno Patrio"
+      "name_local": "Día de la Revolución de Mayo"
     },
     {
       "date": "2028-06-17",
       "name": "Anniversary of the Passing to Immortality of General Martín Miguel de Güemes",
       "type": "public",
-      "name_local": "Día Paso a la Inmortalidad del General Martín Miguel de Güemes"
+      "name_local": "Paso a la Inmortalidad del General Don Martín Miguel de Güemes"
     },
     {
       "date": "2028-06-20",
-      "name": "National Flag Day",
+      "name": "Anniversary of the Passing to Immortality of General Manuel Belgrano",
       "type": "public",
-      "name_local": "Día de la Bandera"
+      "name_local": "Paso a la Inmortalidad del General D. Manuel Belgrano"
     },
     {
       "date": "2028-07-09",
@@ -388,9 +388,9 @@
     },
     {
       "date": "2028-12-08",
-      "name": "Immaculate Conception",
+      "name": "Immaculate Conception of Mary",
       "type": "public",
-      "name_local": "La inmaculada concepción"
+      "name_local": "Inmaculada Concepción de María"
     },
     {
       "date": "2028-12-25",
@@ -442,21 +442,21 @@
     },
     {
       "date": "2029-05-25",
-      "name": "Day of the First National Government",
+      "name": "Day of the May Revolution",
       "type": "public",
-      "name_local": "Primer Gobierno Patrio"
+      "name_local": "Día de la Revolución de Mayo"
     },
     {
       "date": "2029-06-17",
       "name": "Anniversary of the Passing to Immortality of General Martín Miguel de Güemes",
       "type": "public",
-      "name_local": "Día Paso a la Inmortalidad del General Martín Miguel de Güemes"
+      "name_local": "Paso a la Inmortalidad del General Don Martín Miguel de Güemes"
     },
     {
       "date": "2029-06-20",
-      "name": "National Flag Day",
+      "name": "Anniversary of the Passing to Immortality of General Manuel Belgrano",
       "type": "public",
-      "name_local": "Día de la Bandera"
+      "name_local": "Paso a la Inmortalidad del General D. Manuel Belgrano"
     },
     {
       "date": "2029-07-09",
@@ -484,9 +484,9 @@
     },
     {
       "date": "2029-12-08",
-      "name": "Immaculate Conception",
+      "name": "Immaculate Conception of Mary",
       "type": "public",
-      "name_local": "La inmaculada concepción"
+      "name_local": "Inmaculada Concepción de María"
     },
     {
       "date": "2029-12-25",
