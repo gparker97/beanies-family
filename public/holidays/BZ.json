@@ -2,12 +2,12 @@
   "meta": {
     "country": "BZ",
     "name": "Belize",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-06-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.28.0",
+    "source": "date-holidays@3.30.1",
     "primaryLanguage": "en",
     "types": [
       "public"
@@ -20,8 +20,13 @@
       "type": "public"
     },
     {
+      "date": "2025-01-15",
+      "name": "George Price Day",
+      "type": "public"
+    },
+    {
       "date": "2025-03-10",
-      "name": "Baron Bliss Day",
+      "name": "National Heroes and Benefactor Day",
       "type": "public"
     },
     {
@@ -45,13 +50,13 @@
       "type": "public"
     },
     {
-      "date": "2025-05-26",
-      "name": "Commonwealth Day, Sovereign's Day",
+      "date": "2025-08-01",
+      "name": "Emancipation Day",
       "type": "public"
     },
     {
       "date": "2025-09-10",
-      "name": "Saint George's Caye Day, National Day",
+      "name": "St. George's Caye Day",
       "type": "public"
     },
     {
@@ -61,7 +66,7 @@
     },
     {
       "date": "2025-10-13",
-      "name": "Day of the Americas",
+      "name": "Indigenous People’s Resistance Day",
       "type": "public"
     },
     {
@@ -85,8 +90,13 @@
       "type": "public"
     },
     {
+      "date": "2026-01-15",
+      "name": "George Price Day",
+      "type": "public"
+    },
+    {
       "date": "2026-03-09",
-      "name": "Baron Bliss Day",
+      "name": "National Heroes and Benefactor Day",
       "type": "public"
     },
     {
@@ -110,13 +120,13 @@
       "type": "public"
     },
     {
-      "date": "2026-05-25",
-      "name": "Commonwealth Day, Sovereign's Day",
+      "date": "2026-08-01",
+      "name": "Emancipation Day",
       "type": "public"
     },
     {
       "date": "2026-09-10",
-      "name": "Saint George's Caye Day, National Day",
+      "name": "St. George's Caye Day",
       "type": "public"
     },
     {
@@ -126,7 +136,7 @@
     },
     {
       "date": "2026-10-12",
-      "name": "Day of the Americas",
+      "name": "Indigenous People’s Resistance Day",
       "type": "public"
     },
     {
@@ -150,8 +160,13 @@
       "type": "public"
     },
     {
+      "date": "2027-01-15",
+      "name": "George Price Day",
+      "type": "public"
+    },
+    {
       "date": "2027-03-08",
-      "name": "Baron Bliss Day",
+      "name": "National Heroes and Benefactor Day",
       "type": "public"
     },
     {
@@ -175,13 +190,13 @@
       "type": "public"
     },
     {
-      "date": "2027-05-24",
-      "name": "Commonwealth Day, Sovereign's Day",
+      "date": "2027-08-02",
+      "name": "Emancipation Day",
       "type": "public"
     },
     {
       "date": "2027-09-10",
-      "name": "Saint George's Caye Day, National Day",
+      "name": "St. George's Caye Day",
       "type": "public"
     },
     {
@@ -191,7 +206,7 @@
     },
     {
       "date": "2027-10-11",
-      "name": "Day of the Americas",
+      "name": "Indigenous People’s Resistance Day",
       "type": "public"
     },
     {
@@ -220,8 +235,13 @@
       "type": "public"
     },
     {
+      "date": "2028-01-15",
+      "name": "George Price Day",
+      "type": "public"
+    },
+    {
       "date": "2028-03-06",
-      "name": "Baron Bliss Day",
+      "name": "National Heroes and Benefactor Day",
       "type": "public"
     },
     {
@@ -245,13 +265,13 @@
       "type": "public"
     },
     {
-      "date": "2028-05-22",
-      "name": "Commonwealth Day, Sovereign's Day",
+      "date": "2028-08-01",
+      "name": "Emancipation Day",
       "type": "public"
     },
     {
       "date": "2028-09-11",
-      "name": "Saint George's Caye Day, National Day",
+      "name": "St. George's Caye Day",
       "type": "public"
     },
     {
@@ -261,7 +281,7 @@
     },
     {
       "date": "2028-10-09",
-      "name": "Day of the Americas",
+      "name": "Indigenous People’s Resistance Day",
       "type": "public"
     },
     {
@@ -285,8 +305,13 @@
       "type": "public"
     },
     {
+      "date": "2029-01-15",
+      "name": "George Price Day",
+      "type": "public"
+    },
+    {
       "date": "2029-03-12",
-      "name": "Baron Bliss Day",
+      "name": "National Heroes and Benefactor Day",
       "type": "public"
     },
     {
@@ -310,13 +335,13 @@
       "type": "public"
     },
     {
-      "date": "2029-05-21",
-      "name": "Commonwealth Day, Sovereign's Day",
+      "date": "2029-08-01",
+      "name": "Emancipation Day",
       "type": "public"
     },
     {
       "date": "2029-09-10",
-      "name": "Saint George's Caye Day, National Day",
+      "name": "St. George's Caye Day",
       "type": "public"
     },
     {
@@ -326,7 +351,7 @@
     },
     {
       "date": "2029-10-15",
-      "name": "Day of the Americas",
+      "name": "Indigenous People’s Resistance Day",
       "type": "public"
     },
     {
