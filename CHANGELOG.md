@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-01
+
+### Changed
+
+- **Refreshed the public-holiday and airport reference data.** The built-in public-holiday calendars (used by the Family Planner) were regenerated from the latest upstream dataset — more accurate coverage across many countries, with corrected primary languages for a few (e.g. Kazakhstan, Pakistan). One new airport was added to the travel airport list. _(Data update; reaches users on the next app release.)_
+
 ## 2026-05-30
 
 ### Changed
