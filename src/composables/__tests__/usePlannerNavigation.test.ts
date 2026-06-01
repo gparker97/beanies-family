@@ -3,6 +3,27 @@ import { setActivePinia, createPinia } from 'pinia';
 import { ref } from 'vue';
 import { usePlannerNavigation, type PlannerView } from '@/composables/usePlannerNavigation';
 
+// Mock useToday so its `startOfToday` reflects whatever time is set via
+// `vi.setSystemTime` at the moment useToday() is invoked. The real composable
+// initialises a module-scoped singleton at import time, which captures the real
+// system date before vi.useFakeTimers() runs in beforeEach — so without this
+// mock the seeded referenceDate ignores the pinned clock and the month/week
+// assertions below silently break whenever the real wall-clock date crosses a
+// month boundary (e.g. the 1st). Mirrors the useNavBadges.test mock.
+vi.mock('@/composables/useToday', async () => {
+  const { ref: vueRef, computed } = await import('vue');
+  const { toDateInputValue, getStartOfDay } = await import('@/utils/date');
+  return {
+    useToday: () => ({
+      today: vueRef(toDateInputValue(new Date())),
+      startOfToday: computed(() => getStartOfDay(new Date())),
+      isVisible: vueRef(true),
+      lastVisibleAt: vueRef(0),
+      lastHiddenAt: vueRef(0),
+    }),
+  };
+});
+
 describe('usePlannerNavigation', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -36,9 +57,8 @@ describe('usePlannerNavigation', () => {
   it('day: steps by 1 day; label is non-empty', () => {
     const view = ref<PlannerView>('day');
     const nav = usePlannerNavigation(view);
-    // Derive the expectation from the composable's own seed (today) so the
-    // test is robust to the wall-clock date rolling over — the navigation
-    // seeds from useToday, which is unaffected by vi.setSystemTime here.
+    // Derive the expectation from the composable's own seed so the test is
+    // robust regardless of the pinned date — goNext just adds one day.
     const expected = new Date(nav.referenceDate.value);
     expected.setDate(expected.getDate() + 1);
     nav.goNext();
