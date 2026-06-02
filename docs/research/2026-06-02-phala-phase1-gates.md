@@ -10,9 +10,9 @@ ADR-030 accepts the tiered architecture but holds two gates open. This doc is ho
 
 ## Gate 1 — Extraction quality (does the model actually work?)
 
-**Question:** does `phala/qwen3-vl-30b-a3b-instruct` (via RedPill) reliably extract title / date / time / location from real invitation/itinerary/receipt images? (The research verified the API surface + model availability but **not** real-image accuracy — and a 404 on the model's dedicated page is a yellow flag worth clearing early.)
+**Question:** do Phala's open-weight vision models reliably extract title / date / time / location from real invitation/itinerary/receipt images? We test **two** and pick on evidence — `phala/qwen3-vl-30b-a3b-instruct` (strongest documented quality, Alibaba-origin) and `phala/gemma-3-27b-it` (Google-origin, sidesteps the China optic, possibly weaker). Both are **open-weight** running inside Phala's enclave — neither sends data to Alibaba/Google/China. (The research verified the API surface but **not** real-image accuracy — a 404 on Qwen's dedicated model page is a yellow flag worth clearing early.)
 
-**Harness:** `scripts/spikes/ai-extract-spike.mjs` (imports the shipping prompt from `scripts/spikes/extractionPrompt.mjs`).
+**Harness:** `scripts/spikes/ai-extract-spike.mjs` (imports the shipping prompt from `scripts/spikes/extractionPrompt.mjs`; tests both models by default, configurable via `REDPILL_MODELS`).
 
 **To run:**
 
@@ -27,7 +27,7 @@ REDPILL_API_KEY=sk-... node scripts/spikes/ai-extract-spike.mjs ./spike-images .
 
 **What it reports:** per-field ✓/✗ vs ground truth, an overall accuracy %, JSON parse/shape failure count, request-failure count, and how often the Phala attestation header was present.
 
-**Pass criteria (suggested):** title / date / location reliably correct on realistic samples, JSON well-formed every time, attestation header present. Erratic dates, hallucinated values, or frequent malformed JSON → **fail → use Gemini Flash-Lite**.
+**Pass criteria (suggested):** for at least one of the two models — title / date / location reliably correct on realistic samples, JSON well-formed every time, attestation header present. Compare the per-model OVERALL %; pick the stronger (weighing Qwen quality vs Gemma origin-optics). If _both_ are erratic / hallucinate / emit malformed JSON → **fail → use Gemini Flash-Lite (via Vertex)**.
 
 **Verdict:** _pending — paste harness summary here once run._
 
@@ -41,11 +41,13 @@ REDPILL_API_KEY=sk-... node scripts/spikes/ai-extract-spike.mjs ./spike-images .
 
 1. **Zero data retention** — are prompts (including the image) and completions stored at rest at all? If so, where, for how long, and can it be contractually set to zero?
 2. **No training** — is customer content excluded from any model training / fine-tuning / evaluation use?
-3. **GDPR Article 28 processor terms / DPA** — will they sign a Data Processing Agreement naming beanies as controller and them as processor? Sub-processors list? Data location (EU/US)?
-4. **Children's data** — any contractual restriction on processing data that may relate to minors? (We send a single user-provided document, not a profile, but content may mention a child.)
-5. **Attestation in practice** — confirm the `GET /v1/attestation/report` flow and per-response signature are available on the production endpoint we'd call, and what exactly they cover (model hash, code hash, TEE quote).
-6. **Logging** — what request metadata do they log (IP, timestamps, token counts)? Is the image content ever logged?
-7. **Incident / breach** notification terms and SLA.
+3. **GDPR Article 28 processor terms / DPA** — will they sign a Data Processing Agreement naming beanies as controller and them as processor? Sub-processors list?
+4. **Data residency** — where do the GPUs physically sit? **Confirm not China** (EU/US for GDPR). This matters more than the model's country of origin (the model is open-weight and inert).
+5. **Children's data** — any contractual restriction on processing data that may relate to minors? (We send a single user-provided document, not a profile, but content may mention a child.)
+6. **Gateway plaintext handling** (from the Pass-4 trust-boundary finding) — TLS terminates at RedPill's gateway, which decrypts the request inside its own enclave. Confirm: is the gateway image reproducibly attestable, and does the contract **bar logging/retaining request plaintext** at the gateway? This is the real residual exposure, not the model GPU.
+7. **Attestation in practice** — confirm the `GET /v1/attestation/report` flow and per-response signature are available on the production endpoint we'd call, and what exactly they cover (model hash, code hash, TEE quote).
+8. **Logging** — what request metadata do they log (IP, timestamps, token counts)? Is the image content ever logged?
+9. **Incident / breach** notification terms and SLA.
 
 **Verdict:** _pending — record terms + a go/no-go here once confirmed._
 

@@ -120,6 +120,42 @@ Remote attestation is real and signature-chain-checkable but rests on a **single
 
 ---
 
+## Pass 4 — Trust-boundary verification spike (RedPill/Phala request confidentiality)
+
+A fourth verification spike (104 agents, 21 sources, 21/25 claims confirmed) answered the load-bearing question: **when a request goes through RedPill to a Phala TEE, can the gateway read the plaintext?**
+
+### 4.1 RedPill does NOT shield request plaintext from itself
+
+RedPill's own documented flow is `Your Request →|TLS| Gateway TEE →|RA-TLS/Secure Channel| GPU TEE`. **TLS terminates at the gateway**, which decrypts and processes the request _inside its own enclave_ before re-encrypting to the model GPU. It is a **two-hop** design, **not** client→enclave encryption. The gateway is itself an attested confidential VM (so the cloud **host** can't read it), but the gateway **code decrypts the request**. _(Confidence: high, 3-0.)_
+
+- Sources: `docs.redpill.ai/privacy/confidential-ai/overview`, `github.com/dstack-TEE/dstack`, `phala.com/dstack`, `arxiv.org/html/2509.11555v1`.
+
+### 4.2 Attestation proves compute integrity, NOT transit confidentiality
+
+A Phala/RedPill attestation (`x-phala-*` receipts, GPU/model/code hashes, TDX quotes) proves "a genuine TEE ran this exact model+code and signed the response." It does **not** prove "no intermediary saw the plaintext request." These are different guarantees. _(Confidence: high, 3-0.)_
+
+### 4.3 Phala's stronger marketing claims were refuted
+
+"Encrypted on the client before transmission… no plaintext intermediary," "two-hop RA-TLS where each hop terminates in a TEE so the gateway never sees plaintext" — **refuted 0-3** against primary sources. Treat "no plaintext intermediary" as a _TEE-not-host_ framing, not client-opaque ciphertext routing.
+
+### 4.4 Client→enclave encryption is buildable but not available on the managed path
+
+The primitive exists in dstack (RA-TLS binds a cert key into the TDX quote's `report_data`; an enclave can embed an attested public key as Quote custom data) — but it's documented for **internal** channels and KMS key-release, and **RedPill's standard OpenAI endpoint does not expose it**. True client→enclave encryption would require **self-deploying** our own model in a dstack container (the rejected high-ops self-host path). _(Confidence: high, 3-0.)_
+
+### 4.5 "Direct Phala" = self-deploy, not an endpoint swap
+
+RedPill is effectively Phala's serverless-inference front-end for hosted models. "Going direct" means deploying your own model in a dstack confidential container (deploy-your-own-container on confidential compute) — categorically more work, and the only path that removes third-party plaintext touchpoints today. _(Confidence: high, 3-0.)_
+
+### 4.6 Practical verdict
+
+On the RedPill path the trust boundary includes **RedPill's gateway CVM AND our own forwarding Lambda** as plaintext touchpoints (both mitigated, neither blind). Three options: **(i) accept** them as trusted, relying on attested-compute + contractual zero-retention (shippable; must scope claims honestly — no "end-to-end encrypted/trustless"); **(ii) client→enclave encryption** (primitive exists, not exposed by RedPill → needs self-deploy); **(iii) self-deploy a dstack container** (strongest, highest ops). **Decision: option (i), Phala kept primary, with honest scoping** (see ADR-030 "Trust boundary"). The genuinely strongest tiers remain BYOK and on-device.
+
+**Caveat:** all findings are documentation-based (no live request was sent to `api.redpill.ai`). An empirical probe + the Gate-2 DPA answers may refine this. Other providers (Chutes/Tinfoil/Anthropic confidential inference) market stronger client→enclave models — unverified, a future option if transit-secrecy ever becomes a hard requirement.
+
+- Sources: `docs.redpill.ai/privacy/confidential-ai/overview`, `phala.com/posts/understanding-tdx-attestation-reports-a-developers-guide`, `docs.phala.com/dstack/design-documents/decentralized-root-of-trust`, `arxiv.org/html/2509.11555v1`, `security.apple.com/blog/private-cloud-compute/` (PCC design reference).
+
+---
+
 ## Cost economics (managed tier)
 
 | Engine                | Vision input            | ~$/doc (1–3 pp) | Notes                                  |
