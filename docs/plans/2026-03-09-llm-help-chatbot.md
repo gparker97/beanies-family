@@ -2,6 +2,8 @@
 
 > Date: 2026-03-09
 > Related issues: #133
+>
+> **⚠️ SUPERSEDED (2026-06-02).** The AI strategy was re-scoped after three deep-research passes. The headline AI vision for beanies is no longer a help chatbot but a **tiered, privacy-first document-understanding capability** (on-device → BYOK → verifiable-TEE managed → cloud fallback), with the first wedge being _event/invitation image → prefilled calendar activity_. See ADR-030 (`docs/adr/030-private-ai-tiered-architecture.md`), the research record (`docs/research/2026-06-02-private-ai-llm-capability.md`), and the current plan (`docs/plans/2026-06-02-private-ai-tiered-architecture-and-invitation-wedge.md`). #133 has been rewritten to that vision. A help chatbot may return as a _later optional tier_ — this plan is retained only as a historical record.
 
 ## Context
 
