@@ -2,7 +2,7 @@
 
 > Date: 2026-06-02
 > Status: **Accepted** (2026-06-02). Architecture decision accepted; two implementation gates remain open before the managed provider is committed (see "Open gates"). First feature wedge (event/invitation image → prefilled calendar activity) planned in `docs/plans/2026-06-02-private-ai-tiered-architecture-and-invitation-wedge.md`.
-> Research basis: `docs/research/2026-06-02-private-ai-llm-capability.md` (three adversarially-verified deep-research passes).
+> Research basis: `docs/research/2026-06-02-private-ai-llm-capability.md` (three adversarially-verified deep-research passes + a fourth trust-boundary verification spike — see its Pass 4 section).
 > Related: ADR-001 (local-first IndexedDB), ADR-003 (Web-Crypto encryption), ADR-011 (file-first architecture), ADR-019 (family-key encryption), ADR-013 (admin API Lambda), ADR-027 (diagnostic logging/telemetry). Supersedes the scope of GitHub #133 (LLM help chatbot).
 
 ## Context
@@ -13,17 +13,19 @@ The central question — _are "genuinely useful AI" and "private/local-first" mu
 
 ### The decision space (cloud privacy spectrum)
 
-| Option                                                       | Privacy guarantee                                           | Reality                                                                                                | Verdict                                                            |
-| ------------------------------------------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| **On-device** (WebLLM/WebGPU, Ollama)                        | Absolute — nothing leaves the device                        | Text inference real today; **multimodal/vision nascent + unreliable** at small sizes                   | First-class for **text**, not yet for **document images**          |
-| **Trust-based cloud (ZDR)** — Anthropic/OpenAI/Gemini/Vertex | Contractual zero-retention + no-train                       | Provider reads plaintext in-memory; Anthropic ZDR needs enterprise contract + no CORS (proxy required) | Acceptable with a DPA; **Gemini Flash-Lite = documented fallback** |
-| **Hardware TEE** (NVIDIA GPU-TEE, Nitro Enclaves)            | Cryptographically attested; host/operator can't read memory | Strongest grounding, but rooted in one vendor's silicon PKI — **"verifiable" ≠ "trustless"**           | **Chosen primary** (Phala)                                         |
-| **FHE** (encrypted inference)                                | Only path eliminating plaintext-in-memory                   | ~100 s GPU **per token** (Feb 2026) → hours per extraction                                             | Impractical; research-only                                         |
-| **Self-host open model on confidential compute**             | Same TEE guarantee, our infra                               | Same single-vendor PKI root; little verifiable delta; high ops burden                                  | **Rejected** — security theater for an indie team                  |
+| Option                                                       | Privacy guarantee                                                                                         | Reality                                                                                                                                                                                                                                     | Verdict                                                            |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **On-device** (WebLLM/WebGPU, Ollama)                        | Absolute — nothing leaves the device                                                                      | Text inference real today; **multimodal/vision nascent + unreliable** at small sizes                                                                                                                                                        | First-class for **text**, not yet for **document images**          |
+| **Trust-based cloud (ZDR)** — Anthropic/OpenAI/Gemini/Vertex | Contractual zero-retention + no-train                                                                     | Provider reads plaintext in-memory; Anthropic ZDR needs enterprise contract + no CORS (proxy required)                                                                                                                                      | Acceptable with a DPA; **Gemini Flash-Lite = documented fallback** |
+| **Hardware TEE** (NVIDIA GPU-TEE, Nitro Enclaves)            | Compute runs in an attested enclave the **cloud host can't read**; attestation proves model/code identity | Rooted in one vendor's silicon PKI — **"verifiable" ≠ "trustless"**; and **NOT** end-to-end-encrypted to the enclave — the gateway (and our proxy) still decrypt the request (each inside a TEE / our control). See "Trust boundary" below. | **Chosen primary** (Phala)                                         |
+| **FHE** (encrypted inference)                                | Only path eliminating plaintext-in-memory                                                                 | ~100 s GPU **per token** (Feb 2026) → hours per extraction                                                                                                                                                                                  | Impractical; research-only                                         |
+| **Self-host open model on confidential compute**             | Same TEE guarantee, our infra                                                                             | Same single-vendor PKI root; little verifiable delta; high ops burden                                                                                                                                                                       | **Rejected** — security theater for an indie team                  |
 
 ### Provider verification
 
-Of four candidate resellable TEE inference providers, only **Phala Cloud (RedPill gateway, `api.redpill.ai/v1`)** verified end-to-end: OpenAI-compatible, hosts `phala/qwen3-vl-30b-a3b-instruct` (vision, 128K ctx), Intel TDX + NVIDIA H100/H200 GPU-TEE, per-response attestation, ~$0.20/$0.70 per-M-tok, independently corroborated live on OpenRouter (~1.34B tok/day). GPU-TEE overhead is a low 4–8% (independent ETH Zurich). NEAR AI is a decentralized blockchain marketplace (wrong shape); **VoltageGPU and Super Protocol could not be verified** and are not adopted.
+Of four candidate resellable TEE inference providers, only **Phala Cloud (RedPill gateway, `api.redpill.ai/v1`)** verified end-to-end: OpenAI-compatible, Intel TDX + NVIDIA H100/H200 GPU-TEE, per-response attestation, ~$0.20/$0.70 per-M-tok, independently corroborated live on OpenRouter (~1.34B tok/day). GPU-TEE overhead is a low 4–8% (independent ETH Zurich). NEAR AI is a decentralized blockchain marketplace (wrong shape); **VoltageGPU and Super Protocol could not be verified** and are not adopted.
+
+**Model inside the enclave — gate-test two open-weight vision models:** `phala/qwen3-vl-30b-a3b-instruct` (strongest documented doc-extraction) and `gemma-3-27b-it` (Google open model, also on Phala). Both are **open-weight** and run _locally inside Phala's enclave_ — **no data flows to Alibaba/Google/China**; an open-weight model is inert and cannot phone home. The Qwen-vs-Gemma choice is therefore **quality vs origin-optics**, not a data-path question: Qwen-VL is likely the stronger extractor; Gemma sidesteps the Alibaba-origin optic a privacy-first brand may want to avoid. For our constrained extract-and-validate task (schema-checked JSON of title/date/location), model-bias/censorship concerns are negligible. Gate 1 tests both and decides on evidence. (Cost is not a tiebreaker: Phala ≈ $0.0006/doc vs Gemini Flash-Lite ≈ $0.0003/doc — both sub-cent; ~$6 vs ~$3 per 10k docs.)
 
 ### Regulatory driver
 
@@ -48,16 +50,30 @@ Adopt a **tiered AI architecture** with this preference order:
 
 - **Per-action consent.** No document leaves the device without an explicit, friendly, per-action consent step stating what is sent, where, and the retention posture. Never auto-send, never silent auto-create.
 - **Data-minimization.** Send **only the single document** the user pointed at — never the family dataset. Compress/down-scale client-side first.
-- **"Verifiable" ≠ "trustless."** Attestation proves hardware + loaded-code identity rooted in Intel/NVIDIA/Phala PKI; it does **not** make the silicon independently auditable. No "trustless" claims in code, copy, or docs.
+- **"Verifiable" ≠ "trustless," and TEE ≠ "only the enclave sees it."** Attestation proves hardware + loaded-code identity rooted in Intel/NVIDIA/Phala PKI; it does **not** make the silicon independently auditable, and it does **not** mean the request was confidential in transit (the gateway and our proxy decrypt it — see Trust boundary). No "trustless" or "end-to-end encrypted" claims in code, copy, or docs.
+- **Honest user-facing claim.** The truthful description of the managed tier is: _"your document is processed only inside attested confidential hardware that the cloud host cannot read, and is never retained or trained on."_ Never: _"only the secure enclave can ever see it"_ or _"end-to-end encrypted to the model."_
 - **Two config surfaces stay separate.** Client settings hold tier selection + BYOK keys only; the managed-tier key lives **server-side only** (never in `aiApiKeys`). This is the privacy boundary, not an unfinished feature.
 - **No silent failures, no predictive warnings.** Every failure is caught, classified, and surfaced (per project convention); friction is shown only when it actually happens.
 
+## Trust boundary (what the managed TEE tier does and does not give you)
+
+The Pass-4 verification spike (cited in the research doc) settled a load-bearing question: **RedPill does not shield the request plaintext from itself.** Its documented flow is `Your Request →|TLS| Gateway TEE →|RA-TLS| GPU TEE` — TLS **terminates at RedPill's gateway**, which decrypts and processes the request _inside its own enclave_ before re-encrypting to the model GPU. It is a **two-hop** design, **not** client→enclave encryption. (Phala's stronger marketing claims — "no plaintext intermediary," "encrypted requests" — were **refuted** against primary sources.)
+
+What this means, stated honestly:
+
+- **Attestation proves compute integrity, not transit confidentiality.** It proves "a genuine TEE ran this exact model+code and signed the response," not "no intermediary saw the plaintext request."
+- **The trust boundary includes two plaintext touchpoints before the model enclave:** RedPill's gateway CVM **and** our own proxy Lambda (which holds the key and forwards). Both are mitigated — the gateway is itself an attested TEE the _host_ can't read; our Lambda is ours and retains nothing — but neither is a blind ciphertext router.
+- **What the TEE genuinely buys us** (a real edge over a plain ZDR API, and brand-aligned): the cloud **host/operator cannot read** the in-memory request, plus cryptographic **attestation** of the model/code. What it does **not** buy: secrecy of the request from the gateway code or our proxy.
+- **True client→enclave encryption is buildable but not available on the managed path.** The dstack primitive exists (RA-TLS, attested public key in the TDX quote) but is used for internal channels/KMS, not exposed by RedPill's OpenAI endpoint. Achieving it would require **self-deploying** our own model in a dstack container (the rejected high-ops self-host path) — out of scope.
+
+**Decision given this:** keep Phala primary (the host-memory protection + attestation + brand fit remain worth it for a privacy-first product), but **scope every claim honestly** (binding principle above) and treat the managed tier's privacy story as "attested confidential compute + zero retention," not "only the enclave sees it." The strongest-privacy tiers remain **BYOK** (client→provider direct, no beanies server) and **on-device** (future). This narrows — but does not erase — Phala's edge over a mature ZDR provider (Gemini/Vertex), which is why Gemini stays the wired fallback.
+
 ## Open gates (must pass before the managed provider is committed)
 
-1. **Extraction-quality gate** — a hands-on real-image test of `qwen3-vl-30b-a3b-instruct` against a corpus of real invitation/itinerary/receipt images, scoring title/date/time/location accuracy.
-2. **DPA gate** — confirm Phala/RedPill zero-retention / GDPR Article 28 processor terms suit a YMYL family app that may process children's data.
+1. **Extraction-quality gate** — a hands-on real-image test of **both** `qwen3-vl-30b-a3b-instruct` **and** `gemma-3-27b-it` on Phala, against a corpus of real invitation/itinerary/receipt images, scoring title/date/time/location accuracy. Pick the model on evidence (quality vs origin-optics).
+2. **DPA gate** — confirm Phala/RedPill **zero-retention**, **no-training**, **GDPR Article 28** processor terms, **data residency** (where the GPUs physically sit — confirm not China; EU/US for GDPR), and children's-data suitability. Also confirm whether the gateway image is reproducibly attestable / contractually bars logging request plaintext.
 
-If either fails, the managed engine switches to **Gemini Flash-Lite** behind the same abstraction; the rest of the architecture is unchanged.
+If either fails, the managed engine switches to **Gemini Flash-Lite (via Vertex, for the DPA)** behind the same abstraction; the rest of the architecture is unchanged.
 
 ## Consequences
 
@@ -74,6 +90,7 @@ If either fails, the managed engine switches to **Gemini Flash-Lite** behind the
 - The managed tier is a billable third-party dependency (cost + rotation + abuse surface).
 - On-device multimodal is deferred; the wedge depends on the cloud tier until in-browser VLMs mature.
 - Provider lock-in to Phala for the vision path (mitigated by the Gemini fallback abstraction).
+- The managed TEE tier is **not** end-to-end-encrypted to the model enclave — the gateway and our proxy are (mitigated) plaintext touchpoints. The privacy story must be scoped to "attested confidential compute + zero retention," which is a narrower (still real) edge over a mature ZDR provider than a naive "TEE = nobody sees it" reading would suggest.
 
 **Rejected alternatives**
 
