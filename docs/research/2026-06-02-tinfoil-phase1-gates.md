@@ -1,73 +1,80 @@
-# Phase 1 — the two hard gates (Phala managed tier)
+# Phase 1 — managed-tier gates (Tinfoil)
 
 > Date: 2026-06-02
-> Status: **Open** — both gates must pass before the managed provider is committed (ADR-030).
-> Decision rule: if either gate fails, switch the managed engine to **Gemini Flash-Lite** behind the same provider abstraction. The rest of the plan is unchanged.
+> Status: **Gate 1 PASSED** (quality + attestation, empirically). **Gate 2 open** (Tinfoil DPA). **Gate 3 open** (verification-SDK integration). See ADR-030.
+> Decision rule: if the DPA gate fails, switch the managed engine to **Gemini Flash-Lite (via Vertex)** behind the same provider abstraction. The rest of the plan is unchanged.
 
-ADR-030 accepts the tiered architecture but holds two gates open. This doc is how we close them and where the verdicts get recorded.
+This doc records how the managed-provider gates were closed. **Provider chosen: Tinfoil-direct (`qwen3-vl-30b` at `https://inference.tinfoil.sh/v1`).** RedPill/Phala was investigated first and rejected (see Gate 1).
 
 ---
 
-## Gate 1 — Extraction quality (does the model actually work?)
+## Gate 1 — Extraction quality + provider trust boundary — ✅ PASSED (2026-06-02)
 
-**Question:** do Phala's open-weight vision models reliably extract title / date / time / location from real invitation/itinerary/receipt images? We test **two** and pick on evidence — `phala/qwen3-vl-30b-a3b-instruct` (strongest documented quality, Alibaba-origin) and `phala/gemma-3-27b-it` (Google-origin, sidesteps the China optic, possibly weaker). Both are **open-weight** running inside Phala's enclave — neither sends data to Alibaba/Google/China. (The research verified the API surface but **not** real-image accuracy — a 404 on Qwen's dedicated model page is a yellow flag worth clearing early.)
+**Question:** does an open-weight vision model reliably extract title/date/time/location from real invitation images/PDFs, and can we get a deterministic, attestable processor?
 
-**Harness:** `scripts/spikes/ai-extract-spike.mjs` (imports the shipping prompt from `scripts/spikes/extractionPrompt.mjs`; tests both models by default, configurable via `REDPILL_MODELS`).
-
-**To run:**
+**Harness:** `scripts/spikes/ai-extract-spike.mjs` (imports the shipping prompt from `extractionPrompt.mjs`; provider-configurable via `LLM_API_BASE` / `LLM_API_KEY` / `LLM_MODELS`).
 
 ```bash
-# 1. Create + fund a RedPill account ($5 min balance): https://red-pill.ai
-# 2. Put ~8–12 SYNTHETIC or NON-SENSITIVE invitation/itinerary/receipt images in a folder.
-#    (Each image is sent to a third-party API — do NOT use real family data for the gate.)
-# 3. (Optional but recommended) write a ground-truth.json mapping each filename to its expected
-#    { title, date, startTime, endTime, location } so the harness scores accuracy.
-REDPILL_API_KEY=sk-... node scripts/spikes/ai-extract-spike.mjs ./spike-images ./ground-truth.json
+# Tinfoil (chosen):
+LLM_API_BASE="https://inference.tinfoil.sh/v1" LLM_MODELS="qwen3-vl-30b" \
+  LLM_API_KEY="$(cat /tmp/beanies-tinfoil-api)" \
+  node scripts/spikes/ai-extract-spike.mjs <images-dir> [ground-truth.json]
+# PDFs: render page-1 to image first (Ghostscript): gs -sDEVICE=jpeg -r150 -dFirstPage=1 -dLastPage=1 -o out.jpg in.pdf
 ```
 
-**What it reports:** per-field ✓/✗ vs ground truth, an overall accuracy %, JSON parse/shape failure count, request-failure count, and how often the Phala attestation header was present.
+**Results** (6 real WhatsApp invitation photos + 5 invitation PDFs):
 
-**Pass criteria (suggested):** for at least one of the two models — title / date / location reliably correct on realistic samples, JSON well-formed every time, attestation header present. Compare the per-model OVERALL %; pick the stronger (weighing Qwen quality vs Gemma origin-optics). If _both_ are erratic / hallucinate / emit malformed JSON → **fail → use Gemini Flash-Lite (via Vertex)**.
+- **`qwen3-vl-30b`: 6/6 images + 5/5 PDFs clean** — correct title/date/time/location, well-formed JSON every time, and correctly returned `isEvent:false` for non-events (spelling list, parent survey). **Identical quality on RedPill and Tinfoil.** → model = **`qwen3-vl-30b`**.
+- `gemma-3-27b`: weaker (a JSON parse failure + an end-before-start time) → not chosen.
+- One Qwen date came back as a past date on a low-quality image — exactly what the low-confidence flag + user-confirm step is for.
 
-**Verdict:** _pending — paste harness summary here once run._
+**Provider decision (the bigger finding):**
 
----
-
-## Gate 2 — Data-handling / DPA (is it lawful for a YMYL family app?)
-
-**Question:** do Phala/RedPill's terms suit an app that may process **children's data** and financial data? The research found **no** substantiated retention/processor terms — they must be confirmed in writing.
-
-**Confirm with Phala/RedPill (email/support/contract):**
-
-1. **Zero data retention** — are prompts (including the image) and completions stored at rest at all? If so, where, for how long, and can it be contractually set to zero?
-2. **No training** — is customer content excluded from any model training / fine-tuning / evaluation use?
-3. **GDPR Article 28 processor terms / DPA** — will they sign a Data Processing Agreement naming beanies as controller and them as processor? Sub-processors list?
-4. **Data residency** — where do the GPUs physically sit? **Confirm not China** (EU/US for GDPR). This matters more than the model's country of origin (the model is open-weight and inert).
-5. **Children's data** — any contractual restriction on processing data that may relate to minors? (We send a single user-provided document, not a profile, but content may mention a child.)
-6. **Gateway plaintext handling** (from the Pass-4 trust-boundary finding) — TLS terminates at RedPill's gateway, which decrypts the request inside its own enclave. Confirm: is the gateway image reproducibly attestable, and does the contract **bar logging/retaining request plaintext** at the gateway? This is the real residual exposure, not the model GPU.
-7. **Attestation in practice** — confirm the `GET /v1/attestation/report` flow and per-response signature are available on the production endpoint we'd call, and what exactly they cover (model hash, code hash, TEE quote).
-8. **Logging** — what request metadata do they log (IP, timestamps, token counts)? Is the image content ever logged?
-9. **Incident / breach** notification terms and SLA.
-
-**Verdict:** _pending — record terms + a go/no-go here once confirmed._
+- **RedPill/Phala — REJECTED.** RedPill is an aggregator; calling `phala/qwen3-vl-30b-a3b-instruct` was served **~50/50 Phala/Tinfoil** over 10 calls, and **every documented pin** (`provider:{order:["phala"],allow_fallbacks:false}`, `route`, header) was **ignored**. Its docs ("Phala-exclusive", "prefix pins", "no fallback") are **false** under test. It also terminates TLS at its gateway (a plaintext touchpoint). No deterministic/named/attestable processor.
+- **Tinfoil-direct — CHOSEN.** Its own OpenAI-compatible API hosts `qwen3-vl-30b`, with the trust-boundary claims **verified live**:
+  - `tinfoil-enclave: qwen3-vl-30b.inf10.tinfoil.sh` on every response (named enclave) + `tinfoil-pt` AMD SEV-SNP + Intel TDX predicates.
+  - `GET /.well-known/tinfoil-attestation` → HTTP 200, real SEV-SNP attestation document.
+  - Docs: in-enclave TLS termination + EHBP (body encrypted to the attested enclave) + client-verified attestation → enables a genuine "no plaintext intermediary" path **and a blind forwarding proxy**.
 
 ---
 
-## If a gate fails → Gemini Flash-Lite fallback
+## Gate 2 — Data-handling / DPA (Tinfoil) — OPEN
 
-The provider abstraction (Phase 2) means the swap is a config change, not a rewrite:
+**Question:** do Tinfoil's terms suit a YMYL app that may process children's + financial data? Confirm in writing with Tinfoil:
+
+1. **Zero data retention** — are prompts (incl. the image) and completions stored at rest at all? Can it be contractually set to zero?
+2. **No training** — is customer content excluded from any training / fine-tuning / evaluation use?
+3. **GDPR Article 28 / DPA** — will they sign a DPA naming beanies as controller, Tinfoil as processor? Sub-processors list?
+4. **Data residency** — where do the GPUs physically sit (EU/US for GDPR)?
+5. **Children's data** — any contractual restriction on processing data that may relate to minors?
+6. **Enclave image bars logging** — the attestation measures the published enclave image; confirm that image / the contract **bars logging or retaining request plaintext** (the residual exposure even with in-enclave TLS).
+7. **Logging** — what request metadata is logged (IP, timestamps, token counts)? Is image content ever logged?
+8. **Incident / breach** notification terms + SLA.
+9. **Pricing** — exact `qwen3-vl-30b` $/M input + output (read from the dashboard / confirm; the gate run produces real token usage for a true $/doc).
+
+**Verdict:** _pending — record terms + go/no-go here once confirmed._
+
+---
+
+## Gate 3 — Verification-SDK integration — OPEN (implementation)
+
+Before any "no intermediary sees the document" claim, integrate Tinfoil's attestation-verification SDK + EHBP into our path and confirm the proxy forwards **only ciphertext** (it never decrypts the document). Until shipped + verified, scope claims to "attested confidential compute + zero retention" (ADR-030 binding principle).
+
+---
+
+## If the DPA gate fails → Gemini Flash-Lite (Vertex) fallback
+
+Provider abstraction makes the swap a config change, not a rewrite:
 
 - Same `documentExtractionService` funnel + same extraction prompt.
-- `managedProvider` points at Gemini Flash-Lite (OpenAI-compatible endpoint) instead of RedPill.
-- Re-run Gate 2's DPA questions against Google (Vertex AI offers CMEK + no-training + Art-28 DPA; consumer Gemini API does not — use Vertex for the managed tier if going this route).
-- Lose the hardware-TEE attestation (Gemini is trust-based ZDR, not TEE) — the consent copy + ADR must reflect the weaker (but still contractual) guarantee honestly.
+- `managedProvider` points at Gemini Flash-Lite via **Vertex** (CMEK + no-training + Art-28 DPA; the consumer Gemini API lacks these).
+- Lose the hardware-TEE attestation (Gemini is trust-based ZDR, not TEE) — consent copy + ADR must reflect the weaker (still contractual) guarantee honestly.
 
 ---
 
-## What's needed from greg to close Phase 1
+## What's left to close Phase 1
 
-1. A **RedPill API key** (funded account) — set as `REDPILL_API_KEY` when running the harness.
-2. **~8–12 test images** (synthetic or non-sensitive invitations/itineraries/receipts) + optionally a `ground-truth.json`.
-3. **Contacting Phala/RedPill** for the Gate-2 DPA answers (a contract/comms action I can't perform).
+1. **Gate 2 (DPA):** greg to contact Tinfoil for the questions above (a contract/comms action). + grab exact pricing from the dashboard.
+2. **Gate 3 (SDK):** implementation task, lands with Phase 2 of the plan.
 
-I can run the harness for you if you provide a key + images (note: it sends each image to RedPill and spends from the account's balance), or you can run it yourself with the command above.
+Gate 1 is done — quality + provider + trust boundary all settled empirically.

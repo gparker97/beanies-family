@@ -156,6 +156,37 @@ On the RedPill path the trust boundary includes **RedPill's gateway CVM AND our 
 
 ---
 
+## Pass 5 — Empirical provider validation (the gate run)
+
+Desk research (Passes 1–4) pointed at RedPill/Phala. **Hands-on testing then changed the answer.** A throwaway harness (`scripts/spikes/ai-extract-spike.mjs`) ran `qwen3-vl-30b` against 6 real WhatsApp invitation photos + 5 invitation PDFs (rendered page-1 to image via Ghostscript).
+
+### 5.1 Extraction quality — PASS, Qwen wins
+
+- **Qwen3-VL-30B: 6/6 images + 5/5 PDFs clean** — correct title/date/time/location, well-formed JSON every time, and correctly returned `isEvent:false` for non-events (a spelling list, a parent survey). Identical results on RedPill and Tinfoil.
+- **Gemma-3-27b: weaker** — a JSON parse failure (trailing junk) + an end-before-start time. Not chosen.
+
+### 5.2 RedPill routing is non-deterministic — the documented pin does not work
+
+RedPill is an aggregator (Phala/Tinfoil/NEAR/Chutes). Calling `phala/qwen3-vl-30b-a3b-instruct`:
+
+- A minimal probe returned `x-redpill-provider: tinfoil` — i.e. the `phala/`-namespaced request was served by **Tinfoil**.
+- Over **10 calls**, the serving provider split **~50/50 Phala/Tinfoil**.
+- Every documented pin was **ignored**: `provider:{order:["phala"],allow_fallbacks:false}`, `route:phala`, `order:[phala]`, and an `x-redpill-provider` header all still produced ~50/50 over a 10-call sample (a 3-call sample that looked deterministic was small-sample luck).
+- The docs' claims ("`qwen3-vl-30b` is Phala-exclusive", "the prefix pins", "no fallback") are **false** under test. → RedPill cannot give a deterministic, nameable, attestable processor. **Rejected.**
+
+### 5.3 Tinfoil-direct verified — chosen
+
+Tinfoil's own OpenAI-compatible API (`https://inference.tinfoil.sh/v1`) hosts `qwen3-vl-30b` (added 2026). Live probing confirmed its privacy claims (the opposite of RedPill):
+
+- **Per-response enclave identity:** `tinfoil-enclave: qwen3-vl-30b.inf10.tinfoil.sh`, plus `tinfoil-pt` predicates for **AMD SEV-SNP + Intel TDX**.
+- **Live attestation:** `GET /.well-known/tinfoil-attestation` → HTTP 200 returning a real SEV-SNP attestation document.
+- **Architecture (docs):** TLS terminates **inside** the enclave (bound to the attested key); **EHBP** encrypts the HTTP body so only the attested enclave decrypts it; the client SDK verifies attestation (AMD cert chain + code measurements + Sigstore) before sending. → Enables a genuine "no plaintext intermediary" path **and a blind forwarding proxy**.
+- Quality identical to RedPill's Qwen (6/6 + 5/5). **Chosen as managed primary.**
+
+**Caveat:** full client→enclave verification requires integrating Tinfoil's SDK (an implementation gate); the architecture is confirmed present but not yet wired into our path. Tinfoil's exact Qwen-VL $/M and its DPA/residency terms remain to confirm (Gate 2). PDF support is validated via render-page-1-to-image (Ghostscript locally; `pdfjs-dist` in the browser).
+
+---
+
 ## Cost economics (managed tier)
 
 | Engine                | Vision input            | ~$/doc (1–3 pp) | Notes                                  |

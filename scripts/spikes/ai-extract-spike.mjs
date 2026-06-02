@@ -27,7 +27,11 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { buildExtractionMessages, REQUIRED_KEYS, PROMPT_VERSION } from './extractionPrompt.mjs';
 
-const API_URL = 'https://api.redpill.ai/v1/chat/completions';
+// Provider-configurable: defaults to RedPill, override for Tinfoil etc.
+//   RedPill: LLM_API_BASE=https://api.redpill.ai/v1  LLM_MODELS=phala/qwen3-vl-30b-a3b-instruct,phala/gemma-3-27b-it
+//   Tinfoil: LLM_API_BASE=https://inference.tinfoil.sh/v1  LLM_MODELS=qwen3-vl-30b
+const API_BASE = (process.env.LLM_API_BASE || 'https://api.redpill.ai/v1').replace(/\/+$/, '');
+const API_URL = `${API_BASE}/chat/completions`;
 const DEFAULT_MODELS = ['phala/qwen3-vl-30b-a3b-instruct', 'phala/gemma-3-27b-it'];
 const MIME = {
   '.jpg': 'image/jpeg',
@@ -41,12 +45,12 @@ function fail(msg) {
   process.exit(1);
 }
 
-const apiKey = process.env.REDPILL_API_KEY;
+const apiKey = process.env.LLM_API_KEY || process.env.REDPILL_API_KEY;
 if (!apiKey) {
   fail(
-    'Missing REDPILL_API_KEY.\n' +
-      'Create/fund a RedPill account (https://red-pill.ai, $5 min balance), then:\n' +
-      '  REDPILL_API_KEY=sk-... node scripts/spikes/ai-extract-spike.mjs <images-dir> [ground-truth.json]'
+    'Missing LLM_API_KEY (or REDPILL_API_KEY).\n' +
+      '  LLM_API_KEY=sk-... node scripts/spikes/ai-extract-spike.mjs <images-dir> [ground-truth.json]\n' +
+      `  (API base: ${API_BASE} — override with LLM_API_BASE; models via LLM_MODELS)`
   );
 }
 
@@ -67,7 +71,7 @@ if (groundTruthPath) {
   }
 }
 
-const models = (process.env.REDPILL_MODELS || DEFAULT_MODELS.join(','))
+const models = (process.env.LLM_MODELS || process.env.REDPILL_MODELS || DEFAULT_MODELS.join(','))
   .split(',')
   .map((m) => m.trim())
   .filter(Boolean);
@@ -81,7 +85,7 @@ const encoded = images.map((file) => {
   return { file, dataUrl: `data:${MIME[extname(file).toLowerCase()]};base64,${b64}` };
 });
 
-console.log(`\n[ai-extract-spike] prompt=${PROMPT_VERSION} today=${todayIso}`);
+console.log(`\n[ai-extract-spike] api=${API_BASE} prompt=${PROMPT_VERSION} today=${todayIso}`);
 console.log(
   `[ai-extract-spike] ${images.length} image(s) from ${imagesDir} · models: ${models.join(', ')}`
 );
