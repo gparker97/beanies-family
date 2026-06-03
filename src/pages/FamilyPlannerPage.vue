@@ -32,6 +32,12 @@ import { formatDateFull, parseLocalDate, toDateInputValue } from '@/utils/date';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
 import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
+import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import { useDocumentToActivity } from '@/composables/useDocumentToActivity';
+import { useAiCapability } from '@/composables/useAiCapability';
+import { useFilePicker } from '@/composables/useFilePicker';
+import type { FieldConfidence } from '@/services/ai/types';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
@@ -128,6 +134,56 @@ function handleCreateAnother() {
 
 const defaultAssigneeId = ref<string | undefined>(undefined);
 
+// --- Add from a photo (#133) ---
+// Extraction prefill handed to ActivityModal for a new activity, plus consent-modal state.
+const activityPrefill = ref<Partial<CreateFamilyActivityInput> | undefined>(undefined);
+const activityPrefillConfidence = ref<FieldConfidence | undefined>(undefined);
+const consentOpen = ref(false);
+let consentResolver: ((granted: boolean) => void) | null = null;
+const { tier: aiTier } = useAiCapability();
+
+/** Promise-based consent gate the wedge awaits before any document leaves the device. */
+function requestPhotoConsent(): Promise<boolean> {
+  return new Promise((resolve) => {
+    consentResolver = resolve;
+    consentOpen.value = true;
+  });
+}
+function resolvePhotoConsent(granted: boolean): void {
+  consentOpen.value = false;
+  consentResolver?.(granted);
+  consentResolver = null;
+}
+
+/** Open a fresh new-activity form pre-filled from the extracted document. */
+function onPhotoActivityReady(
+  prefill: Partial<CreateFamilyActivityInput>,
+  confidence: FieldConfidence
+): void {
+  sidebarDate.value = null;
+  editingActivity.value = null;
+  editingOccurrenceDate.value = undefined;
+  selectedDate.value = undefined;
+  defaultStartTime.value = undefined;
+  defaultAssigneeId.value = undefined;
+  activityPrefill.value = prefill;
+  activityPrefillConfidence.value = confidence;
+  showModal.value = true; // last → ActivityModal.onNew reads the prefill set above
+}
+
+const { isProcessing: isReadingPhoto, processFile: processPhoto } = useDocumentToActivity({
+  requestConsent: requestPhotoConsent,
+  onActivityReady: onPhotoActivityReady,
+});
+
+const photoPicker = useFilePicker({
+  accept: 'image/jpeg,image/png,image/heic,image/heif',
+  capture: 'environment', // mobile opens the rear camera
+  onPick: (files) => {
+    if (files[0]) void processPhoto(files[0]);
+  },
+});
+
 // Vacation wizard state
 const showVacationWizard = ref(false);
 const vacationWizardDefaults = ref<{ assigneeIds: string[]; date: string }>({
@@ -194,6 +250,9 @@ watch(editingSegmentValue, (next, prev) => {
 });
 
 function openAddModal(date?: string, time?: string, memberId?: string) {
+  // A manual add is never a photo prefill — clear any leftover so it can't leak in.
+  activityPrefill.value = undefined;
+  activityPrefillConfidence.value = undefined;
   sidebarDate.value = null;
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
@@ -474,6 +533,7 @@ function handleActivitySwapped(newId: string) {
       @today="handleToday"
       @update:active-view="setView"
       @add="openAddModal()"
+      @add-from-photo="photoPicker.open()"
       @open-agenda="handleOpenAgenda"
       @select-all="onSelectAll"
       @select-member="onSelectMember"
@@ -593,17 +653,47 @@ function handleActivitySwapped(newId: string) {
       :default-date="selectedDate"
       :default-start-time="defaultStartTime"
       :default-assignee-ids="defaultAssigneeId ? [defaultAssigneeId] : undefined"
+      :prefill="activityPrefill"
+      :prefill-confidence="activityPrefillConfidence"
       :read-only="!canEditActivities"
       :occurrence-date="editingOccurrenceDate"
       @close="
         showModal = false;
         defaultStartTime = undefined;
         defaultAssigneeId = undefined;
+        activityPrefill = undefined;
+        activityPrefillConfidence = undefined;
       "
       @save="handleSave"
       @delete="handleDelete"
       @start-vacation-wizard="handleStartVacationWizard"
     />
+
+    <!-- Add from a photo (#133): consent gate, hidden picker input, and processing overlay -->
+    <DocumentExtractConsentModal
+      :open="consentOpen"
+      :tier="aiTier"
+      @confirm="resolvePhotoConsent(true)"
+      @cancel="resolvePhotoConsent(false)"
+    />
+    <input
+      :ref="(el) => (photoPicker.inputRef.value = el as HTMLInputElement)"
+      v-bind="photoPicker.bindings"
+      class="hidden"
+    />
+    <div
+      v-if="isReadingPhoto"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"
+    >
+      <div
+        class="flex flex-col items-center gap-3 rounded-3xl bg-white px-8 py-6 shadow-[var(--soft-shadow)] dark:bg-slate-800"
+      >
+        <BeanieSpinner size="lg" :halo="true" />
+        <p class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100">
+          {{ t('ai.processing') }}
+        </p>
+      </div>
+    </div>
 
     <!-- Vacation wizard -->
     <VacationWizard

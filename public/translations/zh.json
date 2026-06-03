@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-03",
-    "translationCount": 2979
+    "translationCount": 2992
   },
   "translations": {
     "app.name": {
@@ -14899,6 +14899,71 @@
     "ai.lowConfidence.hint": {
       "translation": "我们不确定这一点。值得快速检查。",
       "hash": "3225qy",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.addFromPhoto": {
+      "translation": "从照片添加",
+      "hash": "6x73vg",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.processing": {
+      "translation": "正在读取您的照片…",
+      "hash": "pivnjn",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.title": {
+      "translation": "从照片添加",
+      "hash": "6x73vg",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.intro": {
+      "translation": "要为您填写活动， Beanies只会阅读这张照片。",
+      "hash": "u3f2r0",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.whatLabel": {
+      "translation": "我们发送的内容",
+      "hash": "7drnfi",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.whatValue": {
+      "translation": "只有这张照片。切勿使用您家人的其他数据。",
+      "hash": "acgmu3",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.whereLabel": {
+      "translation": "去向",
+      "hash": "nk04xa",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.whereManaged": {
+      "translation": "一种安全的人工智能服务，可以私下阅读并保留任何内容。",
+      "hash": "3k4iyq",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.whereByok": {
+      "translation": "您自己的AI提供商，使用您的密钥。",
+      "hash": "5jog2e",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.afterLabel": {
+      "translation": "adv.事后 ,之后",
+      "hash": "c72vgl",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.afterValue": {
+      "translation": "没有存储任何内容。照片不会保存在任何地方。",
+      "hash": "e46i0m",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.confirm": {
+      "translation": "阅读此照片",
+      "hash": "8sq7mu",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.footnote": {
+      "translation": "每次都由您选择。我们绝不会不经询问就发送任何东西。",
+      "hash": "trpl7t",
       "lastUpdated": "2026-06-03"
     }
   }
