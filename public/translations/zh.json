@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-03",
-    "translationCount": 2978
+    "translationCount": 2979
   },
   "translations": {
     "app.name": {
@@ -14894,6 +14894,11 @@
     "ai.error.generic": {
       "translation": "读取该照片时出错。请重试。",
       "hash": "4deuz5",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.lowConfidence.hint": {
+      "translation": "我们不确定这一点。值得快速检查。",
+      "hash": "3225qy",
       "lastUpdated": "2026-06-03"
     }
   }

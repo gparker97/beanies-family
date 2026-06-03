@@ -6446,6 +6446,10 @@ const STRING_DEFS = {
     en: 'Something went wrong reading that photo. Please try again.',
     beanie: 'something went wrong reading that photo. please try again.',
   },
+  'ai.lowConfidence.hint': {
+    en: "We weren't sure about this one. Worth a quick check.",
+    beanie: "we weren't sure about this one. worth a quick check.",
+  },
   'photos.dropToAdd': { en: 'Drop photo to add', beanie: 'drop photo to add' },
   'photos.missing.tile': { en: 'Photo missing', beanie: 'photo missing' },
   'photos.missing.title': { en: "We Can't Find This Photo", beanie: "we can't find this photo" },
