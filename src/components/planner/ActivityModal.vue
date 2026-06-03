@@ -39,6 +39,7 @@ import type {
   CreateFamilyActivityInput,
   UpdateFamilyActivityInput,
 } from '@/types/models';
+import type { FieldConfidence } from '@/services/ai/types';
 
 const props = defineProps<{
   open: boolean;
@@ -46,6 +47,13 @@ const props = defineProps<{
   defaultDate?: string;
   defaultStartTime?: string;
   defaultAssigneeIds?: string[];
+  /**
+   * Full field prefill for a NEW activity (e.g. extracted from a photo/invitation — #133).
+   * Applied inside `onNew` after the base defaults; purely additive and non-breaking.
+   */
+  prefill?: Partial<CreateFamilyActivityInput>;
+  /** Per-field confidence accompanying `prefill`; low-confidence fields are flagged for review. */
+  prefillConfidence?: FieldConfidence;
   readOnly?: boolean;
   occurrenceDate?: string;
 }>();
@@ -101,6 +109,36 @@ const isActive = ref(true);
 const color = ref('');
 const showMoreDetails = ref(false);
 const showErrors = ref(false);
+
+// --- Document-extraction prefill (#133) ---
+// Below this per-field confidence we visually flag the field for the user to double-check.
+const LOW_CONFIDENCE_THRESHOLD = 0.5;
+// True only when the current NEW form was opened with an extraction prefill — gates the
+// low-confidence hints so a normal manual "add" never shows them.
+const wasPrefilled = ref(false);
+
+/** Apply an optional extraction prefill over the just-set onNew defaults (additive). */
+function applyPrefill(): void {
+  wasPrefilled.value = false;
+  const p = props.prefill;
+  if (!p) return;
+  wasPrefilled.value = true;
+  if (p.title !== undefined) title.value = p.title;
+  if (p.date) date.value = p.date;
+  if (p.location !== undefined) location.value = p.location;
+  if (p.description !== undefined) description.value = p.description;
+  if (p.isAllDay !== undefined) isAllDay.value = p.isAllDay;
+  if (p.startTime) startTime.value = p.startTime;
+  if (p.endTime) endTime.value = p.endTime;
+}
+
+const titleLowConfidence = computed(
+  () =>
+    wasPrefilled.value &&
+    !!props.prefillConfidence &&
+    props.prefillConfidence.title < LOW_CONFIDENCE_THRESHOLD &&
+    !!title.value.trim()
+);
 
 // Auto-labelled frequency chips shown inside the Schedule section when
 // `recurrence !== 'none'`. The 'none' / one-off option is handled by the
@@ -191,6 +229,7 @@ const { isEditing, isSubmitting } = useFormModal(
       color.value = activity.color ?? getActivityCategoryColor(activity.category);
       showMoreDetails.value = hasDetailData(activity);
       showErrors.value = false;
+      wasPrefilled.value = false; // editing an existing activity is never a prefill
     },
     onNew: () => {
       icon.value = '';
@@ -224,6 +263,8 @@ const { isEditing, isSubmitting } = useFormModal(
       color.value = '';
       showMoreDetails.value = false;
       showErrors.value = false;
+      // Apply an extraction prefill, if any, over the defaults just set above.
+      applyPrefill();
     },
   }
 );
@@ -679,6 +720,10 @@ function handleSave() {
             :placeholder="t('modal.whatsTheActivity')"
           />
         </div>
+        <!-- Heritage Orange (never Alert Red) review hint for a low-confidence extracted value -->
+        <p v-if="titleLowConfidence" class="font-outfit text-primary-500 mt-1.5 text-xs">
+          {{ t('ai.lowConfidence.hint') }}
+        </p>
       </FormFieldGroup>
 
       <!-- 3. Schedule: frequency chips + (weekly only) day-of-week selector.
