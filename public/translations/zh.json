@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-03",
-    "translationCount": 2992
+    "translationCount": 2997
   },
   "translations": {
     "app.name": {
@@ -14912,13 +14912,13 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.title": {
-      "translation": "从照片添加",
-      "hash": "6x73vg",
+      "translation": "欢迎来到beanies AI ！",
+      "hash": "3zxtyx",
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.intro": {
-      "translation": "要为您填写活动， Beanies只会阅读这张照片。",
-      "hash": "u3f2r0",
+      "translation": "豆豆会阅读这张照片或文档，神奇地提取关键细节（嗯，这实际上不是魔法，只是人工智能）。",
+      "hash": "s73d9m",
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.whatLabel": {
@@ -14927,8 +14927,8 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.whatValue": {
-      "translation": "只有这张照片。切勿使用您家人的其他数据。",
-      "hash": "acgmu3",
+      "translation": "只有这张照片或文件，没有其他任何东西，也没有任何家庭数据。",
+      "hash": "wi603u",
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.whereLabel": {
@@ -14937,13 +14937,13 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.whereManaged": {
-      "translation": "一种安全的人工智能服务，可以私下阅读并保留任何内容。",
-      "hash": "3k4iyq",
+      "translation": "beanies使用私密、安全和安全的人工智能服务来处理文档，而不保留任何内容。在往返服务期间，您的文件已完全加密。",
+      "hash": "hsp7ey",
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.whereByok": {
-      "translation": "您自己的AI提供商，使用您的密钥。",
-      "hash": "5jog2e",
+      "translation": "使用您提供的密钥，提供给您自己的人工智能提供商。",
+      "hash": "1s4sdl",
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.afterLabel": {
@@ -14952,18 +14952,43 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.afterValue": {
-      "translation": "没有存储任何内容。照片不会保存在任何地方。",
-      "hash": "e46i0m",
+      "translation": "AI服务不保留任何内容。您的照片或文件只会与您家人的数据一起保存，并附加到此活动中。",
+      "hash": "j5kpdz",
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.confirm": {
-      "translation": "阅读此照片",
-      "hash": "8sq7mu",
+      "translation": "我明白了-使用beanies AI ！",
+      "hash": "ds8eo9",
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.footnote": {
-      "translation": "每次都由您选择。我们绝不会不经询问就发送任何东西。",
-      "hash": "trpl7t",
+      "translation": "我们绝不会在没有询问的情况下发送任何内容-每次都由您选择。您可以通过勾选下面的方框来停止提示家人。",
+      "hash": "bulh7e",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.remember": {
+      "translation": "我同意让beanies.family私下安全地处理我选择的文件。",
+      "hash": "rz7xzp",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.consent.privacyLink": {
+      "translation": "我们保护您的隐私",
+      "hash": "s4glf2",
+      "lastUpdated": "2026-06-03"
+    },
+    "settings.ai.title": {
+      "translation": "人工智能与隐私",
+      "hash": "i42mpi",
+      "lastUpdated": "2026-06-03"
+    },
+    "settings.ai.askBeforePhotos": {
+      "translation": "阅读照片前询问",
+      "hash": "2bkeup",
+      "lastUpdated": "2026-06-03"
+    },
+    "settings.ai.askBeforePhotosHint": {
+      "translation": "在将照片或文档发送给beanies AI之前，请先显示隐私检查。",
+      "hash": "oq9unm",
       "lastUpdated": "2026-06-03"
     }
   }

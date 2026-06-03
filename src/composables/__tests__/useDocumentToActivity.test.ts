@@ -85,11 +85,25 @@ describe('useDocumentToActivity', () => {
 
     await processFile(file());
 
-    expect(onActivityReady).toHaveBeenCalledWith(
-      { title: 'Birthday', date: '2026-07-12', startTime: '14:00', location: 'Hall' },
-      SAMPLE.confidence
-    );
+    expect(onActivityReady).toHaveBeenCalledWith({
+      prefill: { title: 'Birthday', date: '2026-07-12', startTime: '14:00', location: 'Hall' },
+      confidence: SAMPLE.confidence,
+      sourcePhoto: undefined, // no compressed blob on this result
+    });
     expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('success with a compressed blob: hands back the source photo as a File to attach', async () => {
+    const blob = new Blob(['imgbytes'], { type: 'image/jpeg' });
+    mockExtract.mockResolvedValue({ success: true, data: SAMPLE, compressedBlob: blob });
+    const { processFile, onActivityReady } = setup(true);
+
+    await processFile(file());
+
+    const arg = onActivityReady.mock.calls[0][0] as { sourcePhoto?: File };
+    expect(arg.sourcePhoto).toBeInstanceOf(File);
+    expect(arg.sourcePhoto?.type).toBe('image/jpeg');
+    expect(arg.sourcePhoto?.name).toMatch(/\.jpg$/);
   });
 
   it('passes the selected tier + byok config to the service', async () => {

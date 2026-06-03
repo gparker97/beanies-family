@@ -6,12 +6,25 @@
  * itemised "what / where / after" list is why this is a dedicated modal rather than a
  * useConfirm() call: useConfirm's `detail` is a single untranslated string and can't carry
  * the per-tier translated list. Info-styled and reassuring (no Alert Red — privacy is a
- * calm, deliberate choice, not an alarm). Confirm = @save, cancel/dismiss = @cancel.
+ * calm, deliberate choice, not an alarm).
+ *
+ * Confirm = @save (emits the optional "remember" choice), cancel/dismiss = @cancel. The
+ * `remember` checkbox is OPTIONAL — confirming proceeds either way; ticking it asks the
+ * parent to persist the family-scoped consent-skip so future extractions don't prompt.
  */
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { openExternal } from '@/utils/openExternal';
 import type { AiTier } from '@/services/ai/types';
+
+// The privacy article lives on the marketing site, which deploys via a SEPARATE manual
+// pipeline (deploy-web.yml / workflow_dispatch) — an app deploy does not publish it. Until
+// it is confirmed live, the checkbox renders label-only (no live link to a 404). Flip to
+// true in the same change that runs deploy-web.
+const PRIVACY_ARTICLE_LIVE = false;
+const PRIVACY_ARTICLE_URL =
+  'https://beanies.family/help/security/how-beanies-ai-handles-your-photos';
 
 const props = defineProps<{
   open: boolean;
@@ -20,11 +33,21 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  confirm: [];
+  confirm: [remember: boolean];
   cancel: [];
 }>();
 
 const { t } = useTranslation();
+
+// The modal's only internal state. Reset on each open-prop edge so a stale tick never
+// carries across reopen.
+const remember = ref(false);
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen) remember.value = false;
+  }
+);
 
 const items = computed(() => [
   { icon: '📄', label: t('ai.consent.whatLabel'), value: t('ai.consent.whatValue') },
@@ -35,6 +58,10 @@ const items = computed(() => [
   },
   { icon: '🗑️', label: t('ai.consent.afterLabel'), value: t('ai.consent.afterValue') },
 ]);
+
+function onConfirm(): void {
+  emit('confirm', remember.value);
+}
 </script>
 
 <template>
@@ -47,7 +74,7 @@ const items = computed(() => [
     icon-bg="var(--tint-orange-8)"
     :save-label="t('ai.consent.confirm')"
     @close="emit('cancel')"
-    @save="emit('confirm')"
+    @save="onConfirm"
   >
     <p class="font-inter text-sm text-[var(--color-text)] dark:text-gray-200">
       {{ t('ai.consent.intro') }}
@@ -72,5 +99,42 @@ const items = computed(() => [
     <p class="font-inter text-xs text-[var(--color-text-muted)]">
       {{ t('ai.consent.footnote') }}
     </p>
+
+    <label class="flex cursor-pointer items-start gap-3">
+      <input v-model="remember" type="checkbox" class="sr-only" />
+      <span
+        class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors"
+        :class="
+          remember
+            ? 'border-[#F15D22] bg-[#F15D22]'
+            : 'border-[var(--color-border)] bg-white dark:bg-slate-700'
+        "
+      >
+        <svg
+          v-if="remember"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          class="h-3.5 w-3.5 text-white"
+          aria-hidden="true"
+        >
+          <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+          />
+        </svg>
+      </span>
+      <span class="font-inter text-sm text-[var(--color-text)] dark:text-gray-200">
+        {{ t('ai.consent.remember') }}
+        <button
+          v-if="PRIVACY_ARTICLE_LIVE"
+          type="button"
+          class="ml-1 underline underline-offset-2 hover:text-[#F15D22]"
+          @click.stop.prevent="openExternal(PRIVACY_ARTICLE_URL)"
+        >
+          {{ t('ai.consent.privacyLink') }}
+        </button>
+      </span>
+    </label>
   </BeanieFormModal>
 </template>

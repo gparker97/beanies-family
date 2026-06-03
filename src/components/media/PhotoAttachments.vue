@@ -123,6 +123,9 @@ const isTouchPrimary = useIsTouchPrimary();
  */
 defineExpose({
   openPicker: () => galleryPicker.open(),
+  /** Programmatically attach already-obtained files (e.g. the #133 AI source photo) through
+   *  the same `add` path as a manual pick — inherits compression/upload/queue/error/toasts. */
+  addFiles: (files: File[]) => add(files),
 });
 </script>
 
