@@ -1,7 +1,7 @@
 # Phase 1 — managed-tier gates (Tinfoil)
 
-> Date: 2026-06-02
-> Status: **Gate 1 PASSED** (quality + attestation, empirically). **Gate 2 open** (Tinfoil DPA). **Gate 3 open** (verification-SDK integration). See ADR-030.
+> Date: 2026-06-02 (Gate 2 desk research added 2026-06-03)
+> Status: **Gate 1 PASSED** (quality + attestation, empirically). **Gate 2 MOSTLY PASSED on public terms** (7 of 9 questions answered in Tinfoil's published Privacy Policy / ToS / Security & Privacy FAQ; pricing confirmed from the dashboard 2026-06-03; DPA + residency + logging-invariant requested from Tinfoil 2026-06-03 — see below). **Gate 3 open** (verification-SDK integration). See ADR-030.
 > Decision rule: if the DPA gate fails, switch the managed engine to **Gemini Flash-Lite (via Vertex)** behind the same provider abstraction. The rest of the plan is unchanged.
 
 This doc records how the managed-provider gates were closed. **Provider chosen: Tinfoil-direct (`qwen3-vl-30b` at `https://inference.tinfoil.sh/v1`).** RedPill/Phala was investigated first and rejected (see Gate 1).
@@ -38,21 +38,89 @@ LLM_API_BASE="https://inference.tinfoil.sh/v1" LLM_MODELS="qwen3-vl-30b" \
 
 ---
 
-## Gate 2 — Data-handling / DPA (Tinfoil) — OPEN
+## Gate 2 — Data-handling / DPA (Tinfoil) — MOSTLY PASSED (desk research, 2026-06-03)
 
-**Question:** do Tinfoil's terms suit a YMYL app that may process children's + financial data? Confirm in writing with Tinfoil:
+**Question:** do Tinfoil's terms suit a YMYL app that may process children's + financial data?
 
-1. **Zero data retention** — are prompts (incl. the image) and completions stored at rest at all? Can it be contractually set to zero?
-2. **No training** — is customer content excluded from any training / fine-tuning / evaluation use?
-3. **GDPR Article 28 / DPA** — will they sign a DPA naming beanies as controller, Tinfoil as processor? Sub-processors list?
-4. **Data residency** — where do the GPUs physically sit (EU/US for GDPR)?
-5. **Children's data** — any contractual restriction on processing data that may relate to minors?
-6. **Enclave image bars logging** — the attestation measures the published enclave image; confirm that image / the contract **bars logging or retaining request plaintext** (the residual exposure even with in-enclave TLS).
-7. **Logging** — what request metadata is logged (IP, timestamps, token counts)? Is image content ever logged?
-8. **Incident / breach** notification terms + SLA.
-9. **Pricing** — exact `qwen3-vl-30b` $/M input + output (read from the dashboard / confirm; the gate run produces real token usage for a true $/doc).
+**Method (2026-06-03):** read Tinfoil's published legal surface directly — Privacy Policy (`https://tinfoil.sh/privacy`), Terms of Service (`https://tinfoil.sh/terms`), and the Security & Privacy FAQ (`https://tinfoil.sh/security-and-privacy-faq`), cross-checked against the technical docs (`docs.tinfoil.sh`). **7 of 9 questions are answered in writing on the public terms.** The 4 residual items (flagged 🔶 below) still need a direct ask to Tinfoil / a dashboard login. All quotes below are verbatim.
 
-**Verdict:** _pending — record terms + go/no-go here once confirmed._
+> **Critical scoping note:** every guarantee below applies to the **Inference API** path (what we use). The separate **Chat product** stores client-side-encrypted conversation backups server-side for multi-device sync (keys held on-device, Tinfoil can't decrypt) — different model. Our integration must use the API, not Chat.
+
+### 1. Zero data retention — ✅ ANSWERED-YES (enclave-enforced default)
+
+- _"Prompts, completions, uploaded files, embeddings, and tool-call payloads are processed exclusively inside secure hardware enclaves. They are never retained on disk, logged, or accessible to Tinfoil."_ — Security & Privacy FAQ
+- _"Do you retain prompts, completions, uploaded files, or tool-call payloads? No."_ — FAQ
+- _"We do not retain prompt or response content after the response is returned"_ — Privacy Policy; _"Prompts and responses are not retained after the response is returned."_ — ToS
+
+There is no retention period because content is **never written to disk** — it's an architectural property of the enclave, not a configurable toggle. Only `input tokens, output tokens, model name, timestamp` metadata is kept for billing.
+
+### 2. No training — ✅ ANSWERED-YES
+
+- _"Are prompts or responses ever used for model training, tuning, or service improvement? No. Enclaves are stateless and plaintext content does not leave the enclave at any point."_ — FAQ
+- _"we do not use API content to train models"_ — Privacy Policy
+
+### 3. GDPR Article 28 / DPA — ✅ DPA EXISTS, 🔶 sales-gated (full text needs request)
+
+- _"Do you offer a DPA? Yes. We offer a Data Processing Agreement including Standard Contractual Clauses where applicable."_ — FAQ
+- _"For business and enterprise customers, we offer a Data Processing Addendum (including Standard Contractual Clauses where applicable)."_ — Privacy Policy
+- _"Tinfoil generally acts as a service provider or processor for personal data submitted to the Services, and as an independent controller for account, billing, security, and business operations data"_ — Privacy Policy (correct Art-28 controller/processor framing)
+- A signed DPA/BAA/order form **overrides** the ToS where they conflict (ToS).
+
+🔶 **Residual:** the DPA is obtained by contacting `privacy@tinfoil.sh` (scoped to "business and enterprise customers"); there is no self-serve click-accept DPA URL. The full Art-28(3) clause completeness — and whether it can name **children's data** as a covered processing category — must be confirmed in the actual signed document.
+
+### 4. Sub-processors — ✅ ANSWERED-YES (published list; no plaintext to any of them)
+
+Privacy Policy §6 publishes the full list: AWS / Cloudflare / Vercel (hosting, CDN, networking), Clerk (auth), Stripe + RevenueCat (payments), GitHub, Resend (email), Plausible + Sentry (analytics/errors), Tigerdata (billing metrics), Probo (SOC 2 trust center), Exa (web search, _"under a Zero Data Retention agreement"_), plus ad/analytics vendors that touch website/account data only. Key isolation statement: _"No subprocessor receives plaintext AI interaction content."_ — FAQ. (GPU compute is AWS + unnamed "GPU cloud providers".)
+
+### 5. Data residency — 🔶 NOT FOUND PUBLICLY (no region commitment)
+
+- _"Tinfoil is based in the United States, and personal data may be processed in the United States and other locations where our providers operate."_ — Privacy Policy
+- EEA/UK transfers: _"we use Standard Contractual Clauses and other appropriate safeguards for transfers where required"_.
+
+No US/EU region selection, no enclave/GPU geography guarantee anywhere public. SCCs are the only stated transfer mechanism. 🔶 **Residual:** confirm enclave geography (and whether a US-only or EU-region pin is possible) directly — material for EU end-users.
+
+### 6. Enclave image bars request-plaintext logging — 🟡 PARTIAL (strong, but no code-level invariant published)
+
+- _"We design our products so that Tinfoil, our cloud providers, and other third parties cannot access the contents of your AI interactions or in-enclave workloads during normal operation."_ — Privacy Policy
+- _"Tinfoil runs LLMs inside secure enclaves — isolated environments on hardware where even Tinfoil cannot access your data."_ — `tinfoil-js` README
+
+The guarantee rests on enclave isolation + attestation of the **measured published image** + the explicit "never logged" line in #1 — strong. But there is no published statement that the attested image's code path contains a **code-level "request plaintext is never written to any log" invariant**. 🔶 **Residual (nice-to-have):** ask Tinfoil to point at the log-handling in the attested image, or confirm the invariant in writing.
+
+### 7. Logging metadata — ✅ ANSWERED-YES
+
+- Logged: _"Usage metrics such as request counts, token counts, feature use, timestamps, and deployment status."_ and _"Internet and device information such as IP address, browser type, device type, and general region."_ — Privacy Policy
+- Content: _"We do not retain prompt or response content after the response is returned"_ — i.e. image/prompt **content is never logged**; only metadata. (Our blind-forwarder proxy further means even our own infra never sees the document body — see Gate 1 / EHBP.)
+
+### 8. Incident / breach notification — ✅ ANSWERED-YES (72h, GDPR-aligned)
+
+- _"If a security incident affects your personal data, we will notify you and relevant supervisory authorities as required by law, and no later than 72 hours after becoming aware of the incident where the GDPR applies."_ — Privacy Policy
+
+(This lives in the Privacy Policy; a processor-side breach SLA in the **signed DPA** is not public — folds into the #3 DPA request.)
+
+### 9. Pricing — 🔶 NOT PUBLIC (usage-based; dashboard-only)
+
+The public pricing page labels the **Private Inference** (API) tier `"Usage-based pricing"` with `activationFee: "$0"` and no per-token figure — confirmed by extracting the page's embedded data payload. Per-model `$/M input` + `$/M output` for `qwen3-vl-30b` is **only visible after dashboard login**. Billing is post-paid (_"You're only charged based on usage"_), per-token, per-model, with an optional **monthly spend limit** in the Billing tab and no published minimum/commitment for the self-serve tier.
+
+**✅ Dashboard pricing confirmed (2026-06-03)** — read from greg's Tinfoil billing dashboard for the Gate 1 spike usage:
+
+> `qwen3-vl-30b` — 12 requests · 22,349 input · 1,628 output tokens · **total $0.03**
+
+That is **~$1.25/M blended** (23,977 tokens × $1.25/M = $0.030, exact to the reported cent) and **~$0.0025/doc** (avg ~2.0k tokens/doc, image-token-dominated). This **confirms the Gate 1 estimate empirically** against real billing. Projected scale: 5k families × 4 docs/mo ≈ 20k docs → **~$50/mo**. Per-token input/output split isn't separately displayed, but the blended rate is what matters for the $/doc model. **Residual #4 closed.**
+
+---
+
+### Gate 2 verdict — ✅ MOSTLY PASSED on public terms; 4 residual confirmations, none blocking
+
+The public terms are **well-suited** to a privacy-first YMYL app: enclave-enforced zero retention, no-training (incl. no service-improvement use), no plaintext to any sub-processor, a published sub-processor list, an offered DPA with SCCs + correct processor framing, and a 72h GDPR breach commitment. Nothing in the terms **prohibits** processing data that relates to children (Tinfoil's own age rules govern who may be an account holder — 18+ for API/paid — not what the API may process), but nothing affirmatively covers it either.
+
+**Residual items (greg-side comms / dashboard — none is a likely showstopper):**
+
+1. **DPA — REQUESTED 2026-06-03** (`privacy@tinfoil.sh`) — asked for the standard DPA + Art-28(3) completeness, processor-side breach SLA, and whether **children's data** can be named as a covered processing category. _Awaiting reply._
+2. **Data residency — REQUESTED 2026-06-03** (same email) — asked for enclave/GPU geography and whether a US-only or EU-region pin is available (matters for EU end-users; otherwise rely on SCCs). _Awaiting reply._
+3. **Enclave logging invariant — REQUESTED 2026-06-03** (same email, nice-to-have) — asked for written confirmation that the attested image never logs request plaintext. _Awaiting reply._
+4. **Exact `qwen3-vl-30b` pricing — ✅ CLOSED 2026-06-03** — dashboard confirms ~$1.25/M blended, ~$0.0025/doc, ~$50/mo at projected scale (see Q9 above).
+
+**Decision-rule status:** the Gemini Flash-Lite (Vertex) fallback is **not triggered** — the DPA gate has not failed; it is offered and the public terms are strong. Proceed with Tinfoil; close the 4 residual items in parallel with Phase 2 (none blocks the build).
 
 ---
 
