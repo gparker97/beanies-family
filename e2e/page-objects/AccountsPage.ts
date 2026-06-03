@@ -1,16 +1,15 @@
 import { Page, expect } from '@playwright/test';
 import { ComboboxHelper } from '../helpers/combobox';
 import { ui } from '../helpers/ui-strings';
+import { gotoRoute } from '../helpers/navigation';
 
 export class AccountsPage {
   constructor(private page: Page) {}
 
   async goto() {
-    // `waitUntil: 'commit'` rather than `'domcontentloaded'` — webkit-CI
-    // is contention-prone; the SPA router's redirect on first paint races
-    // against `domcontentloaded` and produces "Navigation interrupted by
-    // another navigation to /nook". See `gotoRoot` in helpers/navigation.ts.
-    await this.page.goto('/accounts', { waitUntil: 'commit' });
+    // gotoRoute hardens against the webkit-CI navigation-interrupt race
+    // (commit + retry-on-interrupt). See helpers/navigation.ts.
+    await gotoRoute(this.page, '/accounts');
   }
 
   getInstitutionCombobox() {

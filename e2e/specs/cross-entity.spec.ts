@@ -3,7 +3,7 @@ import { AccountsPage } from '../page-objects/AccountsPage';
 import { AssetsPage } from '../page-objects/AssetsPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
-import { gotoRoot } from '../helpers/navigation';
+import { gotoRoot, gotoRoute } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
 import { dismissActivityCreatedConfirm } from '../helpers/activity-modal';
 import { selectBeanieDate } from '../helpers/date-picker';
@@ -156,8 +156,7 @@ test.describe('Onboarding Wizard', () => {
     });
 
     // Restart onboarding via Settings → Family Data modal.
-    // `waitUntil: 'commit'` survives the webkit-CI first-paint redirect race.
-    await page.goto('/settings', { waitUntil: 'commit' });
+    await gotoRoute(page, '/settings');
     await page.getByText(ui('settings.card.familyData')).first().click();
     await page.getByTestId('restart-onboarding').waitFor({ state: 'visible', timeout: 5000 });
     await page.getByTestId('restart-onboarding').click();
@@ -288,8 +287,7 @@ test.describe('Loan & Activity Linking', () => {
     amount: number,
     accountName: string
   ) {
-    // `waitUntil: 'commit'` survives the webkit-CI first-paint redirect race.
-    await page.goto('/activities', { waitUntil: 'commit' });
+    await gotoRoute(page, '/activities');
     await page.waitForURL('/activities');
 
     // Open add activity modal
@@ -425,8 +423,7 @@ test.describe('Loan & Activity Linking', () => {
     await createCheckingAccount(page, 'Integrity Checking');
 
     // Navigate to planner and create a one-off activity WITHOUT cost first
-    // `waitUntil: 'commit'` survives the webkit-CI first-paint redirect race.
-    await page.goto('/activities', { waitUntil: 'commit' });
+    await gotoRoute(page, '/activities');
     await page.waitForURL('/activities');
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();

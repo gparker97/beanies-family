@@ -1,12 +1,13 @@
 import { Page } from '@playwright/test';
+import { gotoRoute } from '../helpers/navigation';
 
 export class DashboardPage {
   constructor(private page: Page) {}
 
   async goto() {
-    // See `gotoRoot` — `waitUntil: 'commit'` survives the webkit-CI race
-    // where `domcontentloaded` loses to the SPA's first-paint redirect.
-    await this.page.goto('/dashboard', { waitUntil: 'commit' });
+    // gotoRoute hardens against the webkit-CI navigation-interrupt race
+    // (commit + retry-on-interrupt). See helpers/navigation.ts.
+    await gotoRoute(this.page, '/dashboard');
   }
 
   /** Click the privacy mode unlock button to reveal masked financial figures */
