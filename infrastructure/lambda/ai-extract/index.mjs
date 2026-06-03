@@ -101,9 +101,12 @@ export async function handler(event) {
   if (typeof imageDataUrl !== 'string' || !ALLOWED_DATA_URL.test(imageDataUrl)) {
     return response(400, { error: 'Expected a single JPEG/PNG image data URL' }, event);
   }
-  if (typeof todayIso !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(todayIso)) {
+  // Accept a date-only string (YYYY-MM-DD) or a full ISO timestamp; normalize to the
+  // date part for the prompt so either client format works.
+  if (typeof todayIso !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(todayIso)) {
     return response(400, { error: 'Invalid todayIso' }, event);
   }
+  const todayDate = todayIso.slice(0, 10);
 
   try {
     let upstream;
@@ -116,7 +119,7 @@ export async function handler(event) {
         },
         body: JSON.stringify({
           model: TINFOIL_MODEL,
-          messages: buildExtractionMessages(imageDataUrl, todayIso),
+          messages: buildExtractionMessages(imageDataUrl, todayDate),
           temperature: 0,
         }),
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
