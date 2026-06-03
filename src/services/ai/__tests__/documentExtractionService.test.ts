@@ -66,7 +66,11 @@ describe('extractEventFromDocument — tier dispatch', () => {
 
     const res = await extractEventFromDocument(file(), { tier: 'managed', todayIso: '2026-06-03' });
 
-    expect(res).toEqual({ success: true, data: SAMPLE });
+    expect(res.success).toBe(true);
+    expect(res.data).toEqual(SAMPLE);
+    // #133: success also hands back the compressed image so the caller can attach it.
+    expect(res.compressedBlob).toBeInstanceOf(Blob);
+    expect(res.compressedBlob?.type).toBe('image/jpeg');
     expect(mockManagedExtract).toHaveBeenCalledTimes(1);
   });
 

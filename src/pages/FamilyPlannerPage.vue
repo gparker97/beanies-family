@@ -16,7 +16,9 @@ import DayAgendaSidebar from '@/components/planner/DayAgendaSidebar.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import HolidayDetailsModal from '@/components/planner/HolidayDetailsModal.vue';
 import { useActivityStore } from '@/stores/activityStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useVacationStore } from '@/stores/vacationStore';
+import { reportError } from '@/utils/errorReporter';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePermissions } from '@/composables/usePermissions';
@@ -52,6 +54,7 @@ const route = useRoute();
 const router = useRouter();
 const { canEditActivities } = usePermissions();
 const activityStore = useActivityStore();
+const settingsStore = useSettingsStore();
 const accountsStore = useAccountsStore();
 const recurringStore = useRecurringStore();
 const transactionsStore = useTransactionsStore();
@@ -138,12 +141,19 @@ const defaultAssigneeId = ref<string | undefined>(undefined);
 // Extraction prefill handed to ActivityModal for a new activity, plus consent-modal state.
 const activityPrefill = ref<Partial<CreateFamilyActivityInput> | undefined>(undefined);
 const activityPrefillConfidence = ref<FieldConfidence | undefined>(undefined);
+// The compressed source document, attached to the activity ActivityModal creates (#133).
+const activitySourcePhoto = ref<File | undefined>(undefined);
 const consentOpen = ref(false);
 let consentResolver: ((granted: boolean) => void) | null = null;
 const { tier: aiTier } = useAiCapability();
 
-/** Promise-based consent gate the wedge awaits before any document leaves the device. */
+/**
+ * Promise-based consent gate the wedge awaits before any document leaves the device.
+ * If the family has opted into "don't ask again" we resolve immediately WITHOUT touching
+ * the modal lifecycle (no `consentResolver` assignment → none can be left dangling).
+ */
 function requestPhotoConsent(): Promise<boolean> {
+  if (settingsStore.skipDocumentConsentPrompt) return Promise.resolve(true);
   return new Promise((resolve) => {
     consentResolver = resolve;
     consentOpen.value = true;
@@ -155,19 +165,45 @@ function resolvePhotoConsent(granted: boolean): void {
   consentResolver = null;
 }
 
+/** Persist the family-scoped consent-skip. Isolated + awaited so failures are caught (not silent). */
+async function persistConsentSkip(): Promise<void> {
+  await settingsStore.setSkipDocumentConsentPrompt(true);
+}
+
+/**
+ * Confirm handler for the consent modal. Proceeds for this document regardless; if the user
+ * ticked "remember", persist the skip — but a persist failure must never strand the wedge,
+ * so we resolve consent in `finally`.
+ */
+async function onConsentConfirm(remember: boolean): Promise<void> {
+  try {
+    if (remember) await persistConsentSkip();
+  } catch (e) {
+    reportError({
+      surface: 'ai-consent',
+      message: 'Failed to save the AI consent preference',
+      error: e,
+    });
+  } finally {
+    resolvePhotoConsent(true);
+  }
+}
+
 /** Open a fresh new-activity form pre-filled from the extracted document. */
-function onPhotoActivityReady(
-  prefill: Partial<CreateFamilyActivityInput>,
-  confidence: FieldConfidence
-): void {
+function onPhotoActivityReady(ready: {
+  prefill: Partial<CreateFamilyActivityInput>;
+  confidence: FieldConfidence;
+  sourcePhoto?: File;
+}): void {
   sidebarDate.value = null;
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
   selectedDate.value = undefined;
   defaultStartTime.value = undefined;
   defaultAssigneeId.value = undefined;
-  activityPrefill.value = prefill;
-  activityPrefillConfidence.value = confidence;
+  activityPrefill.value = ready.prefill;
+  activityPrefillConfidence.value = ready.confidence;
+  activitySourcePhoto.value = ready.sourcePhoto;
   showModal.value = true; // last → ActivityModal.onNew reads the prefill set above
 }
 
@@ -250,9 +286,11 @@ watch(editingSegmentValue, (next, prev) => {
 });
 
 function openAddModal(date?: string, time?: string, memberId?: string) {
-  // A manual add is never a photo prefill — clear any leftover so it can't leak in.
+  // A manual add is never a photo prefill — clear any leftover so it can't leak in
+  // (incl. the source photo, or it would attach to the next manually-added activity).
   activityPrefill.value = undefined;
   activityPrefillConfidence.value = undefined;
+  activitySourcePhoto.value = undefined;
   sidebarDate.value = null;
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
@@ -655,6 +693,7 @@ function handleActivitySwapped(newId: string) {
       :default-assignee-ids="defaultAssigneeId ? [defaultAssigneeId] : undefined"
       :prefill="activityPrefill"
       :prefill-confidence="activityPrefillConfidence"
+      :source-photo="activitySourcePhoto"
       :read-only="!canEditActivities"
       :occurrence-date="editingOccurrenceDate"
       @close="
@@ -663,6 +702,7 @@ function handleActivitySwapped(newId: string) {
         defaultAssigneeId = undefined;
         activityPrefill = undefined;
         activityPrefillConfidence = undefined;
+        activitySourcePhoto = undefined;
       "
       @save="handleSave"
       @delete="handleDelete"
@@ -673,7 +713,7 @@ function handleActivitySwapped(newId: string) {
     <DocumentExtractConsentModal
       :open="consentOpen"
       :tier="aiTier"
-      @confirm="resolvePhotoConsent(true)"
+      @confirm="onConsentConfirm"
       @cancel="resolvePhotoConsent(false)"
     />
     <input

@@ -337,4 +337,87 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  // #133 — beanies AI privacy explainer. DRAFT prose: written within the ADR-030 honesty line
+  // (transit encryption + zero-retention + attested confidential compute; NOT "no one ever
+  // sees it" — that needs Gate 3). Pending greg's voice pass before it is treated as final.
+  {
+    slug: 'how-beanies-ai-handles-your-photos',
+    category: 'security',
+    title: 'How beanies AI Handles Your Photos',
+    excerpt:
+      'What happens when you add an activity from a photo: what we send, where it goes, and what we keep (nothing).',
+    icon: '\u{1F4F8}',
+    readTime: 4,
+    updatedDate: '2026-06-03',
+    sections: [
+      {
+        type: 'heading',
+        content: 'What beanies AI does',
+        level: 2,
+        id: 'what-it-does',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When you tap <strong>Add from a photo</strong>, beanies reads a single picture or document you choose (like a party invitation) and pulls out the event details, then opens a new activity pre-filled for you to check and save. It only ever runs on the one document you pick, and only when you ask it to.',
+      },
+      {
+        type: 'heading',
+        content: 'What we send',
+        level: 2,
+        id: 'what-we-send',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Only the one photo or document</strong> you chose for that action.',
+          "<strong>Never the rest of your family's data</strong> — your accounts, activities, members, and notes never leave your device for this.",
+          'Nothing is sent until you confirm. You can decline and fill the activity in by hand.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Where it goes',
+        level: 2,
+        id: 'where-it-goes',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On the default setting, the photo is sent to a private, secure AI service that processes it and keeps nothing. The document is encrypted while it travels to and from that service. If you bring your own AI provider (BYOK), it goes to that provider instead, using your key.',
+      },
+      {
+        type: 'callout',
+        content:
+          'The AI service processes your document in a secure, attested environment and retains nothing after it answers. It is encrypted in transit. (We are honest about the boundary: the service does process the image to read it. We do not claim no one could ever see it.)',
+        title: 'Private, and honest about it',
+        icon: '\u{1F512}',
+      },
+      {
+        type: 'heading',
+        content: 'What happens afterwards',
+        level: 2,
+        id: 'afterwards',
+      },
+      {
+        type: 'paragraph',
+        content:
+          "The AI service keeps nothing. The photo or document you picked is saved only with your own family's data and attached to the activity it created, so you can find it later. You can remove it before saving like any other photo.",
+      },
+      {
+        type: 'heading',
+        content: 'The “don’t ask again” choice',
+        level: 2,
+        id: 'dont-ask-again',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Ticking "don’t ask again" in the consent box turns off the prompt for <strong>your whole family</strong>, not just your device, because the setting is shared with your family data. You can turn the prompt back on any time in <strong>Settings → AI &amp; Privacy</strong>.',
+        title: 'It applies to your whole family',
+        icon: '\u{1F465}',
+      },
+    ],
+  },
 ];

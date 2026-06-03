@@ -258,6 +258,16 @@ async function updateTextSize(value: string | number) {
   await settingsStore.setTextSize(value as 'normal' | 'large');
 }
 
+// #133: toggle ON = ask before AI photo extraction (setting `false`). The store setter throws
+// on failure, so surface it rather than letting the rejection go unhandled.
+async function updateAskBeforePhotos(ask: boolean) {
+  try {
+    await settingsStore.setSkipDocumentConsentPrompt(!ask);
+  } catch {
+    showToast('error', t('error.saveFailed'), t('error.unexpectedFailureHelp'));
+  }
+}
+
 // ── Family Data handlers ─────────────────────────────────────────────────────
 
 const isSwitchingAccount = ref(false);
@@ -751,6 +761,25 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             data-testid="sound-toggle"
             :model-value="settingsStore.soundEnabled"
             @update:model-value="settingsStore.setSoundEnabled($event)"
+          />
+        </div>
+        <!-- AI & Privacy (#133): ask before sending a photo/document to beanies AI.
+             ON = ask (setting false); turning it off stores the family-scoped skip. -->
+        <div
+          class="flex items-center justify-between border-b border-[var(--tint-slate-05)] py-3.5 dark:border-slate-700"
+        >
+          <div>
+            <p class="text-[0.8rem] font-semibold text-[var(--deep-slate)] dark:text-slate-200">
+              {{ t('settings.ai.askBeforePhotos') }}
+            </p>
+            <p class="text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500">
+              {{ t('settings.ai.askBeforePhotosHint') }}
+            </p>
+          </div>
+          <ToggleSwitch
+            data-testid="ai-consent-toggle"
+            :model-value="!settingsStore.skipDocumentConsentPrompt"
+            @update:model-value="updateAskBeforePhotos"
           />
         </div>
         <!-- Daily Tips — one bell entry per day; mute keeps existing tips

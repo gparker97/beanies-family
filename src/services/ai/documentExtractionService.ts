@@ -88,9 +88,13 @@ export async function extractEventFromDocument(
   opts: ExtractOptions
 ): Promise<DocumentExtractionResult> {
   // 1) Compress client-side (also down-scales for the proxy cap + faster upload).
+  // Keep the compressed blob in function scope so a successful result can hand it back
+  // for attaching to the activity (#133) — avoids a second compression pass.
   let imageDataUrl: string;
+  let compressedBlob: Blob;
   try {
     const compressed = await compress(file, opts.compression ?? DEFAULT_COMPRESSION);
+    compressedBlob = compressed.blob;
     imageDataUrl = await blobToDataUrl(compressed.blob);
   } catch (err) {
     if (err instanceof CompressionError) {
@@ -114,7 +118,7 @@ export async function extractEventFromDocument(
   const request: ExtractionRequest = { imageDataUrl, todayIso: opts.todayIso, signal: opts.signal };
   try {
     const data = await provider.extract(request);
-    return { success: true, data };
+    return { success: true, data, compressedBlob };
   } catch (err) {
     if (err instanceof ExtractionProviderError) {
       return { success: false, errorCode: err.code, error: err.message };

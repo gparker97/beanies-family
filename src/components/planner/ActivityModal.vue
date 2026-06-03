@@ -54,6 +54,12 @@ const props = defineProps<{
   prefill?: Partial<CreateFamilyActivityInput>;
   /** Per-field confidence accompanying `prefill`; low-confidence fields are flagged for review. */
   prefillConfidence?: FieldConfidence;
+  /**
+   * The source document image (#133) to attach to the activity once the eager-create gate is
+   * satisfiable. Attached via the existing PhotoAttachments / photo-upload path; the user can
+   * remove it before saving like any other photo.
+   */
+  sourcePhoto?: File;
   readOnly?: boolean;
   occurrenceDate?: string;
 }>();
@@ -116,6 +122,8 @@ const LOW_CONFIDENCE_THRESHOLD = 0.5;
 // True only when the current NEW form was opened with an extraction prefill — gates the
 // low-confidence hints so a normal manual "add" never shows them.
 const wasPrefilled = ref(false);
+// The #133 source document staged for attach (set in onNew; attached once the gate clears).
+const pendingSourcePhoto = ref<File | null>(null);
 
 /** Apply an optional extraction prefill over the just-set onNew defaults (additive). */
 function applyPrefill(): void {
@@ -230,6 +238,7 @@ const { isEditing, isSubmitting } = useFormModal(
       showMoreDetails.value = hasDetailData(activity);
       showErrors.value = false;
       wasPrefilled.value = false; // editing an existing activity is never a prefill
+      pendingSourcePhoto.value = null; // editing is never a photo-extraction flow
     },
     onNew: () => {
       icon.value = '';
@@ -265,6 +274,8 @@ const { isEditing, isSubmitting } = useFormModal(
       showErrors.value = false;
       // Apply an extraction prefill, if any, over the defaults just set above.
       applyPrefill();
+      // Stage the source document; maybeAttachSourcePhoto() attaches it once the gate clears.
+      pendingSourcePhoto.value = props.sourcePhoto ?? null;
     },
   }
 );
@@ -502,7 +513,10 @@ function buildPayload(): CreateFamilyActivityInput {
  * path is unchanged below — it just emits, with `eager.entityId`
  * choosing the update vs create emit shape.
  */
-const photoAttachmentsRef = ref<{ openPicker: () => void } | null>(null);
+const photoAttachmentsRef = ref<{
+  openPicker: () => void;
+  addFiles: (files: File[]) => Promise<unknown>;
+} | null>(null);
 
 /**
  * Reactive gate predicate. Same fields as `canSave` — keeps the photo
@@ -556,6 +570,35 @@ async function handleAddFirstPhoto(): Promise<void> {
   await nextTick();
   photoAttachmentsRef.value?.openPicker();
 }
+
+// --- Source-photo attach (#133) ---
+// The photo picked for AI extraction is attached to the activity once the eager-create gate
+// is satisfiable (title + date + assignee). We attach via the SAME PhotoAttachments instance
+// the user would use manually (its `addFiles`), so all compression/upload/queue/error/toast
+// handling is inherited. Driven by an explicit trigger — NOT coupled to the validation
+// predicate's field list — with a synchronous clear-before-await one-shot guard.
+// (`pendingSourcePhoto` is declared near the top — useFormModal's onNew sets it.)
+async function maybeAttachSourcePhoto(): Promise<void> {
+  const photo = pendingSourcePhoto.value;
+  if (!photo || firstMissingFieldKey.value !== null) return;
+  pendingSourcePhoto.value = null; // clear FIRST → never double-attaches on re-trigger
+  const id = await eager.ensureId();
+  if (!id) {
+    pendingSourcePhoto.value = photo; // gate raced shut mid-create; retry when it reopens
+    return;
+  }
+  await nextTick(); // PhotoAttachments mounts (v-if entityId) now that the id exists
+  await photoAttachmentsRef.value?.addFiles([photo]);
+}
+
+// Fire when a staged photo first becomes attachable. Only deps: the staged photo + the gate.
+watch(
+  () => pendingSourcePhoto.value !== null && firstMissingFieldKey.value === null,
+  (attachable) => {
+    if (attachable) void maybeAttachSourcePhoto();
+  },
+  { immediate: true }
+);
 
 function handleSave() {
   if (!canSave.value) {

@@ -6452,34 +6452,59 @@ const STRING_DEFS = {
   },
   'ai.addFromPhoto': { en: 'Add from a Photo', beanie: 'add from a photo' },
   'ai.processing': { en: 'Reading your photo…', beanie: 'counting beans…' },
-  'ai.consent.title': { en: 'Add from a Photo', beanie: 'add from a photo' },
+  'ai.consent.title': { en: 'Welcome to beanies AI!', beanie: 'welcome to beanies ai!' },
   'ai.consent.intro': {
-    en: 'To fill in an activity for you, beanies will read just this one photo.',
-    beanie: 'to fill in an activity for you, beanies will read just this one photo.',
+    en: "beanies will read this photo or document to magically extract the key details (well, it's not actually magic, it's just AI).",
+    beanie:
+      "beanies will read this photo or document to magically extract the key details (well, it's not actually magic, it's just ai).",
   },
   'ai.consent.whatLabel': { en: 'What we send', beanie: 'what we send' },
   'ai.consent.whatValue': {
-    en: "Only this one photo. Never the rest of your family's data.",
-    beanie: "only this one photo. never the rest of your family's data.",
+    en: "Only this one photo or document, never anything else, and never any of your family's data.",
+    beanie:
+      "only this one photo or document, never anything else, and never any of your family's data.",
   },
   'ai.consent.whereLabel': { en: 'Where it goes', beanie: 'where it goes' },
   'ai.consent.whereManaged': {
-    en: 'A secure AI service that reads it privately and keeps nothing.',
-    beanie: 'a secure ai service that reads it privately and keeps nothing.',
+    en: 'beanies uses a private, safe, and secure AI service that processes the document and keeps nothing. Your document is fully encrypted while travelling to and from the service.',
+    beanie:
+      'beanies uses a private, safe, and secure ai service that processes the document and keeps nothing. your document is fully encrypted while travelling to and from the service.',
   },
   'ai.consent.whereByok': {
-    en: 'Your own AI provider, using your key.',
-    beanie: 'your own ai provider, using your key.',
+    en: "To your own AI provider, using the key you've provided.",
+    beanie: "to your own ai provider, using the key you've provided.",
   },
   'ai.consent.afterLabel': { en: 'Afterwards', beanie: 'afterwards' },
   'ai.consent.afterValue': {
-    en: "Nothing is stored. The photo isn't saved anywhere.",
-    beanie: "nothing is stored. the photo isn't saved anywhere.",
+    en: "Nothing is kept by the AI service. Your photo or document is saved only with your own family's data, attached to this activity.",
+    beanie:
+      "nothing is kept by the ai service. your photo or document is saved only with your own family's data, attached to this activity.",
   },
-  'ai.consent.confirm': { en: 'Read This Photo', beanie: 'read this photo' },
+  'ai.consent.confirm': {
+    en: 'I understand - use beanies AI!',
+    beanie: 'i understand - use beanies ai!',
+  },
   'ai.consent.footnote': {
-    en: 'You choose each time. We never send anything without asking.',
-    beanie: 'you choose each time. we never send anything without asking.',
+    en: "We'd never send anything without asking - you choose each time. You can stop the prompt for your family by ticking the box below.",
+    beanie:
+      "we'd never send anything without asking - you choose each time. you can stop the prompt for your family by ticking the box below.",
+  },
+  'ai.consent.remember': {
+    en: 'I agree to let beanies.family privately and securely process the documents I choose.',
+    beanie: 'i agree to let beanies.family privately and securely process the documents i choose.',
+  },
+  'ai.consent.privacyLink': {
+    en: 'How we protect your privacy',
+    beanie: 'how we protect your privacy',
+  },
+  'settings.ai.title': { en: 'AI & Privacy', beanie: 'ai & privacy' },
+  'settings.ai.askBeforePhotos': {
+    en: 'Ask before reading photos',
+    beanie: 'ask before reading photos',
+  },
+  'settings.ai.askBeforePhotosHint': {
+    en: 'Show a privacy check before sending a photo or document to beanies AI.',
+    beanie: 'show a privacy check before sending a photo or document to beanies ai.',
   },
   'photos.dropToAdd': { en: 'Drop photo to add', beanie: 'drop photo to add' },
   'photos.missing.tile': { en: 'Photo missing', beanie: 'photo missing' },
