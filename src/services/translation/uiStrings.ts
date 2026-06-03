@@ -6416,6 +6416,36 @@ const STRING_DEFS = {
     en: 'Only JPEG, PNG, and HEIC photos are supported.',
     beanie: 'only jpeg, png, and heic photos are supported.',
   },
+
+  // AI document-extraction wedge (#133) — photo/invitation → prefilled activity.
+  'ai.offline.title': { en: "You're Offline", beanie: "you're offline" },
+  'ai.offline.message': {
+    en: 'Connect to the internet to read a photo into an activity.',
+    beanie: 'connect to the internet to read a photo into an activity.',
+  },
+  'ai.notEvent.title': { en: 'No Event Found', beanie: 'no event found' },
+  'ai.notEvent.message': {
+    en: "We couldn't spot event details in that photo. You can still fill it in below.",
+    beanie: "we couldn't spot event details in that photo. you can still fill it in below.",
+  },
+  'ai.unavailable.title': { en: 'Not Available Yet', beanie: 'not available yet' },
+  'ai.unavailable.message': {
+    en: "Reading photos isn't set up yet. You can add the activity manually.",
+    beanie: "reading photos isn't set up yet. you can add the activity manually.",
+  },
+  'ai.error.title': { en: "Couldn't Read That Photo", beanie: "couldn't read that photo" },
+  'ai.error.timeout': {
+    en: 'That took too long. Please try again.',
+    beanie: 'that took too long. please try again.',
+  },
+  'ai.error.unreadable': {
+    en: "We couldn't make sense of that one. Try a clearer photo.",
+    beanie: "we couldn't make sense of that one. try a clearer photo.",
+  },
+  'ai.error.generic': {
+    en: 'Something went wrong reading that photo. Please try again.',
+    beanie: 'something went wrong reading that photo. please try again.',
+  },
   'photos.dropToAdd': { en: 'Drop photo to add', beanie: 'drop photo to add' },
   'photos.missing.tile': { en: 'Photo missing', beanie: 'photo missing' },
   'photos.missing.title': { en: "We Can't Find This Photo", beanie: "we can't find this photo" },
