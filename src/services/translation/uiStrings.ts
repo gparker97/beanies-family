@@ -6450,6 +6450,37 @@ const STRING_DEFS = {
     en: "We weren't sure about this one. Worth a quick check.",
     beanie: "we weren't sure about this one. worth a quick check.",
   },
+  'ai.addFromPhoto': { en: 'Add from a Photo', beanie: 'add from a photo' },
+  'ai.processing': { en: 'Reading your photo…', beanie: 'counting beans…' },
+  'ai.consent.title': { en: 'Add from a Photo', beanie: 'add from a photo' },
+  'ai.consent.intro': {
+    en: 'To fill in an activity for you, beanies will read just this one photo.',
+    beanie: 'to fill in an activity for you, beanies will read just this one photo.',
+  },
+  'ai.consent.whatLabel': { en: 'What we send', beanie: 'what we send' },
+  'ai.consent.whatValue': {
+    en: "Only this one photo. Never the rest of your family's data.",
+    beanie: "only this one photo. never the rest of your family's data.",
+  },
+  'ai.consent.whereLabel': { en: 'Where it goes', beanie: 'where it goes' },
+  'ai.consent.whereManaged': {
+    en: 'A secure AI service that reads it privately and keeps nothing.',
+    beanie: 'a secure ai service that reads it privately and keeps nothing.',
+  },
+  'ai.consent.whereByok': {
+    en: 'Your own AI provider, using your key.',
+    beanie: 'your own ai provider, using your key.',
+  },
+  'ai.consent.afterLabel': { en: 'Afterwards', beanie: 'afterwards' },
+  'ai.consent.afterValue': {
+    en: "Nothing is stored. The photo isn't saved anywhere.",
+    beanie: "nothing is stored. the photo isn't saved anywhere.",
+  },
+  'ai.consent.confirm': { en: 'Read This Photo', beanie: 'read this photo' },
+  'ai.consent.footnote': {
+    en: 'You choose each time. We never send anything without asking.',
+    beanie: 'you choose each time. we never send anything without asking.',
+  },
   'photos.dropToAdd': { en: 'Drop photo to add', beanie: 'drop photo to add' },
   'photos.missing.tile': { en: 'Photo missing', beanie: 'photo missing' },
   'photos.missing.title': { en: "We Can't Find This Photo", beanie: "we can't find this photo" },

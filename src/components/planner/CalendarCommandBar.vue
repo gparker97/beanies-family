@@ -40,6 +40,7 @@ const emit = defineEmits<{
   today: [];
   'update:activeView': [view: string];
   add: [];
+  'add-from-photo': [];
   'open-agenda': [];
   'select-all': [];
   'select-member': [id: string];
@@ -217,6 +218,17 @@ onBeforeUnmount(() => {
             inline
             @vacation-click="emit('vacation-click', $event)"
           />
+
+          <!-- Add from a photo (#133): reads an invitation photo into a prefilled activity -->
+          <button
+            v-if="canAdd"
+            type="button"
+            class="inline-flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full bg-[var(--tint-orange-8)] text-lg transition-all hover:bg-[var(--tint-orange-15)] sm:rounded-2xl"
+            :aria-label="t('ai.addFromPhoto')"
+            @click="emit('add-from-photo')"
+          >
+            <span aria-hidden="true">📸</span>
+          </button>
 
           <button
             v-if="canAdd"
