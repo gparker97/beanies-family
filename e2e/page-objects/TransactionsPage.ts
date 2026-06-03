@@ -1,5 +1,6 @@
 import { Page, expect } from '@playwright/test';
 import { ui } from '../helpers/ui-strings';
+import { gotoRoute } from '../helpers/navigation';
 
 /**
  * Maps category IDs to their group name for the two-level CategoryChipPicker.
@@ -19,9 +20,9 @@ export class TransactionsPage {
   constructor(private page: Page) {}
 
   async goto() {
-    // See `gotoRoot` — `waitUntil: 'commit'` survives the webkit-CI race
-    // where `domcontentloaded` loses to the SPA's first-paint redirect.
-    await this.page.goto('/transactions', { waitUntil: 'commit' });
+    // gotoRoute hardens against the webkit-CI navigation-interrupt race
+    // (commit + retry-on-interrupt). See helpers/navigation.ts.
+    await gotoRoute(this.page, '/transactions');
   }
 
   /**

@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
-import { gotoRoot } from '../helpers/navigation';
+import { gotoRoot, gotoRoute } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
 import { dismissActivityCreatedConfirm } from '../helpers/activity-modal';
 import { selectBeanieDate } from '../helpers/date-picker';
@@ -26,8 +26,7 @@ test.describe('Family Planner', () => {
     await bypassLoginIfNeeded(page);
 
     // Navigate to planner (defaults to month view).
-    // `waitUntil: 'commit'` survives the webkit-CI first-paint redirect race.
-    await page.goto('/activities', { waitUntil: 'commit' });
+    await gotoRoute(page, '/activities');
     await page.waitForURL('/activities');
   }
 

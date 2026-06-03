@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
-import { gotoRoot } from '../helpers/navigation';
+import { gotoRoot, gotoRoute } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
 
 /**
@@ -139,9 +139,7 @@ test.describe('Trusted Device Password Cache', () => {
     // --- Phase 2: Clear all data removes cached password and trust flag ---
 
     // Navigate to settings and open Data Management modal.
-    // `waitUntil: 'commit'` is the proven harden for webkit-CI's first-
-    // paint redirect race (same pattern as gotoRoot in helpers/navigation.ts).
-    await page.goto('/settings', { waitUntil: 'commit' });
+    await gotoRoute(page, '/settings');
     await page.waitForURL('/settings');
     await page.getByText(ui('settings.dataManagement')).first().click();
 
