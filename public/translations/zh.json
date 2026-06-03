@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-05-31",
-    "translationCount": 2968
+    "lastUpdated": "2026-06-03",
+    "translationCount": 2978
   },
   "translations": {
     "app.name": {
@@ -14845,6 +14845,56 @@
       "translation": "开放创意",
       "hash": "ik1zay",
       "lastUpdated": "2026-05-31"
+    },
+    "ai.offline.title": {
+      "translation": "您已离线",
+      "hash": "upwlpa",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.offline.message": {
+      "translation": "连接到互联网，将照片读入活动。",
+      "hash": "p8tcef",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.notEvent.title": {
+      "translation": "未找到活动项目",
+      "hash": "ijium5",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.notEvent.message": {
+      "translation": "我们无法在该照片中找到活动详情。您仍然可以在下方填写。",
+      "hash": "aly31b",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.unavailable.title": {
+      "translation": "待上架",
+      "hash": "38nk64",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.unavailable.message": {
+      "translation": "尚未设置阅读照片。您可以手动添加活动。",
+      "hash": "nvsox6",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.error.title": {
+      "translation": "无法读取该照片",
+      "hash": "liuqql",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.error.timeout": {
+      "translation": "这花了太长时间。请重试。",
+      "hash": "b5pfa7",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.error.unreadable": {
+      "translation": "我们无法理解这一点。请尝试拍摄更清晰的照片。",
+      "hash": "nswtq6",
+      "lastUpdated": "2026-06-03"
+    },
+    "ai.error.generic": {
+      "translation": "读取该照片时出错。请重试。",
+      "hash": "4deuz5",
+      "lastUpdated": "2026-06-03"
     }
   }
 }
