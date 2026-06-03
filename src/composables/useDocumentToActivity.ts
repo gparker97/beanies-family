@@ -15,7 +15,7 @@ import { useTranslation } from './useTranslation';
 import { extractEventFromDocument } from '@/services/ai/documentExtractionService';
 import type { ExtractionErrorCode, FieldConfidence } from '@/services/ai/types';
 import { extractionToActivityPrefill } from '@/utils/extractionToActivity';
-import { toISODateString } from '@/utils/date';
+import { toDateInputValue } from '@/utils/date';
 import type { CreateFamilyActivityInput } from '@/types/models';
 
 export interface UseDocumentToActivityOptions {
@@ -83,8 +83,10 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
     isProcessing.value = true;
     try {
       const result = await extractEventFromDocument(file, {
+        // Local YYYY-MM-DD (not a full ISO timestamp) so the model resolves relative dates
+        // against the user's calendar date, and the proxy's date validation passes.
         tier: tier.value,
-        todayIso: toISODateString(new Date()),
+        todayIso: toDateInputValue(new Date()),
         byok: byokConfig.value ?? undefined,
       });
 
