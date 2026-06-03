@@ -138,6 +138,16 @@ describe('ai-extract Lambda handler', () => {
       assert.equal(res.statusCode, 400);
     });
 
+    it('accepts a full ISO timestamp for todayIso (normalized to the date)', async () => {
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: { imageDataUrl: IMAGE, todayIso: '2026-06-03T09:20:40.593Z' },
+        })
+      );
+      assert.equal(res.statusCode, 200);
+    });
+
     it('returns 413 on an oversized body', async () => {
       const huge = 'data:image/jpeg;base64,' + 'A'.repeat(2 * 1024 * 1024 + 10);
       const res = await handler(
