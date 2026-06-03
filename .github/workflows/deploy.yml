@@ -160,6 +160,13 @@ jobs:
           # (mirrors VITE_REGISTRY_API_KEY) to deter casual abuse of POST /logs.
           VITE_BEANIES_LOG_INGEST_URL: ${{ vars.BEANIES_LOG_INGEST_URL }}
           VITE_BEANIES_LOG_INGEST_API_KEY: ${{ secrets.BEANIES_LOG_INGEST_API_KEY }}
+          # AI document-extraction proxy (#133, ADR-030). Endpoint is a repository
+          # VARIABLE (Terraform `ai_extract_url` output) — sits in the bundle anyway.
+          # The soft x-api-key is a SECRET (mirrors the ingest key) to deter casual
+          # abuse of the billable POST /ai-extract route. Both unset = managed tier
+          # cleanly reports "not available yet" (no broken UI).
+          VITE_AI_EXTRACT_URL: ${{ vars.AI_EXTRACT_URL }}
+          VITE_AI_EXTRACT_API_KEY: ${{ secrets.AI_EXTRACT_API_KEY }}
           # Plausible site script ID for app.beanies.family (the Vue PWA).
           # `src/services/analytics/plausible.ts` is gated on this var so a
           # vanilla self-host stays fully offline by default — only the

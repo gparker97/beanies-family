@@ -24,6 +24,8 @@ import {
 
 /** Proxy endpoint (our Lambda). Unset until the Phase-2 backend is deployed. */
 const PROXY_URL = import.meta.env.VITE_AI_EXTRACT_URL;
+/** Soft key the proxy expects (in the public bundle; deters casual abuse). */
+const PROXY_API_KEY = import.meta.env.VITE_AI_EXTRACT_API_KEY;
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 function buildSignal(signal?: AbortSignal): AbortSignal {
@@ -48,7 +50,10 @@ export const managedProvider: ExtractionProvider = {
     try {
       res = await fetch(PROXY_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(PROXY_API_KEY ? { 'x-api-key': PROXY_API_KEY } : {}),
+        },
         body: JSON.stringify({ imageDataUrl: request.imageDataUrl, todayIso: request.todayIso }),
         signal: buildSignal(request.signal),
       });

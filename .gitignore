@@ -42,6 +42,7 @@ test-results
 
 # Lambda build artifacts
 infrastructure/lambda/**/lambda.zip
+infrastructure/modules/**/*.zip
 
 # Terraform
 infrastructure/.terraform/
