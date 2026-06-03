@@ -146,3 +146,13 @@ Provider abstraction makes the swap a config change, not a rewrite:
 2. **Gate 3 (SDK):** implementation task, lands with Phase 2 of the plan.
 
 Gate 1 is done — quality + provider + trust boundary all settled empirically.
+
+---
+
+## Phase 2 — proxy DEPLOYED & live-validated (2026-06-03)
+
+The `ai-extract` Lambda (the managed-tier proxy seam) is **deployed** at `https://api.beanies.family/ai-extract`, and the wedge ran **end-to-end against a real invitation**: photo → consent → Tinfoil `qwen3-vl-30b` → prefilled activity, with **title/date/time/location correct on the first live test**. Tinfoil dashboard: 2 requests, 1,889 in / 213 out (~$0.0025/doc — confirms the Gate-1/Gate-2 cost model on live billing).
+
+**Bring-up bugs (all fixed; none in the trust model):** (1) a `todayIso` format mismatch — client sent full-ISO, proxy validated date-only; now tolerant on both ends. (2) a Tinfoil **403** that was **org-side, not code** — a new Tinfoil org had API access un-activated and the key created in the wrong place (CloudWatch: `[ai-extract] upstream_auth status=403`); re-activated + new key, `curl` → `200`. (3) a Terraform footgun where the plan tried to destroy the apex TXT/**SPF** record because `site_verification_txt_records` lived only in a shell env var (now persisted in `infrastructure/terraform.auto.tfvars`).
+
+**This validates Phase 2 plumbing + cost — not Gate 3.** The deployed proxy still sees the document plaintext transiently (zero-retention). The "no intermediary sees the document" claim remains gated on Gate 3 (verification SDK + EHBP).
