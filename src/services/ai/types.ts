@@ -99,6 +99,13 @@ export interface DocumentExtractionResult {
   errorCode?: ExtractionErrorCode;
   /** Human-readable detail for logs/diagnostics (never shown raw to users). */
   error?: string;
+  /**
+   * The client-compressed document image (#133) — present on success so the caller can
+   * attach the source photo to the created activity without re-compressing. Envelope-level
+   * metadata ONLY; never folded into `data` (the model output stays pure text — interface
+   * purity invariant above). Always a JPEG, so its mime is on `Blob.type`.
+   */
+  compressedBlob?: Blob;
 }
 
 /**

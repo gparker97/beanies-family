@@ -86,6 +86,10 @@ export async function setShowPublicHolidays(show: boolean): Promise<Settings> {
   return saveSettings({ showPublicHolidays: show });
 }
 
+export async function setSkipDocumentConsentPrompt(skip: boolean): Promise<Settings> {
+  return saveSettings({ skipDocumentConsentPrompt: skip });
+}
+
 export async function setSyncEnabled(enabled: boolean): Promise<Settings> {
   return saveSettings({ syncEnabled: enabled });
 }

@@ -98,6 +98,11 @@ export const useSettingsStore = defineStore('settings', () => {
   const showPublicHolidays = computed<boolean>(() =>
     country.value ? (settings.value.showPublicHolidays ?? true) : false
   );
+  // #133: when true, the photo→activity AI consent modal is skipped (auto-consented).
+  // Family-scoped (synced); default false so the first use always prompts.
+  const skipDocumentConsentPrompt = computed<boolean>(
+    () => settings.value.skipDocumentConsentPrompt ?? false
+  );
   const isTrustedDevice = computed(() => globalSettings.value.isTrustedDevice ?? false);
   const trustedDevicePromptShown = computed(
     () => globalSettings.value.trustedDevicePromptShown ?? false
@@ -426,6 +431,17 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  // #133: family-scoped consent skip for the photo→activity AI flow. Throws on failure
+  // so the caller (the consent flow) can log it without leaving the wedge stranded.
+  async function setSkipDocumentConsentPrompt(skip: boolean): Promise<void> {
+    try {
+      settings.value = await settingsRepo.setSkipDocumentConsentPrompt(skip);
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update AI consent setting';
+      throw e instanceof Error ? e : new Error(String(e));
+    }
+  }
+
   async function addCustomInstitution(name: string): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -593,6 +609,7 @@ export const useSettingsStore = defineStore('settings', () => {
     weekStartDay,
     country,
     showPublicHolidays,
+    skipDocumentConsentPrompt,
     isTrustedDevice,
     trustedDevicePromptShown,
     passkeyPromptShown,
@@ -615,6 +632,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setWeekStartDay,
     setCountry,
     setShowPublicHolidays,
+    setSkipDocumentConsentPrompt,
     addCustomInstitution,
     removeCustomInstitution,
     setExchangeRateAutoUpdate,

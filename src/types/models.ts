@@ -1125,6 +1125,7 @@ export interface Settings {
   weekStartDay?: 0 | 1; // 0=Sunday, 1=Monday (default: 1)
   country?: CountryCode; // family's country of residence — drives public-holiday display on the planner
   showPublicHolidays?: boolean; // default true once `country` is set; lets the family hide holidays
+  skipDocumentConsentPrompt?: boolean; // #133: when true, the photo→activity AI consent modal is auto-confirmed (default: ask). Family-scoped.
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

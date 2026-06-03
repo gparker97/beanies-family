@@ -22,13 +22,16 @@ export interface UseDocumentToActivityOptions {
   /** Show the per-action consent modal; resolve `true` only if the user agrees to send this document. */
   requestConsent: () => Promise<boolean>;
   /**
-   * Called once extraction succeeds with the prefill + per-field confidence (so the page can
-   * open ActivityModal pre-filled and flag low-confidence fields). Nothing is auto-created.
+   * Called once extraction succeeds (so the page can open ActivityModal pre-filled, flag
+   * low-confidence fields, and attach the source photo). Nothing is auto-created. Takes a
+   * single options object — this callback is expected to grow, so avoid positional args.
    */
-  onActivityReady: (
-    prefill: Partial<CreateFamilyActivityInput>,
-    confidence: FieldConfidence
-  ) => void;
+  onActivityReady: (ready: {
+    prefill: Partial<CreateFamilyActivityInput>;
+    confidence: FieldConfidence;
+    /** The client-compressed source document (#133), to attach to the created activity. */
+    sourcePhoto?: File;
+  }) => void;
 }
 
 const ERROR_SURFACE = 'ai-extract';
@@ -95,7 +98,18 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
           // Not recognised as an event — still open the form so nothing is silently dropped.
           showToast('info', t('ai.notEvent.title'), t('ai.notEvent.message'));
         }
-        options.onActivityReady(extractionToActivityPrefill(result.data), result.data.confidence);
+        // Reuse the already-compressed image (a JPEG) as the source photo to attach —
+        // no second compression pass. `blob.type` carries the mime.
+        const sourcePhoto = result.compressedBlob
+          ? new File([result.compressedBlob], `${file.name.replace(/\.[^.]+$/, '')}.jpg`, {
+              type: result.compressedBlob.type || 'image/jpeg',
+            })
+          : undefined;
+        options.onActivityReady({
+          prefill: extractionToActivityPrefill(result.data),
+          confidence: result.data.confidence,
+          sourcePhoto,
+        });
         return;
       }
 
