@@ -160,6 +160,15 @@ resource "aws_apigatewayv2_stage" "default" {
     throttling_rate_limit  = 10
   }
 
+  # Per-route throttle for the AI extraction proxy (ai-extract module adds the
+  # `POST /ai-extract` route on this shared API — #133). Each call is a billable
+  # Tinfoil request, so this caps abuse/cost; sized low for family-scale volumes.
+  route_settings {
+    route_key              = "POST /ai-extract"
+    throttling_burst_limit = 5
+    throttling_rate_limit  = 2
+  }
+
   tags = {
     Name        = "${var.app_name}-registry-default"
     Environment = var.environment

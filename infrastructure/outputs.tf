@@ -85,3 +85,10 @@ output "telemetry_lambda_name" {
   value       = module.telemetry.lambda_function_name
 }
 
+# ── AI extraction proxy outputs (#133) ───────────────────────────────────────
+
+output "ai_extract_url" {
+  description = "AI document-extraction endpoint — set as the VITE_AI_EXTRACT_URL GitHub repo VARIABLE"
+  value       = module.ai_extract.extract_url
+}
+

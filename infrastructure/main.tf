@@ -128,3 +128,21 @@ module "telemetry" {
   log_ingest_api_key        = var.log_ingest_api_key
 }
 
+# ── ai-extract — private AI document-extraction proxy (added 2026-06-03, #133) ──
+# POST /ai-extract on the shared API → ai-extract Lambda → Tinfoil confidential
+# enclave (server-held key) → structured event JSON. Retains nothing. cors_origins
+# defaulted in-module. Route-level throttle lives on the registry-owned $default
+# stage. See ADR-030 / docs/research/2026-06-02-tinfoil-phase1-gates.md.
+
+module "ai_extract" {
+  source = "./modules/ai-extract"
+
+  app_name                  = var.app_name
+  environment               = var.environment
+  api_gateway_id            = module.registry.api_gateway_id
+  api_gateway_execution_arn = module.registry.api_gateway_execution_arn
+  api_domain_name           = module.registry.api_domain_name
+  tinfoil_api_key           = var.tinfoil_api_key
+  ai_extract_api_key        = var.ai_extract_api_key
+}
+

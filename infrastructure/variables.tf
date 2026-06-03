@@ -46,6 +46,18 @@ variable "log_ingest_api_key" {
   sensitive   = true
 }
 
+variable "tinfoil_api_key" {
+  description = "Tinfoil inference API key for the AI document-extraction proxy (POST /ai-extract). Server-held, billable third-party credential — never in the client bundle. Supply via TF_VAR_tinfoil_api_key. See #133 / ADR-030."
+  type        = string
+  sensitive   = true
+}
+
+variable "ai_extract_api_key" {
+  description = "Soft API key the client sends to the AI extraction proxy (POST /ai-extract). In the public client bundle, so not a true secret, but kept sensitive + a GitHub secret to deter casual abuse (mirrors log_ingest_api_key)."
+  type        = string
+  sensitive   = true
+}
+
 variable "site_verification_txt_records" {
   description = "TXT strings published at the apex for domain verification (Google Search Console, Bing Webmaster Tools, etc.). All entries merged into a single TXT record on beanies.family. These values are not sensitive — they're publicly readable via DNS."
   type        = list(string)
