@@ -1,0 +1,96 @@
+// Managed-tier provider (beanies-managed, default tier). The single compressed document
+// is sent to OUR server-side proxy, which holds the Tinfoil API key, rate-limits per
+// family, and retains nothing. A browser PWA cannot safely hold the provider key, hence
+// the proxy. The proxy returns our typed JSON contract ({ ...ExtractionResult }), so this
+// provider validates that shape rather than parsing a raw chat completion.
+//
+// GATE 3 (deferred — lands with the Phase-2 backend): integrate Tinfoil's verification SDK
+// + EHBP so the client encrypts the document body to the ATTESTED enclave and the proxy
+// forwards ciphertext it cannot read. Until that ships, do NOT claim "no intermediary sees
+// the document"; scope to "attested confidential compute + zero retention" (ADR-030).
+//
+// Until the proxy is deployed, the endpoint env var is unset and this provider degrades to a
+// typed `not_available` — an honest seam, not a fake success. The BYOK and on-device paths,
+// and the whole wedge UX, are exercisable without it.
+
+import { parseExtractionResult } from '../extractionPrompt';
+import {
+  ExtractionProviderError,
+  type AttestationInfo,
+  type ExtractionProvider,
+  type ExtractionRequest,
+  type ExtractionResult,
+} from '../types';
+
+/** Proxy endpoint (our Lambda). Unset until the Phase-2 backend is deployed. */
+const PROXY_URL = import.meta.env.VITE_AI_EXTRACT_URL;
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+function buildSignal(signal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(DEFAULT_TIMEOUT_MS);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
+export const managedProvider: ExtractionProvider = {
+  id: 'tinfoil',
+  async extract(request: ExtractionRequest): Promise<ExtractionResult> {
+    if (!PROXY_URL) {
+      throw new ExtractionProviderError(
+        'not_available',
+        'Managed AI tier is not configured (proxy endpoint unset)'
+      );
+    }
+
+    // GATE 3 TODO: replace this plaintext-body POST with EHBP — encrypt `imageDataUrl`
+    // to the attested enclave's HPKE key (via the Tinfoil verification SDK) so the proxy
+    // forwards ciphertext only. The proxy contract (single document → typed JSON) is unchanged.
+    let res: Response;
+    try {
+      res = await fetch(PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageDataUrl: request.imageDataUrl, todayIso: request.todayIso }),
+        signal: buildSignal(request.signal),
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        throw new ExtractionProviderError('timeout', 'Managed extraction timed out', err);
+      }
+      throw new ExtractionProviderError(
+        'provider_error',
+        'Network error calling managed proxy',
+        err
+      );
+    }
+
+    if (!res.ok) {
+      throw new ExtractionProviderError(
+        'provider_error',
+        `Managed proxy returned HTTP ${res.status}`
+      );
+    }
+
+    let body: { result?: unknown; attestation?: AttestationInfo };
+    try {
+      body = (await res.json()) as { result?: unknown; attestation?: AttestationInfo };
+    } catch (err) {
+      throw new ExtractionProviderError(
+        'malformed_output',
+        'Could not read managed proxy response',
+        err
+      );
+    }
+
+    try {
+      const result = parseExtractionResult(body.result);
+      // Attestation is managed-tier-only metadata (optional on ExtractionResult).
+      return body.attestation ? { ...result, attestation: body.attestation } : result;
+    } catch (err) {
+      throw new ExtractionProviderError(
+        'malformed_output',
+        'Managed proxy returned unparseable or wrong-shape JSON',
+        err
+      );
+    }
+  },
+};
