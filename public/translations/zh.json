@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-03",
-    "translationCount": 2997
+    "lastUpdated": "2026-06-04",
+    "translationCount": 2999
   },
   "translations": {
     "app.name": {
@@ -14990,6 +14990,16 @@
       "translation": "在将照片或文档发送给beanies AI之前，请先显示隐私检查。",
       "hash": "oq9unm",
       "lastUpdated": "2026-06-03"
+    },
+    "ai.sourcePhotoPreview": {
+      "translation": "保存后附加",
+      "hash": "dskrcn",
+      "lastUpdated": "2026-06-04"
+    },
+    "ai.sourcePhotoPreviewAlt": {
+      "translation": "此活动的来源照片",
+      "hash": "fmu8lr",
+      "lastUpdated": "2026-06-04"
     }
   }
 }

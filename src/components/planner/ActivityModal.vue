@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import DayOfWeekSelector from '@/components/ui/DayOfWeekSelector.vue';
@@ -124,6 +124,16 @@ const LOW_CONFIDENCE_THRESHOLD = 0.5;
 const wasPrefilled = ref(false);
 // The #133 source document staged for attach (set in onNew; attached once the gate clears).
 const pendingSourcePhoto = ref<File | null>(null);
+// Local object-URL preview of the staged source photo, shown in the photos section the moment
+// the AI draft opens — BEFORE the activity is eager-created (the real Drive upload still happens
+// via maybeAttachSourcePhoto once the gate clears). Lifecycle is explicit so the object URL is
+// always revoked (no leak): replaced on re-stage, dropped once the real photo binds (entityId
+// set) or the modal closes, and on unmount.
+const sourcePhotoPreviewUrl = ref<string | null>(null);
+function setSourcePhotoPreview(file: File | null): void {
+  if (sourcePhotoPreviewUrl.value) URL.revokeObjectURL(sourcePhotoPreviewUrl.value);
+  sourcePhotoPreviewUrl.value = file ? URL.createObjectURL(file) : null;
+}
 
 /** Apply an optional extraction prefill over the just-set onNew defaults (additive). */
 function applyPrefill(): void {
@@ -245,6 +255,7 @@ const { isEditing, isSubmitting } = useFormModal(
       showErrors.value = false;
       wasPrefilled.value = false; // editing an existing activity is never a prefill
       pendingSourcePhoto.value = null; // editing is never a photo-extraction flow
+      setSourcePhotoPreview(null);
     },
     onNew: () => {
       icon.value = '';
@@ -281,7 +292,9 @@ const { isEditing, isSubmitting } = useFormModal(
       // Apply an extraction prefill, if any, over the defaults just set above.
       applyPrefill();
       // Stage the source document; maybeAttachSourcePhoto() attaches it once the gate clears.
+      // Show it as a local preview immediately so the user sees it on the fresh AI draft.
       pendingSourcePhoto.value = props.sourcePhoto ?? null;
+      setSourcePhotoPreview(props.sourcePhoto ?? null);
     },
   }
 );
@@ -567,8 +580,19 @@ watch(
   () => props.open,
   (isOpen) => {
     if (isOpen && !props.activity) eager.reset();
+    if (!isOpen) setSourcePhotoPreview(null); // revoke the staged-photo object URL on close
   }
 );
+
+// Once the activity is eager-created the real PhotoAttachments tile takes over, so drop the
+// local preview (and revoke its object URL). onBeforeUnmount is the final safety net.
+watch(
+  () => eager.entityId.value,
+  (id) => {
+    if (id) setSourcePhotoPreview(null);
+  }
+);
+onBeforeUnmount(() => setSourcePhotoPreview(null));
 
 async function handleAddFirstPhoto(): Promise<void> {
   const id = await eager.ensureId();
@@ -989,6 +1013,21 @@ function handleSave() {
           :max="4"
           @update:photo-ids="binding.updatePhotoIds"
         />
+        <!-- #133: the AI source photo, shown as a local preview before the activity is created.
+             It uploads to Drive + becomes a real attachment once the activity is created. -->
+        <div
+          v-else-if="sourcePhotoPreviewUrl"
+          class="flex items-center gap-3 rounded-2xl border border-[var(--tint-slate-10)] bg-[var(--tint-orange-4)] p-3"
+        >
+          <img
+            :src="sourcePhotoPreviewUrl"
+            :alt="t('ai.sourcePhotoPreviewAlt')"
+            class="h-16 w-16 flex-shrink-0 rounded-xl object-cover"
+          />
+          <span class="font-outfit text-xs font-semibold text-[var(--color-text-muted)]">
+            📸 {{ t('ai.sourcePhotoPreview') }}
+          </span>
+        </div>
         <button
           v-else
           type="button"

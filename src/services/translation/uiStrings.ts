@@ -6452,6 +6452,14 @@ const STRING_DEFS = {
   },
   'ai.addFromPhoto': { en: 'Add from a Photo', beanie: 'add from a photo' },
   'ai.processing': { en: 'Reading your photo…', beanie: 'counting beans…' },
+  'ai.sourcePhotoPreview': {
+    en: 'Attaches when you save',
+    beanie: 'attaches when you save',
+  },
+  'ai.sourcePhotoPreviewAlt': {
+    en: 'The photo this activity was read from',
+    beanie: 'the photo this activity was read from',
+  },
   'ai.consent.title': { en: 'Welcome to beanies AI!', beanie: 'welcome to beanies ai!' },
   'ai.consent.intro': {
     en: "beanies will read this photo or document to magically extract the key details (well, it's not actually magic, it's just AI).",
