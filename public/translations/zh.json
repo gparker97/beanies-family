@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-04",
-    "translationCount": 2999
+    "translationCount": 3001
   },
   "translations": {
     "app.name": {
@@ -14999,6 +14999,16 @@
     "ai.sourcePhotoPreviewAlt": {
       "translation": "此活动的来源照片",
       "hash": "fmu8lr",
+      "lastUpdated": "2026-06-04"
+    },
+    "ai.error.busy.title": {
+      "translation": "beanies AI 正忙",
+      "hash": "7x685s",
+      "lastUpdated": "2026-06-04"
+    },
+    "ai.error.busy.message": {
+      "translation": "beanies AI现在很忙。请稍后重试。",
+      "hash": "1ww8h1",
       "lastUpdated": "2026-06-04"
     }
   }
