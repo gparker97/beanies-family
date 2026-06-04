@@ -1,10 +1,12 @@
 import { getDoc, changeDoc } from '../docService';
 import { DEFAULT_CURRENCY } from '@/constants/currencies';
 import { DEFAULT_LANGUAGE } from '@/constants/languages';
+import { apiKeyForProvider } from '@/utils/aiApiKeys';
 import type {
   Settings,
   ExchangeRate,
   AIProvider,
+  AiTier,
   CurrencyCode,
   LanguageCode,
 } from '@/types/models';
@@ -28,6 +30,7 @@ export function getDefaultSettings(): Settings {
     encryptionEnabled: true,
     aiProvider: 'none',
     aiApiKeys: {},
+    aiTier: 'managed',
     preferredCurrencies: [],
     customInstitutions: [],
     onboardingCompleted: true,
@@ -38,7 +41,18 @@ export function getDefaultSettings(): Settings {
 
 export async function getSettings(): Promise<Settings> {
   const doc = getDoc();
-  return doc.settings ?? getDefaultSettings();
+  if (!doc.settings) return getDefaultSettings();
+  // Backfill any optional fields added after this doc was written, so downstream readers can
+  // trust that a field with a default in getDefaultSettings() is present — no per-field
+  // `?? default` coalescing required at every call site.
+  const merged: Settings = { ...getDefaultSettings(), ...doc.settings };
+  // #133 migration: a doc written before `aiTier` existed but with a configured BYOK
+  // provider+key was effectively on the BYOK tier. Preserve that rather than letting the
+  // backfill default it to 'managed' (which would silently ignore the user's own key).
+  if (doc.settings.aiTier === undefined && apiKeyForProvider(merged.aiProvider, merged.aiApiKeys)) {
+    merged.aiTier = 'byok';
+  }
+  return merged;
 }
 
 export async function saveSettings(
@@ -100,6 +114,10 @@ export async function setAutoSyncEnabled(enabled: boolean): Promise<Settings> {
 
 export async function setAIProvider(provider: AIProvider): Promise<Settings> {
   return saveSettings({ aiProvider: provider });
+}
+
+export async function setAITier(tier: AiTier): Promise<Settings> {
+  return saveSettings({ aiTier: tier });
 }
 
 export async function setAIApiKey(

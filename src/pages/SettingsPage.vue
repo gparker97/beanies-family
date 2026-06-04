@@ -7,6 +7,8 @@ import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import ChangePasswordSettings from '@/components/settings/ChangePasswordSettings.vue';
 import ProfileHeader from '@/components/settings/ProfileHeader.vue';
 import SettingsCard from '@/components/settings/SettingsCard.vue';
+import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
+import AiSettings from '@/components/settings/AiSettings.vue';
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
 import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
 import BaseModal from '@/components/ui/BaseModal.vue';
@@ -38,6 +40,7 @@ import {
   shouldUseRedirectAuth,
 } from '@/services/google/googleAuth';
 import { getDeploymentBadge } from '@/config/features';
+import { isFlagEnabled } from '@/config/flags';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -86,12 +89,21 @@ const showSecurity = ref(false);
 const showFamilyData = ref(false);
 const showDataManagement = ref(false);
 const showTransferOwnership = ref(false);
+const showAi = ref(false);
+
+// #133: the entire AI surface (wedge entry + this Settings card) is gated behind the same
+// dev flag, so Phase 4 ships to prod without exposing anything to users until launch.
+const aiSurfaceEnabled = isFlagEnabled('aiPhotoExtract');
 
 // ── Deep-link: open a specific card from a route query (e.g. ?open=family-data)
 //    Generalizable — additional cards can opt in by extending the map below.
 const cardOpenMap: Record<string, () => void> = {
   'family-data': () => {
     showFamilyData.value = true;
+  },
+  ai: () => {
+    // Guarded: the AI surface is flag-gated, so the deep-link no-ops when it's off.
+    if (aiSurfaceEnabled) showAi.value = true;
   },
   appearance: () => {
     showAppearance.value = true;
@@ -256,16 +268,6 @@ async function updateTheme(value: string | number) {
 
 async function updateTextSize(value: string | number) {
   await settingsStore.setTextSize(value as 'normal' | 'large');
-}
-
-// #133: toggle ON = ask before AI photo extraction (setting `false`). The store setter throws
-// on failure, so surface it rather than letting the rejection go unhandled.
-async function updateAskBeforePhotos(ask: boolean) {
-  try {
-    await settingsStore.setSkipDocumentConsentPrompt(!ask);
-  } catch {
-    showToast('error', t('error.saveFailed'), t('error.unexpectedFailureHelp'));
-  }
 }
 
 // ── Family Data handlers ─────────────────────────────────────────────────────
@@ -662,6 +664,14 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         icon-bg="var(--tint-orange-8)"
         @click="showSecurity = true"
       />
+      <SettingsCard
+        v-if="aiSurfaceEnabled"
+        icon="🤖"
+        :title="t('settings.card.ai')"
+        :description="t('settings.card.aiDesc')"
+        icon-bg="var(--tint-silk-20)"
+        @click="showAi = true"
+      />
     </div>
 
     <!-- ── Install App Banner ──────────────────────────────────────────── -->
@@ -703,102 +713,49 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       <div
         class="rounded-[var(--sq)] bg-white px-6 shadow-[0_2px_12px_rgba(44,62,80,0.04)] dark:bg-slate-800"
       >
-        <!-- Dark Mode -->
-        <div
-          class="flex items-center justify-between border-b border-[var(--tint-slate-05)] py-3.5 dark:border-slate-700"
+        <SettingToggleRow
+          divider
+          :title="t('settings.darkMode')"
+          :hint="t('settings.darkModeDescription')"
+          :model-value="settingsStore.theme === 'dark'"
+          @update:model-value="settingsStore.setTheme($event ? 'dark' : 'light')"
+        />
+        <SettingToggleRow
+          divider
+          testid="beanie-mode-toggle"
+          :title="t('settings.beanieMode')"
+          :hint="t('settings.beanieModeDescription')"
+          :model-value="settingsStore.beanieMode"
+          :disabled="!translationStore.isEnglish"
+          @update:model-value="settingsStore.setBeanieMode($event)"
         >
-          <div>
-            <p class="text-[0.8rem] font-semibold text-[var(--deep-slate)] dark:text-slate-200">
-              {{ t('settings.darkMode') }}
-            </p>
-            <p class="text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500">
-              {{ t('settings.darkModeDescription') }}
-            </p>
-          </div>
-          <ToggleSwitch
-            :model-value="settingsStore.theme === 'dark'"
-            @update:model-value="settingsStore.setTheme($event ? 'dark' : 'light')"
-          />
-        </div>
-        <!-- Beanie Mode -->
-        <div
-          class="flex items-center justify-between border-b border-[var(--tint-slate-05)] py-3.5 dark:border-slate-700"
-        >
-          <div>
-            <p class="text-[0.8rem] font-semibold text-[var(--deep-slate)] dark:text-slate-200">
-              {{ t('settings.beanieMode') }}
-            </p>
-            <p class="text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500">
-              {{ t('settings.beanieModeDescription') }}
-            </p>
-            <p
-              v-if="!translationStore.isEnglish"
-              class="text-[0.65rem] text-amber-600 dark:text-amber-400"
-            >
-              {{ t('settings.beanieModeDisabled') }}
-            </p>
-          </div>
-          <ToggleSwitch
-            data-testid="beanie-mode-toggle"
-            :model-value="settingsStore.beanieMode"
-            :disabled="!translationStore.isEnglish"
-            @update:model-value="settingsStore.setBeanieMode($event)"
-          />
-        </div>
-        <!-- Sound Effects -->
-        <div
-          class="flex items-center justify-between border-b border-[var(--tint-slate-05)] py-3.5 dark:border-slate-700"
-        >
-          <div>
-            <p class="text-[0.8rem] font-semibold text-[var(--deep-slate)] dark:text-slate-200">
-              {{ t('settings.soundEffects') }}
-            </p>
-            <p class="text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500">
-              {{ t('settings.soundEffectsDescription') }}
-            </p>
-          </div>
-          <ToggleSwitch
-            data-testid="sound-toggle"
-            :model-value="settingsStore.soundEnabled"
-            @update:model-value="settingsStore.setSoundEnabled($event)"
-          />
-        </div>
-        <!-- AI & Privacy (#133): ask before sending a photo/document to beanies AI.
-             ON = ask (setting false); turning it off stores the family-scoped skip. -->
-        <div
-          class="flex items-center justify-between border-b border-[var(--tint-slate-05)] py-3.5 dark:border-slate-700"
-        >
-          <div>
-            <p class="text-[0.8rem] font-semibold text-[var(--deep-slate)] dark:text-slate-200">
-              {{ t('settings.ai.askBeforePhotos') }}
-            </p>
-            <p class="text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500">
-              {{ t('settings.ai.askBeforePhotosHint') }}
-            </p>
-          </div>
-          <ToggleSwitch
-            data-testid="ai-consent-toggle"
-            :model-value="!settingsStore.skipDocumentConsentPrompt"
-            @update:model-value="updateAskBeforePhotos"
-          />
-        </div>
+          <p
+            v-if="!translationStore.isEnglish"
+            class="text-[0.65rem] text-amber-600 dark:text-amber-400"
+          >
+            {{ t('settings.beanieModeDisabled') }}
+          </p>
+        </SettingToggleRow>
+        <SettingToggleRow
+          divider
+          testid="sound-toggle"
+          :title="t('settings.soundEffects')"
+          :hint="t('settings.soundEffectsDescription')"
+          :model-value="settingsStore.soundEnabled"
+          @update:model-value="settingsStore.setSoundEnabled($event)"
+        />
+        <!-- (#133) The "ask before reading photos" consent toggle now lives in the
+             flag-gated beanies AI settings card (AiSettings.vue), consolidating the
+             whole AI surface in one place. -->
         <!-- Daily Tips — one bell entry per day; mute keeps existing tips
              readable, just stops new ones (see TipBody/useBeanTips). -->
-        <div class="flex items-center justify-between py-3.5">
-          <div>
-            <p class="text-[0.8rem] font-semibold text-[var(--deep-slate)] dark:text-slate-200">
-              {{ t('settings.dailyTips') }}
-            </p>
-            <p class="text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500">
-              {{ t('settings.dailyTipsDescription') }}
-            </p>
-          </div>
-          <ToggleSwitch
-            data-testid="daily-tips-toggle"
-            :model-value="beanTips.tipsEnabled.value"
-            @update:model-value="(v) => (v ? beanTips.enableTips() : beanTips.muteAllTips())"
-          />
-        </div>
+        <SettingToggleRow
+          testid="daily-tips-toggle"
+          :title="t('settings.dailyTips')"
+          :hint="t('settings.dailyTipsDescription')"
+          :model-value="beanTips.tipsEnabled.value"
+          @update:model-value="(v) => (v ? beanTips.enableTips() : beanTips.muteAllTips())"
+        />
       </div>
     </div>
 
@@ -827,6 +784,9 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     <!-- ══════════════════════════════════════════════════════════════════ -->
     <!-- ── MODALS ────────────────────────────────────────────────────── -->
     <!-- ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ── beanies AI Modal (#133, flag-gated) ─────────────────────────── -->
+    <AiSettings v-if="aiSurfaceEnabled" :open="showAi" @close="showAi = false" />
 
     <!-- ── Exchange Rates Warning Modal ─────────────────────────────────── -->
     <BaseModal :open="showRatesWarning" size="sm" layer="overlay" @close="showRatesWarning = false">
