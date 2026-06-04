@@ -5,9 +5,43 @@ import topLevelAwait from 'vite-plugin-top-level-await';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
 
+/**
+ * Fail an *official* production build that is missing an operational webhook.
+ *
+ * `deploy.yml` is the only build that sets VITE_BUILD_SHA (= github.sha), so its
+ * presence marks the canonical CI deploy. On such a build the Slack + error
+ * webhooks MUST be wired: without them the client notifications silently no-op
+ * (slackPost short-circuits on an empty URL; the no-cors POST can't report a
+ * failure). Local dev and self-host builds legitimately omit these, so they are
+ * skipped entirely. Runtime counterpart lives in src/config/features.ts.
+ *
+ * This complements — does not replace — deploying via the workflow: a manual
+ * `npm run build` has no VITE_BUILD_SHA, so it's caught at runtime instead (the
+ * features.ts dev-build-on-cloud-host check) rather than here.
+ */
+function assertOfficialBuildEnv() {
+  return {
+    name: 'beanies:assert-official-build-env',
+    apply: 'build' as const,
+    buildStart() {
+      if (!process.env.VITE_BUILD_SHA) return; // not the official CI build
+      const required = ['VITE_SLACK_WEBHOOK_URL', 'VITE_BEANIES_ERROR_WEBHOOK_URL'];
+      const missing = required.filter((k) => !process.env[k]?.trim());
+      if (missing.length > 0) {
+        throw new Error(
+          `[beanies] Official build is missing required env: ${missing.join(', ')}. ` +
+            'These gate operational Slack alerting — shipping without them silently drops every ' +
+            'notification. Set the matching GitHub secret/variable, then redeploy via "Deploy beanies PROD".'
+        );
+      }
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    assertOfficialBuildEnv(),
     wasm(),
     topLevelAwait(),
     vue(),
