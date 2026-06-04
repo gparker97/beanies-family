@@ -29,6 +29,8 @@ defineProps<{
   label: string;
   activeView: PlannerView;
   canAdd: boolean;
+  /** Gates the 📸 add-from-photo button. Falls back to `canAdd` when omitted. */
+  canAddFromPhoto?: boolean;
   isAllActive: boolean;
   isMemberActive: (id: string) => boolean;
   activeMemberNames: string[];
@@ -219,9 +221,10 @@ onBeforeUnmount(() => {
             @vacation-click="emit('vacation-click', $event)"
           />
 
-          <!-- Add from a photo (#133): reads an invitation photo into a prefilled activity -->
+          <!-- Add from a photo (#133): reads an invitation photo into a prefilled activity.
+               Gated by canAddFromPhoto (dev feature flag); falls back to canAdd when unset. -->
           <button
-            v-if="canAdd"
+            v-if="canAddFromPhoto ?? canAdd"
             type="button"
             class="inline-flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full bg-[var(--tint-orange-8)] text-lg transition-all hover:bg-[var(--tint-orange-15)] sm:rounded-2xl"
             :aria-label="t('ai.addFromPhoto')"

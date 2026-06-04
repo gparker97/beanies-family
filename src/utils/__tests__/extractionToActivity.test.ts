@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { extractionToActivityPrefill } from '../extractionToActivity';
+import {
+  extractionToActivityPrefill,
+  inferActivityCategory,
+  CATEGORY_KEYWORDS,
+} from '../extractionToActivity';
 import type { ExtractionResult } from '@/services/ai/types';
+import { ACTIVITY_CATEGORIES } from '@/constants/activityCategories';
 
 function result(overrides: Partial<ExtractionResult> = {}): ExtractionResult {
   return {
@@ -18,7 +23,7 @@ function result(overrides: Partial<ExtractionResult> = {}): ExtractionResult {
 }
 
 describe('extractionToActivityPrefill', () => {
-  it('maps a full timed event to all corresponding fields', () => {
+  it('maps a full timed event to all corresponding fields (+ inferred category)', () => {
     const prefill = extractionToActivityPrefill(
       result({
         title: "Mia's 6th Birthday",
@@ -37,6 +42,7 @@ describe('extractionToActivityPrefill', () => {
       endTime: '16:00',
       location: 'Sunshine Hall',
       description: 'Bring a gift',
+      category: 'birthday',
     });
   });
 
@@ -44,11 +50,11 @@ describe('extractionToActivityPrefill', () => {
     expect(extractionToActivityPrefill(result())).toEqual({});
   });
 
-  it('sets only the present fields for a partial extraction', () => {
+  it('sets only the present fields for a partial extraction (no category match)', () => {
     const prefill = extractionToActivityPrefill(
-      result({ title: 'Swim Lesson', date: '2026-08-01' })
+      result({ title: 'Catch-up time', date: '2026-08-01' })
     );
-    expect(prefill).toEqual({ title: 'Swim Lesson', date: '2026-08-01' });
+    expect(prefill).toEqual({ title: 'Catch-up time', date: '2026-08-01' });
   });
 
   it('all-day event carries isAllDay and drops clock times', () => {
@@ -66,10 +72,47 @@ describe('extractionToActivityPrefill', () => {
     expect(prefill.endTime).toBeUndefined();
   });
 
-  it('never invents an id/category/createdBy — only document-derived fields appear', () => {
+  it('never invents an id/createdBy/recurrence — recurrence is left to the modal', () => {
     const prefill = extractionToActivityPrefill(result({ title: 'X', date: '2026-01-01' }));
-    expect(prefill).not.toHaveProperty('category');
     expect(prefill).not.toHaveProperty('createdBy');
     expect(prefill).not.toHaveProperty('recurrence');
+    expect(prefill).not.toHaveProperty('category'); // 'X' matches no keyword
+  });
+});
+
+describe('inferActivityCategory', () => {
+  it('uses the AI hint as the primary signal (hint beats the title)', () => {
+    // The hint says dentist; the title would otherwise infer birthday — hint wins.
+    const category = inferActivityCategory(
+      result({ categoryHint: 'dentist appointment', title: "Mia's Birthday note" })
+    );
+    expect(category).toBe('dentist');
+  });
+
+  it('falls back to title + description when no hint is present', () => {
+    expect(inferActivityCategory(result({ title: 'Swim Lesson' }))).toBe('swimming');
+    expect(inferActivityCategory(result({ description: 'Annual school recital' }))).toBe(
+      'school_recital'
+    );
+  });
+
+  it('matches every term in a grouped-alternation pattern (word-bounded)', () => {
+    expect(inferActivityCategory(result({ title: "Noah's Bat Mitzvah" }))).toBe('bar_mitzvah');
+    expect(inferActivityCategory(result({ title: 'Bar Mitzvah celebration' }))).toBe('bar_mitzvah');
+  });
+
+  it('returns undefined when neither hint nor title/description matches', () => {
+    expect(
+      inferActivityCategory(result({ categoryHint: 'misc gathering', title: 'Catch-up' }))
+    ).toBeUndefined();
+  });
+});
+
+describe('CATEGORY_KEYWORDS integrity', () => {
+  it('every mapped id is a real ACTIVITY_CATEGORIES entry', () => {
+    const valid = new Set(ACTIVITY_CATEGORIES.map((c) => c.id));
+    for (const [, id] of CATEGORY_KEYWORDS) {
+      expect(valid.has(id)).toBe(true);
+    }
   });
 });

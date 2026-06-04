@@ -1,11 +1,12 @@
-// Wedge orchestration (ADR-030, #133, Phase 3): photo/document → consent → extraction →
-// prefilled activity. Kept deliberately THIN — file intake, the consent gate, the extraction
-// call, and mapping to a prefill. The generic concerns (tier/availability) live in
+// Wedge orchestration (ADR-030, #133, Phase 3): photo/document → extraction → prefilled
+// activity. Kept deliberately THIN — file intake, the extraction call, and mapping to a
+// prefill. Consent is gated by the CALLER before the file picker even opens (see
+// FamilyPlannerPage.handleAddFromPhoto) — nothing here runs until the document is picked,
+// which only happens post-consent. The generic concerns (tier/availability) live in
 // useAiCapability; the only wedge-specific code is the pure mapper (extractionToActivity).
 //
-// Every outcome is explicit and non-silent (see docs/lessons.md): consent declined is a
-// silent no-op with NO network and NO toast; offline is guarded before any work; every
-// failure code maps to an informative toast at the right severity.
+// Every outcome is explicit and non-silent (see docs/lessons.md): offline is guarded before
+// any work; every failure code maps to an informative toast at the right severity.
 
 import { ref } from 'vue';
 import { useAiCapability } from './useAiCapability';
@@ -19,8 +20,6 @@ import { toDateInputValue } from '@/utils/date';
 import type { CreateFamilyActivityInput } from '@/types/models';
 
 export interface UseDocumentToActivityOptions {
-  /** Show the per-action consent modal; resolve `true` only if the user agrees to send this document. */
-  requestConsent: () => Promise<boolean>;
   /**
    * Called once extraction succeeds (so the page can open ActivityModal pre-filled, flag
    * low-confidence fields, and attach the source photo). Nothing is auto-created. Takes a
@@ -71,7 +70,7 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
     }
   }
 
-  /** Run the full intake → consent → extract → prefill flow for one document. */
+  /** Run the full intake → extract → prefill flow for one document (consent already granted). */
   async function processFile(file: File): Promise<void> {
     if (isProcessing.value) return; // ignore a second pick while one is in flight
 
@@ -79,9 +78,6 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
       showToast('info', t('ai.offline.title'), t('ai.offline.message'));
       return;
     }
-
-    const consented = await options.requestConsent();
-    if (!consented) return; // silent no-op: no network, no toast
 
     isProcessing.value = true;
     try {
