@@ -1101,6 +1101,15 @@ export interface AIApiKeys {
   gemini?: string;
 }
 
+/**
+ * Preference-ordered AI tiers (#133, ADR-030). Client settings hold the TIER
+ * choice + BYOK keys only. The managed (Tinfoil) tier intentionally has NO
+ * client-side key — it lives server-side in the ai-extract Lambda. That
+ * separation IS the privacy boundary, not an unfinished feature; never store a
+ * managed key in `AIApiKeys`.
+ */
+export type AiTier = 'managed' | 'byok' | 'on-device';
+
 // Settings - App configuration
 export interface Settings {
   id: 'app_settings';
@@ -1119,6 +1128,9 @@ export interface Settings {
   lastSyncTimestamp?: ISODateString;
   aiProvider: AIProvider;
   aiApiKeys: AIApiKeys;
+  // #133: which AI tier processes documents. Optional because pre-existing family
+  // docs predate the field — read it via settingsStore.aiTier (coalesces to 'managed').
+  aiTier?: AiTier;
   preferredCurrencies?: CurrencyCode[];
   customInstitutions?: string[];
   onboardingCompleted?: boolean;

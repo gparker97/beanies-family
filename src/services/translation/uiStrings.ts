@@ -6519,6 +6519,64 @@ const STRING_DEFS = {
     en: 'Show a privacy check before sending a photo or document to beanies AI.',
     beanie: 'show a privacy check before sending a photo or document to beanies ai.',
   },
+  // #133 Phase 4 — AI tier settings
+  'settings.card.ai': { en: 'beanies AI', beanie: 'beanies ai' },
+  'settings.card.aiDesc': {
+    en: 'How AI handles your documents',
+    beanie: 'how ai handles your beans',
+  },
+  'settings.ai.tierLabel': {
+    en: 'How documents are processed',
+    beanie: 'how documents are processed',
+  },
+  'settings.ai.tier.managed': { en: 'Managed (recommended)', beanie: 'managed (recommended)' },
+  'settings.ai.tier.byok': { en: 'Your own key (BYOK)', beanie: 'your own key (byok)' },
+  'settings.ai.tier.onDevice': { en: 'On your device', beanie: 'on your device' },
+  'settings.ai.comingSoon': { en: ' (coming soon)', beanie: ' (coming soon)' },
+  'settings.ai.privacy.managed': {
+    en: 'Your document is processed in an attested confidential-compute enclave. It is data-minimized, nothing is retained, and your beanies never hold the key.',
+    beanie:
+      'your document is processed in an attested confidential-compute enclave. it is data-minimized, nothing is retained, and your beanies never hold the key.',
+  },
+  'settings.ai.privacy.byok': {
+    en: 'Your own provider key is used. The document goes straight from your device to your provider, so beanies never sees your key or your document.',
+    beanie:
+      'your own provider key is used. the document goes straight from your device to your provider, so beanies never sees your key or your document.',
+  },
+  'settings.ai.privacy.onDevice': {
+    en: 'Everything stays on your device and nothing is sent anywhere. Coming soon.',
+    beanie: 'everything stays on your device and nothing is sent anywhere. coming soon.',
+  },
+  'settings.ai.byok.provider': { en: 'Provider', beanie: 'provider' },
+  'settings.ai.byok.apiKey': { en: 'API Key', beanie: 'api key' },
+  'settings.ai.byok.apiKeyHint': {
+    en: 'Stored on this device only. beanies never sees it.',
+    beanie: 'stored on this device only. beanies never sees it.',
+  },
+  'settings.ai.byok.apiKeyPlaceholder': { en: 'sk-...', beanie: 'sk-...' },
+  'settings.ai.provider.openai': { en: 'OpenAI', beanie: 'openai' },
+  'settings.ai.provider.claude': { en: 'Claude', beanie: 'claude' },
+  'settings.ai.provider.gemini': { en: 'Gemini', beanie: 'gemini' },
+  'settings.ai.byok.test': { en: 'Test Key', beanie: 'test key' },
+  'settings.ai.byok.testing': { en: 'Testing...', beanie: 'counting beans...' },
+  'settings.ai.test.ok.title': { en: 'Key works', beanie: 'key works' },
+  'settings.ai.test.ok.message': {
+    en: 'Your OpenAI key connected successfully.',
+    beanie: 'your openai key connected successfully.',
+  },
+  'settings.ai.test.invalid.title': { en: "Key didn't work", beanie: "key didn't work" },
+  'settings.ai.test.invalid.message': {
+    en: 'OpenAI rejected this key. Check it was copied correctly and is still active.',
+    beanie: 'openai rejected this key. check it was copied correctly and is still active.',
+  },
+  'settings.ai.test.network.title': {
+    en: "Couldn't reach OpenAI",
+    beanie: "couldn't reach openai",
+  },
+  'settings.ai.test.network.message': {
+    en: "We couldn't verify the key right now. Check your connection and try again.",
+    beanie: "we couldn't verify the key right now. check your connection and try again.",
+  },
   'photos.dropToAdd': { en: 'Drop photo to add', beanie: 'drop photo to add' },
   'photos.missing.tile': { en: 'Photo missing', beanie: 'photo missing' },
   'photos.missing.title': { en: "We Can't Find This Photo", beanie: "we can't find this photo" },

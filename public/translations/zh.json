@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-04",
-    "translationCount": 3001
+    "translationCount": 3026
   },
   "translations": {
     "app.name": {
@@ -15009,6 +15009,131 @@
     "ai.error.busy.message": {
       "translation": "beanies AI现在很忙。请稍后重试。",
       "hash": "1ww8h1",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.card.ai": {
+      "translation": "beanies AI",
+      "hash": "cegx8f",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.card.aiDesc": {
+      "translation": "人工智能如何处理您的文档",
+      "hash": "2jf8mw",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.tierLabel": {
+      "translation": "如何处理文件",
+      "hash": "ngfjmy",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.tier.managed": {
+      "translation": "托管（推荐）",
+      "hash": "bid5zf",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.tier.byok": {
+      "translation": "您自己的密钥（ BYOK ）",
+      "hash": "sq9vxm",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.tier.onDevice": {
+      "translation": "在您的设备上",
+      "hash": "ggzflq",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.comingSoon": {
+      "translation": "(即将开放)",
+      "hash": "1d6913",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.privacy.managed": {
+      "translation": "您的文档在经过认证的机密计算飞地中处理。仅发送必要数据，不会保留任何内容，您的 beanies 永远不会持有密钥。",
+      "hash": "l4wuh1",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.privacy.byok": {
+      "translation": "使用您自己的提供商密钥。文档直接从您的设备发送到您的提供商，因此 beanies 永远不会看到您的密钥或文档。",
+      "hash": "yky42a",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.privacy.onDevice": {
+      "translation": "所有内容都会保留在您的设备上，任何内容都不会发送到任何地方。即将推出。",
+      "hash": "ndiyo6",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.byok.provider": {
+      "translation": "提供商",
+      "hash": "f9fw8f",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.byok.apiKey": {
+      "translation": "API 密钥",
+      "hash": "1dfilj",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.byok.apiKeyHint": {
+      "translation": "仅存储在此设备上。beanies 永远不会看到它。",
+      "hash": "bov1ui",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.byok.apiKeyPlaceholder": {
+      "translation": "%sk",
+      "hash": "ex9thj",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.provider.openai": {
+      "translation": "OpenAI 首选模型",
+      "hash": "vv45im",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.provider.claude": {
+      "translation": "克劳德",
+      "hash": "xf6vge",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.provider.gemini": {
+      "translation": "Gemini",
+      "hash": "z7q82d",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.byok.test": {
+      "translation": "测试密钥",
+      "hash": "hx7v3j",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.byok.testing": {
+      "translation": "测试中…",
+      "hash": "tv3we",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.test.ok.title": {
+      "translation": "主要作品",
+      "hash": "nucm8v",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.test.ok.message": {
+      "translation": "您的OpenAI密钥已成功连接。",
+      "hash": "qw8be6",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.test.invalid.title": {
+      "translation": "不能使用",
+      "hash": "8d0q24",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.test.invalid.message": {
+      "translation": "OpenAI拒绝了此密钥。检查是否已正确复制，并且仍处于活动状态。",
+      "hash": "b9agi1",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.test.network.title": {
+      "translation": "无法访问OpenAI",
+      "hash": "qcvz6t",
+      "lastUpdated": "2026-06-04"
+    },
+    "settings.ai.test.network.message": {
+      "translation": "我们目前无法验证密钥。请检查您的网络连接，然后重试。",
+      "hash": "uso1xy",
       "lastUpdated": "2026-06-04"
     }
   }

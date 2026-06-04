@@ -4,6 +4,9 @@ import { computed } from 'vue';
 interface Option {
   value: string | number;
   label: string;
+  /** Render the option but block selection (e.g. a "coming soon" tier). Optional —
+   *  existing callers omit it and the option stays selectable. */
+  disabled?: boolean;
 }
 
 interface OptionGroup {
@@ -93,6 +96,7 @@ function handleChange(event: Event) {
               v-for="option in group.options"
               :key="option.value"
               :value="option.value"
+              :disabled="option.disabled"
               class="font-normal"
             >
               {{ option.label }}
@@ -102,7 +106,12 @@ function handleChange(event: Event) {
 
         <!-- Flat options -->
         <template v-else>
-          <option v-for="option in options" :key="option.value" :value="option.value">
+          <option
+            v-for="option in options"
+            :key="option.value"
+            :value="option.value"
+            :disabled="option.disabled"
+          >
             {{ option.label }}
           </option>
         </template>

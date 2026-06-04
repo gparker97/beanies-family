@@ -9,8 +9,10 @@
 // `attestation` is metadata of the *managed* result only → an OPTIONAL field that
 // on-device/BYOK providers simply omit. Never make it required.
 
-/** Preference-ordered tiers. See ADR-030. */
-export type AiTier = 'managed' | 'byok' | 'on-device';
+/** Preference-ordered tiers. See ADR-030. Canonical definition lives in `@/types/models`
+ *  (so `Settings.aiTier` can reference it without a layering inversion); re-exported here
+ *  for the AI service/provider modules. */
+export type { AiTier } from '@/types/models';
 
 /**
  * Concrete inference backends. `tinfoil` is the managed-tier engine (server-held
