@@ -8,6 +8,8 @@ import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import { BaseCombobox } from '@/components/ui';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
+import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import {
@@ -302,6 +304,24 @@ const rules = computed<BookingValidationRules<SegmentField>>(() => {
 
 const validation = useBookingValidation<SegmentField>(status, rules);
 const canSave = validation.canSave;
+
+// --- Booking-document attachments (images + PDFs) --------------------
+// Live photoIds read from the store (not the captured `props.segment`
+// snapshot, which can go stale after an attach). Add/remove persist
+// immediately via `updateSegmentPhotoIds`, independent of the Save button;
+// handleSave preserves them by spreading the freshly-read segment.
+const segmentPhotoIds = computed<string[]>(
+  () =>
+    vacationStore.getVacationById(props.vacationId)?.travelSegments[props.segmentIndex]?.photoIds ??
+    []
+);
+const attachmentEntityId = computed(() =>
+  vacationSegmentEntityId(props.vacationId, props.segment?.id ?? '')
+);
+function onPhotoIds(ids: string[]): void {
+  if (!props.segment?.id) return;
+  void vacationStore.updateSegmentPhotoIds(props.vacationId, props.segment.id, ids);
+}
 
 function handleDepartureTimeChange(val: string | number) {
   const v = String(val);
@@ -891,6 +911,18 @@ async function handleSave() {
           v-model="notes"
           :placeholder="t('vacation.field.notesPlaceholder')"
           :rows="3"
+        />
+      </FormFieldGroup>
+
+      <!-- Booking documents (images + PDFs) -->
+      <FormFieldGroup v-if="segment?.id" :label="t('vacation.field.documents')">
+        <PhotoAttachments
+          collection="vacations"
+          :entity-id="attachmentEntityId"
+          :photo-ids="segmentPhotoIds"
+          allow-documents
+          :max="6"
+          @update:photo-ids="onPhotoIds"
         />
       </FormFieldGroup>
     </div>

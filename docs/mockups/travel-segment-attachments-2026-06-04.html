@@ -1,0 +1,1404 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Travel segment attachments — mockup · beanies.family</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --slate: #2c3e50;
+        --slate-dark: #1a252f;
+        --orange: #f15d22;
+        --orange-dark: #d14d1a;
+        --silk: #aed6f1;
+        --terracotta: #e67e22;
+        --cloud: #f8f9fa;
+        --green: #27ae60;
+
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-silk-10: rgba(174, 214, 241, 0.1);
+        --tint-silk-20: rgba(174, 214, 241, 0.2);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+        --tint-slate-10: rgba(44, 62, 80, 0.1);
+        --tint-terra-12: rgba(230, 126, 34, 0.12);
+        --tint-success-10: rgba(39, 174, 96, 0.1);
+
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --card-hover-shadow: 0 8px 32px rgba(44, 62, 80, 0.1);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+        --sq: 24px;
+
+        --text-muted: #7b8794;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: 'Inter', sans-serif;
+        background:
+          radial-gradient(1200px 600px at 85% -10%, rgba(174, 214, 241, 0.25), transparent 60%),
+          radial-gradient(900px 500px at -10% 110%, rgba(241, 93, 34, 0.06), transparent 55%),
+          var(--cloud);
+        color: var(--slate);
+        line-height: 1.5;
+        padding: 48px 24px 96px;
+        min-height: 100vh;
+      }
+
+      .page {
+        max-width: 1120px;
+        margin: 0 auto;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4,
+      .display {
+        font-family: 'Outfit', sans-serif;
+      }
+
+      /* ---------- page header ---------- */
+      .masthead {
+        margin-bottom: 12px;
+      }
+      .eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--orange);
+      }
+      .masthead h1 {
+        font-size: 2.25rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 6px 0 10px;
+      }
+      .masthead p {
+        max-width: 720px;
+        color: #51606e;
+        font-size: 0.95rem;
+      }
+      .tagline {
+        font-family: 'Caveat', cursive;
+        font-size: 1.25rem;
+        color: var(--terracotta);
+        margin-top: 10px;
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 22px 0 8px;
+      }
+      .legend .pill {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 20px;
+        background: white;
+        box-shadow: var(--card-shadow);
+        border: 1px solid var(--tint-slate-5);
+      }
+
+      /* ---------- section scaffolding ---------- */
+      section.block {
+        margin-top: 56px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+      .sec-num {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 0.85rem;
+        color: white;
+        background: var(--slate);
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        flex: none;
+        transform: translateY(-2px);
+      }
+      .sec-head h2 {
+        font-size: 1.4rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      .sec-sub {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin: 2px 0 22px 40px;
+        max-width: 760px;
+      }
+      .sec-sub strong {
+        color: var(--slate);
+      }
+
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 26px;
+      }
+      @media (min-width: 880px) {
+        .grid2.desktop-phone {
+          grid-template-columns: 1.55fr 1fr;
+          align-items: start;
+        }
+      }
+
+      .frame-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .frame-label::before {
+        content: '';
+        width: 14px;
+        height: 14px;
+        border-radius: 5px;
+        background: var(--tint-silk-20);
+      }
+      .frame-label.mobile::before {
+        background: var(--tint-orange-15);
+      }
+
+      /* ---------- generic surfaces ---------- */
+      .surface {
+        background: white;
+        border-radius: var(--sq);
+        box-shadow: var(--card-shadow);
+        padding: 20px;
+      }
+
+      /* phone frame */
+      .phone {
+        width: 360px;
+        max-width: 100%;
+        margin: 0 auto;
+        border-radius: 40px;
+        background: var(--slate);
+        padding: 12px;
+        box-shadow: var(--soft-shadow);
+      }
+      .phone .screen {
+        background: var(--cloud);
+        border-radius: 30px;
+        overflow: hidden;
+        min-height: 200px;
+      }
+      .phone .statusbar {
+        height: 30px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .phone .notch {
+        width: 110px;
+        height: 22px;
+        background: var(--slate);
+        border-radius: 0 0 16px 16px;
+      }
+      .phone .pad {
+        padding: 14px;
+      }
+
+      /* ---------- segment card (timeline) ---------- */
+      .timeline-rail {
+        position: relative;
+        padding-left: 34px;
+      }
+      .timeline-rail::before {
+        content: '';
+        position: absolute;
+        left: 11px;
+        top: 6px;
+        bottom: 6px;
+        width: 2px;
+        background: linear-gradient(var(--silk), var(--tint-slate-10));
+        border-radius: 2px;
+      }
+      .rail-dot {
+        position: absolute;
+        left: 4px;
+        top: 22px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: white;
+        border: 3px solid var(--terracotta);
+      }
+
+      .seg-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: var(--card-shadow);
+        border: 1px solid var(--tint-slate-5);
+        padding: 14px 16px;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      }
+      .seg-card + .seg-card {
+        margin-top: 16px;
+      }
+      .seg-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--card-hover-shadow);
+      }
+      .seg-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .seg-emoji {
+        font-size: 1.4rem;
+        width: 40px;
+        height: 40px;
+        border-radius: 14px;
+        background: var(--tint-silk-20);
+        display: grid;
+        place-items: center;
+        flex: none;
+      }
+      .seg-body {
+        flex: 1;
+        min-width: 0;
+      }
+      .seg-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 1rem;
+      }
+      .seg-meta {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
+      .seg-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: none;
+      }
+      .status-pill {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 20px;
+        background: var(--tint-success-10);
+        color: var(--green);
+      }
+      .status-pill.pending {
+        background: var(--tint-orange-15);
+        color: var(--orange-dark);
+      }
+      .chev {
+        color: var(--tint-slate-10);
+        font-size: 1.1rem;
+      }
+
+      /* indicator variants */
+      .attach-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 4px 9px 4px 7px;
+        border-radius: 20px;
+        background: var(--tint-slate-5);
+        color: #5a6b7a;
+      }
+      .attach-chip .dot {
+        color: var(--orange);
+      }
+
+      .attach-stack {
+        display: inline-flex;
+        align-items: center;
+      }
+      .attach-stack .mini {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        border: 2px solid white;
+        box-shadow: 0 1px 4px rgba(44, 62, 80, 0.15);
+        background-size: cover;
+        background-position: center;
+        margin-left: -10px;
+        display: grid;
+        place-items: center;
+        font-size: 0.85rem;
+      }
+      .attach-stack .mini:first-child {
+        margin-left: 0;
+      }
+      .attach-stack .mini.doc {
+        background: var(--slate);
+        color: white;
+      }
+      .attach-stack .mini.count {
+        background: var(--tint-orange-15);
+        color: var(--orange-dark);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 0.7rem;
+      }
+
+      /* ---------- attach control / dashed strip ---------- */
+      .field-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #9aa6b1;
+        margin-bottom: 9px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .dropzone {
+        border: 2px dashed var(--tint-slate-10);
+        border-radius: 18px;
+        background: #fcfdfe;
+      }
+      .strip {
+        display: flex;
+        gap: 10px;
+        padding: 12px;
+        overflow-x: auto;
+        align-items: stretch;
+      }
+      .strip::-webkit-scrollbar {
+        height: 6px;
+      }
+      .strip::-webkit-scrollbar-thumb {
+        background: var(--tint-slate-10);
+        border-radius: 6px;
+      }
+
+      .tile {
+        width: 96px;
+        height: 96px;
+        border-radius: 16px;
+        flex: none;
+        position: relative;
+        overflow: hidden;
+      }
+      .tile.image {
+        background-size: cover;
+        background-position: center;
+        box-shadow: inset 0 0 0 1px var(--tint-slate-10);
+      }
+      .tile .remove {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: rgba(26, 37, 47, 0.78);
+        color: white;
+        border: none;
+        font-size: 0.85rem;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        backdrop-filter: blur(2px);
+      }
+
+      .add-tile {
+        width: 96px;
+        height: 96px;
+        border-radius: 16px;
+        flex: none;
+        border: 2px dashed var(--tint-slate-10);
+        background: transparent;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition:
+          color 0.15s,
+          border-color 0.15s,
+          background 0.15s;
+        font-family: 'Inter', sans-serif;
+      }
+      .add-tile:hover {
+        color: var(--orange);
+        border-color: rgba(241, 93, 34, 0.5);
+        background: rgba(241, 93, 34, 0.04);
+      }
+      .add-tile .ic {
+        font-size: 1.3rem;
+      }
+      .add-tile .lbl {
+        font-size: 0.625rem;
+      }
+      .drop-hint {
+        padding: 0 14px 11px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      /* ---------- document tile treatments ---------- */
+      .treatments {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      @media (min-width: 760px) {
+        .treatments {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      .treatment {
+        background: white;
+        border-radius: var(--sq);
+        box-shadow: var(--card-shadow);
+        padding: 22px 20px 20px;
+        position: relative;
+        border: 1px solid var(--tint-slate-5);
+      }
+      .treatment.recommended {
+        border: 2px solid var(--orange);
+      }
+      .treatment .tname {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+      }
+      .treatment .tletter {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 0.78rem;
+        color: white;
+        background: var(--slate);
+        border-radius: 7px;
+        padding: 2px 8px;
+        margin-right: 8px;
+      }
+      .treatment.recommended .tletter {
+        background: var(--orange);
+      }
+      .rec-flag {
+        position: absolute;
+        top: -11px;
+        right: 16px;
+        background: var(--orange);
+        color: white;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 4px 10px;
+        border-radius: 20px;
+      }
+      .treatment .tdesc {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin: 6px 0 18px;
+        min-height: 54px;
+      }
+      .tstage {
+        display: flex;
+        justify-content: center;
+        padding: 18px 6px 6px;
+        background: var(--cloud);
+        border-radius: 16px;
+      }
+
+      /* doc tile — Treatment A: boarding-pass stub */
+      .doc-stub {
+        width: 124px;
+        height: 96px;
+        background: white;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(44, 62, 80, 0.12);
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .doc-stub .edge {
+        height: 6px;
+        background: linear-gradient(90deg, var(--orange), var(--terracotta));
+      }
+      .doc-stub .perf {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 28px;
+        border-top: 2px dashed var(--tint-slate-10);
+      }
+      .doc-stub .perf::before,
+      .doc-stub .perf::after {
+        content: '';
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--cloud);
+        top: -7px;
+      }
+      .doc-stub .perf::before {
+        left: -6px;
+      }
+      .doc-stub .perf::after {
+        right: -6px;
+      }
+      .doc-stub .body {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.7rem;
+      }
+      .doc-stub .foot {
+        height: 28px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 0 9px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.62rem;
+        font-weight: 600;
+        color: var(--slate);
+      }
+      .doc-stub .foot .ft {
+        color: var(--orange);
+        font-weight: 700;
+      }
+
+      /* doc tile — Treatment B: clean doc card */
+      .doc-clean {
+        width: 96px;
+        height: 96px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: inset 0 0 0 1px var(--tint-slate-10);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 8px;
+        position: relative;
+      }
+      .doc-clean .glyph {
+        font-size: 1.9rem;
+        line-height: 1;
+      }
+      .doc-clean .badge {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.58rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: white;
+        background: var(--terracotta);
+        padding: 2px 7px;
+        border-radius: 6px;
+      }
+      .doc-clean .fname {
+        font-size: 0.62rem;
+        color: var(--text-muted);
+        max-width: 84px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: center;
+      }
+
+      /* doc tile — Treatment C: folder tab */
+      .doc-folder {
+        width: 104px;
+        height: 96px;
+        position: relative;
+      }
+      .doc-folder .tab {
+        position: absolute;
+        top: 6px;
+        left: 10px;
+        width: 46px;
+        height: 14px;
+        border-radius: 8px 8px 0 0;
+        background: var(--terracotta);
+      }
+      .doc-folder .sheet {
+        position: absolute;
+        top: 14px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(160deg, #fff, #fbf3ec);
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(44, 62, 80, 0.12);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+      }
+      .doc-folder .sheet .glyph {
+        font-size: 1.55rem;
+      }
+      .doc-folder .sheet .fname {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.6rem;
+        font-weight: 600;
+        color: var(--slate);
+        max-width: 86px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* ---------- lightbox ---------- */
+      .viewer {
+        background: var(--slate-dark);
+        border-radius: var(--sq);
+        overflow: hidden;
+        box-shadow: var(--soft-shadow);
+      }
+      .viewer .vbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        color: white;
+      }
+      .viewer .vbar .vtitle {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .viewer .vbar .vtitle .fn {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .viewer .vactions {
+        display: flex;
+        gap: 8px;
+        flex: none;
+      }
+      .vbtn {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        border: none;
+        background: rgba(255, 255, 255, 0.12);
+        color: white;
+        cursor: pointer;
+        font-size: 1rem;
+        display: grid;
+        place-items: center;
+      }
+      .vbtn.x {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .vstage {
+        height: 360px;
+        display: grid;
+        place-items: center;
+        position: relative;
+        background:
+          radial-gradient(600px 300px at 50% 0%, rgba(174, 214, 241, 0.12), transparent 70%);
+      }
+      .vstage img {
+        max-width: 86%;
+        max-height: 88%;
+        border-radius: 10px;
+        box-shadow: 0 16px 50px rgba(0, 0, 0, 0.5);
+      }
+      .vnav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.14);
+        color: white;
+        border: none;
+        font-size: 1.1rem;
+        cursor: pointer;
+      }
+      .vnav.prev {
+        left: 16px;
+      }
+      .vnav.next {
+        right: 16px;
+      }
+      .vpips {
+        position: absolute;
+        bottom: 16px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        gap: 7px;
+      }
+      .vpip {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.4);
+      }
+      .vpip.active {
+        background: var(--orange);
+      }
+
+      /* PDF viewer stage */
+      .pdf-stage {
+        height: 360px;
+        background: #e9edf1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 24px;
+        text-align: center;
+      }
+      .pdf-doc {
+        width: 220px;
+        max-width: 70%;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+        padding: 18px 16px;
+        text-align: left;
+      }
+      .pdf-doc .ph {
+        height: 8px;
+        border-radius: 4px;
+        background: var(--tint-slate-10);
+        margin-bottom: 8px;
+      }
+      .pdf-doc .ph.title {
+        height: 12px;
+        width: 70%;
+        background: var(--slate);
+        opacity: 0.7;
+        margin-bottom: 14px;
+      }
+      .pdf-doc .ph.s {
+        width: 90%;
+      }
+      .pdf-doc .ph.m {
+        width: 75%;
+      }
+      .pdf-doc .ph.airline {
+        width: 40%;
+        background: var(--orange);
+        opacity: 0.5;
+        height: 10px;
+        margin-bottom: 16px;
+      }
+      .open-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: white;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        padding: 11px 20px;
+        border-radius: 16px;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 6px 18px rgba(241, 93, 34, 0.3);
+      }
+      .pdf-note {
+        font-size: 0.78rem;
+        color: #6b7681;
+      }
+
+      .callout {
+        margin-top: 18px;
+        background: var(--tint-orange-8);
+        border-radius: 16px;
+        padding: 14px 16px;
+        font-size: 0.84rem;
+        color: #6a4a38;
+        display: flex;
+        gap: 10px;
+      }
+      .callout b {
+        color: var(--slate);
+      }
+
+      .note-row {
+        display: flex;
+        gap: 22px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+      .note {
+        flex: 1;
+        min-width: 220px;
+        background: white;
+        border-radius: 18px;
+        padding: 15px 17px;
+        box-shadow: var(--card-shadow);
+        border: 1px solid var(--tint-slate-5);
+      }
+      .note h4 {
+        font-size: 0.9rem;
+        margin-bottom: 5px;
+      }
+      .note p {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
+
+      footer.foot {
+        margin-top: 64px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+      }
+      .pod {
+        display: inline-flex;
+        gap: 5px;
+        margin-bottom: 10px;
+      }
+      .pod i {
+        width: 12px;
+        height: 16px;
+        border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+        display: inline-block;
+      }
+      .pod i:nth-child(1) {
+        background: var(--slate);
+      }
+      .pod i:nth-child(2) {
+        background: var(--terracotta);
+      }
+      .pod i:nth-child(3) {
+        background: var(--orange);
+      }
+      .pod i:nth-child(4) {
+        background: var(--silk);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- ============ MASTHEAD ============ -->
+      <header class="masthead">
+        <div class="eyebrow">beanies.family · mockup · 2026-06-04</div>
+        <h1>Attach images &amp; PDFs to travel segments</h1>
+        <p>
+          Keep the original booking or itinerary right on the segment — an airline e-ticket PDF,
+          a hotel confirmation screenshot. Built on the same photo pipeline activities already use,
+          extended to also hold PDFs. This mockup shows every surface at desktop and phone widths,
+          and offers <strong>three treatments for the new PDF "document tile"</strong> and
+          <strong>two for the "has attachment" indicator</strong> — pick one of each.
+        </p>
+        <div class="tagline">every bean counts — and now so does every boarding pass</div>
+
+        <div class="legend">
+          <span class="pill">🟠 Heritage Orange — actions</span>
+          <span class="pill">🔵 Deep Slate — anchor</span>
+          <span class="pill">🟦 Sky Silk — calm</span>
+          <span class="pill">squircle 24px · soft shadows</span>
+          <span class="pill">Outfit + Inter</span>
+        </div>
+      </header>
+
+      <!-- ============ 1 · INDICATOR ON COLLAPSED CARD ============ -->
+      <section class="block">
+        <div class="sec-head">
+          <span class="sec-num">1</span>
+          <h2>The "has attachment" indicator</h2>
+        </div>
+        <p class="sec-sub">
+          On the collapsed timeline card, a quiet signal that this segment carries documents — so you
+          can see it at a glance without expanding. <strong>Pick A or B.</strong> Both sit left of the
+          status pill and disappear entirely when a segment has zero attachments.
+        </p>
+
+        <div class="grid2 desktop-phone">
+          <div>
+            <div class="frame-label">Desktop · trip timeline</div>
+            <div class="surface">
+              <div class="timeline-rail">
+                <span class="rail-dot"></span>
+                <!-- Variant A: paperclip chip -->
+                <div class="seg-card">
+                  <div class="seg-top">
+                    <div class="seg-emoji">✈️</div>
+                    <div class="seg-body">
+                      <div class="seg-title">SIN → HND · Singapore Airlines</div>
+                      <div class="seg-meta">Sat 21 Mar · 09:40 — SQ12</div>
+                    </div>
+                    <div class="seg-right">
+                      <span class="attach-chip" title="Indicator A — paperclip chip"
+                        ><span class="dot">📎</span> 2</span
+                      >
+                      <span class="status-pill">Booked</span>
+                      <span class="chev">⌄</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Variant B: mini stack -->
+                <div class="seg-card">
+                  <div class="seg-top">
+                    <div class="seg-emoji">🏨</div>
+                    <div class="seg-body">
+                      <div class="seg-title">Park Hyatt Tokyo</div>
+                      <div class="seg-meta">3 nights · check-in 21 Mar</div>
+                    </div>
+                    <div class="seg-right">
+                      <span class="attach-stack" title="Indicator B — mini stack">
+                        <span
+                          class="mini"
+                          style="
+                            background-image: url('https://images.unsplash.com/photo-1542640244-7e672d6cef4e?w=120&q=60');
+                          "
+                        ></span>
+                        <span class="mini doc">📄</span>
+                        <span class="mini count">+1</span>
+                      </span>
+                      <span class="status-pill pending">Pending</span>
+                      <span class="chev">⌄</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- No attachments — indicator absent -->
+                <div class="seg-card">
+                  <div class="seg-top">
+                    <div class="seg-emoji">🚆</div>
+                    <div class="seg-body">
+                      <div class="seg-title">Tokyo → Kyoto · Shinkansen</div>
+                      <div class="seg-meta">no documents yet — indicator hidden</div>
+                    </div>
+                    <div class="seg-right">
+                      <span class="status-pill pending">Pending</span>
+                      <span class="chev">⌄</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="callout">
+                <span>💡</span>
+                <div>
+                  <b>Indicator A (paperclip chip)</b> reads as "documents attached" universally and is
+                  tiny. <b>Indicator B (mini stack)</b> previews the actual content (image thumb + a
+                  📄 for PDFs + a "+N" overflow) — warmer, but busier on a dense timeline.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="frame-label mobile">Phone · same two indicators</div>
+            <div class="phone">
+              <div class="screen">
+                <div class="statusbar"><div class="notch"></div></div>
+                <div class="pad">
+                  <div class="seg-card">
+                    <div class="seg-top">
+                      <div class="seg-emoji">✈️</div>
+                      <div class="seg-body">
+                        <div class="seg-title" style="font-size: 0.92rem">SIN → HND</div>
+                        <div class="seg-meta">09:40 · SQ12</div>
+                      </div>
+                      <div class="seg-right">
+                        <span class="attach-chip"><span class="dot">📎</span> 2</span>
+                        <span class="chev">⌄</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="seg-card">
+                    <div class="seg-top">
+                      <div class="seg-emoji">🏨</div>
+                      <div class="seg-body">
+                        <div class="seg-title" style="font-size: 0.92rem">Park Hyatt</div>
+                        <div class="seg-meta">3 nights</div>
+                      </div>
+                      <div class="seg-right">
+                        <span class="attach-stack">
+                          <span
+                            class="mini"
+                            style="
+                              background-image: url('https://images.unsplash.com/photo-1542640244-7e672d6cef4e?w=120&q=60');
+                            "
+                          ></span>
+                          <span class="mini doc">📄</span>
+                          <span class="mini count">+1</span>
+                        </span>
+                        <span class="chev">⌄</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 2 · ATTACH CONTROL ============ -->
+      <section class="block">
+        <div class="sec-head">
+          <span class="sec-num">2</span>
+          <h2>The attach control — in the edit drawer &amp; wizard</h2>
+        </div>
+        <p class="sec-sub">
+          A new <strong>"Booking documents"</strong> section inside the segment edit drawer (and the
+          same control in the create wizard). It's the existing dashed photo strip, widened to accept
+          PDFs — image thumbnails and PDF document tiles sit side by side, with add buttons and
+          drag-and-drop. Camera capture stays image-only.
+        </p>
+
+        <div class="grid2 desktop-phone">
+          <div>
+            <div class="frame-label">Desktop · edit drawer (BeanieFormModal body)</div>
+            <div class="surface" style="background: var(--cloud)">
+              <div class="field-label">📎 Booking documents <span style="color:#c2cad2;font-weight:500;text-transform:none;letter-spacing:0">· up to 6</span></div>
+              <div class="dropzone">
+                <div class="strip">
+                  <!-- image thumb -->
+                  <div
+                    class="tile image"
+                    style="
+                      background-image: url('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=300&q=60');
+                    "
+                  >
+                    <button class="remove" title="Remove">×</button>
+                  </div>
+                  <!-- pdf doc tile (recommended treatment A preview) -->
+                  <div class="doc-stub" style="width: 96px; height: 96px">
+                    <div class="edge"></div>
+                    <div class="body" style="font-size: 1.5rem">📄</div>
+                    <div class="perf" style="bottom: 26px"></div>
+                    <div class="foot">
+                      <span class="ft">PDF</span><span style="opacity:0.7">e-ticket</span>
+                    </div>
+                  </div>
+                  <!-- add from library -->
+                  <button class="add-tile">
+                    <span class="ic">🖼️</span><span class="lbl">Add file</span>
+                  </button>
+                  <!-- camera (touch only) -->
+                  <button class="add-tile">
+                    <span class="ic">📷</span><span class="lbl">Take photo</span>
+                  </button>
+                </div>
+                <div class="drop-hint">Drop an image or PDF to add · or tap a tile to view</div>
+              </div>
+
+              <div class="note-row">
+                <div class="note">
+                  <h4>What's accepted</h4>
+                  <p>Images (jpg/png/webp/heic) and PDFs up to 10&nbsp;MB. A clear toast appears for
+                  anything too big or the wrong type — never a silent drop.</p>
+                </div>
+                <div class="note">
+                  <h4>Where it lives</h4>
+                  <p>Stored encrypted in your family's Drive, just like photos. Offline? It queues and
+                  uploads when you reconnect.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="frame-label mobile">Phone · fullscreen drawer</div>
+            <div class="phone">
+              <div class="screen">
+                <div class="statusbar"><div class="notch"></div></div>
+                <div class="pad">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                    <div class="seg-emoji" style="background: var(--tint-orange-8)">✈️</div>
+                    <div style="font-family:'Outfit';font-weight:700;font-size:1.05rem">Edit flight</div>
+                  </div>
+                  <div class="field-label">📎 Booking documents</div>
+                  <div class="dropzone">
+                    <div class="strip">
+                      <div
+                        class="tile image"
+                        style="
+                          width: 78px;
+                          height: 78px;
+                          background-image: url('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=240&q=60');
+                        "
+                      >
+                        <button class="remove" style="width:18px;height:18px;font-size:0.7rem">×</button>
+                      </div>
+                      <div class="doc-stub" style="width: 78px; height: 78px">
+                        <div class="edge"></div>
+                        <div class="body" style="font-size: 1.3rem">📄</div>
+                        <div class="perf" style="bottom: 22px"></div>
+                        <div class="foot" style="height:22px;font-size:0.55rem">
+                          <span class="ft">PDF</span>
+                        </div>
+                      </div>
+                      <button class="add-tile" style="width:78px;height:78px">
+                        <span class="ic" style="font-size:1.1rem">＋</span
+                        ><span class="lbl">Add</span>
+                      </button>
+                    </div>
+                    <div class="drop-hint" style="font-size:0.7rem">Tap a tile to view</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 3 · DOCUMENT TILE TREATMENTS ============ -->
+      <section class="block">
+        <div class="sec-head">
+          <span class="sec-num">3</span>
+          <h2>PDF document tile — three treatments</h2>
+        </div>
+        <p class="sec-sub">
+          Image attachments already have an established thumbnail look. PDFs are new and need their own
+          tile. <strong>Pick A, B, or C.</strong> All show the original filename and a 📄 cue; the
+          difference is personality. (Brand note: PDF accent uses Terracotta/Orange, never Alert Red.)
+        </p>
+
+        <div class="treatments">
+          <!-- A -->
+          <div class="treatment recommended">
+            <span class="rec-flag">Recommended</span>
+            <div><span class="tletter">A</span><span class="tname">Boarding-pass stub</span></div>
+            <div class="tdesc">
+              A little ticket stub — Heritage Orange→Terracotta top edge, a perforated tear line, and a
+              "PDF · filename" footer. On-brand and playful; reads instantly as a travel document.
+            </div>
+            <div class="tstage">
+              <div class="doc-stub">
+                <div class="edge"></div>
+                <div class="body">📄</div>
+                <div class="perf"></div>
+                <div class="foot"><span class="ft">PDF</span> United_eticket</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- B -->
+          <div class="treatment">
+            <div><span class="tletter">B</span><span class="tname">Clean doc card</span></div>
+            <div class="tdesc">
+              Minimal white square matching the photo thumbnail footprint exactly: a 📄 glyph, a small
+              Terracotta "PDF" badge, and the truncated filename. Calm and utilitarian.
+            </div>
+            <div class="tstage">
+              <div class="doc-clean">
+                <div class="glyph">📄</div>
+                <div class="badge">PDF</div>
+                <div class="fname">United_eticket.pdf</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- C -->
+          <div class="treatment">
+            <div><span class="tletter">C</span><span class="tname">Folder tab</span></div>
+            <div class="tdesc">
+              A manila-style file with a Terracotta tab — leans into the "filed paperwork" metaphor.
+              Warm and tactile, slightly more decorative than B.
+            </div>
+            <div class="tstage">
+              <div class="doc-folder">
+                <div class="tab"></div>
+                <div class="sheet">
+                  <div class="glyph">📄</div>
+                  <div class="fname">United_eticket.pdf</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 4 · IMAGE LIGHTBOX ============ -->
+      <section class="block">
+        <div class="sec-head">
+          <span class="sec-num">4</span>
+          <h2>Viewing an image — the lightbox</h2>
+        </div>
+        <p class="sec-sub">
+          Tapping an image attachment opens the existing full-screen lightbox (reused as-is) — swipe /
+          arrow between attachments, pips below, remove + download in the bar.
+        </p>
+
+        <div class="grid2 desktop-phone">
+          <div>
+            <div class="frame-label">Desktop · image lightbox (reused)</div>
+            <div class="viewer">
+              <div class="vbar">
+                <div class="vtitle">
+                  🖼️ <span class="fn">boarding-pass-screenshot.png</span>
+                </div>
+                <div class="vactions">
+                  <button class="vbtn" title="Download">⤓</button>
+                  <button class="vbtn" title="Remove">🗑️</button>
+                  <button class="vbtn x" title="Close">×</button>
+                </div>
+              </div>
+              <div class="vstage">
+                <button class="vnav prev">‹</button>
+                <img
+                  src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=700&q=70"
+                  alt="attachment"
+                />
+                <button class="vnav next">›</button>
+                <div class="vpips">
+                  <span class="vpip active"></span>
+                  <span class="vpip"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="frame-label mobile">Phone · same lightbox</div>
+            <div class="phone">
+              <div class="screen">
+                <div class="statusbar"><div class="notch"></div></div>
+                <div class="viewer" style="border-radius: 0; box-shadow: none">
+                  <div class="vbar">
+                    <div class="vtitle" style="font-size: 0.8rem">🖼️ <span class="fn">boarding-pass.png</span></div>
+                    <button class="vbtn x" style="width:30px;height:30px">×</button>
+                  </div>
+                  <div class="vstage" style="height: 300px">
+                    <img
+                      src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=500&q=70"
+                      alt="attachment"
+                    />
+                    <div class="vpips">
+                      <span class="vpip active"></span><span class="vpip"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 5 · PDF VIEWER ============ -->
+      <section class="block">
+        <div class="sec-head">
+          <span class="sec-num">5</span>
+          <h2>Viewing a PDF</h2>
+        </div>
+        <p class="sec-sub">
+          PDFs render inline where the browser supports it, with a prominent
+          <strong>"Open in new tab"</strong> action that always works — important on phones, where
+          inline PDF rendering is unreliable. Same bar as the lightbox (download uses the original
+          filename).
+        </p>
+
+        <div class="grid2 desktop-phone">
+          <div>
+            <div class="frame-label">Desktop · inline embed + Open fallback</div>
+            <div class="viewer">
+              <div class="vbar">
+                <div class="vtitle">📄 <span class="fn">United_eticket.pdf</span></div>
+                <div class="vactions">
+                  <button class="vbtn" title="Open in new tab">↗</button>
+                  <button class="vbtn" title="Download">⤓</button>
+                  <button class="vbtn" title="Remove">🗑️</button>
+                  <button class="vbtn x" title="Close">×</button>
+                </div>
+              </div>
+              <div class="pdf-stage">
+                <div class="pdf-doc">
+                  <div class="ph airline"></div>
+                  <div class="ph title"></div>
+                  <div class="ph s"></div>
+                  <div class="ph m"></div>
+                  <div class="ph s"></div>
+                  <div class="ph" style="width: 55%"></div>
+                </div>
+                <button class="open-cta">↗ Open in new tab</button>
+                <div class="pdf-note">Inline preview where supported · always openable</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="frame-label mobile">Phone · Open-first (no flaky inline)</div>
+            <div class="phone">
+              <div class="screen">
+                <div class="statusbar"><div class="notch"></div></div>
+                <div class="viewer" style="border-radius: 0; box-shadow: none">
+                  <div class="vbar">
+                    <div class="vtitle" style="font-size: 0.8rem">📄 <span class="fn">United_eticket.pdf</span></div>
+                    <button class="vbtn x" style="width:30px;height:30px">×</button>
+                  </div>
+                  <div class="pdf-stage" style="height: 320px; gap: 18px">
+                    <div class="doc-stub" style="width: 120px; height: 150px">
+                      <div class="edge"></div>
+                      <div class="body" style="font-size: 2.4rem">📄</div>
+                      <div class="perf" style="bottom: 30px"></div>
+                      <div class="foot" style="height: 30px"><span class="ft">PDF</span> e-ticket</div>
+                    </div>
+                    <button class="open-cta">↗ Open PDF</button>
+                    <div class="pdf-note" style="font-size: 0.72rem">Opens in your browser's PDF viewer</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <div class="pod"><i></i><i></i><i></i><i></i></div>
+        <div>
+          beanies.family — travel segment attachments · static mockup, no live data ·
+          plan: <code>docs/plans/2026-06-04-travel-segment-attachments.md</code>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>

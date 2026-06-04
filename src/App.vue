@@ -74,6 +74,7 @@ import { useStaleTabRefresh } from '@/composables/useStaleTabRefresh';
 import { attemptSilentReconnect } from '@/utils/silentReconnect';
 import { saveNow, hasFamilyKey, setFamilyKey } from '@/services/sync/syncService';
 import { __internals as photoStoreInternals } from '@/stores/photoStore';
+import { avatarPhotoHooks, vacationPhotoHooks } from '@/services/photos/photoCollectionHooks';
 
 /**
  * Register every collection that owns photo references so the photoStore
@@ -81,14 +82,23 @@ import { __internals as photoStoreInternals } from '@/stores/photoStore';
  * boundary (rather than inside each store) to avoid the top-level import
  * cycle family/medications → photoStore → syncStore → family/medications
  * that broke test loading in P3 dev. Safe to call multiple times —
- * registerPhotoCollection is idempotent (backed by a Set).
+ * registerPhotoCollection is idempotent (backed by a Map).
+ *
+ * Flat collections (a `photoIds?: UUID[]` array) register by name only and
+ * get the default flat hooks. Non-flat hosts pass explicit hooks:
+ *   - familyMembers: a scalar `avatarPhotoId` (NOT a photoIds array) — MUST
+ *     use the avatar collect hook, else GC (which has no grace for orphans)
+ *     would wipe every avatar.
+ *   - vacations: booking-segment photoIds nested inside
+ *     `vacations[*].{travelSegments,accommodations,transportation}[]`.
  */
-photoStoreInternals.registerPhotoCollection('familyMembers');
+photoStoreInternals.registerPhotoCollection('familyMembers', avatarPhotoHooks);
 photoStoreInternals.registerPhotoCollection('medications');
 photoStoreInternals.registerPhotoCollection('recipes');
 photoStoreInternals.registerPhotoCollection('cookLogs');
 photoStoreInternals.registerPhotoCollection('milestones');
 photoStoreInternals.registerPhotoCollection('activities');
+photoStoreInternals.registerPhotoCollection('vacations', vacationPhotoHooks);
 
 const route = useRoute();
 const router = useRouter();

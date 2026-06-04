@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-04",
-    "translationCount": 3026
+    "translationCount": 3034
   },
   "translations": {
     "app.name": {
@@ -15134,6 +15134,46 @@
     "settings.ai.test.network.message": {
       "translation": "我们目前无法验证密钥。请检查您的网络连接，然后重试。",
       "hash": "uso1xy",
+      "lastUpdated": "2026-06-04"
+    },
+    "vacation.field.documents": {
+      "translation": "预订文件",
+      "hash": "gbnnu9",
+      "lastUpdated": "2026-06-04"
+    },
+    "vacation.documentsCount": {
+      "translation": "{n}个已附加",
+      "hash": "rfem4m",
+      "lastUpdated": "2026-06-04"
+    },
+    "photos.pdfTooLarge": {
+      "translation": "PDF文件必须小于10 MB。",
+      "hash": "b593lx",
+      "lastUpdated": "2026-06-04"
+    },
+    "photos.addFile": {
+      "translation": "添加文件",
+      "hash": "kcqvj9",
+      "lastUpdated": "2026-06-04"
+    },
+    "photos.dropToAddDoc": {
+      "translation": "拖放图像或PDF以添加",
+      "hash": "jr8bs0",
+      "lastUpdated": "2026-06-04"
+    },
+    "photos.openInNewTab": {
+      "translation": "在新标签页中打开",
+      "hash": "8cg67k",
+      "lastUpdated": "2026-06-04"
+    },
+    "photos.document.tile": {
+      "translation": "PDF 文档",
+      "hash": "yh7gkp",
+      "lastUpdated": "2026-06-04"
+    },
+    "photos.document.tileNamed": {
+      "translation": "PDF：{name}",
+      "hash": "3frxsh",
       "lastUpdated": "2026-06-04"
     }
   }

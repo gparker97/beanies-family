@@ -4,6 +4,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { generateUUID } from '@/utils/id';
 import { addHourToTime } from '@/utils/date';
 import VacationSegmentCard from './VacationSegmentCard.vue';
+import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
+import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
@@ -292,6 +294,20 @@ function removeSegment(index: number) {
   const updated = props.segments.filter((_, i) => i !== index);
   emit('update:segments', updated);
 }
+
+/**
+ * Booking-document attachments are held on the segment's local `photoIds`
+ * and persisted with the vacation on Save (the wizard owns the array). A
+ * completed upload flows back here via PhotoAttachments' `update:photoIds`
+ * emit. `expose`d for the template; uses the composite entity id (no
+ * vacationId yet during create — the attach hook no-ops, the emit carries it).
+ */
+function updateSegmentPhotos(index: number, ids: string[]): void {
+  const updated = [...props.segments];
+  updated[index] = { ...updated[index]!, photoIds: [...ids] };
+  emit('update:segments', updated);
+}
+const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', segId);
 </script>
 
 <template>
@@ -716,6 +732,20 @@ function removeSegment(index: number) {
             rows="2"
             class="w-full rounded-xl border border-[var(--tint-slate-10)] bg-white px-3 py-2 text-sm text-[var(--color-text)] placeholder:text-gray-400 focus:border-[var(--vacation-teal)] focus:ring-2 focus:ring-[var(--vacation-teal-tint)] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100 dark:placeholder:text-gray-500"
             @input="updateSegment(idx, 'notes', ($event.target as HTMLTextAreaElement).value)"
+          />
+        </FormFieldGroup>
+      </div>
+
+      <!-- Booking documents (images + PDFs) -->
+      <div class="mt-3">
+        <FormFieldGroup :label="t('vacation.field.documents')">
+          <PhotoAttachments
+            collection="vacations"
+            :entity-id="segmentEntityId(seg.id)"
+            :photo-ids="seg.photoIds ?? []"
+            allow-documents
+            :max="6"
+            @update:photo-ids="updateSegmentPhotos(idx, $event)"
           />
         </FormFieldGroup>
       </div>

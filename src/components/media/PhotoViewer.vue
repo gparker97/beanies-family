@@ -13,6 +13,7 @@ import { usePhotoStore } from '@/stores/photoStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm } from '@/composables/useConfirm';
 import { useFilePicker } from '@/composables/useFilePicker';
+import { attachmentKind } from '@/utils/attachmentKind';
 import type { UUID } from '@/types/models';
 
 interface Props {
@@ -43,6 +44,13 @@ const fullUrl = ref<string | null>(null);
 const loading = ref(false);
 
 const currentPhotoId = computed(() => props.photoIds[currentIndex.value] ?? null);
+const currentPhoto = computed(() =>
+  currentPhotoId.value ? store.photos[currentPhotoId.value] : undefined
+);
+const isPdfDoc = computed(
+  () => !!currentPhoto.value && attachmentKind(currentPhoto.value) === 'pdf'
+);
+const docFileName = computed(() => currentPhoto.value?.fileName);
 const isMissing = computed(
   () => !!currentPhotoId.value && store.isUnresolved(currentPhotoId.value)
 );
@@ -72,6 +80,29 @@ function resolve(): void {
   if (!currentPhotoId.value) {
     fullUrl.value = null;
     loading.value = false;
+    return;
+  }
+  if (isPdfDoc.value) {
+    // PDFs need real bytes — the lh3 image CDN (getPublicUrl) can't serve
+    // them. getBlobUrl does an authorized alt=media download → a same-origin
+    // object URL, which renders inline AND honours the <a download> filename.
+    // It caches per driveFileId and is revoked centrally (invalidateThumbCache)
+    // — so we deliberately do NOT revoke on unmount here.
+    const id = currentPhotoId.value;
+    loading.value = true;
+    fullUrl.value = null;
+    void store
+      .getBlobUrl(id)
+      .then((url) => {
+        if (currentPhotoId.value !== id) return; // navigated away mid-fetch
+        fullUrl.value = url; // null → getBlobUrl marked it unresolved → missing state
+        loading.value = false;
+      })
+      .catch((e) => {
+        if (currentPhotoId.value !== id) return;
+        console.warn('[PhotoViewer] PDF fetch failed', id, e);
+        loading.value = false;
+      });
     return;
   }
   // Public Drive CDN URL (ADR-021). No fetch, no OAuth — the `<img>`
@@ -229,6 +260,31 @@ async function handleRemoveMissing(): Promise<void> {
       </div>
 
       <!--
+        PDF — render the bytes inline where the browser supports it, with a
+        prominent always-works "Open in new tab" action (mobile browsers
+        frequently won't inline-render an <iframe> PDF). Same-origin blob URL,
+        so the iframe and the open/download both work.
+      -->
+      <div
+        v-else-if="fullUrl && isPdfDoc"
+        class="flex h-full w-full flex-col items-center justify-center gap-4 px-4 py-6"
+      >
+        <iframe
+          :src="fullUrl"
+          :title="docFileName || t('photos.document.tile')"
+          class="h-[68vh] w-full max-w-3xl rounded-xl bg-white shadow-lg"
+        ></iframe>
+        <a
+          :href="fullUrl"
+          target="_blank"
+          rel="noopener"
+          class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 inline-flex items-center gap-2 rounded-[16px] bg-gradient-to-r px-5 py-3 text-sm font-bold text-white no-underline shadow-sm transition-all duration-200 hover:shadow-md"
+        >
+          ↗ {{ t('photos.openInNewTab') }}
+        </a>
+      </div>
+
+      <!--
         Image — fills the body container (edge-to-edge on mobile via
         BaseModal's flush-body). `object-contain` preserves aspect ratio;
         max-h/max-w-full keeps it within the frame without overflow.
@@ -305,7 +361,7 @@ async function handleRemoveMissing(): Promise<void> {
         <a
           v-if="!isMissing && fullUrl"
           :href="fullUrl"
-          download
+          :download="docFileName || ''"
           :aria-label="t('photos.download')"
           class="flex h-[48px] w-[48px] flex-shrink-0 items-center justify-center rounded-[14px] text-xl no-underline transition-all duration-150 hover:scale-105"
           style="background: rgb(44 62 80 / 6%)"
@@ -315,8 +371,10 @@ async function handleRemoveMissing(): Promise<void> {
 
         <!-- Primary: Close (or Replace photo when the file is missing).
              Mirrors BeanieFormModal's flex-1 gradient-orange Save button. -->
+        <!-- Replace is image-only: replacePhotoFile compresses, which would
+             corrupt a PDF. For a missing PDF we fall through to Close. -->
         <button
-          v-if="isMissing"
+          v-if="isMissing && !isPdfDoc"
           type="button"
           class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 flex-1 rounded-[16px] bg-gradient-to-r py-3.5 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:shadow-md"
           @click="replacePicker.open"

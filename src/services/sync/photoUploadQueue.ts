@@ -31,11 +31,12 @@ export interface QueuedPhotoUpload {
   entityCollection: string; // e.g. 'activities', 'familyMembers'
   entityId: string; // the entity whose photoIds we'll push to
   blob: Blob;
-  filename: string; // e.g. 'beanies-photo-<photoId>.jpg'
+  filename: string; // the Drive object name, e.g. 'beanies-photo-<photoId>.jpg'
   mime: string;
   width: number;
   height: number;
   sizeBytes: number;
+  fileName?: string; // original user filename (PDFs) — preserved across the offline path
   createdBy?: string;
   createdAt: number; // epoch ms
 }

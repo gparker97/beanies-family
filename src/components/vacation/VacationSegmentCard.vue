@@ -19,6 +19,8 @@ interface Props {
   showEdit?: boolean;
   /** Helpful hint message (overlap warning) — shown when expanded */
   hint?: string;
+  /** Count of attached booking documents — shows a 📎 N chip in the header when > 0. */
+  attachmentCount?: number;
 }
 
 const props = defineProps<Props>();
@@ -94,6 +96,15 @@ async function handleDelete() {
 
         <!-- Spacer to push actions to right -->
         <div class="flex-1" />
+
+        <!-- Attachment indicator — 📎 N chip (Treatment A) -->
+        <span
+          v-if="attachmentCount && attachmentCount > 0"
+          class="font-outfit inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-xs font-semibold text-[#5a6b7a] dark:bg-slate-700 dark:text-gray-300"
+          :title="t('vacation.documentsCount').replace('{n}', String(attachmentCount))"
+        >
+          📎 {{ attachmentCount }}
+        </span>
 
         <!-- Hint indicator — static icon signaling a hint exists -->
         <span

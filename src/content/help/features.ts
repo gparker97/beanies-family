@@ -586,7 +586,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Plan family trips from start to finish \u2014 flights, hotels, transport, activities, and ideas \u2014 all in one place.',
     icon: '\u2708\uFE0F',
     readTime: 5,
-    updatedDate: '2026-05-26',
+    updatedDate: '2026-06-04',
     sections: [
       {
         type: 'heading',
@@ -693,6 +693,29 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'You can add more segments anytime using the <strong>+ add a plan</strong> button at the bottom of the timeline.',
+      },
+      {
+        type: 'heading',
+        content: 'Attaching booking documents',
+        level: 2,
+        id: 'attachments',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Every travel segment, stay, and transport item can hold the original booking — attach <strong>images, screenshots, or PDFs</strong> of your airline e-ticket, hotel confirmation, or rental agreement so you can always refer back to the source. Open a segment’s edit drawer (or add it in the trip wizard), then drop files into <strong>Booking documents</strong> or tap to pick them. A \u{1F4CE} count appears on the segment card whenever it has attachments.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Tap an attachment to view it — images open in a full-screen lightbox, and PDFs open for reading (with an <strong>Open in new tab</strong> option on phones). Remove an attachment anytime from the segment’s edit drawer.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Attachments are stored in your family’s encrypted Drive, just like photos — so cloud sync needs to be on. Images are compressed automatically; PDFs are kept as-is, up to 10 MB each. Removing an attachment is reversible only within a short grace window before it’s cleaned up.',
+        title: 'How attachments are stored',
+        icon: '\u{1F510}',
       },
       {
         type: 'heading',

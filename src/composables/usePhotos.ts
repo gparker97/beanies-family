@@ -24,6 +24,30 @@ import type { QueuedPhotoUpload } from '@/services/sync/photoUploadQueue';
 export const MAX_PHOTOS_PER_SET = 4;
 const ACCEPTED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
+/** PDFs aren't compressed (stored raw), so cap their size. Booking docs are
+ *  comfortably under this; oversized ones get a distinct toast. */
+export const PDF_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+
+/** Cheap content sniff: look for the `%PDF-` signature within the first 1KB
+ *  (tolerates a few leading bytes some generators prepend). Guards against a
+ *  non-PDF renamed `.pdf` slipping into Drive. Byte-compared (no TextDecoder
+ *  encoding-label pitfalls). */
+async function looksLikePdf(file: File): Promise<boolean> {
+  try {
+    const bytes = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
+    const sig = [0x25, 0x50, 0x44, 0x46, 0x2d]; // %PDF-
+    outer: for (let i = 0; i + sig.length <= bytes.length; i++) {
+      for (let j = 0; j < sig.length; j++) {
+        if (bytes[i + j] !== sig[j]) continue outer;
+      }
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export interface UsePhotosOptions {
   /** The Automerge collection name the entity lives in, e.g. 'activities'. */
   collection: string;
@@ -46,6 +70,13 @@ export interface UsePhotosOptions {
    * `photoStore.addAvatarPhoto` path (different compression profile).
    */
   max?: number;
+  /**
+   * Which file kinds this surface accepts. `'images'` (default) keeps the
+   * original image-only behavior; `'imagesAndPdf'` also accepts PDFs (the
+   * travel booking-documents surface). Images are always compressed; PDFs
+   * are validated here (size + `%PDF` magic-byte) and stored raw.
+   */
+  accept?: 'images' | 'imagesAndPdf';
 }
 
 export interface UsePhotosReturn {
@@ -111,18 +142,34 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
       return [];
     }
 
+    const allowPdf = options.accept === 'imagesAndPdf';
     const accepted: File[] = [];
-    const rejected: File[] = [];
+    const rejectedType: File[] = []; // wrong type / mislabeled
+    const rejectedOversize: File[] = []; // PDF over the size cap
     for (const file of files) {
-      if (ACCEPTED_MIMES.includes(file.type) || file.name.match(/\.(jpe?g|png|webp|heic|heif)$/i)) {
+      const isImage =
+        ACCEPTED_MIMES.includes(file.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+      const isPdfCandidate =
+        allowPdf && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name));
+      if (isImage) {
         accepted.push(file);
+      } else if (isPdfCandidate) {
+        // Read bytes only for PDF candidates — images skip this latency.
+        if (file.size > PDF_MAX_BYTES) {
+          rejectedOversize.push(file);
+        } else if (!(await looksLikePdf(file))) {
+          rejectedType.push(file); // not actually a PDF
+        } else {
+          accepted.push(file);
+        }
       } else {
-        rejected.push(file);
+        rejectedType.push(file);
       }
       if (accepted.length >= remainingSlots) break;
     }
 
-    if (rejected.length > 0) showToast('warning', t('photos.invalidType'));
+    if (rejectedType.length > 0) showToast('warning', t('photos.invalidType'));
+    if (rejectedOversize.length > 0) showToast('warning', t('photos.pdfTooLarge'));
 
     const createdBy = unref(options.currentMemberId);
     const entityId = unref(options.entityId);

@@ -87,7 +87,7 @@ vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-import { usePhotos, MAX_PHOTOS_PER_SET } from '../usePhotos';
+import { usePhotos, MAX_PHOTOS_PER_SET, PDF_MAX_BYTES } from '../usePhotos';
 import { usePhotoStore } from '@/stores/photoStore';
 import {
   __internals as queueInternals,
@@ -261,6 +261,55 @@ describe('usePhotos', () => {
 
   it('MAX_PHOTOS_PER_SET is 4', () => {
     expect(MAX_PHOTOS_PER_SET).toBe(4);
+  });
+
+  describe('PDF attachments (accept: imagesAndPdf)', () => {
+    function pdfFile(name = 'doc.pdf', size = 100): File {
+      const bytes = new Uint8Array(size);
+      bytes.set([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF-
+      return new File([bytes], name, { type: 'application/pdf' });
+    }
+    function setup(accept?: 'images' | 'imagesAndPdf') {
+      const photoIds = ref<string[]>([]);
+      const api = usePhotos({
+        collection: 'activities',
+        entityId: ref('act-1'),
+        photoIds,
+        updatePhotoIds: (ids) => {
+          photoIds.value = ids;
+        },
+        accept,
+      });
+      return { api, photoIds };
+    }
+
+    it('accepts a valid PDF when opted in', async () => {
+      const ids = await setup('imagesAndPdf').api.add([pdfFile()]);
+      expect(ids).toHaveLength(1);
+      expect(driveMocks.createFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects PDFs by default (images only) with the invalid-type toast', async () => {
+      const ids = await setup().api.add([pdfFile()]);
+      expect(ids).toHaveLength(0);
+      expect(driveMocks.createFile).not.toHaveBeenCalled();
+      expect(toastCalls.some((c) => c.title === 'photos.invalidType')).toBe(true);
+    });
+
+    it('rejects an oversized PDF with the size toast (not invalid-type)', async () => {
+      const ids = await setup('imagesAndPdf').api.add([pdfFile('big.pdf', PDF_MAX_BYTES + 1)]);
+      expect(ids).toHaveLength(0);
+      expect(toastCalls.some((c) => c.title === 'photos.pdfTooLarge')).toBe(true);
+    });
+
+    it('rejects a non-PDF masquerading as .pdf (magic-byte check)', async () => {
+      const fake = new File([new Uint8Array([0x00, 0x01, 0x02])], 'fake.pdf', {
+        type: 'application/pdf',
+      });
+      const ids = await setup('imagesAndPdf').api.add([fake]);
+      expect(ids).toHaveLength(0);
+      expect(toastCalls.some((c) => c.title === 'photos.invalidType')).toBe(true);
+    });
   });
 
   describe('queue-fallback awareness (transient online failures)', () => {

@@ -46,6 +46,8 @@ export interface TimelineItem {
   detailRows: DetailRow[];
   /** Original index in the vacation's array (for targeted updates) */
   arrayIndex: number;
+  /** Attached booking-document ids (images/PDFs) — for the timeline indicator + strip. */
+  photoIds?: string[];
 }
 
 export interface DateGroup {
@@ -346,6 +348,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         stepNumber: 2,
         detailRows: travelDetailRows(seg),
         arrayIndex: i,
+        photoIds: seg.photoIds,
       });
     }
 
@@ -395,6 +398,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         stepNumber: 3,
         detailRows: enrichRows(rows),
         arrayIndex: i,
+        photoIds: acc.photoIds,
       });
     }
 
@@ -493,6 +497,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         stepNumber: 4,
         detailRows: enrichRows(rows),
         arrayIndex: i,
+        photoIds: trans.photoIds,
       });
     }
 

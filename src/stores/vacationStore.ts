@@ -323,6 +323,36 @@ export const useVacationStore = defineStore('vacations', () => {
     await updateVacation(vacationId, { ideas });
   }
 
+  /**
+   * Set the attached document/photo ids on one booking segment (travel,
+   * accommodation, or transportation). Owns the find-by-id + index-merge so
+   * the five UI callers (3 edit drawers + wizard steps) don't each hand-roll
+   * an array spread. Persists via `updateVacation` (which re-syncs trip dates).
+   */
+  async function updateSegmentPhotoIds(
+    vacationId: string,
+    segmentId: string,
+    photoIds: string[]
+  ): Promise<void> {
+    const vacation = vacations.value.find((v) => v.id === vacationId);
+    if (!vacation) {
+      console.warn(`[vacation] updateSegmentPhotoIds: no vacation "${vacationId}"`);
+      return;
+    }
+    const keys = ['travelSegments', 'accommodations', 'transportation'] as const;
+    for (const key of keys) {
+      const arr = vacation[key] as Array<{ id: string; photoIds?: string[] }>;
+      const idx = arr.findIndex((s) => s.id === segmentId);
+      if (idx < 0) continue;
+      const nextArr = arr.map((s, i) => (i === idx ? { ...s, photoIds: [...photoIds] } : s));
+      await updateVacation(vacationId, { [key]: nextArr } as UpdateFamilyVacationInput);
+      return;
+    }
+    console.warn(
+      `[vacation] updateSegmentPhotoIds: segment "${segmentId}" not found on vacation "${vacationId}"`
+    );
+  }
+
   function resetState() {
     vacations.value = [];
     isLoading.value = false;
@@ -346,6 +376,7 @@ export const useVacationStore = defineStore('vacations', () => {
     updateVacation,
     deleteVacation,
     toggleIdeaVote,
+    updateSegmentPhotoIds,
     resetState,
   };
 });
