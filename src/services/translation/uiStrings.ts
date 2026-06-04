@@ -6164,6 +6164,8 @@ const STRING_DEFS = {
   'vacation.field.location': { en: 'Location', beanie: 'location' },
   'vacation.field.link': { en: 'Link', beanie: 'link' },
   'vacation.field.notes': { en: 'Notes', beanie: 'notes' },
+  'vacation.field.documents': { en: 'Booking Documents', beanie: 'booking documents' },
+  'vacation.documentsCount': { en: '{n} attached', beanie: '{n} attached' },
   'vacation.field.status': { en: 'Status', beanie: 'status' },
   'vacation.field.title': { en: 'Title', beanie: 'title' },
   'vacation.field.openInMaps': { en: 'Open in Google Maps', beanie: 'open in google maps' },
@@ -6416,6 +6418,18 @@ const STRING_DEFS = {
     en: 'Only JPEG, PNG, and HEIC photos are supported.',
     beanie: 'only jpeg, png, and heic photos are supported.',
   },
+  'photos.pdfTooLarge': {
+    en: 'PDFs must be under 10 MB.',
+    beanie: 'pdfs must be under 10 mb.',
+  },
+  'photos.addFile': { en: 'Add File', beanie: 'add file' },
+  'photos.dropToAddDoc': {
+    en: 'Drop an image or PDF to add',
+    beanie: 'drop an image or pdf to add',
+  },
+  'photos.openInNewTab': { en: 'Open in new tab', beanie: 'open in new tab' },
+  'photos.document.tile': { en: 'PDF document', beanie: 'pdf document' },
+  'photos.document.tileNamed': { en: 'PDF: {name}', beanie: 'pdf: {name}' },
 
   // AI document-extraction wedge (#133) — photo/invitation → prefilled activity.
   'ai.offline.title': { en: "You're Offline", beanie: "you're offline" },

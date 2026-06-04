@@ -699,6 +699,11 @@ export interface VacationTravelSegment {
   location?: string;
   startTime?: string;
   duration?: string;
+
+  // Attached booking documents — images/PDFs of the original itinerary
+  // (references into doc.photos; see PhotoAttachment). Same shape as
+  // FamilyActivity.photoIds.
+  photoIds?: UUID[];
 }
 
 export interface VacationAccommodation {
@@ -716,6 +721,9 @@ export interface VacationAccommodation {
   breakfastIncluded?: boolean;
   link?: string;
   notes?: string;
+
+  // Attached booking documents — see VacationTravelSegment.photoIds.
+  photoIds?: UUID[];
 }
 
 export interface VacationTransportation {
@@ -739,6 +747,9 @@ export interface VacationTransportation {
   departureTime?: string;
   link?: string;
   notes?: string;
+
+  // Attached booking documents — see VacationTravelSegment.photoIds.
+  photoIds?: UUID[];
 }
 
 export interface VacationIdeaVote {
@@ -807,16 +818,25 @@ export type UpdateFamilyVacationInput = Partial<
   Omit<FamilyVacation, 'id' | 'createdAt' | 'updatedAt'>
 >;
 
-// Photo attachment — metadata only; bytes live in the user's Google Drive app folder.
+// Attachment substrate — metadata only; bytes live in the user's Google Drive app folder.
 // The driveFileId is the canonical reference; thumbnailLink is looked up on demand
 // via driveService.getFileMetadata and never persisted (signed URLs expire in hours).
+//
+// Despite the historical name, this record holds BOTH images and non-image
+// documents (PDFs — travel booking attachments). For non-image attachments
+// `width`/`height` are 0 and `fileName` carries the original filename. Branch
+// on kind via `attachmentKind()` / `isPdf()` (src/utils/attachmentKind.ts) —
+// never assume `mime` is an image. The name stays "Photo" for storage-compat
+// (the `doc.photos` Automerge key + every existing call site); see
+// docs/plans/2026-06-04-travel-segment-attachments.md.
 export interface PhotoAttachment {
   id: UUID;
   driveFileId: string;
   mime: string;
-  width: number;
-  height: number;
+  width: number; // 0 for non-raster attachments (PDFs)
+  height: number; // 0 for non-raster attachments (PDFs)
   sizeBytes: number;
+  fileName?: string; // original filename — set for PDFs; optional for images
   createdBy?: UUID;
   createdAt: ISODateString;
   updatedAt: ISODateString;

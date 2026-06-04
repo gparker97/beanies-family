@@ -20,8 +20,10 @@ const props = withDefaults(
     photoIds?: UUID[] | null;
     /** Show the numeric count after the icon when count > 1. Default: icon only. */
     showCount?: boolean;
+    /** Lead glyph. Defaults to 📷 (photos); the travel surface passes 📎 (documents). */
+    icon?: string;
   }>(),
-  { photoIds: null, showCount: false }
+  { photoIds: null, showCount: false, icon: '📷' }
 );
 
 const { t } = useTranslation();
@@ -42,6 +44,6 @@ const ariaLabel = computed(() =>
     :aria-label="ariaLabel"
     role="img"
   >
-    📷<span v-if="showCount && count > 1">{{ count }}</span>
+    {{ icon }}<span v-if="showCount && count > 1">{{ count }}</span>
   </span>
 </template>
