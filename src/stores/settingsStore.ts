@@ -11,10 +11,12 @@ import type {
   GlobalSettings,
   CurrencyCode,
   AIProvider,
+  AiTier,
   ExchangeRate,
   LanguageCode,
   CountryCode,
 } from '@/types/models';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -36,6 +38,11 @@ export const useSettingsStore = defineStore('settings', () => {
   );
   const syncEnabled = computed(() => settings.value.syncEnabled);
   const aiProvider = computed(() => settings.value.aiProvider);
+  // Coalesced on read: pre-existing family docs predate the aiTier field, so the stored
+  // value can be undefined (getSettings() backfills only a wholly-absent settings object).
+  // Defaulting here — the single read site every consumer goes through — avoids scattering
+  // `?? 'managed'` and keeps the tier switch/assertNever safe for upgraded families.
+  const aiTier = computed<AiTier>(() => settings.value.aiTier ?? 'managed');
   // Use the most recent rates between per-family (synced via .beanpod) and
   // device-local (IndexedDB). Per-family rates sync across devices, ensuring
   // all devices converge on the same values. Device-local rates may be newer
@@ -321,29 +328,46 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  async function setAIProvider(provider: AIProvider): Promise<void> {
+  const setAIProvider = (provider: AIProvider) =>
+    persistAiSetting('settings.ai.byok.provider', 'aiProvider', () =>
+      settingsRepo.setAIProvider(provider)
+    );
+
+  // All AI settings persist family-only (no device layer) and share ONE error contract:
+  // reset error, attempt, and on failure surface a toast (with field name + dev console
+  // diagnostic) and RE-THROW so the calling control can revert its visual state. Centralizing
+  // here means no component reads the shared `error` ref out-of-band to decide whether to toast.
+  async function persistAiSetting(
+    label: UIStringKey,
+    field: string,
+    op: () => Promise<Settings>
+  ): Promise<void> {
     isLoading.value = true;
     error.value = null;
     try {
-      settings.value = await settingsRepo.setAIProvider(provider);
+      settings.value = await op();
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update AI provider';
+      error.value = e instanceof Error ? e.message : 'Failed to update AI setting';
+      const { t } = useTranslation();
+      showToast('error', t('settings.persistFailed'), t(label), {
+        error: e,
+        surface: 'settings-persist',
+        context: { field },
+      });
+      console.error(`[settingsStore] persistAiSetting('${field}') failed.`, e);
+      throw e instanceof Error ? e : new Error(String(e));
     } finally {
       isLoading.value = false;
     }
   }
 
-  async function setAIApiKey(provider: 'claude' | 'openai' | 'gemini', key: string): Promise<void> {
-    isLoading.value = true;
-    error.value = null;
-    try {
-      settings.value = await settingsRepo.setAIApiKey(provider, key);
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update API key';
-    } finally {
-      isLoading.value = false;
-    }
-  }
+  const setAITier = (tier: AiTier) =>
+    persistAiSetting('settings.ai.title', 'aiTier', () => settingsRepo.setAITier(tier));
+
+  const setAIApiKey = (provider: 'claude' | 'openai' | 'gemini', key: string) =>
+    persistAiSetting('settings.ai.byok.apiKey', 'aiApiKeys', () =>
+      settingsRepo.setAIApiKey(provider, key)
+    );
 
   async function setExchangeRateAutoUpdate(enabled: boolean): Promise<void> {
     isLoading.value = true;
@@ -433,14 +457,10 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // #133: family-scoped consent skip for the photo→activity AI flow. Throws on failure
   // so the caller (the consent flow) can log it without leaving the wedge stranded.
-  async function setSkipDocumentConsentPrompt(skip: boolean): Promise<void> {
-    try {
-      settings.value = await settingsRepo.setSkipDocumentConsentPrompt(skip);
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update AI consent setting';
-      throw e instanceof Error ? e : new Error(String(e));
-    }
-  }
+  const setSkipDocumentConsentPrompt = (skip: boolean) =>
+    persistAiSetting('settings.ai.askBeforePhotos', 'skipDocumentConsentPrompt', () =>
+      settingsRepo.setSkipDocumentConsentPrompt(skip)
+    );
 
   async function addCustomInstitution(name: string): Promise<void> {
     isLoading.value = true;
@@ -597,6 +617,7 @@ export const useSettingsStore = defineStore('settings', () => {
     textSize,
     syncEnabled,
     aiProvider,
+    aiTier,
     exchangeRates,
     exchangeRateAutoUpdate,
     exchangeRateLastFetch,
@@ -624,6 +645,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setSyncEnabled,
     setAutoSyncEnabled,
     setAIProvider,
+    setAITier,
     setAIApiKey,
     setBeanieMode,
     setSoundEnabled,

@@ -25,7 +25,8 @@ export interface ByokConfig {
 
 /** Default OpenAI vision model for BYOK. (GPT-4o-mini is a documented vision cost trap — see ADR-030.) */
 const OPENAI_DEFAULT_MODEL = 'gpt-4o';
-const OPENAI_BASE_URL = 'https://api.openai.com/v1';
+/** Exported so validateByokKey reuses the single source for the OpenAI base URL. */
+export const OPENAI_BASE_URL = 'https://api.openai.com/v1';
 
 export function createByokProvider(config: ByokConfig): ExtractionProvider {
   return {
