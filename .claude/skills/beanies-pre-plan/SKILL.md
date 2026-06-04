@@ -19,6 +19,8 @@ This skill front-loads that completeness. It gathers intent into a standard stru
 - **Natural language:** "pre-plan this", "intake this issue", "prep a plan for X", "let's spec this before planning"
 - The skill chains INTO `beanies-plan` — it never replaces or modifies it.
 
+> **Issue numbers always mean the Notion tracker, never GitHub.** Any bare issue reference — `#29`, `issue #29`, `id 29`, "the 29 issue" — resolves to the **`ID` (unique_id) of a row in the "Beanies Main Issue Tracker" Notion DB** (binding block below), and the skill runs in **NOTION mode**. These are NOT GitHub issue numbers and the skill must never `gh issue view` them. (GitHub issues are an _output_ of `beanies-plan`, gated by the Notion `github issue` passthrough — never an input here.) If the intended source is genuinely a GitHub issue or a pasted block, the user will say so explicitly.
+
 ---
 
 ## The Canonical Field Table — single source of truth
@@ -111,7 +113,7 @@ A flat, linear sequence of guarded steps. Each step has one job and one explicit
 
 1. **Determine mode.**
    - Message contains a filled `=== BEANIES PRE-PLAN ===` block → **PASTE mode** (step 3).
-   - Message references a Notion issue ("pre-plan the X issue", a title, or an `ID`) → **NOTION mode** (step 2 then 4).
+   - Message references a tracker issue — **any issue-number form (`#29`, `issue #29`, `id 29`, "the 29 issue")**, a title, or an `ID` → **NOTION mode** (step 2 then 4). The number is the Notion **`ID` (unique_id)**, never a GitHub issue — do not `gh issue view` it (see "When to Invoke"). Resolve it against the Beanies Main Issue Tracker only.
    - "pre-plan the next issue" / no specific reference but NOTION is wanted → **NOTION mode** with the default filter (step 4).
    - Neither, and no content to work with → emit the blank template (above) and stop. Let the user fill it.
 
@@ -201,6 +203,7 @@ Device Type / View: carried verbatim into the Surfaces line (no remap)
 
 ## Rules
 
+- **Issue numbers are Notion tracker IDs, never GitHub.** A bare `#N` / `issue #N` / `id N` always resolves to the Beanies Main Issue Tracker `ID` (unique_id) → NOTION mode. Never `gh issue view` an issue number here; GitHub issues are a `beanies-plan` _output_, not a pre-plan _input_. (See "When to Invoke".)
 - **Problem-side only.** Capture what/why; never the how. The one exception — _Reuse hints / affected files_ — is an optional DRY-pass pointer, not an approach; it never constrains the design.
 - **Never modify `beanies-plan`.** The only coupling is the assembled prompt crossing the boundary in-thread (+ the captured row id, used for the at-handoff and the deferred write-backs). The `plan file url` write-back lives here, not in `beanies-plan`, so `beanies-plan` stays Notion-agnostic when invoked standalone.
 - **Single source of truth.** The Canonical Field Table is authoritative; template + Notion mapping + section mapping are projections. Changing a field is a one-row edit. The Status vocabulary, its transition, both Notion ids, the vocab maps, and the write-back contract live only in the binding block.
