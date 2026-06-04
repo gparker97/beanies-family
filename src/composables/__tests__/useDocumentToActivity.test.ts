@@ -43,11 +43,12 @@ function file(): File {
   return new File(['x'], 'invite.jpg', { type: 'image/jpeg' });
 }
 
-function setup(consent: boolean) {
-  const requestConsent = vi.fn().mockResolvedValue(consent);
+// Consent is gated by the page (FamilyPlannerPage.handleAddFromPhoto) BEFORE the picker, so
+// this composable no longer takes a requestConsent option — processFile runs post-consent.
+function setup() {
   const onActivityReady = vi.fn();
-  const wedge = useDocumentToActivity({ requestConsent, onActivityReady });
-  return { ...wedge, requestConsent, onActivityReady };
+  const wedge = useDocumentToActivity({ onActivityReady });
+  return { ...wedge, onActivityReady };
 }
 
 beforeEach(() => {
@@ -58,35 +59,31 @@ beforeEach(() => {
 });
 
 describe('useDocumentToActivity', () => {
-  it('offline: info toast, no consent prompt, no extraction', async () => {
+  it('offline: info toast, no extraction', async () => {
     isOnline.value = false;
-    const { processFile, requestConsent } = setup(true);
+    const { processFile } = setup();
 
     await processFile(file());
 
     expect(showToast).toHaveBeenCalledWith('info', 'ai.offline.title', 'ai.offline.message');
-    expect(requestConsent).not.toHaveBeenCalled();
     expect(mockExtract).not.toHaveBeenCalled();
-  });
-
-  it('consent declined: silent no-op — no network, no toast, no activity', async () => {
-    const { processFile, onActivityReady } = setup(false);
-
-    await processFile(file());
-
-    expect(mockExtract).not.toHaveBeenCalled();
-    expect(showToast).not.toHaveBeenCalled();
-    expect(onActivityReady).not.toHaveBeenCalled();
   });
 
   it('success (event): opens the activity with prefill + confidence, no toast', async () => {
     mockExtract.mockResolvedValue({ success: true, data: SAMPLE });
-    const { processFile, onActivityReady } = setup(true);
+    const { processFile, onActivityReady } = setup();
 
     await processFile(file());
 
     expect(onActivityReady).toHaveBeenCalledWith({
-      prefill: { title: 'Birthday', date: '2026-07-12', startTime: '14:00', location: 'Hall' },
+      // 'Birthday' title → inferred category rides along in the prefill.
+      prefill: {
+        title: 'Birthday',
+        date: '2026-07-12',
+        startTime: '14:00',
+        location: 'Hall',
+        category: 'birthday',
+      },
       confidence: SAMPLE.confidence,
       sourcePhoto: undefined, // no compressed blob on this result
     });
@@ -96,7 +93,7 @@ describe('useDocumentToActivity', () => {
   it('success with a compressed blob: hands back the source photo as a File to attach', async () => {
     const blob = new Blob(['imgbytes'], { type: 'image/jpeg' });
     mockExtract.mockResolvedValue({ success: true, data: SAMPLE, compressedBlob: blob });
-    const { processFile, onActivityReady } = setup(true);
+    const { processFile, onActivityReady } = setup();
 
     await processFile(file());
 
@@ -110,7 +107,7 @@ describe('useDocumentToActivity', () => {
     tier.value = 'byok';
     byokConfig.value = { provider: 'openai', apiKey: 'sk-test' };
     mockExtract.mockResolvedValue({ success: true, data: SAMPLE });
-    const { processFile } = setup(true);
+    const { processFile } = setup();
 
     await processFile(file());
 
@@ -122,7 +119,7 @@ describe('useDocumentToActivity', () => {
 
   it('non-event: still opens the form AND shows an info toast (never silently dropped)', async () => {
     mockExtract.mockResolvedValue({ success: true, data: { ...SAMPLE, isEvent: false } });
-    const { processFile, onActivityReady } = setup(true);
+    const { processFile, onActivityReady } = setup();
 
     await processFile(file());
 
@@ -132,7 +129,7 @@ describe('useDocumentToActivity', () => {
 
   it('provider_error: error toast with report surface, no activity opened', async () => {
     mockExtract.mockResolvedValue({ success: false, errorCode: 'provider_error' });
-    const { processFile, onActivityReady } = setup(true);
+    const { processFile, onActivityReady } = setup();
 
     await processFile(file());
 
@@ -144,7 +141,7 @@ describe('useDocumentToActivity', () => {
 
   it('compression failure: warning toast reusing the photo-type wording', async () => {
     mockExtract.mockResolvedValue({ success: false, errorCode: 'compression' });
-    const { processFile } = setup(true);
+    const { processFile } = setup();
 
     await processFile(file());
 
@@ -153,7 +150,7 @@ describe('useDocumentToActivity', () => {
 
   it('not_available: info toast (not an error)', async () => {
     mockExtract.mockResolvedValue({ success: false, errorCode: 'not_available' });
-    const { processFile } = setup(true);
+    const { processFile } = setup();
 
     await processFile(file());
 
@@ -166,7 +163,7 @@ describe('useDocumentToActivity', () => {
 
   it('malformed_output: error toast with the "clearer photo" hint', async () => {
     mockExtract.mockResolvedValue({ success: false, errorCode: 'malformed_output' });
-    const { processFile } = setup(true);
+    const { processFile } = setup();
 
     await processFile(file());
 
@@ -177,11 +174,11 @@ describe('useDocumentToActivity', () => {
 
   it('toggles isProcessing around the extraction', async () => {
     mockExtract.mockResolvedValue({ success: true, data: SAMPLE });
-    const { processFile, isProcessing } = setup(true);
+    const { processFile, isProcessing } = setup();
 
     expect(isProcessing.value).toBe(false);
     const p = processFile(file());
-    // requestConsent resolves on a microtask; isProcessing flips true once extraction starts.
+    // isProcessing flips true once extraction starts and back to false when it resolves.
     await p;
     expect(isProcessing.value).toBe(false);
   });

@@ -9,7 +9,7 @@
 // required keys, or the built messages diverge (src/services/ai/__tests__/extractionPromptDrift.test.ts).
 // Bump PROMPT_VERSION on ANY change so drift is detectable, and update every copy together.
 
-export const PROMPT_VERSION = '2026-06-02.1';
+export const PROMPT_VERSION = '2026-06-04.1';
 
 // The structured shape we ask the model to return. Confidence is 0..1 per field so the UI can flag
 // low-confidence values. `isEvent` lets us gracefully handle a non-event image instead of inventing one.
@@ -25,6 +25,8 @@ export const EXTRACTION_JSON_SHAPE = {
   location: 'string — venue/address as written, or "" if absent',
   description:
     'string — a short note capturing anything useful not in the other fields (dress code, RSVP, what to bring), or ""',
+  categoryHint:
+    'string — a short lowercase label classifying the event type, e.g. "birthday", "soccer game", "dentist", "school recital", or "" if unclear',
   confidence: 'object — a 0..1 number for each of: title, date, startTime, endTime, location',
 };
 

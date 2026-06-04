@@ -39,6 +39,7 @@ import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useDocumentToActivity } from '@/composables/useDocumentToActivity';
 import { useAiCapability } from '@/composables/useAiCapability';
 import { useFilePicker } from '@/composables/useFilePicker';
+import { isFlagEnabled } from '@/config/flags';
 import type { FieldConfidence } from '@/services/ai/types';
 import type {
   FamilyActivity,
@@ -53,6 +54,9 @@ const { t } = useTranslation();
 const route = useRoute();
 const router = useRouter();
 const { canEditActivities } = usePermissions();
+// The photo→activity wedge (#133) is hidden behind a dev feature flag until it ships to
+// users: ON in dev, OFF in prod (override per-browser via localStorage). Gates the 📸 button.
+const canAddFromPhoto = computed(() => canEditActivities.value && isFlagEnabled('aiPhotoExtract'));
 const activityStore = useActivityStore();
 const settingsStore = useSettingsStore();
 const accountsStore = useAccountsStore();
@@ -208,7 +212,6 @@ function onPhotoActivityReady(ready: {
 }
 
 const { isProcessing: isReadingPhoto, processFile: processPhoto } = useDocumentToActivity({
-  requestConsent: requestPhotoConsent,
   onActivityReady: onPhotoActivityReady,
 });
 
@@ -219,6 +222,20 @@ const photoPicker = useFilePicker({
     if (files[0]) void processPhoto(files[0]);
   },
 });
+
+/**
+ * 📸 entry point. The consent gate runs BEFORE the file picker — nothing leaves the device
+ * until the user agrees, and a decline is a deliberate silent no-op (no picker, no network,
+ * no toast). Honours skipDocumentConsentPrompt (requestPhotoConsent resolves true at once).
+ * Offline is detected later in processPhoto (after a file is picked), so an offline user may
+ * pass consent + the picker before the "offline" toast — acceptable; consent-first is the
+ * privacy-correct order.
+ */
+async function handleAddFromPhoto(): Promise<void> {
+  const granted = await requestPhotoConsent();
+  if (!granted) return;
+  photoPicker.open();
+}
 
 // Vacation wizard state
 const showVacationWizard = ref(false);
@@ -563,6 +580,7 @@ function handleActivitySwapped(newId: string) {
       :label="label"
       :active-view="activeView"
       :can-add="canEditActivities"
+      :can-add-from-photo="canAddFromPhoto"
       :is-all-active="isAllActive"
       :is-member-active="isMemberActive"
       :active-member-names="activeMemberNames"
@@ -571,7 +589,7 @@ function handleActivitySwapped(newId: string) {
       @today="handleToday"
       @update:active-view="setView"
       @add="openAddModal()"
-      @add-from-photo="photoPicker.open()"
+      @add-from-photo="handleAddFromPhoto"
       @open-agenda="handleOpenAgenda"
       @select-all="onSelectAll"
       @select-member="onSelectMember"

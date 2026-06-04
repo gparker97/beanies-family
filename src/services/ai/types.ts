@@ -68,6 +68,13 @@ export interface ExtractionResult {
   isAllDay: boolean;
   location: string;
   description: string;
+  /**
+   * Optional free-text category label the model suggests (e.g. "birthday", "soccer game").
+   * The client maps it to an ActivityCategory (see utils/extractionToActivity). OPTIONAL:
+   * an older deployed managed proxy omits it, and BYOK/on-device may too — callers must
+   * tolerate its absence and fall back to keyword inference.
+   */
+  categoryHint?: string;
   confidence: FieldConfidence;
   /** Managed tier only (see AttestationInfo). */
   attestation?: AttestationInfo;

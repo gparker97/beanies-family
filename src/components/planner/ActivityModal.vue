@@ -131,6 +131,10 @@ function applyPrefill(): void {
   const p = props.prefill;
   if (!p) return;
   wasPrefilled.value = true;
+  // Photo-extracted events default to one-time, overriding onNew's 'weekly' (an invitation
+  // is almost always a single occurrence). Forward-compatible: honours an explicit recurrence
+  // if a prefill ever carries one (e.g. a detected repeating event).
+  recurrence.value = p.recurrence ?? 'none';
   if (p.title !== undefined) title.value = p.title;
   if (p.date) date.value = p.date;
   if (p.location !== undefined) location.value = p.location;
@@ -138,6 +142,8 @@ function applyPrefill(): void {
   if (p.isAllDay !== undefined) isAllDay.value = p.isAllDay;
   if (p.startTime) startTime.value = p.startTime;
   if (p.endTime) endTime.value = p.endTime;
+  // Inferred category (when matched) — the category watch derives the icon + colour.
+  if (p.category) category.value = p.category;
 }
 
 const titleLowConfidence = computed(

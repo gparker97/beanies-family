@@ -11,7 +11,7 @@
 
 import type { ExtractionResult, FieldConfidence } from './types';
 
-export const PROMPT_VERSION = '2026-06-02.1';
+export const PROMPT_VERSION = '2026-06-04.1';
 
 /**
  * The structured shape we ask the model to return. Confidence is 0..1 per field so the
@@ -30,6 +30,8 @@ export const EXTRACTION_JSON_SHAPE = {
   location: 'string — venue/address as written, or "" if absent',
   description:
     'string — a short note capturing anything useful not in the other fields (dress code, RSVP, what to bring), or ""',
+  categoryHint:
+    'string — a short lowercase label classifying the event type, e.g. "birthday", "soccer game", "dentist", "school recital", or "" if unclear',
   confidence: 'object — a 0..1 number for each of: title, date, startTime, endTime, location',
 } as const;
 
@@ -130,6 +132,11 @@ export function parseExtractionResult(raw: unknown): ExtractionResult {
     location: clamp01(rawConfidence.location),
   };
 
+  // categoryHint is OPTIONAL (not in REQUIRED_KEYS) so an older deployed proxy that
+  // predates this field still parses. Include it only when present + non-empty, so the
+  // parsed shape stays byte-identical to before for any response that omits it.
+  const categoryHint = asString(obj.categoryHint);
+
   return {
     isEvent: asBool(obj.isEvent),
     title: asString(obj.title),
@@ -140,5 +147,6 @@ export function parseExtractionResult(raw: unknown): ExtractionResult {
     location: asString(obj.location),
     description: asString(obj.description),
     confidence,
+    ...(categoryHint ? { categoryHint } : {}),
   };
 }
