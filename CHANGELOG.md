@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-04
+
+### Changed
+
+- **Minor reliability and settings improvements** under the hood — groundwork for upcoming features, with no visible change yet.
+
 ## 2026-06-01
 
 ### Changed
