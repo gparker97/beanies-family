@@ -127,15 +127,28 @@ export async function handler(event) {
     } catch (err) {
       const timedOut = err && err.name === 'TimeoutError';
       console.error(`[ai-extract] upstream ${timedOut ? 'timeout' : 'network error'}`);
-      return response(timedOut ? 504 : 502, { error: 'Upstream inference failed' }, event);
+      return timedOut
+        ? response(504, { error: 'AI service timed out', code: 'upstream_timeout' }, event)
+        : response(502, { error: 'Upstream inference failed', code: 'upstream_network' }, event);
     }
 
     if (!upstream.ok) {
-      // Distinct, byte-free log so a revoked/rotated Tinfoil key is diagnosable from CloudWatch.
-      const code =
-        upstream.status === 401 || upstream.status === 403 ? 'upstream_auth' : 'upstream_http';
+      // Classify the failure so the client can react correctly (byte-free log either way):
+      //   • 5xx  → the provider is overloaded/down. TRANSIENT — tell the client it's retryable
+      //            (503 + upstream_unavailable), and don't treat it like a hard error.
+      //   • 401/403 → OUR Tinfoil key is bad. Hard config failure (502 + upstream_auth).
+      //   • other non-2xx → generic upstream HTTP error (502 + upstream_http).
+      const isAuth = upstream.status === 401 || upstream.status === 403;
+      const isUpstreamBusy = upstream.status >= 500;
+      const code = isAuth
+        ? 'upstream_auth'
+        : isUpstreamBusy
+          ? 'upstream_unavailable'
+          : 'upstream_http';
       console.error(`[ai-extract] ${code} status=${upstream.status}`);
-      return response(502, { error: 'Upstream inference failed' }, event);
+      return isUpstreamBusy
+        ? response(503, { error: 'AI service temporarily unavailable', code }, event)
+        : response(502, { error: 'Upstream inference failed', code }, event);
     }
 
     // Pass through the attested enclave identity (NOT yet client-verified — Gate 3).
@@ -146,7 +159,7 @@ export async function handler(event) {
       data = await upstream.json();
     } catch {
       console.error('[ai-extract] upstream returned non-JSON envelope');
-      return response(502, { error: 'Upstream inference failed' }, event);
+      return response(502, { error: 'Upstream inference failed', code: 'upstream_badjson' }, event);
     }
 
     const content = data?.choices?.[0]?.message?.content ?? '';
@@ -155,13 +168,21 @@ export async function handler(event) {
       result = parseModelJson(content);
     } catch {
       console.error('[ai-extract] model returned unparseable JSON');
-      return response(502, { error: 'Model returned unparseable output' }, event);
+      return response(
+        502,
+        { error: 'Model returned unparseable output', code: 'model_unparseable' },
+        event
+      );
     }
 
     const missing = REQUIRED_KEYS.filter((k) => !(k in result));
     if (missing.length) {
       console.error(`[ai-extract] model output missing keys: ${missing.join(',')}`);
-      return response(502, { error: 'Model returned wrong-shape output' }, event);
+      return response(
+        502,
+        { error: 'Model returned wrong-shape output', code: 'model_shape' },
+        event
+      );
     }
 
     // Retain nothing: no document bytes, no model content — only a structured success line.

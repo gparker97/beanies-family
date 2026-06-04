@@ -55,6 +55,12 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
         // Reuse the established photo-type wording (e.g. HEIC on Chromium).
         showToast('warning', t('ai.error.title'), t('photos.invalidType'));
         return;
+      case 'upstream_busy':
+        // The AI provider is temporarily overloaded/down — transient, not our bug. Friendly
+        // retry toast only; deliberately NO error surface so provider 5xx flapping can't spam
+        // #beanies-errors.
+        showToast('warning', t('ai.error.busy.title'), t('ai.error.busy.message'));
+        return;
       case 'timeout':
         showToast('error', t('ai.error.title'), t('ai.error.timeout'), { surface: ERROR_SURFACE });
         return;

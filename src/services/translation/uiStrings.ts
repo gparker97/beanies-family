@@ -6446,6 +6446,11 @@ const STRING_DEFS = {
     en: 'Something went wrong reading that photo. Please try again.',
     beanie: 'something went wrong reading that photo. please try again.',
   },
+  'ai.error.busy.title': { en: 'beanies AI Is Busy', beanie: 'beanies ai is busy' },
+  'ai.error.busy.message': {
+    en: 'beanies AI is busy right now. Please try again in a moment.',
+    beanie: 'beanies ai is busy right now. please try again in a moment.',
+  },
   'ai.lowConfidence.hint': {
     en: "We weren't sure about this one. Worth a quick check.",
     beanie: "we weren't sure about this one. worth a quick check.",

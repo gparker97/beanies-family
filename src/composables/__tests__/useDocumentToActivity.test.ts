@@ -161,6 +161,21 @@ describe('useDocumentToActivity', () => {
     );
   });
 
+  it('upstream_busy: friendly retry toast, NO report surface (transient provider outage)', async () => {
+    mockExtract.mockResolvedValue({ success: false, errorCode: 'upstream_busy' });
+    const { processFile } = setup();
+
+    await processFile(file());
+
+    expect(showToast).toHaveBeenCalledWith(
+      'warning',
+      'ai.error.busy.title',
+      'ai.error.busy.message'
+    );
+    // No 4th argument → no surface → no reportError/Slack alert for a transient 5xx.
+    expect(showToast.mock.calls[0].length).toBe(3);
+  });
+
   it('malformed_output: error toast with the "clearer photo" hint', async () => {
     mockExtract.mockResolvedValue({ success: false, errorCode: 'malformed_output' });
     const { processFile } = setup();
