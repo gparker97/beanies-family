@@ -17,6 +17,9 @@ const env = import.meta.env;
 
 const ok = (v: unknown): boolean => typeof v === 'string' && v.trim().length > 0;
 
+// The canonical cloud host. Update this set if it ever changes.
+const CLOUD_HOSTS = new Set(['app.beanies.family']);
+
 export const features = {
   // Drive sync only requires VITE_GOOGLE_CLIENT_ID — that's what gates OAuth
   // and the Drive REST API. VITE_GOOGLE_API_KEY + VITE_GOOGLE_PROJECT_NUMBER
@@ -40,16 +43,50 @@ export const features = {
 
 export type FeatureKey = keyof typeof features;
 
-// A cloud-ish build (Drive and/or the family registry wired) with no error
-// webhook means `reportError()` silently no-ops — exactly the failure mode
-// that hid a real iPhone onboarding break (May 2026). Make it loud at boot so
-// a missing `VITE_BEANIES_ERROR_WEBHOOK_URL` (e.g. an unset GitHub repo
-// variable) can't masquerade as working error reporting. Production builds
-// only — dev/test don't ship that env var and that's fine.
-if (env.PROD && !features.errorReporter && (features.drive || features.registry)) {
-  console.warn(
-    '[features] errorReporter is OFF (VITE_BEANIES_ERROR_WEBHOOK_URL is unset) but this looks like a cloud build (drive/registry are configured). Errors will NOT reach #beanies-errors. Set the BEANIES_ERROR_WEBHOOK_URL repo variable.'
-  );
+// A cloud-ish build (Drive and/or the family registry wired) is the official
+// app, so it MUST also have the operational webhooks wired — otherwise the
+// notification silently no-ops: `slackPost` short-circuits on an empty URL, and
+// the client POSTs with `no-cors` so even a live-but-dead webhook can't surface
+// a failure. This exact gap hid a real iPhone onboarding break (May 2026,
+// errorReporter) and later dropped every "new family pod" Slack ping (June 2026,
+// slackPodCreate — a dev build shipped to prod with no webhook). Make it loud at
+// boot so an unset GitHub secret/variable can't masquerade as working alerting.
+// Production builds only — dev/test/self-host omit these and that's fine.
+if (env.PROD && (features.drive || features.registry)) {
+  const operationalWebhooks: ReadonlyArray<readonly [FeatureKey, string, string]> = [
+    ['errorReporter', 'VITE_BEANIES_ERROR_WEBHOOK_URL', 'Errors will NOT reach #beanies-errors'],
+    [
+      'slackPodCreate',
+      'VITE_SLACK_WEBHOOK_URL',
+      'New-family pod notifications will NOT reach Slack',
+    ],
+  ];
+  for (const [key, envVar, impact] of operationalWebhooks) {
+    if (!features[key]) {
+      console.warn(
+        `[features] ${key} is OFF (${envVar} is unset) but this looks like a cloud build ` +
+          `(drive/registry are configured). ${impact}. Set the matching GitHub secret/variable.`
+      );
+    }
+  }
+
+  // A dev/local build (no VITE_BUILD_SHA → 'dev') must never reach the canonical
+  // cloud host: it ships none of the CI-injected env (webhooks, analytics, build
+  // SHA). Detecting it here fingerprints the June 2026 incident — a manual
+  // `npm run build` synced to app.beanies.family instead of deploying through the
+  // "Deploy beanies PROD" workflow. Fix: redeploy via the workflow.
+  const buildSha = (env.VITE_BUILD_SHA as string | undefined) ?? 'dev';
+  if (
+    typeof window !== 'undefined' &&
+    CLOUD_HOSTS.has(window.location.hostname) &&
+    buildSha === 'dev'
+  ) {
+    console.error(
+      '[features] A dev/local build is live on the cloud host (VITE_BUILD_SHA is "dev"). ' +
+        'This bundle was NOT produced by the "Deploy beanies PROD" workflow, so Slack webhooks, ' +
+        'error reporting, and analytics are all disabled. Redeploy via the workflow.'
+    );
+  }
 }
 
 /**
@@ -72,9 +109,6 @@ export function canInviteFamily(): boolean {
 const ESSENTIAL: FeatureKey[] = ['drive', 'registry'];
 
 export type DeploymentMode = 'cloud' | 'self-host-full' | 'self-host-limited';
-
-// Update this set if the canonical cloud host ever changes.
-const CLOUD_HOSTS = new Set(['app.beanies.family']);
 
 export function getDeploymentMode(): DeploymentMode {
   if (CLOUD_HOSTS.has(window.location.hostname)) return 'cloud';
