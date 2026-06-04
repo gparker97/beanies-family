@@ -39,6 +39,8 @@ import {
 } from '@/utils/vacation';
 import TodayTimelineMarker from '@/components/travel/TodayTimelineMarker.vue';
 import ExpandableText from '@/components/ui/ExpandableText.vue';
+import PhotoThumbnail from '@/components/media/PhotoThumbnail.vue';
+import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import type { FamilyVacation, VacationIdea } from '@/types/models';
 
 const { t } = useTranslation();
@@ -66,6 +68,17 @@ const editingItemIndex = ref(-1);
 
 // Collapsible segment cards
 const collapsedCards = ref<Record<string, boolean>>({});
+
+// Attachment viewer (read-only lightbox for timeline segment documents;
+// add/remove happens in the segment edit drawer, not here).
+const viewerOpen = ref(false);
+const viewerPhotoIds = ref<string[]>([]);
+const viewerIndex = ref(0);
+function openAttachmentViewer(photoIds: string[], photoId: string): void {
+  viewerPhotoIds.value = photoIds;
+  viewerIndex.value = Math.max(0, photoIds.indexOf(photoId));
+  viewerOpen.value = true;
+}
 
 // Ideas state
 const quickIdeaText = ref('');
@@ -1093,6 +1106,7 @@ function addQuickIdea() {
                       show-edit
                       deletable
                       :hint="hintMap.get(item.id)?.message"
+                      :attachment-count="item.photoIds?.length ?? 0"
                       @update:title="saveInlineField(item, 'title', $event)"
                       @update:collapsed="setCollapsed(item.id, $event)"
                       @edit="openEditModal(item)"
@@ -1202,6 +1216,19 @@ function addQuickIdea() {
                           </span>
                         </div>
                       </div>
+
+                      <!-- Attached booking documents — thumbnail strip, opens the viewer -->
+                      <div
+                        v-if="item.photoIds && item.photoIds.length > 0"
+                        class="mt-3 flex items-center gap-2 overflow-x-auto pt-2"
+                      >
+                        <PhotoThumbnail
+                          v-for="pid in item.photoIds"
+                          :key="pid"
+                          :photo-id="pid"
+                          @open="openAttachmentViewer(item.photoIds ?? [], pid)"
+                        />
+                      </div>
                     </VacationSegmentCard>
                   </div>
                 </div>
@@ -1270,6 +1297,7 @@ function addQuickIdea() {
               :read-only="false"
               show-edit
               deletable
+              :attachment-count="item.photoIds?.length ?? 0"
               @update:title="saveInlineField(item, 'title', $event)"
               @update:collapsed="setCollapsed(item.id, $event)"
               @edit="openEditModal(item)"
@@ -1378,6 +1406,15 @@ function addQuickIdea() {
     <!-- ═══════════════════════════════════════════════════════════════════════
          MODALS
          ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Booking-document lightbox (read-only; edit/remove via the segment drawer) -->
+    <PhotoViewer
+      :open="viewerOpen"
+      :photo-ids="viewerPhotoIds"
+      :initial-index="viewerIndex"
+      read-only
+      @close="viewerOpen = false"
+    />
 
     <!-- Vacation wizard -->
     <VacationWizard

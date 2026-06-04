@@ -38,6 +38,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import type { FamilyDocument } from '@/types/automerge';
 import type { PhotoAttachment, UUID } from '@/types/models';
+import { PDF_MIME } from '@/utils/attachmentKind';
 
 const THUMB_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const TOMBSTONE_GRACE_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -113,15 +114,67 @@ export type PhotoResolution =
   | { status: 'missing' };
 
 /**
- * Collections that currently reference photos via a `photoIds?: UUID[]`
- * field. Follow-up integration plans (activities, family avatars, todos)
- * register their collection name here so `gcOrphans` can detect photos
- * with zero inbound references.
+ * How a collection references photos. Two functions cover the two
+ * GC-critical surfaces:
+ *   - `attach`: append a finished upload's photoId to its parent entity
+ *     inside the doc (the safety-net write used by the online path AND the
+ *     offline queue flush).
+ *   - `collect`: yield every photoId the collection currently references, so
+ *     `gcOrphans` knows what NOT to delete.
+ *
+ * Most collections are flat top-level id-keyed records with a `photoIds?`
+ * array (`doc[collection][entityId].photoIds`) — they register by name only
+ * and get `flatHooks` synthesized. Non-flat hosts (family-member avatars
+ * via a scalar `avatarPhotoId`; vacation booking segments nested inside
+ * `doc.vacations[*].{travelSegments,…}[]`) pass explicit hooks.
  */
-const photoReferringCollections = new Set<string>();
+export interface PhotoCollectionHooks {
+  attach: (doc: FamilyDocument, entityId: string, photoId: UUID) => void;
+  collect: (doc: FamilyDocument) => Iterable<UUID>;
+}
 
-export function registerPhotoCollection(name: string): void {
-  photoReferringCollections.add(name);
+/** Thrown when a registered `collect` hook fails. Signals `gcOrphans` to
+ *  abort the sweep (fail-safe: never delete photos we couldn't prove orphaned). */
+export class PhotoCollectHookError extends Error {
+  readonly collection: string;
+  readonly cause: unknown;
+  constructor(collection: string, cause: unknown) {
+    super(`photo collect hook failed for "${collection}"`);
+    this.name = 'PhotoCollectHookError';
+    this.collection = collection;
+    this.cause = cause;
+  }
+}
+
+/** The standard flat shape: `doc[collection][entityId].photoIds`. */
+function flatHooks(collection: string): PhotoCollectionHooks {
+  type FlatEntities = Record<string, { photoIds?: UUID[] }>;
+  return {
+    attach(doc, entityId, photoId) {
+      const entities = (doc as unknown as Record<string, FlatEntities>)[collection];
+      const entity = entities?.[entityId];
+      if (!entity) return;
+      entity.photoIds = [...(entity.photoIds ?? []), photoId];
+    },
+    *collect(doc) {
+      const entities = (doc as unknown as Record<string, FlatEntities>)[collection];
+      if (!entities) return;
+      for (const entity of Object.values(entities)) {
+        for (const pid of entity?.photoIds ?? []) yield pid;
+      }
+    },
+  };
+}
+
+/**
+ * Registered photo-referencing collections. Replaces the former
+ * `Set<string>` + hardcoded `avatarPhotoId` branch with one consistent
+ * shape — every collection (flat or not) is just a registration.
+ */
+const photoCollections = new Map<string, PhotoCollectionHooks>();
+
+export function registerPhotoCollection(name: string, hooks?: PhotoCollectionHooks): void {
+  photoCollections.set(name, hooks ?? flatHooks(name));
 }
 
 export const usePhotoStore = defineStore('photos', () => {
@@ -283,28 +336,57 @@ export const usePhotoStore = defineStore('photos', () => {
       throw new Error('photoStore: cloud sync is required to attach photos.');
     }
 
-    // Compress first so the queue stores the smaller blob (and we know
-    // the final dimensions/mime even before we attempt Drive upload).
-    let compressed;
-    try {
-      compressed = await compress(file);
-    } catch (e) {
-      if (e instanceof CompressionError) throw e;
-      throw new CompressionError('Failed to compress image', e);
+    const photoId = crypto.randomUUID();
+
+    // Two kinds flow through this one path:
+    //   - PDFs (booking documents): stored as-is — no canvas compression
+    //     (createImageBitmap can't decode a PDF). Size/type/magic-byte are
+    //     ALREADY validated upstream in usePhotos.add; this branch trusts that
+    //     and never throws CompressionError. width/height are 0 (non-raster);
+    //     the original filename is preserved for display/download.
+    //   - Images: compressed to JPEG as before.
+    let attachmentBlob: Blob;
+    let filename: string;
+    let mime: string;
+    let width: number;
+    let height: number;
+    let originalFileName: string | undefined;
+
+    if (file.type === PDF_MIME) {
+      attachmentBlob = file;
+      filename = `beanies-doc-${photoId}.pdf`;
+      mime = PDF_MIME;
+      width = 0;
+      height = 0;
+      originalFileName = file.name;
+    } else {
+      // Compress first so the queue stores the smaller blob (and we know
+      // the final dimensions/mime even before we attempt Drive upload).
+      let compressed;
+      try {
+        compressed = await compress(file);
+      } catch (e) {
+        if (e instanceof CompressionError) throw e;
+        throw new CompressionError('Failed to compress image', e);
+      }
+      attachmentBlob = compressed.blob;
+      filename = `beanies-photo-${photoId}.jpg`;
+      mime = compressed.mime;
+      width = compressed.width;
+      height = compressed.height;
     }
 
-    const photoId = crypto.randomUUID();
-    const filename = `beanies-photo-${photoId}.jpg`;
     const payload = {
       photoId,
       entityCollection,
       entityId,
-      blob: compressed.blob,
+      blob: attachmentBlob,
       filename,
-      mime: compressed.mime,
-      width: compressed.width,
-      height: compressed.height,
-      sizeBytes: compressed.blob.size,
+      mime,
+      width,
+      height,
+      sizeBytes: attachmentBlob.size,
+      ...(originalFileName ? { fileName: originalFileName } : {}),
       createdBy,
     };
 
@@ -405,6 +487,7 @@ export const usePhotoStore = defineStore('photos', () => {
         // Automerge rejects undefined property assignments — only set
         // optional fields when they have a value.
         if (payload.createdBy) record.createdBy = payload.createdBy;
+        if (payload.fileName) record.fileName = payload.fileName;
         doc.photos[payload.photoId] = record;
         attachPhotoToEntity(doc, payload.entityCollection, payload.entityId, payload.photoId);
       }, `photos: add ${payload.photoId}`);
@@ -734,12 +817,22 @@ export const usePhotoStore = defineStore('photos', () => {
     const all = Object.values(doc.photos ?? {});
     const now = Date.now();
     const toDelete: PhotoAttachment[] = [];
-    const referenced = collectReferencedPhotoIds(doc);
+
+    // Fail-safe: if ANY collect hook throws we cannot reliably tell which
+    // photos are referenced — deleting on a partial set would wipe live
+    // attachments app-wide. Abort the sweep entirely (delete nothing) and
+    // retry next time. The error is logged in collectReferencedPhotoIds.
+    let referenced: Set<UUID>;
+    try {
+      referenced = collectReferencedPhotoIds(doc);
+    } catch {
+      return { scanned: all.length, deleted: 0 };
+    }
 
     for (const photo of all) {
       const tombstoneExpired =
         photo.deletedAt && now - Date.parse(photo.deletedAt) > TOMBSTONE_GRACE_MS;
-      const orphaned = photoReferringCollections.size > 0 && !referenced.has(photo.id);
+      const orphaned = photoCollections.size > 0 && !referenced.has(photo.id);
       if (tombstoneExpired || orphaned) toDelete.push(photo);
     }
 
@@ -769,24 +862,23 @@ export const usePhotoStore = defineStore('photos', () => {
     return { scanned: all.length, deleted: toDelete.length };
   }
 
+  /**
+   * Gather every photoId referenced by any registered collection, via its
+   * `collect` hook. Throws `PhotoCollectHookError` if a hook fails — the
+   * caller (`gcOrphans`) treats that as "cannot determine references" and
+   * aborts the sweep (fail-safe: never delete on a partial set).
+   */
   function collectReferencedPhotoIds(doc: FamilyDocument): Set<UUID> {
     const ids = new Set<UUID>();
-    for (const collection of photoReferringCollections) {
-      // Scan both shapes in one pass:
-      //   - `photoIds?: UUID[]` (e.g. activities, recipes, medications)
-      //   - `avatarPhotoId?: UUID` scalar (family-member avatars)
-      // Entities that only have one field are fine — the missing field is
-      // undefined and contributes nothing.
-      const entities = (
-        doc as unknown as Record<
-          string,
-          Record<string, { photoIds?: UUID[]; avatarPhotoId?: UUID }>
-        >
-      )[collection];
-      if (!entities) continue;
-      for (const entity of Object.values(entities)) {
-        for (const pid of entity?.photoIds ?? []) ids.add(pid);
-        if (entity?.avatarPhotoId) ids.add(entity.avatarPhotoId);
+    for (const [name, hooks] of photoCollections) {
+      try {
+        for (const pid of hooks.collect(doc)) ids.add(pid);
+      } catch (e) {
+        console.error(
+          `[photoStore] collect hook failed for "${name}" — aborting GC sweep to avoid deleting referenced photos`,
+          e
+        );
+        throw new PhotoCollectHookError(name, e);
       }
     }
     return ids;
@@ -861,13 +953,16 @@ export const usePhotoStore = defineStore('photos', () => {
     entityId: string,
     photoId: UUID
   ): void {
-    const entities = (doc as unknown as Record<string, Record<string, { photoIds?: UUID[] }>>)[
-      entityCollection
-    ];
-    if (!entities) return;
-    const entity = entities[entityId];
-    if (!entity) return;
-    entity.photoIds = [...(entity.photoIds ?? []), photoId];
+    // Registered hooks know how to reach the entity (flat or nested);
+    // an unregistered collection falls back to flat behavior (preserves the
+    // pre-registry contract). A throwing hook must never break the upload —
+    // the caller's `updatePhotoIds` emit is the primary reference path.
+    const hooks = photoCollections.get(entityCollection) ?? flatHooks(entityCollection);
+    try {
+      hooks.attach(doc, entityId, photoId);
+    } catch (e) {
+      console.error(`[photoStore] attach hook failed for "${entityCollection}"/${entityId}`, e);
+    }
   }
 
   return {
@@ -902,5 +997,6 @@ export const usePhotoStore = defineStore('photos', () => {
 // Exported for tests only.
 export const __internals = {
   registerPhotoCollection,
-  photoReferringCollections,
+  photoCollections,
+  flatHooks,
 };

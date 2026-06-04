@@ -6,8 +6,10 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import DocumentTile from '@/components/media/DocumentTile.vue';
 import { usePhotoStore } from '@/stores/photoStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { attachmentKind } from '@/utils/attachmentKind';
 import type { UUID } from '@/types/models';
 
 interface Props {
@@ -28,11 +30,20 @@ const loadedOnce = ref(false);
 const imgError = ref(false);
 
 const isPending = computed(() => !!props.pendingLabel);
+const photo = computed(() => (props.photoId ? store.photos[props.photoId] : undefined));
+// PDF attachments have no raster URL — render the boarding-pass DocumentTile
+// instead of resolving an image. (Missing-PDF state is surfaced in the viewer
+// on open, not in the tile.)
+const isPdfDoc = computed(
+  () => !isPending.value && !!photo.value && attachmentKind(photo.value) === 'pdf'
+);
 const photoIsMissing = computed(() => !!props.photoId && store.isUnresolved(props.photoId));
-const showBroken = computed(() => photoIsMissing.value || (!loading.value && imgError.value));
+const showBroken = computed(
+  () => !isPdfDoc.value && (photoIsMissing.value || (!loading.value && imgError.value))
+);
 
 function resolve(): void {
-  if (!props.photoId || isPending.value) {
+  if (!props.photoId || isPending.value || isPdfDoc.value) {
     url.value = null;
     loading.value = false;
     return;
@@ -97,6 +108,9 @@ watch(
         pendingLabel
       }}</span>
     </div>
+
+    <!-- PDF document tile (boarding-pass stub) -->
+    <DocumentTile v-else-if="isPdfDoc" :file-name="photo?.fileName" />
 
     <!-- Broken / missing state -->
     <div

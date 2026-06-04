@@ -7,6 +7,8 @@ import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
+import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import {
@@ -164,6 +166,20 @@ const rules = computed<BookingValidationRules<TransportationField>>(() => {
 
 const validation = useBookingValidation<TransportationField>(status, rules);
 const canSave = validation.canSave;
+
+// --- Booking-document attachments (images + PDFs) --------------------
+const segmentPhotoIds = computed<string[]>(
+  () =>
+    vacationStore.getVacationById(props.vacationId)?.transportation[props.transportationIndex]
+      ?.photoIds ?? []
+);
+const attachmentEntityId = computed(() =>
+  vacationSegmentEntityId(props.vacationId, props.transportation?.id ?? '')
+);
+function onPhotoIds(ids: string[]): void {
+  if (!props.transportation?.id) return;
+  void vacationStore.updateSegmentPhotoIds(props.vacationId, props.transportation.id, ids);
+}
 
 async function handleSave() {
   if (!props.vacationId || props.transportationIndex < 0) return;
@@ -362,6 +378,18 @@ async function handleSave() {
           v-model="notes"
           :placeholder="t('vacation.field.notesPlaceholder')"
           :rows="3"
+        />
+      </FormFieldGroup>
+
+      <!-- Booking documents (images + PDFs) -->
+      <FormFieldGroup v-if="transportation?.id" :label="t('vacation.field.documents')">
+        <PhotoAttachments
+          collection="vacations"
+          :entity-id="attachmentEntityId"
+          :photo-ids="segmentPhotoIds"
+          allow-documents
+          :max="6"
+          @update:photo-ids="onPhotoIds"
         />
       </FormFieldGroup>
     </div>

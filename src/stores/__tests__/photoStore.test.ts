@@ -141,7 +141,7 @@ describe('photoStore', () => {
     driveMocks.setPublicLinkPermission.mockReset().mockResolvedValue(undefined);
 
     // Clear the registered integration collections between tests.
-    storeInternals.photoReferringCollections.clear();
+    storeInternals.photoCollections.clear();
 
     const store = usePhotoStore();
     await store.activate(FAMILY_ID);
@@ -217,6 +217,58 @@ describe('photoStore', () => {
     const pendingForEntity = store.pendingUploadsFor('activities', 'act-1');
     expect(pendingForEntity).toHaveLength(1);
     expect(pendingForEntity[0]!.photoId).toBe(photoId);
+  });
+
+  it('addPhoto stores a PDF as-is (no compression, fileName + 0×0 recorded)', async () => {
+    storeInternals.registerPhotoCollection('activities');
+    ensureEntity('activities', 'act-pdf');
+    const store = usePhotoStore();
+    const { compress } = await import('@/services/photos/photoCompression');
+    vi.mocked(compress).mockClear();
+
+    const pdf = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])], 'United eticket.pdf', {
+      type: 'application/pdf',
+    });
+    const { photoId, status } = await store.addPhoto(pdf, 'activities', 'act-pdf', 'member-1');
+
+    expect(status).toBe('completed');
+    // Passthrough: compression is skipped entirely for PDFs.
+    expect(compress).not.toHaveBeenCalled();
+    const [, , filename, blob, mime] = driveMocks.createFile.mock.calls[0]!;
+    expect(filename).toBe(`beanies-doc-${photoId}.pdf`);
+    expect(mime).toBe('application/pdf');
+    expect(blob).toBe(pdf); // raw bytes, not recompressed
+
+    const record = getDoc().photos[photoId];
+    expect(record!.mime).toBe('application/pdf');
+    expect(record!.width).toBe(0);
+    expect(record!.height).toBe(0);
+    expect(record!.fileName).toBe('United eticket.pdf');
+  });
+
+  it('gcOrphans aborts (deletes nothing) when a collect hook throws — fail-safe', async () => {
+    // A throwing collect hook must never widen the delete set: the whole
+    // sweep aborts so no referenced photo is mistaken for an orphan.
+    storeInternals.registerPhotoCollection('boom', {
+      attach: () => {},
+      collect: () => {
+        throw new Error('hook blew up');
+      },
+    });
+    storeInternals.registerPhotoCollection('activities');
+    ensureEntity('activities', 'act-x');
+    const store = usePhotoStore();
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-x');
+    // Drop the reference so it WOULD look orphaned if the sweep proceeded.
+    changeDoc((d) => {
+      (d as unknown as Record<string, Record<string, { photoIds: string[] }>>).activities[
+        'act-x'
+      ]!.photoIds = [];
+    });
+
+    const result = await store.gcOrphans();
+    expect(result.deleted).toBe(0);
+    expect(getDoc().photos[photoId]).toBeDefined();
   });
 
   it('getImageUrl returns a resized thumbnailLink and caches within TTL', async () => {

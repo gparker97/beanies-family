@@ -10,6 +10,8 @@ import type {
 import { generateUUID } from '@/utils/id';
 import { prefillTransportationDates } from '@/utils/vacation';
 import VacationSegmentCard from './VacationSegmentCard.vue';
+import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
+import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
@@ -93,6 +95,15 @@ function removeItem(index: number) {
   const updated = props.transportation.filter((_, i) => i !== index);
   emit('update:transportation', updated);
 }
+
+/** Booking-document attachments — held on local `photoIds`, saved with the
+ *  vacation (see VacationStep2 for the rationale). */
+function updateItemPhotos(index: number, ids: string[]): void {
+  const updated = [...props.transportation];
+  updated[index] = { ...updated[index]!, photoIds: [...ids] };
+  emit('update:transportation', updated);
+}
+const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', segId);
 
 function buildTransportKeyValue(item: VacationTransportation): string {
   const parts: string[] = [];
@@ -342,6 +353,18 @@ function isBus(type: VacationTransportationType): boolean {
             :model-value="item.notes ?? ''"
             class="vacation-teal-input"
             @update:model-value="updateItem(index, 'notes', String($event))"
+          />
+        </FormFieldGroup>
+
+        <!-- Booking documents (images + PDFs) -->
+        <FormFieldGroup :label="t('vacation.field.documents')">
+          <PhotoAttachments
+            collection="vacations"
+            :entity-id="segmentEntityId(item.id)"
+            :photo-ids="item.photoIds ?? []"
+            allow-documents
+            :max="6"
+            @update:photo-ids="updateItemPhotos(index, $event)"
           />
         </FormFieldGroup>
       </div>

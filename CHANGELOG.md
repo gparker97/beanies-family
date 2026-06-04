@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-06-04
 
+### Added
+
+- **Attach booking documents to travel plans.** Every travel segment, stay, and transport item can now hold images and PDFs of the original booking or itinerary — your airline e-ticket, hotel confirmation, rental agreement. Add them from the trip wizard or a segment's edit drawer, see a 📎 count on the card, and tap to view (images in a lightbox, PDFs open for reading). Stored in your family's encrypted Drive like photos. _(Reaches users on the next app release.)_
+
 ### Changed
 
 - **Minor reliability and settings improvements** under the hood — groundwork for upcoming features, with no visible change yet.

@@ -33,12 +33,19 @@ interface Props {
    * light since that's where every current caller lives.
    */
   tone?: 'light' | 'dark';
+  /**
+   * Also accept PDFs alongside images (the travel booking-documents
+   * surface). Defaults false — image-only, so existing callers
+   * (activities, medications, recipes…) are unaffected.
+   */
+  allowDocuments?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   tone: 'light',
   max: undefined,
   currentMemberId: undefined,
+  allowDocuments: false,
 });
 const emit = defineEmits<{ 'update:photoIds': [ids: UUID[]] }>();
 
@@ -62,6 +69,7 @@ const { photos, pending, canAdd, atCap, uploading, add, remove } = usePhotos({
   currentMemberId: computed(() => props.currentMemberId),
   updatePhotoIds: (ids) => emit('update:photoIds', ids),
   max: props.max,
+  accept: props.allowDocuments ? 'imagesAndPdf' : 'images',
 });
 
 const viewerOpen = ref(false);
@@ -73,9 +81,11 @@ function openViewer(photoId: UUID): void {
   viewerOpen.value = true;
 }
 
-// Drag-drop
+// Drag-drop. When documents are allowed, widen to also accept PDFs.
 const { isDragging, bindings: dropBindings } = useFileDrop({
-  accept: ['image/*', '.heic', '.heif'],
+  accept: props.allowDocuments
+    ? ['image/*', '.heic', '.heif', 'application/pdf', '.pdf']
+    : ['image/*', '.heic', '.heif'],
   multiple: true,
   onDrop: async (dropped) => {
     await add(dropped.map((d) => d.file));
@@ -93,7 +103,7 @@ const { isDragging, bindings: dropBindings } = useFileDrop({
 // "Take photo" tile (shown on touch-primary devices) covers the camera
 // path directly via `capture="environment"`.
 const galleryPicker = useFilePicker({
-  accept: 'image/*',
+  accept: props.allowDocuments ? 'image/*,application/pdf' : 'image/*',
   multiple: (props.max ?? MAX_PHOTOS_DEFAULT) > 1,
   onPick: async (files) => {
     await add(files);
@@ -188,7 +198,11 @@ defineExpose({
       >
         <BeanieIcon name="image" size="md" />
         <span class="text-[0.625rem]">{{
-          isTouchPrimary ? t('photos.fromLibrary') : t('photos.addPhoto')
+          allowDocuments
+            ? t('photos.addFile')
+            : isTouchPrimary
+              ? t('photos.fromLibrary')
+              : t('photos.addPhoto')
         }}</span>
       </button>
     </div>
@@ -199,7 +213,7 @@ defineExpose({
       class="px-3 pb-2 text-xs"
       :class="tone === 'dark' ? 'text-white/50' : 'text-[var(--color-text-muted)]'"
     >
-      {{ t('photos.dropToAdd') }}
+      {{ allowDocuments ? t('photos.dropToAddDoc') : t('photos.dropToAdd') }}
     </p>
     <p
       v-else-if="atCap"
