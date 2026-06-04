@@ -175,16 +175,32 @@ describe('ai-extract Lambda handler', () => {
   });
 
   describe('upstream + parsing failures', () => {
-    it('returns 502 when Tinfoil responds non-2xx', async () => {
-      globalThis.fetch = async () => fakeUpstream({ ok: false, status: 500 });
-      const res = await handler(makeEvent({ headers: keyHeader, body: goodBody }));
-      assert.equal(res.statusCode, 502);
+    it('maps a Tinfoil 5xx to a retryable 503 (upstream_unavailable)', async () => {
+      globalThis.fetch = async () => fakeUpstream({ ok: false, status: 503 });
+      const res = parseResponse(await handler(makeEvent({ headers: keyHeader, body: goodBody })));
+      assert.equal(res.statusCode, 503);
+      assert.equal(res.parsedBody.code, 'upstream_unavailable');
     });
 
-    it('returns 502 on a 401 from Tinfoil (revoked key)', async () => {
+    it('maps a Tinfoil 500 to a retryable 503 (upstream_unavailable)', async () => {
+      globalThis.fetch = async () => fakeUpstream({ ok: false, status: 500 });
+      const res = parseResponse(await handler(makeEvent({ headers: keyHeader, body: goodBody })));
+      assert.equal(res.statusCode, 503);
+      assert.equal(res.parsedBody.code, 'upstream_unavailable');
+    });
+
+    it('returns 502 + upstream_auth on a 401 from Tinfoil (revoked key)', async () => {
       globalThis.fetch = async () => fakeUpstream({ ok: false, status: 401 });
-      const res = await handler(makeEvent({ headers: keyHeader, body: goodBody }));
+      const res = parseResponse(await handler(makeEvent({ headers: keyHeader, body: goodBody })));
       assert.equal(res.statusCode, 502);
+      assert.equal(res.parsedBody.code, 'upstream_auth');
+    });
+
+    it('returns 502 + upstream_http on a non-auth 4xx from Tinfoil', async () => {
+      globalThis.fetch = async () => fakeUpstream({ ok: false, status: 429 });
+      const res = parseResponse(await handler(makeEvent({ headers: keyHeader, body: goodBody })));
+      assert.equal(res.statusCode, 502);
+      assert.equal(res.parsedBody.code, 'upstream_http');
     });
 
     it('returns 502 when the model output is not JSON', async () => {

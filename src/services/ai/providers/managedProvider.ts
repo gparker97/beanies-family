@@ -69,6 +69,24 @@ export const managedProvider: ExtractionProvider = {
     }
 
     if (!res.ok) {
+      // The proxy returns { error, code } on failure so we can distinguish a transient upstream
+      // outage (retry) from a hard failure. Read the body defensively — fall back to status-based
+      // mapping if it's absent/unreadable so we never mis-handle a failure.
+      let code: string | undefined;
+      try {
+        code = ((await res.json()) as { code?: string })?.code;
+      } catch {
+        /* no/unreadable error body — use the HTTP status below */
+      }
+      if (code === 'upstream_unavailable' || res.status === 503) {
+        throw new ExtractionProviderError(
+          'upstream_busy',
+          `Managed proxy upstream unavailable (HTTP ${res.status})`
+        );
+      }
+      if (code === 'upstream_timeout' || res.status === 504) {
+        throw new ExtractionProviderError('timeout', 'Managed extraction timed out upstream');
+      }
       throw new ExtractionProviderError(
         'provider_error',
         `Managed proxy returned HTTP ${res.status}`

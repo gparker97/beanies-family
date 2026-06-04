@@ -90,7 +90,8 @@ export type ExtractionErrorCode =
   | 'offline' // no network (the composable guards before calling, but providers may also surface it)
   | 'compression' // the file could not be decoded/compressed (e.g. HEIC on Chromium)
   | 'not_available' // tier/provider unavailable (on-device stub, BYOK missing/unsupported)
-  | 'provider_error' // upstream non-2xx or network failure
+  | 'provider_error' // upstream non-2xx or network failure (hard failure)
+  | 'upstream_busy' // the inference provider is overloaded/down (5xx) — TRANSIENT, retryable
   | 'timeout' // the request was aborted / exceeded the deadline
   | 'malformed_output'; // the model returned unparseable or wrong-shape JSON
 
