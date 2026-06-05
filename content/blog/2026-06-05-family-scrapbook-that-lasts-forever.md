@@ -9,7 +9,7 @@ excerpt: "AI's memory can be wiped clean in an instant - ours can't, and that's 
 subtitle: 'no memories will be wiped clean today'
 featured: false
 author: greg
-draft: true
+draft: false
 ---
 
 What's the best way to tell the difference between humans and AI? Hit the clear button, and AI can't remember what happened 5 minutes ago, let alone 10 years ago.
