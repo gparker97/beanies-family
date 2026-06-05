@@ -59,3 +59,5 @@ As much as AI knows about the world, it will never know enough to be sentimental
 Here's to my beans, and to all of our most precious moments.
 
 greg
+
+_by the way, if you do start a scapbook of your own, come share the memory (or tell me what to build next) on our lovely [beanies.family discord](https://discord.com/invite/NE4grWzjxV)._
