@@ -17,6 +17,29 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.06.05',
+    date: '2026-06-05',
+    month: '5 june 2026',
+    spotlight: true,
+    summary: {
+      en: 'Keep your booking documents right with your trips.',
+      beanie: 'keep your booking documents right with your trips.',
+    },
+    features: [
+      {
+        title: {
+          en: 'Attach documents to your travel plans',
+          beanie: 'attach documents to your travel plans',
+        },
+        description: {
+          en: 'Add the images and PDFs of your bookings - e-tickets, hotel confirmations, rental agreements - onto each flight, stay, or transfer, so the paperwork is always there when you need it.',
+          beanie:
+            'add the images and pdfs of your bookings - e-tickets, hotel confirmations, rental agreements - onto each flight, stay, or transfer, so the paperwork is always there when you need it.',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.06.04',
     date: '2026-06-04',
     month: '4 june 2026',
