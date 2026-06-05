@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-05
+
+### Added
+
+- **New blog post: "a family scrapbook that lasts forever."** A personal post on the beanies scrapbook and the milestones timeline — capturing your family's photos, funny quotes, and little milestones in a beanpod file you own, forever.
+
+### Changed
+
+- **Travel booking-document attachments are now live** — the feature to attach images and PDFs of your bookings to each trip segment (built earlier) ships to everyone with this release.
+
 ## 2026-06-04
 
 ### Added

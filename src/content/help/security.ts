@@ -337,9 +337,10 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       },
     ],
   },
-  // #133 — beanies AI privacy explainer. DRAFT prose: written within the ADR-030 honesty line
-  // (transit encryption + zero-retention + attested confidential compute; NOT "no one ever
-  // sees it" — that needs Gate 3). Pending greg's voice pass before it is treated as final.
+  // #133 — beanies AI privacy explainer. HELD from production until Phase 5
+  // (greg's voice pass + PRIVACY_ARTICLE_LIVE flip). Commented out so web deploys
+  // do not publish it yet. To restore: remove the /* and */ wrapping this object.
+  /*
   {
     slug: 'how-beanies-ai-handles-your-photos',
     category: 'security',
@@ -420,4 +421,5 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  */
 ];
