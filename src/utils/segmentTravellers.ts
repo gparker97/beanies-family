@@ -140,6 +140,23 @@ export function learnableAliases(
 }
 
 /**
+ * Union the travellers of an EXISTING segment with those of an INCOMING (merged-in) one,
+ * respecting the "undefined = the whole trip" rule:
+ * - existing `undefined` → stays `undefined` (everyone already includes the incoming people);
+ * - incoming `undefined`/empty → existing unchanged (the new doc named no one — never shrink an
+ *   "everyone" segment, nor drop existing explicit travellers);
+ * - both explicit → de-duplicated union.
+ */
+export function mergeSegmentTravellers(
+  existing: UUID[] | undefined,
+  incoming: UUID[] | undefined
+): UUID[] | undefined {
+  if (existing === undefined) return undefined;
+  if (!incoming?.length) return existing;
+  return [...new Set([...existing, ...incoming])];
+}
+
+/**
  * Append `additions` to `existing`, case-insensitively de-duplicated against existing entries
  * and each other, order-stable. Used to grow a member's alias list in a single write.
  */
