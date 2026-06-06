@@ -6481,6 +6481,13 @@ const STRING_DEFS = {
   'travelExtract.defaultTripName': { en: 'New Trip', beanie: 'new trip' },
   'travelExtract.createTrip': { en: 'Create Trip', beanie: 'create trip' },
   'travelExtract.addToTrip': { en: 'Add to Trip', beanie: 'add to trip' },
+  'travelExtract.targetHeading': {
+    en: 'Where should these go?',
+    beanie: 'where should these go?',
+  },
+  'travelExtract.newTripNameLabel': { en: 'New trip name', beanie: 'new trip name' },
+  'travelExtract.addToTripLabel': { en: 'Add to which trip?', beanie: 'add to which trip?' },
+  'travelExtract.selectTripPlaceholder': { en: 'Select a trip', beanie: 'select a trip' },
   'travelExtract.kind.travel': { en: 'Travel', beanie: 'travel' },
   'travelExtract.kind.accommodation': { en: 'Stay', beanie: 'stay' },
   'travelExtract.kind.transportation': { en: 'Transport', beanie: 'transport' },
