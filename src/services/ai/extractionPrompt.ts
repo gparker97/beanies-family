@@ -237,6 +237,39 @@ export const EXTRACTION_TASKS = {
   travel: { buildMessages: buildTravelExtractionMessages, requiredKeys: TRAVEL_REQUIRED_KEYS },
 } as const;
 
+/** The per-kind objects the model nests its detail fields under (per TRAVEL_JSON_SHAPE). */
+const NESTED_FIELD_KEYS = ['travelFields', 'accommodationFields', 'transportationFields'] as const;
+
+/**
+ * Structural keys that are NOT segment detail fields — handled explicitly below. Excluded
+ * from the flat-field sweep so they never leak into `fields` (and from there into `notes`).
+ */
+const SEGMENT_STRUCTURAL_KEYS = new Set<string>([
+  'kind',
+  'type',
+  'title',
+  'status',
+  'bookingReference',
+  'notes',
+  'confidence',
+  'arrivesNextDay',
+  'breakfastIncluded',
+  ...NESTED_FIELD_KEYS,
+]);
+
+/** Copy a source object's scalar (string/number) entries into `target`, skipping `skip` keys. */
+function collectScalarFields(
+  source: Record<string, unknown>,
+  target: Record<string, string>,
+  skip?: Set<string>
+): void {
+  for (const [k, v] of Object.entries(source)) {
+    if (skip?.has(k)) continue;
+    if (typeof v === 'string') target[k] = v;
+    else if (typeof v === 'number') target[k] = String(v);
+  }
+}
+
 /** Coerce one raw model segment into a defensively-typed {@link TravelSegmentDraft}. */
 function parseTravelSegment(raw: unknown): TravelSegmentDraft | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -244,15 +277,20 @@ function parseTravelSegment(raw: unknown): TravelSegmentDraft | null {
   const kind = asString(obj.kind);
   if (kind !== 'travel' && kind !== 'accommodation' && kind !== 'transportation') return null;
 
-  // Carry every recognized string field through as-is; the mapper (Phase C) decides
-  // which apply to the chosen kind/type. Unknown fields are ignored here, not lost —
-  // the model is instructed to fold non-field detail into `notes`.
+  // The model nests detail fields under travelFields / accommodationFields /
+  // transportationFields (per TRAVEL_JSON_SHAPE). Flatten whichever are present into a single
+  // flat `fields` record the mapper (Phase C) reads by name. Also tolerate a flat shape
+  // (stray top-level scalars) for BYOK/older responses — structural keys are excluded so
+  // they never leak into fields (and from there into the notes overflow).
   const fields: Record<string, string> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (k === 'kind' || k === 'confidence' || k === 'arrivesNextDay' || k === 'breakfastIncluded')
-      continue;
-    if (typeof v === 'string') fields[k] = v;
-    else if (typeof v === 'number') fields[k] = String(v);
+  collectScalarFields(obj, fields, SEGMENT_STRUCTURAL_KEYS);
+  const nested: Record<string, unknown> = {};
+  for (const nk of NESTED_FIELD_KEYS) {
+    const sub = obj[nk];
+    if (typeof sub === 'object' && sub !== null) {
+      collectScalarFields(sub as Record<string, unknown>, fields);
+      Object.assign(nested, sub);
+    }
   }
 
   const rawConfidence =
@@ -267,8 +305,9 @@ function parseTravelSegment(raw: unknown): TravelSegmentDraft | null {
     status: asString(obj.status) === 'pending' ? 'pending' : 'booked',
     bookingReference: asString(obj.bookingReference),
     notes: asString(obj.notes),
-    arrivesNextDay: asBool(obj.arrivesNextDay),
-    breakfastIncluded: asBool(obj.breakfastIncluded),
+    // These booleans live inside the nested *Fields object; fall back to top-level for a flat shape.
+    arrivesNextDay: asBool(obj.arrivesNextDay) || asBool(nested.arrivesNextDay),
+    breakfastIncluded: asBool(obj.breakfastIncluded) || asBool(nested.breakfastIncluded),
     fields,
     confidence: clamp01(rawConfidence.overall),
   };

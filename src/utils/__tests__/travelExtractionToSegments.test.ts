@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { travelExtractionToSegments, inferTripType } from '../travelExtractionToSegments';
+import { parseTravelExtractionResult } from '@/services/ai/extractionPrompt';
 import type { TravelExtractionResult, TravelSegmentDraft } from '@/services/ai/types';
 
 function draft(over: Partial<TravelSegmentDraft> = {}): TravelSegmentDraft {
@@ -100,8 +101,8 @@ describe('travelExtractionToSegments', () => {
     ]);
     const seg = travelExtractionToSegments(r).travelSegments[0];
     expect(seg.notes).toContain('Window seat');
-    expect(seg.notes).toContain('baggage: 30kg');
-    expect(seg.notes).toContain('seat: 12A');
+    expect(seg.notes).toContain('Baggage: 30kg'); // humanized label
+    expect(seg.notes).toContain('Seat: 12A');
     // mapped field is NOT duplicated into notes
     expect(seg.notes).not.toContain('departureAirport');
   });
@@ -155,5 +156,91 @@ describe('inferTripType', () => {
   it('defaults to fly_and_stay when undetermined', () => {
     const r = result([draft({ kind: 'accommodation', type: 'hotel' })]);
     expect(inferTripType(r)).toBe('fly_and_stay');
+  });
+});
+
+// Regression for #30: the managed model nests detail fields under travelFields /
+// accommodationFields / transportationFields. The parser must flatten them so the mapper
+// populates the real columns (airline, flight number, airports, dates) instead of blanks.
+describe('parseTravelExtractionResult → travelExtractionToSegments (nested *Fields shape)', () => {
+  it('flattens nested travelFields into populated travel-segment columns', () => {
+    const raw = {
+      isTravel: true,
+      tripName: 'Singapore to Shanghai Trip',
+      tripTypeHint: 'fly_and_stay',
+      segments: [
+        {
+          kind: 'travel',
+          type: 'flight_outbound',
+          title: 'June 20, 2026 - Singapore to Shanghai',
+          status: 'booked',
+          bookingReference: 'QJSRKE',
+          notes: 'Economy class.',
+          confidence: { overall: 0.95 },
+          travelFields: {
+            airline: 'Juneyao Airlines',
+            flightNumber: 'HO1602',
+            departureAirport: 'Singapore Changi Airport',
+            arrivalAirport: 'Shanghai Pudong International Airport',
+            departureDate: '2026-06-20',
+            departureTime: '16:10',
+            arrivalDate: '2026-06-20',
+            arrivalTime: '21:30',
+            arrivesNextDay: false,
+          },
+        },
+      ],
+    };
+
+    const parsed = parseTravelExtractionResult(raw);
+    expect(parsed.segments[0].fields.airline).toBe('Juneyao Airlines');
+    expect(parsed.segments[0].fields.flightNumber).toBe('HO1602');
+
+    const seg = travelExtractionToSegments(parsed).travelSegments[0];
+    expect(seg.airline).toBe('Juneyao Airlines');
+    expect(seg.flightNumber).toBe('HO1602');
+    expect(seg.departureAirport).toBe('Singapore Changi Airport');
+    expect(seg.arrivalAirport).toBe('Shanghai Pudong International Airport');
+    expect(seg.departureTime).toBe('16:10');
+    expect(seg.arrivalTime).toBe('21:30');
+    expect(seg.sortDate).toBe('2026-06-20');
+    expect(seg.bookingReference).toBe('QJSRKE');
+    // structural keys must NOT leak into the notes overflow
+    expect(seg.notes ?? '').not.toContain('flight_outbound');
+    expect(seg.notes ?? '').not.toContain('QJSRKE');
+  });
+
+  it('reads arrivesNextDay / breakfastIncluded from the nested object', () => {
+    const raw = {
+      isTravel: true,
+      tripName: 'Trip',
+      tripTypeHint: '',
+      segments: [
+        {
+          kind: 'travel',
+          type: 'flight_other',
+          title: '',
+          status: 'booked',
+          bookingReference: '',
+          notes: '',
+          confidence: { overall: 0.8 },
+          travelFields: { departureAirport: 'SIN', arrivalAirport: 'LHR', arrivesNextDay: true },
+        },
+        {
+          kind: 'accommodation',
+          type: 'hotel',
+          title: 'Hotel',
+          status: 'booked',
+          bookingReference: '',
+          notes: '',
+          confidence: { overall: 0.8 },
+          accommodationFields: { name: 'Hotel', breakfastIncluded: true },
+        },
+      ],
+    };
+    const parsed = parseTravelExtractionResult(raw);
+    const buckets = travelExtractionToSegments(parsed);
+    expect(buckets.travelSegments[0].arrivesNextDay).toBe(true);
+    expect(buckets.accommodations[0].breakfastIncluded).toBe(true);
   });
 });
