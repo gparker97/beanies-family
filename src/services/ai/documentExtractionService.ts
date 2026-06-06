@@ -26,6 +26,9 @@ import {
   type DocumentExtractionResult,
   type ExtractionProvider,
   type ExtractionRequest,
+  type ExtractionResult,
+  type ExtractionTask,
+  type TravelExtractionResult,
 } from './types';
 
 /**
@@ -80,16 +83,19 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 /**
- * Extract event details from a single document image and return a typed result.
- * Always resolves (never rejects) with a classified outcome.
+ * Shared funnel for every extraction task (DRY): client-side compression → tier dispatch →
+ * the task-specific provider call → typed result. Always resolves (never rejects) with a
+ * classified outcome; `run` selects the per-task provider method (`extract` / `extractTravel`).
  */
-export async function extractEventFromDocument(
+async function runExtraction<T>(
   file: File,
-  opts: ExtractOptions
-): Promise<DocumentExtractionResult> {
+  opts: ExtractOptions,
+  task: ExtractionTask,
+  run: (provider: ExtractionProvider, request: ExtractionRequest) => Promise<T>
+): Promise<DocumentExtractionResult<T>> {
   // 1) Compress client-side (also down-scales for the proxy cap + faster upload).
   // Keep the compressed blob in function scope so a successful result can hand it back
-  // for attaching to the activity (#133) — avoids a second compression pass.
+  // for attaching to the created entity — avoids a second compression pass.
   let imageDataUrl: string;
   let compressedBlob: Blob;
   try {
@@ -115,9 +121,14 @@ export async function extractEventFromDocument(
   }
 
   // 3) Run extraction; classify any failure.
-  const request: ExtractionRequest = { imageDataUrl, todayIso: opts.todayIso, signal: opts.signal };
+  const request: ExtractionRequest = {
+    imageDataUrl,
+    todayIso: opts.todayIso,
+    signal: opts.signal,
+    task,
+  };
   try {
-    const data = await provider.extract(request);
+    const data = await run(provider, request);
     return { success: true, data, compressedBlob };
   } catch (err) {
     if (err instanceof ExtractionProviderError) {
@@ -129,4 +140,28 @@ export async function extractEventFromDocument(
       error: err instanceof Error ? err.message : 'Extraction failed',
     };
   }
+}
+
+/**
+ * Extract event details from a single document image and return a typed result (#133).
+ * Always resolves (never rejects) with a classified outcome.
+ */
+export function extractEventFromDocument(
+  file: File,
+  opts: ExtractOptions
+): Promise<DocumentExtractionResult<ExtractionResult>> {
+  return runExtraction(file, opts, 'event', (provider, request) => provider.extract(request));
+}
+
+/**
+ * Extract travel booking(s) from a single document image and return a typed result (#30).
+ * Always resolves (never rejects) with a classified outcome.
+ */
+export function extractTravelFromDocument(
+  file: File,
+  opts: ExtractOptions
+): Promise<DocumentExtractionResult<TravelExtractionResult>> {
+  return runExtraction(file, opts, 'travel', (provider, request) =>
+    provider.extractTravel(request)
+  );
 }

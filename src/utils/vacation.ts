@@ -412,6 +412,91 @@ export function tripDayProgress(
   return { day, total };
 }
 
+// ── Trip targeting for AI travel extraction (#30) ────────────────────────────
+
+export interface DateRange {
+  start: string;
+  end: string;
+}
+
+/**
+ * The inclusive date window of the extracted segments, or `null` when none of them
+ * carry a usable date. Pure; scans the same date fields as `computeVacationDates`.
+ */
+export function segmentDateRange(buckets: {
+  travelSegments: {
+    departureDate?: string;
+    arrivalDate?: string;
+    embarkationDate?: string;
+    disembarkationDate?: string;
+    sortDate?: string;
+  }[];
+  accommodations: { checkInDate?: string; checkOutDate?: string }[];
+  transportation: { pickupDate?: string; returnDate?: string; departureDate?: string }[];
+}): DateRange | null {
+  const dates: string[] = [];
+  const push = (d?: string) => {
+    if (d && isValidISODate(extractDatePart(d))) dates.push(extractDatePart(d));
+  };
+  for (const s of buckets.travelSegments) {
+    push(s.departureDate);
+    push(s.arrivalDate);
+    push(s.embarkationDate);
+    push(s.disembarkationDate);
+    push(s.sortDate);
+  }
+  for (const a of buckets.accommodations) {
+    push(a.checkInDate);
+    push(a.checkOutDate);
+  }
+  for (const t of buckets.transportation) {
+    push(t.pickupDate);
+    push(t.returnDate);
+    push(t.departureDate);
+  }
+  if (dates.length === 0) return null;
+  dates.sort();
+  return { start: dates[0]!, end: dates[dates.length - 1]! };
+}
+
+/**
+ * Non-past trips whose date window overlaps `range`. Pure; `todayStr` excludes trips
+ * that have already ended (via `tripPhase`). A trip with no usable start date can't
+ * be matched and is skipped. A missing trip end is treated as a single-day window.
+ */
+export function tripsOverlappingRange(
+  vacations: FamilyVacation[],
+  range: DateRange,
+  todayStr: string
+): FamilyVacation[] {
+  if (!isValidISODate(range.start) || !isValidISODate(range.end)) return [];
+  return vacations.filter((v) => {
+    if (tripPhase(v, todayStr) === 'past') return false;
+    const tStart = v.startDate ? extractDatePart(v.startDate) : undefined;
+    if (!tStart || !isValidISODate(tStart)) return false;
+    const tEndRaw = v.endDate ? extractDatePart(v.endDate) : tStart;
+    const tEnd = isValidISODate(tEndRaw) ? tEndRaw : tStart;
+    // Inclusive overlap on YYYY-MM-DD strings (lexicographic == chronological).
+    return tStart <= range.end && tEnd >= range.start;
+  });
+}
+
+export type TripTarget =
+  | { kind: 'create' }
+  | { kind: 'attach'; vacationId: string }
+  | { kind: 'choose'; candidates: FamilyVacation[] };
+
+/**
+ * The match/prompt/create rule for where extracted segments should go (#30):
+ * 0 matches → create a new trip; exactly 1 → attach to it; 2+ → let the user choose.
+ * Pure — the composable and the review modal both consume this; neither re-derives it.
+ */
+export function resolveTripTarget(matches: FamilyVacation[]): TripTarget {
+  if (matches.length === 0) return { kind: 'create' };
+  if (matches.length === 1) return { kind: 'attach', vacationId: matches[0]!.id };
+  return { kind: 'choose', candidates: matches };
+}
+
 // ── Auto-generated segment titles ────────────────────────────────────────────
 
 /** Extract 3-letter airport code from strings like "Singapore (SIN)" */

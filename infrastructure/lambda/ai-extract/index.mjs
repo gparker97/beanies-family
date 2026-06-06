@@ -18,7 +18,7 @@
  * (ADR-030 binding principle). Never log the document bytes.
  */
 
-import { buildExtractionMessages, REQUIRED_KEYS } from './extractionPrompt.mjs';
+import { EXTRACTION_TASKS } from './extractionPrompt.mjs';
 
 const TINFOIL_API_KEY = process.env.TINFOIL_API_KEY;
 const API_KEY = process.env.AI_EXTRACT_API_KEY;
@@ -95,7 +95,14 @@ export async function handler(event) {
     return response(400, { error: 'Malformed JSON body' }, event);
   }
 
-  const { imageDataUrl, todayIso } = parsed || {};
+  const { imageDataUrl, todayIso, task: rawTask } = parsed || {};
+  // Task selects the prompt + required-keys. Default to 'event' so older clients (which
+  // send no task) keep the original #133 behavior byte-for-byte. Reject an unknown task.
+  const task = rawTask === undefined ? 'event' : rawTask;
+  const taskConfig = EXTRACTION_TASKS[task];
+  if (!taskConfig) {
+    return response(400, { error: `Unknown task: ${String(task)}` }, event);
+  }
   // Validate exactly one image of an allowed type within the cap BEFORE the billable upstream
   // call (cheap belt-and-braces against a malformed/oversized request burning a request).
   if (typeof imageDataUrl !== 'string' || !ALLOWED_DATA_URL.test(imageDataUrl)) {
@@ -119,7 +126,7 @@ export async function handler(event) {
         },
         body: JSON.stringify({
           model: TINFOIL_MODEL,
-          messages: buildExtractionMessages(imageDataUrl, todayDate),
+          messages: taskConfig.buildMessages(imageDataUrl, todayDate),
           temperature: 0,
         }),
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
@@ -175,7 +182,7 @@ export async function handler(event) {
       );
     }
 
-    const missing = REQUIRED_KEYS.filter((k) => !(k in result));
+    const missing = taskConfig.requiredKeys.filter((k) => !(k in result));
     if (missing.length) {
       console.error(`[ai-extract] model output missing keys: ${missing.join(',')}`);
       return response(
@@ -186,9 +193,7 @@ export async function handler(event) {
     }
 
     // Retain nothing: no document bytes, no model content — only a structured success line.
-    console.log(
-      `[ai-extract] ok enclave=${enclave || 'unknown'} isEvent=${result.isEvent === true}`
-    );
+    console.log(`[ai-extract] ok task=${task} enclave=${enclave || 'unknown'}`);
     return response(200, { result, attestation: enclave ? { enclave } : undefined }, event);
   } catch (err) {
     console.error('[ai-extract] error:', err);

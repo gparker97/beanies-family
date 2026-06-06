@@ -17,10 +17,19 @@ import { useToday } from '@/composables/useToday';
 import type {
   FamilyVacation,
   VacationTravelSegment,
+  VacationAccommodation,
+  VacationTransportation,
   CreateFamilyVacationInput,
   UpdateFamilyVacationInput,
   CreateFamilyActivityInput,
 } from '@/types/models';
+
+/** The three segment arrays produced by AI travel extraction (#30). */
+export interface ExtractedSegmentBuckets {
+  travelSegments: VacationTravelSegment[];
+  accommodations: VacationAccommodation[];
+  transportation: VacationTransportation[];
+}
 
 export const useVacationStore = defineStore('vacations', () => {
   // State
@@ -354,6 +363,29 @@ export const useVacationStore = defineStore('vacations', () => {
     );
   }
 
+  /**
+   * Append AI-extracted segments to an existing trip (#30). Concatenates each bucket
+   * onto the current arrays and persists via `updateVacation` (which auto-extends the
+   * trip window + re-syncs the linked activity). Owns the merge so the review modal
+   * doesn't hand-roll array spreads — mirrors `updateSegmentPhotoIds`. Returns the
+   * updated vacation (whose segments carry the ids the caller generated) or null on miss.
+   */
+  async function addExtractedSegments(
+    vacationId: string,
+    buckets: ExtractedSegmentBuckets
+  ): Promise<FamilyVacation | null> {
+    const vacation = vacations.value.find((v) => v.id === vacationId);
+    if (!vacation) {
+      console.warn(`[vacation] addExtractedSegments: no vacation "${vacationId}"`);
+      return null;
+    }
+    return updateVacation(vacationId, {
+      travelSegments: [...vacation.travelSegments, ...buckets.travelSegments],
+      accommodations: [...vacation.accommodations, ...buckets.accommodations],
+      transportation: [...vacation.transportation, ...buckets.transportation],
+    });
+  }
+
   function resetState() {
     vacations.value = [];
     isLoading.value = false;
@@ -378,6 +410,7 @@ export const useVacationStore = defineStore('vacations', () => {
     deleteVacation,
     toggleIdeaVote,
     updateSegmentPhotoIds,
+    addExtractedSegments,
     resetState,
   };
 });

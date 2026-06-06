@@ -7,13 +7,18 @@
 // so they are explicit, typed `not_available` seams to be filled in later — NOT silent
 // no-ops. The factory keeps the key out of `ExtractionRequest`, preserving interface purity.
 
-import { callOpenAiCompatibleVision } from './openaiCompatible';
+import {
+  callOpenAiCompatibleTravel,
+  callOpenAiCompatibleVision,
+  type OpenAiCompatibleConfig,
+} from './openaiCompatible';
 import {
   ExtractionProviderError,
   type AiProviderId,
   type ExtractionProvider,
   type ExtractionRequest,
   type ExtractionResult,
+  type TravelExtractionResult,
 } from '../types';
 
 export interface ByokConfig {
@@ -29,43 +34,52 @@ const OPENAI_DEFAULT_MODEL = 'gpt-4o';
 export const OPENAI_BASE_URL = 'https://api.openai.com/v1';
 
 export function createByokProvider(config: ByokConfig): ExtractionProvider {
+  /**
+   * Resolve the OpenAI-compatible call config, or throw the right typed `not_available`
+   * for an unsupported/non-BYOK provider. Shared by both extract paths so the provider
+   * support matrix lives in exactly one place.
+   */
+  function openAiConfig(): OpenAiCompatibleConfig {
+    if (!config.apiKey) {
+      throw new ExtractionProviderError('not_available', 'No BYOK API key configured');
+    }
+    switch (config.provider) {
+      case 'openai':
+        return {
+          baseUrl: OPENAI_BASE_URL,
+          apiKey: config.apiKey,
+          model: config.model ?? OPENAI_DEFAULT_MODEL,
+        };
+      case 'claude':
+      case 'gemini':
+        // Different wire formats than OpenAI vision — a real future task, surfaced
+        // honestly rather than pretended-supported.
+        throw new ExtractionProviderError(
+          'not_available',
+          `BYOK vision for "${config.provider}" is not supported yet`
+        );
+      case 'tinfoil':
+      case 'on-device':
+        // These are not BYOK targets (tinfoil = managed tier; on-device = its own provider).
+        throw new ExtractionProviderError(
+          'not_available',
+          `"${config.provider}" is not a BYOK provider`
+        );
+      default:
+        throw new ExtractionProviderError(
+          'not_available',
+          `Unknown BYOK provider: ${String(config.provider)}`
+        );
+    }
+  }
+
   return {
     id: config.provider,
-    async extract(request: ExtractionRequest): Promise<ExtractionResult> {
-      if (!config.apiKey) {
-        throw new ExtractionProviderError('not_available', 'No BYOK API key configured');
-      }
-      switch (config.provider) {
-        case 'openai':
-          return callOpenAiCompatibleVision(
-            {
-              baseUrl: OPENAI_BASE_URL,
-              apiKey: config.apiKey,
-              model: config.model ?? OPENAI_DEFAULT_MODEL,
-            },
-            request
-          );
-        case 'claude':
-        case 'gemini':
-          // Different wire formats than OpenAI vision — a real future task, surfaced
-          // honestly rather than pretended-supported.
-          throw new ExtractionProviderError(
-            'not_available',
-            `BYOK vision for "${config.provider}" is not supported yet`
-          );
-        case 'tinfoil':
-        case 'on-device':
-          // These are not BYOK targets (tinfoil = managed tier; on-device = its own provider).
-          throw new ExtractionProviderError(
-            'not_available',
-            `"${config.provider}" is not a BYOK provider`
-          );
-        default:
-          throw new ExtractionProviderError(
-            'not_available',
-            `Unknown BYOK provider: ${String(config.provider)}`
-          );
-      }
+    extract(request: ExtractionRequest): Promise<ExtractionResult> {
+      return callOpenAiCompatibleVision(openAiConfig(), request);
+    },
+    extractTravel(request: ExtractionRequest): Promise<TravelExtractionResult> {
+      return callOpenAiCompatibleTravel(openAiConfig(), request);
     },
   };
 }

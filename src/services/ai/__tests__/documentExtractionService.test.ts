@@ -9,11 +9,11 @@ vi.mock('@/services/photos/photoCompression', async (importActual) => {
 
 // Mock the providers so we control their extract() behaviour per test.
 vi.mock('../providers/managedProvider', () => ({
-  managedProvider: { id: 'tinfoil', extract: vi.fn() },
+  managedProvider: { id: 'tinfoil', extract: vi.fn(), extractTravel: vi.fn() },
 }));
 vi.mock('../providers/byokProvider', () => ({ createByokProvider: vi.fn() }));
 vi.mock('../providers/onDeviceProvider', () => ({
-  onDeviceProvider: { id: 'on-device', extract: vi.fn() },
+  onDeviceProvider: { id: 'on-device', extract: vi.fn(), extractTravel: vi.fn() },
 }));
 
 import { extractEventFromDocument } from '../documentExtractionService';
@@ -82,12 +82,16 @@ describe('extractEventFromDocument — tier dispatch', () => {
     const request = mockManagedExtract.mock.calls[0][0];
     expect(request.imageDataUrl).toMatch(/^data:image\/jpeg;base64,/);
     expect(request.todayIso).toBe('2026-06-03');
-    // No family-data fields are present on the request — only the document + date + signal.
-    expect(Object.keys(request).sort()).toEqual(['imageDataUrl', 'signal', 'todayIso']);
+    // No family-data fields are present on the request — only the document + date + signal + task.
+    expect(Object.keys(request).sort()).toEqual(['imageDataUrl', 'signal', 'task', 'todayIso']);
   });
 
   it('byok tier: constructs the BYOK provider from the supplied config', async () => {
-    mockCreateByok.mockReturnValue({ id: 'openai', extract: vi.fn().mockResolvedValue(SAMPLE) });
+    mockCreateByok.mockReturnValue({
+      id: 'openai',
+      extract: vi.fn().mockResolvedValue(SAMPLE),
+      extractTravel: vi.fn(),
+    });
 
     const res = await extractEventFromDocument(file(), {
       tier: 'byok',
