@@ -13,6 +13,7 @@ import {
   buildTransportationTitle,
   buildTravelSegmentTitle,
 } from './vacation';
+import { normalizePersonName } from '@/utils/segmentTravellers';
 import type { TravelExtractionResult, TravelSegmentDraft } from '@/services/ai/types';
 import type {
   VacationAccommodation,
@@ -28,6 +29,32 @@ export interface SegmentBuckets {
   travelSegments: VacationTravelSegment[];
   accommodations: VacationAccommodation[];
   transportation: VacationTransportation[];
+}
+
+export interface MappedExtraction {
+  /** The three segment buckets, produced WITHOUT `travellerIds` (resolved post-confirm). */
+  buckets: SegmentBuckets;
+  /**
+   * Normalized, de-duplicated traveller names per produced segment id — the side-channel the
+   * review modal maps to family members (confirm-and-learn). Keyed by the segment's generated
+   * id, which survives unchanged into the saved trip, so the page resolves names→ids directly.
+   */
+  travellerNamesBySegmentId: Record<string, string[]>;
+}
+
+/** Normalize + de-duplicate (case-insensitive) a draft's raw traveller names. */
+function normalizeTravellerNames(raw: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const r of raw) {
+    const n = normalizePersonName(r);
+    const key = n.toLowerCase();
+    if (n && !seen.has(key)) {
+      seen.add(key);
+      out.push(n);
+    }
+  }
+  return out;
 }
 
 const TRAVEL_TYPES: readonly VacationTravelType[] = [
@@ -206,50 +233,50 @@ function toTransportation(draft: TravelSegmentDraft): VacationTransportation {
 }
 
 /**
- * Map a travel extraction result into the three segment buckets ready for the store.
- * Pure + total — unrecognized-kind drafts are skipped (warned), never thrown.
- *
- * `resolveTravellerIds` (optional) turns the model's per-segment traveller NAMES into family
- * member ids. It is applied ONCE per draft here (the kind-specific `to*` factories stay
- * logistics-only). A no-match leaves `travellerIds` absent — the caller materializes the trip
- * default for new trips, or lets it resolve dynamically when attaching to an existing trip.
+ * Map a travel extraction result into the three segment buckets PLUS a per-segment side-channel
+ * of normalized traveller names (for confirm-and-learn). Pure + total — unrecognized-kind drafts
+ * are skipped (warned), never thrown. Segments carry NO `travellerIds`; identity resolution
+ * happens after the user confirms the name→member mapping in the review modal. The `to*`
+ * factories stay logistics-only.
  */
-export function travelExtractionToSegments(
-  result: TravelExtractionResult,
-  resolveTravellerIds?: (names: string[]) => string[]
-): SegmentBuckets {
+export function travelExtractionToSegments(result: TravelExtractionResult): MappedExtraction {
   const buckets: SegmentBuckets = {
     travelSegments: [],
     accommodations: [],
     transportation: [],
   };
+  const travellerNamesBySegmentId: Record<string, string[]> = {};
   for (const draft of result.segments) {
-    const withTravellers = <
-      T extends VacationTravelSegment | VacationAccommodation | VacationTransportation,
-    >(
-      seg: T
-    ): T => {
-      const ids = resolveTravellerIds?.(draft.travellers) ?? [];
-      if (ids.length) seg.travellerIds = ids;
-      return seg;
+    const names = normalizeTravellerNames(draft.travellers);
+    const record = (seg: { id: string }) => {
+      if (names.length) travellerNamesBySegmentId[seg.id] = names;
     };
     switch (draft.kind) {
-      case 'travel':
-        buckets.travelSegments.push(withTravellers(toTravelSegment(draft)));
+      case 'travel': {
+        const seg = toTravelSegment(draft);
+        buckets.travelSegments.push(seg);
+        record(seg);
         break;
-      case 'accommodation':
-        buckets.accommodations.push(withTravellers(toAccommodation(draft)));
+      }
+      case 'accommodation': {
+        const seg = toAccommodation(draft);
+        buckets.accommodations.push(seg);
+        record(seg);
         break;
-      case 'transportation':
-        buckets.transportation.push(withTravellers(toTransportation(draft)));
+      }
+      case 'transportation': {
+        const seg = toTransportation(draft);
+        buckets.transportation.push(seg);
+        record(seg);
         break;
+      }
       default:
         console.warn(
           `[travel-extract] skipping segment with unrecognized kind: ${String(draft.kind)}`
         );
     }
   }
-  return buckets;
+  return { buckets, travellerNamesBySegmentId };
 }
 
 const VALID_TRIP_TYPES: readonly VacationTripType[] = [

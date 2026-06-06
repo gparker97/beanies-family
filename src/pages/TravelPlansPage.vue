@@ -36,7 +36,7 @@ import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks'
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
 import type { SegmentBuckets } from '@/utils/travelExtractionToSegments';
-import { unionTravellerIds } from '@/utils/segmentTravellers';
+import { unionTravellerIds, dedupedAppend } from '@/utils/segmentTravellers';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { formatDateShort, formatNookDate, extractDatePart } from '@/utils/date';
 import { useToday } from '@/composables/useToday';
@@ -125,9 +125,32 @@ function materializeUnmatchedTravellers(buckets: SegmentBuckets, defaultIds: str
   }
 }
 
+/**
+ * Resolve each segment's `travellerIds` from the user-confirmed name→member map (the segment id
+ * keys `travellerNamesBySegmentId`). A segment with no mapped members is left undefined so it
+ * falls back to the trip default (new-trip union / dynamic for attach).
+ */
+function resolveSegmentTravellersFromMap(
+  ready: TravelReady,
+  travellerMap: Record<string, string>
+): void {
+  for (const seg of [
+    ...ready.buckets.travelSegments,
+    ...ready.buckets.accommodations,
+    ...ready.buckets.transportation,
+  ]) {
+    const names = ready.travellerNamesBySegmentId[seg.id];
+    if (!names?.length) continue;
+    const ids = [...new Set(names.map((n) => travellerMap[n]).filter(Boolean))] as string[];
+    if (ids.length) seg.travellerIds = ids;
+  }
+}
+
 async function onReviewSubmit(payload: {
   target: { kind: 'create' } | { kind: 'attach'; vacationId: string };
   tripName: string;
+  travellerMap: Record<string, string>;
+  aliasesToLearn: Array<{ memberId: string; alias: string }>;
 }): Promise<void> {
   const ready = reviewReady.value;
   if (!ready) return;
@@ -139,6 +162,10 @@ async function onReviewSubmit(payload: {
 
   reviewSubmitting.value = true;
   try {
+    // Resolve segment travellers from the user-confirmed mapping FIRST, so the new-trip union +
+    // materialize logic below operates on resolved buckets (attach leaves unmapped undefined).
+    resolveSegmentTravellersFromMap(ready, payload.travellerMap);
+
     let vacationId: string | null = null;
     try {
       if (payload.target.kind === 'create') {
@@ -200,6 +227,31 @@ async function onReviewSubmit(payload: {
           'warning',
           t('travelExtract.attachFailed.title'),
           t('travelExtract.attachFailed.message')
+        );
+      }
+    }
+
+    // Learn the confirmed legal-name → member mappings so they auto-match next time. Grouped per
+    // member (ONE write each — a second sequential write for the same member would read stale
+    // aliases and clobber the first). Warn-not-block: a failed write never undoes the saved trip.
+    if (payload.aliasesToLearn.length) {
+      try {
+        const byMember = new Map<string, string[]>();
+        for (const { memberId, alias } of payload.aliasesToLearn) {
+          byMember.set(memberId, [...(byMember.get(memberId) ?? []), alias]);
+        }
+        for (const [memberId, additions] of byMember) {
+          const member = familyStore.members.find((m) => m.id === memberId);
+          await familyStore.updateMember(memberId, {
+            aliases: dedupedAppend(member?.aliases, additions),
+          });
+        }
+      } catch (err) {
+        console.error('[travel-extract] alias learning failed:', err);
+        showToast(
+          'warning',
+          t('travelExtract.aliasLearnFailed.title'),
+          t('travelExtract.aliasLearnFailed.message')
         );
       }
     }

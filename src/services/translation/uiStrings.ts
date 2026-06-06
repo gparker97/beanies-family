@@ -6488,6 +6488,11 @@ const STRING_DEFS = {
   'travelExtract.newTripNameLabel': { en: 'New trip name', beanie: 'new trip name' },
   'travelExtract.addToTripLabel': { en: 'Add to which trip?', beanie: 'add to which trip?' },
   'travelExtract.selectTripPlaceholder': { en: 'Select a trip', beanie: 'select a trip' },
+  'travelExtract.travellersHeading': {
+    en: 'Who are these travellers?',
+    beanie: 'who are these travellers?',
+  },
+  'travelExtract.whoIsThis': { en: "who's this?", beanie: "who's this?" },
   'travelExtract.kind.travel': { en: 'Travel', beanie: 'travel' },
   'travelExtract.kind.accommodation': { en: 'Stay', beanie: 'stay' },
   'travelExtract.kind.transportation': { en: 'Transport', beanie: 'transport' },
@@ -6504,6 +6509,11 @@ const STRING_DEFS = {
   'travelExtract.attachFailed.message': {
     en: 'Your plans were added, but the document didn’t attach. You can add it from the trip.',
     beanie: 'your plans were added, but the document didn’t attach. you can add it from the trip.',
+  },
+  'travelExtract.aliasLearnFailed.title': { en: 'Trip Saved', beanie: 'trip saved' },
+  'travelExtract.aliasLearnFailed.message': {
+    en: 'Your trip was saved, but we couldn’t remember a traveller name for next time.',
+    beanie: 'your trip was saved, but we couldn’t remember a traveller name for next time.',
   },
   'travelExtract.added.title': { en: 'Travel Plans Added', beanie: 'travel plans added' },
   'travelExtract.added.message': {
