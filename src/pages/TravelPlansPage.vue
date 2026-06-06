@@ -167,6 +167,9 @@ async function onReviewSubmit(payload: {
     resolveSegmentTravellersFromMap(ready, payload.travellerMap);
 
     let vacationId: string | null = null;
+    // Maps each extracted segment id → its FINAL segment id in the saved trip. Identity for the
+    // create path; on attach, a segment merged into an existing one remaps to that existing id.
+    let idRemap: Record<string, string> = {};
     try {
       if (payload.target.kind === 'create') {
         // A new trip has no travellers to inherit, so seed them from the union of everyone the
@@ -186,11 +189,14 @@ async function onReviewSubmit(payload: {
         });
         vacationId = created?.id ?? null;
       } else {
-        const updated = await vacationStore.addExtractedSegments(
+        // Attach: merge into matching existing segments instead of duplicating; the remap tells
+        // us which final segment each extracted one landed on (for the document attachment).
+        const res = await vacationStore.addExtractedSegments(
           payload.target.vacationId,
           ready.buckets
         );
-        vacationId = updated?.id ?? null;
+        vacationId = res?.vacation.id ?? null;
+        idRemap = res?.idRemap ?? {};
       }
     } catch (err) {
       console.error('[travel-extract] failed to save extracted segments:', err);
@@ -201,10 +207,11 @@ async function onReviewSubmit(payload: {
       return;
     }
 
-    // Attach the source document to EVERY extracted segment: store the file once, then
-    // link the same photoId to the remaining segments (no duplicate storage). Warn-not-
-    // rollback — a failed attach never undoes the saved trip (mirrors updateVacation).
-    const segIds = allSegmentIds(ready);
+    // Attach the source document to EVERY final segment: store the file once, then link the same
+    // photoId to the rest (no duplicate storage). Remap through idRemap + de-dupe so a document
+    // attaches to the merged-into existing segment (not a dropped extracted id) and never double-
+    // links when two extracted segments merge into one. Warn-not-rollback.
+    const segIds = [...new Set(allSegmentIds(ready).map((id) => idRemap[id] ?? id))];
     if (segIds.length) {
       try {
         const [firstId, ...restIds] = segIds;

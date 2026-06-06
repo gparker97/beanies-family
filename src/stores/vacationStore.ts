@@ -13,6 +13,7 @@ import {
   type TravelSegmentOccurrence,
 } from '@/utils/vacation';
 import { toISODateString, extractDatePart } from '@/utils/date';
+import { mergeExtractedIntoVacation } from '@/utils/segmentMerge';
 import { useToday } from '@/composables/useToday';
 import type {
   FamilyVacation,
@@ -370,20 +371,43 @@ export const useVacationStore = defineStore('vacations', () => {
    * doesn't hand-roll array spreads — mirrors `updateSegmentPhotoIds`. Returns the
    * updated vacation (whose segments carry the ids the caller generated) or null on miss.
    */
+  /**
+   * Add AI-extracted segments to an existing trip, MERGING any that match an existing segment
+   * (same kind + identity key) instead of duplicating — newer doc wins on fields, travellers
+   * union, notes append, source document re-targeted via the returned id-remap (extracted id →
+   * final segment id). The pure merge is wrapped so a malformed segment surfaces as the caller's
+   * saveFailed toast (a `[vacation]` console.error), never a silent throw.
+   */
   async function addExtractedSegments(
     vacationId: string,
     buckets: ExtractedSegmentBuckets
-  ): Promise<FamilyVacation | null> {
+  ): Promise<{ vacation: FamilyVacation; idRemap: Record<string, string> } | null> {
     const vacation = vacations.value.find((v) => v.id === vacationId);
     if (!vacation) {
       console.warn(`[vacation] addExtractedSegments: no vacation "${vacationId}"`);
       return null;
     }
-    return updateVacation(vacationId, {
-      travelSegments: [...vacation.travelSegments, ...buckets.travelSegments],
-      accommodations: [...vacation.accommodations, ...buckets.accommodations],
-      transportation: [...vacation.transportation, ...buckets.transportation],
+    let merged: ExtractedSegmentBuckets;
+    let idRemap: Record<string, string>;
+    try {
+      ({ merged, idRemap } = mergeExtractedIntoVacation(
+        {
+          travelSegments: vacation.travelSegments,
+          accommodations: vacation.accommodations,
+          transportation: vacation.transportation,
+        },
+        buckets
+      ));
+    } catch (err) {
+      console.error('[vacation] addExtractedSegments merge failed:', err);
+      return null;
+    }
+    const updated = await updateVacation(vacationId, {
+      travelSegments: merged.travelSegments,
+      accommodations: merged.accommodations,
+      transportation: merged.transportation,
     });
+    return updated ? { vacation: updated, idRemap } : null;
   }
 
   function resetState() {
