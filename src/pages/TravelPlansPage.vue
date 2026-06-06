@@ -71,6 +71,9 @@ const { consentOpen, requestConsent, resolveConsent, onConsentConfirm } = useDoc
 
 // The extracted payload handed to the review modal (null when closed).
 const reviewReady = ref<TravelReady | null>(null);
+// True while onReviewSubmit persists the trip + attaches the document — drives the modal's
+// save spinner and locks its buttons so the create action never looks like a no-op.
+const reviewSubmitting = ref(false);
 
 const { isProcessing: isReadingDoc, processFile: processTravelDoc } = useDocumentToTravel({
   onTravelReady: (ready) => {
@@ -115,69 +118,74 @@ async function onReviewSubmit(payload: {
     return;
   }
 
-  let vacationId: string | null = null;
+  reviewSubmitting.value = true;
   try {
-    if (payload.target.kind === 'create') {
-      const created = await vacationStore.createVacation({
-        name: payload.tripName,
-        tripType: ready.tripType,
-        assigneeIds: [],
-        ideas: [],
-        travelSegments: ready.buckets.travelSegments,
-        accommodations: ready.buckets.accommodations,
-        transportation: ready.buckets.transportation,
-        createdBy,
-      });
-      vacationId = created?.id ?? null;
-    } else {
-      const updated = await vacationStore.addExtractedSegments(
-        payload.target.vacationId,
-        ready.buckets
-      );
-      vacationId = updated?.id ?? null;
-    }
-  } catch (err) {
-    console.error('[travel-extract] failed to save extracted segments:', err);
-  }
-
-  if (!vacationId) {
-    showToast('error', t('travelExtract.error.title'), t('travelExtract.error.saveFailed'));
-    return;
-  }
-
-  // Attach the source document to EVERY extracted segment: store the file once, then
-  // link the same photoId to the remaining segments (no duplicate storage). Warn-not-
-  // rollback — a failed attach never undoes the saved trip (mirrors updateVacation).
-  const segIds = allSegmentIds(ready);
-  if (segIds.length) {
+    let vacationId: string | null = null;
     try {
-      const [firstId, ...restIds] = segIds;
-      const { photoId } = await photoStore.addPhoto(
-        ready.sourceFile,
-        'vacations',
-        vacationSegmentEntityId(vacationId, firstId),
-        createdBy
-      );
-      for (const otherId of restIds) {
-        photoStore.linkPhotoToEntity(
-          'vacations',
-          vacationSegmentEntityId(vacationId, otherId),
-          photoId
+      if (payload.target.kind === 'create') {
+        const created = await vacationStore.createVacation({
+          name: payload.tripName,
+          tripType: ready.tripType,
+          assigneeIds: [],
+          ideas: [],
+          travelSegments: ready.buckets.travelSegments,
+          accommodations: ready.buckets.accommodations,
+          transportation: ready.buckets.transportation,
+          createdBy,
+        });
+        vacationId = created?.id ?? null;
+      } else {
+        const updated = await vacationStore.addExtractedSegments(
+          payload.target.vacationId,
+          ready.buckets
         );
+        vacationId = updated?.id ?? null;
       }
     } catch (err) {
-      console.error('[travel-extract] document attach failed (trip kept):', err);
-      showToast(
-        'warning',
-        t('travelExtract.attachFailed.title'),
-        t('travelExtract.attachFailed.message')
-      );
+      console.error('[travel-extract] failed to save extracted segments:', err);
     }
-  }
 
-  reviewReady.value = null;
-  selectedVacationId.value = vacationId;
-  showToast('success', t('travelExtract.added.title'), t('travelExtract.added.message'));
+    if (!vacationId) {
+      showToast('error', t('travelExtract.error.title'), t('travelExtract.error.saveFailed'));
+      return;
+    }
+
+    // Attach the source document to EVERY extracted segment: store the file once, then
+    // link the same photoId to the remaining segments (no duplicate storage). Warn-not-
+    // rollback — a failed attach never undoes the saved trip (mirrors updateVacation).
+    const segIds = allSegmentIds(ready);
+    if (segIds.length) {
+      try {
+        const [firstId, ...restIds] = segIds;
+        const { photoId } = await photoStore.addPhoto(
+          ready.sourceFile,
+          'vacations',
+          vacationSegmentEntityId(vacationId, firstId),
+          createdBy
+        );
+        for (const otherId of restIds) {
+          photoStore.linkPhotoToEntity(
+            'vacations',
+            vacationSegmentEntityId(vacationId, otherId),
+            photoId
+          );
+        }
+      } catch (err) {
+        console.error('[travel-extract] document attach failed (trip kept):', err);
+        showToast(
+          'warning',
+          t('travelExtract.attachFailed.title'),
+          t('travelExtract.attachFailed.message')
+        );
+      }
+    }
+
+    reviewReady.value = null;
+    selectedVacationId.value = vacationId;
+    showToast('success', t('travelExtract.added.title'), t('travelExtract.added.message'));
+  } finally {
+    reviewSubmitting.value = false;
+  }
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -1627,6 +1635,7 @@ function addQuickIdea() {
     <TravelExtractReviewModal
       :open="reviewReady !== null"
       :ready="reviewReady"
+      :submitting="reviewSubmitting"
       @close="reviewReady = null"
       @submit="onReviewSubmit"
     />

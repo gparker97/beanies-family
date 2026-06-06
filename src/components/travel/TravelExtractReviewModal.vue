@@ -21,6 +21,8 @@ import type {
 const props = defineProps<{
   open: boolean;
   ready: TravelReady | null;
+  /** True while the parent persists the trip + attaches the document — drives the save spinner. */
+  submitting?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -164,6 +166,7 @@ function onSave(): void {
     save-gradient="teal"
     :save-label="saveLabel"
     :save-disabled="saveDisabled"
+    :is-submitting="submitting"
     @close="emit('close')"
     @save="onSave"
   >
