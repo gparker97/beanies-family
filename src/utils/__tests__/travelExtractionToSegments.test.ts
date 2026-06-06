@@ -44,9 +44,9 @@ describe('travelExtractionToSegments', () => {
         bookingReference: 'ABC123',
       }),
     ]);
-    const { travelSegments } = travelExtractionToSegments(r);
-    expect(travelSegments).toHaveLength(1);
-    const seg = travelSegments[0];
+    const { buckets } = travelExtractionToSegments(r);
+    expect(buckets.travelSegments).toHaveLength(1);
+    const seg = buckets.travelSegments[0];
     expect(seg.type).toBe('flight_outbound');
     expect(seg.departureAirport).toBe('Singapore (SIN)');
     expect(seg.departureDate).toBe('2026-08-12');
@@ -70,11 +70,11 @@ describe('travelExtractionToSegments', () => {
         breakfastIncluded: true,
       }),
     ]);
-    const { accommodations } = travelExtractionToSegments(r);
-    expect(accommodations).toHaveLength(1);
-    expect(accommodations[0].title).toBe('Park Hyatt Tokyo');
-    expect(accommodations[0].checkInDate).toBe('2026-08-12');
-    expect(accommodations[0].breakfastIncluded).toBe(true);
+    const { buckets } = travelExtractionToSegments(r);
+    expect(buckets.accommodations).toHaveLength(1);
+    expect(buckets.accommodations[0].title).toBe('Park Hyatt Tokyo');
+    expect(buckets.accommodations[0].checkInDate).toBe('2026-08-12');
+    expect(buckets.accommodations[0].breakfastIncluded).toBe(true);
   });
 
   it('maps a transportation draft', () => {
@@ -85,11 +85,11 @@ describe('travelExtractionToSegments', () => {
         fields: { agencyName: 'Hertz', pickupDate: '2026-08-12', returnDate: '2026-08-16' },
       }),
     ]);
-    const { transportation } = travelExtractionToSegments(r);
-    expect(transportation).toHaveLength(1);
-    expect(transportation[0].type).toBe('rental_car');
-    expect(transportation[0].agencyName).toBe('Hertz');
-    expect(transportation[0].title).toBe('rental car — Hertz');
+    const { buckets } = travelExtractionToSegments(r);
+    expect(buckets.transportation).toHaveLength(1);
+    expect(buckets.transportation[0].type).toBe('rental_car');
+    expect(buckets.transportation[0].agencyName).toBe('Hertz');
+    expect(buckets.transportation[0].title).toBe('rental car — Hertz');
   });
 
   it('folds unmapped fields and the model notes into the segment notes (no data loss)', () => {
@@ -100,7 +100,7 @@ describe('travelExtractionToSegments', () => {
         fields: { departureAirport: 'SIN', baggage: '30kg', seat: '12A' },
       }),
     ]);
-    const seg = travelExtractionToSegments(r).travelSegments[0];
+    const seg = travelExtractionToSegments(r).buckets.travelSegments[0];
     expect(seg.notes).toContain('Window seat');
     expect(seg.notes).toContain('Baggage: 30kg'); // humanized label
     expect(seg.notes).toContain('Seat: 12A');
@@ -110,7 +110,7 @@ describe('travelExtractionToSegments', () => {
 
   it('coerces an unknown type to the safe per-kind default', () => {
     const r = result([draft({ kind: 'accommodation', type: 'bogus', title: 'Somewhere' })]);
-    expect(travelExtractionToSegments(r).accommodations[0].type).toBe('hotel');
+    expect(travelExtractionToSegments(r).buckets.accommodations[0].type).toBe('hotel');
   });
 
   it('skips a draft with an unrecognized kind (warns, never throws)', () => {
@@ -118,7 +118,7 @@ describe('travelExtractionToSegments', () => {
     // Force an invalid kind past the type system.
     const bad = { ...draft(), kind: 'mystery' } as unknown as TravelSegmentDraft;
     const r = result([bad, draft({ kind: 'accommodation', type: 'hotel', title: 'Hotel' })]);
-    const buckets = travelExtractionToSegments(r);
+    const { buckets } = travelExtractionToSegments(r);
     expect(buckets.travelSegments).toHaveLength(0);
     expect(buckets.accommodations).toHaveLength(1);
     expect(warn).toHaveBeenCalled();
@@ -129,44 +129,44 @@ describe('travelExtractionToSegments', () => {
       draft({ fields: { departureAirport: 'SIN' } }),
       draft({ type: 'flight_return', fields: { departureAirport: 'HND' } }),
     ]);
-    const segs = travelExtractionToSegments(r).travelSegments;
+    const segs = travelExtractionToSegments(r).buckets.travelSegments;
     expect(segs[0].id).not.toBe(segs[1].id);
   });
 
-  describe('traveller resolution (#30 follow-up)', () => {
-    // Resolver stub: each name → "id-<lowercased name>" (so we can assert what was passed).
-    const resolve = (names: string[]) => names.map((n) => `id-${n.toLowerCase()}`);
-
-    it('resolves multiple names onto ONE segment (never splits per person)', () => {
+  describe('traveller names side-channel (#30 follow-up)', () => {
+    it('records NORMALIZED names per segment id (one segment, many people, no split)', () => {
       const r = result([
-        draft({ type: 'flight_outbound', travellers: ['John', 'Mary'], fields: { airline: 'SQ' } }),
+        draft({ travellers: ['SMITH/JOHN MR', 'mary jones'], fields: { airline: 'SQ' } }),
       ]);
-      const segs = travelExtractionToSegments(r, resolve).travelSegments;
-      expect(segs).toHaveLength(1); // still one segment, not one per traveller
-      expect(segs[0].travellerIds).toEqual(['id-john', 'id-mary']);
+      const { buckets, travellerNamesBySegmentId } = travelExtractionToSegments(r);
+      expect(buckets.travelSegments).toHaveLength(1); // one segment, not one per person
+      const id = buckets.travelSegments[0].id;
+      expect(travellerNamesBySegmentId[id]).toEqual(['John Smith', 'Mary Jones']); // normalized
+      expect(buckets.travelSegments[0].travellerIds).toBeUndefined(); // resolved post-confirm
     });
 
-    it('applies the resolver across all three kinds', () => {
+    it('keys names by segment id across all three kinds', () => {
       const r = result([
-        draft({ kind: 'travel', type: 'flight_outbound', travellers: ['A'] }),
-        draft({ kind: 'accommodation', type: 'hotel', title: 'Hotel', travellers: ['B'] }),
-        draft({ kind: 'transportation', type: 'rental_car', travellers: ['C'] }),
+        draft({ kind: 'travel', type: 'flight_outbound', travellers: ['Amy'] }),
+        draft({ kind: 'accommodation', type: 'hotel', title: 'Hotel', travellers: ['Bob'] }),
+        draft({ kind: 'transportation', type: 'rental_car', travellers: ['Cara'] }),
       ]);
-      const b = travelExtractionToSegments(r, resolve);
-      expect(b.travelSegments[0].travellerIds).toEqual(['id-a']);
-      expect(b.accommodations[0].travellerIds).toEqual(['id-b']);
-      expect(b.transportation[0].travellerIds).toEqual(['id-c']);
+      const { buckets, travellerNamesBySegmentId } = travelExtractionToSegments(r);
+      expect(travellerNamesBySegmentId[buckets.travelSegments[0].id]).toEqual(['Amy']);
+      expect(travellerNamesBySegmentId[buckets.accommodations[0].id]).toEqual(['Bob']);
+      expect(travellerNamesBySegmentId[buckets.transportation[0].id]).toEqual(['Cara']);
     });
 
-    it('leaves travellerIds absent when no resolver is given', () => {
-      const r = result([draft({ travellers: ['John'] })]);
-      expect(travelExtractionToSegments(r).travelSegments[0].travellerIds).toBeUndefined();
+    it('de-duplicates names within a segment (case-insensitive)', () => {
+      const r = result([draft({ travellers: ['John Smith', 'JOHN SMITH', '  '] })]);
+      const { buckets, travellerNamesBySegmentId } = travelExtractionToSegments(r);
+      expect(travellerNamesBySegmentId[buckets.travelSegments[0].id]).toEqual(['John Smith']);
     });
 
-    it('leaves travellerIds absent when the resolver matches nobody', () => {
-      const r = result([draft({ travellers: ['Stranger'] })]);
-      const segs = travelExtractionToSegments(r, () => []).travelSegments;
-      expect(segs[0].travellerIds).toBeUndefined();
+    it('omits the names entry for a segment with no travellers', () => {
+      const r = result([draft({ travellers: [] })]);
+      const { buckets, travellerNamesBySegmentId } = travelExtractionToSegments(r);
+      expect(travellerNamesBySegmentId[buckets.travelSegments[0].id]).toBeUndefined();
     });
 
     it('never leaks traveller names into fields or notes', () => {
@@ -191,7 +191,7 @@ describe('travelExtractionToSegments', () => {
       const parsed = parseTravelExtractionResult(raw);
       expect(parsed.segments[0].travellers).toEqual(['John Smith']);
       expect(parsed.segments[0].fields).not.toHaveProperty('travellers');
-      const seg = travelExtractionToSegments(parsed, resolve).travelSegments[0];
+      const seg = travelExtractionToSegments(parsed).buckets.travelSegments[0];
       expect(seg.notes ?? '').not.toContain('John Smith');
     });
 
@@ -303,7 +303,7 @@ describe('parseTravelExtractionResult → travelExtractionToSegments (nested *Fi
     expect(parsed.segments[0].fields.airline).toBe('Juneyao Airlines');
     expect(parsed.segments[0].fields.flightNumber).toBe('HO1602');
 
-    const seg = travelExtractionToSegments(parsed).travelSegments[0];
+    const seg = travelExtractionToSegments(parsed).buckets.travelSegments[0];
     expect(seg.airline).toBe('Juneyao Airlines');
     expect(seg.flightNumber).toBe('HO1602');
     expect(seg.departureAirport).toBe('Singapore Changi Airport');
@@ -347,7 +347,7 @@ describe('parseTravelExtractionResult → travelExtractionToSegments (nested *Fi
       ],
     };
     const parsed = parseTravelExtractionResult(raw);
-    const buckets = travelExtractionToSegments(parsed);
+    const { buckets } = travelExtractionToSegments(parsed);
     expect(buckets.travelSegments[0].arrivesNextDay).toBe(true);
     expect(buckets.accommodations[0].breakfastIncluded).toBe(true);
   });

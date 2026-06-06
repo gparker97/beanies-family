@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-06",
-    "translationCount": 3070
+    "translationCount": 3074
   },
   "translations": {
     "app.name": {
@@ -15354,6 +15354,26 @@
     "travelExtract.selectTripPlaceholder": {
       "translation": "选择",
       "hash": "glbcaw",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.travellersHeading": {
+      "translation": "这些旅客是谁？",
+      "hash": "xvj28",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.whoIsThis": {
+      "translation": "“这是谁？”",
+      "hash": "ulhc5x",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.aliasLearnFailed.title": {
+      "translation": "已保存行程",
+      "hash": "bnmdvw",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.aliasLearnFailed.message": {
+      "translation": "您的行程已保存，但我们无法记住下次的旅客姓名。",
+      "hash": "mcopfs",
       "lastUpdated": "2026-06-06"
     }
   }

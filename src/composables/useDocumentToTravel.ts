@@ -15,14 +15,12 @@ import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
 import { useExtractionErrorToast } from './useExtractionErrorToast';
 import { useVacationStore } from '@/stores/vacationStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { extractTravelFromDocument } from '@/services/ai/documentExtractionService';
 import {
   inferTripType,
   travelExtractionToSegments,
   type SegmentBuckets,
 } from '@/utils/travelExtractionToSegments';
-import { matchTravellerIds } from '@/utils/segmentTravellers';
 import { resolveTripTarget, segmentDateRange, tripsOverlappingRange } from '@/utils/vacation';
 import type { TripTarget } from '@/utils/vacation';
 import { isPdfFile, pdfFirstPageToImage } from '@/utils/pdfFirstPageToImage';
@@ -32,6 +30,10 @@ import type { VacationTripType } from '@/types/models';
 export interface TravelReady {
   /** The mapped segment buckets, ready to attach or seed a new trip. */
   buckets: SegmentBuckets;
+  /** Normalized traveller names per segment id — resolved to members after the user confirms. */
+  travellerNamesBySegmentId: Record<string, string[]>;
+  /** The distinct normalized traveller names across the whole document (for the mapping UI). */
+  distinctTravellerNames: string[];
   /** Inferred trip type for the new-trip case. */
   tripType: VacationTripType;
   /** Where the segments should go (create / attach / choose) — pre-decided, pure. */
@@ -57,7 +59,6 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
   const { t } = useTranslation();
   const { reportExtractionFailure } = useExtractionErrorToast();
   const vacationStore = useVacationStore();
-  const familyStore = useFamilyStore();
 
   const isProcessing = ref(false);
 
@@ -101,10 +102,13 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
           return;
         }
 
-        // Match the model's per-segment traveller NAMES to family members (humans only).
-        const buckets = travelExtractionToSegments(result.data, (names) =>
-          matchTravellerIds(names, familyStore.sortedHumans)
-        );
+        // Map to segment buckets + carry the normalized per-segment traveller NAMES through to
+        // the review modal, where the user confirms each name→member mapping (identity matching
+        // is local; the roster is never sent to the model).
+        const { buckets, travellerNamesBySegmentId } = travelExtractionToSegments(result.data);
+        const distinctTravellerNames = [
+          ...new Set(Object.values(travellerNamesBySegmentId).flat()),
+        ];
         const range = segmentDateRange(buckets);
         const matches = range
           ? tripsOverlappingRange(vacationStore.vacations, range, toDateInputValue(new Date()))
@@ -112,6 +116,8 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
 
         options.onTravelReady({
           buckets,
+          travellerNamesBySegmentId,
+          distinctTravellerNames,
           tripType: inferTripType(result.data),
           target: resolveTripTarget(matches),
           suggestedTripName: result.data.tripName,
