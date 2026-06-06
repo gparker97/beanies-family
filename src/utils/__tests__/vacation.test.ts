@@ -7,6 +7,9 @@ import {
   validateSegmentTarget,
   tripPhase,
   tripDayProgress,
+  segmentDateRange,
+  tripsOverlappingRange,
+  resolveTripTarget,
   type SupportedTravelType,
 } from '../vacation';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
@@ -360,5 +363,68 @@ describe('tripDayProgress', () => {
 
   it('returns null when today is before the trip start (tripDayNumber → null)', () => {
     expect(tripDayProgress({ startDate: '2026-06-12', endDate: '2026-06-15' }, TODAY)).toBeNull();
+  });
+});
+
+describe('segmentDateRange / tripsOverlappingRange / resolveTripTarget (#30)', () => {
+  const TODAY = '2026-06-10';
+
+  function vac(over: Partial<FamilyVacation> = {}): FamilyVacation {
+    return {
+      id: over.id ?? 'v1',
+      activityId: 'a1',
+      name: 'Trip',
+      tripType: 'fly_and_stay',
+      assigneeIds: [],
+      travelSegments: [],
+      accommodations: [],
+      transportation: [],
+      ideas: [],
+      createdBy: 'm1',
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
+      ...over,
+    };
+  }
+
+  it('segmentDateRange spans the earliest and latest segment dates', () => {
+    const range = segmentDateRange({
+      travelSegments: [{ departureDate: '2026-08-12', arrivalDate: '2026-08-12' }],
+      accommodations: [{ checkInDate: '2026-08-12', checkOutDate: '2026-08-16' }],
+      transportation: [],
+    });
+    expect(range).toEqual({ start: '2026-08-12', end: '2026-08-16' });
+  });
+
+  it('segmentDateRange returns null when no usable dates', () => {
+    expect(
+      segmentDateRange({ travelSegments: [{}], accommodations: [], transportation: [] })
+    ).toBeNull();
+  });
+
+  it('tripsOverlappingRange returns trips whose window overlaps and excludes past trips', () => {
+    const overlapping = vac({ id: 'a', startDate: '2026-08-10', endDate: '2026-08-20' });
+    const disjoint = vac({ id: 'b', startDate: '2026-09-01', endDate: '2026-09-05' });
+    const past = vac({ id: 'c', startDate: '2026-05-01', endDate: '2026-05-05' });
+    const matches = tripsOverlappingRange(
+      [overlapping, disjoint, past],
+      { start: '2026-08-12', end: '2026-08-16' },
+      TODAY
+    );
+    expect(matches.map((m) => m.id)).toEqual(['a']);
+  });
+
+  it('tripsOverlappingRange skips trips with no start date', () => {
+    const noDates = vac({ id: 'a', startDate: undefined, endDate: undefined });
+    expect(
+      tripsOverlappingRange([noDates], { start: '2026-08-12', end: '2026-08-16' }, TODAY)
+    ).toHaveLength(0);
+  });
+
+  it('resolveTripTarget: 0 → create, 1 → attach, 2+ → choose', () => {
+    expect(resolveTripTarget([])).toEqual({ kind: 'create' });
+    expect(resolveTripTarget([vac({ id: 'x' })])).toEqual({ kind: 'attach', vacationId: 'x' });
+    const two = [vac({ id: 'x' }), vac({ id: 'y' })];
+    expect(resolveTripTarget(two)).toEqual({ kind: 'choose', candidates: two });
   });
 });

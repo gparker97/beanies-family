@@ -19,6 +19,23 @@ const VALID_EXTRACTION = {
   confidence: { title: 0.9, date: 0.9, startTime: 0.8, endTime: 0.7, location: 0.8 },
 };
 
+const VALID_TRAVEL = {
+  isTravel: true,
+  tripName: 'Tokyo Trip',
+  tripTypeHint: 'fly_and_stay',
+  segments: [
+    {
+      kind: 'travel',
+      type: 'flight_outbound',
+      title: 'SIN → HND',
+      status: 'booked',
+      bookingReference: 'ABC123',
+      notes: '',
+      confidence: { overall: 0.9 },
+    },
+  ],
+};
+
 const IMAGE = 'data:image/jpeg;base64,AAAA';
 
 function makeEvent({
@@ -223,6 +240,39 @@ describe('ai-extract Lambda handler', () => {
       };
       const res = await handler(makeEvent({ headers: keyHeader, body: goodBody }));
       assert.equal(res.statusCode, 504);
+    });
+  });
+
+  describe('task routing (#30)', () => {
+    it('runs the travel task and returns the travel-shaped result', async () => {
+      globalThis.fetch = async () => fakeUpstream({ content: JSON.stringify(VALID_TRAVEL) });
+      const res = parseResponse(
+        await handler(makeEvent({ headers: keyHeader, body: { ...goodBody, task: 'travel' } }))
+      );
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.parsedBody.result.isTravel, true);
+      assert.equal(res.parsedBody.result.segments.length, 1);
+    });
+
+    it('defaults a missing task to event (backward-compat)', async () => {
+      const res = parseResponse(await handler(makeEvent({ headers: keyHeader, body: goodBody })));
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.parsedBody.result.title, "Mia's Party");
+    });
+
+    it('rejects an unknown task with 400', async () => {
+      const res = await handler(
+        makeEvent({ headers: keyHeader, body: { ...goodBody, task: 'bogus' } })
+      );
+      assert.equal(res.statusCode, 400);
+    });
+
+    it('validates travel required-keys (502 on wrong shape for travel task)', async () => {
+      globalThis.fetch = async () => fakeUpstream({ content: JSON.stringify({ isTravel: true }) });
+      const res = await handler(
+        makeEvent({ headers: keyHeader, body: { ...goodBody, task: 'travel' } })
+      );
+      assert.equal(res.statusCode, 502);
     });
   });
 

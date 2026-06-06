@@ -21,19 +21,35 @@ describe('extraction prompt drift guard (client vs spike vs server)', () => {
     expect(server.PROMPT_VERSION).toBe(spike.PROMPT_VERSION);
   });
 
-  it('EXTRACTION_JSON_SHAPE matches exactly across all three', () => {
+  it('EXTRACTION_JSON_SHAPE (event) matches exactly across all three', () => {
     expect(client.EXTRACTION_JSON_SHAPE).toEqual(spike.EXTRACTION_JSON_SHAPE);
     expect(server.EXTRACTION_JSON_SHAPE).toEqual(spike.EXTRACTION_JSON_SHAPE);
   });
 
-  it('REQUIRED_KEYS match (same keys, same order) across all three', () => {
-    expect([...client.REQUIRED_KEYS]).toEqual([...spike.REQUIRED_KEYS]);
-    expect([...server.REQUIRED_KEYS]).toEqual([...spike.REQUIRED_KEYS]);
+  it('TRAVEL_JSON_SHAPE matches exactly across all three', () => {
+    expect(client.TRAVEL_JSON_SHAPE).toEqual(spike.TRAVEL_JSON_SHAPE);
+    expect(server.TRAVEL_JSON_SHAPE).toEqual(spike.TRAVEL_JSON_SHAPE);
   });
 
-  it('buildExtractionMessages produces identical output across all three', () => {
-    const expected = spike.buildExtractionMessages(imageDataUrl, todayIso);
-    expect(client.buildExtractionMessages(imageDataUrl, todayIso)).toEqual(expected);
-    expect(server.buildExtractionMessages(imageDataUrl, todayIso)).toEqual(expected);
-  });
+  // Per-task drift: required keys + built messages must match across the three copies
+  // for every task in the registry. Adding a task automatically extends this guard.
+  type TaskEntry = {
+    requiredKeys: readonly string[];
+    buildMessages: (imageDataUrl: string, todayIso: string) => unknown;
+  };
+  const tasks = (registry: Record<string, unknown>, task: string) => registry[task] as TaskEntry;
+
+  for (const task of Object.keys(spike.EXTRACTION_TASKS as Record<string, unknown>)) {
+    it(`task "${task}": REQUIRED keys + built messages match across all three`, () => {
+      const s = tasks(spike.EXTRACTION_TASKS, task);
+      const c = tasks(client.EXTRACTION_TASKS, task);
+      const v = tasks(server.EXTRACTION_TASKS, task);
+      expect([...c.requiredKeys]).toEqual([...s.requiredKeys]);
+      expect([...v.requiredKeys]).toEqual([...s.requiredKeys]);
+
+      const expected = s.buildMessages(imageDataUrl, todayIso);
+      expect(c.buildMessages(imageDataUrl, todayIso)).toEqual(expected);
+      expect(v.buildMessages(imageDataUrl, todayIso)).toEqual(expected);
+    });
+  }
 });

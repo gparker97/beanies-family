@@ -13,8 +13,9 @@ import { useAiCapability } from './useAiCapability';
 import { useOnline } from './useOnline';
 import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
+import { useExtractionErrorToast } from './useExtractionErrorToast';
 import { extractEventFromDocument } from '@/services/ai/documentExtractionService';
-import type { ExtractionErrorCode, FieldConfidence } from '@/services/ai/types';
+import type { FieldConfidence } from '@/services/ai/types';
 import { extractionToActivityPrefill } from '@/utils/extractionToActivity';
 import { toDateInputValue } from '@/utils/date';
 import type { CreateFamilyActivityInput } from '@/types/models';
@@ -33,48 +34,14 @@ export interface UseDocumentToActivityOptions {
   }) => void;
 }
 
-const ERROR_SURFACE = 'ai-extract';
-
 export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
   const { tier, byokConfig } = useAiCapability();
   const { isOnline } = useOnline();
   const { showToast } = useToast();
   const { t } = useTranslation();
+  const { reportExtractionFailure } = useExtractionErrorToast();
 
   const isProcessing = ref(false);
-
-  function reportFailure(code: ExtractionErrorCode | undefined): void {
-    switch (code) {
-      case 'offline':
-        showToast('info', t('ai.offline.title'), t('ai.offline.message'));
-        return;
-      case 'not_available':
-        showToast('info', t('ai.unavailable.title'), t('ai.unavailable.message'));
-        return;
-      case 'compression':
-        // Reuse the established photo-type wording (e.g. HEIC on Chromium).
-        showToast('warning', t('ai.error.title'), t('photos.invalidType'));
-        return;
-      case 'upstream_busy':
-        // The AI provider is temporarily overloaded/down — transient, not our bug. Friendly
-        // retry toast only; deliberately NO error surface so provider 5xx flapping can't spam
-        // #beanies-errors.
-        showToast('warning', t('ai.error.busy.title'), t('ai.error.busy.message'));
-        return;
-      case 'timeout':
-        showToast('error', t('ai.error.title'), t('ai.error.timeout'), { surface: ERROR_SURFACE });
-        return;
-      case 'malformed_output':
-        showToast('error', t('ai.error.title'), t('ai.error.unreadable'), {
-          surface: ERROR_SURFACE,
-        });
-        return;
-      case 'provider_error':
-      default:
-        showToast('error', t('ai.error.title'), t('ai.error.generic'), { surface: ERROR_SURFACE });
-        return;
-    }
-  }
 
   /** Run the full intake → extract → prefill flow for one document (consent already granted). */
   async function processFile(file: File): Promise<void> {
@@ -115,7 +82,7 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
         return;
       }
 
-      reportFailure(result.errorCode);
+      reportExtractionFailure(result.errorCode);
     } finally {
       isProcessing.value = false;
     }

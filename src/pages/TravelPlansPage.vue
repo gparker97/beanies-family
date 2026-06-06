@@ -14,7 +14,11 @@ import TravelSegmentEditModal from '@/components/travel/TravelSegmentEditModal.v
 import AccommodationEditModal from '@/components/travel/AccommodationEditModal.vue';
 import TransportationEditModal from '@/components/travel/TransportationEditModal.vue';
 import IdeaEditModal from '@/components/travel/IdeaEditModal.vue';
+import TravelExtractReviewModal from '@/components/travel/TravelExtractReviewModal.vue';
+import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useVacationStore } from '@/stores/vacationStore';
+import { usePhotoStore } from '@/stores/photoStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useClipboard } from '@/composables/useClipboard';
@@ -22,6 +26,12 @@ import { confirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { usePermissions } from '@/composables/usePermissions';
 import { showToast } from '@/composables/useToast';
+import { useFilePicker } from '@/composables/useFilePicker';
+import { useDocumentToTravel, type TravelReady } from '@/composables/useDocumentToTravel';
+import { useDocumentConsent } from '@/composables/useDocumentConsent';
+import { useAiCapability } from '@/composables/useAiCapability';
+import { isFlagEnabled } from '@/config/flags';
+import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
 import { formatDateShort, formatNookDate, extractDatePart } from '@/utils/date';
@@ -50,6 +60,118 @@ const router = useRouter();
 const vacationStore = useVacationStore();
 const familyStore = useFamilyStore();
 const { copied, copy } = useClipboard();
+const photoStore = usePhotoStore();
+
+// ── AI: add travel plans from a document (#30, flag-gated, prod-off) ───────────
+const { tier: aiTier } = useAiCapability();
+const canAddTravelFromDoc = computed(
+  () => canEditActivities.value && isFlagEnabled('aiTravelExtract')
+);
+const { consentOpen, requestConsent, resolveConsent, onConsentConfirm } = useDocumentConsent();
+
+// The extracted payload handed to the review modal (null when closed).
+const reviewReady = ref<TravelReady | null>(null);
+
+const { isProcessing: isReadingDoc, processFile: processTravelDoc } = useDocumentToTravel({
+  onTravelReady: (ready) => {
+    reviewReady.value = ready;
+  },
+});
+
+const docPicker = useFilePicker({
+  accept: 'image/jpeg,image/png,image/heic,image/heif,application/pdf',
+  onPick: (files) => {
+    if (files[0]) void processTravelDoc(files[0]);
+  },
+});
+
+/** 📄 entry point. Consent gate runs BEFORE the picker; a decline is a silent no-op. */
+async function handleAddFromDocument(): Promise<void> {
+  const granted = await requestConsent();
+  if (!granted) return;
+  docPicker.open();
+}
+
+/** First created segment id across the buckets, for attaching the source document. */
+function primarySegmentId(ready: TravelReady): string | undefined {
+  return (
+    ready.buckets.travelSegments[0]?.id ??
+    ready.buckets.accommodations[0]?.id ??
+    ready.buckets.transportation[0]?.id
+  );
+}
+
+/**
+ * Confirm handler: create the new trip or attach to the chosen one, then attach the source
+ * document to the primary segment. A failed attach warns but never rolls back the saved trip
+ * (mirrors updateVacation's activity-sync posture). Nothing fails silently.
+ */
+async function onReviewSubmit(payload: {
+  target: { kind: 'create' } | { kind: 'attach'; vacationId: string };
+  tripName: string;
+}): Promise<void> {
+  const ready = reviewReady.value;
+  if (!ready) return;
+  const createdBy = familyStore.currentMemberId;
+  if (!createdBy) {
+    showToast('error', t('travelExtract.error.title'), t('travelExtract.error.noMember'));
+    return;
+  }
+
+  let vacationId: string | null = null;
+  try {
+    if (payload.target.kind === 'create') {
+      const created = await vacationStore.createVacation({
+        name: payload.tripName,
+        tripType: ready.tripType,
+        assigneeIds: [],
+        ideas: [],
+        travelSegments: ready.buckets.travelSegments,
+        accommodations: ready.buckets.accommodations,
+        transportation: ready.buckets.transportation,
+        createdBy,
+      });
+      vacationId = created?.id ?? null;
+    } else {
+      const updated = await vacationStore.addExtractedSegments(
+        payload.target.vacationId,
+        ready.buckets
+      );
+      vacationId = updated?.id ?? null;
+    }
+  } catch (err) {
+    console.error('[travel-extract] failed to save extracted segments:', err);
+  }
+
+  if (!vacationId) {
+    showToast('error', t('travelExtract.error.title'), t('travelExtract.error.saveFailed'));
+    return;
+  }
+
+  // Attach the original document to the primary segment (warn-not-rollback).
+  const segId = primarySegmentId(ready);
+  if (segId) {
+    try {
+      await photoStore.addPhoto(
+        ready.sourceFile,
+        'vacations',
+        vacationSegmentEntityId(vacationId, segId),
+        createdBy
+      );
+    } catch (err) {
+      console.error('[travel-extract] document attach failed (trip kept):', err);
+      showToast(
+        'warning',
+        t('travelExtract.attachFailed.title'),
+        t('travelExtract.attachFailed.message')
+      );
+    }
+  }
+
+  reviewReady.value = null;
+  selectedVacationId.value = vacationId;
+  showToast('success', t('travelExtract.added.title'), t('travelExtract.added.message'));
+}
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -544,14 +666,24 @@ function addQuickIdea() {
          ═══════════════════════════════════════════════════════════════════════ -->
     <template v-if="!selectedVacationId">
       <PageHeader icon="airplane" :title="t('travel.title')" :subtitle="t('travel.subtitle')">
-        <button
-          v-if="canEditActivities"
-          type="button"
-          class="font-outfit inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-5 py-2.5 text-sm font-semibold whitespace-nowrap text-white shadow-[0_4px_12px_rgba(0,180,216,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(0,180,216,0.3)]"
-          @click="startWizard"
-        >
-          {{ t('travel.planATrip') }} 🌴
-        </button>
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            v-if="canAddTravelFromDoc"
+            type="button"
+            class="font-outfit inline-flex cursor-pointer items-center gap-2 rounded-2xl border-[1.5px] border-[var(--vacation-teal-15)] bg-white px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-[#0077B6] transition-all hover:border-[var(--vacation-teal)] dark:bg-slate-800"
+            @click="handleAddFromDocument"
+          >
+            {{ t('travelExtract.addButton') }} 📄
+          </button>
+          <button
+            v-if="canEditActivities"
+            type="button"
+            class="font-outfit inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-5 py-2.5 text-sm font-semibold whitespace-nowrap text-white shadow-[0_4px_12px_rgba(0,180,216,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(0,180,216,0.3)]"
+            @click="startWizard"
+          >
+            {{ t('travel.planATrip') }} 🌴
+          </button>
+        </div>
       </PageHeader>
 
       <!-- Upcoming trip cards -->
@@ -1472,6 +1604,38 @@ function addQuickIdea() {
         closeIdeaEdit();
       "
     />
+
+    <!-- Add travel plans from a document (#30): consent gate, picker, review modal, overlay -->
+    <DocumentExtractConsentModal
+      :open="consentOpen"
+      :tier="aiTier"
+      @confirm="onConsentConfirm"
+      @cancel="resolveConsent(false)"
+    />
+    <input
+      :ref="(el) => (docPicker.inputRef.value = el as HTMLInputElement)"
+      v-bind="docPicker.bindings"
+      class="hidden"
+    />
+    <TravelExtractReviewModal
+      :open="reviewReady !== null"
+      :ready="reviewReady"
+      @close="reviewReady = null"
+      @submit="onReviewSubmit"
+    />
+    <div
+      v-if="isReadingDoc"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"
+    >
+      <div
+        class="flex flex-col items-center gap-3 rounded-3xl bg-white px-8 py-6 shadow-[var(--soft-shadow)] dark:bg-slate-800"
+      >
+        <BeanieSpinner size="lg" :halo="true" />
+        <p class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100">
+          {{ t('ai.processing') }}
+        </p>
+      </div>
+    </div>
 
     <!-- Copied toast -->
     <Transition

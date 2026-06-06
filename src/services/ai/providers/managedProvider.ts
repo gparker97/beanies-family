@@ -13,13 +13,14 @@
 // typed `not_available` — an honest seam, not a fake success. The BYOK and on-device paths,
 // and the whole wedge UX, are exercisable without it.
 
-import { parseExtractionResult } from '../extractionPrompt';
+import { parseExtractionResult, parseTravelExtractionResult } from '../extractionPrompt';
 import {
   ExtractionProviderError,
   type AttestationInfo,
   type ExtractionProvider,
   type ExtractionRequest,
   type ExtractionResult,
+  type TravelExtractionResult,
 } from '../types';
 
 /** Proxy endpoint (our Lambda). Unset until the Phase-2 backend is deployed. */
@@ -33,77 +34,92 @@ function buildSignal(signal?: AbortSignal): AbortSignal {
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
+interface ProxyBody {
+  result?: unknown;
+  attestation?: AttestationInfo;
+}
+
+/**
+ * POST one document to the proxy for the given `task` and return the raw `{ result, attestation }`
+ * envelope. Owns the shared transport + error classification (timeout / upstream_busy /
+ * provider_error / malformed) so the event and travel paths don't duplicate it.
+ */
+async function postToProxy(
+  request: ExtractionRequest,
+  task: 'event' | 'travel'
+): Promise<ProxyBody> {
+  if (!PROXY_URL) {
+    throw new ExtractionProviderError(
+      'not_available',
+      'Managed AI tier is not configured (proxy endpoint unset)'
+    );
+  }
+
+  // GATE 3 TODO: replace this plaintext-body POST with EHBP — encrypt `imageDataUrl`
+  // to the attested enclave's HPKE key (via the Tinfoil verification SDK) so the proxy
+  // forwards ciphertext only. The proxy contract (single document → typed JSON) is unchanged.
+  let res: Response;
+  try {
+    res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(PROXY_API_KEY ? { 'x-api-key': PROXY_API_KEY } : {}),
+      },
+      body: JSON.stringify({
+        imageDataUrl: request.imageDataUrl,
+        todayIso: request.todayIso,
+        task,
+      }),
+      signal: buildSignal(request.signal),
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ExtractionProviderError('timeout', 'Managed extraction timed out', err);
+    }
+    throw new ExtractionProviderError('provider_error', 'Network error calling managed proxy', err);
+  }
+
+  if (!res.ok) {
+    // The proxy returns { error, code } on failure so we can distinguish a transient upstream
+    // outage (retry) from a hard failure. Read the body defensively — fall back to status-based
+    // mapping if it's absent/unreadable so we never mis-handle a failure.
+    let code: string | undefined;
+    try {
+      code = ((await res.json()) as { code?: string })?.code;
+    } catch {
+      /* no/unreadable error body — use the HTTP status below */
+    }
+    if (code === 'upstream_unavailable' || res.status === 503) {
+      throw new ExtractionProviderError(
+        'upstream_busy',
+        `Managed proxy upstream unavailable (HTTP ${res.status})`
+      );
+    }
+    if (code === 'upstream_timeout' || res.status === 504) {
+      throw new ExtractionProviderError('timeout', 'Managed extraction timed out upstream');
+    }
+    throw new ExtractionProviderError(
+      'provider_error',
+      `Managed proxy returned HTTP ${res.status}`
+    );
+  }
+
+  try {
+    return (await res.json()) as ProxyBody;
+  } catch (err) {
+    throw new ExtractionProviderError(
+      'malformed_output',
+      'Could not read managed proxy response',
+      err
+    );
+  }
+}
+
 export const managedProvider: ExtractionProvider = {
   id: 'tinfoil',
   async extract(request: ExtractionRequest): Promise<ExtractionResult> {
-    if (!PROXY_URL) {
-      throw new ExtractionProviderError(
-        'not_available',
-        'Managed AI tier is not configured (proxy endpoint unset)'
-      );
-    }
-
-    // GATE 3 TODO: replace this plaintext-body POST with EHBP — encrypt `imageDataUrl`
-    // to the attested enclave's HPKE key (via the Tinfoil verification SDK) so the proxy
-    // forwards ciphertext only. The proxy contract (single document → typed JSON) is unchanged.
-    let res: Response;
-    try {
-      res = await fetch(PROXY_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(PROXY_API_KEY ? { 'x-api-key': PROXY_API_KEY } : {}),
-        },
-        body: JSON.stringify({ imageDataUrl: request.imageDataUrl, todayIso: request.todayIso }),
-        signal: buildSignal(request.signal),
-      });
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        throw new ExtractionProviderError('timeout', 'Managed extraction timed out', err);
-      }
-      throw new ExtractionProviderError(
-        'provider_error',
-        'Network error calling managed proxy',
-        err
-      );
-    }
-
-    if (!res.ok) {
-      // The proxy returns { error, code } on failure so we can distinguish a transient upstream
-      // outage (retry) from a hard failure. Read the body defensively — fall back to status-based
-      // mapping if it's absent/unreadable so we never mis-handle a failure.
-      let code: string | undefined;
-      try {
-        code = ((await res.json()) as { code?: string })?.code;
-      } catch {
-        /* no/unreadable error body — use the HTTP status below */
-      }
-      if (code === 'upstream_unavailable' || res.status === 503) {
-        throw new ExtractionProviderError(
-          'upstream_busy',
-          `Managed proxy upstream unavailable (HTTP ${res.status})`
-        );
-      }
-      if (code === 'upstream_timeout' || res.status === 504) {
-        throw new ExtractionProviderError('timeout', 'Managed extraction timed out upstream');
-      }
-      throw new ExtractionProviderError(
-        'provider_error',
-        `Managed proxy returned HTTP ${res.status}`
-      );
-    }
-
-    let body: { result?: unknown; attestation?: AttestationInfo };
-    try {
-      body = (await res.json()) as { result?: unknown; attestation?: AttestationInfo };
-    } catch (err) {
-      throw new ExtractionProviderError(
-        'malformed_output',
-        'Could not read managed proxy response',
-        err
-      );
-    }
-
+    const body = await postToProxy(request, 'event');
     try {
       const result = parseExtractionResult(body.result);
       // Attestation is managed-tier-only metadata (optional on ExtractionResult).
@@ -112,6 +128,18 @@ export const managedProvider: ExtractionProvider = {
       throw new ExtractionProviderError(
         'malformed_output',
         'Managed proxy returned unparseable or wrong-shape JSON',
+        err
+      );
+    }
+  },
+  async extractTravel(request: ExtractionRequest): Promise<TravelExtractionResult> {
+    const body = await postToProxy(request, 'travel');
+    try {
+      return parseTravelExtractionResult(body.result);
+    } catch (err) {
+      throw new ExtractionProviderError(
+        'malformed_output',
+        'Managed proxy returned unparseable or wrong-shape travel JSON',
         err
       );
     }

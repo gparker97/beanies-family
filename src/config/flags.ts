@@ -14,7 +14,7 @@
 // a silent failure, never a page crash.
 
 /** The closed set of developer flags. Add a member to introduce a new flag. */
-export type DevFlag = 'aiPhotoExtract';
+export type DevFlag = 'aiPhotoExtract' | 'aiTravelExtract';
 
 const overrideKey = (flag: DevFlag): string => `beanies:flag:${flag}`;
 
