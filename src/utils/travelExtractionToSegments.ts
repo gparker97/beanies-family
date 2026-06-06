@@ -122,14 +122,29 @@ function pickFields(
 }
 
 /**
+ * Turn a camelCase / snake_case model field key into a human-readable label,
+ * e.g. `cabinNumber` → "Cabin number", `loyalty_number` → "Loyalty number".
+ */
+function humanizeFieldKey(key: string): string {
+  const spaced = key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
+}
+
+/**
  * Build the `notes` value: the model's own notes plus any recognized field that this kind
- * has no column for (so nothing the model surfaced is lost). Returns `undefined` when empty.
+ * has no column for (so nothing the model surfaced is lost). Overflow fields are rendered
+ * with humanized labels (e.g. "Cabin number: 12A") so they read cleanly in the app.
+ * Returns `undefined` when empty.
  */
 function buildNotes(draft: TravelSegmentDraft, mappedKeys: readonly string[]): string | undefined {
   const overflow: string[] = [];
   for (const [k, v] of Object.entries(draft.fields)) {
     if (mappedKeys.includes(k)) continue;
-    if (typeof v === 'string' && v.trim() !== '') overflow.push(`${k}: ${v}`);
+    if (typeof v === 'string' && v.trim() !== '')
+      overflow.push(`${humanizeFieldKey(k)}: ${v.trim()}`);
   }
   const parts = [draft.notes.trim(), ...overflow].filter((p) => p !== '');
   return parts.length ? parts.join('\n') : undefined;
