@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-04",
-    "translationCount": 3034
+    "lastUpdated": "2026-06-06",
+    "translationCount": 3037
   },
   "translations": {
     "app.name": {
@@ -15175,6 +15175,21 @@
       "translation": "PDF：{name}",
       "hash": "3frxsh",
       "lastUpdated": "2026-06-04"
+    },
+    "vacation.happeningNow": {
+      "translation": "旅程进行中",
+      "hash": "sl48ay",
+      "lastUpdated": "2026-06-06"
+    },
+    "vacation.startsToday": {
+      "translation": "今天出发！",
+      "hash": "jkdeof",
+      "lastUpdated": "2026-06-06"
+    },
+    "vacation.dayOfTrip": {
+      "translation": "第{n}天，共{total}天",
+      "hash": "e3mof9",
+      "lastUpdated": "2026-06-06"
     }
   }
 }

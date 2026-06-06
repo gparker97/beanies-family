@@ -367,6 +367,51 @@ export function tripDurationDays(start: string, end: string): number {
   return Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 }
 
+export type TripPhase = 'upcoming' | 'today' | 'ongoing' | 'past';
+
+/**
+ * Classify a vacation relative to `todayStr` (`YYYY-MM-DD`) into a lifecycle
+ * phase. Pure + date-only lexicographic comparison (valid for ISO dates),
+ * matching the convention of `classifyTripDay` in this file.
+ *  - 'past':     ended before today
+ *  - 'upcoming': no start date, or starts after today
+ *  - 'today':    starts today
+ *  - 'ongoing':  started before today and not yet ended
+ * No startDate → 'upcoming' (preserves current card copy).
+ */
+export function tripPhase(
+  v: Pick<FamilyVacation, 'startDate' | 'endDate'>,
+  todayStr: string
+): TripPhase {
+  const end = v.endDate ? extractDatePart(v.endDate) : undefined;
+  if (end && end < todayStr) return 'past';
+  const start = v.startDate ? extractDatePart(v.startDate) : undefined;
+  if (!start || start > todayStr) return 'upcoming';
+  if (start === todayStr) return 'today';
+  return 'ongoing';
+}
+
+/**
+ * "Day X of N" progress for an in-progress trip, or `null` when it can't be
+ * computed (missing/invalid dates, or a non-positive/NaN duration). Pure;
+ * `todayStr` is injected (no clock read). Owns validation at this boundary
+ * because `tripDurationDays` does not guard malformed input (returns NaN),
+ * whereas `tripDayNumber` returns `null` — this helper normalizes both.
+ *
+ * Returns the {day, total} numbers (not the localized string) so the i18n
+ * substitution stays in the component layer, consistent with the ribbon.
+ */
+export function tripDayProgress(
+  v: Pick<FamilyVacation, 'startDate' | 'endDate'>,
+  todayStr: string
+): { day: number; total: number } | null {
+  if (!v.startDate || !v.endDate) return null;
+  const day = tripDayNumber(todayStr, v.startDate); // null on bad/missing
+  const total = tripDurationDays(v.startDate, v.endDate); // NaN on bad input
+  if (day === null || !Number.isFinite(total) || total <= 0) return null;
+  return { day, total };
+}
+
 // ── Auto-generated segment titles ────────────────────────────────────────────
 
 /** Extract 3-letter airport code from strings like "Singapore (SIN)" */
