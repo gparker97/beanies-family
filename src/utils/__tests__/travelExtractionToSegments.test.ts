@@ -14,6 +14,7 @@ function draft(over: Partial<TravelSegmentDraft> = {}): TravelSegmentDraft {
     arrivesNextDay: false,
     breakfastIncluded: false,
     fields: {},
+    travellers: [],
     confidence: 0.9,
     ...over,
   };
@@ -130,6 +131,111 @@ describe('travelExtractionToSegments', () => {
     ]);
     const segs = travelExtractionToSegments(r).travelSegments;
     expect(segs[0].id).not.toBe(segs[1].id);
+  });
+
+  describe('traveller resolution (#30 follow-up)', () => {
+    // Resolver stub: each name → "id-<lowercased name>" (so we can assert what was passed).
+    const resolve = (names: string[]) => names.map((n) => `id-${n.toLowerCase()}`);
+
+    it('resolves multiple names onto ONE segment (never splits per person)', () => {
+      const r = result([
+        draft({ type: 'flight_outbound', travellers: ['John', 'Mary'], fields: { airline: 'SQ' } }),
+      ]);
+      const segs = travelExtractionToSegments(r, resolve).travelSegments;
+      expect(segs).toHaveLength(1); // still one segment, not one per traveller
+      expect(segs[0].travellerIds).toEqual(['id-john', 'id-mary']);
+    });
+
+    it('applies the resolver across all three kinds', () => {
+      const r = result([
+        draft({ kind: 'travel', type: 'flight_outbound', travellers: ['A'] }),
+        draft({ kind: 'accommodation', type: 'hotel', title: 'Hotel', travellers: ['B'] }),
+        draft({ kind: 'transportation', type: 'rental_car', travellers: ['C'] }),
+      ]);
+      const b = travelExtractionToSegments(r, resolve);
+      expect(b.travelSegments[0].travellerIds).toEqual(['id-a']);
+      expect(b.accommodations[0].travellerIds).toEqual(['id-b']);
+      expect(b.transportation[0].travellerIds).toEqual(['id-c']);
+    });
+
+    it('leaves travellerIds absent when no resolver is given', () => {
+      const r = result([draft({ travellers: ['John'] })]);
+      expect(travelExtractionToSegments(r).travelSegments[0].travellerIds).toBeUndefined();
+    });
+
+    it('leaves travellerIds absent when the resolver matches nobody', () => {
+      const r = result([draft({ travellers: ['Stranger'] })]);
+      const segs = travelExtractionToSegments(r, () => []).travelSegments;
+      expect(segs[0].travellerIds).toBeUndefined();
+    });
+
+    it('never leaks traveller names into fields or notes', () => {
+      const raw = {
+        isTravel: true,
+        tripName: 'Trip',
+        tripTypeHint: '',
+        segments: [
+          {
+            kind: 'travel',
+            type: 'flight_outbound',
+            title: '',
+            status: 'booked',
+            bookingReference: '',
+            notes: '',
+            confidence: { overall: 0.9 },
+            travellers: ['John Smith'],
+            travelFields: { airline: 'SQ' },
+          },
+        ],
+      };
+      const parsed = parseTravelExtractionResult(raw);
+      expect(parsed.segments[0].travellers).toEqual(['John Smith']);
+      expect(parsed.segments[0].fields).not.toHaveProperty('travellers');
+      const seg = travelExtractionToSegments(parsed, resolve).travelSegments[0];
+      expect(seg.notes ?? '').not.toContain('John Smith');
+    });
+
+    it('parses travellers nested under travelFields', () => {
+      const raw = {
+        isTravel: true,
+        tripName: 'Trip',
+        tripTypeHint: '',
+        segments: [
+          {
+            kind: 'travel',
+            type: 'flight_outbound',
+            title: '',
+            status: 'booked',
+            bookingReference: '',
+            notes: '',
+            confidence: { overall: 0.9 },
+            travelFields: { airline: 'SQ', travellers: ['Amy'] },
+          },
+        ],
+      };
+      expect(parseTravelExtractionResult(raw).segments[0].travellers).toEqual(['Amy']);
+    });
+
+    it('coerces garbage travellers to an empty list', () => {
+      const raw = {
+        isTravel: true,
+        tripName: 'Trip',
+        tripTypeHint: '',
+        segments: [
+          {
+            kind: 'travel',
+            type: 'flight_outbound',
+            title: '',
+            status: 'booked',
+            bookingReference: '',
+            notes: '',
+            confidence: { overall: 0.9 },
+            travellers: 'not-an-array',
+          },
+        ],
+      };
+      expect(parseTravelExtractionResult(raw).segments[0].travellers).toEqual([]);
+    });
   });
 });
 
