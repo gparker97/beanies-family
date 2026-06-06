@@ -73,6 +73,7 @@ const departureDate = ref('');
 const departureTime = ref('');
 const arrivalTime = ref('');
 const arrivesNextDay = ref(false);
+const terminal = ref('');
 const cruiseLine = ref('');
 const shipName = ref('');
 const departurePort = ref('');
@@ -112,6 +113,7 @@ const { isEditing, isSubmitting } = useFormModal(
       departureTime.value = seg.departureTime ?? '';
       arrivalTime.value = seg.arrivalTime ?? '';
       arrivesNextDay.value = seg.arrivesNextDay ?? false;
+      terminal.value = seg.terminal ?? '';
       cruiseLine.value = seg.cruiseLine ?? '';
       shipName.value = seg.shipName ?? '';
       departurePort.value = seg.departurePort ?? '';
@@ -147,6 +149,7 @@ const { isEditing, isSubmitting } = useFormModal(
       departureTime.value = '';
       arrivalTime.value = '';
       arrivesNextDay.value = false;
+      terminal.value = '';
       cruiseLine.value = '';
       shipName.value = '';
       departurePort.value = '';
@@ -364,6 +367,7 @@ async function handleSave() {
         arrivalDate: computedArrivalDate.value,
         arrivalTime: arrivalTime.value,
         arrivesNextDay: arrivesNextDay.value,
+        terminal: terminal.value,
         cruiseLine: cruiseLine.value,
         shipName: shipName.value,
         departurePort: departurePort.value,
@@ -623,6 +627,12 @@ async function handleSave() {
                 />
               </FormFieldGroup>
             </div>
+            <FormFieldGroup :label="t('vacation.field.terminal')">
+              <BaseInput
+                v-model="terminal"
+                :placeholder="t('vacation.field.terminalPlaceholder')"
+              />
+            </FormFieldGroup>
           </div>
         </div>
       </template>
@@ -713,6 +723,12 @@ async function handleSave() {
                 <BaseInput
                   v-model="bookingReference"
                   :placeholder="t('vacation.field.bookingReference')"
+                />
+              </FormFieldGroup>
+              <FormFieldGroup :label="t('vacation.field.terminal')">
+                <BaseInput
+                  v-model="terminal"
+                  :placeholder="t('vacation.field.terminalPlaceholder')"
                 />
               </FormFieldGroup>
             </div>

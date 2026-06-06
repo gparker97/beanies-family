@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-06-06
 
+### Added
+
+- **Terminal field for flights and cruises.** Travel segments can now capture the departure terminal (e.g. "Terminal 1", "Cruise Terminal A") when adding or editing a flight or cruise.
+
 ### Fixed
 
 - **Family Nook travel card now reflects a trip that's actually happening.** A vacation that's currently underway (or starting today) used to show "Upcoming Vacations" with no countdown. It now reads "Happening Now" with a clear status — "Day X of N" while you're away, or "Starts today!" on departure day.
