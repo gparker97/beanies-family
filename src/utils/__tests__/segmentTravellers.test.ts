@@ -7,6 +7,7 @@ import {
   normalizePersonName,
   learnableAliases,
   dedupedAppend,
+  mergeSegmentTravellers,
 } from '@/utils/segmentTravellers';
 import type { FamilyMember } from '@/types/models';
 import type { SegmentBuckets } from '@/utils/travelExtractionToSegments';
@@ -126,6 +127,19 @@ describe('learnableAliases', () => {
     const confirmed = { Stranger: '', Johnny: 'm-johnny', 'Mary Jones': 'm-mary' };
     const auto = { Stranger: '', Johnny: '', 'Mary Jones': '' };
     expect(learnableAliases(confirmed, auto, roster)).toEqual([]);
+  });
+});
+
+describe('mergeSegmentTravellers', () => {
+  it('keeps an everyone-segment (existing undefined) as everyone', () => {
+    expect(mergeSegmentTravellers(undefined, ['mum'])).toBeUndefined();
+  });
+  it('leaves existing unchanged when incoming is undefined/empty', () => {
+    expect(mergeSegmentTravellers(['dad'], undefined)).toEqual(['dad']);
+    expect(mergeSegmentTravellers(['dad'], [])).toEqual(['dad']);
+  });
+  it('de-duplicated union of two explicit lists', () => {
+    expect(mergeSegmentTravellers(['dad'], ['mum', 'dad'])).toEqual(['dad', 'mum']);
   });
 });
 
