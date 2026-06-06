@@ -6093,6 +6093,9 @@ const STRING_DEFS = {
 
   // Sidebar
   'vacation.upcoming': { en: 'Upcoming Vacations', beanie: 'upcoming vacations' },
+  'vacation.happeningNow': { en: 'Happening Now', beanie: 'happening now' },
+  'vacation.startsToday': { en: 'Starts today!', beanie: 'starts today!' },
+  'vacation.dayOfTrip': { en: 'Day {n} of {total}', beanie: 'day {n} of {total}' },
   'vacation.inDays': { en: '{n}d', beanie: '{n}d' },
   'vacation.onNow': { en: 'now', beanie: 'now' },
   'vacation.daysAway': { en: 'Days Away', beanie: 'days away' },

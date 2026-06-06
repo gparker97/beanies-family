@@ -5,6 +5,8 @@ import {
   transportEmoji,
   splitTimedUntimed,
   validateSegmentTarget,
+  tripPhase,
+  tripDayProgress,
   type SupportedTravelType,
 } from '../vacation';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
@@ -280,5 +282,83 @@ describe('validateSegmentTarget', () => {
     const r = validateSegmentTarget(vacationWith(0), 'vac-1', 0);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toContain('out of bounds (0)');
+  });
+});
+
+describe('tripPhase', () => {
+  const TODAY = '2026-06-10';
+
+  it('returns "past" when the trip ended before today', () => {
+    expect(tripPhase({ startDate: '2026-06-01', endDate: '2026-06-05' }, TODAY)).toBe('past');
+  });
+
+  it('returns "upcoming" when the trip starts after today', () => {
+    expect(tripPhase({ startDate: '2026-06-20', endDate: '2026-06-25' }, TODAY)).toBe('upcoming');
+  });
+
+  it('returns "today" when the trip starts today', () => {
+    expect(tripPhase({ startDate: '2026-06-10', endDate: '2026-06-15' }, TODAY)).toBe('today');
+  });
+
+  it('returns "ongoing" when the trip started before today and has not ended', () => {
+    expect(tripPhase({ startDate: '2026-06-08', endDate: '2026-06-15' }, TODAY)).toBe('ongoing');
+  });
+
+  it('treats an end date equal to today as not past (ongoing)', () => {
+    expect(tripPhase({ startDate: '2026-06-08', endDate: '2026-06-10' }, TODAY)).toBe('ongoing');
+  });
+
+  it('handles a missing end date: future start → upcoming, past start → ongoing', () => {
+    expect(tripPhase({ startDate: '2026-06-20', endDate: undefined }, TODAY)).toBe('upcoming');
+    expect(tripPhase({ startDate: '2026-06-08', endDate: undefined }, TODAY)).toBe('ongoing');
+  });
+
+  it('treats a missing start date as "upcoming" (no countdown to derive)', () => {
+    expect(tripPhase({ startDate: undefined, endDate: '2026-06-20' }, TODAY)).toBe('upcoming');
+    expect(tripPhase({ startDate: undefined, endDate: undefined }, TODAY)).toBe('upcoming');
+  });
+
+  it('tolerates full ISO timestamps by comparing the date part only', () => {
+    expect(
+      tripPhase(
+        { startDate: '2026-06-08T09:00:00.000Z', endDate: '2026-06-15T18:00:00.000Z' },
+        TODAY
+      )
+    ).toBe('ongoing');
+  });
+});
+
+describe('tripDayProgress', () => {
+  const TODAY = '2026-06-10';
+
+  it('returns {day, total} for a valid in-progress window', () => {
+    // Trip 2026-06-08..2026-06-12 → day 3 of 5 on 2026-06-10.
+    expect(tripDayProgress({ startDate: '2026-06-08', endDate: '2026-06-12' }, TODAY)).toEqual({
+      day: 3,
+      total: 5,
+    });
+  });
+
+  it('returns day 1 when the trip starts today', () => {
+    expect(tripDayProgress({ startDate: '2026-06-10', endDate: '2026-06-12' }, TODAY)).toEqual({
+      day: 1,
+      total: 3,
+    });
+  });
+
+  it('returns null when the end date is missing', () => {
+    expect(tripDayProgress({ startDate: '2026-06-08', endDate: undefined }, TODAY)).toBeNull();
+  });
+
+  it('returns null when the start date is missing', () => {
+    expect(tripDayProgress({ startDate: undefined, endDate: '2026-06-12' }, TODAY)).toBeNull();
+  });
+
+  it('returns null on a malformed date (guards the tripDurationDays NaN path)', () => {
+    expect(tripDayProgress({ startDate: 'not-a-date', endDate: '2026-06-12' }, TODAY)).toBeNull();
+  });
+
+  it('returns null when today is before the trip start (tripDayNumber → null)', () => {
+    expect(tripDayProgress({ startDate: '2026-06-12', endDate: '2026-06-15' }, TODAY)).toBeNull();
   });
 });

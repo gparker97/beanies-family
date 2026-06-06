@@ -9,13 +9,17 @@ import {
   daysUntilTrip,
   tripCountdownKey,
   computeAccommodationGaps,
+  tripPhase,
+  tripDayProgress,
 } from '@/utils/vacation';
 import { formatDateShort } from '@/utils/date';
+import { useToday } from '@/composables/useToday';
 import NookSectionCard from './NookSectionCard.vue';
 
 const router = useRouter();
 const vacationStore = useVacationStore();
 const { t } = useTranslation();
+const { today } = useToday();
 
 const vacation = computed(() => vacationStore.upcomingVacations[0]);
 
@@ -23,9 +27,54 @@ const progress = computed(() => (vacation.value ? bookingProgress(vacation.value
 const gapCount = computed(() =>
   vacation.value ? computeAccommodationGaps(vacation.value).length : 0
 );
-const countdown = computed(() =>
-  vacation.value?.startDate ? daysUntilTrip(vacation.value.startDate) : null
+
+const phase = computed(() =>
+  vacation.value ? tripPhase(vacation.value, today.value) : 'upcoming'
 );
+
+/**
+ * Single source of truth for the card's badge, so exactly one badge (or none)
+ * renders by construction — no parallel phase-gated `v-if`s to keep in sync.
+ *  - 'countdown': the upcoming hero badge (big day count + trip-type label)
+ *  - 'status':    a calmer pill for a trip happening today / in progress
+ */
+type BadgeView =
+  | { kind: 'countdown'; n: number; labelKey: string; emoji: string }
+  | { kind: 'status'; text: string }
+  | null;
+
+const badge = computed<BadgeView>(() => {
+  const v = vacation.value;
+  if (!v) return null;
+
+  if (phase.value === 'upcoming') {
+    const n = v.startDate ? daysUntilTrip(v.startDate) : null;
+    if (n === null || n <= 0) return null; // preserves the existing hero-badge gate
+    return {
+      kind: 'countdown',
+      n,
+      labelKey: tripCountdownKey(v.tripType, v.tripPurpose),
+      emoji: tripTypeEmoji(v.tripType, v.tripPurpose),
+    };
+  }
+
+  if (phase.value === 'today') {
+    return { kind: 'status', text: t('vacation.startsToday') };
+  }
+
+  if (phase.value === 'ongoing') {
+    const prog = tripDayProgress(v, today.value);
+    const text = prog
+      ? t('vacation.dayOfTrip')
+          .replace('{n}', String(prog.day))
+          .replace('{total}', String(prog.total))
+      : t('vacation.onNow'); // graceful fallback — never a blank/NaN badge
+    return { kind: 'status', text };
+  }
+
+  return null; // 'past' never reaches the nook, but the branch is total
+});
+
 const dateRange = computed(() => {
   const v = vacation.value;
   if (!v?.startDate) return '';
@@ -45,7 +94,7 @@ function handleClick() {
   <NookSectionCard
     v-if="vacation"
     class="nook-vacation-tint cursor-pointer"
-    :title="t('vacation.upcoming')"
+    :title="phase === 'upcoming' ? t('vacation.upcoming') : t('vacation.happeningNow')"
     border-color="#00B4D8"
     @click="handleClick"
   >
@@ -82,18 +131,25 @@ function handleClick() {
       </span>
     </div>
 
-    <!-- Row 3: Countdown hero badge -->
+    <!-- Row 3: Countdown hero badge (upcoming) -->
     <div
-      v-if="countdown !== null && countdown > 0"
+      v-if="badge?.kind === 'countdown'"
       class="mt-3 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-4 py-2 shadow-[0_4px_12px_rgba(0,180,216,0.2)]"
     >
       <span class="font-outfit text-lg leading-none font-extrabold text-white">
-        {{ countdown }}
+        {{ badge.n }}
       </span>
       <span class="font-outfit text-[0.6875rem] font-semibold text-white/80">
-        {{ t(tripCountdownKey(vacation.tripType, vacation.tripPurpose) as any) }}!
-        {{ tripTypeEmoji(vacation.tripType, vacation.tripPurpose) }}
+        {{ t(badge.labelKey as any) }}! {{ badge.emoji }}
       </span>
+    </div>
+
+    <!-- Row 3: Status pill (happening today / in progress) -->
+    <div
+      v-else-if="badge?.kind === 'status'"
+      class="font-outfit mt-3 inline-flex items-center gap-1 rounded-full bg-[rgba(0,180,216,0.1)] px-3 py-1 text-xs font-semibold text-[#0077B6]"
+    >
+      {{ badge.text }}
     </div>
   </NookSectionCard>
 </template>
