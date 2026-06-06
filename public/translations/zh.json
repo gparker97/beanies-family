@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-06",
-    "translationCount": 3066
+    "translationCount": 3070
   },
   "translations": {
     "app.name": {
@@ -15334,6 +15334,26 @@
     "vacation.field.travelling": {
       "translation": "旅行",
       "hash": "qru3tc",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.targetHeading": {
+      "translation": "这些应该放在哪里？",
+      "hash": "ejxiyu",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.newTripNameLabel": {
+      "translation": "新旅游名称",
+      "hash": "orxjba",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.addToTripLabel": {
+      "translation": "新增至哪趟行程？",
+      "hash": "obly9b",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.selectTripPlaceholder": {
+      "translation": "选择",
+      "hash": "glbcaw",
       "lastUpdated": "2026-06-06"
     }
   }

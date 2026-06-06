@@ -1,16 +1,20 @@
 <script setup lang="ts">
 // Review + confirm surface for AI-extracted travel segments (#30). NOT an editor — it shows
-// the 1..N extracted segments as read-only summary rows and a trip-target section reflecting
-// the already-decided `target` (attach / choose / create). Field corrections happen AFTER save
-// via the existing segment edit drawers. On save it emits the resolved target + trip name; the
+// the 1..N extracted segments as read-only summary rows and a trip-target chooser. The auto-logic
+// (resolveTripTarget) only SUGGESTS a default (new vs existing); the user always decides — they
+// can create a new trip (entering a name) or add to ANY current/upcoming trip (e.g. a one-way
+// return flight whose dates fall outside the existing trip's range). Field corrections happen
+// AFTER save via the segment edit drawers. On save it emits the chosen target + trip name; the
 // page owns persistence + document attachment.
 
 import { computed, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseSelect from '@/components/ui/BaseSelect.vue';
 import ExtractedSegmentRow from './ExtractedSegmentRow.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useVacationStore } from '@/stores/vacationStore';
+import { formatDateShort } from '@/utils/date';
 import type { TravelReady } from '@/composables/useDocumentToTravel';
 import type {
   VacationAccommodation,
@@ -39,17 +43,39 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const vacationStore = useVacationStore();
 
+type TargetMode = 'new' | 'existing';
+
+const mode = ref<TargetMode>('new');
 const tripName = ref('');
 const chosenVacationId = ref<string>('');
 
-// Reset local state whenever a fresh extraction opens the modal.
+/** Current + upcoming trips (never past) the user can add these segments to. */
+const tripOptions = computed(() =>
+  vacationStore.upcomingVacations.map((v) => ({
+    value: v.id,
+    label: v.startDate ? `${v.name} · ${formatDateShort(v.startDate)}` : v.name,
+  }))
+);
+const hasTripsToJoin = computed(() => tripOptions.value.length > 0);
+
+// Seed local state from the auto-determined target whenever a fresh extraction opens the modal —
+// then let the user freely override the choice.
 watch(
   () => props.ready,
   (ready) => {
     if (!ready) return;
     tripName.value = ready.suggestedTripName.trim() || t('travelExtract.defaultTripName');
+    const tgt = ready.target;
+    // Default the existing-trip selection to whatever the auto-logic matched (the single attach
+    // trip, or the best of the overlapping candidates), else the first upcoming trip.
     chosenVacationId.value =
-      ready.target.kind === 'choose' ? (ready.target.candidates[0]?.id ?? '') : '';
+      tgt.kind === 'attach'
+        ? tgt.vacationId
+        : tgt.kind === 'choose'
+          ? (tgt.candidates[0]?.id ?? '')
+          : (vacationStore.upcomingVacations[0]?.id ?? '');
+    // Honour the suggestion, but only land on 'existing' when there's actually a trip to join.
+    mode.value = tgt.kind !== 'create' && hasTripsToJoin.value ? 'existing' : 'new';
   },
   { immediate: true }
 );
@@ -117,36 +143,19 @@ const rows = computed<ReviewRow[]>(() => {
   ];
 });
 
-const target = computed(() => props.ready?.target ?? { kind: 'create' as const });
-
-/** Trip name shown for an attach/choose candidate id. */
-function nameFor(vacationId: string): string {
-  return vacationStore.getVacationById(vacationId)?.name ?? '';
-}
-
-const attachName = computed(() =>
-  target.value.kind === 'attach' ? nameFor(target.value.vacationId) : ''
-);
-
-/** A brand-new trip will be created (vs attaching to / choosing an existing one). */
-const isNewTrip = computed(() => target.value.kind === 'create');
+const isNewTrip = computed(() => mode.value === 'new');
 
 const saveLabel = computed(() =>
-  target.value.kind === 'create' ? t('travelExtract.createTrip') : t('travelExtract.addToTrip')
+  isNewTrip.value ? t('travelExtract.createTrip') : t('travelExtract.addToTrip')
 );
 
 const saveDisabled = computed(() => {
   if (rows.value.length === 0) return true;
-  if (target.value.kind === 'create') return tripName.value.trim() === '';
-  if (target.value.kind === 'choose') return chosenVacationId.value === '';
-  return false;
+  return isNewTrip.value ? tripName.value.trim() === '' : chosenVacationId.value === '';
 });
 
 function onSave(): void {
-  const tgt = target.value;
-  if (tgt.kind === 'attach') {
-    emit('submit', { target: { kind: 'attach', vacationId: tgt.vacationId }, tripName: '' });
-  } else if (tgt.kind === 'choose') {
+  if (!isNewTrip.value && chosenVacationId.value) {
     emit('submit', {
       target: { kind: 'attach', vacationId: chosenVacationId.value },
       tripName: '',
@@ -187,7 +196,7 @@ function onSave(): void {
         />
       </div>
 
-      <!-- Trip target — visually distinct for a NEW trip (teal) vs an EXISTING trip (slate) -->
+      <!-- Trip target — the user chooses: a NEW trip, or add to an EXISTING one -->
       <div
         class="rounded-2xl p-3.5 ring-1"
         :class="
@@ -196,48 +205,57 @@ function onSave(): void {
             : 'bg-[var(--tint-slate-3)] ring-[var(--tint-slate-10)]'
         "
       >
-        <!-- New vs Existing badge -->
-        <div class="mb-2.5 flex items-center gap-2">
-          <span
-            class="font-outfit inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.625rem] font-bold tracking-[0.04em] uppercase"
+        <p class="font-inter mb-2 text-xs text-gray-400">{{ t('travelExtract.targetHeading') }}</p>
+
+        <!-- New vs Existing toggle -->
+        <div class="mb-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            class="font-outfit flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all"
             :class="
               isNewTrip
-                ? 'bg-gradient-to-r from-[#00B4D8] to-[#0077B6] text-white'
-                : 'bg-white text-[#0077B6] dark:bg-slate-700 dark:text-[#00B4D8]'
+                ? 'bg-gradient-to-r from-[#00B4D8] to-[#0077B6] text-white shadow-sm'
+                : 'bg-white text-gray-500 ring-1 ring-[var(--tint-slate-10)] hover:text-gray-700 dark:bg-slate-700 dark:text-gray-300'
             "
+            @click="mode = 'new'"
           >
-            <span aria-hidden="true">{{ isNewTrip ? '✨' : '🧳' }}</span>
-            {{ isNewTrip ? t('travelExtract.newTripBadge') : t('travelExtract.existingTripBadge') }}
-          </span>
+            <span aria-hidden="true">✨</span>
+            {{ t('travelExtract.newTripBadge') }}
+          </button>
+          <button
+            type="button"
+            :disabled="!hasTripsToJoin"
+            class="font-outfit flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40"
+            :class="
+              !isNewTrip
+                ? 'bg-gradient-to-r from-[#00B4D8] to-[#0077B6] text-white shadow-sm'
+                : 'bg-white text-gray-500 ring-1 ring-[var(--tint-slate-10)] hover:text-gray-700 dark:bg-slate-700 dark:text-gray-300'
+            "
+            @click="mode = 'existing'"
+          >
+            <span aria-hidden="true">🧳</span>
+            {{ t('travelExtract.existingTripBadge') }}
+          </button>
         </div>
 
-        <!-- attach: single match -->
-        <template v-if="target.kind === 'attach'">
-          <p class="font-inter text-xs text-gray-400">{{ t('travelExtract.addingTo') }}</p>
-          <p class="font-outfit text-base font-semibold text-gray-900 dark:text-gray-100">
-            {{ attachName }}
-          </p>
-        </template>
-
-        <!-- choose: 2+ matches -->
-        <div v-else-if="target.kind === 'choose'" class="space-y-1.5">
-          <p class="font-inter mb-1 text-xs text-gray-400">{{ t('travelExtract.chooseTrip') }}</p>
-          <label
-            v-for="c in target.candidates"
-            :key="c.id"
-            class="flex cursor-pointer items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-white dark:hover:bg-slate-700"
-          >
-            <input v-model="chosenVacationId" type="radio" :value="c.id" class="accent-[#0077B6]" />
-            <span class="font-outfit text-sm font-medium text-gray-900 dark:text-gray-100">{{
-              c.name
-            }}</span>
+        <!-- New trip: editable name -->
+        <div v-if="isNewTrip">
+          <label class="font-inter mb-1.5 block text-xs text-gray-400">
+            {{ t('travelExtract.newTripNameLabel') }}
           </label>
+          <BaseInput v-model="tripName" :placeholder="t('travelExtract.tripNamePlaceholder')" />
         </div>
 
-        <!-- create: editable name -->
+        <!-- Existing trip: dropdown of current / upcoming trips -->
         <div v-else>
-          <p class="font-inter mb-1.5 text-xs text-gray-400">{{ t('travelExtract.newTrip') }}</p>
-          <BaseInput v-model="tripName" :placeholder="t('travelExtract.tripNamePlaceholder')" />
+          <label class="font-inter mb-1.5 block text-xs text-gray-400">
+            {{ t('travelExtract.addToTripLabel') }}
+          </label>
+          <BaseSelect
+            v-model="chosenVacationId"
+            :options="tripOptions"
+            :placeholder="t('travelExtract.selectTripPlaceholder')"
+          />
         </div>
       </div>
     </div>
