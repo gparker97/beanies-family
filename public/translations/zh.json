@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-06",
-    "translationCount": 3060
+    "translationCount": 3064
   },
   "translations": {
     "app.name": {
@@ -15304,6 +15304,26 @@
     "travelExtract.added.message": {
       "translation": "我们已将您的行程计划添加到行程中。",
       "hash": "8cfle6",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.existingTripBadge": {
+      "translation": "现有行程",
+      "hash": "607ujq",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.newTripBadge": {
+      "translation": "新行程",
+      "hash": "mvb8it",
+      "lastUpdated": "2026-06-06"
+    },
+    "vacation.field.terminal": {
+      "translation": "Terminal",
+      "hash": "igspr8",
+      "lastUpdated": "2026-06-06"
+    },
+    "vacation.field.terminalPlaceholder": {
+      "translation": "例如： 1号航站楼",
+      "hash": "ay2j25",
       "lastUpdated": "2026-06-06"
     }
   }

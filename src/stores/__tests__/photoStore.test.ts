@@ -185,6 +185,25 @@ describe('photoStore', () => {
     expect(activity.photoIds).toContain(photoId);
   });
 
+  it('linkPhotoToEntity links a stored photoId to another entity without re-uploading', async () => {
+    storeInternals.registerPhotoCollection('activities');
+    ensureEntity('activities', 'act-1');
+    ensureEntity('activities', 'act-2');
+    const store = usePhotoStore();
+
+    // One document, stored once via addPhoto, then linked to a second entity (#30).
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1', 'member-1');
+    store.linkPhotoToEntity('activities', 'act-2', photoId);
+
+    const activities = (
+      getDoc() as unknown as { activities: Record<string, { photoIds: string[] }> }
+    ).activities;
+    expect(activities['act-1']!.photoIds).toContain(photoId);
+    expect(activities['act-2']!.photoIds).toContain(photoId);
+    // Stored exactly once — no second Drive upload for the linked entity.
+    expect(driveMocks.createFile).toHaveBeenCalledTimes(1);
+  });
+
   it('addPhoto rolls back the Drive file when Automerge write fails', async () => {
     storeInternals.registerPhotoCollection('activities');
     ensureEntity('activities', 'act-1');

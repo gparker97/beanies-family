@@ -63,6 +63,7 @@ const TRAVEL_FIELDS = [
   'departureTime',
   'arrivalDate',
   'arrivalTime',
+  'terminal',
   'cruiseLine',
   'shipName',
   'departurePort',

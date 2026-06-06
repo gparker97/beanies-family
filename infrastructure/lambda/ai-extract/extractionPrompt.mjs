@@ -9,7 +9,7 @@
 // required keys, or the built messages diverge (src/services/ai/__tests__/extractionPromptDrift.test.ts).
 // Bump PROMPT_VERSION on ANY change so drift is detectable, and update every copy together.
 
-export const PROMPT_VERSION = '2026-06-06.1';
+export const PROMPT_VERSION = '2026-06-06.2';
 
 // The structured shape we ask the model to return. Confidence is 0..1 per field so the UI can flag
 // low-confidence values. `isEvent` lets us gracefully handle a non-event image instead of inventing one.
@@ -93,7 +93,7 @@ export const TRAVEL_JSON_SHAPE = {
   kind: 'string — one of: "travel" | "accommodation" | "transportation"',
   type: 'string — for kind=travel: flight_outbound|flight_return|flight_other|cruise|train|ferry|car. for kind=accommodation: hotel|airbnb|campground|family_friends. for kind=transportation: airport_shuttle|rental_car|taxi_rideshare|bus.',
   travelFields:
-    'kind=travel flights: airline, flightNumber, departureAirport, arrivalAirport, departureDate (YYYY-MM-DD), departureTime (24h HH:mm), arrivalDate, arrivalTime, arrivesNextDay (boolean). cruise: cruiseLine, shipName, departurePort, cabinNumber, embarkationDate, embarkationTime, disembarkationDate. train/ferry: operator, route, departureStation, arrivalStation, departureDate, departureTime, arrivalDate, arrivalTime.',
+    'kind=travel flights: airline, flightNumber, departureAirport, arrivalAirport, departureDate (YYYY-MM-DD), departureTime (24h HH:mm), arrivalDate, arrivalTime, terminal (departure terminal, e.g. "Terminal 1"), arrivesNextDay (boolean). cruise: cruiseLine, shipName, departurePort, terminal (cruise terminal, e.g. "Cruise Terminal A"), cabinNumber, embarkationDate, embarkationTime, disembarkationDate. train/ferry: operator, route, departureStation, arrivalStation, departureDate, departureTime, arrivalDate, arrivalTime.',
   accommodationFields:
     'kind=accommodation: name, address, checkInDate (YYYY-MM-DD), checkOutDate, confirmationNumber, roomType, contactPhone, breakfastIncluded (boolean), link.',
   transportationFields:
@@ -103,7 +103,7 @@ export const TRAVEL_JSON_SHAPE = {
   bookingReference: 'string — booking/confirmation/PNR reference, or ""',
   title: 'string — a short human label for the segment, or "" to let the app derive one',
   notes:
-    'string — anything useful in the document not captured by a dedicated field (baggage allowance, seat, loyalty number, cancellation policy, terminal), or ""',
+    'string — anything useful in the document not captured by a dedicated field (baggage allowance, seat, loyalty number, cancellation policy, terminal). Write each distinct fact on its own line (one per line), never a single run-on paragraph. Or "".',
   confidence: 'object — a 0..1 number under key "overall" for the segment as a whole',
 };
 
@@ -118,7 +118,7 @@ export function buildTravelExtractionMessages(imageDataUrl, todayIso) {
     'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
     `Today's date is ${todayIso}. Resolve any relative or partial dates against it. Output dates as YYYY-MM-DD and times as 24-hour HH:mm.`,
     'A single document may contain SEVERAL bookings (e.g. an outbound and a return flight, or a flight plus a hotel). Return one object in "segments" for each distinct booking. A round-trip flight is two segments.',
-    'Classify each segment with the correct "kind" and "type" and fill the relevant fields. Put any useful detail that has no dedicated field into that segment\'s "notes".',
+    'Classify each segment with the correct "kind" and "type" and fill the relevant fields. Put any useful detail that has no dedicated field into that segment\'s "notes", writing ONE fact per line (each on its own line, separated by a line break) rather than a single run-on paragraph.',
     'If a field is not present in the document, return an empty string for it (do not invent values). Set isTravel=false and segments=[] if the document is not a travel booking.',
     'Never output any value that is not actually supported by the document. It is better to leave a field empty than to hallucinate.',
     'The top-level JSON object must have exactly these keys: ' +

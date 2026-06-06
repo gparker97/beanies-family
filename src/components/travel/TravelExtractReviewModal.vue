@@ -126,6 +126,9 @@ const attachName = computed(() =>
   target.value.kind === 'attach' ? nameFor(target.value.vacationId) : ''
 );
 
+/** A brand-new trip will be created (vs attaching to / choosing an existing one). */
+const isNewTrip = computed(() => target.value.kind === 'create');
+
 const saveLabel = computed(() =>
   target.value.kind === 'create' ? t('travelExtract.createTrip') : t('travelExtract.addToTrip')
 );
@@ -181,21 +184,37 @@ function onSave(): void {
         />
       </div>
 
-      <!-- Trip target -->
-      <div class="rounded-2xl bg-[var(--tint-slate-3)] p-3">
-        <div
-          class="font-outfit mb-2 text-[0.625rem] font-bold tracking-[0.06em] text-gray-400 uppercase"
-        >
-          {{ t('travelExtract.tripLabel') }}
+      <!-- Trip target — visually distinct for a NEW trip (teal) vs an EXISTING trip (slate) -->
+      <div
+        class="rounded-2xl p-3.5 ring-1"
+        :class="
+          isNewTrip
+            ? 'bg-[var(--vacation-teal-5)] ring-[var(--vacation-teal-15)]'
+            : 'bg-[var(--tint-slate-3)] ring-[var(--tint-slate-10)]'
+        "
+      >
+        <!-- New vs Existing badge -->
+        <div class="mb-2.5 flex items-center gap-2">
+          <span
+            class="font-outfit inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.625rem] font-bold tracking-[0.04em] uppercase"
+            :class="
+              isNewTrip
+                ? 'bg-gradient-to-r from-[#00B4D8] to-[#0077B6] text-white'
+                : 'bg-white text-[#0077B6] dark:bg-slate-700 dark:text-[#00B4D8]'
+            "
+          >
+            <span aria-hidden="true">{{ isNewTrip ? '✨' : '🧳' }}</span>
+            {{ isNewTrip ? t('travelExtract.newTripBadge') : t('travelExtract.existingTripBadge') }}
+          </span>
         </div>
 
         <!-- attach: single match -->
-        <p
-          v-if="target.kind === 'attach'"
-          class="font-outfit text-sm font-semibold text-gray-900 dark:text-gray-100"
-        >
-          {{ t('travelExtract.addingTo') }} {{ attachName }}
-        </p>
+        <template v-if="target.kind === 'attach'">
+          <p class="font-inter text-xs text-gray-400">{{ t('travelExtract.addingTo') }}</p>
+          <p class="font-outfit text-base font-semibold text-gray-900 dark:text-gray-100">
+            {{ attachName }}
+          </p>
+        </template>
 
         <!-- choose: 2+ matches -->
         <div v-else-if="target.kind === 'choose'" class="space-y-1.5">

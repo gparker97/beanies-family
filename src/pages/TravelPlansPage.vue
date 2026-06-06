@@ -92,13 +92,10 @@ async function handleAddFromDocument(): Promise<void> {
   docPicker.open();
 }
 
-/** First created segment id across the buckets, for attaching the source document. */
-function primarySegmentId(ready: TravelReady): string | undefined {
-  return (
-    ready.buckets.travelSegments[0]?.id ??
-    ready.buckets.accommodations[0]?.id ??
-    ready.buckets.transportation[0]?.id
-  );
+/** Every created segment id across the buckets, in timeline order. */
+function allSegmentIds(ready: TravelReady): string[] {
+  const { travelSegments, accommodations, transportation } = ready.buckets;
+  return [...travelSegments, ...accommodations, ...transportation].map((s) => s.id);
 }
 
 /**
@@ -148,16 +145,26 @@ async function onReviewSubmit(payload: {
     return;
   }
 
-  // Attach the original document to the primary segment (warn-not-rollback).
-  const segId = primarySegmentId(ready);
-  if (segId) {
+  // Attach the source document to EVERY extracted segment: store the file once, then
+  // link the same photoId to the remaining segments (no duplicate storage). Warn-not-
+  // rollback — a failed attach never undoes the saved trip (mirrors updateVacation).
+  const segIds = allSegmentIds(ready);
+  if (segIds.length) {
     try {
-      await photoStore.addPhoto(
+      const [firstId, ...restIds] = segIds;
+      const { photoId } = await photoStore.addPhoto(
         ready.sourceFile,
         'vacations',
-        vacationSegmentEntityId(vacationId, segId),
+        vacationSegmentEntityId(vacationId, firstId),
         createdBy
       );
+      for (const otherId of restIds) {
+        photoStore.linkPhotoToEntity(
+          'vacations',
+          vacationSegmentEntityId(vacationId, otherId),
+          photoId
+        );
+      }
     } catch (err) {
       console.error('[travel-extract] document attach failed (trip kept):', err);
       showToast(

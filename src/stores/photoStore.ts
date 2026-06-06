@@ -965,6 +965,20 @@ export const usePhotoStore = defineStore('photos', () => {
     }
   }
 
+  /**
+   * Link an ALREADY-STORED photo to an additional entity, without re-uploading the
+   * blob. Used when one source document belongs to several entities (e.g. a travel
+   * itinerary that extracts into multiple booking segments — #30): the file is stored
+   * once via `addPhoto`, then its photoId is linked to every other segment here.
+   * Runs the collection's attach hook inside a single changeDoc; a throwing hook is
+   * logged, never thrown (consistent with `attachPhotoToEntity`).
+   */
+  function linkPhotoToEntity(entityCollection: string, entityId: string, photoId: UUID): void {
+    changeDoc((doc: FamilyDocument) => {
+      attachPhotoToEntity(doc, entityCollection, entityId, photoId);
+    });
+  }
+
   return {
     // state (computed)
     photos,
@@ -975,6 +989,7 @@ export const usePhotoStore = defineStore('photos', () => {
     deactivate,
     // actions
     addPhoto,
+    linkPhotoToEntity,
     addAvatarPhoto,
     getImageUrl,
     getBlobUrl,
