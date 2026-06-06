@@ -5923,6 +5923,11 @@ const STRING_DEFS = {
   'vacation.field.shipName': { en: 'Ship Name', beanie: 'ship name' },
   'vacation.field.departurePort': { en: 'Departure Port', beanie: 'departure port' },
   'vacation.field.cabinNumber': { en: 'Cabin Number', beanie: 'cabin number' },
+  'vacation.field.terminal': { en: 'Terminal', beanie: 'terminal' },
+  'vacation.field.terminalPlaceholder': {
+    en: 'e.g. Terminal 1',
+    beanie: 'e.g. terminal 1',
+  },
   'vacation.field.embarkationDate': { en: 'Embarkation', beanie: 'embarkation' },
   'vacation.field.disembarkationDate': { en: 'Disembarkation', beanie: 'disembarkation' },
   'vacation.field.operator': { en: 'Operator', beanie: 'operator' },
@@ -6459,6 +6464,8 @@ const STRING_DEFS = {
       'here’s what we found. check it over, then add it to a trip — you can fine-tune any detail afterward.',
   },
   'travelExtract.tripLabel': { en: 'Trip', beanie: 'trip' },
+  'travelExtract.existingTripBadge': { en: 'Existing Trip', beanie: 'existing trip' },
+  'travelExtract.newTripBadge': { en: 'New Trip', beanie: 'new trip' },
   'travelExtract.addingTo': { en: 'Adding to', beanie: 'adding to' },
   'travelExtract.chooseTrip': {
     en: 'A few trips overlap these dates — which one?',

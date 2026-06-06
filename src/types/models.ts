@@ -659,6 +659,9 @@ export interface VacationTravelSegment {
   arrivalTime?: string;
   arrivesNextDay?: boolean;
 
+  // Departure terminal — shared by flights ("Terminal 1") and cruises ("Cruise Terminal A").
+  terminal?: string;
+
   // Return flight fields (used in combined flight entry, split on save)
   returnAirline?: string;
   returnFlightNumber?: string;

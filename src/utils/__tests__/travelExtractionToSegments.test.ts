@@ -186,6 +186,7 @@ describe('parseTravelExtractionResult → travelExtractionToSegments (nested *Fi
             departureTime: '16:10',
             arrivalDate: '2026-06-20',
             arrivalTime: '21:30',
+            terminal: 'Terminal 1',
             arrivesNextDay: false,
           },
         },
@@ -201,6 +202,7 @@ describe('parseTravelExtractionResult → travelExtractionToSegments (nested *Fi
     expect(seg.flightNumber).toBe('HO1602');
     expect(seg.departureAirport).toBe('Singapore Changi Airport');
     expect(seg.arrivalAirport).toBe('Shanghai Pudong International Airport');
+    expect(seg.terminal).toBe('Terminal 1');
     expect(seg.departureTime).toBe('16:10');
     expect(seg.arrivalTime).toBe('21:30');
     expect(seg.sortDate).toBe('2026-06-20');
