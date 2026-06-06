@@ -85,6 +85,14 @@ export interface FamilyMember {
   id: UUID;
   name: string;
   /**
+   * Alternate names this member is known by — chiefly the legal/full name(s) as written on
+   * travel documents (e.g. "Jonathan Smith" for a member named "Johnny"). Used to match
+   * AI-extracted itinerary passenger names to the right member, and learned automatically when
+   * the user confirms a mapping in the travel-extract review. Stored normalized (see
+   * `normalizePersonName`). Local-only — never transmitted. Absent = none.
+   */
+  aliases?: string[];
+  /**
    * User-editable contact email. May be any address the user wants
    * displayed for this member; not required to match any specific
    * external account. Distinct from `googleAccountEmail`, which is

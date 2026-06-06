@@ -11,10 +11,13 @@ import { computed, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
+import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import ExtractedSegmentRow from './ExtractedSegmentRow.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useVacationStore } from '@/stores/vacationStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { formatDateShort } from '@/utils/date';
+import { matchTravellerIds, learnableAliases } from '@/utils/segmentTravellers';
 import type { TravelReady } from '@/composables/useDocumentToTravel';
 import type {
   VacationAccommodation,
@@ -31,23 +34,34 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  /** Resolved target + the (possibly edited) new-trip name. */
+  /** Chosen target + new-trip name + the confirmed traveller name→member map + aliases to learn. */
   submit: [
     payload: {
       target: { kind: 'create' } | { kind: 'attach'; vacationId: string };
       tripName: string;
+      travellerMap: Record<string, string>;
+      aliasesToLearn: Array<{ memberId: string; alias: string }>;
     },
   ];
 }>();
 
 const { t } = useTranslation();
 const vacationStore = useVacationStore();
+const familyStore = useFamilyStore();
 
 type TargetMode = 'new' | 'existing';
 
 const mode = ref<TargetMode>('new');
 const tripName = ref('');
 const chosenVacationId = ref<string>('');
+
+// Confirm-and-learn: the distinct (normalized) traveller names found across the document, each
+// mapped to a family member. Pre-filled with the local matcher's best guess (the roster is NEVER
+// sent to the model); the user corrects any. `autoMatches` snapshots that best guess at open so
+// we learn exactly what the user changed.
+const distinctNames = computed(() => props.ready?.distinctTravellerNames ?? []);
+const nameToMemberId = ref<Record<string, string>>({});
+const autoMatches = ref<Record<string, string>>({});
 
 /** Current + upcoming trips (never past) the user can add these segments to. */
 const tripOptions = computed(() =>
@@ -76,6 +90,13 @@ watch(
           : (vacationStore.upcomingVacations[0]?.id ?? '');
     // Honour the suggestion, but only land on 'existing' when there's actually a trip to join.
     mode.value = tgt.kind !== 'create' && hasTripsToJoin.value ? 'existing' : 'new';
+    // Pre-fill the traveller mapping with the local matcher's confident guesses.
+    const auto: Record<string, string> = {};
+    for (const name of ready.distinctTravellerNames) {
+      auto[name] = matchTravellerIds([name], familyStore.sortedHumans)[0] ?? '';
+    }
+    autoMatches.value = auto;
+    nameToMemberId.value = { ...auto };
   },
   { immediate: true }
 );
@@ -155,14 +176,22 @@ const saveDisabled = computed(() => {
 });
 
 function onSave(): void {
-  if (!isNewTrip.value && chosenVacationId.value) {
-    emit('submit', {
-      target: { kind: 'attach', vacationId: chosenVacationId.value },
-      tripName: '',
-    });
-  } else {
-    emit('submit', { target: { kind: 'create' }, tripName: tripName.value.trim() });
-  }
+  const travellerMap = { ...nameToMemberId.value };
+  const aliasesToLearn = learnableAliases(
+    nameToMemberId.value,
+    autoMatches.value,
+    familyStore.sortedHumans
+  );
+  const target =
+    !isNewTrip.value && chosenVacationId.value
+      ? ({ kind: 'attach', vacationId: chosenVacationId.value } as const)
+      : ({ kind: 'create' } as const);
+  emit('submit', {
+    target,
+    tripName: target.kind === 'create' ? tripName.value.trim() : '',
+    travellerMap,
+    aliasesToLearn,
+  });
 }
 </script>
 
@@ -194,6 +223,37 @@ function onSave(): void {
           :detail="row.detail"
           :type-label="row.typeLabel"
         />
+      </div>
+
+      <!-- Who's travelling — map each name on the booking to a family member (learned for next time) -->
+      <div
+        v-if="distinctNames.length"
+        class="rounded-2xl bg-[var(--tint-slate-3)] p-3.5 ring-1 ring-[var(--tint-slate-10)]"
+      >
+        <p class="font-inter mb-2.5 text-xs text-gray-400">
+          {{ t('travelExtract.travellersHeading') }}
+        </p>
+        <div class="space-y-3">
+          <div v-for="name in distinctNames" :key="name">
+            <div class="mb-1.5 flex items-center gap-2">
+              <span class="font-outfit text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {{ name }}
+              </span>
+              <span
+                v-if="!nameToMemberId[name]"
+                class="font-inter text-xs text-[var(--vacation-teal)]"
+              >
+                {{ t('travelExtract.whoIsThis') }}
+              </span>
+            </div>
+            <FamilyChipPicker
+              :model-value="nameToMemberId[name] ?? ''"
+              mode="single"
+              compact
+              @update:model-value="nameToMemberId[name] = $event as string"
+            />
+          </div>
+        </div>
       </div>
 
       <!-- Trip target — the user chooses: a NEW trip, or add to an EXISTING one -->
