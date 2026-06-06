@@ -6445,6 +6445,55 @@ const STRING_DEFS = {
     en: "We couldn't spot event details in that photo. You can still fill it in below.",
     beanie: "we couldn't spot event details in that photo. you can still fill it in below.",
   },
+  'ai.notTravel.title': { en: 'No Travel Plans Found', beanie: 'no travel plans found' },
+  'ai.notTravel.message': {
+    en: "We couldn't spot any travel details in that document. You can add the trip manually.",
+    beanie: "we couldn't spot any travel details in that document. you can add the trip manually.",
+  },
+  // ── Travel document extraction (#30) ──
+  'travelExtract.addButton': { en: 'Add from Document', beanie: 'add from document' },
+  'travelExtract.reviewTitle': { en: 'Review Travel Plans', beanie: 'review travel plans' },
+  'travelExtract.reviewSubtitle': {
+    en: 'Here’s what we found. Check it over, then add it to a trip — you can fine-tune any detail afterward.',
+    beanie:
+      'here’s what we found. check it over, then add it to a trip — you can fine-tune any detail afterward.',
+  },
+  'travelExtract.tripLabel': { en: 'Trip', beanie: 'trip' },
+  'travelExtract.addingTo': { en: 'Adding to', beanie: 'adding to' },
+  'travelExtract.chooseTrip': {
+    en: 'A few trips overlap these dates — which one?',
+    beanie: 'a few trips overlap these dates — which one?',
+  },
+  'travelExtract.newTrip': {
+    en: 'No matching trip — we’ll create a new one:',
+    beanie: 'no matching trip — we’ll create a new one:',
+  },
+  'travelExtract.tripNamePlaceholder': { en: 'Trip name', beanie: 'trip name' },
+  'travelExtract.defaultTripName': { en: 'New Trip', beanie: 'new trip' },
+  'travelExtract.createTrip': { en: 'Create Trip', beanie: 'create trip' },
+  'travelExtract.addToTrip': { en: 'Add to Trip', beanie: 'add to trip' },
+  'travelExtract.kind.travel': { en: 'Travel', beanie: 'travel' },
+  'travelExtract.kind.accommodation': { en: 'Stay', beanie: 'stay' },
+  'travelExtract.kind.transportation': { en: 'Transport', beanie: 'transport' },
+  'travelExtract.error.title': { en: "Couldn't Add That", beanie: "couldn't add that" },
+  'travelExtract.error.noMember': {
+    en: 'Set up your family profile first, then try again.',
+    beanie: 'set up your family profile first, then try again.',
+  },
+  'travelExtract.error.saveFailed': {
+    en: 'Something went wrong saving the trip. Please try again.',
+    beanie: 'something went wrong saving the trip. please try again.',
+  },
+  'travelExtract.attachFailed.title': { en: 'Trip Saved', beanie: 'trip saved' },
+  'travelExtract.attachFailed.message': {
+    en: 'Your plans were added, but the document didn’t attach. You can add it from the trip.',
+    beanie: 'your plans were added, but the document didn’t attach. you can add it from the trip.',
+  },
+  'travelExtract.added.title': { en: 'Travel Plans Added', beanie: 'travel plans added' },
+  'travelExtract.added.message': {
+    en: 'We’ve added your plans to the trip.',
+    beanie: 'we’ve added your plans to the trip.',
+  },
   'ai.unavailable.title': { en: 'Not Available Yet', beanie: 'not available yet' },
   'ai.unavailable.message': {
     en: "Reading photos isn't set up yet. You can add the activity manually.",

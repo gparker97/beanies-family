@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-06",
-    "translationCount": 3037
+    "translationCount": 3060
   },
   "translations": {
     "app.name": {
@@ -15189,6 +15189,121 @@
     "vacation.dayOfTrip": {
       "translation": "第{n}天，共{total}天",
       "hash": "e3mof9",
+      "lastUpdated": "2026-06-06"
+    },
+    "ai.notTravel.title": {
+      "translation": "未找到差旅计划",
+      "hash": "qywon9",
+      "lastUpdated": "2026-06-06"
+    },
+    "ai.notTravel.message": {
+      "translation": "我们无法在该文件中找到任何旅行详情。您可以手动添加行程。",
+      "hash": "2mss8g",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.addButton": {
+      "translation": "从文档添加",
+      "hash": "kskupa",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.reviewTitle": {
+      "translation": "查看差旅计划",
+      "hash": "op8fp0",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.reviewSubtitle": {
+      "translation": "以下是我们的发现。检查完毕，然后将其添加到行程中。您可以在行程结束后对任何细节进行微调。",
+      "hash": "ctqm3c",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.tripLabel": {
+      "translation": "行程",
+      "hash": "1k211",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.addingTo": {
+      "translation": "添加到：",
+      "hash": "rk1d52",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.chooseTrip": {
+      "translation": "一些行程与这些日期重叠—哪一个？",
+      "hash": "ndn9rm",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.newTrip": {
+      "translation": "没有匹配的行程，我们将创建新的行程：",
+      "hash": "dfs9dr",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.tripNamePlaceholder": {
+      "translation": "行程名称",
+      "hash": "pldl6u",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.defaultTripName": {
+      "translation": "新行程",
+      "hash": "mvb8it",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.createTrip": {
+      "translation": "创建行程",
+      "hash": "ifxx3d",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.addToTrip": {
+      "translation": "添加到行程",
+      "hash": "aqnzkl",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.kind.travel": {
+      "translation": "旅行",
+      "hash": "tguthi",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.kind.accommodation": {
+      "translation": "住宿",
+      "hash": "1jgc9",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.kind.transportation": {
+      "translation": "交通",
+      "hash": "kh3do7",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.error.title": {
+      "translation": "无法添加",
+      "hash": "q6zjws",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.error.noMember": {
+      "translation": "请先设置家庭账户，然后重试。",
+      "hash": "plpjy9",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.error.saveFailed": {
+      "translation": "保存行程时出错。请重试。",
+      "hash": "2sdpdi",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.attachFailed.title": {
+      "translation": "已保存行程",
+      "hash": "bnmdvw",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.attachFailed.message": {
+      "translation": "已添加计划，但未附上文件。您可以在行程中添加。",
+      "hash": "o2xk85",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.added.title": {
+      "translation": "已添加差旅计划",
+      "hash": "s95nl0",
+      "lastUpdated": "2026-06-06"
+    },
+    "travelExtract.added.message": {
+      "translation": "我们已将您的行程计划添加到行程中。",
+      "hash": "8cfle6",
       "lastUpdated": "2026-06-06"
     }
   }

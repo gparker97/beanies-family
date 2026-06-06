@@ -16,9 +16,7 @@ import DayAgendaSidebar from '@/components/planner/DayAgendaSidebar.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import HolidayDetailsModal from '@/components/planner/HolidayDetailsModal.vue';
 import { useActivityStore } from '@/stores/activityStore';
-import { useSettingsStore } from '@/stores/settingsStore';
 import { useVacationStore } from '@/stores/vacationStore';
-import { reportError } from '@/utils/errorReporter';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePermissions } from '@/composables/usePermissions';
@@ -37,6 +35,7 @@ import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
 import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useDocumentToActivity } from '@/composables/useDocumentToActivity';
+import { useDocumentConsent } from '@/composables/useDocumentConsent';
 import { useAiCapability } from '@/composables/useAiCapability';
 import { useFilePicker } from '@/composables/useFilePicker';
 import { isFlagEnabled } from '@/config/flags';
@@ -58,7 +57,6 @@ const { canEditActivities } = usePermissions();
 // users: ON in dev, OFF in prod (override per-browser via localStorage). Gates the 📸 button.
 const canAddFromPhoto = computed(() => canEditActivities.value && isFlagEnabled('aiPhotoExtract'));
 const activityStore = useActivityStore();
-const settingsStore = useSettingsStore();
 const accountsStore = useAccountsStore();
 const recurringStore = useRecurringStore();
 const transactionsStore = useTransactionsStore();
@@ -147,51 +145,15 @@ const activityPrefill = ref<Partial<CreateFamilyActivityInput> | undefined>(unde
 const activityPrefillConfidence = ref<FieldConfidence | undefined>(undefined);
 // The compressed source document, attached to the activity ActivityModal creates (#133).
 const activitySourcePhoto = ref<File | undefined>(undefined);
-const consentOpen = ref(false);
-let consentResolver: ((granted: boolean) => void) | null = null;
 const { tier: aiTier } = useAiCapability();
 
-/**
- * Promise-based consent gate the wedge awaits before any document leaves the device.
- * If the family has opted into "don't ask again" we resolve immediately WITHOUT touching
- * the modal lifecycle (no `consentResolver` assignment → none can be left dangling).
- */
-function requestPhotoConsent(): Promise<boolean> {
-  if (settingsStore.skipDocumentConsentPrompt) return Promise.resolve(true);
-  return new Promise((resolve) => {
-    consentResolver = resolve;
-    consentOpen.value = true;
-  });
-}
-function resolvePhotoConsent(granted: boolean): void {
-  consentOpen.value = false;
-  consentResolver?.(granted);
-  consentResolver = null;
-}
-
-/** Persist the family-scoped consent-skip. Isolated + awaited so failures are caught (not silent). */
-async function persistConsentSkip(): Promise<void> {
-  await settingsStore.setSkipDocumentConsentPrompt(true);
-}
-
-/**
- * Confirm handler for the consent modal. Proceeds for this document regardless; if the user
- * ticked "remember", persist the skip — but a persist failure must never strand the wedge,
- * so we resolve consent in `finally`.
- */
-async function onConsentConfirm(remember: boolean): Promise<void> {
-  try {
-    if (remember) await persistConsentSkip();
-  } catch (e) {
-    reportError({
-      surface: 'ai-consent',
-      message: 'Failed to save the AI consent preference',
-      error: e,
-    });
-  } finally {
-    resolvePhotoConsent(true);
-  }
-}
+// Shared per-document consent gate (reused by the travel wedge on TravelPlansPage).
+const {
+  consentOpen,
+  requestConsent: requestPhotoConsent,
+  resolveConsent: resolvePhotoConsent,
+  onConsentConfirm,
+} = useDocumentConsent();
 
 /** Open a fresh new-activity form pre-filled from the extracted document. */
 function onPhotoActivityReady(ready: {

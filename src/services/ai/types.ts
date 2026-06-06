@@ -33,7 +33,16 @@ export interface ExtractionRequest {
   todayIso: string;
   /** Optional cancel signal so the UI can abort a slow extraction. */
   signal?: AbortSignal;
+  /**
+   * Which extraction task to run. `event` (default) is the #133 invitation→activity
+   * wedge; `travel` is the #30 document→travel-segment wedge. The provider selects the
+   * task-appropriate prompt + parser; omitting it preserves the original event behavior.
+   */
+  task?: ExtractionTask;
 }
+
+/** The extraction tasks the funnel supports (one prompt/schema/parser per task). */
+export type ExtractionTask = 'event' | 'travel';
 
 /** Per-field 0..1 confidence so the UI can flag low-confidence values for review. */
 export interface FieldConfidence {
@@ -83,6 +92,39 @@ export interface ExtractionResult {
 }
 
 /**
+ * One booking the travel model extracted from a document, defensively typed (#30).
+ * `fields` carries every recognized string field by name; the pure mapper
+ * (`utils/travelExtractionToSegments`) decides which apply to the chosen kind/type and
+ * folds the rest into the segment's notes — so nothing the model returned is lost.
+ */
+export interface TravelSegmentDraft {
+  kind: 'travel' | 'accommodation' | 'transportation';
+  /** Kind-specific sub-type string (coerced to a valid enum by the mapper). */
+  type: string;
+  title: string;
+  status: 'booked' | 'pending';
+  bookingReference: string;
+  notes: string;
+  arrivesNextDay: boolean;
+  breakfastIncluded: boolean;
+  /** Recognized string fields keyed by model field name (e.g. `departureAirport`). */
+  fields: Record<string, string>;
+  /** Overall 0..1 confidence for the segment (the model's `confidence.overall`). */
+  confidence: number;
+}
+
+/** The structured travel result extracted from a document. Mirrors TRAVEL_JSON_SHAPE. */
+export interface TravelExtractionResult {
+  /** False when the document is not a travel booking — handled gracefully, never invented. */
+  isTravel: boolean;
+  /** Suggested destination-based trip name, or `''`. */
+  tripName: string;
+  /** One of the 6 VacationTripType values, or `''` if unclear. */
+  tripTypeHint: string;
+  segments: TravelSegmentDraft[];
+}
+
+/**
  * Stable error codes the UI maps to a friendly toast. The service classifies every
  * failure into exactly one of these — there are no silent or unclassified failures
  * (see docs/lessons.md). Reporting (toast + reportError) is the CALLER's job, not
@@ -103,9 +145,9 @@ export type ExtractionErrorCode =
  * interfaces. There is deliberately NO generic `Result<T>` in this codebase; do not
  * introduce one.
  */
-export interface DocumentExtractionResult {
+export interface DocumentExtractionResult<T = ExtractionResult> {
   success: boolean;
-  data?: ExtractionResult;
+  data?: T;
   errorCode?: ExtractionErrorCode;
   /** Human-readable detail for logs/diagnostics (never shown raw to users). */
   error?: string;
@@ -125,7 +167,10 @@ export interface DocumentExtractionResult {
  */
 export interface ExtractionProvider {
   readonly id: AiProviderId;
+  /** Event/invitation → activity extraction (#133). */
   extract(request: ExtractionRequest): Promise<ExtractionResult>;
+  /** Travel document → travel-segment extraction (#30). */
+  extractTravel(request: ExtractionRequest): Promise<TravelExtractionResult>;
 }
 
 /** Typed provider failure carrying a stable {@link ExtractionErrorCode}. */

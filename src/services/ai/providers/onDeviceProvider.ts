@@ -10,16 +10,23 @@ import {
   type ExtractionProvider,
   type ExtractionRequest,
   type ExtractionResult,
+  type TravelExtractionResult,
 } from '../types';
+
+const notAvailable = () =>
+  Promise.reject(
+    new ExtractionProviderError(
+      'not_available',
+      'On-device document extraction is not available yet'
+    )
+  );
 
 export const onDeviceProvider: ExtractionProvider = {
   id: 'on-device',
   extract(_request: ExtractionRequest): Promise<ExtractionResult> {
-    return Promise.reject(
-      new ExtractionProviderError(
-        'not_available',
-        'On-device document extraction is not available yet'
-      )
-    );
+    return notAvailable();
+  },
+  extractTravel(_request: ExtractionRequest): Promise<TravelExtractionResult> {
+    return notAvailable();
   },
 };

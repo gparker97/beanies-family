@@ -6,8 +6,19 @@
 // This module is the ONLY place OpenAI-wire concerns (chat/completions, `choices`,
 // message roles) are allowed — they must never leak into types.ts or the service.
 
-import { buildExtractionMessages, parseExtractionResult } from '../extractionPrompt';
-import { ExtractionProviderError, type ExtractionRequest, type ExtractionResult } from '../types';
+import {
+  buildExtractionMessages,
+  buildTravelExtractionMessages,
+  parseExtractionResult,
+  parseTravelExtractionResult,
+  type ChatMessage,
+} from '../extractionPrompt';
+import {
+  ExtractionProviderError,
+  type ExtractionRequest,
+  type ExtractionResult,
+  type TravelExtractionResult,
+} from '../types';
 
 /** Hard ceiling on a single extraction call, so a hung upstream surfaces as a timeout. */
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -46,10 +57,12 @@ function buildSignal(signal?: AbortSignal): AbortSignal {
  *   • non-2xx       → `provider_error` (upstream body is NOT surfaced to the user)
  *   • bad JSON/shape → `malformed_output`
  */
-export async function callOpenAiCompatibleVision(
+async function callOpenAiCompatible<T>(
   config: OpenAiCompatibleConfig,
-  request: ExtractionRequest
-): Promise<ExtractionResult> {
+  request: ExtractionRequest,
+  messages: ChatMessage[],
+  parse: (raw: unknown) => T
+): Promise<T> {
   const url = `${config.baseUrl.replace(/\/+$/, '')}/chat/completions`;
 
   let res: Response;
@@ -60,11 +73,7 @@ export async function callOpenAiCompatibleVision(
         Authorization: `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: config.model,
-        messages: buildExtractionMessages(request.imageDataUrl, request.todayIso),
-        temperature: 0,
-      }),
+      body: JSON.stringify({ model: config.model, messages, temperature: 0 }),
       signal: buildSignal(request.signal),
     });
   } catch (err) {
@@ -95,7 +104,7 @@ export async function callOpenAiCompatibleVision(
   }
 
   try {
-    return parseExtractionResult(parseJsonContent(content));
+    return parse(parseJsonContent(content));
   } catch (err) {
     throw new ExtractionProviderError(
       'malformed_output',
@@ -103,4 +112,28 @@ export async function callOpenAiCompatibleVision(
       err
     );
   }
+}
+
+export function callOpenAiCompatibleVision(
+  config: OpenAiCompatibleConfig,
+  request: ExtractionRequest
+): Promise<ExtractionResult> {
+  return callOpenAiCompatible(
+    config,
+    request,
+    buildExtractionMessages(request.imageDataUrl, request.todayIso),
+    parseExtractionResult
+  );
+}
+
+export function callOpenAiCompatibleTravel(
+  config: OpenAiCompatibleConfig,
+  request: ExtractionRequest
+): Promise<TravelExtractionResult> {
+  return callOpenAiCompatible(
+    config,
+    request,
+    buildTravelExtractionMessages(request.imageDataUrl, request.todayIso),
+    parseTravelExtractionResult
+  );
 }
