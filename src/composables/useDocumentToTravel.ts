@@ -15,12 +15,14 @@ import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
 import { useExtractionErrorToast } from './useExtractionErrorToast';
 import { useVacationStore } from '@/stores/vacationStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { extractTravelFromDocument } from '@/services/ai/documentExtractionService';
 import {
   inferTripType,
   travelExtractionToSegments,
   type SegmentBuckets,
 } from '@/utils/travelExtractionToSegments';
+import { matchTravellerIds } from '@/utils/segmentTravellers';
 import { resolveTripTarget, segmentDateRange, tripsOverlappingRange } from '@/utils/vacation';
 import type { TripTarget } from '@/utils/vacation';
 import { isPdfFile, pdfFirstPageToImage } from '@/utils/pdfFirstPageToImage';
@@ -55,6 +57,7 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
   const { t } = useTranslation();
   const { reportExtractionFailure } = useExtractionErrorToast();
   const vacationStore = useVacationStore();
+  const familyStore = useFamilyStore();
 
   const isProcessing = ref(false);
 
@@ -98,7 +101,10 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
           return;
         }
 
-        const buckets = travelExtractionToSegments(result.data);
+        // Match the model's per-segment traveller NAMES to family members (humans only).
+        const buckets = travelExtractionToSegments(result.data, (names) =>
+          matchTravellerIds(names, familyStore.sortedHumans)
+        );
         const range = segmentDateRange(buckets);
         const matches = range
           ? tripsOverlappingRange(vacationStore.vacations, range, toDateInputValue(new Date()))

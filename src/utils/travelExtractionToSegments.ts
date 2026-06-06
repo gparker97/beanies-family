@@ -208,23 +208,40 @@ function toTransportation(draft: TravelSegmentDraft): VacationTransportation {
 /**
  * Map a travel extraction result into the three segment buckets ready for the store.
  * Pure + total — unrecognized-kind drafts are skipped (warned), never thrown.
+ *
+ * `resolveTravellerIds` (optional) turns the model's per-segment traveller NAMES into family
+ * member ids. It is applied ONCE per draft here (the kind-specific `to*` factories stay
+ * logistics-only). A no-match leaves `travellerIds` absent — the caller materializes the trip
+ * default for new trips, or lets it resolve dynamically when attaching to an existing trip.
  */
-export function travelExtractionToSegments(result: TravelExtractionResult): SegmentBuckets {
+export function travelExtractionToSegments(
+  result: TravelExtractionResult,
+  resolveTravellerIds?: (names: string[]) => string[]
+): SegmentBuckets {
   const buckets: SegmentBuckets = {
     travelSegments: [],
     accommodations: [],
     transportation: [],
   };
   for (const draft of result.segments) {
+    const withTravellers = <
+      T extends VacationTravelSegment | VacationAccommodation | VacationTransportation,
+    >(
+      seg: T
+    ): T => {
+      const ids = resolveTravellerIds?.(draft.travellers) ?? [];
+      if (ids.length) seg.travellerIds = ids;
+      return seg;
+    };
     switch (draft.kind) {
       case 'travel':
-        buckets.travelSegments.push(toTravelSegment(draft));
+        buckets.travelSegments.push(withTravellers(toTravelSegment(draft)));
         break;
       case 'accommodation':
-        buckets.accommodations.push(toAccommodation(draft));
+        buckets.accommodations.push(withTravellers(toAccommodation(draft)));
         break;
       case 'transportation':
-        buckets.transportation.push(toTransportation(draft));
+        buckets.transportation.push(withTravellers(toTransportation(draft)));
         break;
       default:
         console.warn(

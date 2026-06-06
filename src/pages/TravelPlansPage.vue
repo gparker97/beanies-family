@@ -5,6 +5,7 @@ import PageHeader from '@/components/common/PageHeader.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import VacationSegmentCard from '@/components/vacation/VacationSegmentCard.vue';
+import MemberChip from '@/components/ui/MemberChip.vue';
 import VacationIdeaCard from '@/components/vacation/VacationIdeaCard.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import TripDatesHeader from '@/components/travel/TripDatesHeader.vue';
@@ -34,6 +35,9 @@ import { isFlagEnabled } from '@/config/flags';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
+import type { SegmentBuckets } from '@/utils/travelExtractionToSegments';
+import { unionTravellerIds } from '@/utils/segmentTravellers';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { formatDateShort, formatNookDate, extractDatePart } from '@/utils/date';
 import { useToday } from '@/composables/useToday';
 import {
@@ -59,6 +63,7 @@ const route = useRoute();
 const router = useRouter();
 const vacationStore = useVacationStore();
 const familyStore = useFamilyStore();
+const { getMemberName } = useMemberInfo();
 const { copied, copy } = useClipboard();
 const photoStore = usePhotoStore();
 
@@ -106,6 +111,20 @@ function allSegmentIds(ready: TravelReady): string[] {
  * document to the primary segment. A failed attach warns but never rolls back the saved trip
  * (mirrors updateVacation's activity-sync posture). Nothing fails silently.
  */
+/**
+ * Pin the trip default onto every extracted segment the AI matched no travellers for. Used only
+ * for a NEW AI-created trip (an attach leaves them undefined so they resolve dynamically).
+ */
+function materializeUnmatchedTravellers(buckets: SegmentBuckets, defaultIds: string[]): void {
+  for (const seg of [
+    ...buckets.travelSegments,
+    ...buckets.accommodations,
+    ...buckets.transportation,
+  ]) {
+    if (!seg.travellerIds) seg.travellerIds = defaultIds;
+  }
+}
+
 async function onReviewSubmit(payload: {
   target: { kind: 'create' } | { kind: 'attach'; vacationId: string };
   tripName: string;
@@ -123,10 +142,15 @@ async function onReviewSubmit(payload: {
     let vacationId: string | null = null;
     try {
       if (payload.target.kind === 'create') {
+        // A new trip has no travellers to inherit, so seed them from the union of everyone the
+        // document named across all segments, and materialize that default onto any segment the
+        // AI matched no names for (so they're not left "everyone" once the trip is concrete).
+        const defaultTravellers = unionTravellerIds(ready.buckets);
+        materializeUnmatchedTravellers(ready.buckets, defaultTravellers);
         const created = await vacationStore.createVacation({
           name: payload.tripName,
           tripType: ready.tripType,
-          assigneeIds: [],
+          assigneeIds: defaultTravellers,
           ideas: [],
           travelSegments: ready.buckets.travelSegments,
           accommodations: ready.buckets.accommodations,
@@ -526,6 +550,14 @@ async function addActivitySegment() {
 }
 
 // ── Collapsible cards ────────────────────────────────────────────────────────
+
+/** Comma-joined member names for a segment's travellers — used as the avatar-stack tooltip. */
+function travellerNames(ids: string[]): string {
+  return ids
+    .map((id) => getMemberName(id, ''))
+    .filter(Boolean)
+    .join(', ');
+}
 
 function isCollapsed(id: string): boolean {
   return collapsedCards.value[id] !== false;
@@ -1259,8 +1291,43 @@ function addQuickIdea() {
                       @edit="openEditModal(item)"
                       @delete="deleteTimelineItem(item)"
                     >
-                      <!-- Detail rows — divided, compact, inline-editable with pencil -->
+                      <!-- Collapsed: a compact avatar stack, only when travellers are a subset -->
+                      <template v-if="item.showTravellers && isCollapsed(item.id)" #header-trailing>
+                        <div
+                          class="flex shrink-0 items-center pr-1"
+                          :title="travellerNames(item.travellers)"
+                          :aria-label="travellerNames(item.travellers)"
+                        >
+                          <MemberChip
+                            v-for="id in item.travellers"
+                            :key="id"
+                            :member-id="id"
+                            size="dot"
+                            class="-ml-1.5 first:ml-0"
+                          />
+                        </div>
+                      </template>
+
+                      <!-- Expanded: always list who's travelling -->
                       <div class="divide-y divide-gray-100 dark:divide-slate-700/40">
+                        <div
+                          v-if="item.travellers.length"
+                          class="flex items-center gap-3 py-1 first:pt-0 last:pb-0"
+                        >
+                          <span
+                            class="font-outfit w-20 shrink-0 text-xs font-semibold text-gray-400 uppercase dark:text-gray-500"
+                          >
+                            {{ t('vacation.field.travelling') }}
+                          </span>
+                          <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+                            <MemberChip
+                              v-for="id in item.travellers"
+                              :key="id"
+                              :member-id="id"
+                              size="sm"
+                            />
+                          </div>
+                        </div>
                         <div
                           v-for="row in item.detailRows"
                           :key="row.label"
@@ -1449,7 +1516,23 @@ function addQuickIdea() {
               @update:collapsed="setCollapsed(item.id, $event)"
               @edit="openEditModal(item)"
               @delete="deleteTimelineItem(item)"
-            />
+            >
+              <template v-if="item.showTravellers && isCollapsed(item.id)" #header-trailing>
+                <div
+                  class="flex shrink-0 items-center pr-1"
+                  :title="travellerNames(item.travellers)"
+                  :aria-label="travellerNames(item.travellers)"
+                >
+                  <MemberChip
+                    v-for="id in item.travellers"
+                    :key="id"
+                    :member-id="id"
+                    size="dot"
+                    class="-ml-1.5 first:ml-0"
+                  />
+                </div>
+              </template>
+            </VacationSegmentCard>
           </div>
         </div>
 

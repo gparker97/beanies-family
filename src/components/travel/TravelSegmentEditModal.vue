@@ -8,6 +8,7 @@ import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import { BaseCombobox } from '@/components/ui';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useTranslation } from '@/composables/useTranslation';
@@ -26,6 +27,7 @@ import {
   buildCruisePortOptions,
   buildTravelSegmentTitle,
 } from '@/utils/vacation';
+import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import type { VacationTravelSegment, VacationSegmentStatus } from '@/types/models';
 
 type SegmentField =
@@ -96,6 +98,12 @@ const location = ref('');
 const link = ref('');
 const startTime = ref('');
 const activityDuration = ref('');
+const travellerIds = ref<string[]>([]);
+
+/** Trip-level travellers, the default for a segment with no explicit list. */
+const tripAssigneeIds = computed(
+  () => vacationStore.getVacationById(props.vacationId)?.assigneeIds ?? []
+);
 
 const { isEditing, isSubmitting } = useFormModal(
   () => props.segment,
@@ -136,6 +144,7 @@ const { isEditing, isSubmitting } = useFormModal(
       link.value = seg.link ?? '';
       startTime.value = seg.startTime ?? '';
       activityDuration.value = seg.duration ?? '';
+      travellerIds.value = resolveSegmentTravellers(seg.travellerIds, tripAssigneeIds.value);
     },
     onNew() {
       validation.reset();
@@ -172,6 +181,7 @@ const { isEditing, isSubmitting } = useFormModal(
       link.value = '';
       startTime.value = '';
       activityDuration.value = '';
+      travellerIds.value = [...tripAssigneeIds.value];
     },
   }
 );
@@ -392,6 +402,7 @@ async function handleSave() {
         link: link.value || undefined,
         startTime: startTime.value || undefined,
         duration: activityDuration.value || undefined,
+        travellerIds: travellerIds.value.length ? travellerIds.value : tripAssigneeIds.value,
         sortDate,
       };
       // Auto-populate return flight from outbound flight data.
@@ -477,6 +488,11 @@ async function handleSave() {
           :options="statusOptions"
           @update:model-value="status = $event as VacationSegmentStatus"
         />
+      </FormFieldGroup>
+
+      <!-- Who's travelling on this segment -->
+      <FormFieldGroup :label="t('vacation.field.travellers')">
+        <FamilyChipPicker v-model="travellerIds" mode="multi" />
       </FormFieldGroup>
 
       <!-- Activity type (above title, only for activities) -->

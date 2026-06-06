@@ -21,6 +21,11 @@ vi.mock('@/stores/vacationStore', () => ({
   useVacationStore: () => ({ vacations: vacations.value }),
 }));
 
+const sortedHumans = ref<unknown[]>([]);
+vi.mock('@/stores/familyStore', () => ({
+  useFamilyStore: () => ({ sortedHumans: sortedHumans.value }),
+}));
+
 vi.mock('@/services/ai/documentExtractionService', () => ({
   extractTravelFromDocument: vi.fn(),
 }));
@@ -52,6 +57,7 @@ const TRAVEL: TravelExtractionResult = {
       arrivesNextDay: false,
       breakfastIncluded: false,
       fields: { departureAirport: 'SIN', arrivalAirport: 'HND', departureDate: '2026-08-12' },
+      travellers: [],
       confidence: 0.9,
     },
   ],

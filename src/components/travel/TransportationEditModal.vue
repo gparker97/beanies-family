@@ -7,6 +7,7 @@ import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useTranslation } from '@/composables/useTranslation';
@@ -17,6 +18,7 @@ import {
 } from '@/composables/useBookingValidation';
 import { useVacationStore } from '@/stores/vacationStore';
 import { buildTransportationTitle } from '@/utils/vacation';
+import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import type { VacationTransportation, VacationSegmentStatus } from '@/types/models';
 
 type TransportationField =
@@ -58,6 +60,12 @@ const departureDate = ref('');
 const departureTime = ref('');
 const link = ref('');
 const notes = ref('');
+const travellerIds = ref<string[]>([]);
+
+/** Trip-level travellers, the default for a segment with no explicit list. */
+const tripAssigneeIds = computed(
+  () => vacationStore.getVacationById(props.vacationId)?.assigneeIds ?? []
+);
 
 const { isEditing, isSubmitting } = useFormModal(
   () => props.transportation,
@@ -82,6 +90,7 @@ const { isEditing, isSubmitting } = useFormModal(
       departureTime.value = trans.departureTime ?? '';
       link.value = trans.link ?? '';
       notes.value = trans.notes ?? '';
+      travellerIds.value = resolveSegmentTravellers(trans.travellerIds, tripAssigneeIds.value);
     },
     onNew() {
       validation.reset();
@@ -102,6 +111,7 @@ const { isEditing, isSubmitting } = useFormModal(
       departureTime.value = '';
       link.value = '';
       notes.value = '';
+      travellerIds.value = [...tripAssigneeIds.value];
     },
   }
 );
@@ -208,6 +218,7 @@ async function handleSave() {
         departureTime: departureTime.value,
         link: link.value || undefined,
         notes: notes.value,
+        travellerIds: travellerIds.value.length ? travellerIds.value : tripAssigneeIds.value,
       };
       await vacationStore.updateVacation(props.vacationId, { transportation });
       emit('close');
@@ -240,6 +251,11 @@ async function handleSave() {
           :options="statusOptions"
           @update:model-value="status = $event as VacationSegmentStatus"
         />
+      </FormFieldGroup>
+
+      <!-- Who's travelling on this segment -->
+      <FormFieldGroup :label="t('vacation.field.travellers')">
+        <FamilyChipPicker v-model="travellerIds" mode="multi" />
       </FormFieldGroup>
 
       <!-- Auto-generated title -->

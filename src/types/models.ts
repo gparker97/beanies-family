@@ -707,6 +707,9 @@ export interface VacationTravelSegment {
   // (references into doc.photos; see PhotoAttachment). Same shape as
   // FamilyActivity.photoIds.
   photoIds?: UUID[];
+
+  // Family members on THIS segment. Undefined = the whole trip (FamilyVacation.assigneeIds).
+  travellerIds?: UUID[];
 }
 
 export interface VacationAccommodation {
@@ -727,6 +730,9 @@ export interface VacationAccommodation {
 
   // Attached booking documents — see VacationTravelSegment.photoIds.
   photoIds?: UUID[];
+
+  // Family members on THIS segment. Undefined = the whole trip (FamilyVacation.assigneeIds).
+  travellerIds?: UUID[];
 }
 
 export interface VacationTransportation {
@@ -753,6 +759,9 @@ export interface VacationTransportation {
 
   // Attached booking documents — see VacationTravelSegment.photoIds.
   photoIds?: UUID[];
+
+  // Family members on THIS segment. Undefined = the whole trip (FamilyVacation.assigneeIds).
+  travellerIds?: UUID[];
 }
 
 export interface VacationIdeaVote {

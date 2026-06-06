@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **Who's travelling on each segment.** Each trip leg — flights, hotels, rental cars — can now record exactly who's on it, defaulting to everyone on the trip and editable per segment (one parent flies in early, the kids share a different room). When a leg isn't the whole family, a small avatar appears on the timeline; open it to see the full list.
 - **Terminal field for flights and cruises.** Travel segments can now capture the departure terminal (e.g. "Terminal 1", "Cruise Terminal A") when adding or editing a flight or cruise.
 
 ### Changed

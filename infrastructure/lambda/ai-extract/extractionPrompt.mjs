@@ -9,7 +9,7 @@
 // required keys, or the built messages diverge (src/services/ai/__tests__/extractionPromptDrift.test.ts).
 // Bump PROMPT_VERSION on ANY change so drift is detectable, and update every copy together.
 
-export const PROMPT_VERSION = '2026-06-06.2';
+export const PROMPT_VERSION = '2026-06-06.3';
 
 // The structured shape we ask the model to return. Confidence is 0..1 per field so the UI can flag
 // low-confidence values. `isEvent` lets us gracefully handle a non-event image instead of inventing one.
@@ -89,9 +89,11 @@ export const TRAVEL_JSON_SHAPE = {
   tripTypeHint:
     'string — one of: fly_and_stay, cruise, road_trip, combo, camping, adventure; or "" if unclear',
   segments:
-    'array — ONE object per distinct booking in the document. A round-trip flight is TWO segments (outbound + return). Each object has: kind, type, title, status, bookingReference, notes, confidence, plus the relevant fields below.',
+    'array — ONE object per distinct booking in the document. A round-trip flight is TWO segments (outbound + return). Each object has: kind, type, title, status, travellers, bookingReference, notes, confidence, plus the relevant fields below.',
   kind: 'string — one of: "travel" | "accommodation" | "transportation"',
   type: 'string — for kind=travel: flight_outbound|flight_return|flight_other|cruise|train|ferry|car. for kind=accommodation: hotel|airbnb|campground|family_friends. for kind=transportation: airport_shuttle|rental_car|taxi_rideshare|bus.',
+  travellers:
+    'array of strings — the names of the people on THIS segment exactly as written on the booking/ticket (e.g. ["John Smith","Mary Smith"]), or [] if no names are shown. A booking shared by several people is ONE segment with multiple names here — NEVER output a separate segment per person.',
   travelFields:
     'kind=travel flights: airline, flightNumber, departureAirport, arrivalAirport, departureDate (YYYY-MM-DD), departureTime (24h HH:mm), arrivalDate, arrivalTime, terminal (departure terminal, e.g. "Terminal 1"), arrivesNextDay (boolean). cruise: cruiseLine, shipName, departurePort, terminal (cruise terminal, e.g. "Cruise Terminal A"), cabinNumber, embarkationDate, embarkationTime, disembarkationDate. train/ferry: operator, route, departureStation, arrivalStation, departureDate, departureTime, arrivalDate, arrivalTime.',
   accommodationFields:
@@ -119,6 +121,7 @@ export function buildTravelExtractionMessages(imageDataUrl, todayIso) {
     `Today's date is ${todayIso}. Resolve any relative or partial dates against it. Output dates as YYYY-MM-DD and times as 24-hour HH:mm.`,
     'A single document may contain SEVERAL bookings (e.g. an outbound and a return flight, or a flight plus a hotel). Return one object in "segments" for each distinct booking. A round-trip flight is two segments.',
     'Classify each segment with the correct "kind" and "type" and fill the relevant fields. Put any useful detail that has no dedicated field into that segment\'s "notes", writing ONE fact per line (each on its own line, separated by a line break) rather than a single run-on paragraph.',
+    'If one booking covers multiple passengers, return a single segment and list every passenger in that segment\'s "travellers". Never duplicate a segment to represent different passengers.',
     'If a field is not present in the document, return an empty string for it (do not invent values). Set isTravel=false and segments=[] if the document is not a travel booking.',
     'Never output any value that is not actually supported by the document. It is better to leave a field empty than to hallucinate.',
     'The top-level JSON object must have exactly these keys: ' +

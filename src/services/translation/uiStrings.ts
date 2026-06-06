@@ -5928,6 +5928,8 @@ const STRING_DEFS = {
     en: 'e.g. Terminal 1',
     beanie: 'e.g. terminal 1',
   },
+  'vacation.field.travellers': { en: "Who's Travelling", beanie: "who's travelling" },
+  'vacation.field.travelling': { en: 'Travelling', beanie: 'travelling' },
   'vacation.field.embarkationDate': { en: 'Embarkation', beanie: 'embarkation' },
   'vacation.field.disembarkationDate': { en: 'Disembarkation', beanie: 'disembarkation' },
   'vacation.field.operator': { en: 'Operator', beanie: 'operator' },
