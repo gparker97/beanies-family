@@ -102,13 +102,13 @@ export function buildTravelKeyValue(seg: {
   arrivalAirport?: string;
   departureDate?: string;
   departureTime?: string;
+  terminal?: string;
   cruiseLine?: string;
   shipName?: string;
   embarkationDate?: string;
   disembarkationDate?: string;
   operator?: string;
   route?: string;
-  arrivalTime?: string;
   startTime?: string;
   location?: string;
   description?: string;
@@ -116,27 +116,23 @@ export function buildTravelKeyValue(seg: {
   const p: string[] = [];
   const t12 = (v: string) => formatTime12(v);
   const isF = seg.type?.startsWith('flight');
+  // Departure date + time only (arrival time intentionally omitted — summary space is at a
+  // premium). Shared by flights and train/ferry.
+  const pushDeparture = (): void => {
+    if (seg.departureDate) {
+      const datePart = formatDateShort(seg.departureDate).toLowerCase();
+      p.push(seg.departureTime ? `${datePart} · ${t12(seg.departureTime)}` : datePart);
+    } else if (seg.departureTime) {
+      p.push(t12(seg.departureTime));
+    }
+  };
   if (isF) {
     if (seg.airline) {
       const code = seg.airline.match(/\(([A-Z0-9]{2})\)/)?.[1] ?? seg.airline.split(' ')[0];
       p.push(seg.flightNumber ? `${code} ${seg.flightNumber}` : code!);
     }
-    if (seg.departureDate) {
-      const datePart = formatDateShort(seg.departureDate).toLowerCase();
-      const timePart =
-        seg.departureTime && seg.arrivalTime
-          ? `${t12(seg.departureTime)} – ${t12(seg.arrivalTime)}`
-          : seg.departureTime
-            ? t12(seg.departureTime)
-            : '';
-      p.push(timePart ? `${datePart} · ${timePart}` : datePart);
-    } else if (seg.departureTime) {
-      p.push(
-        seg.arrivalTime
-          ? `${t12(seg.departureTime)} – ${t12(seg.arrivalTime)}`
-          : t12(seg.departureTime)
-      );
-    }
+    pushDeparture();
+    if (seg.terminal) p.push(seg.terminal);
   } else if (seg.type === 'cruise') {
     if (seg.shipName) p.push(seg.shipName);
     if (seg.embarkationDate && seg.disembarkationDate) {
@@ -146,6 +142,7 @@ export function buildTravelKeyValue(seg: {
     } else if (seg.embarkationDate) {
       p.push(formatDateShort(seg.embarkationDate).toLowerCase());
     }
+    if (seg.terminal) p.push(seg.terminal);
   } else if (seg.type === 'activity') {
     if (seg.location) p.push(seg.location);
     if (seg.startTime) p.push(t12(seg.startTime));
@@ -154,22 +151,7 @@ export function buildTravelKeyValue(seg: {
     // Train / Ferry
     if (seg.operator) p.push(seg.operator);
     if (seg.route) p.push(seg.route);
-    if (seg.departureDate) {
-      const datePart = formatDateShort(seg.departureDate).toLowerCase();
-      const timePart =
-        seg.departureTime && seg.arrivalTime
-          ? `${t12(seg.departureTime)} – ${t12(seg.arrivalTime)}`
-          : seg.departureTime
-            ? t12(seg.departureTime)
-            : '';
-      p.push(timePart ? `${datePart} · ${timePart}` : datePart);
-    } else if (seg.departureTime) {
-      p.push(
-        seg.arrivalTime
-          ? `${t12(seg.departureTime)} – ${t12(seg.arrivalTime)}`
-          : t12(seg.departureTime)
-      );
-    }
+    pushDeparture();
   }
   return p.join(' · ');
 }
@@ -201,6 +183,7 @@ export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
       rows.push({ label: 'flight #', value: seg.flightNumber, field: 'flightNumber' });
     if (seg.departureAirport) rows.push({ label: 'from', value: seg.departureAirport });
     if (seg.arrivalAirport) rows.push({ label: 'to', value: seg.arrivalAirport });
+    if (seg.terminal) rows.push({ label: 'terminal', value: seg.terminal });
     if (seg.departureDate)
       rows.push({
         label: 'date',
@@ -226,6 +209,7 @@ export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
     if (seg.cruiseLine) rows.push({ label: 'cruise line', value: seg.cruiseLine });
     if (seg.shipName) rows.push({ label: 'ship', value: seg.shipName });
     if (seg.departurePort) rows.push({ label: 'port', value: seg.departurePort });
+    if (seg.terminal) rows.push({ label: 'terminal', value: seg.terminal });
     if (seg.cabinNumber)
       rows.push({ label: 'cabin', value: seg.cabinNumber, field: 'cabinNumber' });
     if (seg.embarkationDate)
