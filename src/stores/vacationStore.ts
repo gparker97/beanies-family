@@ -9,6 +9,7 @@ import {
   extendTripDates,
   collectSegmentDates,
   extractSegmentOccurrences,
+  tripPhase,
   type TravelSegmentOccurrence,
 } from '@/utils/vacation';
 import { toISODateString, extractDatePart } from '@/utils/date';
@@ -32,7 +33,7 @@ export const useVacationStore = defineStore('vacations', () => {
   const upcomingVacations = computed(() => {
     const todayStr = today.value;
     return vacations.value
-      .filter((v) => !v.endDate || extractDatePart(v.endDate) >= todayStr)
+      .filter((v) => tripPhase(v, todayStr) !== 'past')
       .sort((a, b) => (a.startDate ?? '').localeCompare(b.startDate ?? ''));
   });
 

@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-06
+
+### Fixed
+
+- **Family Nook travel card now reflects a trip that's actually happening.** A vacation that's currently underway (or starting today) used to show "Upcoming Vacations" with no countdown. It now reads "Happening Now" with a clear status — "Day X of N" while you're away, or "Starts today!" on departure day.
+
 ## 2026-06-05
 
 ### Added
