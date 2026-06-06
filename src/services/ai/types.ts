@@ -109,6 +109,8 @@ export interface TravelSegmentDraft {
   breakfastIncluded: boolean;
   /** Recognized string fields keyed by model field name (e.g. `departureAirport`). */
   fields: Record<string, string>;
+  /** Names of the people on this segment, exactly as written in the document (or []). */
+  travellers: string[];
   /** Overall 0..1 confidence for the segment (the model's `confidence.overall`). */
   confidence: number;
 }

@@ -97,6 +97,9 @@ async function handleDelete() {
         <!-- Spacer to push actions to right -->
         <div class="flex-1" />
 
+        <!-- Trailing header content (e.g. a collapsed traveller avatar stack) -->
+        <slot name="header-trailing" />
+
         <!-- Attachment indicator — 📎 N chip (Treatment A) -->
         <span
           v-if="attachmentCount && attachmentCount > 0"

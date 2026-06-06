@@ -12,6 +12,7 @@ import {
   buildAccommodationTitle,
   buildTransportationTitle,
 } from '@/utils/vacation';
+import { isTravellerSubset, resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
 
 // ── Shared types ────────────────────────────────────────────────────────────
@@ -48,6 +49,10 @@ export interface TimelineItem {
   arrayIndex: number;
   /** Attached booking-document ids (images/PDFs) — for the timeline indicator + strip. */
   photoIds?: string[];
+  /** Resolved member ids on this segment (the explicit list, or the whole trip). Always listed when expanded. */
+  travellers: string[];
+  /** True only when `travellers` is a strict subset of the trip — gates the collapsed avatar row. */
+  showTravellers: boolean;
 }
 
 export interface DateGroup {
@@ -315,6 +320,13 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
     if (!v) return [];
     const items: TimelineItem[] = [];
 
+    // Resolve a segment's travellers against the trip default + flag a strict subset.
+    // Shared across all three kinds so the rule lives in exactly one expression.
+    const travellersFor = (ids: string[] | undefined) => ({
+      travellers: resolveSegmentTravellers(ids, v.assigneeIds),
+      showTravellers: isTravellerSubset(ids, v.assigneeIds),
+    });
+
     for (let i = 0; i < v.travelSegments.length; i++) {
       const seg = v.travelSegments[i]!;
       const date = seg.sortDate || seg.departureDate || seg.embarkationDate || '';
@@ -333,6 +345,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         detailRows: travelDetailRows(seg),
         arrayIndex: i,
         photoIds: seg.photoIds,
+        ...travellersFor(seg.travellerIds),
       });
     }
 
@@ -383,6 +396,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         detailRows: enrichRows(rows),
         arrayIndex: i,
         photoIds: acc.photoIds,
+        ...travellersFor(acc.travellerIds),
       });
     }
 
@@ -482,6 +496,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         detailRows: enrichRows(rows),
         arrayIndex: i,
         photoIds: trans.photoIds,
+        ...travellersFor(trans.travellerIds),
       });
     }
 
