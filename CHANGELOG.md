@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-07
+
+### Added
+
+- **beanies can do magic (beta).** Snap a photo or PDF of a party invite or a travel booking, and beanies pulls out the details and builds the activity or trip for you to check and save - add several documents to one trip, or start new ones. It is an early beta, you choose every time before anything is sent, and a new "Magic Beans" help article explains exactly how your data is kept secure (processed in attested confidential-compute hardware, encrypted in transit, nothing kept). Find it on the FAB, the calendar bar, the new-activity and new-trip screens, all labelled Beta.
+- **New help center content for AI.** A "Magic Beans: How beanies Reads Your Photos & Documents" privacy article, a "how beanies uses AI" card on the help home, and the Security category renamed to "Security, Privacy, and AI".
+
 ## 2026-06-06
 
 ### Added
