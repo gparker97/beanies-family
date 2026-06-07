@@ -16,6 +16,7 @@ import { computed, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { openExternal } from '@/utils/openExternal';
+import { splitAroundAccent } from '@/utils/splitAroundAccent';
 import type { AiTier } from '@/services/ai/types';
 
 // The privacy article lives on the marketing site, which deploys via a SEPARATE manual
@@ -49,6 +50,14 @@ watch(
   }
 );
 
+// Split the intro sentence around the "secure, private" phrase so it can become
+// an inline link. Reuses the shared accent-splitter (same pattern as WelcomeGate /
+// LoginBackground): case-insensitive, and if the phrase isn't present in a
+// translation it degrades to the whole sentence as `lead` with no link.
+const introParts = computed(() =>
+  splitAroundAccent(t('ai.consent.intro'), t('ai.consent.introLink'))
+);
+
 const items = computed(() => [
   { icon: '📄', label: t('ai.consent.whatLabel'), value: t('ai.consent.whatValue') },
   {
@@ -76,8 +85,20 @@ function onConfirm(): void {
     @close="emit('cancel')"
     @save="onConfirm"
   >
+    <!-- "secure, private" becomes an inline link to the privacy article once it
+         ships (PRIVACY_ARTICLE_LIVE); until then it renders as plain emphasised
+         text so the sentence still reads correctly. -->
     <p class="font-inter text-sm text-[var(--color-text)] dark:text-gray-200">
-      {{ t('ai.consent.intro') }}
+      <span>{{ introParts.lead }}</span
+      ><button
+        v-if="introParts.accent && PRIVACY_ARTICLE_LIVE"
+        type="button"
+        class="font-semibold underline underline-offset-2 hover:text-[#F15D22]"
+        @click.stop.prevent="openExternal(PRIVACY_ARTICLE_URL)"
+      >
+        {{ introParts.accent }}</button
+      ><span v-else-if="introParts.accent" class="font-semibold">{{ introParts.accent }}</span
+      ><span>{{ introParts.trail }}</span>
     </p>
 
     <ul class="space-y-3">

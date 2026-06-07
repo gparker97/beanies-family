@@ -14,6 +14,7 @@
  */
 import { computed } from 'vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
+import MagicReaderCard from '@/components/ai/MagicReaderCard.vue';
 import QuickAddPicker from '@/components/common/QuickAddPicker.vue';
 import QuickAddMemberPicker from '@/components/common/QuickAddMemberPicker.vue';
 import {
@@ -153,6 +154,11 @@ function handleItemClick(item: QuickAddItem): void {
           <span aria-hidden="true">×</span>
         </button>
       </header>
+
+      <!-- "beanies can do magic" — the AI document readers, above the jar.
+           Self-gating on flags + permission. Hidden on a scoped sheet
+           (allowedActions set) so consolidation pages stay on-topic. -->
+      <MagicReaderCard v-if="!allowedActions" />
 
       <!-- Everyday beans — kraft-paper card with 3x2 grid -->
       <section
