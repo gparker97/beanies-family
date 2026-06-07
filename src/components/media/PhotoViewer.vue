@@ -14,6 +14,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { confirm } from '@/composables/useConfirm';
 import { useFilePicker } from '@/composables/useFilePicker';
 import { attachmentKind } from '@/utils/attachmentKind';
+import { pdfToPageImages } from '@/utils/pdfRender';
 import type { UUID } from '@/types/models';
 
 interface Props {
@@ -43,6 +44,19 @@ const currentIndex = ref(props.initialIndex);
 const fullUrl = ref<string | null>(null);
 const loading = ref(false);
 
+// Inline PDF pages rendered via pdf.js (mobile/PWA webviews show a dead native
+// fallback for an <iframe> PDF, so we rasterize the pages ourselves). Object URLs,
+// revoked on navigation / close / unmount. When no pages render (fetch or render
+// failure), the template falls back to the open/download actions.
+const pdfPages = ref<string[]>([]);
+const pdfTruncated = ref(false);
+
+function cleanupPdfPages(): void {
+  for (const url of pdfPages.value) URL.revokeObjectURL(url);
+  pdfPages.value = [];
+  pdfTruncated.value = false;
+}
+
 const currentPhotoId = computed(() => props.photoIds[currentIndex.value] ?? null);
 const currentPhoto = computed(() =>
   currentPhotoId.value ? store.photos[currentPhotoId.value] : undefined
@@ -68,6 +82,8 @@ watch(
     if (open) {
       currentIndex.value = props.initialIndex;
       resolve();
+    } else {
+      cleanupPdfPages();
     }
   }
 );
@@ -77,26 +93,48 @@ watch(currentPhotoId, () => {
 });
 
 function resolve(): void {
+  cleanupPdfPages();
   if (!currentPhotoId.value) {
     fullUrl.value = null;
     loading.value = false;
     return;
   }
   if (isPdfDoc.value) {
-    // PDFs need real bytes — the lh3 image CDN (getPublicUrl) can't serve
-    // them. getBlobUrl does an authorized alt=media download → a same-origin
-    // object URL, which renders inline AND honours the <a download> filename.
-    // It caches per driveFileId and is revoked centrally (invalidateThumbCache)
-    // — so we deliberately do NOT revoke on unmount here.
+    // PDFs need real bytes — the lh3 image CDN (getPublicUrl) can't serve them.
+    // getBlobUrl does an authorized alt=media download → a same-origin object URL
+    // (backs the download + open-in-new-tab links). We then read those bytes back
+    // and rasterize every page with pdf.js so the document renders inline on every
+    // platform — an <iframe> PDF dies in mobile/PWA webviews. The store caches the
+    // blob URL per driveFileId (revoked centrally), so we don't revoke it here; the
+    // per-page object URLs we DO own and revoke (cleanupPdfPages).
     const id = currentPhotoId.value;
     loading.value = true;
     fullUrl.value = null;
     void store
       .getBlobUrl(id)
-      .then((url) => {
+      .then(async (url) => {
         if (currentPhotoId.value !== id) return; // navigated away mid-fetch
         fullUrl.value = url; // null → getBlobUrl marked it unresolved → missing state
-        loading.value = false;
+        if (!url) {
+          loading.value = false;
+          return;
+        }
+        try {
+          const bytes = await (await fetch(url)).arrayBuffer();
+          if (currentPhotoId.value !== id) return;
+          const { urls, truncated } = await pdfToPageImages(bytes);
+          if (currentPhotoId.value !== id) {
+            for (const u of urls) URL.revokeObjectURL(u);
+            return;
+          }
+          pdfPages.value = urls;
+          pdfTruncated.value = truncated;
+        } catch (e) {
+          if (currentPhotoId.value !== id) return;
+          console.warn('[PhotoViewer] PDF render failed — falling back to open/download', id, e);
+        } finally {
+          if (currentPhotoId.value === id) loading.value = false;
+        }
       })
       .catch((e) => {
         if (currentPhotoId.value !== id) return;
@@ -144,7 +182,10 @@ function handleKeydown(e: KeyboardEvent): void {
 }
 
 onMounted(() => document.addEventListener('keydown', handleKeydown));
-onUnmounted(() => document.removeEventListener('keydown', handleKeydown));
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown);
+  cleanupPdfPages();
+});
 
 // --- Actions ---------------------------------------------------------
 
@@ -254,34 +295,66 @@ async function handleRemoveMissing(): Promise<void> {
         <p class="max-w-md text-sm text-white/60">{{ t('photos.missing.body') }}</p>
       </div>
 
-      <!-- Loading -->
-      <div v-else-if="loading && !fullUrl" class="flex flex-col items-center gap-2 text-white/80">
-        <BeanieSpinner size="md" />
-      </div>
-
       <!--
-        PDF — render the bytes inline where the browser supports it, with a
-        prominent always-works "Open in new tab" action (mobile browsers
-        frequently won't inline-render an <iframe> PDF). Same-origin blob URL,
-        so the iframe and the open/download both work.
+        PDF — rasterized inline via pdf.js (every page), because mobile/PWA
+        webviews show a dead native fallback for an <iframe> PDF. Spinner while
+        rendering; the pages scroll; an always-works "Open in new tab" action
+        (and the footer Download) hand off to an external viewer. If pdf.js can't
+        render it, fall back to those actions with a note.
+      -->
+      <!--
+        `absolute inset-0` (not h-full) so the stacked pages scroll WITHIN the
+        body instead of growing the flex-1 body past the modal's max-height,
+        which would clip the footer (delete/download) off the bottom — the
+        height-constrained <img> branch below doesn't hit this, tall PDF pages do.
       -->
       <div
-        v-else-if="fullUrl && isPdfDoc"
-        class="flex h-full w-full flex-col items-center justify-center gap-4 px-4 py-6"
+        v-else-if="isPdfDoc"
+        class="absolute inset-0 flex flex-col items-center gap-4 overflow-y-auto px-4 py-6"
       >
-        <iframe
-          :src="fullUrl"
-          :title="docFileName || t('photos.document.tile')"
-          class="h-[68vh] w-full max-w-3xl rounded-xl bg-white shadow-lg"
-        ></iframe>
-        <a
-          :href="fullUrl"
-          target="_blank"
-          rel="noopener"
-          class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 inline-flex items-center gap-2 rounded-[16px] bg-gradient-to-r px-5 py-3 text-sm font-bold text-white no-underline shadow-sm transition-all duration-200 hover:shadow-md"
-        >
-          ↗ {{ t('photos.openInNewTab') }}
-        </a>
+        <div v-if="loading" class="flex flex-1 flex-col items-center justify-center text-white/80">
+          <BeanieSpinner size="md" />
+        </div>
+        <template v-else-if="pdfPages.length">
+          <img
+            v-for="(pageUrl, i) in pdfPages"
+            :key="i"
+            :src="pageUrl"
+            alt=""
+            class="w-full max-w-3xl rounded-xl bg-white shadow-lg"
+          />
+          <p v-if="pdfTruncated" class="text-xs text-white/55">
+            {{ t('photos.pdf.truncated') }}
+          </p>
+          <a
+            v-if="fullUrl"
+            :href="fullUrl"
+            target="_blank"
+            rel="noopener"
+            class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 mt-1 inline-flex items-center gap-2 rounded-[16px] bg-gradient-to-r px-5 py-3 text-sm font-bold text-white no-underline shadow-sm transition-all duration-200 hover:shadow-md"
+          >
+            ↗ {{ t('photos.openInNewTab') }}
+          </a>
+        </template>
+        <!-- Render failed (or no bytes) → the open/download actions still work. -->
+        <div v-else class="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+          <span class="text-5xl" aria-hidden="true">📄</span>
+          <p class="max-w-xs text-sm text-white/70">{{ t('photos.pdf.previewFailed') }}</p>
+          <a
+            v-if="fullUrl"
+            :href="fullUrl"
+            target="_blank"
+            rel="noopener"
+            class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 inline-flex items-center gap-2 rounded-[16px] bg-gradient-to-r px-5 py-3 text-sm font-bold text-white no-underline shadow-sm transition-all duration-200 hover:shadow-md"
+          >
+            ↗ {{ t('photos.openInNewTab') }}
+          </a>
+        </div>
+      </div>
+
+      <!-- Loading (images) -->
+      <div v-else-if="loading && !fullUrl" class="flex flex-col items-center gap-2 text-white/80">
+        <BeanieSpinner size="md" />
       </div>
 
       <!--

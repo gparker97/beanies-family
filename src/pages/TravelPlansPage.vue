@@ -318,15 +318,33 @@ const editingItemIndex = ref(-1);
 // Collapsible segment cards
 const collapsedCards = ref<Record<string, boolean>>({});
 
-// Attachment viewer (read-only lightbox for timeline segment documents;
-// add/remove happens in the segment edit drawer, not here).
+// Attachment lightbox for timeline segment documents. Supports remove via the
+// standard PhotoViewer 🗑️ — `viewerSegmentId` tracks which segment the open
+// photos belong to so a remove updates the right segment's photoIds.
 const viewerOpen = ref(false);
 const viewerPhotoIds = ref<string[]>([]);
 const viewerIndex = ref(0);
-function openAttachmentViewer(photoIds: string[], photoId: string): void {
+const viewerSegmentId = ref<string | null>(null);
+function openAttachmentViewer(segmentId: string, photoIds: string[], photoId: string): void {
+  viewerSegmentId.value = segmentId;
   viewerPhotoIds.value = photoIds;
   viewerIndex.value = Math.max(0, photoIds.indexOf(photoId));
   viewerOpen.value = true;
+}
+
+/**
+ * Remove a booking document from the open segment. Mirrors `usePhotos.remove`:
+ * tombstone the photo (24h GC reclaims Drive + Automerge) and detach it from the
+ * segment's `photoIds`. The viewer closes itself after emitting remove.
+ */
+async function onAttachmentRemove(photoId: string): Promise<void> {
+  const vacationId = selectedVacationId.value;
+  const segmentId = viewerSegmentId.value;
+  if (!vacationId || !segmentId) return;
+  photoStore.markDeleted(photoId);
+  const nextIds = viewerPhotoIds.value.filter((id) => id !== photoId);
+  viewerPhotoIds.value = nextIds;
+  await vacationStore.updateSegmentPhotoIds(vacationId, segmentId, nextIds);
 }
 
 // Ideas state
@@ -1533,7 +1551,7 @@ function addQuickIdea() {
                           v-for="pid in item.photoIds"
                           :key="pid"
                           :photo-id="pid"
-                          @open="openAttachmentViewer(item.photoIds ?? [], pid)"
+                          @open="openAttachmentViewer(item.id, item.photoIds ?? [], pid)"
                         />
                       </div>
                     </VacationSegmentCard>
@@ -1730,13 +1748,13 @@ function addQuickIdea() {
          MODALS
          ═══════════════════════════════════════════════════════════════════════ -->
 
-    <!-- Booking-document lightbox (read-only; edit/remove via the segment drawer) -->
+    <!-- Booking-document lightbox — standard viewer with remove (🗑️). -->
     <PhotoViewer
       :open="viewerOpen"
       :photo-ids="viewerPhotoIds"
       :initial-index="viewerIndex"
-      read-only
       @close="viewerOpen = false"
+      @remove="onAttachmentRemove"
     />
 
     <!-- Vacation wizard -->

@@ -21,6 +21,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **One consistent magic button everywhere.** The "Perform magic" AI button now looks and behaves the same across the calendar and travel screens — the full "✨ Perform magic" label on larger screens, a compact ✨ on phones — so the AI capability is easy to spot wherever you are.
 
+### Fixed
+
+- **View attached PDFs inside the app.** Booking documents that are PDFs now render page-by-page right in the document viewer, instead of a blank box that wouldn't open. The "Open in new tab" and download options are still there if you'd rather use another app.
+- **Remove a booking document from a trip.** Opening an attached photo or PDF from the trip timeline now offers a delete option, so you can remove an attachment you no longer want.
+
 ## 2026-06-06
 
 ### Added

@@ -6440,6 +6440,14 @@ const STRING_DEFS = {
     beanie: 'drop an image or pdf to add',
   },
   'photos.openInNewTab': { en: 'Open in new tab', beanie: 'open in new tab' },
+  'photos.pdf.truncated': {
+    en: 'Showing the first pages. Open it to see the whole document.',
+    beanie: 'showing the first pages. open it to see the whole document.',
+  },
+  'photos.pdf.previewFailed': {
+    en: "This PDF can't be shown here. Open it in a new tab to view it.",
+    beanie: "this pdf can't be shown here. open it in a new tab to view it.",
+  },
   'photos.document.tile': { en: 'PDF document', beanie: 'pdf document' },
   'photos.document.tileNamed': { en: 'PDF: {name}', beanie: 'pdf: {name}' },
 
