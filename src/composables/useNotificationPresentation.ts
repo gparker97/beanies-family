@@ -13,6 +13,7 @@ import { useBeanieText } from '@/composables/useBeanieText';
 import { getReleaseNote } from '@/content/release-notes';
 import { getAnnouncement } from '@/content/announcements';
 import { getTip } from '@/content/tips';
+import { COMMUNITY_NUDGES } from '@/content/communityNudges';
 import {
   NOTIFICATION_KIND_PRESENTATION,
   ACCENT_TINT_CLASS,
@@ -48,9 +49,17 @@ export function useNotificationPresentation(notification: MaybeRefOrGetter<AppNo
   const tip = computed(() =>
     n.value.kind === 'tip' && n.value.sourceId ? getTip(n.value.sourceId) : undefined
   );
-  /** Whether the detail should render a rich celebratory body (whats-new / announcement / tip). */
+  /** The backing community-nudge message (resolved by its sourceId = messageIndex). */
+  const nudgeMessage = computed(() => {
+    if (n.value.kind !== 'communityNudge' || n.value.sourceId === undefined) return undefined;
+    return COMMUNITY_NUDGES[Number(n.value.sourceId)];
+  });
+  /** Whether the detail should render a rich body (whats-new / announcement / tip / nudge). */
   const hasRichBody = computed(() =>
-    Boolean((release.value || announcement.value || tip.value) && presentation.value.detailBody)
+    Boolean(
+      (release.value || announcement.value || tip.value || nudgeMessage.value) &&
+      presentation.value.detailBody
+    )
   );
 
   // whats-new is framed by its kind label; an announcement shows its own (bilingual)
@@ -62,6 +71,7 @@ export function useNotificationPresentation(notification: MaybeRefOrGetter<AppNo
     if (release.value?.summary) return txt(release.value.summary);
     if (announcement.value) return announcement.value.kicker ? txt(announcement.value.kicker) : '';
     if (tip.value) return txt(tip.value.message);
+    if (nudgeMessage.value) return txt(nudgeMessage.value);
     return notificationSummary(n.value, t);
   });
   const when = computed(() => notificationWhen(n.value, t));
@@ -74,6 +84,7 @@ export function useNotificationPresentation(notification: MaybeRefOrGetter<AppNo
     release,
     announcement,
     tip,
+    nudgeMessage,
     hasRichBody,
     title,
     summary,

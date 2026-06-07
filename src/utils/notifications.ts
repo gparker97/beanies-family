@@ -30,7 +30,13 @@ const DEFAULT_REMINDER_MINUTES = 30;
 const WHATS_NEW_PREFIX = 'whats-new:';
 const ANNOUNCEMENT_PREFIX = 'announcement:';
 const TIP_PREFIX = 'tip:';
-const PRUNE_EXEMPT_PREFIXES = [WHATS_NEW_PREFIX, ANNOUNCEMENT_PREFIX, TIP_PREFIX] as const;
+const COMMUNITY_NUDGE_PREFIX = 'community-nudge:';
+const PRUNE_EXEMPT_PREFIXES = [
+  WHATS_NEW_PREFIX,
+  ANNOUNCEMENT_PREFIX,
+  TIP_PREFIX,
+  COMMUNITY_NUDGE_PREFIX,
+] as const;
 
 export interface NotificationOccurrence {
   activity: FamilyActivity;
@@ -48,6 +54,8 @@ export interface DeriveInput {
   issuedTips: readonly { tipId: string; issuedAt: string }[];
   /** Resolver for issuedTips — module-level Map from `tips.ts`. */
   tipsById: ReadonlyMap<string, BeanTip>;
+  /** The one live community nudge (Discord), or null. Window-exempt; projected 1:1. */
+  activeNudge: { messageIndex: number; issuedAt: number } | null;
   /** The current member's id→readAt slice of `notificationReads`. */
   readState: Record<string, string>;
   /** Rolling history window (days) for time-based kinds; whats-new is exempt. */
@@ -69,6 +77,11 @@ export const activityReminderId = (activityId: string, occurrenceDate: string): 
 export const whatsNewId = (version: string): string => `${WHATS_NEW_PREFIX}${version}`;
 export const announcementId = (id: string): string => `${ANNOUNCEMENT_PREFIX}${id}`;
 export const tipId = (id: string): string => `${TIP_PREFIX}${id}`;
+// Encodes the rotating messageIndex so each interval's nudge is a DISTINCT id →
+// re-derives as unread (so "Not now → reappears next interval" works) and the
+// cap (< message count) guarantees an index never repeats within a lifetime.
+export const communityNudgeId = (messageIndex: number): string =>
+  `${COMMUNITY_NUDGE_PREFIX}${messageIndex}`;
 
 // ── Internal pure date helpers (LOCAL time — avoids the UTC-midnight trap of
 //    `new Date('YYYY-MM-DD')`) ─────────────────────────────────────────────────
@@ -116,6 +129,7 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
     announcements,
     issuedTips,
     tipsById,
+    activeNudge,
     readState,
     windowDays,
     occurrencesByDate,
@@ -331,6 +345,28 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
       });
     } catch (err) {
       console.warn(`[deriveNotifications] skipped tip ${issued?.tipId ?? '?'}:`, err);
+    }
+  }
+
+  // ── community nudge (window-exempt; at most one active at a time) ────────────
+  // Pure 1:1 projection of `activeNudge`: the issue/cap/cadence policy already
+  // ran in `decideIssue` (useCommunityNudge), so presence here = "fresh + chosen."
+  if (activeNudge) {
+    try {
+      const id = communityNudgeId(activeNudge.messageIndex);
+      const issuedMs = activeNudge.issuedAt;
+      out.push({
+        id,
+        kind: 'communityNudge',
+        // Language-agnostic fallback; the bilingual label resolves in the
+        // presentation layer (useNotificationPresentation), like tip/announcement.
+        title: '',
+        occurredAt: Number.isNaN(issuedMs) ? now.toISOString() : new Date(issuedMs).toISOString(),
+        sourceId: String(activeNudge.messageIndex),
+        read: isRead(id),
+      });
+    } catch (err) {
+      console.warn('[deriveNotifications] skipped community nudge:', err);
     }
   }
 

@@ -1,0 +1,55 @@
+---
+// Stable redirect to the beanies.family Discord. Every in-app "join Discord"
+// CTA points at /discord (via DISCORD_URL) so the actual invite can be rotated
+// here — a small web deploy — without an app/PWA release, and a dead invite can
+// never ship inside a bundle.
+//
+// Deliberately a minimal standalone page (NOT BaseLayout): no nav/footer and,
+// crucially, none of BaseLayout's standalone-PWA escape-hatch script — this page
+// is a pure forward.
+//
+// To change the invite: edit INVITE_URL below and deploy the web site.
+const INVITE_URL = 'https://discord.gg/NE4grWzjxV';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content={`0; url=${INVITE_URL}`} />
+    <link rel="canonical" href={INVITE_URL} />
+    <meta name="robots" content="noindex" />
+    <title>Joining the beanies.family Discord…</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: #f8f9fa;
+        color: #2c3e50;
+        font-family: Outfit, system-ui, sans-serif;
+        text-align: center;
+        padding: 24px;
+      }
+      a {
+        color: #f15d22;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <p>taking you to our discord… 🫘</p>
+    <p>
+      not redirected? <a href={INVITE_URL} rel="noopener">tap here to join us on discord</a>.
+    </p>
+    <script is:inline define:vars={{ INVITE_URL }}>
+      // Belt-and-braces: also redirect via JS in case meta-refresh is delayed.
+      window.location.replace(INVITE_URL);
+    </script>
+  </body>
+</html>

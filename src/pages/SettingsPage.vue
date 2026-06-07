@@ -8,6 +8,7 @@ import ChangePasswordSettings from '@/components/settings/ChangePasswordSettings
 import ProfileHeader from '@/components/settings/ProfileHeader.vue';
 import SettingsCard from '@/components/settings/SettingsCard.vue';
 import BetaBadge from '@/components/ui/BetaBadge.vue';
+import { openDiscord } from '@/utils/discord';
 import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
 import AiSettings from '@/components/settings/AiSettings.vue';
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
@@ -674,6 +675,13 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       >
         <template #badge><BetaBadge /></template>
       </SettingsCard>
+      <SettingsCard
+        icon="💬"
+        :title="t('settings.card.community')"
+        :description="t('settings.card.communityDesc')"
+        icon-bg="var(--tint-silk-20)"
+        @click="openDiscord('settings')"
+      />
     </div>
 
     <!-- ── Install App Banner ──────────────────────────────────────────── -->
