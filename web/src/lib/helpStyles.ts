@@ -99,9 +99,9 @@ export const CATEGORY_COPY: Record<string, { label: string; description: string 
       'Accounts, transactions, budgets, goals, activities, the planner, and everything in between.',
   },
   security: {
-    label: 'Security & Privacy',
+    label: 'Security, Privacy, and AI',
     description:
-      'How we encrypt your data, protect your keys, and keep your beans safe \u2014 with full transparency.',
+      'How we encrypt your data, protect your keys, handle AI privately, and keep your beans safe \u2014 with full transparency.',
   },
   'how-it-works': {
     label: 'How It Works',
