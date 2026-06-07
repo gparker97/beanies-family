@@ -44,6 +44,14 @@ export interface ReleaseNote {
     icon?: string;
     /** Route for "try it →" button */
     tryItRoute?: string;
+    /**
+     * Turn a phrase that appears inside `description` into an external link
+     * (e.g. a help article). The phrase must be a verbatim substring of the
+     * description; if it isn't found the description renders as plain text.
+     */
+    descriptionLink?: { phrase: { en: string; beanie: string }; href: string };
+    /** A trailing call-to-action that opens an external URL in a new tab. */
+    cta?: { label: { en: string; beanie: string }; href: string };
   }>;
   fixes?: Array<{ text: { en: string; beanie: string } }>;
   signature?: string;
