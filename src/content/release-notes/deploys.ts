@@ -17,6 +17,34 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.06.07.2',
+    date: '2026-06-07',
+    month: '7 june 2026',
+    spotlight: false,
+    summary: {
+      en: 'Help us grow beanies.family together on Discord.',
+      beanie: 'help us grow beanies.family together on discord.',
+    },
+    features: [
+      {
+        icon: '💬',
+        title: {
+          en: 'Join the beanies community',
+          beanie: 'join the beanies community',
+        },
+        description: {
+          en: "We're building a community of early beanie families on Discord - help shape what we build, swap tips, hear what's coming next, or just have a chat. All our early beans are welcome. Come say hi.",
+          beanie:
+            "we're building a community of early beanie families on discord - help shape what we build, swap tips, hear what's coming next, or just have a chat. all our early beans are welcome. come say hi.",
+        },
+        cta: {
+          label: { en: 'Join us on Discord', beanie: 'join us on discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.06.07',
     date: '2026-06-07',
     month: '7 june 2026',
