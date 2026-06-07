@@ -92,6 +92,7 @@ const STRING_DEFS = {
   'common.createdBy': { en: 'Created by', beanie: 'created by' },
   'common.purchased': { en: 'Purchased', beanie: 'purchased' },
   'common.save': { en: 'Save', beanie: 'save' },
+  'common.beta': { en: 'Beta', beanie: 'beta' },
   'common.cancel': { en: 'Cancel', beanie: 'cancel' },
   'common.delete': { en: 'Delete', beanie: 'delete' },
   'common.saving': { en: 'Saving...', beanie: 'counting beans...' },
@@ -6627,6 +6628,10 @@ const STRING_DEFS = {
   'ai.consent.privacyLink': {
     en: 'How we protect your privacy',
     beanie: 'how we protect your privacy',
+  },
+  'ai.consent.learnMore': {
+    en: 'Learn how your data is kept secure',
+    beanie: 'learn how your data is kept secure',
   },
   'settings.ai.title': { en: 'AI & Privacy', beanie: 'ai & privacy' },
   'settings.ai.askBeforePhotos': {

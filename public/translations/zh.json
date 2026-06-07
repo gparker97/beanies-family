@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-07",
-    "translationCount": 3084
+    "translationCount": 3085
   },
   "translations": {
     "app.name": {
@@ -15419,6 +15419,16 @@
     "ai.consent.introLink": {
       "translation": "安全、私密",
       "hash": "lw6tq0",
+      "lastUpdated": "2026-06-07"
+    },
+    "common.beta": {
+      "translation": "测试版",
+      "hash": "18avk",
+      "lastUpdated": "2026-06-07"
+    },
+    "ai.consent.learnMore": {
+      "translation": "了解如何保障您的数据安全",
+      "hash": "n4cffc",
       "lastUpdated": "2026-06-07"
     }
   }

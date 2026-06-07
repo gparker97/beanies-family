@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mutable mock state — hoisted so the vi.mock factories below can close over it.
 const h = vi.hoisted(() => ({
   canEdit: { value: true },
-  flag: vi.fn((_flag: string) => true),
   closeQuickAdd: vi.fn(),
   closeSheetForNavigation: vi.fn(),
   hasMarker: { value: false },
@@ -14,9 +13,6 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/composables/usePermissions', () => ({
   usePermissions: () => ({ canEditActivities: h.canEdit }),
-}));
-vi.mock('@/config/flags', () => ({
-  isFlagEnabled: (flag: string) => h.flag(flag),
 }));
 vi.mock('@/composables/useQuickAdd', () => ({
   closeQuickAdd: h.closeQuickAdd,
@@ -54,16 +50,15 @@ beforeEach(() => {
   h.canEdit.value = true;
   h.currentPath.value = '/';
   h.hasMarker.value = false;
-  h.flag.mockImplementation(() => true);
   resetPending();
 });
 
 describe('useMagicReader — gating', () => {
-  it('canReadPhoto / canReadDocument reflect permission × flag', () => {
-    h.flag.mockImplementation((f: string) => f === 'aiPhotoExtract');
+  it('both readers are available when the member can edit activities (launched — no flag gating)', () => {
+    h.canEdit.value = true;
     const r = useMagicReader();
     expect(r.canReadPhoto.value).toBe(true);
-    expect(r.canReadDocument.value).toBe(false);
+    expect(r.canReadDocument.value).toBe(true);
     expect(r.canReadAny.value).toBe(true);
   });
 
@@ -73,11 +68,6 @@ describe('useMagicReader — gating', () => {
     expect(r.canReadPhoto.value).toBe(false);
     expect(r.canReadDocument.value).toBe(false);
     expect(r.canReadAny.value).toBe(false);
-  });
-
-  it('canReadAny is false only when BOTH flags are off', () => {
-    h.flag.mockImplementation(() => false);
-    expect(useMagicReader().canReadAny.value).toBe(false);
   });
 });
 
