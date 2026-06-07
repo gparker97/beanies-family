@@ -393,7 +393,8 @@
   .beanie-sync-in,
   .beanie-sync-pulse,
   .animate-beanie-shimmer,
-  .attention-pulse {
+  .attention-pulse,
+  .magic-shimmer::after {
     animation: none !important;
   }
 
@@ -579,6 +580,41 @@
 
 .attention-pulse {
   animation: attention-pulse 1.5s ease-out;
+}
+
+/* ───── Magic Shimmer ───────────────────────────────────────────────────────
+   The "beanies can do magic" signal. Add .magic-shimmer to any element that
+   already carries the Heritage Orange → Terracotta gradient (supplied inline as
+   `bg-gradient-to-br from-primary-500 to-terracotta-400`). This adds a slow
+   white sheen that sweeps across the surface — motion only, so the colour stays
+   co-located with the markup and reuses the existing brand gradient tokens.
+   Disabled under prefers-reduced-motion (see the block above).
+──────────────────────────────────────────────────────────────────────────── */
+@keyframes magic-sheen {
+  0%,
+  55% {
+    transform: translateX(-120%);
+  }
+
+  85%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+.magic-shimmer {
+  overflow: hidden;
+  position: relative;
+}
+
+.magic-shimmer::after {
+  animation: magic-sheen 4.4s ease-in-out infinite;
+  background: linear-gradient(105deg, transparent 32%, rgb(255 255 255 / 32%) 50%, transparent 68%);
+  content: '';
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-120%);
 }
 
 /* ── Family Scrapbook decorative utilities ─────────────────────────────

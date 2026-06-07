@@ -344,23 +344,23 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
   {
     slug: 'how-beanies-ai-handles-your-photos',
     category: 'security',
-    title: 'How beanies AI Handles Your Photos',
+    title: 'Magic Beans: How beanies Reads Your Photos &amp; Documents',
     excerpt:
-      'What happens when you add an activity from a photo: what we send, where it goes, and what we keep (nothing).',
-    icon: '\u{1F4F8}',
+      'Hand beanies a "magic bean" — a photo or booking — and it sprouts the details for you. Here is exactly what we send, where it goes, and what we keep (which is nothing).',
+    icon: '\u{1FAD8}',
     readTime: 4,
-    updatedDate: '2026-06-03',
+    updatedDate: '2026-06-07',
     sections: [
       {
         type: 'heading',
-        content: 'What beanies AI does',
+        content: 'What the magic beans do',
         level: 2,
         id: 'what-it-does',
       },
       {
         type: 'paragraph',
         content:
-          'When you tap <strong>Add from a photo</strong>, beanies reads a single picture or document you choose (like a party invitation) and pulls out the event details, then opens a new activity pre-filled for you to check and save. It only ever runs on the one document you pick, and only when you ask it to.',
+          'Tap <strong>✨ Perform magic</strong> (or the <strong>Invite</strong> and <strong>Travel booking</strong> buttons) and beanies reads a single photo or document you choose — a party invitation, a flight itinerary, a hotel confirmation — and magically pulls out the key details, then opens a pre-filled activity or trip for you to check and save. As you probably guessed, it's not actually magic: it's secure, private AI. It only ever runs on the one document you pick, and only when you ask.',
       },
       {
         type: 'heading',
@@ -373,8 +373,8 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>Only the one photo or document</strong> you chose for that action.',
-          "<strong>Never the rest of your family's data</strong> — your accounts, activities, members, and notes never leave your device for this.",
-          'Nothing is sent until you confirm. You can decline and fill the activity in by hand.',
+          "<strong>Never the rest of your family's data</strong> — your accounts, activities, trips, members, and notes never leave your device for this.",
+          'Nothing is sent until you confirm. You can decline and fill the activity or trip in by hand.',
         ],
       },
       {
@@ -386,13 +386,13 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'On the default setting, the photo is sent to a private, secure AI service that processes it and keeps nothing. The document is encrypted while it travels to and from that service. If you bring your own AI provider (BYOK), it goes to that provider instead, using your key.',
+          'On the default setting, your photo or document is encrypted and sent to a private, secure AI service that processes it and keeps nothing. It is encrypted while it travels to and from that service. If you bring your own AI provider (BYOK), it goes to that provider instead, using your key.',
       },
       {
         type: 'callout',
         content:
-          'The AI service processes your document in a secure, attested environment and retains nothing after it answers. It is encrypted in transit. (We are honest about the boundary: the service does process the image to read it. We do not claim no one could ever see it.)',
-        title: 'Private, and honest about it',
+          'The AI service processes your document in a secure, attested environment and retains nothing after it answers. It is encrypted in transit. Once your document or image arrives in the secure enclave, it is decrypted and procesed to read, encrypt, and return the details back to beanies.family.)',
+        title: 'Private and secure as can be',
         icon: '\u{1F512}',
       },
       {
@@ -404,7 +404,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          "The AI service keeps nothing. The photo or document you picked is saved only with your own family's data and attached to the activity it created, so you can find it later. You can remove it before saving like any other photo.",
+          "The AI service does not retain any data or information. The photo or document you picked is saved only with your own family's data file, and attached to the activity, trip, or other item it created, so you can find it later. You can remove it before saving if you'd like.",
       },
       {
         type: 'heading',
@@ -415,7 +415,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'Ticking "don’t ask again" in the consent box turns off the prompt for <strong>your whole family</strong>, not just your device, because the setting is shared with your family data. You can turn the prompt back on any time in <strong>Settings → AI &amp; Privacy</strong>.',
+          'Ticking "don’t ask again" in the consent box turns off the AI consent prompt for <strong>your whole family</strong>, not just your device, because the setting is shared with your family data. You can turn the prompt back on any time in <strong>Settings → AI &amp; Privacy</strong>.',
         title: 'It applies to your whole family',
         icon: '\u{1F465}',
       },

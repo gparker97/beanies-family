@@ -31,7 +31,9 @@ import { useFilePicker } from '@/composables/useFilePicker';
 import { useDocumentToTravel, type TravelReady } from '@/composables/useDocumentToTravel';
 import { useDocumentConsent } from '@/composables/useDocumentConsent';
 import { useAiCapability } from '@/composables/useAiCapability';
-import { isFlagEnabled } from '@/config/flags';
+import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
+import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
+import { AI_PICKER_ACCEPT } from '@/constants/aiDocumentPicker';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
@@ -69,9 +71,8 @@ const photoStore = usePhotoStore();
 
 // ── AI: add travel plans from a document (#30, flag-gated, prod-off) ───────────
 const { tier: aiTier } = useAiCapability();
-const canAddTravelFromDoc = computed(
-  () => canEditActivities.value && isFlagEnabled('aiTravelExtract')
-);
+// Gating for the document→trip reader lives in useMagicReader now (single source).
+const { canReadDocument } = useMagicReader();
 const { consentOpen, requestConsent, resolveConsent, onConsentConfirm } = useDocumentConsent();
 
 // The extracted payload handed to the review modal (null when closed).
@@ -87,7 +88,10 @@ const { isProcessing: isReadingDoc, processFile: processTravelDoc } = useDocumen
 });
 
 const docPicker = useFilePicker({
-  accept: 'image/jpeg,image/png,image/heic,image/heif,application/pdf',
+  // Images + PDFs (page 1 rasterized client-side). image/* offers the camera in
+  // the mobile chooser; application/pdf + .pdf keeps PDFs selectable on every
+  // platform. No forced `capture` — the camera is an option, not the only choice.
+  accept: AI_PICKER_ACCEPT,
   onPick: (files) => {
     if (files[0]) void processTravelDoc(files[0]);
   },
@@ -99,6 +103,10 @@ async function handleAddFromDocument(): Promise<void> {
   if (!granted) return;
   docPicker.open();
 }
+
+// Document-reader cross-surface dispatch: the FAB card / new-trip-wizard banner
+// set `pendingMagic` and route here; pick it up (watch + onMounted) and run it.
+useMagicReaderConsumer('document', handleAddFromDocument, canReadDocument);
 
 /** Every created segment id across the buckets, in timeline order. */
 function allSegmentIds(ready: TravelReady): string[] {
@@ -773,14 +781,11 @@ function addQuickIdea() {
     <template v-if="!selectedVacationId">
       <PageHeader icon="airplane" :title="t('travel.title')" :subtitle="t('travel.subtitle')">
         <div class="flex flex-wrap items-center gap-2">
-          <button
-            v-if="canAddTravelFromDoc"
-            type="button"
-            class="font-outfit inline-flex cursor-pointer items-center gap-2 rounded-2xl border-[1.5px] border-[var(--vacation-teal-15)] bg-white px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-[#0077B6] transition-all hover:border-[var(--vacation-teal)] dark:bg-slate-800"
+          <MagicReaderPill
+            v-if="canReadDocument"
+            :label="t('ai.magic.perform')"
             @click="handleAddFromDocument"
-          >
-            {{ t('travelExtract.addButton') }} 📄
-          </button>
+          />
           <button
             v-if="canEditActivities"
             type="button"

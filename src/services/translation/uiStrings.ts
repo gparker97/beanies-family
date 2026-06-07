@@ -6457,8 +6457,26 @@ const STRING_DEFS = {
     en: "We couldn't spot any travel details in that document. You can add the trip manually.",
     beanie: "we couldn't spot any travel details in that document. you can add the trip manually.",
   },
+  // ── "beanies can do magic" AI entry points — shared magic-reader language ──
+  'ai.magic.title': { en: 'beanies can do magic', beanie: 'beanies can do magic' },
+  'ai.magic.subtitle': {
+    en: 'Snap an invite or travel booking, beanies will fill it in',
+    beanie: 'snap an invite or travel booking, beanies will fill it in',
+  },
+  'ai.magic.invite': { en: 'Invite', beanie: 'invite' },
+  'ai.magic.travelBooking': { en: 'Travel booking', beanie: 'travel booking' },
+  'ai.magic.perform': { en: 'Perform magic', beanie: 'perform magic' },
+  'ai.magic.performHint': {
+    en: 'Snap an invite, beanies fills it in',
+    beanie: 'snap an invite, beanies fills it in',
+  },
+  'ai.magic.quickStart': { en: 'Quick start', beanie: 'quick start' },
+  'ai.magic.travelSubtitle': {
+    en: "Snap your travel booking, I'll build the trip",
+    beanie: "snap your travel booking, i'll build the trip",
+  },
+  'ai.magic.orAddYourself': { en: 'or add it yourself', beanie: 'or add it yourself' },
   // ── Travel document extraction (#30) ──
-  'travelExtract.addButton': { en: 'Add from Document', beanie: 'add from document' },
   'travelExtract.reviewTitle': { en: 'Review Travel Plans', beanie: 'review travel plans' },
   'travelExtract.reviewSubtitle': {
     en: 'Here’s what we found. Check it over, then add it to a trip — you can fine-tune any detail afterward.',
@@ -6557,12 +6575,20 @@ const STRING_DEFS = {
     en: 'The photo this activity was read from',
     beanie: 'the photo this activity was read from',
   },
-  'ai.consent.title': { en: 'Welcome to beanies AI!', beanie: 'welcome to beanies ai!' },
-  'ai.consent.intro': {
-    en: "beanies will read this photo or document to magically extract the key details (well, it's not actually magic, it's just AI).",
-    beanie:
-      "beanies will read this photo or document to magically extract the key details (well, it's not actually magic, it's just ai).",
+  'ai.consent.title': {
+    en: 'Ready for some magic beans?',
+    beanie: 'ready for some magic beans?',
   },
+  // `intro` is one translatable sentence; the modal locates `introLink`
+  // ("secure, private") inside it at render time and turns that phrase into an
+  // inline link to the privacy article (gated on PRIVACY_ARTICLE_LIVE — plain
+  // text until it ships). Keep `introLink` a verbatim substring of `intro`.
+  'ai.consent.intro': {
+    en: "beanies will read this photo or document and magically extract the key details for you (well, it's not actually magic, it's just secure, private AI).",
+    beanie:
+      "beanies will read this photo or document and magically extract the key details for you (well, it's not actually magic, it's just secure, private ai).",
+  },
+  'ai.consent.introLink': { en: 'secure, private', beanie: 'secure, private' },
   'ai.consent.whatLabel': { en: 'What we send', beanie: 'what we send' },
   'ai.consent.whatValue': {
     en: "Only this one photo or document, never anything else, and never any of your family's data.",
@@ -6586,8 +6612,8 @@ const STRING_DEFS = {
       "nothing is kept by the ai service. your photo or document is saved only with your own family's data, attached to this activity.",
   },
   'ai.consent.confirm': {
-    en: 'I understand - use beanies AI!',
-    beanie: 'i understand - use beanies ai!',
+    en: 'I understand - gimme those beans!',
+    beanie: 'i understand - gimme those beans!',
   },
   'ai.consent.footnote': {
     en: "We'd never send anything without asking - you choose each time. You can stop the prompt for your family by ticking the box below.",

@@ -57,7 +57,7 @@ const allowedActions = ref<readonly QuickAddAction[] | null>(null);
  */
 const HISTORY_MARKER_KEY = '__beanieQuickAddOpen';
 
-function hasSheetHistoryMarker(): boolean {
+export function hasSheetHistoryMarker(): boolean {
   if (typeof window === 'undefined') return false;
   const state = window.history.state as Record<string, unknown> | null;
   return Boolean(state && state[HISTORY_MARKER_KEY]);
@@ -174,7 +174,7 @@ export function closeQuickAdd(): void {
  * via `history.back()` plus `router.replace` would race and leave the
  * stack in a bad state.
  */
-function closeSheetForNavigation(): void {
+export function closeSheetForNavigation(): void {
   isOpen.value = false;
   stage.value = { mode: 'main' };
   allowedActions.value = null;

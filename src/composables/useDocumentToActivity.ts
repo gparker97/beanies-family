@@ -15,6 +15,7 @@ import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
 import { useExtractionErrorToast } from './useExtractionErrorToast';
 import { extractEventFromDocument } from '@/services/ai/documentExtractionService';
+import { isPdfFile, pdfFirstPageToImage } from '@/utils/pdfFirstPageToImage';
 import type { FieldConfidence } from '@/services/ai/types';
 import { extractionToActivityPrefill } from '@/utils/extractionToActivity';
 import { toDateInputValue } from '@/utils/date';
@@ -54,7 +55,23 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
 
     isProcessing.value = true;
     try {
-      const result = await extractEventFromDocument(file, {
+      // PDFs are rasterized (page 1) to an image for the image-only extraction
+      // proxy — the same client-side step the travel reader uses, so the prompt
+      // and Lambda are unchanged (they always receive an image). A rasterization
+      // failure surfaces via the shared reporter (compression bucket), never
+      // silently swallowed.
+      let extractFile = file;
+      if (isPdfFile(file)) {
+        try {
+          extractFile = await pdfFirstPageToImage(file);
+        } catch (err) {
+          console.error('[photo-extract] PDF rasterization failed:', err);
+          reportExtractionFailure('compression');
+          return;
+        }
+      }
+
+      const result = await extractEventFromDocument(extractFile, {
         // Local YYYY-MM-DD (not a full ISO timestamp) so the model resolves relative dates
         // against the user's calendar date, and the proxy's date validation passes.
         tier: tier.value,
