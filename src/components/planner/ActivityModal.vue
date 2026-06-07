@@ -16,6 +16,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import RecurringPaymentPrompt from '@/components/ui/RecurringPaymentPrompt.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
+import TripShortcutCard from '@/components/planner/TripShortcutCard.vue';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { calculateMonthlyFee } from '@/utils/finance';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -23,6 +24,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { usePhotoStore } from '@/stores/photoStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useMagicReader } from '@/composables/useMagicReader';
 import { useFormModal } from '@/composables/useFormModal';
 import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
@@ -69,9 +71,19 @@ const emit = defineEmits<{
   save: [data: CreateFamilyActivityInput | { id: string; data: UpdateFamilyActivityInput }];
   delete: [];
   'start-vacation-wizard': [defaults: { assigneeIds: string[]; date: string }];
+  /** "Perform magic" — page closes this modal, runs the photo reader, reopens pre-filled. */
+  'start-photo-reader': [];
 }>();
 
 const { t } = useTranslation();
+// Gates the "Perform magic" half of the Quick-start row (photo reader, #133).
+const { canReadPhoto } = useMagicReader();
+
+/** "Plan a trip" — hand off to the vacation wizard and close this modal. */
+function startTripWizard(): void {
+  emit('start-vacation-wizard', { assigneeIds: [...assigneeIds.value], date: date.value });
+  emit('close');
+}
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const activityStore = useActivityStore();
@@ -689,37 +701,39 @@ function handleSave() {
       </div>
 
       <!-- Vacation toggle bar -->
-      <div
-        v-if="!isEditing"
-        class="cursor-pointer rounded-2xl border px-4 py-3 transition-all duration-200 hover:shadow-sm"
-        style="
-          background: linear-gradient(135deg, rgb(0 180 216 / 12%), rgb(255 217 61 / 10%));
-          border-color: rgb(0 180 216 / 18%);
-        "
-        @click="
-          emit('start-vacation-wizard', {
-            assigneeIds: [...assigneeIds],
-            date: date,
-          });
-          emit('close');
-        "
-      >
-        <div class="flex items-center gap-3">
-          <span class="text-xl" style="animation: sway 3s ease-in-out infinite">🏖️</span>
-          <div class="min-w-0 flex-1">
-            <span
-              class="font-outfit block text-xs font-semibold"
-              style="color: var(--vacation-teal)"
-            >
-              {{ t('vacation.planningATrip') }}
-            </span>
-            <span class="block text-[0.625rem] text-[var(--color-text-muted)] opacity-60">
-              {{ t('vacation.planningSubtitle') }}
-            </span>
+      <!-- Quick start: alternative ways to begin a NEW activity. When the photo
+           reader is available (flag + permission), "Perform magic" pairs with the
+           trip shortcut in a two-up row under a kicker; otherwise the trip
+           shortcut shows full-width exactly as before. -->
+      <template v-if="!isEditing">
+        <!-- Magic available → kicker + two-up row -->
+        <div v-if="canReadPhoto">
+          <div
+            class="font-outfit mb-2 flex items-center gap-1.5 text-xs font-bold tracking-wide text-[var(--color-text-muted)] uppercase opacity-60"
+          >
+            <span aria-hidden="true">✨</span>{{ t('ai.magic.quickStart') }}
           </div>
-          <span class="text-sm font-semibold" style="color: var(--vacation-teal)">›</span>
+          <div class="grid grid-cols-2 gap-3">
+            <!-- Perform magic (photo reader) -->
+            <button
+              type="button"
+              class="magic-shimmer from-primary-500 to-terracotta-400 flex cursor-pointer flex-col gap-1 rounded-2xl bg-gradient-to-br p-3 text-left text-white shadow-[0_8px_18px_-8px_rgba(241,93,34,0.6)]"
+              @click="emit('start-photo-reader')"
+            >
+              <span aria-hidden="true" class="text-lg leading-none">✨</span>
+              <span class="font-outfit text-sm font-extrabold">{{ t('ai.magic.perform') }}</span>
+              <span class="relative z-[1] text-xs leading-snug opacity-90">
+                {{ t('ai.magic.performHint') }}
+              </span>
+            </button>
+            <!-- Plan a trip (existing shortcut), compact for the two-up grid -->
+            <TripShortcutCard compact @start="startTripWizard" />
+          </div>
         </div>
-      </div>
+
+        <!-- Magic off → the original full-width trip shortcut, unchanged -->
+        <TripShortcutCard v-else @start="startTripWizard" />
+      </template>
 
       <!-- 1. Schedule mode tab bar (recurring / one-time) — the first-order
            decision. Frequency chips (weekly / biweekly / monthly variants)

@@ -17,6 +17,7 @@ import ViewToggle from '@/components/planner/ViewToggle.vue';
 import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
 import MemberFilterMobileMenu from '@/components/planner/MemberFilterMobileMenu.vue';
 import CalendarTripRibbon from '@/components/planner/CalendarTripRibbon.vue';
+import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
 import HamburgerButton from '@/components/common/HamburgerButton.vue';
 import SearchButton from '@/components/common/SearchButton.vue';
 import NotificationsBell from '@/components/notifications/NotificationsBell.vue';
@@ -221,17 +222,17 @@ onBeforeUnmount(() => {
             @vacation-click="emit('vacation-click', $event)"
           />
 
-          <!-- Add from a photo (#133): reads an invitation photo into a prefilled activity.
-               Gated by canAddFromPhoto (dev feature flag); falls back to canAdd when unset. -->
-          <button
+          <!-- "✨ Perform magic" — reads an invitation photo into a prefilled
+               activity (#133). Restyled into the shared magic language; icon-only
+               here to stay compact beside the Add button. Gated by canAddFromPhoto
+               (dev flag); falls back to canAdd when unset. -->
+          <MagicReaderPill
             v-if="canAddFromPhoto ?? canAdd"
-            type="button"
-            class="inline-flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full bg-[var(--tint-orange-8)] text-lg transition-all hover:bg-[var(--tint-orange-15)] sm:rounded-2xl"
+            icon-only
+            :label="t('ai.magic.perform')"
             :aria-label="t('ai.addFromPhoto')"
             @click="emit('add-from-photo')"
-          >
-            <span aria-hidden="true">📸</span>
-          </button>
+          />
 
           <button
             v-if="canAdd"

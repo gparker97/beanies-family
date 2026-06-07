@@ -38,7 +38,8 @@ import { useDocumentToActivity } from '@/composables/useDocumentToActivity';
 import { useDocumentConsent } from '@/composables/useDocumentConsent';
 import { useAiCapability } from '@/composables/useAiCapability';
 import { useFilePicker } from '@/composables/useFilePicker';
-import { isFlagEnabled } from '@/config/flags';
+import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
+import { AI_PICKER_ACCEPT } from '@/constants/aiDocumentPicker';
 import type { FieldConfidence } from '@/services/ai/types';
 import type {
   FamilyActivity,
@@ -53,9 +54,10 @@ const { t } = useTranslation();
 const route = useRoute();
 const router = useRouter();
 const { canEditActivities } = usePermissions();
-// The photo→activity wedge (#133) is hidden behind a dev feature flag until it ships to
-// users: ON in dev, OFF in prod (override per-browser via localStorage). Gates the 📸 button.
-const canAddFromPhoto = computed(() => canEditActivities.value && isFlagEnabled('aiPhotoExtract'));
+// Gating + cross-surface dispatch for the photo→activity reader (#133) live in
+// one place now (useMagicReader). `canReadPhoto` = canEditActivities && the dev
+// flag; it gates the command-bar pill and (via the wizard) the activity modal.
+const { canReadPhoto } = useMagicReader();
 const activityStore = useActivityStore();
 const accountsStore = useAccountsStore();
 const recurringStore = useRecurringStore();
@@ -170,7 +172,14 @@ function onPhotoActivityReady(ready: {
   activityPrefill.value = ready.prefill;
   activityPrefillConfidence.value = ready.confidence;
   activitySourcePhoto.value = ready.sourcePhoto;
-  showModal.value = true; // last → ActivityModal.onNew reads the prefill set above
+  // Close-then-reopen so ActivityModal.onNew re-fires applyPrefill even when a
+  // modal is already open (the in-modal "Perform magic" path). This runs only on
+  // a successful extraction — a declined consent or a failed read never reaches
+  // here, so the user's open modal is left exactly as it was.
+  showModal.value = false;
+  void nextTick(() => {
+    showModal.value = true;
+  });
 }
 
 const { isProcessing: isReadingPhoto, processFile: processPhoto } = useDocumentToActivity({
@@ -178,8 +187,10 @@ const { isProcessing: isReadingPhoto, processFile: processPhoto } = useDocumentT
 });
 
 const photoPicker = useFilePicker({
-  accept: 'image/jpeg,image/png,image/heic,image/heif',
-  capture: 'environment', // mobile opens the rear camera
+  // Images + PDFs (the reader rasterizes a PDF's page 1 client-side). image/*
+  // also makes the mobile chooser offer the camera; no forced `capture` so the
+  // camera is an option, not the only choice.
+  accept: AI_PICKER_ACCEPT,
   onPick: (files) => {
     if (files[0]) void processPhoto(files[0]);
   },
@@ -198,6 +209,10 @@ async function handleAddFromPhoto(): Promise<void> {
   if (!granted) return;
   photoPicker.open();
 }
+
+// Photo-reader cross-surface dispatch: the global FAB card sets `pendingMagic`
+// and navigates here; pick it up (watch + onMounted) and run the same handler.
+useMagicReaderConsumer('photo', handleAddFromPhoto, canReadPhoto);
 
 // Vacation wizard state
 const showVacationWizard = ref(false);
@@ -542,7 +557,7 @@ function handleActivitySwapped(newId: string) {
       :label="label"
       :active-view="activeView"
       :can-add="canEditActivities"
-      :can-add-from-photo="canAddFromPhoto"
+      :can-add-from-photo="canReadPhoto"
       :is-all-active="isAllActive"
       :is-member-active="isMemberActive"
       :active-member-names="activeMemberNames"
@@ -687,6 +702,7 @@ function handleActivitySwapped(newId: string) {
       @save="handleSave"
       @delete="handleDelete"
       @start-vacation-wizard="handleStartVacationWizard"
+      @start-photo-reader="handleAddFromPhoto"
     />
 
     <!-- Add from a photo (#133): consent gate, hidden picker input, and processing overlay -->

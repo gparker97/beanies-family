@@ -354,6 +354,7 @@ const saveLabel = computed(() => {
       v-model:trip-end-date="tripEndDate"
       v-model:trip-dates-valid="tripDatesValid"
       :show-errors="showErrors"
+      :is-new-trip="!isEditing"
     />
     <VacationStep2
       v-if="currentStep === 2"

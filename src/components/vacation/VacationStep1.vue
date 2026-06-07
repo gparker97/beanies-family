@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
+import { useMagicReader } from '@/composables/useMagicReader';
 import type { VacationTripType, VacationTripPurpose } from '@/types/models';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -14,10 +15,13 @@ interface Props {
   tripStartDate: string;
   tripEndDate: string;
   showErrors?: boolean;
+  /** True for a brand-new trip — shows the "beanies can do magic" reader banner. */
+  isNewTrip?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showErrors: false,
+  isNewTrip: false,
 });
 
 const emit = defineEmits<{
@@ -31,6 +35,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+// "beanies can do magic" — read a travel booking into a built trip (#30).
+const { canReadDocument, openDocumentReader } = useMagicReader();
 
 const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
   { value: 'fly_and_stay', emoji: '✈️', key: 'fly_and_stay' },
@@ -43,6 +49,37 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
 </script>
 
 <template>
+  <!-- "beanies can do magic" — read a travel booking into a built trip. New
+       trip only, and only when the flag + permission allow. Followed by an
+       "or add it yourself" divider before the manual fields. -->
+  <div v-if="isNewTrip && canReadDocument" class="mb-5">
+    <button
+      type="button"
+      class="magic-shimmer from-primary-500 to-terracotta-400 flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-gradient-to-br p-3 text-left text-white shadow-[0_8px_18px_-8px_rgba(241,93,34,0.55)]"
+      @click="openDocumentReader"
+    >
+      <span
+        aria-hidden="true"
+        class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/20 text-lg"
+        >✨</span
+      >
+      <span class="relative z-[1] min-w-0 flex-1">
+        <span class="font-outfit block text-sm font-extrabold">{{ t('ai.magic.title') }}</span>
+        <span class="block text-xs leading-snug opacity-90">{{
+          t('ai.magic.travelSubtitle')
+        }}</span>
+      </span>
+      <span aria-hidden="true" class="font-outfit relative z-[1] font-extrabold">→</span>
+    </button>
+    <div
+      class="font-outfit mt-4 flex items-center gap-3 text-xs font-semibold tracking-wide text-[var(--color-text-muted)] uppercase opacity-60"
+    >
+      <span class="h-px flex-1 bg-gray-200 dark:bg-slate-700"></span>
+      {{ t('ai.magic.orAddYourself') }}
+      <span class="h-px flex-1 bg-gray-200 dark:bg-slate-700"></span>
+    </div>
+  </div>
+
   <!-- Step header -->
   <div class="mb-5 text-center">
     <div class="text-3xl">🗺️</div>

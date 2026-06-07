@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-06",
-    "translationCount": 3074
+    "lastUpdated": "2026-06-07",
+    "translationCount": 3084
   },
   "translations": {
     "app.name": {
@@ -14912,14 +14912,14 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.title": {
-      "translation": "欢迎来到beanies AI ！",
-      "hash": "3zxtyx",
-      "lastUpdated": "2026-06-03"
+      "translation": "想试试神奇魔豆吗？",
+      "hash": "t8u68p",
+      "lastUpdated": "2026-06-07"
     },
     "ai.consent.intro": {
-      "translation": "豆豆会阅读这张照片或文档，神奇地提取关键细节（嗯，这实际上不是魔法，只是人工智能）。",
-      "hash": "s73d9m",
-      "lastUpdated": "2026-06-03"
+      "translation": "beanies 会读取这张照片或文档，神奇地帮你提取关键信息（嗯，其实不是魔法，只是安全、私密的 AI）。",
+      "hash": "s9q2es",
+      "lastUpdated": "2026-06-07"
     },
     "ai.consent.whatLabel": {
       "translation": "我们发送的内容",
@@ -14957,9 +14957,9 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.confirm": {
-      "translation": "我明白了-使用beanies AI ！",
-      "hash": "ds8eo9",
-      "lastUpdated": "2026-06-03"
+      "translation": "我明白了，魔豆拿来吧！",
+      "hash": "h53xik",
+      "lastUpdated": "2026-06-07"
     },
     "ai.consent.footnote": {
       "translation": "我们绝不会在没有询问的情况下发送任何内容-每次都由您选择。您可以通过勾选下面的方框来停止提示家人。",
@@ -15201,11 +15201,6 @@
       "hash": "2mss8g",
       "lastUpdated": "2026-06-06"
     },
-    "travelExtract.addButton": {
-      "translation": "从文档添加",
-      "hash": "kskupa",
-      "lastUpdated": "2026-06-06"
-    },
     "travelExtract.reviewTitle": {
       "translation": "查看差旅计划",
       "hash": "op8fp0",
@@ -15375,6 +15370,56 @@
       "translation": "您的行程已保存，但我们无法记住下次的旅客姓名。",
       "hash": "mcopfs",
       "lastUpdated": "2026-06-06"
+    },
+    "ai.magic.title": {
+      "translation": "beanies 会变魔法",
+      "hash": "auripr",
+      "lastUpdated": "2026-06-07"
+    },
+    "ai.magic.subtitle": {
+      "translation": "拍下邀请函或旅行预订，beanies 帮你填好",
+      "hash": "vv84co",
+      "lastUpdated": "2026-06-07"
+    },
+    "ai.magic.invite": {
+      "translation": "邀请函",
+      "hash": "yq6orb",
+      "lastUpdated": "2026-06-07"
+    },
+    "ai.magic.travelBooking": {
+      "translation": "旅行预订",
+      "hash": "e8gk99",
+      "lastUpdated": "2026-06-07"
+    },
+    "ai.magic.perform": {
+      "translation": "施展魔法",
+      "hash": "yfnj76",
+      "lastUpdated": "2026-06-07"
+    },
+    "ai.magic.performHint": {
+      "translation": "拍下邀请函，beanies 帮你填好",
+      "hash": "i5pb6x",
+      "lastUpdated": "2026-06-07"
+    },
+    "ai.magic.quickStart": {
+      "translation": "快速开始",
+      "hash": "6i993j",
+      "lastUpdated": "2026-06-07"
+    },
+    "ai.magic.travelSubtitle": {
+      "translation": "拍下旅行预订，我来帮你建好行程",
+      "hash": "8sa32u",
+      "lastUpdated": "2026-06-07"
+    },
+    "ai.magic.orAddYourself": {
+      "translation": "或自行添加",
+      "hash": "7ogqug",
+      "lastUpdated": "2026-06-07"
+    },
+    "ai.consent.introLink": {
+      "translation": "安全、私密",
+      "hash": "lw6tq0",
+      "lastUpdated": "2026-06-07"
     }
   }
 }
