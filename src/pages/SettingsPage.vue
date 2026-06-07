@@ -7,6 +7,7 @@ import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import ChangePasswordSettings from '@/components/settings/ChangePasswordSettings.vue';
 import ProfileHeader from '@/components/settings/ProfileHeader.vue';
 import SettingsCard from '@/components/settings/SettingsCard.vue';
+import BetaBadge from '@/components/ui/BetaBadge.vue';
 import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
 import AiSettings from '@/components/settings/AiSettings.vue';
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
@@ -40,7 +41,6 @@ import {
   shouldUseRedirectAuth,
 } from '@/services/google/googleAuth';
 import { getDeploymentBadge } from '@/config/features';
-import { isFlagEnabled } from '@/config/flags';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -91,9 +91,9 @@ const showDataManagement = ref(false);
 const showTransferOwnership = ref(false);
 const showAi = ref(false);
 
-// #133: the entire AI surface (wedge entry + this Settings card) is gated behind the same
-// dev flag, so Phase 4 ships to prod without exposing anything to users until launch.
-const aiSurfaceEnabled = isFlagEnabled('aiPhotoExtract');
+// #133: the AI surface launched (soft release, 2026-06-07) — was flag-gated, now always on
+// (labelled Beta). Kept as a named constant so the card/deep-link guards read clearly.
+const aiSurfaceEnabled = true;
 
 // ── Deep-link: open a specific card from a route query (e.g. ?open=family-data)
 //    Generalizable — additional cards can opt in by extending the map below.
@@ -671,7 +671,9 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         :description="t('settings.card.aiDesc')"
         icon-bg="var(--tint-silk-20)"
         @click="showAi = true"
-      />
+      >
+        <template #badge><BetaBadge /></template>
+      </SettingsCard>
     </div>
 
     <!-- ── Install App Banner ──────────────────────────────────────────── -->

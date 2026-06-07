@@ -23,7 +23,6 @@
 import { computed, onMounted, watch, type Ref } from 'vue';
 import { ref } from 'vue';
 import router from '@/router';
-import { isFlagEnabled } from '@/config/flags';
 import { usePermissions } from '@/composables/usePermissions';
 import {
   closeQuickAdd,
@@ -130,17 +129,17 @@ export function useMagicReaderConsumer(
 // --- Composable ----------------------------------------------------------
 
 /**
- * Gating computeds (permission × dev-flag) — the single source of truth for
- * whether each reader is available. Consumed by both pages and both magic
- * components; pure, so unit-testable without mounting. Also re-exports the
- * dispatchers for convenience at call sites that already use the composable.
+ * Gating computeds — the single source of truth for whether each reader is
+ * available. The AI document readers launched 2026-06-07, so the only gate is
+ * the activity-edit permission (the `aiPhotoExtract`/`aiTravelExtract` dev flags
+ * that hid them pre-launch are no longer consulted). Consumed by both pages and
+ * both magic components; pure, so unit-testable without mounting. Also re-exports
+ * the dispatchers for convenience at call sites that already use the composable.
  */
 export function useMagicReader() {
   const { canEditActivities } = usePermissions();
-  const canReadPhoto = computed(() => canEditActivities.value && isFlagEnabled('aiPhotoExtract'));
-  const canReadDocument = computed(
-    () => canEditActivities.value && isFlagEnabled('aiTravelExtract')
-  );
+  const canReadPhoto = computed(() => canEditActivities.value);
+  const canReadDocument = computed(() => canEditActivities.value);
   const canReadAny = computed(() => canReadPhoto.value || canReadDocument.value);
   return {
     canReadPhoto,

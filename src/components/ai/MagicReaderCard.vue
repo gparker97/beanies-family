@@ -9,6 +9,7 @@
  */
 import { useTranslation } from '@/composables/useTranslation';
 import { useMagicReader } from '@/composables/useMagicReader';
+import BetaBadge from '@/components/ui/BetaBadge.vue';
 
 const { t } = useTranslation();
 const { canReadPhoto, canReadDocument, canReadAny, openPhotoReader, openDocumentReader } =
@@ -23,6 +24,7 @@ const { canReadPhoto, canReadDocument, canReadAny, openPhotoReader, openDocument
     <h2 class="font-outfit flex items-center gap-2 text-base font-extrabold">
       <span aria-hidden="true">✨</span>
       <span>{{ t('ai.magic.title') }}</span>
+      <BetaBadge tone="onAccent" class="ml-auto" />
     </h2>
     <p class="mt-1.5 text-xs leading-snug opacity-90">{{ t('ai.magic.subtitle') }}</p>
 
