@@ -16,6 +16,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useBeanTips } from '@/composables/useBeanTips';
+import { useCommunityNudge } from '@/composables/useCommunityNudge';
 import { changeDoc, docVersion, getDoc, isDocLoaded } from '@/services/automerge/docService';
 import { getAllReleaseNotes, getReleaseNote, isSpotlightRelease } from '@/content/release-notes';
 import {
@@ -58,6 +59,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
   // Bound ONCE at store-setup scope (mirrors the other store bindings above);
   // the snapshot reads `issuedTips.value` on each recompute — no re-instantiation.
   const beanTips = useBeanTips();
+  const communityNudge = useCommunityNudge();
 
   // ── Derive-clock — advanced ONLY by tick() (the poll). Nothing else writes it.
   const now = ref<Date>(new Date());
@@ -99,6 +101,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       announcements: getAllAnnouncements(),
       issuedTips: beanTips.issuedTips.value,
       tipsById: TIPS_BY_ID,
+      activeNudge: communityNudge.activeNudge.value,
       readState,
       windowDays: WINDOW_DAYS,
       occurrencesByDate,
@@ -144,6 +147,11 @@ export const useNotificationsStore = defineStore('notifications', () => {
           const ann = getAnnouncement(n.sourceId);
           return ann ? isAutoOpenAnnouncement(ann) : false;
         }
+        // Community nudge: no content-registry lookup needed — the auto-open
+        // policy was already decided at issuance (decideIssue) and the deriver
+        // projects the active nudge 1:1, so any unread nudge is one we chose to
+        // surface. The session latch + openTo→markRead make it open at most once.
+        if (n.kind === 'communityNudge') return true;
         return false;
       }) ?? null
   );

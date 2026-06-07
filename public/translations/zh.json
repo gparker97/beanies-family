@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-07",
-    "translationCount": 3088
+    "translationCount": 3102
   },
   "translations": {
     "app.name": {
@@ -15444,6 +15444,76 @@
     "photos.pdf.previewFailed": {
       "translation": "此处无法显示此PDF。在新标签页中打开以查看。",
       "hash": "uycqgy",
+      "lastUpdated": "2026-06-07"
+    },
+    "nav.community": {
+      "translation": "Discord上的社区",
+      "hash": "7a7rzy",
+      "lastUpdated": "2026-06-07"
+    },
+    "discord.openFailedTitle": {
+      "translation": "无法打开Discord",
+      "hash": "ip9zng",
+      "lastUpdated": "2026-06-07"
+    },
+    "discord.openFailedBody": {
+      "translation": "请重试，或在浏览器中访问beanies.family/discord。",
+      "hash": "4pqe7d",
+      "lastUpdated": "2026-06-07"
+    },
+    "onboarding.discordEyebrow": {
+      "translation": "你是个早熟的豆子 🫘",
+      "hash": "6fhfhb",
+      "lastUpdated": "2026-06-07"
+    },
+    "onboarding.discordTitle": {
+      "translation": "帮助我们种植豆子",
+      "hash": "fm0x3x",
+      "lastUpdated": "2026-06-07"
+    },
+    "onboarding.discordBody": {
+      "translation": "我们还是新手，您是我们的首批家庭成员之一。与Discord上的其他Bean一起交换建议，了解下一步，告诉我们要构建什么，然后进行聊天。",
+      "hash": "hmeze1",
+      "lastUpdated": "2026-06-07"
+    },
+    "onboarding.discordPrimary": {
+      "translation": "加入我们的 Discord",
+      "hash": "ql9n0p",
+      "lastUpdated": "2026-06-07"
+    },
+    "onboarding.discordSkip": {
+      "translation": "以后再说",
+      "hash": "lados4",
+      "lastUpdated": "2026-06-07"
+    },
+    "communityNudge.label": {
+      "translation": "从豆茎",
+      "hash": "g0fyu",
+      "lastUpdated": "2026-06-07"
+    },
+    "communityNudge.join": {
+      "translation": "加入我们的 Discord",
+      "hash": "ql9n0p",
+      "lastUpdated": "2026-06-07"
+    },
+    "communityNudge.snooze": {
+      "translation": "立即购买",
+      "hash": "8bjtp3",
+      "lastUpdated": "2026-06-07"
+    },
+    "communityNudge.joined": {
+      "translation": "我已经到了！",
+      "hash": "1l29yi",
+      "lastUpdated": "2026-06-07"
+    },
+    "settings.card.community": {
+      "translation": "粉丝论坛",
+      "hash": "8nt3ux",
+      "lastUpdated": "2026-06-07"
+    },
+    "settings.card.communityDesc": {
+      "translation": "与其他家庭一起使用我们的Discord",
+      "hash": "qjhp8x",
       "lastUpdated": "2026-06-07"
     }
   }

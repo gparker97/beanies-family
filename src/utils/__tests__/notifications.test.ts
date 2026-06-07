@@ -82,6 +82,7 @@ function derive(overrides: Partial<DeriveInput>, now: Date = NOW) {
     announcements: [],
     issuedTips: [],
     tipsById: new Map<string, BeanTip>(),
+    activeNudge: null,
     readState: {},
     windowDays: 30,
     occurrencesByDate: {},
@@ -90,6 +91,21 @@ function derive(overrides: Partial<DeriveInput>, now: Date = NOW) {
 }
 
 const byId = (list: ReturnType<typeof derive>, id: string) => list.find((n) => n.id === id);
+
+describe('deriveNotifications — community nudge', () => {
+  it('emits one nudge when activeNudge is set; id + sourceId encode the messageIndex', () => {
+    const out = derive({ activeNudge: { messageIndex: 2, issuedAt: NOW.getTime() } });
+    const nudges = out.filter((n) => n.kind === 'communityNudge');
+    expect(nudges).toHaveLength(1);
+    expect(nudges[0]?.id).toBe('community-nudge:2');
+    expect(nudges[0]?.sourceId).toBe('2');
+  });
+
+  it('emits no nudge when activeNudge is null', () => {
+    const out = derive({ activeNudge: null });
+    expect(out.some((n) => n.kind === 'communityNudge')).toBe(false);
+  });
+});
 
 describe('deriveNotifications — todo-due', () => {
   it('dated, no time → fires morning-of (start of due day), not overdue when due today', () => {

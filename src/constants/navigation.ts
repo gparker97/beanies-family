@@ -214,6 +214,14 @@ export const NAV_ITEMS: NavItemDef[] = [
     external: true,
     externalUrl: `${MARKETING_URL}/help`,
   },
+  {
+    labelKey: 'nav.community',
+    path: '/discord',
+    emoji: '\u{1F4AC}',
+    section: 'pinned',
+    external: true,
+    externalUrl: `${MARKETING_URL}/discord`,
+  },
   { labelKey: 'nav.settings', path: '/settings', emoji: '⚙️', section: 'pinned' },
 ];
 

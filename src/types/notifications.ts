@@ -20,7 +20,8 @@ export type NotificationKind =
   | 'activity-reminder'
   | 'whats-new'
   | 'announcement'
-  | 'tip';
+  | 'tip'
+  | 'communityNudge';
 
 export interface AppNotification {
   /** Deterministic stable id (e.g. `todo-due:<todoId>:<dueDate>`). */
@@ -57,7 +58,14 @@ export interface AppNotification {
 
 /** Per-kind presentation — the single edit surface when adding a kind. */
 export interface KindPresentation {
-  accent: 'todo' | 'activity' | 'assigned' | 'whats-new' | 'announcement' | 'tip';
+  accent:
+    | 'todo'
+    | 'activity'
+    | 'assigned'
+    | 'whats-new'
+    | 'announcement'
+    | 'tip'
+    | 'community-nudge';
   /** Emoji shown in the row's tinted lead icon. */
   icon: string;
   /** Custom detail body component; undefined ⇒ the default meta card. */

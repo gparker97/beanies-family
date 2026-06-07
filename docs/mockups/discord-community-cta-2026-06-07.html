@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family — Discord community nudges (mockup)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --heritage-orange: #f15d22;
+        --terracotta: #e67e22;
+        --deep-slate: #2c3e50;
+        --sky-silk: #aed6f1;
+        --cloud-white: #f8f9fa;
+        --blurple: #5865f2;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #eceff3;
+        font-family: Inter, sans-serif;
+        color: var(--deep-slate);
+        padding: 40px 24px 80px;
+      }
+      .page-title {
+        font-family: Outfit, sans-serif;
+        font-weight: 800;
+        font-size: 1.9rem;
+        text-align: center;
+        margin: 0 0 4px;
+      }
+      .page-sub {
+        text-align: center;
+        opacity: 0.55;
+        max-width: 640px;
+        margin: 0 auto 8px;
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }
+      .section-title {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 1.15rem;
+        margin: 48px 0 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .section-note {
+        opacity: 0.55;
+        font-size: 0.82rem;
+        margin: 0 0 20px;
+        max-width: 720px;
+        line-height: 1.5;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 28px;
+        align-items: flex-start;
+      }
+      .frame-label {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        opacity: 0.4;
+        margin: 0 0 8px;
+      }
+
+      /* ---- phone + desktop frames ---- */
+      .phone {
+        width: 390px;
+        border-radius: 38px;
+        background: #fff;
+        box-shadow: 0 18px 50px rgb(44 62 80 / 18%);
+        overflow: hidden;
+        border: 9px solid #1a252f;
+      }
+      .surface {
+        width: 760px;
+        border-radius: 22px;
+        background: #fff;
+        box-shadow: 0 18px 50px rgb(44 62 80 / 12%);
+        overflow: hidden;
+      }
+
+      /* ===================== ONBOARDING FINALE ===================== */
+      .ob {
+        background: linear-gradient(180deg, #edf6fc 0%, #f8f9fa 50%, #fef8f4 100%);
+        text-align: center;
+        padding: 30px 22px 26px;
+      }
+      .ob-hero {
+        font-size: 3.6rem;
+        margin-bottom: 8px;
+      }
+      .ob-title {
+        font-family: Outfit, sans-serif;
+        font-weight: 800;
+        font-size: 1.5rem;
+        margin: 0 0 6px;
+      }
+      .ob-orange {
+        color: var(--heritage-orange);
+      }
+      .ob-desc {
+        font-size: 0.8rem;
+        line-height: 1.6;
+        opacity: 0.5;
+        max-width: 380px;
+        margin: 0 auto 18px;
+      }
+      .ob-cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      .ob-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 12px rgb(44 62 80 / 5%);
+        padding: 10px 6px;
+      }
+      .ob-card .v {
+        font-family: Outfit, sans-serif;
+        font-weight: 800;
+        font-size: 0.95rem;
+        margin-top: 2px;
+      }
+      .ob-card .l {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.5rem;
+        opacity: 0.4;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+
+      /* ---- the NEW Discord card ---- */
+      .discord-card {
+        position: relative;
+        text-align: left;
+        background: linear-gradient(135deg, #f3f4fe 0%, #eef0fd 100%);
+        border: 1.5px solid rgb(88 101 242 / 18%);
+        border-radius: 20px;
+        padding: 16px 18px;
+        margin-bottom: 18px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        overflow: hidden;
+      }
+      .discord-card::after {
+        content: '';
+        position: absolute;
+        right: -30px;
+        top: -30px;
+        width: 130px;
+        height: 130px;
+        background: radial-gradient(circle, rgb(88 101 242 / 12%), transparent 70%);
+        pointer-events: none;
+      }
+      .discord-badge {
+        flex-shrink: 0;
+        width: 52px;
+        height: 52px;
+        border-radius: 16px;
+        background: var(--blurple);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 6px 16px rgb(88 101 242 / 35%);
+      }
+      .discord-badge svg {
+        width: 30px;
+        height: 30px;
+        fill: #fff;
+      }
+      .discord-eyebrow {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--blurple);
+        margin: 0 0 2px;
+      }
+      .discord-title {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+        margin: 0 0 3px;
+      }
+      .discord-body {
+        font-size: 0.76rem;
+        line-height: 1.5;
+        opacity: 0.7;
+        margin: 0;
+      }
+      .ob-cta {
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        border: none;
+        border-radius: 60px;
+        box-shadow: 0 8px 28px rgb(241 93 34 / 25%);
+        color: #fff;
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.95rem;
+        padding: 14px 44px;
+        cursor: pointer;
+      }
+      .ob-skip {
+        display: block;
+        margin: 14px auto 0;
+        background: none;
+        border: none;
+        font-family: Outfit, sans-serif;
+        font-size: 0.72rem;
+        font-style: italic;
+        opacity: 0.4;
+        cursor: pointer;
+      }
+      /* desktop tweaks for the finale */
+      .surface .ob-cards {
+        display: flex;
+        justify-content: center;
+        gap: 14px;
+      }
+      .surface .ob-card {
+        padding: 14px 22px;
+      }
+      .surface .ob-title {
+        font-size: 2rem;
+      }
+      .surface .ob-desc {
+        font-size: 0.9rem;
+      }
+      .surface .discord-card {
+        max-width: 460px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      /* ===================== WEEKLY NUDGE (tip card) ===================== */
+      .drawer {
+        background: #fff;
+        padding: 16px;
+      }
+      .drawer-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 4px 14px;
+        border-bottom: 1px solid rgb(44 62 80 / 8%);
+        margin-bottom: 16px;
+      }
+      .drawer-head .bell {
+        font-size: 1.1rem;
+      }
+      .drawer-head .t {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+      }
+      .tip {
+        position: relative;
+        background: linear-gradient(135deg, #f4f5fe 0%, #eef0fd 55%, #f3eefb 100%);
+        border-radius: 24px;
+        box-shadow:
+          0 6px 28px rgb(88 101 242 / 8%),
+          0 2px 8px rgb(44 62 80 / 4%);
+        overflow: hidden;
+        margin-bottom: 16px;
+      }
+      .tip::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        opacity: 0.7;
+        background: linear-gradient(90deg, var(--sky-silk), var(--blurple) 50%, var(--heritage-orange));
+      }
+      .tip-inner {
+        display: flex;
+        align-items: flex-start;
+        padding: 20px 22px 18px;
+        gap: 16px;
+      }
+      .tip-char {
+        flex-shrink: 0;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 50% 40%, #fff 0%, #eef0fd 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        box-shadow: 0 4px 10px rgb(44 62 80 / 8%);
+      }
+      .tip-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 7px;
+      }
+      .tip-label .glyph {
+        width: 14px;
+        height: 14px;
+        fill: var(--blurple);
+      }
+      .tip-label .txt {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        color: var(--blurple);
+      }
+      .tip-msg {
+        font-size: 0.86rem;
+        line-height: 1.55;
+        opacity: 0.8;
+        margin: 0;
+      }
+      .tip-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .a-mute {
+        background: none;
+        border: none;
+        color: rgb(120 130 145 / 75%);
+        font-size: 0.7rem;
+        cursor: pointer;
+        margin-right: auto;
+      }
+      .a-snooze {
+        background: none;
+        border: none;
+        color: rgb(120 130 145 / 90%);
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.78rem;
+        cursor: pointer;
+      }
+      .a-join {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        border: none;
+        border-radius: 14px;
+        box-shadow: 0 3px 12px rgb(241 93 34 / 22%);
+        color: #fff;
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.8rem;
+        padding: 8px 18px;
+        cursor: pointer;
+      }
+      .a-join svg {
+        width: 15px;
+        height: 15px;
+        fill: #fff;
+      }
+      .variant-tag {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--blurple);
+        opacity: 0.7;
+        margin: 0 0 6px 4px;
+      }
+
+      /* ===================== PERSISTENT DOORS ===================== */
+      .settings-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 2px 12px rgb(44 62 80 / 6%);
+        padding: 14px 18px;
+        width: 420px;
+        max-width: 100%;
+      }
+      .settings-row .ic {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: rgb(88 101 242 / 12%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .settings-row .ic svg {
+        width: 22px;
+        height: 22px;
+        fill: var(--blurple);
+      }
+      .settings-row .tt {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      .settings-row .ss {
+        font-size: 0.72rem;
+        opacity: 0.55;
+      }
+      .settings-row .chev {
+        margin-left: auto;
+        opacity: 0.3;
+        font-size: 1.1rem;
+      }
+      .footer-demo {
+        display: flex;
+        gap: 22px;
+        align-items: center;
+        background: var(--deep-slate);
+        color: #fff;
+        border-radius: 14px;
+        padding: 16px 22px;
+        font-size: 0.82rem;
+        width: 560px;
+        max-width: 100%;
+      }
+      .footer-demo a {
+        color: rgb(255 255 255 / 75%);
+        text-decoration: none;
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .footer-demo a.disc {
+        color: #fff;
+        font-weight: 600;
+      }
+      .footer-demo svg {
+        width: 15px;
+        height: 15px;
+        fill: currentColor;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Reusable Discord glyph -->
+    <svg style="display: none">
+      <symbol id="discord" viewBox="0 0 24 24">
+        <path
+          d="M20.317 4.369A19.79 19.79 0 0 0 16.558 3.2a.074.074 0 0 0-.079.037c-.34.6-.717 1.385-.98 2.001a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.997-2.001.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C1.235 8.018.572 11.578.9 15.093a.08.08 0 0 0 .031.055 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.891.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-4.06-.838-7.59-3.549-10.697a.06.06 0 0 0-.031-.028zM8.02 12.952c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.42 2.157-2.42 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.419-2.157 2.419zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.42 2.157-2.42 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.419-2.157 2.419z"
+        />
+      </symbol>
+    </svg>
+
+    <h1 class="page-title">Discord community — in-app nudges</h1>
+    <p class="page-sub">
+      Mockup for review · 2026-06-07 · all CTAs point at a stable
+      <strong>beanies.family/discord</strong> redirect so the invite can change without an app
+      deploy.
+    </p>
+
+    <!-- ============ 1. ONBOARDING FINALE ============ -->
+    <h2 class="section-title">1 · Onboarding finale — the prime moment 🎉</h2>
+    <p class="section-note">
+      A Discord card on the existing "all done!" celebration screen (between the summary cards and
+      the Finish button). Peak goodwill, seen by 100% of new families. The card uses Discord's
+      blurple for instant recognition; the primary action stays on-brand Heritage Orange.
+    </p>
+    <div class="row">
+      <div>
+        <p class="frame-label">Mobile · 390px</p>
+        <div class="phone">
+          <div class="ob">
+            <div class="ob-hero">👨‍👩‍👧‍👦</div>
+            <h2 class="ob-title">You're all set, <span class="ob-orange">beanie</span>!</h2>
+            <p class="ob-desc">
+              Your family's home base is ready. Here's what you set up to get going.
+            </p>
+            <div class="ob-cards">
+              <div class="ob-card"><div>🏦</div><div class="v">2</div><div class="l">Accounts</div></div>
+              <div class="ob-card"><div>🔄</div><div class="v">3</div><div class="l">Recurring</div></div>
+              <div class="ob-card"><div>🎯</div><div class="v ob-orange">20%</div><div class="l">Savings</div></div>
+              <div class="ob-card"><div>🎹</div><div class="v">1</div><div class="l">Activity</div></div>
+            </div>
+
+            <div class="discord-card">
+              <div class="discord-badge"><svg><use href="#discord" /></svg></div>
+              <div>
+                <p class="discord-eyebrow">You're an early bean 🫘</p>
+                <p class="discord-title">Come grow beans with us</p>
+                <p class="discord-body">
+                  We're brand new, and you're one of our first families. Join the Discord to swap
+                  tips, hear what's next, and tell us what to build.
+                </p>
+              </div>
+            </div>
+
+            <button class="ob-cta">Join us on Discord</button>
+            <button class="ob-skip">Maybe later — take me in</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p class="frame-label">Desktop · 760px</p>
+        <div class="surface">
+          <div class="ob">
+            <div class="ob-hero">👨‍👩‍👧‍👦</div>
+            <h2 class="ob-title">You're all set, <span class="ob-orange">beanie</span>!</h2>
+            <p class="ob-desc">
+              Your family's home base is ready. Here's what you set up to get going.
+            </p>
+            <div class="ob-cards">
+              <div class="ob-card"><div>🏦</div><div class="v">2</div><div class="l">Accounts</div></div>
+              <div class="ob-card"><div>🔄</div><div class="v">3</div><div class="l">Recurring</div></div>
+              <div class="ob-card"><div>🎯</div><div class="v ob-orange">20%</div><div class="l">Savings</div></div>
+              <div class="ob-card"><div>🎹</div><div class="v">1</div><div class="l">Activity</div></div>
+            </div>
+
+            <div class="discord-card">
+              <div class="discord-badge"><svg><use href="#discord" /></svg></div>
+              <div>
+                <p class="discord-eyebrow">You're an early bean 🫘</p>
+                <p class="discord-title">Come grow beans with us</p>
+                <p class="discord-body">
+                  We're brand new, and you're one of our first families. Join the Discord to swap
+                  tips, hear what's next, and tell us what to build.
+                </p>
+              </div>
+            </div>
+
+            <button class="ob-cta">Join us on Discord</button>
+            <button class="ob-skip">Maybe later — take me in</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 2. WEEKLY NUDGE ============ -->
+    <h2 class="section-title">2 · Weekly community nudge — tip-style 💬</h2>
+    <p class="section-note">
+      Reuses the bean-tips card in the notification bell, auto-surfaced on app open about once a
+      week. Rotating fun copy (3 of 8 shown), a hard cap of ~5 shows, and dismissals that respect
+      the user: "I'm in!" silences it for good, "not now" snoozes a week, "don't show these" mutes
+      the category.
+    </p>
+    <div class="row">
+      <div>
+        <p class="frame-label">Mobile · 390px (bell drawer)</p>
+        <div class="phone">
+          <div class="drawer">
+            <div class="drawer-head"><span class="bell">🔔</span><span class="t">Notifications</span></div>
+
+            <p class="variant-tag">Copy variant A — warmth</p>
+            <div class="tip">
+              <div class="tip-inner">
+                <div class="tip-char">🫘</div>
+                <div style="flex: 1; min-width: 0">
+                  <div class="tip-label">
+                    <svg class="glyph"><use href="#discord" /></svg><span class="txt">FROM THE BEANSTALK</span>
+                  </div>
+                  <p class="tip-msg">
+                    The beanies get lonely between visits. Come say hi in our Discord — other
+                    families are already there. 🫘
+                  </p>
+                  <div class="tip-actions">
+                    <button class="a-mute">don't show these</button>
+                    <button class="a-snooze">not now</button>
+                    <button class="a-join"><svg><use href="#discord" /></svg>Join us</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p class="variant-tag">Copy variant B — sneak peeks</p>
+            <div class="tip">
+              <div class="tip-inner">
+                <div class="tip-char">👀</div>
+                <div style="flex: 1; min-width: 0">
+                  <div class="tip-label">
+                    <svg class="glyph"><use href="#discord" /></svg><span class="txt">FROM THE BEANSTALK</span>
+                  </div>
+                  <p class="tip-msg">
+                    Psst… we spill what's coming next in Discord before anywhere else.
+                  </p>
+                  <div class="tip-actions">
+                    <button class="a-mute">don't show these</button>
+                    <button class="a-snooze">not now</button>
+                    <button class="a-join"><svg><use href="#discord" /></svg>Join us</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p class="frame-label">Desktop · 760px (bell drawer panel)</p>
+        <div class="surface">
+          <div class="drawer">
+            <div class="drawer-head"><span class="bell">🔔</span><span class="t">Notifications</span></div>
+            <p class="variant-tag">Copy variant C — have a say</p>
+            <div class="tip">
+              <div class="tip-inner">
+                <div class="tip-char">💡</div>
+                <div style="flex: 1; min-width: 0">
+                  <div class="tip-label">
+                    <svg class="glyph"><use href="#discord" /></svg><span class="txt">FROM THE BEANSTALK</span>
+                  </div>
+                  <p class="tip-msg">
+                    Got a wish for beanies.family? The team reads every message in our Discord — and
+                    early beans get a real say in what we build next.
+                  </p>
+                  <div class="tip-actions">
+                    <button class="a-mute">don't show these</button>
+                    <button class="a-snooze">not now</button>
+                    <button class="a-join"><svg><use href="#discord" /></svg>Join us on Discord</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p style="opacity: 0.45; font-size: 0.78rem; margin: 4px 4px 0">
+              The card sits in the bell among normal tips &amp; announcements; the bell badges once
+              when a new one is waiting.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 3. PERSISTENT DOORS ============ -->
+    <h2 class="section-title">3 · Always-on doors — the quiet baseline 🚪</h2>
+    <p class="section-note">
+      Never-nagging links so motivated users can always find us: a Settings row, a Help-menu entry,
+      and a marketing-site footer link.
+    </p>
+    <div class="row">
+      <div>
+        <p class="frame-label">Settings row</p>
+        <div class="settings-row">
+          <div class="ic"><svg><use href="#discord" /></svg></div>
+          <div>
+            <div class="tt">Community</div>
+            <div class="ss">Join other families on our Discord</div>
+          </div>
+          <div class="chev">↗</div>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">Marketing footer</p>
+        <div class="footer-demo">
+          <span style="opacity: 0.6">© beanies.family</span>
+          <a href="#">Help</a>
+          <a href="#">Blog</a>
+          <a class="disc" href="#"><svg><use href="#discord" /></svg>Discord</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
