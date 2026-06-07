@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import OnboardingInvitePanel from './OnboardingInvitePanel.vue';
+import DiscordGlyph from '@/components/ui/DiscordGlyph.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { openDiscord } from '@/utils/discord';
 
 defineProps<{
   /** Slider value from Step 4. Default 20 if onboarding skipped Savings. */
@@ -24,6 +26,13 @@ const activityStore = useActivityStore();
 const accountCount = computed(() => accountsStore.accounts.length);
 const recurringCount = computed(() => recurringStore.recurringItems.length);
 const activityCount = computed(() => activityStore.activities.length);
+
+// "Join us on Discord" opens the community in a new tab AND completes onboarding,
+// so the app loads underneath while Discord opens. "Maybe later" just finishes.
+function onJoinDiscord(): void {
+  openDiscord('onboarding');
+  emit('finish');
+}
 </script>
 
 <template>
@@ -76,15 +85,28 @@ const activityCount = computed(() => activityStore.activities.length);
       <!-- Inline invite panel (renders only when storage = Drive AND >=1 invitable member) -->
       <OnboardingInvitePanel />
 
-      <!-- CTA -->
-      <button class="ob-cta ob-pulse-glow" data-testid="onboarding-finish" @click="emit('finish')">
-        {{ t('onboarding.completeCta') }}
+      <!-- Discord community card — the prime "join us" moment (#discord). The only
+           blurple in the app is the DiscordGlyph; the surface stays on-brand. -->
+      <div class="ob-discord-card">
+        <span class="ob-discord-badge"><DiscordGlyph :size="26" /></span>
+        <div class="ob-discord-text">
+          <p class="ob-discord-eyebrow">{{ t('onboarding.discordEyebrow') }}</p>
+          <p class="ob-discord-title">{{ t('onboarding.discordTitle') }}</p>
+          <p class="ob-discord-body">{{ t('onboarding.discordBody') }}</p>
+        </div>
+      </div>
+
+      <!-- Primary CTA: join Discord (also finishes onboarding) -->
+      <button class="ob-cta ob-pulse-glow" @click="onJoinDiscord">
+        <DiscordGlyph :size="20" />
+        {{ t('onboarding.discordPrimary') }}
       </button>
 
-      <!-- Subtitle -->
-      <p class="ob-subtitle">
-        {{ t('onboarding.completeSubtitle') }}
-      </p>
+      <!-- Skip: finish without opening Discord. Keeps the onboarding-finish testid
+           on the side-effect-free path so e2e/unit finish flows stay clean. -->
+      <button class="ob-skip" data-testid="onboarding-finish" @click="emit('finish')">
+        {{ t('onboarding.discordSkip') }}
+      </button>
     </div>
   </div>
 </template>
@@ -300,17 +322,122 @@ const activityCount = computed(() => activityStore.activities.length);
 }
 
 .ob-cta {
+  align-items: center;
   background: linear-gradient(135deg, var(--heritage-orange, #f15d22), var(--terracotta, #e67e22));
   border: none;
   border-radius: 60px;
   box-shadow: 0 8px 32px rgb(241 93 34 / 25%);
   color: white;
   cursor: pointer;
+  display: inline-flex;
   font-family: Outfit, sans-serif;
   font-size: 0.88rem;
   font-weight: 600;
+  gap: 8px;
+  justify-content: center;
   padding: 14px 40px;
   transition: transform 0.2s;
+}
+
+/* The Discord glyph keeps its blurple even on the orange CTA (white would erase
+   the recognition); a subtle white ring lifts it off the gradient. */
+.ob-cta :deep(svg) {
+  background: white;
+  border-radius: 50%;
+  flex-shrink: 0;
+  padding: 3px;
+}
+
+/* ── Discord community card ── */
+.ob-discord-card {
+  align-items: center;
+  background: linear-gradient(135deg, #f3f4fe 0%, #eef0fd 100%);
+  border: 1.5px solid rgb(88 101 242 / 18%);
+  border-radius: 20px;
+  display: flex;
+  gap: 14px;
+  margin: 0 auto 18px;
+  max-width: 460px;
+  padding: 16px 18px;
+  text-align: left;
+}
+
+.dark .ob-discord-card {
+  background: linear-gradient(135deg, #2a2f4a 0%, #242942 100%);
+  border-color: rgb(88 101 242 / 30%);
+}
+
+.ob-discord-badge {
+  align-items: center;
+  background: #5865f2;
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgb(88 101 242 / 35%);
+  display: flex;
+  flex-shrink: 0;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.ob-discord-badge :deep(svg) {
+  fill: white;
+}
+
+.ob-discord-eyebrow {
+  color: #5865f2;
+  font-family: Outfit, sans-serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin: 0 0 2px;
+  text-transform: uppercase;
+}
+
+.ob-discord-title {
+  color: var(--deep-slate, #2c3e50);
+  font-family: Outfit, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 3px;
+}
+
+.dark .ob-discord-title {
+  color: #f1f5f9;
+}
+
+.ob-discord-body {
+  color: var(--deep-slate, #2c3e50);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin: 0;
+  opacity: 0.65;
+}
+
+.dark .ob-discord-body {
+  color: #cbd5e1;
+}
+
+/* ── "Maybe later" skip ── */
+.ob-skip {
+  background: none;
+  border: none;
+  color: var(--deep-slate, #2c3e50);
+  cursor: pointer;
+  display: block;
+  font-family: Outfit, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin: 14px auto 0;
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+
+.ob-skip:hover {
+  opacity: 0.7;
+}
+
+.dark .ob-skip {
+  color: #94a3b8;
 }
 
 .ob-cta:hover {

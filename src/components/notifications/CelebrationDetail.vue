@@ -41,7 +41,7 @@ withDefaults(
         <img :src="medallionSrc" alt="" />
       </div>
       <div class="wn-kick"><slot name="kick" /></div>
-      <div class="wn-datepill">{{ dateLabel }}</div>
+      <div v-if="dateLabel" class="wn-datepill">{{ dateLabel }}</div>
     </div>
 
     <!-- ===== CONTENT ===== -->

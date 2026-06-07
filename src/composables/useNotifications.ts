@@ -16,6 +16,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { usePollWhileVisible } from '@/composables/usePollWhileVisible';
 import { useBeanTips } from '@/composables/useBeanTips';
+import { useCommunityNudge } from '@/composables/useCommunityNudge';
 import { useToday } from '@/composables/useToday';
 import { isDocLoaded } from '@/services/automerge/docService';
 import { getAllReleaseNotes } from '@/content/release-notes';
@@ -35,6 +36,7 @@ export function useNotifications(): void {
   const settingsStore = useSettingsStore();
   const familyStore = useFamilyStore();
   const beanTips = useBeanTips();
+  const communityNudge = useCommunityNudge();
   const { today } = useToday();
 
   // Shared session-ready gate — both the migration/auto-open watcher (#4) and
@@ -102,8 +104,11 @@ export function useNotifications(): void {
       if (!isReady) return;
       if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('e2e_auto_auth')) return;
       runWhatsNewMigrationOnce();
-      store.openToLatestAutoOpen();
+      // Issue tip + nudge BEFORE auto-open so a freshly-due community nudge is in
+      // the derived list when openToLatestAutoOpen() reads it (tips don't auto-open).
       beanTips.ensureTodayTipIssued();
+      communityNudge.ensureNudgeIssued();
+      store.openToLatestAutoOpen();
     },
     { immediate: true }
   );
@@ -116,5 +121,6 @@ export function useNotifications(): void {
   watch(today, () => {
     if (!ready()) return;
     beanTips.ensureTodayTipIssued();
+    communityNudge.ensureNudgeIssued();
   });
 }

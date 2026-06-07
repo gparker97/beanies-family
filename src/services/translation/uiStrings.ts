@@ -1035,6 +1035,26 @@ const STRING_DEFS = {
   'contacts.action.call': { en: 'Call', beanie: 'call' },
   'contacts.action.email': { en: 'Email', beanie: 'email' },
   'nav.settings': { en: 'Settings', beanie: 'settings' },
+  'nav.community': { en: 'Community on Discord', beanie: 'community on discord' },
+  // ── Discord community (onboarding card, nudge, settings, open-failure) ──────
+  'discord.openFailedTitle': { en: "Couldn't open Discord", beanie: "couldn't open discord" },
+  'discord.openFailedBody': {
+    en: 'Please try again, or visit beanies.family/discord in your browser.',
+    beanie: 'please try again, or visit beanies.family/discord in your browser.',
+  },
+  'onboarding.discordEyebrow': { en: "You're an early bean 🫘", beanie: "you're an early bean 🫘" },
+  'onboarding.discordTitle': { en: 'Help us grow beanies', beanie: 'help us grow beanies' },
+  'onboarding.discordBody': {
+    en: "We're still new, and you're one of our first families. Join the other beanies on Discord to swap tips, hear what's next, tell us what to build, and just have a chat.",
+    beanie:
+      "we're still new, and you're one of our first families. join the other beanies on discord to swap tips, hear what's next, tell us what to build, and just have a chat.",
+  },
+  'onboarding.discordPrimary': { en: 'Join us on Discord', beanie: 'join us on discord' },
+  'onboarding.discordSkip': { en: 'Maybe later', beanie: 'maybe later' },
+  'communityNudge.label': { en: 'From the beanstalk', beanie: 'from the beanstalk' },
+  'communityNudge.join': { en: 'Join us on Discord', beanie: 'join us on discord' },
+  'communityNudge.snooze': { en: 'Not now', beanie: 'not now' },
+  'communityNudge.joined': { en: "I'm already there!", beanie: "i'm already there!" },
   'nav.section.treehouse': { en: 'The Treehouse', beanie: 'family treehouse' },
   'nav.section.piggyBank': { en: 'The Piggy Bank', beanie: 'piggy bank' },
   'nav.nook': { en: 'Family Dashboard', beanie: 'family nook' },
@@ -1996,6 +2016,11 @@ const STRING_DEFS = {
   'settings.subtitle': { en: 'Configure your app preferences', beanie: 'tune your beanie patch' },
   'settings.general': { en: 'General', beanie: 'general' },
   'settings.editProfile': { en: 'Edit Profile', beanie: 'edit profile' },
+  'settings.card.community': { en: 'Community', beanie: 'community' },
+  'settings.card.communityDesc': {
+    en: 'Join other families on our Discord',
+    beanie: 'join other families on our discord',
+  },
   'settings.card.appearance': { en: 'Appearance', beanie: 'appearance' },
   'settings.card.appearanceDesc': { en: 'Theme & display preferences', beanie: 'how things look' },
   'settings.card.currency': { en: 'Currency & Rates', beanie: 'currency & rates' },
