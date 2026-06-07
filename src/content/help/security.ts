@@ -342,7 +342,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
   {
     slug: 'how-beanies-ai-handles-your-photos',
     category: 'security',
-    title: 'Magic Beans: How beanies Reads Your Photos &amp; Documents',
+    title: 'Magic Beans: How beanies Reads Your Photos & Documents',
     excerpt:
       'Hand beanies a "magic bean" — a photo or booking — and it sprouts the details for you. Here is exactly what we send, where it goes, and what we keep (which is nothing).',
     icon: '\u{1FAD8}',
