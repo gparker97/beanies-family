@@ -397,6 +397,33 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
+        content: 'How your data is kept secure',
+        level: 2,
+        id: 'how-its-secured',
+      },
+      {
+        type: 'paragraph',
+        content:
+          "On the default setting, your photo or document is read by a specialist AI model running inside <strong>attested confidential-compute hardware</strong>. It is a sealed environment, built on AMD SEV-SNP and Intel TDX chips, that the company operating the servers cannot see into. Your document is encrypted on the way there and back, read only to pull out the details, and then it is gone.",
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Sealed processing:</strong> your document is decrypted and read only inside the attested enclave, not on an ordinary server someone could log into.',
+          '<strong>Encrypted in transit:</strong> it is encrypted on the way to the enclave and on the way back.',
+          '<strong>Nothing kept, nothing trained on:</strong> the AI service retains nothing once it has answered, and never uses your data to train its models.',
+          "<strong>You can verify it:</strong> the enclave publishes a live <em>attestation</em>, a cryptographic proof of exactly what hardware and code are running, so the privacy promise is not just our word for it.",
+          '<strong>Or skip it entirely:</strong> bring your own AI provider and key (BYOK) and your document goes straight to your provider, never through ours.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          "Today that secure hardware is provided by <strong>Tinfoil</strong>, a privacy-focused AI host whose enclaves both we and you can verify on every request. If we ever change providers, it will only be to one that meets the same verifiable standard. We try to be precise rather than boastful: the AI genuinely does read your document to pull out the details, but that only ever happens inside sealed, verifiable hardware, and nothing is kept.",
+      },
+      {
+        type: 'heading',
         content: 'What happens afterwards',
         level: 2,
         id: 'afterwards',
