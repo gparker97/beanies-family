@@ -1,0 +1,1384 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family · AI entry points — 3 placement strategies · 2026-06-07</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ----------------------------------------------------------------
+         beanies.family — "let beanies read it" AI entry-point exploration
+         All values pulled from the brand theme. NO purple. The "magic" tell
+         is a Heritage Orange -> Terracotta shimmer + a single sparkle,
+         drawn from the existing celebration language.
+         ---------------------------------------------------------------- */
+      :root {
+        --orange: #f15d22;
+        --orange-600: #d14d1a;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --slate-2: #34495e;
+        --silk: #aed6f1;
+        --cloud: #f8f9fa;
+        --teal: #0077b6;
+        --line: #ecf0f2;
+        --ink-60: rgb(44 62 80 / 60%);
+        --ink-45: rgb(44 62 80 / 45%);
+        --tint-orange-8: rgb(241 93 34 / 8%);
+        --tint-orange-15: rgb(241 93 34 / 15%);
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Inter', sans-serif;
+        background: #e7ebef;
+        color: var(--slate);
+        -webkit-font-smoothing: antialiased;
+        padding: 40px 24px 96px;
+      }
+      h1,
+      h2,
+      h3,
+      h4 {
+        font-family: 'Outfit', sans-serif;
+        margin: 0;
+      }
+
+      /* ---- page intro ---- */
+      .intro {
+        max-width: 1180px;
+        margin: 0 auto 14px;
+      }
+      .intro .kick {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--orange);
+      }
+      .intro h1 {
+        font-size: 28px;
+        font-weight: 800;
+        margin: 6px 0 0;
+      }
+      .intro p {
+        color: #5d6d7e;
+        font-size: 15px;
+        line-height: 1.6;
+        margin: 10px 0 0;
+        max-width: 760px;
+      }
+      .principle {
+        max-width: 1180px;
+        margin: 18px auto 0;
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .principle .chip {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 12px 16px;
+        font-size: 13px;
+        line-height: 1.45;
+        box-shadow: var(--card-shadow);
+        flex: 1 1 240px;
+      }
+      .principle .chip b {
+        font-family: 'Outfit', sans-serif;
+        display: block;
+        font-size: 13px;
+        margin-bottom: 2px;
+        color: var(--slate);
+      }
+      .principle .chip.no {
+        border-color: rgb(241 93 34 / 25%);
+        background: linear-gradient(135deg, rgb(241 93 34 / 6%), #fff);
+      }
+
+      /* ---- shared-language band ---- */
+      .band {
+        max-width: 1180px;
+        margin: 40px auto 0;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        padding: 26px 28px;
+        box-shadow: var(--card-shadow);
+      }
+      .band h2 {
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .band > p {
+        color: #5d6d7e;
+        font-size: 13.5px;
+        margin: 6px 0 20px;
+      }
+      .swatches {
+        display: flex;
+        gap: 22px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+      .swatch {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      .swatch .cap {
+        font-size: 12px;
+        color: var(--ink-60);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+      }
+
+      /* ===== THE MAGIC SHIMMER — the one shared signal ===== */
+      /* A soft Heritage Orange -> Terracotta sheen sweeps across the
+         surface. Used on every AI affordance so the language is one thing. */
+      .shimmer {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(135deg, rgb(241 93 34 / 12%) 0%, rgb(230 126 34 / 10%) 100%);
+        border: 1px solid rgb(241 93 34 / 22%);
+      }
+      .shimmer::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          105deg,
+          transparent 30%,
+          rgb(255 255 255 / 55%) 48%,
+          transparent 66%
+        );
+        transform: translateX(-120%);
+        animation: sheen 4.2s ease-in-out infinite;
+        pointer-events: none;
+      }
+      @keyframes sheen {
+        0%,
+        55% {
+          transform: translateX(-120%);
+        }
+        85%,
+        100% {
+          transform: translateX(120%);
+        }
+      }
+      .spark {
+        position: absolute;
+        font-size: 11px;
+        animation: twinkle 2.8s ease-in-out infinite;
+        pointer-events: none;
+      }
+      @keyframes twinkle {
+        0%,
+        100% {
+          opacity: 0.25;
+          transform: scale(0.7);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.1);
+        }
+      }
+
+      /* upgraded inline add buttons */
+      .pill-old {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 40px;
+        width: 40px;
+        border-radius: 14px;
+        background: var(--tint-orange-8);
+        font-size: 18px;
+        border: none;
+      }
+      .pill-new {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 40px;
+        padding: 0 16px;
+        border-radius: 14px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--orange-600);
+        cursor: pointer;
+      }
+      .pill-new .s {
+        font-size: 13px;
+      }
+
+      /* FAB sample */
+      .fab {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(150deg, var(--orange), var(--terracotta));
+        box-shadow: 0 10px 24px -6px rgb(241 93 34 / 55%);
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 30px;
+        position: relative;
+        font-family: 'Outfit';
+      }
+      .fab .spark {
+        font-size: 14px;
+        color: #fff;
+      }
+      .fab .s1 {
+        top: -2px;
+        right: 2px;
+      }
+      .fab .s2 {
+        bottom: 4px;
+        left: 0px;
+        animation-delay: 1.1s;
+      }
+
+      /* ---- options grid ---- */
+      .options {
+        max-width: 1180px;
+        margin: 44px auto 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 28px;
+      }
+      @media (max-width: 1080px) {
+        .options {
+          grid-template-columns: 1fr;
+          max-width: 420px;
+        }
+      }
+      .opt {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .opt-head .tag {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--orange);
+      }
+      .opt-head h3 {
+        font-size: 19px;
+        font-weight: 800;
+        margin: 4px 0 0;
+      }
+      .opt-head p {
+        color: #5d6d7e;
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 7px 0 0;
+        min-height: 58px;
+      }
+      .verdict {
+        font-size: 12px;
+        color: var(--ink-60);
+        font-style: italic;
+        line-height: 1.5;
+        border-left: 3px solid rgb(241 93 34 / 35%);
+        padding-left: 12px;
+      }
+
+      /* ---- phone frame ---- */
+      .bezel {
+        background: #1a232c;
+        border-radius: 40px;
+        padding: 9px;
+        box-shadow: 0 22px 50px -18px rgba(44, 62, 80, 0.4);
+      }
+      .device {
+        background: var(--cloud);
+        border-radius: 32px;
+        overflow: hidden;
+        height: 600px;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+      .statusbar {
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        font-family: 'Outfit';
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--slate);
+        flex-shrink: 0;
+      }
+      .screencap {
+        text-align: center;
+        font-size: 11px;
+        font-family: 'Outfit';
+        font-weight: 600;
+        color: var(--ink-45);
+        padding: 2px 0 6px;
+        flex-shrink: 0;
+      }
+      .scroll {
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+      }
+
+      /* dim backdrop behind sheets */
+      .backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgb(26 35 44 / 45%);
+      }
+      .page-ghost {
+        position: absolute;
+        inset: 0;
+        padding: 14px;
+        opacity: 0.5;
+      }
+      .ghost-row {
+        height: 14px;
+        border-radius: 7px;
+        background: #fff;
+        margin-bottom: 10px;
+      }
+      .ghost-card {
+        height: 64px;
+        border-radius: 18px;
+        background: #fff;
+        margin-bottom: 12px;
+        box-shadow: var(--card-shadow);
+      }
+
+      /* bottom sheet */
+      .sheet {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #fff;
+        border-radius: 26px 26px 0 0;
+        padding: 16px 16px 22px;
+        box-shadow: 0 -10px 40px -10px rgb(26 35 44 / 35%);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        max-height: 94%;
+        overflow-y: auto;
+      }
+      .sheet-h {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .sheet-h h4 {
+        font-size: 17px;
+        font-weight: 700;
+      }
+      .sheet-h .x {
+        color: var(--ink-45);
+        font-size: 20px;
+      }
+      .grabber {
+        width: 40px;
+        height: 4px;
+        border-radius: 2px;
+        background: rgb(44 62 80 / 15%);
+        margin: -4px auto 0;
+      }
+
+      /* everyday kraft card (from shipped CSS) */
+      .everyday {
+        background: linear-gradient(135deg, rgb(241 93 34 / 15%) 0%, rgb(241 93 34 / 8%) 100%);
+        border: 1px solid rgb(241 93 34 / 20%);
+        border-radius: 20px;
+        padding: 16px;
+      }
+      .everyday .ek {
+        font-family: 'Outfit';
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--orange);
+      }
+      .egrid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 9px;
+        margin-top: 12px;
+      }
+      .etile {
+        background: #fff;
+        border: 1px solid rgb(241 93 34 / 15%);
+        border-radius: 15px;
+        box-shadow: 0 2px 6px -2px rgb(44 62 80 / 10%);
+        padding: 12px 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+      }
+      .etile .em {
+        font-size: 23px;
+      }
+      .etile .lb {
+        font-family: 'Outfit';
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--slate);
+        text-align: center;
+      }
+      .sec-title {
+        font-family: 'Outfit';
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgb(44 62 80 / 75%);
+        margin: 2px 0 0;
+      }
+      .sgrid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 9px;
+        margin-top: 10px;
+      }
+      .stile {
+        background: #fff;
+        border: 1px solid rgb(44 62 80 / 10%);
+        border-radius: 14px;
+        padding: 11px 12px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .stile .em {
+        font-size: 20px;
+      }
+      .stile .lb {
+        font-family: 'Outfit';
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .stile .hint {
+        font-size: 11px;
+        color: var(--ink-60);
+      }
+
+      /* ===== Option A — woven-in magic row (calm peer) ===== */
+      .magic-row {
+        border-radius: 16px;
+        padding: 13px 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+      }
+      .magic-row .glyph {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        background: linear-gradient(150deg, var(--orange), var(--terracotta));
+        display: grid;
+        place-items: center;
+        font-size: 19px;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px -3px rgb(241 93 34 / 50%);
+        color: #fff;
+      }
+      .magic-row .tx b {
+        font-family: 'Outfit';
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--slate);
+        display: block;
+      }
+      .magic-row .tx span {
+        font-size: 12px;
+        color: var(--ink-60);
+        line-height: 1.35;
+      }
+      .magic-row .go {
+        margin-left: auto;
+        color: var(--orange);
+        font-size: 18px;
+        font-family: 'Outfit';
+        font-weight: 700;
+      }
+
+      /* modal (BeanieFormModal anatomy) */
+      .modal {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #fff;
+        border-radius: 26px;
+        overflow: hidden;
+        box-shadow: var(--soft-shadow);
+        display: flex;
+        flex-direction: column;
+        max-height: 90%;
+      }
+      .modal-h {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 15px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+      .modal-h .ibox {
+        width: 42px;
+        height: 42px;
+        border-radius: 13px;
+        background: var(--tint-orange-8);
+        display: grid;
+        place-items: center;
+        font-size: 19px;
+      }
+      .modal-h h4 {
+        font-size: 16px;
+        font-weight: 700;
+        flex: 1;
+      }
+      .modal-h .x {
+        color: var(--ink-45);
+        font-size: 18px;
+      }
+      .modal-b {
+        background: var(--cloud);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 13px;
+        overflow-y: auto;
+      }
+      .field .fl {
+        font-family: 'Outfit';
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ink-45);
+        margin-bottom: 5px;
+      }
+      .field .fi {
+        height: 38px;
+        background: #fff;
+        border: 1px solid rgb(44 62 80 / 12%);
+        border-radius: 11px;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        font-size: 13px;
+        color: var(--slate);
+      }
+      .field .fi.empty {
+        color: var(--ink-45);
+      }
+      .modal-f {
+        padding: 14px 16px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        gap: 10px;
+      }
+      .save {
+        flex: 1;
+        height: 46px;
+        border-radius: 15px;
+        background: linear-gradient(90deg, var(--orange), var(--terracotta));
+        color: #fff;
+        font-family: 'Outfit';
+        font-size: 14px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+      }
+      .del {
+        width: 46px;
+        height: 46px;
+        border-radius: 13px;
+        background: rgb(239 68 68 / 8%);
+        display: grid;
+        place-items: center;
+        font-size: 17px;
+      }
+
+      /* one-line banner inside modal body */
+      .modal-banner {
+        border-radius: 14px;
+        padding: 11px 13px;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        cursor: pointer;
+      }
+      .modal-banner .glyph {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        background: linear-gradient(150deg, var(--orange), var(--terracotta));
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+        flex-shrink: 0;
+        color: #fff;
+      }
+      .modal-banner .tx {
+        font-size: 12.5px;
+        line-height: 1.35;
+        color: var(--slate);
+      }
+      .modal-banner .tx b {
+        font-family: 'Outfit';
+        font-weight: 700;
+      }
+      .modal-banner .go {
+        margin-left: auto;
+        color: var(--orange);
+        font-weight: 700;
+        font-family: 'Outfit';
+      }
+
+      /* ===== Option B — front-door hero ===== */
+      .hero {
+        border-radius: 20px;
+        padding: 18px;
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(140deg, var(--orange) 0%, var(--terracotta) 100%);
+        color: #fff;
+      }
+      .hero::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          105deg,
+          transparent 32%,
+          rgb(255 255 255 / 28%) 50%,
+          transparent 68%
+        );
+        transform: translateX(-120%);
+        animation: sheen 4.6s ease-in-out infinite;
+      }
+      .hero .ek {
+        font-family: 'Outfit';
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        opacity: 0.85;
+      }
+      .hero h4 {
+        font-size: 20px;
+        font-weight: 800;
+        margin: 6px 0 0;
+      }
+      .hero p {
+        font-size: 12.5px;
+        line-height: 1.45;
+        margin: 6px 0 0;
+        opacity: 0.92;
+        max-width: 86%;
+      }
+      .hero-chips {
+        display: flex;
+        gap: 9px;
+        margin-top: 14px;
+        position: relative;
+        z-index: 1;
+      }
+      .hero-chip {
+        background: rgb(255 255 255 / 92%);
+        color: var(--orange-600);
+        border-radius: 12px;
+        padding: 9px 13px;
+        font-family: 'Outfit';
+        font-size: 12.5px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .hero .mascot {
+        position: absolute;
+        right: 12px;
+        bottom: 8px;
+        font-size: 34px;
+        opacity: 0.9;
+      }
+      .hero .cap {
+        font-family: 'Caveat', cursive;
+        font-size: 17px;
+        font-weight: 700;
+        position: absolute;
+        right: 14px;
+        top: 16px;
+        opacity: 0.95;
+        transform: rotate(-6deg);
+      }
+      .or-divider {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--ink-45);
+        font-size: 11px;
+        font-family: 'Outfit';
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .or-divider::before,
+      .or-divider::after {
+        content: '';
+        height: 1px;
+        flex: 1;
+        background: var(--line);
+      }
+
+      /* big magic card in modal */
+      .magic-card {
+        border-radius: 18px;
+        padding: 16px;
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+      }
+      .magic-card .glyph {
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        background: linear-gradient(150deg, var(--orange), var(--terracotta));
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        margin: 0 auto;
+        color: #fff;
+        box-shadow: 0 6px 16px -4px rgb(241 93 34 / 50%);
+      }
+      .magic-card h5 {
+        font-family: 'Outfit';
+        font-size: 15px;
+        font-weight: 700;
+        margin: 10px 0 0;
+      }
+      .magic-card p {
+        font-size: 12px;
+        color: var(--ink-60);
+        margin: 5px 0 0;
+        line-height: 1.4;
+      }
+      .magic-card .btn {
+        margin-top: 12px;
+        height: 40px;
+        border-radius: 13px;
+        background: linear-gradient(90deg, var(--orange), var(--terracotta));
+        color: #fff;
+        font-family: 'Outfit';
+        font-size: 13px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ===== Option C — the fork ===== */
+      .fork-h {
+        text-align: center;
+        padding: 6px 4px 2px;
+      }
+      .fork-h h5 {
+        font-family: 'Outfit';
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .fork-h p {
+        font-size: 12.5px;
+        color: var(--ink-60);
+        margin: 5px 0 0;
+      }
+      .fork-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 4px;
+      }
+      .fork-card {
+        border-radius: 18px;
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+      }
+      .fork-card.primary {
+        border: 1.5px solid rgb(241 93 34 / 30%);
+      }
+      .fork-card.plain {
+        background: #fff;
+        border: 1px solid rgb(44 62 80 / 12%);
+        box-shadow: var(--card-shadow);
+      }
+      .fork-card .glyph {
+        width: 48px;
+        height: 48px;
+        border-radius: 15px;
+        display: grid;
+        place-items: center;
+        font-size: 24px;
+        flex-shrink: 0;
+      }
+      .fork-card.primary .glyph {
+        background: linear-gradient(150deg, var(--orange), var(--terracotta));
+        color: #fff;
+        box-shadow: 0 6px 16px -4px rgb(241 93 34 / 50%);
+      }
+      .fork-card.plain .glyph {
+        background: var(--tint-orange-8);
+      }
+      .fork-card .tx b {
+        font-family: 'Outfit';
+        font-size: 15px;
+        font-weight: 700;
+        display: block;
+      }
+      .fork-card .tx span {
+        font-size: 12px;
+        color: var(--ink-60);
+        line-height: 1.35;
+        position: relative;
+        z-index: 1;
+      }
+      .fork-card .rec {
+        position: absolute;
+        top: 10px;
+        right: 12px;
+        font-family: 'Outfit';
+        font-size: 9.5px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--orange);
+        z-index: 1;
+      }
+      .conf-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: rgb(241 93 34 / 12%);
+        color: var(--orange-600);
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-family: 'Outfit';
+        font-size: 10px;
+        font-weight: 700;
+        margin-left: 8px;
+      }
+      .reading {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #fff;
+        border-radius: 22px;
+        padding: 26px 20px;
+        text-align: center;
+        box-shadow: var(--soft-shadow);
+      }
+      .reading .doc {
+        width: 78px;
+        height: 100px;
+        margin: 0 auto 16px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #fff, #f1f4f7);
+        border: 1px solid var(--line);
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+      }
+      .reading .doc::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 22px;
+        background: linear-gradient(90deg, transparent, rgb(241 93 34 / 35%), transparent);
+        animation: scanline 1.8s ease-in-out infinite;
+      }
+      @keyframes scanline {
+        0% {
+          top: 0;
+        }
+        100% {
+          top: 78px;
+        }
+      }
+      .reading h5 {
+        font-family: 'Outfit';
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .reading p {
+        font-size: 12px;
+        color: var(--ink-60);
+        margin: 5px 0 0;
+        font-family: 'Caveat', cursive;
+        font-weight: 700;
+        font-size: 16px;
+      }
+
+      .footnote {
+        max-width: 1180px;
+        margin: 40px auto 0;
+        font-size: 12.5px;
+        color: var(--ink-60);
+        line-height: 1.6;
+      }
+      .footnote b {
+        color: var(--slate);
+        font-family: 'Outfit';
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .shimmer::after,
+        .hero::after,
+        .spark,
+        .reading .doc::before {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <div class="kick">beanies.family · design exploration · 2026-06-07</div>
+      <h1>Let beanies read it — AI entry points</h1>
+      <p>
+        Three ways to weave the new "read my document" capability into the paths families already
+        know — the add buttons, the FAB sheet, and the create modals. One shared visual signal: a
+        Heritage&nbsp;Orange&nbsp;→&nbsp;Terracotta shimmer and a single ✨. No purple, no robots.
+        The magic looks like <em>the beanies doing something delightful</em>, never a bolted-on "AI"
+        brand.
+      </p>
+    </div>
+
+    <div class="principle">
+      <div class="chip">
+        <b>The agent is the beanies</b>
+        AI is something beanies <em>do</em> for you — "let beanies read it." The capability is
+        reading-your-document; the beanies are who does it.
+      </div>
+      <div class="chip">
+        <b>A peer, never a takeover</b>
+        It sits beside manual entry everywhere you create — discoverable, inviting, but never
+        louder than the rest of the Nook.
+      </div>
+      <div class="chip no">
+        <b>What we deliberately avoid</b>
+        No purple gradients. No circuit/robot/brain icons. No "AI ✨ Powered" badge. The shimmer
+        and one sparkle carry all the "magic."
+      </div>
+    </div>
+
+    <!-- ============ SHARED LANGUAGE BAND ============ -->
+    <section class="band">
+      <h2>The shared signal — and the inconsistency it fixes</h2>
+      <p>
+        Today the two entry points disagree: a bare camera circle on activities, a teal outlined
+        pill on travel. One signal unifies them and adds a value promise.
+      </p>
+      <div class="swatches">
+        <div class="swatch">
+          <span class="cap">Before · activities</span>
+          <button class="pill-old">📸</button>
+        </div>
+        <div class="swatch">
+          <span class="cap">Before · travel</span>
+          <span
+            class="pill-new"
+            style="
+              border: 1.5px solid rgb(0 119 182 / 25%);
+              color: #0077b6;
+              background: #fff;
+              font-weight: 600;
+            "
+            >Add from Document 📄</span
+          >
+        </div>
+        <div class="swatch">
+          <span class="cap">After · one shimmer language</span>
+          <span class="pill-new shimmer" style="border-radius: 14px">
+            <span class="s">✨</span> Read a document
+          </span>
+        </div>
+        <div class="swatch">
+          <span class="cap">FAB · a quiet sparkle hint</span>
+          <div class="fab">
+            ＋
+            <span class="spark s1">✨</span>
+            <span class="spark s2">✨</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ THE THREE OPTIONS ============ -->
+    <div class="options">
+      <!-- ---------- OPTION A ---------- -->
+      <div class="opt">
+        <div class="opt-head">
+          <span class="tag">Strategy A</span>
+          <h3>Woven In</h3>
+          <p>
+            AI appears as a calm peer wherever manual add already lives — a shimmer row atop the FAB
+            sheet, and a one-line banner at the top of every create modal. Discoverable, never
+            shouts.
+          </p>
+        </div>
+
+        <!-- Phone A1 — FAB sheet -->
+        <div class="bezel">
+          <div class="device">
+            <div class="statusbar"><span>9:41</span><span>▦ ▮▮▮</span></div>
+            <div class="screencap">FAB sheet · a magic row above the jar</div>
+            <div class="scroll">
+              <div class="backdrop"></div>
+              <div class="sheet">
+                <div class="grabber"></div>
+                <div class="sheet-h"><h4>Add something</h4><span class="x">×</span></div>
+
+                <!-- the woven magic row -->
+                <div class="magic-row shimmer">
+                  <div class="glyph">✨</div>
+                  <div class="tx">
+                    <b>Read a document</b>
+                    <span>Snap an invite or booking — beanies fills it in.</span>
+                  </div>
+                  <span class="go">→</span>
+                </div>
+
+                <div class="everyday">
+                  <span class="ek">Everyday beans</span>
+                  <div class="egrid">
+                    <div class="etile"><span class="em">📅</span><span class="lb">Activity</span></div>
+                    <div class="etile"><span class="em">✅</span><span class="lb">To-Do</span></div>
+                    <div class="etile"><span class="em">💳</span><span class="lb">Spend</span></div>
+                    <div class="etile"><span class="em">✈️</span><span class="lb">Trip</span></div>
+                    <div class="etile"><span class="em">👨‍🍳</span><span class="lb">Cooked</span></div>
+                    <div class="etile"><span class="em">💬</span><span class="lb">Saying</span></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="sec-title">Family</div>
+                  <div class="sgrid">
+                    <div class="stile">
+                      <span class="em">💝</span>
+                      <div><div class="lb">Favorite</div><div class="hint">a thing they love</div></div>
+                    </div>
+                    <div class="stile">
+                      <span class="em">🌟</span>
+                      <div><div class="lb">Milestone</div><div class="hint">a proud moment</div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phone A2 — modal banner -->
+        <div class="bezel">
+          <div class="device">
+            <div class="statusbar"><span>9:41</span><span>▦ ▮▮▮</span></div>
+            <div class="screencap">New Activity · one-line banner up top</div>
+            <div class="scroll">
+              <div class="backdrop"></div>
+              <div class="modal">
+                <div class="modal-h">
+                  <div class="ibox">📅</div>
+                  <h4>New Activity</h4>
+                  <span class="x">×</span>
+                </div>
+                <div class="modal-b">
+                  <div class="modal-banner shimmer">
+                    <div class="glyph">✨</div>
+                    <div class="tx"><b>Got the invite?</b> Let beanies read it and fill this in.</div>
+                    <span class="go">→</span>
+                  </div>
+                  <div class="field">
+                    <div class="fl">What's happening</div>
+                    <div class="fi empty">e.g. Mia's birthday party</div>
+                  </div>
+                  <div class="field">
+                    <div class="fl">When</div>
+                    <div class="fi empty">Pick a date & time</div>
+                  </div>
+                  <div class="field">
+                    <div class="fl">Where</div>
+                    <div class="fi empty">Add a place</div>
+                  </div>
+                </div>
+                <div class="modal-f">
+                  <div class="del">🗑️</div>
+                  <div class="save">Add to calendar</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="verdict">
+          <b>Best for:</b> shipping fast with the lowest risk of overpowering. The capability is
+          everywhere, but the eye still lands on the family's content first. Lowest engineering
+          lift — one shared component dropped into the sheet + BeanieFormModal slot.
+        </div>
+      </div>
+
+      <!-- ---------- OPTION B ---------- -->
+      <div class="opt">
+        <div class="opt-head">
+          <span class="tag">Strategy B</span>
+          <h3>Front Door</h3>
+          <p>
+            A warm hero greets you at the top of the FAB sheet and the create modal — "skip the
+            typing." Highest visibility; the magic gets a real moment without changing the flow.
+          </p>
+        </div>
+
+        <!-- Phone B1 — hero sheet -->
+        <div class="bezel">
+          <div class="device">
+            <div class="statusbar"><span>9:41</span><span>▦ ▮▮▮</span></div>
+            <div class="screencap">FAB sheet · a hero greets you</div>
+            <div class="scroll">
+              <div class="backdrop"></div>
+              <div class="sheet">
+                <div class="grabber"></div>
+                <div class="sheet-h"><h4>Add something</h4><span class="x">×</span></div>
+
+                <div class="hero">
+                  <div class="ek">✨ beanies can help</div>
+                  <h4>Skip the typing</h4>
+                  <p>Snap a photo of any invite or booking — your beanies read it and fill everything in.</p>
+                  <span class="cap">tap →</span>
+                  <div class="hero-chips">
+                    <span class="hero-chip">📸 An invite</span>
+                    <span class="hero-chip">✈️ A booking</span>
+                  </div>
+                </div>
+
+                <div class="everyday">
+                  <span class="ek">Or add it yourself</span>
+                  <div class="egrid">
+                    <div class="etile"><span class="em">📅</span><span class="lb">Activity</span></div>
+                    <div class="etile"><span class="em">✅</span><span class="lb">To-Do</span></div>
+                    <div class="etile"><span class="em">💳</span><span class="lb">Spend</span></div>
+                    <div class="etile"><span class="em">✈️</span><span class="lb">Trip</span></div>
+                    <div class="etile"><span class="em">👨‍🍳</span><span class="lb">Cooked</span></div>
+                    <div class="etile"><span class="em">💬</span><span class="lb">Saying</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phone B2 — big magic card in modal -->
+        <div class="bezel">
+          <div class="device">
+            <div class="statusbar"><span>9:41</span><span>▦ ▮▮▮</span></div>
+            <div class="screencap">New Trip · invite the shortcut first</div>
+            <div class="scroll">
+              <div class="backdrop"></div>
+              <div class="modal">
+                <div class="modal-h">
+                  <div class="ibox" style="background: rgb(0 180 216 / 10%)">✈️</div>
+                  <h4>New Trip</h4>
+                  <span class="x">×</span>
+                </div>
+                <div class="modal-b">
+                  <div class="magic-card shimmer">
+                    <div class="glyph">✨</div>
+                    <h5>Have your itinerary?</h5>
+                    <p>Let beanies read your booking and build the trip for you.</p>
+                    <div class="btn">📄 &nbsp;Read my itinerary</div>
+                  </div>
+                  <div class="or-divider">or fill it in</div>
+                  <div class="field">
+                    <div class="fl">Where to?</div>
+                    <div class="fi empty">e.g. Tokyo</div>
+                  </div>
+                  <div class="field">
+                    <div class="fl">Dates</div>
+                    <div class="fi empty">Add travel dates</div>
+                  </div>
+                </div>
+                <div class="modal-f">
+                  <div class="save" style="background: linear-gradient(90deg, #00b4d8, #0096b7)">
+                    Start the trip
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="verdict">
+          <b>Best for:</b> maximum adoption of a brand-new capability users don't yet know exists.
+          The hero teaches the feature; the "or add it yourself" reframing keeps manual entry an
+          equal, unembarrassed choice. Slightly more vertical space in the sheet.
+        </div>
+      </div>
+
+      <!-- ---------- OPTION C ---------- -->
+      <div class="opt">
+        <div class="opt-head">
+          <span class="tag">Strategy C</span>
+          <h3>The Fork</h3>
+          <p>
+            Reframe the creation <em>moment</em>: tapping "New Activity" opens a friendly fork —
+            read a document, or type it in. AI becomes a first-class equal at the decision point.
+          </p>
+        </div>
+
+        <!-- Phone C1 — the fork choice -->
+        <div class="bezel">
+          <div class="device">
+            <div class="statusbar"><span>9:41</span><span>▦ ▮▮▮</span></div>
+            <div class="screencap">New Activity · how do you want to add it?</div>
+            <div class="scroll">
+              <div class="backdrop"></div>
+              <div class="modal">
+                <div class="modal-h">
+                  <div class="ibox">📅</div>
+                  <h4>New Activity</h4>
+                  <span class="x">×</span>
+                </div>
+                <div class="modal-b">
+                  <div class="fork-h">
+                    <h5>How would you like to add this?</h5>
+                    <p>Got the invite handy? Save yourself the typing.</p>
+                  </div>
+                  <div class="fork-cards">
+                    <div class="fork-card primary shimmer">
+                      <span class="rec">Fastest</span>
+                      <div class="glyph">✨</div>
+                      <div class="tx">
+                        <b>Read a document</b>
+                        <span>Snap the invite — beanies fills in the date, time &amp; place.</span>
+                      </div>
+                    </div>
+                    <div class="fork-card plain">
+                      <div class="glyph">✍️</div>
+                      <div class="tx">
+                        <b>Type it in</b>
+                        <span>Fill the details in yourself.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phone C2 — reading + prefilled result -->
+        <div class="bezel">
+          <div class="device">
+            <div class="statusbar"><span>9:41</span><span>▦ ▮▮▮</span></div>
+            <div class="screencap">…beanies reads it → prefilled, with confidence</div>
+            <div class="scroll" style="background: var(--cloud)">
+              <!-- top half: the reading state, bottom: ghost of filled form -->
+              <div class="page-ghost" style="opacity: 1; padding: 0">
+                <div class="modal" style="top: 50%; max-height: 94%">
+                  <div class="modal-h">
+                    <div class="ibox" style="background: rgb(241 93 34 / 12%)">✨</div>
+                    <h4>Review &amp; save</h4>
+                    <span class="x">×</span>
+                  </div>
+                  <div class="modal-b">
+                    <div
+                      class="modal-banner"
+                      style="background: rgb(39 174 96 / 10%); cursor: default"
+                    >
+                      <div class="glyph" style="background: #27ae60">✓</div>
+                      <div class="tx"><b>Read it!</b> Check the details and save.</div>
+                    </div>
+                    <div class="field">
+                      <div class="fl">What's happening</div>
+                      <div class="fi">Mia's 7th Birthday Party</div>
+                    </div>
+                    <div class="field">
+                      <div class="fl">
+                        When <span class="conf-chip">✨ double-check</span>
+                      </div>
+                      <div class="fi">Sat 14 Jun · 2:00 PM</div>
+                    </div>
+                    <div class="field">
+                      <div class="fl">Where</div>
+                      <div class="fi">Parkland Green, ECP</div>
+                    </div>
+                  </div>
+                  <div class="modal-f">
+                    <div class="save">Add to calendar</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="verdict">
+          <b>Best for:</b> making AI a genuine equal path rather than an "extra." Strongest framing
+          of value, but it adds one step to every manual create — so it's best gated to entities
+          where documents are common (activities, trips), with a "always type it in" preference for
+          power users. Most engineering + most behavioural change.
+        </div>
+      </div>
+    </div>
+
+    <div class="footnote">
+      <p>
+        <b>Across all three</b>, the same primitives do the work: a shared
+        <b>&lt;MagicShimmer&gt;</b> surface (the orange→terracotta sheen + sparkle), one unified
+        verb — <b>"Read a document"</b> with context variants ("Read the invite" / "Read my
+        itinerary") — and the existing consent → file-picker → review flow underneath, untouched.
+        The standalone page buttons (the camera circle, the teal pill) collapse into the same
+        shimmer pill so the language is one thing everywhere.
+      </p>
+      <p>
+        <b>Other surfaces worth a follow-up</b> (not mocked here): a first-run "did you know beanies
+        can read your invites?" spotlight in the notifications drawer; an empty-state nudge on a
+        blank calendar/trip list; and a long-press on the FAB jumping straight to the camera. These
+        layer on top of whichever strategy we pick.
+      </p>
+    </div>
+  </body>
+</html>
