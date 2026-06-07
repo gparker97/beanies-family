@@ -17,6 +17,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useBeanieText } from '@/composables/useBeanieText';
 import { MARKETING_URL } from '@/utils/marketing';
 import { openExternal } from '@/utils/openExternal';
+import { splitAroundAccent } from '@/utils/splitAroundAccent';
 import { getReleaseNote } from '@/content/release-notes';
 import CelebrationDetail from '@/components/notifications/CelebrationDetail.vue';
 import type { AppNotification } from '@/types/notifications';
@@ -38,6 +39,19 @@ const release = computed(() =>
  * minor summary-only note) falls back to its centred `summary` message.
  */
 const blocks = computed(() => release.value?.features ?? []);
+
+/**
+ * Per-block description split for an optional inline `descriptionLink`. `null`
+ * when the block has no link; otherwise `{ lead, accent, trail }` where `accent`
+ * is the linked phrase (empty if the phrase isn't found — then it renders as the
+ * whole sentence in `lead`, no link).
+ */
+const blockParts = computed(() =>
+  blocks.value.map((f) =>
+    f.descriptionLink ? splitAroundAccent(txt(f.description), txt(f.descriptionLink.phrase)) : null
+  )
+);
+
 const isMulti = computed(() => blocks.value.length > 1);
 const isSingle = computed(() => blocks.value.length === 1);
 const fixes = computed(() => release.value?.fixes ?? []);
@@ -73,13 +87,27 @@ function handleSeeAll() {
             {{ feature.icon }}
           </span>
           <h4 class="wn-item-title">{{ txt(feature.title) }}</h4>
-          <p class="wn-item-desc">{{ txt(feature.description) }}</p>
+          <!-- description: plain text, or split around an inline external link -->
+          <p v-if="blockParts[i] && blockParts[i]!.accent" class="wn-item-desc">
+            <span>{{ blockParts[i]!.lead }}</span
+            ><button
+              type="button"
+              class="wn-inline-link"
+              @click="openExternal(feature.descriptionLink!.href)"
+            >
+              {{ blockParts[i]!.accent }}</button
+            ><span>{{ blockParts[i]!.trail }}</span>
+          </p>
+          <p v-else class="wn-item-desc">{{ txt(feature.description) }}</p>
           <button
             v-if="feature.tryItRoute"
             class="wn-tryit"
             @click="handleTryIt(feature.tryItRoute!)"
           >
             {{ t('whatsNew.tryIt') }}<span class="wn-tryit-arrow">→</span>
+          </button>
+          <button v-if="feature.cta" class="wn-tryit" @click="openExternal(feature.cta.href)">
+            {{ txt(feature.cta.label) }}<span class="wn-tryit-arrow">↗</span>
           </button>
         </div>
       </div>
@@ -220,6 +248,22 @@ function handleSeeAll() {
   box-shadow:
     0 0 0 4px #1e293b,
     0 3px 8px -3px rgb(241 93 34 / 70%);
+}
+
+/* inline external link inside a description (e.g. to a help article) */
+.wn-inline-link {
+  background: none;
+  border: none;
+  color: #f15d22;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.wn-inline-link:hover {
+  color: #d14d1a;
 }
 
 .wn-tryit {

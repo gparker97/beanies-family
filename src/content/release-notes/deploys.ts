@@ -17,6 +17,44 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.06.07',
+    date: '2026-06-07',
+    month: '7 june 2026',
+    spotlight: true,
+    summary: {
+      en: 'New and in beta: let beanies read your invites and bookings for you.',
+      beanie: 'new and in beta: let beanies read your invites and bookings for you.',
+    },
+    features: [
+      {
+        icon: '✨',
+        title: {
+          en: 'Magic beans: beanies reads your invites and bookings (beta)',
+          beanie: 'magic beans: beanies reads your invites and bookings (beta)',
+        },
+        description: {
+          en: "Snap a photo or PDF of a party invite or a travel booking, and beanies pulls out the details and builds the entire trip or activity for you. Add multiple documents, images, or itineraries to add to an existing trip or create new ones - it's all under your control. Nothing is ever sent without you choosing first, and you can read exactly how your data is kept secure.",
+          beanie:
+            "snap a photo or pdf of a party invite or a travel booking, and beanies pulls out the details and builds the entire trip or activity for you. add multiple documents, images, or itineraries to add to an existing trip or create new ones - it's all under your control. nothing is ever sent without you choosing first, and you can read exactly how your data is kept secure.",
+        },
+        descriptionLink: {
+          phrase: {
+            en: 'you can read exactly how your data is kept secure',
+            beanie: 'you can read exactly how your data is kept secure',
+          },
+          href: 'https://beanies.family/help/security/how-beanies-ai-handles-your-photos',
+        },
+        cta: {
+          label: {
+            en: 'Learn more about magic beans',
+            beanie: 'learn more about magic beans',
+          },
+          href: 'https://beanies.family/help/security/how-beanies-ai-handles-your-photos',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.06.05',
     date: '2026-06-05',
     month: '5 june 2026',

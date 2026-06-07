@@ -113,4 +113,63 @@ describe('WhatsNewBody — headline + detail blocks', () => {
     await w.find('.wn-seeall').trigger('click');
     expect(openExternal).toHaveBeenCalledWith('https://beanies.family/help/whats-new');
   });
+
+  it('a feature cta renders a button that opens the external href in a new tab', async () => {
+    const HREF = 'https://beanies.family/help/security/magic';
+    getReleaseNote.mockReturnValue({
+      ...base,
+      features: [
+        {
+          title: bilingual('Magic'),
+          description: bilingual('Let beanies read your stuff.'),
+          cta: { label: bilingual('Learn more about magic beans'), href: HREF },
+        },
+      ],
+    });
+    const w = mount(WhatsNewBody, { props: { notification: note } });
+    const cta = w.find('.wn-tryit');
+    expect(cta.exists()).toBe(true);
+    expect(cta.text()).toContain('Learn more about magic beans');
+    await cta.trigger('click');
+    expect(openExternal).toHaveBeenCalledWith(HREF);
+  });
+
+  it('a descriptionLink turns the matching phrase into an inline external link', async () => {
+    const HREF = 'https://beanies.family/help/security/magic';
+    getReleaseNote.mockReturnValue({
+      ...base,
+      features: [
+        {
+          title: bilingual('Magic'),
+          description: bilingual(
+            'Nothing is sent first, and you can read how it stays secure here.'
+          ),
+          descriptionLink: { phrase: bilingual('how it stays secure'), href: HREF },
+        },
+      ],
+    });
+    const w = mount(WhatsNewBody, { props: { notification: note } });
+    const link = w.find('.wn-inline-link');
+    expect(link.exists()).toBe(true);
+    expect(link.text()).toBe('how it stays secure');
+    expect(w.find('.wn-item-desc').text()).toContain('Nothing is sent first');
+    await link.trigger('click');
+    expect(openExternal).toHaveBeenCalledWith(HREF);
+  });
+
+  it('a descriptionLink whose phrase is absent degrades to plain text (no link)', () => {
+    getReleaseNote.mockReturnValue({
+      ...base,
+      features: [
+        {
+          title: bilingual('Magic'),
+          description: bilingual('A plain sentence.'),
+          descriptionLink: { phrase: bilingual('not present'), href: 'https://x' },
+        },
+      ],
+    });
+    const w = mount(WhatsNewBody, { props: { notification: note } });
+    expect(w.find('.wn-inline-link').exists()).toBe(false);
+    expect(w.find('.wn-item-desc').text()).toBe('A plain sentence.');
+  });
 });
