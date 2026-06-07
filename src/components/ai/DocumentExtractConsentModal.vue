@@ -17,13 +17,13 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { openExternal } from '@/utils/openExternal';
 import { splitAroundAccent } from '@/utils/splitAroundAccent';
+import BetaBadge from '@/components/ui/BetaBadge.vue';
 import type { AiTier } from '@/services/ai/types';
 
-// The privacy article lives on the marketing site, which deploys via a SEPARATE manual
-// pipeline (deploy-web.yml / workflow_dispatch) — an app deploy does not publish it. Until
-// it is confirmed live, the checkbox renders label-only (no live link to a 404). Flip to
-// true in the same change that runs deploy-web.
-const PRIVACY_ARTICLE_LIVE = false;
+// The privacy article lives on the marketing site (deployed via deploy-web.yml). LIVE as of
+// the 2026-06-07 soft launch — this change ships alongside that web deploy, so the consent
+// links resolve. (If the article is ever pulled, set this back to false.)
+const PRIVACY_ARTICLE_LIVE = true;
 const PRIVACY_ARTICLE_URL =
   'https://beanies.family/help/security/how-beanies-ai-handles-your-photos';
 
@@ -85,6 +85,11 @@ function onConfirm(): void {
     @close="emit('cancel')"
     @save="onConfirm"
   >
+    <!-- Beta: the AI document readers are an early release. -->
+    <div>
+      <BetaBadge />
+    </div>
+
     <!-- "secure, private" becomes an inline link to the privacy article once it
          ships (PRIVACY_ARTICLE_LIVE); until then it renders as plain emphasised
          text so the sentence still reads correctly. -->
@@ -121,6 +126,18 @@ function onConfirm(): void {
       {{ t('ai.consent.footnote') }}
     </p>
 
+    <!-- Clear "learn more" link to the privacy help article (opens a real new tab
+         via openExternal, which is PWA-safe). -->
+    <button
+      v-if="PRIVACY_ARTICLE_LIVE"
+      type="button"
+      class="font-outfit inline-flex items-center gap-1 text-sm font-semibold text-[#F15D22] underline underline-offset-2 hover:text-[#D14D1A]"
+      @click.stop.prevent="openExternal(PRIVACY_ARTICLE_URL)"
+    >
+      {{ t('ai.consent.learnMore') }}
+      <span aria-hidden="true">↗</span>
+    </button>
+
     <label class="flex cursor-pointer items-start gap-3">
       <input v-model="remember" type="checkbox" class="sr-only" />
       <span
@@ -147,14 +164,6 @@ function onConfirm(): void {
       </span>
       <span class="font-inter text-sm text-[var(--color-text)] dark:text-gray-200">
         {{ t('ai.consent.remember') }}
-        <button
-          v-if="PRIVACY_ARTICLE_LIVE"
-          type="button"
-          class="ml-1 underline underline-offset-2 hover:text-[#F15D22]"
-          @click.stop.prevent="openExternal(PRIVACY_ARTICLE_URL)"
-        >
-          {{ t('ai.consent.privacyLink') }}
-        </button>
       </span>
     </label>
   </BeanieFormModal>

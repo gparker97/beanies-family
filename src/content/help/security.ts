@@ -337,10 +337,8 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       },
     ],
   },
-  // #133 — beanies AI privacy explainer. HELD from production until Phase 5
-  // (greg's voice pass + PRIVACY_ARTICLE_LIVE flip). Commented out so web deploys
-  // do not publish it yet. To restore: remove the /* and */ wrapping this object.
-  /*
+  // #133 / #30 — beanies AI privacy explainer. LIVE as of the 2026-06-07 soft launch
+  // (alongside the consent modal's PRIVACY_ARTICLE_LIVE flip + this deploy-web run).
   {
     slug: 'how-beanies-ai-handles-your-photos',
     category: 'security',
@@ -360,7 +358,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Tap <strong>✨ Perform magic</strong> (or the <strong>Invite</strong> and <strong>Travel booking</strong> buttons) and beanies reads a single photo or document you choose — a party invitation, a flight itinerary, a hotel confirmation — and magically pulls out the key details, then opens a pre-filled activity or trip for you to check and save. As you probably guessed, it's not actually magic: it's secure, private AI. It only ever runs on the one document you pick, and only when you ask.',
+          "Tap <strong>✨ Perform magic</strong> (or the <strong>Invite</strong> and <strong>Travel booking</strong> buttons) and beanies reads a single photo or document you choose — a party invitation, a flight itinerary, a hotel confirmation — and magically pulls out the key details, then opens a pre-filled activity or trip for you to check and save. As you probably guessed, it's not actually magic: it's secure, private AI. It only ever runs on the one document you pick, and only when you ask.",
       },
       {
         type: 'heading',
@@ -391,7 +389,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'callout',
         content:
-          'The AI service processes your document in a secure, attested environment and retains nothing after it answers. It is encrypted in transit. Once your document or image arrives in the secure enclave, it is decrypted and procesed to read, encrypt, and return the details back to beanies.family.)',
+          'The AI service processes your document in a secure, attested environment and retains nothing after it answers. It is encrypted in transit. Once your document or image arrives in the secure enclave, it is decrypted and processed to read, encrypt, and return the details back to beanies.family.',
         title: 'Private and secure as can be',
         icon: '\u{1F512}',
       },
@@ -404,7 +402,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          "On the default setting, your photo or document is read by a specialist AI model running inside <strong>attested confidential-compute hardware</strong>. It is a sealed environment, built on AMD SEV-SNP and Intel TDX chips, that the company operating the servers cannot see into. Your document is encrypted on the way there and back, read only to pull out the details, and then it is gone.",
+          'On the default setting, your photo or document is read by a specialist AI model running inside <strong>attested confidential-compute hardware</strong>. It is a sealed environment, built on AMD SEV-SNP and Intel TDX chips, that the company operating the servers cannot see into. Your document is encrypted on the way there and back, read only to pull out the details, and then it is gone.',
       },
       {
         type: 'list',
@@ -413,14 +411,14 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
           '<strong>Sealed processing:</strong> your document is decrypted and read only inside the attested enclave, not on an ordinary server someone could log into.',
           '<strong>Encrypted in transit:</strong> it is encrypted on the way to the enclave and on the way back.',
           '<strong>Nothing kept, nothing trained on:</strong> the AI service retains nothing once it has answered, and never uses your data to train its models.',
-          "<strong>You can verify it:</strong> the enclave publishes a live <em>attestation</em>, a cryptographic proof of exactly what hardware and code are running, so the privacy promise is not just our word for it.",
+          '<strong>You can verify it:</strong> the enclave publishes a live <em>attestation</em>, a cryptographic proof of exactly what hardware and code are running, so the privacy promise is not just our word for it.',
           '<strong>Or skip it entirely:</strong> bring your own AI provider and key (BYOK) and your document goes straight to your provider, never through ours.',
         ],
       },
       {
         type: 'paragraph',
         content:
-          "Today that secure hardware is provided by <strong>Tinfoil</strong>, a privacy-focused AI host whose enclaves both we and you can verify on every request. If we ever change providers, it will only be to one that meets the same verifiable standard. We try to be precise rather than boastful: the AI genuinely does read your document to pull out the details, but that only ever happens inside sealed, verifiable hardware, and nothing is kept.",
+          'Today that secure hardware is provided by <strong>Tinfoil</strong>, a privacy-focused AI host whose enclaves both we and you can verify on every request. If we ever change providers, it will only be to one that meets the same verifiable standard. We try to be precise rather than boastful: the AI genuinely does read your document to pull out the details, but that only ever happens inside sealed, verifiable hardware, and nothing is kept.',
       },
       {
         type: 'heading',
@@ -448,5 +446,4 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       },
     ],
   },
-  */
 ];
