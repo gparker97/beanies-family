@@ -14,6 +14,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **beanies can do magic (beta).** Snap a photo or PDF of a party invite or a travel booking, and beanies pulls out the details and builds the activity or trip for you to check and save - add several documents to one trip, or start new ones. It is an early beta, you choose every time before anything is sent, and a new "Magic Beans" help article explains exactly how your data is kept secure (processed in attested confidential-compute hardware, encrypted in transit, nothing kept). Find it on the FAB, the calendar bar, the new-activity and new-trip screens, all labelled Beta.
 - **New help center content for AI.** A "Magic Beans: How beanies Reads Your Photos & Documents" privacy article, a "how beanies uses AI" card on the help home, and the Security category renamed to "Security, Privacy, and AI".
+- **Magic on a specific trip.** Open a trip and tap the magic button to read a booking straight into that trip — it defaults to the trip you're looking at, and you can still send it to a new trip instead.
+- **Activities back in the Planning menu.** On mobile, Activities now appears in the Planning menu as well as the centre calendar button. Tapping either opens the calendar and jumps to today — even if you're already on the calendar.
+
+### Changed
+
+- **One consistent magic button everywhere.** The "Perform magic" AI button now looks and behaves the same across the calendar and travel screens — the full "✨ Perform magic" label on larger screens, a compact ✨ on phones — so the AI capability is easy to spot wherever you are.
 
 ## 2026-06-06
 

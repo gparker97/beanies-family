@@ -39,6 +39,7 @@ import { useDocumentConsent } from '@/composables/useDocumentConsent';
 import { useAiCapability } from '@/composables/useAiCapability';
 import { useFilePicker } from '@/composables/useFilePicker';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
+import { usePlannerTodayConsumer } from '@/composables/usePlannerToday';
 import { AI_PICKER_ACCEPT } from '@/constants/aiDocumentPicker';
 import type { FieldConfidence } from '@/services/ai/types';
 import type {
@@ -332,6 +333,9 @@ function handleToday() {
   focusedDate.value = null;
   todayTick.value++;
 }
+// A calendar nav tap (center button / Planning-stack Activities) jumps to today —
+// incl. the already-on-this-page case where router.push is a no-op.
+usePlannerTodayConsumer(handleToday);
 function setView(view: string) {
   activeView.value = view as PlannerView;
 }
