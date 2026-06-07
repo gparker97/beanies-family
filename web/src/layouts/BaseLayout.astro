@@ -130,7 +130,14 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
          /terms external-redirects point here, and an in-place standalone nav
          would otherwise ping-pong forever). Render the marketing page instead
          of redirecting again. The genuine stale-PWA launch hits the apex
-         without the param, so it still bounces exactly once. -->
+         without the param, so it still bounces exactly once.
+
+         Marketing-only guard: sections that live ONLY on this site (help, blog,
+         guides, about, privacy, terms) have no counterpart on app.beanies.family,
+         so bouncing them yields the app's 404 page. This is what broke the in-app
+         AI-consent link to /help/security/... when tapped from the iOS PWA. Never
+         bounce these — a genuine stale-PWA launch always starts at the apex '/',
+         which is not in the list and still bounces exactly once. -->
     <script is:inline>
       (function () {
         try {
@@ -140,7 +147,12 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
           var isIOS = window.navigator.standalone === true;
           var alreadyBounced =
             new URLSearchParams(window.location.search).get('from-stale-pwa') === '1';
-          if ((isStandalone || isIOS) && !alreadyBounced) {
+          var path = window.location.pathname;
+          var MARKETING_ONLY = ['/help', '/blog', '/guides', '/about', '/privacy', '/terms'];
+          var isMarketingOnly = MARKETING_ONLY.some(function (p) {
+            return path === p || path.indexOf(p + '/') === 0;
+          });
+          if ((isStandalone || isIOS) && !alreadyBounced && !isMarketingOnly) {
             var url = new URL(
               'https://app.beanies.family' +
                 window.location.pathname +
