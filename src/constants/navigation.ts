@@ -43,8 +43,12 @@ export interface NavItemDef {
   badgeKey?: string;
   external?: boolean;
   externalUrl?: string;
-  /** See `MobileCategoryId` for tagging contract. */
-  mobileCategory?: MobileCategoryId;
+  /**
+   * See `MobileCategoryId` for the tagging contract. Accepts an array to place
+   * one route in MORE THAN ONE mobile slot — e.g. `/activities` is both the
+   * center Calendar leaf AND a Planning-stack bean.
+   */
+  mobileCategory?: MobileCategoryId | MobileCategoryId[];
   /**
    * Optional nested sub-items. When present, the parent renders as an
    * expandable group in the sidebar — clicking the parent navigates to its
@@ -59,7 +63,15 @@ export interface NavSubItemDef {
   path: string;
   emoji: string;
   /** See `MobileCategoryId` for tagging contract. */
-  mobileCategory?: MobileCategoryId;
+  mobileCategory?: MobileCategoryId | MobileCategoryId[];
+}
+
+/** Normalize the single-or-array `mobileCategory` tag to an array (possibly empty). */
+function mobileCategoriesOf(item: {
+  mobileCategory?: MobileCategoryId | MobileCategoryId[];
+}): MobileCategoryId[] {
+  if (!item.mobileCategory) return [];
+  return Array.isArray(item.mobileCategory) ? item.mobileCategory : [item.mobileCategory];
 }
 
 export const NAV_SECTIONS: NavSectionDef[] = [
@@ -81,7 +93,9 @@ export const NAV_ITEMS: NavItemDef[] = [
     path: '/activities',
     emoji: '\u{1F4C5}',
     section: 'treehouse',
-    mobileCategory: 'calendar',
+    // Both the center Calendar hero (leaf) AND a Planning-stack bean — greg wants
+    // it reachable from both. Order in NAV_ITEMS puts it first in the stack.
+    mobileCategory: ['calendar', 'planning'],
   },
   {
     labelKey: 'nav.travel',
@@ -235,21 +249,21 @@ const KNOWN_BADGE_KEY_SET: ReadonlySet<string> = new Set(KNOWN_BADGE_KEYS);
 const NAV_ITEMS_FLAT: ReadonlyArray<{
   path: string;
   badgeKey?: string;
-  mobileCategory?: MobileCategoryId;
+  mobileCategories: MobileCategoryId[];
 }> = (() => {
   const flat: Array<{
     path: string;
     badgeKey?: string;
-    mobileCategory?: MobileCategoryId;
+    mobileCategories: MobileCategoryId[];
   }> = [];
   for (const item of NAV_ITEMS) {
     flat.push({
       path: item.path,
       badgeKey: item.badgeKey,
-      mobileCategory: item.mobileCategory,
+      mobileCategories: mobileCategoriesOf(item),
     });
     for (const child of item.children ?? []) {
-      flat.push({ path: child.path, mobileCategory: child.mobileCategory });
+      flat.push({ path: child.path, mobileCategories: mobileCategoriesOf(child) });
     }
   }
   return flat;
@@ -282,10 +296,9 @@ export function getBadgeKeyForPath(path: string): KnownBadgeKey | undefined {
 export const MOBILE_TAGGED_NAV_ITEMS: ReadonlyArray<{
   path: string;
   mobileCategory: MobileCategoryId;
-}> = NAV_ITEMS_FLAT.filter(
-  (e): e is { path: string; badgeKey?: string; mobileCategory: MobileCategoryId } =>
-    !!e.mobileCategory
-).map((e) => ({ path: e.path, mobileCategory: e.mobileCategory }));
+}> = NAV_ITEMS_FLAT.flatMap((e) =>
+  e.mobileCategories.map((mobileCategory) => ({ path: e.path, mobileCategory }))
+);
 
 // =============================================================================
 // Mobile nav v3 — derived from NAV_ITEMS
@@ -315,6 +328,7 @@ export interface MobileNavCategory {
  * navigation unit test) — making typos impossible to ship.
  */
 const HINT_KEY_BY_PATH: Record<string, UIStringKey> = {
+  '/activities': 'mobileNav.hint.activities',
   '/todo': 'mobileNav.hint.todo',
   '/travel': 'mobileNav.hint.travel',
   '/dashboard': 'mobileNav.hint.overview',
@@ -360,24 +374,12 @@ function collectTaggedRoutes(): Array<{
     category: MobileCategoryId;
   }> = [];
   for (const item of NAV_ITEMS) {
-    if (item.mobileCategory) {
-      out.push({
-        path: item.path,
-        labelKey: item.labelKey,
-        emoji: item.emoji,
-        category: item.mobileCategory,
-      });
+    for (const category of mobileCategoriesOf(item)) {
+      out.push({ path: item.path, labelKey: item.labelKey, emoji: item.emoji, category });
     }
-    if (item.children) {
-      for (const child of item.children) {
-        if (child.mobileCategory) {
-          out.push({
-            path: child.path,
-            labelKey: child.labelKey,
-            emoji: child.emoji,
-            category: child.mobileCategory,
-          });
-        }
+    for (const child of item.children ?? []) {
+      for (const category of mobileCategoriesOf(child)) {
+        out.push({ path: child.path, labelKey: child.labelKey, emoji: child.emoji, category });
       }
     }
   }

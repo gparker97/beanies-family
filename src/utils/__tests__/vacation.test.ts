@@ -10,6 +10,7 @@ import {
   segmentDateRange,
   tripsOverlappingRange,
   resolveTripTarget,
+  overrideTripTarget,
   type SupportedTravelType,
 } from '../vacation';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
@@ -426,5 +427,23 @@ describe('segmentDateRange / tripsOverlappingRange / resolveTripTarget (#30)', (
     expect(resolveTripTarget([vac({ id: 'x' })])).toEqual({ kind: 'attach', vacationId: 'x' });
     const two = [vac({ id: 'x' }), vac({ id: 'y' })];
     expect(resolveTripTarget(two)).toEqual({ kind: 'choose', candidates: two });
+  });
+
+  it('overrideTripTarget: pins to the pre-selected trip when it exists', () => {
+    const trips = [vac({ id: 'open' }), vac({ id: 'other' })];
+    expect(overrideTripTarget({ kind: 'create' }, 'open', trips)).toEqual({
+      kind: 'attach',
+      vacationId: 'open',
+    });
+  });
+
+  it('overrideTripTarget: falls back to the original target when no trip pre-selected', () => {
+    const original = resolveTripTarget([]);
+    expect(overrideTripTarget(original, null, [vac({ id: 'x' })])).toEqual(original);
+  });
+
+  it('overrideTripTarget: falls back when the pre-selected trip no longer exists', () => {
+    const original = { kind: 'attach', vacationId: 'matched' } as const;
+    expect(overrideTripTarget(original, 'deleted', [vac({ id: 'matched' })])).toEqual(original);
   });
 });

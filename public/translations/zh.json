@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-07",
-    "translationCount": 3085
+    "translationCount": 3086
   },
   "translations": {
     "app.name": {
@@ -15429,6 +15429,11 @@
     "ai.consent.learnMore": {
       "translation": "了解如何保障您的数据安全",
       "hash": "n4cffc",
+      "lastUpdated": "2026-06-07"
+    },
+    "mobileNav.hint.activities": {
+      "translation": "日历和计划",
+      "hash": "eeqq5u",
       "lastUpdated": "2026-06-07"
     }
   }

@@ -497,6 +497,24 @@ export function resolveTripTarget(matches: FamilyVacation[]): TripTarget {
   return { kind: 'choose', candidates: matches };
 }
 
+/**
+ * When the reader is launched from a specific trip's detail page, that trip is the intended
+ * default — override the date-resolved target with an `attach` to it (the review modal still lets
+ * the user switch to New or another trip). Falls back to the original date-resolved target when
+ * no trip was pre-selected, or when the pre-selected trip no longer exists (e.g. deleted
+ * mid-flow). Pure — safe to unit-test without Vue.
+ */
+export function overrideTripTarget(
+  target: TripTarget,
+  tripId: string | null,
+  vacations: FamilyVacation[]
+): TripTarget {
+  if (tripId && vacations.some((v) => v.id === tripId)) {
+    return { kind: 'attach', vacationId: tripId };
+  }
+  return target;
+}
+
 // ── Auto-generated segment titles ────────────────────────────────────────────
 
 /** Extract 3-letter airport code from strings like "Singapore (SIN)" */
