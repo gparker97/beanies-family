@@ -25,6 +25,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **View attached PDFs inside the app.** Booking documents that are PDFs now render page-by-page right in the document viewer, instead of a blank box that wouldn't open. The "Open in new tab" and download options are still there if you'd rather use another app.
 - **Remove a booking document from a trip.** Opening an attached photo or PDF from the trip timeline now offers a delete option, so you can remove an attachment you no longer want.
+- **"How your data is kept secure" links now open.** The privacy links in the AI consent prompt (the inline "secure, private" link and the "learn more" link) opened a not-found page when tapped from the installed app; they now open the help article correctly.
 
 ## 2026-06-06
 
