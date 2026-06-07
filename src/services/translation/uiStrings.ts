@@ -4673,6 +4673,7 @@ const STRING_DEFS = {
   // v3 side-card hint copy. Each line is a one-line preview of what the
   // user finds on the route, capped at ~22 chars to never wrap on a
   // 360px phone. See docs/mockups/mobile-nav-bean-jar-v3.html.
+  'mobileNav.hint.activities': { en: 'calendar & plans', beanie: 'calendar & plans' },
   'mobileNav.hint.todo': { en: 'shared family tasks', beanie: 'shared family tasks' },
   'mobileNav.hint.travel': { en: 'trips & ideas', beanie: 'trips & ideas' },
   'mobileNav.hint.overview': { en: 'your bottom line', beanie: 'your bottom line' },

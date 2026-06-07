@@ -52,6 +52,7 @@ import {
   classifyTripDay,
   tripDayNumber,
   tripDurationDays,
+  overrideTripTarget,
 } from '@/utils/vacation';
 import TodayTimelineMarker from '@/components/travel/TodayTimelineMarker.vue';
 import ExpandableText from '@/components/ui/ExpandableText.vue';
@@ -81,9 +82,21 @@ const reviewReady = ref<TravelReady | null>(null);
 // save spinner and locks its buttons so the create action never looks like a no-op.
 const reviewSubmitting = ref(false);
 
+// Set by `handleAddFromDocument(tripId)` when the reader is launched from a specific trip's
+// detail page; consumed once in `onTravelReady` to default the review modal to that trip. Null
+// when launched from the list header (target auto-resolves by date).
+const pendingTripTarget = ref<string | null>(null);
+
 const { isProcessing: isReadingDoc, processFile: processTravelDoc } = useDocumentToTravel({
   onTravelReady: (ready) => {
-    reviewReady.value = ready;
+    // If launched from a trip's detail page, default to that trip (modal still allows New/other).
+    const target = overrideTripTarget(
+      ready.target,
+      pendingTripTarget.value,
+      vacationStore.vacations
+    );
+    pendingTripTarget.value = null;
+    reviewReady.value = { ...ready, target };
   },
 });
 
@@ -97,10 +110,18 @@ const docPicker = useFilePicker({
   },
 });
 
-/** 📄 entry point. Consent gate runs BEFORE the picker; a decline is a silent no-op. */
-async function handleAddFromDocument(): Promise<void> {
+/**
+ * 📄 entry point. Consent gate runs BEFORE the picker; a decline is a silent no-op. When called
+ * with a `tripId` (from a trip's detail page), the review modal defaults to attaching to that
+ * trip; the list-header call passes nothing → the target auto-resolves by date.
+ */
+async function handleAddFromDocument(tripId?: string): Promise<void> {
+  pendingTripTarget.value = tripId ?? null;
   const granted = await requestConsent();
-  if (!granted) return;
+  if (!granted) {
+    pendingTripTarget.value = null;
+    return;
+  }
   docPicker.open();
 }
 
@@ -1020,7 +1041,15 @@ function addQuickIdea() {
 
         <div class="relative z-10 px-6 py-5">
           <!-- Actions row -->
-          <div class="mb-3 flex items-center justify-end">
+          <div class="mb-3 flex items-center justify-end gap-1.5">
+            <!-- ✨ Beanies AI — read a booking into THIS trip. Same responsive pill as
+                 everywhere else; defaults the review modal to the open trip (user can
+                 still switch to New / another trip). -->
+            <MagicReaderPill
+              v-if="canReadDocument"
+              :label="t('ai.magic.perform')"
+              @click="handleAddFromDocument(selectedVacation.id)"
+            />
             <div class="flex gap-1.5">
               <button
                 type="button"

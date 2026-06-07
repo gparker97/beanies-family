@@ -41,14 +41,21 @@ describe('navigation: MOBILE_NAV_CATEGORIES', () => {
     }
   });
 
-  it('total stack items = 14 (Activities promoted out of Planning to the Calendar leaf)', () => {
+  it('total stack items = 15 (Planning: Activities, Travel, To-do = 3; Money 6; Pod 6)', () => {
     const total = MOBILE_NAV_CATEGORIES.reduce((sum, c) => sum + (c.items?.length ?? 0), 0);
-    expect(total).toBe(14);
+    expect(total).toBe(15);
   });
 
-  it('Planning has Travel, To-do (Activities moved to the Calendar leaf)', () => {
+  it('Planning has Activities (first), Travel, To-do', () => {
     const planning = MOBILE_NAV_CATEGORIES.find((c) => c.id === 'planning')!;
-    expect(planning.items!.map((i) => i.path)).toEqual(['/travel', '/todo']);
+    expect(planning.items!.map((i) => i.path)).toEqual(['/activities', '/travel', '/todo']);
+  });
+
+  it('Activities lives in BOTH the Calendar leaf and the Planning stack', () => {
+    const calendar = MOBILE_NAV_CATEGORIES.find((c) => c.id === 'calendar')!;
+    const planning = MOBILE_NAV_CATEGORIES.find((c) => c.id === 'planning')!;
+    expect(calendar.rootPath).toBe('/activities');
+    expect(planning.items!.map((i) => i.path)).toContain('/activities');
   });
 
   it('Money has 6 finance routes', () => {
@@ -144,5 +151,10 @@ describe('navigation: badge registry', () => {
     // Pod children tagged with mobileCategory
     expect(paths).toContain('/pod/scrapbook');
     expect(paths).toContain('/pod/cookbook');
+  });
+
+  it('expands a multi-category route into one entry per category (Activities → calendar + planning)', () => {
+    const activities = MOBILE_TAGGED_NAV_ITEMS.filter((i) => i.path === '/activities');
+    expect(activities.map((e) => e.mobileCategory).sort()).toEqual(['calendar', 'planning']);
   });
 });

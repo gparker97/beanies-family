@@ -223,14 +223,13 @@ onBeforeUnmount(() => {
           />
 
           <!-- "✨ Perform magic" — reads an invitation photo into a prefilled
-               activity (#133). Restyled into the shared magic language; icon-only
-               here to stay compact beside the Add button. Gated by canAddFromPhoto
-               (dev flag); falls back to canAdd when unset. -->
+               activity (#133). The shared responsive AI pill: compact ✨ circle
+               on mobile, full "✨ Perform magic" label on sm:+ — identical to the
+               Travel headers so the AI door is consistent everywhere. Gated by
+               canAddFromPhoto (falls back to canAdd when unset). -->
           <MagicReaderPill
             v-if="canAddFromPhoto ?? canAdd"
-            icon-only
             :label="t('ai.magic.perform')"
-            :aria-label="t('ai.addFromPhoto')"
             @click="emit('add-from-photo')"
           />
 

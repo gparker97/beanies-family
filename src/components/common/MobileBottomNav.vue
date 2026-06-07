@@ -39,6 +39,7 @@ import {
   type MobileNavCategory,
   type StackableCategoryId,
 } from '@/constants/navigation';
+import { requestGoToday } from '@/composables/usePlannerToday';
 
 const route = useRoute();
 const router = useRouter();
@@ -140,6 +141,11 @@ function closeStack() {
 }
 
 function navigate(path: string) {
+  // The planner is reachable from two slots (center Calendar hero + the new
+  // Planning-stack Activities bean); either should jump to today, including when
+  // we're already on /activities (a router.push no-op, so the page's route watch
+  // never fires). The signal handles both the same-page and cross-page cases.
+  if (path === '/activities') requestGoToday();
   router.push(path).catch((err: unknown) => {
     // vue-router rejects on duplicate / cancelled navigation; not user-facing.
     console.warn('[MobileBottomNav] navigation swallowed:', err);
