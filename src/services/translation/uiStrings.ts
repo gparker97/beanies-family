@@ -6640,8 +6640,8 @@ const STRING_DEFS = {
     beanie: 'the photo this activity was read from',
   },
   'ai.consent.title': {
-    en: 'Ready for some magic beans?',
-    beanie: 'ready for some magic beans?',
+    en: 'Ready for some magic beans 🫘?',
+    beanie: 'ready for some magic beans 🫘?',
   },
   // `intro` is one translatable sentence; the modal locates `introLink`
   // ("secure, private") inside it at render time and turns that phrase into an
