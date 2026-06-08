@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **The camera now actually opens in the installed app.** On the Android app, tapping "Take a photo" in Magic beans was opening a file picker instead of the camera. Fixed so it launches the camera as expected. (Also prepared the installed iOS app for the same camera flow.)
 - **Take a photo with Magic beans on mobile.** On phones, after you agree to the privacy prompt, beanies now asks whether to **take a photo** or **choose a file** - so you can snap a paper notice or invite on the spot, not just pick an existing file. (On the installed app the camera option was missing.)
 
 ### Added

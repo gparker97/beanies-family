@@ -58,4 +58,19 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 11+ (API 30+) package visibility: without this <queries> entry,
+         Intent(ACTION_IMAGE_CAPTURE).resolveActivity() returns null even when a
+         camera app is installed, so Capacitor's WebView file chooser silently
+         falls back to the document picker instead of launching the camera. This
+         is what powers the `capture="environment"` file inputs (AiDocumentPicker
+         "Take a photo" + PhotoAttachments "Take photo"). We deliberately do NOT
+         declare android.permission.CAMERA — the system camera app handles the
+         capture via intent, and leaving the permission undeclared lets Capacitor
+         skip the runtime permission prompt (see BridgeWebChromeClient). -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
 </manifest>
