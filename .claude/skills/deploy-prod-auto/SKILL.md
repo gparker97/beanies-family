@@ -75,9 +75,16 @@ The final block of the output is machine-readable:
 === Deploy targets ===
 VUE: yes|no
 WEB: yes|no
+MOBILE: yes|no
 ```
 
-Record `VUE` and `WEB` flags. If both are `no`, report "no runtime changes since last deploy — nothing to ship" and stop.
+Record `VUE`, `WEB`, and `MOBILE` flags.
+
+**`MOBILE` is the native Capacitor wrapper** (`android/**`, `ios/**`, `capacitor.config.*`). These files are NOT in the deployed web app or the Astro site, so **neither web deploy ships them** — a native-only change reaches users only through a mobile app build + store release. This skill deploys the **web targets only**; it never builds or releases the mobile app. So:
+
+- **If `MOBILE: yes`** — note it in your report and tell greg how it actually ships: the **free unsigned debug APK auto-builds on every push** to `main` (`mobile-android-build.yml`, published to the `spike-android-latest` rolling prerelease for on-device testing); a **signed store release is manual** (`mobile-android-release.yml` / `mobile-ios-release.yml`, currently DUNS-gated until ~early July). Do **not** dispatch those workflows from this skill unless greg explicitly asks. The push you already made (Step 3) triggers the debug-APK build automatically.
+- **If `VUE: no` and `WEB: no` and `MOBILE: no`** — report "no runtime changes since last deploy — nothing to ship" and stop.
+- **If `VUE: no` and `WEB: no` but `MOBILE: yes`** — there is nothing for this skill to deploy (it's native-only). Report that the change ships via the mobile lane (per the note above), confirm the auto-triggered APK build, and stop — do NOT run `deploy.yml` or `deploy-web.yml` (they would be no-ops that mislead).
 
 ## Step 4b: Author the release note (only if `VUE: yes`)
 
