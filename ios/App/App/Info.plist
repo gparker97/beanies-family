@@ -6,6 +6,8 @@
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<key>NSCameraUsageDescription</key>
+	<string>beanies.family uses the camera so you can take a photo of an invitation or booking for the beanies to read.</string>
 	<key>CFBundleDisplayName</key>
         <string>beanies.family</string>
 	<key>CFBundleExecutable</key>
