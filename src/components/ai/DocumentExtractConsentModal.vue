@@ -79,7 +79,7 @@ function onConfirm(): void {
     size="narrow"
     :open="open"
     :title="t('ai.consent.title')"
-    icon="📸"
+    icon="✨"
     icon-bg="var(--tint-orange-8)"
     :save-label="t('ai.consent.confirm')"
     @close="emit('cancel')"
