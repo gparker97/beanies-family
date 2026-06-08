@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-08",
-    "translationCount": 3106
+    "translationCount": 3111
   },
   "translations": {
     "app.name": {
@@ -15534,6 +15534,31 @@
     "planner.duplicate.addAnyway": {
       "translation": "仍然添加",
       "hash": "t1p42m",
+      "lastUpdated": "2026-06-08"
+    },
+    "ai.picker.title": {
+      "translation": "您想如何添加它？",
+      "hash": "p2w62i",
+      "lastUpdated": "2026-06-08"
+    },
+    "ai.picker.takePhoto": {
+      "translation": "拍一张照片",
+      "hash": "dll39i",
+      "lastUpdated": "2026-06-08"
+    },
+    "ai.picker.chooseFile": {
+      "translation": "选择一个文件",
+      "hash": "88oil8",
+      "lastUpdated": "2026-06-08"
+    },
+    "ai.picker.openErrorTitle": {
+      "translation": "无法打开选取器",
+      "hash": "7r5tnx",
+      "lastUpdated": "2026-06-08"
+    },
+    "ai.picker.openErrorBody": {
+      "translation": "打开摄像头或文件选取器时出错。请重试。",
+      "hash": "9sef55",
       "lastUpdated": "2026-06-08"
     }
   }
