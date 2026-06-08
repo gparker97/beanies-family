@@ -8,6 +8,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-08
+
+### Added
+
+- **No more duplicate activities from re-uploads.** If you scan a photo or PDF for an activity you already have on the calendar (same day, similar name), beanies now asks whether to update the existing one — folding in any new details and attaching the document to it — instead of quietly creating a duplicate. Choose "Add anyway" and it behaves exactly as before.
+
+### Changed
+
+- **Magic-read activities now capture the "what to bring" details.** When beanies reads a school notice or invitation, it now pulls preparation details that don't have their own field — what to bring, what to wear, RSVP, fees, drop-off/pick-up notes — into the activity's Notes, one item per line, and opens the details section so you see them right away.
+- **Smarter activity categories from photos.** beanies now picks the activity category from the full list (so a "school learning journey" lands as a Field Trip, not uncategorized), and falls back to keyword matching when needed.
+
+> Both improvements take effect once the AI reader's backend is redeployed alongside the app.
+
 ## 2026-06-07
 
 ### Added

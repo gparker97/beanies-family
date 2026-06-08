@@ -5234,6 +5234,20 @@ const STRING_DEFS = {
   'planner.field.color': { en: 'Highlight Color', beanie: 'highlight color' },
   'planner.field.active': { en: 'Active', beanie: 'active' },
 
+  // Duplicate-activity detection (AI extraction) — confirm prompt when a re-uploaded document
+  // matches an activity the family already has.
+  'planner.duplicate.title': {
+    en: 'Already on your calendar?',
+    beanie: 'already on your calendar?',
+  },
+  'planner.duplicate.message': {
+    en: 'Looks like you already have a similar activity. Update it instead of adding a new one?',
+    beanie:
+      'looks like you already have a similar activity. update it instead of adding a new one?',
+  },
+  'planner.duplicate.updateExisting': { en: 'Update Existing', beanie: 'update existing' },
+  'planner.duplicate.addAnyway': { en: 'Add Anyway', beanie: 'add anyway' },
+
   // Activity photos — placeholder button + inline gate hint.
   'activities.addPhotos': { en: 'Add Photos', beanie: 'add photos' },
   'activities.photoGate.fillFirst': {

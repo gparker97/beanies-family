@@ -161,6 +161,13 @@ function applyPrefill(): void {
   if (p.date) date.value = p.date;
   if (p.location !== undefined) location.value = p.location;
   if (p.description !== undefined) description.value = p.description;
+  // AI-extracted prep notes route to the VISIBLE `notes` field, which lives inside the
+  // collapsed "Add more details" section — reveal it so the prefilled notes aren't hidden
+  // (onNew sets showMoreDetails=false before this runs; only `notes` is prefilled today).
+  if (p.notes !== undefined) {
+    notes.value = p.notes;
+    showMoreDetails.value = true;
+  }
   if (p.isAllDay !== undefined) isAllDay.value = p.isAllDay;
   if (p.startTime) startTime.value = p.startTime;
   if (p.endTime) endTime.value = p.endTime;
@@ -266,8 +273,11 @@ const { isEditing, isSubmitting } = useFormModal(
       showMoreDetails.value = hasDetailData(activity);
       showErrors.value = false;
       wasPrefilled.value = false; // editing an existing activity is never a prefill
-      pendingSourcePhoto.value = null; // editing is never a photo-extraction flow
-      setSourcePhotoPreview(null);
+      // Usually null, but the AI "update existing" flow opens an existing activity in edit mode
+      // WITH a source document to attach — stage it symmetrically with onNew so it binds to this
+      // activity. Manual edits never set props.sourcePhoto (the page clears it), so this is null.
+      pendingSourcePhoto.value = props.sourcePhoto ?? null;
+      setSourcePhotoPreview(props.sourcePhoto ?? null);
     },
     onNew: () => {
       icon.value = '';

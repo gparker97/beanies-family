@@ -29,6 +29,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { getActivityFallbackEmoji, getActivityCategoryName } from '@/constants/activityCategories';
 import { formatDateFull, parseLocalDate, toDateInputValue } from '@/utils/date';
+import { findDuplicateActivity, mergeExtractionIntoActivity } from '@/utils/activityDuplicate';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
 import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
@@ -158,29 +159,72 @@ const {
   onConsentConfirm,
 } = useDocumentConsent();
 
-/** Open a fresh new-activity form pre-filled from the extracted document. */
-function onPhotoActivityReady(ready: {
+type PhotoActivityReady = {
   prefill: Partial<CreateFamilyActivityInput>;
   confidence: FieldConfidence;
   sourcePhoto?: File;
-}): void {
+};
+
+/**
+ * Reset the shared modal context and close-then-reopen so ActivityModal's open-watch re-fires
+ * (onNew or onEdit, depending on whether editingActivity is set) even when a modal is already
+ * open (the in-modal "Perform magic" path). Runs only on a successful extraction — a declined
+ * consent or a failed read never reaches here, so an open modal is left exactly as it was.
+ */
+function openExtractionModalReset(): void {
   sidebarDate.value = null;
-  editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
   selectedDate.value = undefined;
   defaultStartTime.value = undefined;
   defaultAssigneeId.value = undefined;
-  activityPrefill.value = ready.prefill;
-  activityPrefillConfidence.value = ready.confidence;
-  activitySourcePhoto.value = ready.sourcePhoto;
-  // Close-then-reopen so ActivityModal.onNew re-fires applyPrefill even when a
-  // modal is already open (the in-modal "Perform magic" path). This runs only on
-  // a successful extraction — a declined consent or a failed read never reaches
-  // here, so the user's open modal is left exactly as it was.
   showModal.value = false;
   void nextTick(() => {
     showModal.value = true;
   });
+}
+
+/** Open a fresh new-activity form pre-filled from the extracted document (today's behavior). */
+function applyAddNew(ready: PhotoActivityReady): void {
+  editingActivity.value = null;
+  activityPrefill.value = ready.prefill;
+  activityPrefillConfidence.value = ready.confidence;
+  activitySourcePhoto.value = ready.sourcePhoto;
+  openExtractionModalReset();
+}
+
+/** Open the matched activity in edit mode, merged non-destructively with the extracted info. */
+function applyUpdateExisting(match: FamilyActivity, ready: PhotoActivityReady): void {
+  editingActivity.value = mergeExtractionIntoActivity(match, ready.prefill);
+  // Prefill/confidence belong to the new-activity path only — clear so nothing leaks into edit.
+  activityPrefill.value = undefined;
+  activityPrefillConfidence.value = undefined;
+  activitySourcePhoto.value = ready.sourcePhoto;
+  openExtractionModalReset();
+}
+
+/**
+ * After a successful extraction, detect whether the prefill duplicates an existing activity. If
+ * it matches exactly one, ask the user whether to update it instead of adding a duplicate; 0 or
+ * 2+ matches (or a detection error) fall back to today's add-new behavior.
+ */
+async function onPhotoActivityReady(ready: PhotoActivityReady): Promise<void> {
+  let match: FamilyActivity | null = null;
+  try {
+    match = findDuplicateActivity(ready.prefill, activityStore.activeActivities);
+  } catch (err) {
+    console.warn('[activity-extract] duplicate detection failed; adding new', err);
+  }
+  if (!match) return applyAddNew(ready);
+
+  const update = await confirm({
+    title: 'planner.duplicate.title',
+    message: 'planner.duplicate.message',
+    detail: `${match.title} • ${formatDateFull(match.date)}`,
+    variant: 'info',
+    confirmLabel: 'planner.duplicate.updateExisting',
+    cancelLabel: 'planner.duplicate.addAnyway',
+  });
+  return update ? applyUpdateExisting(match, ready) : applyAddNew(ready);
 }
 
 const { isProcessing: isReadingPhoto, processFile: processPhoto } = useDocumentToActivity({
