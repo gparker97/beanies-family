@@ -38,10 +38,9 @@ import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useDocumentToActivity } from '@/composables/useDocumentToActivity';
 import { useDocumentConsent } from '@/composables/useDocumentConsent';
 import { useAiCapability } from '@/composables/useAiCapability';
-import { useFilePicker } from '@/composables/useFilePicker';
+import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import { usePlannerTodayConsumer } from '@/composables/usePlannerToday';
-import { AI_PICKER_ACCEPT } from '@/constants/aiDocumentPicker';
 import type { FieldConfidence } from '@/services/ai/types';
 import type {
   FamilyActivity,
@@ -231,15 +230,10 @@ const { isProcessing: isReadingPhoto, processFile: processPhoto } = useDocumentT
   onActivityReady: onPhotoActivityReady,
 });
 
-const photoPicker = useFilePicker({
-  // Images + PDFs (the reader rasterizes a PDF's page 1 client-side). image/*
-  // also makes the mobile chooser offer the camera; no forced `capture` so the
-  // camera is an option, not the only choice.
-  accept: AI_PICKER_ACCEPT,
-  onPick: (files) => {
-    if (files[0]) void processPhoto(files[0]);
-  },
-});
+// The AI document picker (a camera-or-file chooser on touch devices, a direct
+// file dialog on desktop) is opened via its exposed pick() after consent; it
+// emits the chosen file. See AiDocumentPicker.vue.
+const aiPhotoPicker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
 
 /**
  * 📸 entry point. The consent gate runs BEFORE the file picker — nothing leaves the device
@@ -252,7 +246,7 @@ const photoPicker = useFilePicker({
 async function handleAddFromPhoto(): Promise<void> {
   const granted = await requestPhotoConsent();
   if (!granted) return;
-  photoPicker.open();
+  aiPhotoPicker.value?.pick();
 }
 
 // Photo-reader cross-surface dispatch: the global FAB card sets `pendingMagic`
@@ -760,11 +754,7 @@ function handleActivitySwapped(newId: string) {
       @confirm="onConsentConfirm"
       @cancel="resolvePhotoConsent(false)"
     />
-    <input
-      :ref="(el) => (photoPicker.inputRef.value = el as HTMLInputElement)"
-      v-bind="photoPicker.bindings"
-      class="hidden"
-    />
+    <AiDocumentPicker ref="aiPhotoPicker" @file="(f) => void processPhoto(f)" />
     <div
       v-if="isReadingPhoto"
       class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"

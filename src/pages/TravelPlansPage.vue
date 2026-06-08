@@ -27,13 +27,12 @@ import { confirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { usePermissions } from '@/composables/usePermissions';
 import { showToast } from '@/composables/useToast';
-import { useFilePicker } from '@/composables/useFilePicker';
 import { useDocumentToTravel, type TravelReady } from '@/composables/useDocumentToTravel';
 import { useDocumentConsent } from '@/composables/useDocumentConsent';
 import { useAiCapability } from '@/composables/useAiCapability';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
-import { AI_PICKER_ACCEPT } from '@/constants/aiDocumentPicker';
+import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
@@ -100,15 +99,10 @@ const { isProcessing: isReadingDoc, processFile: processTravelDoc } = useDocumen
   },
 });
 
-const docPicker = useFilePicker({
-  // Images + PDFs (page 1 rasterized client-side). image/* offers the camera in
-  // the mobile chooser; application/pdf + .pdf keeps PDFs selectable on every
-  // platform. No forced `capture` — the camera is an option, not the only choice.
-  accept: AI_PICKER_ACCEPT,
-  onPick: (files) => {
-    if (files[0]) void processTravelDoc(files[0]);
-  },
-});
+// The AI document picker (a camera-or-file chooser on touch devices, a direct
+// file dialog on desktop) is opened via its exposed pick() after consent; it
+// emits the chosen file. See AiDocumentPicker.vue.
+const aiDocPicker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
 
 /**
  * 📄 entry point. Consent gate runs BEFORE the picker; a decline is a silent no-op. When called
@@ -122,7 +116,7 @@ async function handleAddFromDocument(tripId?: string): Promise<void> {
     pendingTripTarget.value = null;
     return;
   }
-  docPicker.open();
+  aiDocPicker.value?.pick();
 }
 
 // Document-reader cross-surface dispatch: the FAB card / new-trip-wizard banner
@@ -1821,11 +1815,7 @@ function addQuickIdea() {
       @confirm="onConsentConfirm"
       @cancel="resolveConsent(false)"
     />
-    <input
-      :ref="(el) => (docPicker.inputRef.value = el as HTMLInputElement)"
-      v-bind="docPicker.bindings"
-      class="hidden"
-    />
+    <AiDocumentPicker ref="aiDocPicker" @file="(f) => void processTravelDoc(f)" />
     <TravelExtractReviewModal
       :open="reviewReady !== null"
       :ready="reviewReady"
