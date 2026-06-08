@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-07",
-    "translationCount": 3102
+    "lastUpdated": "2026-06-08",
+    "translationCount": 3106
   },
   "translations": {
     "app.name": {
@@ -15372,9 +15372,9 @@
       "lastUpdated": "2026-06-06"
     },
     "ai.magic.title": {
-      "translation": "beanies 会变魔法",
-      "hash": "auripr",
-      "lastUpdated": "2026-06-07"
+      "translation": "魔豆",
+      "hash": "laeicw",
+      "lastUpdated": "2026-06-08"
     },
     "ai.magic.subtitle": {
       "translation": "拍下邀请函或旅行预订，beanies 帮你填好",
@@ -15392,9 +15392,9 @@
       "lastUpdated": "2026-06-07"
     },
     "ai.magic.perform": {
-      "translation": "施展魔法",
-      "hash": "yfnj76",
-      "lastUpdated": "2026-06-07"
+      "translation": "魔豆",
+      "hash": "laeicw",
+      "lastUpdated": "2026-06-08"
     },
     "ai.magic.performHint": {
       "translation": "拍下邀请函，beanies 帮你填好",
@@ -15515,6 +15515,26 @@
       "translation": "与其他家庭一起使用我们的Discord",
       "hash": "qjhp8x",
       "lastUpdated": "2026-06-07"
+    },
+    "planner.duplicate.title": {
+      "translation": "已在您的日历上？",
+      "hash": "sj2i6l",
+      "lastUpdated": "2026-06-08"
+    },
+    "planner.duplicate.message": {
+      "translation": "您似乎已经有了类似的活动。要更新它，而不是新增一条吗？",
+      "hash": "o99rn5",
+      "lastUpdated": "2026-06-08"
+    },
+    "planner.duplicate.updateExisting": {
+      "translation": "更新现有活动",
+      "hash": "puaada",
+      "lastUpdated": "2026-06-08"
+    },
+    "planner.duplicate.addAnyway": {
+      "translation": "仍然添加",
+      "hash": "t1p42m",
+      "lastUpdated": "2026-06-08"
     }
   }
 }

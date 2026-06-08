@@ -6,7 +6,27 @@
 // extractionPrompt.mjs` (server/managed), keep the two copies drift-pinned by a unit test that asserts
 // PROMPT_VERSION + the schema shape match. Bump PROMPT_VERSION on any change so drift is detectable.
 
-export const PROMPT_VERSION = '2026-06-06.4';
+export const PROMPT_VERSION = '2026-06-08.1';
+
+// The activity-category taxonomy rendered for the model to pick `category` from.
+// HARDCODED and byte-identical across all three prompt copies (drift guard) — the .mjs copies
+// cannot import src/constants/activityCategories.ts. Recipe (enforced by the extractionCategoryList
+// sync test in the client): one line per group, `GroupName: id (Name), id (Name)`; groups
+// alphabetical with "Other" last; categories alphabetical with "Other *" last — exactly what
+// getActivityCategoriesGrouped() produces. On taxonomy change, regenerate, update all three
+// copies, and bump PROMPT_VERSION.
+export const CATEGORY_OPTIONS_TEXT = [
+  'Appointments: dentist (Dentist), doctor (Doctor), eye_exam (Eye Exam), haircut (Haircut), other_appointment (Other Appointment)',
+  'Competitions: cubing (Cubing Competition), math_competition (Math Competition), spelling_bee (Spelling Bee), other_competition (Other Competition)',
+  'Educational: language (Language), math (Math), science (Science), tutoring (Tutoring), other_educational (Other Educational)',
+  'Entertainment: concert (Concert), festival (Festival / Fair), movie (Movie), museum (Museum), show (Show / Musical), sporting_event (Sporting Event), theme_park (Theme Park), other_entertainment (Other Entertainment)',
+  'Food: brunch (Brunch), coffee (Coffee), dining_out (Dining Out), drinks (Drinks), picnic (Picnic), other_food (Other Food)',
+  'Lessons: art (Art), dance (Dance / Ballet), drum (Drum), guitar (Guitar), music (Music), piano (Piano), swimming (Swimming), trumpet (Trumpet), other_lesson (Other Lesson)',
+  'Party: bar_mitzvah (Bar Mitzvah), birthday (Birthday Party), wedding (Wedding), other_celebration (Other Celebration)',
+  'School: after_school (After School Activity), field_trip (Field Trip), school_recital (School Recital / Presentation), other_school (Other School Activity)',
+  'Sports: badminton (Badminton), baseball (Baseball), football (Football), golf_activity (Golf), gymnastics (Gymnastics), mma (MMA), multi_sport (Multi Sport), rugby (Rugby), soccer (Soccer), taekwondo (Taekwondo), tennis (Tennis), gym_activity (Training), yoga_activity (Yoga / Pilates), other_sports_activity (Other Sports)',
+  'Other: other_activity (Other Activity)',
+].join('\n');
 
 // The structured shape we ask the model to return. Confidence is 0..1 per field so the UI can flag
 // low-confidence values. `isEvent` lets us gracefully handle a non-event image instead of inventing one.
@@ -21,9 +41,11 @@ export const EXTRACTION_JSON_SHAPE = {
   isAllDay: 'boolean — true if it is an all-day event with no specific time',
   location: 'string — venue/address as written, or "" if absent',
   description:
-    'string — a short note capturing anything useful not in the other fields (dress code, RSVP, what to bring), or ""',
+    'string — capture every practical detail a parent, helper, or child needs to be ready that has no dedicated field above: what to bring, what to wear / dress code, what to prepare, RSVP, fees or money to bring, drop-off / pick-up notes — anything actionable. Write each distinct fact on its own line (one per line), never a single run-on paragraph. "" if there is nothing.',
   categoryHint:
     'string — a short lowercase label classifying the event type, e.g. "birthday", "soccer game", "dentist", "school recital", or "" if unclear',
+  category:
+    'string — the single best-matching category id chosen from the category list provided below, or "" if none fits well. Use ONLY an id from that list; prefer an "other_*" id within the correct group over a wrong specific id',
   confidence: 'object — a 0..1 number for each of: title, date, startTime, endTime, location',
 };
 
@@ -39,6 +61,9 @@ export function buildExtractionMessages(imageDataUrl, todayIso) {
     `Today's date is ${todayIso}. Resolve any relative or partial dates against it. Output dates as YYYY-MM-DD and times as 24-hour HH:mm.`,
     'If a field is not present in the image, return an empty string for it (do not invent values). Set isEvent=false if the image is not an event/invitation.',
     'Never output any value that is not actually supported by the image. It is better to leave a field empty than to hallucinate.',
+    'For "description", write each distinct fact on its own line (one per line), never a single run-on paragraph.',
+    'For "category", choose the single best-matching id from this list (one line per group, shown as id (Name)); use "" if none fits well, and prefer an "other_*" id in the right group over a wrong specific id:\n' +
+      CATEGORY_OPTIONS_TEXT,
     'The JSON object must have exactly these keys: ' +
       Object.keys(EXTRACTION_JSON_SHAPE).join(', ') +
       '.',

@@ -3,13 +3,18 @@
 // in isolation and future AI features (NL search) reuse the generic service without importing
 // anything activity-shaped.
 //
-// Only fields the model found — plus a category we infer from the model's hint/title — are
-// set (the prompt returns '' for absent fields); everything else (incl. recurrence) is left
-// to ActivityModal's onNew/applyPrefill defaults. Nothing is auto-created — the prefill opens
-// the form for the user to review, edit, and confirm.
+// Only fields the model found — plus a category (the model's picked id when valid, else inferred
+// from its hint/title) — are set (the prompt returns '' for absent fields); everything else
+// (incl. recurrence) is left to ActivityModal's onNew/applyPrefill defaults. Nothing is
+// auto-created — the prefill opens the form for the user to review, edit, and confirm.
+//
+// Pure + total apart from ONE deliberate diagnostic: a present-but-unknown model category id is
+// logged via console.warn (matching the [travel-extract] convention) rather than silently
+// dropped, then keyword inference takes over. No throws, no other side effects.
 
 import type { ExtractionResult } from '@/services/ai/types';
 import type { ActivityCategory, CreateFamilyActivityInput, ISODateString } from '@/types/models';
+import { getActivityCategoryById } from '@/constants/activityCategories';
 
 /**
  * Keyword → activity-category inference. The extraction model returns at most a short
@@ -47,6 +52,14 @@ export const CATEGORY_KEYWORDS: ReadonlyArray<readonly [RegExp, ActivityCategory
   [/\b(coffee|café|cafe)\b/i, 'coffee'],
   [/\b(drinks|cocktail|happy hour)\b/i, 'drinks'],
   [/\bpicnic\b/i, 'picnic'],
+  // School (the motivating gap — esp. "learning journey", the SG term for a field trip).
+  [/\b(field trip|excursion|learning journey|school outing|school visit)\b/i, 'field_trip'],
+  [/\bafter[- ]school\b/i, 'after_school'],
+  // A couple of unambiguous, collision-free extras. Broad Educational/Lessons/Sports keyword
+  // coverage is deliberately NOT added — the model's list-pick (result.category) is the primary
+  // path now, so this table stays a shallow, low-collision backstop (see plan).
+  [/\bspelling bee\b/i, 'spelling_bee'],
+  [/\bcubing\b/i, 'cubing'],
 ];
 
 function matchCategory(text: string): ActivityCategory | undefined {
@@ -57,13 +70,30 @@ function matchCategory(text: string): ActivityCategory | undefined {
 }
 
 /**
- * Infer an activity category from an extraction result. The model's free-text hint is the
- * primary signal; the title + description is the fallback; undefined when nothing matches.
- * Works for every tier — when no hint is present (older proxy, BYOK, on-device) it simply
- * relies on the title/description pass.
+ * The model may return a `category` id it picked directly from the taxonomy embedded in the
+ * prompt. Trust it ONLY when it is a real ACTIVITY_CATEGORIES id; a present-but-unknown id is
+ * logged (never silently accepted) and treated as no signal so keyword inference takes over.
+ */
+function validatedModelCategory(result: ExtractionResult): ActivityCategory | undefined {
+  const id = result.category;
+  if (!id) return undefined;
+  if (getActivityCategoryById(id)) return id as ActivityCategory;
+  console.warn(
+    '[activity-extract] model category id not recognized; falling back to keyword inference',
+    { got: id, hint: result.categoryHint }
+  );
+  return undefined;
+}
+
+/**
+ * Infer an activity category from an extraction result. Precedence: (1) the model's directly
+ * picked, validated category id; (2) keyword match on the model's free-text hint; (3) keyword
+ * match on title + description. undefined when nothing matches. Works for every tier — when no
+ * model id/hint is present (older proxy, BYOK, on-device) it relies on the title/description pass.
  */
 export function inferActivityCategory(result: ExtractionResult): ActivityCategory | undefined {
   return (
+    validatedModelCategory(result) ??
     matchCategory(result.categoryHint ?? '') ??
     matchCategory(`${result.title} ${result.description}`)
   );
@@ -77,7 +107,10 @@ export function extractionToActivityPrefill(
   if (result.title) prefill.title = result.title;
   if (result.date) prefill.date = result.date as ISODateString;
   if (result.location) prefill.location = result.location;
-  if (result.description) prefill.description = result.description;
+  // The model's free-text overflow (prep details, what-to-bring, dress code, RSVP — one fact
+  // per line) routes to the activity's VISIBLE `notes` field. The `description` field is not
+  // rendered/editable in ActivityModal, so routing here would hide it from the user.
+  if (result.description) prefill.notes = result.description;
 
   // All-day events carry no clock times; otherwise pass through whatever was found.
   if (result.isAllDay) {

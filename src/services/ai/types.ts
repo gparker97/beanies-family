@@ -86,6 +86,13 @@ export interface ExtractionResult {
    * tolerate its absence and fall back to keyword inference.
    */
   categoryHint?: string;
+  /**
+   * Optional category id the model picks directly from the app taxonomy (the closed list
+   * embedded in the prompt). OPTIONAL for the same backward-compat reasons as categoryHint.
+   * NOT trusted blindly — the mapper validates it against ACTIVITY_CATEGORIES and falls back
+   * to keyword inference (categoryHint, then title/description) when it is absent or unknown.
+   */
+  category?: string;
   confidence: FieldConfidence;
   /** Managed tier only (see AttestationInfo). */
   attestation?: AttestationInfo;

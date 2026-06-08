@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   extractionToActivityPrefill,
   inferActivityCategory,
@@ -22,6 +22,10 @@ function result(overrides: Partial<ExtractionResult> = {}): ExtractionResult {
   };
 }
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('extractionToActivityPrefill', () => {
   it('maps a full timed event to all corresponding fields (+ inferred category)', () => {
     const prefill = extractionToActivityPrefill(
@@ -41,7 +45,8 @@ describe('extractionToActivityPrefill', () => {
       startTime: '14:00',
       endTime: '16:00',
       location: 'Sunshine Hall',
-      description: 'Bring a gift',
+      // The model's overflow `description` routes to the activity's VISIBLE `notes` field.
+      notes: 'Bring a gift',
       category: 'birthday',
     });
   });
@@ -105,6 +110,30 @@ describe('inferActivityCategory', () => {
     expect(
       inferActivityCategory(result({ categoryHint: 'misc gathering', title: 'Catch-up' }))
     ).toBeUndefined();
+  });
+
+  it('uses the model-picked category id when it is a real category (beats hint + title)', () => {
+    // The model returns a valid id; even a conflicting hint/title must not override it.
+    const category = inferActivityCategory(
+      result({ category: 'field_trip', categoryHint: 'birthday', title: 'Party time' })
+    );
+    expect(category).toBe('field_trip');
+  });
+
+  it('ignores an unknown model id (logs a warning) and falls back to keyword inference', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const category = inferActivityCategory(
+      result({ category: 'not_a_real_id', categoryHint: 'dentist appointment' })
+    );
+    expect(category).toBe('dentist'); // fell back to the hint keyword
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('categorizes a "learning journey" (SG term) as a field trip via the keyword fallback', () => {
+    expect(inferActivityCategory(result({ title: 'School Learning Journey to the Zoo' }))).toBe(
+      'field_trip'
+    );
+    expect(inferActivityCategory(result({ categoryHint: 'school excursion' }))).toBe('field_trip');
   });
 });
 
