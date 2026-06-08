@@ -1,0 +1,53 @@
+# Fastlane — iOS TestFlight lane for the Capacitor app (ADR-029).
+#
+# DORMANT until the Apple Developer (Organization) account exists (gated on the
+# D-U-N-S number). This lane signs via an **App Store Connect API key** with
+# Xcode cloud-managed automatic signing (`-allowProvisioningUpdates`), so there
+# is no manual certificate/provisioning-profile juggling and no separate
+# `match` certificates repo to maintain — the right trade-off for a solo
+# publisher. If automatic signing is ever rejected for distribution, switch to
+# `match` (App Store) here; the rest of the lane is unchanged.
+#
+# Env provided by .github/workflows/mobile-ios-release.yml:
+#   APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_API_ISSUER_ID,
+#   APP_STORE_CONNECT_API_KEY_PATH (decoded .p8 on disk), APPLE_TEAM_ID,
+#   BUILD_NUMBER (CI run number), MARKETING_VERSION.
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Build the Release IPA and upload it to TestFlight"
+  lane :beta do
+    api_key = app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
+      key_filepath: ENV["APP_STORE_CONNECT_API_KEY_PATH"],
+      duration: 1200,
+      in_house: false
+    )
+
+    build_app(
+      project: "App.xcodeproj",
+      scheme: "App",
+      configuration: "Release",
+      export_method: "app-store",
+      export_team_id: ENV["APPLE_TEAM_ID"],
+      # Cloud-managed automatic signing via the App Store Connect API key. The
+      # version/build numbers are stamped here (rather than via agvtool) so the
+      # lane doesn't depend on the project's versioning system being configured.
+      xcargs: "-allowProvisioningUpdates " \
+              "CURRENT_PROJECT_VERSION=#{ENV['BUILD_NUMBER']} " \
+              "MARKETING_VERSION=#{ENV['MARKETING_VERSION']}",
+      output_directory: "build",
+      output_name: "beanies.ipa"
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      ipa: "build/beanies.ipa",
+      # Don't block the CI job on Apple's async build processing; check status in
+      # App Store Connect / TestFlight.
+      skip_waiting_for_build_processing: true
+    )
+  end
+end
