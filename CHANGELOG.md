@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-06-08
 
+### Fixed
+
+- **Take a photo with Magic beans on mobile.** On phones, after you agree to the privacy prompt, beanies now asks whether to **take a photo** or **choose a file** - so you can snap a paper notice or invite on the spot, not just pick an existing file. (On the installed app the camera option was missing.)
+
 ### Added
 
 - **No more duplicate activities from re-uploads.** If you scan a photo or PDF for an activity you already have on the calendar (same day, similar name), beanies now asks whether to update the existing one — folding in any new details and attaching the document to it — instead of quietly creating a duplicate. Choose "Add anyway" and it behaves exactly as before.
