@@ -1,0 +1,4 @@
+# Fastlane app identity (ADR-029). The Apple ID / team ID are supplied via
+# App Store Connect API key env at runtime (see Fastfile + the CI workflow),
+# so nothing secret lives here.
+app_identifier("family.beanies.app")
