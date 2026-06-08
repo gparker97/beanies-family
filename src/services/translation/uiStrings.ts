@@ -6500,7 +6500,7 @@ const STRING_DEFS = {
   },
   'ai.magic.invite': { en: 'Invite', beanie: 'invite' },
   'ai.magic.travelBooking': { en: 'Travel booking', beanie: 'travel booking' },
-  'ai.magic.perform': { en: 'Perform magic', beanie: 'perform magic' },
+  'ai.magic.perform': { en: 'Magic beans', beanie: 'magic beans' },
   'ai.magic.performHint': {
     en: 'Snap an invite, beanies fills it in',
     beanie: 'snap an invite, beanies fills it in',
