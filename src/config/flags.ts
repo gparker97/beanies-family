@@ -14,6 +14,10 @@
 // a silent failure, never a page crash.
 
 /** The closed set of developer flags. Add a member to introduce a new flag. */
+// NOTE: both flags below are currently DORMANT — the AI document readers they
+// gated launched to prod 2026-06-07, so nothing consults them right now. They
+// are retained (not deleted) intentionally so the readers can be re-gated, or
+// the flags reused, without rebuilding this machinery.
 export type DevFlag = 'aiPhotoExtract' | 'aiTravelExtract';
 
 const overrideKey = (flag: DevFlag): string => `beanies:flag:${flag}`;
