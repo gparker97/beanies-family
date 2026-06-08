@@ -6493,7 +6493,7 @@ const STRING_DEFS = {
     beanie: "we couldn't spot any travel details in that document. you can add the trip manually.",
   },
   // ── "beanies can do magic" AI entry points — shared magic-reader language ──
-  'ai.magic.title': { en: 'beanies can do magic', beanie: 'beanies can do magic' },
+  'ai.magic.title': { en: 'Magic beans', beanie: 'magic beans' },
   'ai.magic.subtitle': {
     en: 'Snap an invite or travel booking, beanies will fill it in',
     beanie: 'snap an invite or travel booking, beanies will fill it in',
