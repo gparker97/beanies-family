@@ -61,9 +61,9 @@ export const ALL_TIPS: BeanTip[] = [
     tryItRoute: '/transactions',
     condition: (ctx) => ctx.transactionCount > 0 && ctx.activityCount > 0,
     message: {
-      en: "you can link transactions directly to activities. that way, when you open piano lessons, you'll see exactly what you've paid — no detective work required.",
+      en: "you can link transactions directly to activities. that way, when you open piano lessons, you'll see exactly what you've paid. no detective work required.",
       beanie:
-        "you can link transactions directly to activities. that way, when you open piano lessons, you'll see exactly what you've paid — no detective work required.",
+        "you can link transactions directly to activities. that way, when you open piano lessons, you'll see exactly what you've paid. no detective work required.",
     },
   },
   {
@@ -81,9 +81,9 @@ export const ALL_TIPS: BeanTip[] = [
     category: 'planner',
     tryItRoute: '/travel',
     message: {
-      en: 'planning a trip? the vacation planner breaks it into flights, hotels, and activities — and totals the cost so there are no surprises.',
+      en: 'planning a trip? the vacation planner breaks it into flights, hotels, and activities, and totals the cost so there are no surprises.',
       beanie:
-        'planning a trip? the vacation planner breaks it into flights, hotels, and activities — and totals the cost so there are no surprises.',
+        'planning a trip? the vacation planner breaks it into flights, hotels, and activities, and totals the cost so there are no surprises.',
     },
   },
   {
@@ -111,9 +111,9 @@ export const ALL_TIPS: BeanTip[] = [
     id: 'tip-offline',
     category: 'general',
     message: {
-      en: "beanies works offline. if you lose internet, keep going — your data syncs when you're back.",
+      en: "beanies works offline. if you lose internet, keep going. your data syncs when you're back.",
       beanie:
-        "beanies works offline. if you lose internet, keep going — your data syncs when you're back.",
+        "beanies works offline. if you lose internet, keep going. your data syncs when you're back.",
     },
   },
   {
@@ -131,9 +131,9 @@ export const ALL_TIPS: BeanTip[] = [
     category: 'general',
     tryItRoute: '/settings',
     message: {
-      en: 'text feels small on your phone? settings → appearance → text size has a large mode. the whole app gets bigger and friendlier — buttons, cards, everything.',
+      en: 'text feels small on your phone? settings → appearance → text size has a large mode. the whole app gets bigger and friendlier. buttons, cards, everything.',
       beanie:
-        'text feels small on your phone? settings → appearance → text size has a large mode. the whole app gets bigger and friendlier — buttons, cards, everything.',
+        'text feels small on your phone? settings → appearance → text size has a large mode. the whole app gets bigger and friendlier. buttons, cards, everything.',
     },
   },
   {
@@ -152,9 +152,9 @@ export const ALL_TIPS: BeanTip[] = [
     category: 'security',
     tryItRoute: '/settings',
     message: {
-      en: "your data is always yours. export your .beanpod file anytime from settings — it's your encrypted backup.",
+      en: "your data is always yours. export your .beanpod file anytime from settings. it's your encrypted backup.",
       beanie:
-        "your data is always yours. export your .beanpod file anytime from settings — it's your encrypted backup.",
+        "your data is always yours. export your .beanpod file anytime from settings. it's your encrypted backup.",
     },
   },
   {
@@ -186,9 +186,9 @@ export const ALL_TIPS: BeanTip[] = [
     // route to the hub rather than /pod/milestones (the family-wide view).
     tryItRoute: '/pod',
     message: {
-      en: "track your family's milestones — first day of school, lost teeth, birthdays. the small stuff matters. that's what beanies is for.",
+      en: "track your family's milestones. first day of school, lost teeth, birthdays. the small stuff matters. that's what beanies is for.",
       beanie:
-        "track your family's milestones — first day of school, lost teeth, birthdays. the small stuff matters. that's what beanies is for.",
+        "track your family's milestones. first day of school, lost teeth, birthdays. the small stuff matters. that's what beanies is for.",
     },
   },
   {
@@ -224,10 +224,11 @@ export const ALL_TIPS: BeanTip[] = [
   {
     id: 'tip-nook-schedule',
     category: 'general',
+    tryItRoute: '/nook',
     message: {
-      en: "the nook shows today's schedule and the week ahead — only the stuff assigned to you. one glance to know where you need to be.",
+      en: "the nook shows today's schedule and the week ahead, only the stuff assigned to you. one glance to know where you need to be.",
       beanie:
-        "the nook shows today's schedule and the week ahead — only the stuff assigned to you. one glance to know where you need to be.",
+        "the nook shows today's schedule and the week ahead, only the stuff assigned to you. one glance to know where you need to be.",
     },
   },
   {
@@ -246,9 +247,9 @@ export const ALL_TIPS: BeanTip[] = [
     tryItRoute: '/dashboard',
     condition: (ctx) => ctx.accountCount > 0,
     message: {
-      en: "the dashboard tracks your net worth over time. it adds up everything — accounts, assets, loans — so you don't have to.",
+      en: "the dashboard tracks your net worth over time. it adds up everything (accounts, assets, loans) so you don't have to.",
       beanie:
-        "the dashboard tracks your net worth over time. it adds up everything — accounts, assets, loans — so you don't have to.",
+        "the dashboard tracks your net worth over time. it adds up everything (accounts, assets, loans) so you don't have to.",
     },
   },
   {
@@ -266,9 +267,190 @@ export const ALL_TIPS: BeanTip[] = [
     category: 'general',
     tryItRoute: '/settings',
     message: {
-      en: 'beanies speaks Chinese too. switch languages in settings — all labels, tips, and help content translate.',
+      en: 'beanies speaks Chinese too. switch languages in settings. all labels, tips, and help content translate.',
       beanie:
-        'beanies speaks Chinese too. switch languages in settings — all labels, tips, and help content translate.',
+        'beanies speaks Chinese too. switch languages in settings. all labels, tips, and help content translate.',
+    },
+  },
+
+  // ── New features (2026-06) ──────────────────────────────────────────────────
+  {
+    id: 'tip-magic-invite',
+    category: 'planner',
+    tryItRoute: '/activities',
+    message: {
+      en: 'snap a photo of a party invite or school notice and let magic beans read it. the date, time, place, and what to bring fill themselves in.',
+      beanie:
+        'snap a photo of a party invite or school notice and let magic beans read it. the date, time, place, and what to bring fill themselves in.',
+    },
+  },
+  {
+    id: 'tip-magic-travel',
+    category: 'planner',
+    tryItRoute: '/travel',
+    message: {
+      en: 'got a flight or hotel confirmation? hand it to magic beans on the travel page and beanies builds the trip for you, flights and all.',
+      beanie:
+        'got a flight or hotel confirmation? hand it to magic beans on the travel page and beanies builds the trip for you, flights and all.',
+    },
+  },
+  {
+    id: 'tip-magic-camera',
+    category: 'planner',
+    tryItRoute: '/activities',
+    message: {
+      en: "on your phone you don't even need to save the photo first. tap magic beans, point your camera at the notice, and you're done.",
+      beanie:
+        "on your phone you don't even need to save the photo first. tap magic beans, point your camera at the notice, and you're done.",
+    },
+  },
+  {
+    id: 'tip-magic-dupe',
+    category: 'planner',
+    tryItRoute: '/activities',
+    message: {
+      en: 'scanned the same invite twice? beanies spots it and offers to update what you already have, so you never end up with two.',
+      beanie:
+        'scanned the same invite twice? beanies spots it and offers to update what you already have, so you never end up with two.',
+    },
+  },
+  {
+    id: 'tip-magic-prep',
+    category: 'planner',
+    tryItRoute: '/activities',
+    message: {
+      en: "field trip coming up? when beanies reads the notice, the 'bring a backpack, snack, water bottle' bits land right in the activity notes.",
+      beanie:
+        "field trip coming up? when beanies reads the notice, the 'bring a backpack, snack, water bottle' bits land right in the activity notes.",
+    },
+  },
+  {
+    id: 'tip-ai-privacy',
+    category: 'security',
+    message: {
+      en: "feeding documents to ai feels scary, i get it. beanies reads them inside sealed, private hardware we can't see into, keeps nothing, and trains nothing.",
+      beanie:
+        "feeding documents to ai feels scary, i get it. beanies reads them inside sealed, private hardware we can't see into, keeps nothing, and trains nothing.",
+    },
+  },
+  {
+    id: 'tip-activity-photos',
+    category: 'planner',
+    tryItRoute: '/activities',
+    message: {
+      en: "pin a photo to any activity. the invite, a map to the venue, the kit list, whatever you'll want later. it lives right on the calendar entry.",
+      beanie:
+        "pin a photo to any activity. the invite, a map to the venue, the kit list, whatever you'll want later. it lives right on the calendar entry.",
+    },
+  },
+  {
+    id: 'tip-scrapbook',
+    category: 'family',
+    tryItRoute: '/pod/scrapbook',
+    message: {
+      en: "the family scrapbook is for the everyday photos, not just the big occasions. that's usually the stuff you're glad you kept.",
+      beanie:
+        "the family scrapbook is for the everyday photos, not just the big occasions. that's usually the stuff you're glad you kept.",
+    },
+  },
+  {
+    id: 'tip-travel-docs',
+    category: 'planner',
+    tryItRoute: '/travel',
+    message: {
+      en: "keep boarding passes and hotel confirmations attached to the trip itself, so they're one tap away when you're standing at the gate.",
+      beanie:
+        "keep boarding passes and hotel confirmations attached to the trip itself, so they're one tap away when you're standing at the gate.",
+    },
+  },
+  {
+    id: 'tip-milestone-photo',
+    category: 'family',
+    tryItRoute: '/pod/milestones',
+    message: {
+      en: 'add a photo to a milestone and the first lost tooth becomes a memory, not just a date in a list.',
+      beanie:
+        'add a photo to a milestone and the first lost tooth becomes a memory, not just a date in a list.',
+    },
+  },
+  {
+    id: 'tip-cookbook',
+    category: 'family',
+    tryItRoute: '/pod/cookbook',
+    message: {
+      en: "the family cookbook keeps grandma's recipes and the weeknight regulars together. no more digging through screenshots.",
+      beanie:
+        "the family cookbook keeps grandma's recipes and the weeknight regulars together. no more digging through screenshots.",
+    },
+  },
+  {
+    id: 'tip-medications',
+    category: 'family',
+    tryItRoute: '/pod',
+    message: {
+      en: "keep each bean's medications on their page, with the dose and timing. a lifesaver for a babysitter, or a 2am 'wait, how much?'",
+      beanie:
+        "keep each bean's medications on their page, with the dose and timing. a lifesaver for a babysitter, or a 2am 'wait, how much?'",
+    },
+  },
+  {
+    id: 'tip-allergies',
+    category: 'family',
+    tryItRoute: '/pod/safety',
+    message: {
+      en: 'log allergies on the care & safety page so anyone minding the kids knows what to avoid at a glance.',
+      beanie:
+        'log allergies on the care & safety page so anyone minding the kids knows what to avoid at a glance.',
+    },
+  },
+  {
+    id: 'tip-contacts',
+    category: 'family',
+    tryItRoute: '/pod/contacts',
+    message: {
+      en: 'fill in your emergency contacts once. the doctor, the school, the neighbour with the spare key, all there when you need them in a hurry.',
+      beanie:
+        'fill in your emergency contacts once. the doctor, the school, the neighbour with the spare key, all there when you need them in a hurry.',
+    },
+  },
+  {
+    id: 'tip-care-safety',
+    category: 'family',
+    tryItRoute: '/pod/safety',
+    message: {
+      en: 'the care & safety page gathers allergies, medications, and who to call in one spot, so a sitter has what they need without asking.',
+      beanie:
+        'the care & safety page gathers allergies, medications, and who to call in one spot, so a sitter has what they need without asking.',
+    },
+  },
+  {
+    id: 'tip-sayings',
+    category: 'family',
+    tryItRoute: '/pod',
+    message: {
+      en: "kids say the funniest things. jot them down under a bean's sayings before you forget. future you will thank you.",
+      beanie:
+        "kids say the funniest things. jot them down under a bean's sayings before you forget. future you will thank you.",
+    },
+  },
+  {
+    id: 'tip-invite-partner',
+    category: 'family',
+    tryItRoute: '/family',
+    message: {
+      en: "beanies is better shared. invite your partner from the family page and you'll both see the same plan, always in sync.",
+      beanie:
+        "beanies is better shared. invite your partner from the family page and you'll both see the same plan, always in sync.",
+    },
+  },
+  {
+    id: 'tip-assets',
+    category: 'finance',
+    tryItRoute: '/assets',
+    message: {
+      en: 'car, house, a bit of crypto? add them as assets and beanies folds them into your net worth without you doing the math.',
+      beanie:
+        'car, house, a bit of crypto? add them as assets and beanies folds them into your net worth without you doing the math.',
     },
   },
 ];

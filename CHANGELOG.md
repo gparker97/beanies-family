@@ -16,6 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **Fresh tips of the day.** Added 18 new tips covering the newer features - magic beans (reading invites and bookings), taking a photo, the family scrapbook and cookbook, milestones, medications, allergies, emergency contacts, and more - and tidied up the existing ones.
 - **No more duplicate activities from re-uploads.** If you scan a photo or PDF for an activity you already have on the calendar (same day, similar name), beanies now asks whether to update the existing one — folding in any new details and attaching the document to it — instead of quietly creating a duplicate. Choose "Add anyway" and it behaves exactly as before.
 
 ### Changed
