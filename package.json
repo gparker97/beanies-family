@@ -80,7 +80,7 @@
     "@vue/test-utils": "^2.4.10",
     "@vue/tsconfig": "^0.9.1",
     "autoprefixer": "^10.5.0",
-    "concurrently": "^9.2.1",
+    "concurrently": "^10.0.3",
     "date-holidays": "^3.30.2",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
