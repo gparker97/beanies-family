@@ -17,6 +17,42 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.06.08',
+    date: '2026-06-08',
+    month: '8 june 2026',
+    spotlight: false,
+    summary: {
+      en: 'Your magic beans just got smarter at reading invites.',
+      beanie: 'your magic beans just got smarter at reading invites.',
+    },
+    features: [
+      {
+        title: { en: 'Everything you need to bring', beanie: 'everything you need to bring' },
+        description: {
+          en: "When beanies reads a school notice or invite, it now pulls the prep details - what to bring, what to wear, RSVPs - into the activity's notes, so the whole family is ready.",
+          beanie:
+            "when beanies reads a school notice or invite, it now pulls the prep details - what to bring, what to wear, rsvps - into the activity's notes, so the whole family is ready.",
+        },
+      },
+      {
+        title: { en: 'Smarter categories', beanie: 'smarter categories' },
+        description: {
+          en: 'beanies now picks the right category from your list, so a school learning journey lands as a field trip instead of uncategorized.',
+          beanie:
+            'beanies now picks the right category from your list, so a school learning journey lands as a field trip instead of uncategorized.',
+        },
+      },
+      {
+        title: { en: 'No more duplicates', beanie: 'no more duplicates' },
+        description: {
+          en: 'Scan the same invite twice and beanies offers to update the activity you already have, instead of quietly adding a duplicate.',
+          beanie:
+            'scan the same invite twice and beanies offers to update the activity you already have, instead of quietly adding a duplicate.',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.06.07.2',
     date: '2026-06-07',
     month: '7 june 2026',
