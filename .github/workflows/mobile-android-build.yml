@@ -57,6 +57,11 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           VITE_REGISTRY_API_URL: ${{ secrets.REGISTRY_API_URL }}
           VITE_REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
+          # The official-build guard in vite.config.ts requires BOTH webhooks
+          # whenever VITE_BUILD_SHA is set (below). Without this Slack one the
+          # build hard-fails ("Official build is missing required env"), which is
+          # what was breaking every iOS/Android CI build.
+          VITE_SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           # Surface any native OAuth/runtime errors during on-device testing.
           VITE_BEANIES_ERROR_WEBHOOK_URL: ${{ vars.BEANIES_ERROR_WEBHOOK_URL }}
           VITE_BEANIES_LOG_INGEST_URL: ${{ vars.BEANIES_LOG_INGEST_URL }}

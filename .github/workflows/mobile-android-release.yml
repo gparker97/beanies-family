@@ -63,6 +63,32 @@ jobs:
 
       - name: Build web app
         run: npm run build
+        env:
+          # Full client-side config for the SHIPPED release bundle — mirrors
+          # deploy.yml's prod web build so the Play Store app has Google sign-in,
+          # the registry/OAuth proxy, AI document extraction, and operational
+          # alerting all wired. Previously this step set NO env, so a release
+          # would have shipped an unconfigured bundle (no sign-in, no AI, no
+          # alerting). The official-build guard in vite.config.ts also requires
+          # both webhooks once VITE_BUILD_SHA is set.
+          VITE_REGISTRY_API_URL: ${{ secrets.REGISTRY_API_URL }}
+          VITE_REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          VITE_GOOGLE_PROJECT_NUMBER: ${{ secrets.GOOGLE_PROJECT_NUMBER }}
+          VITE_INVITE_BEAN_HASHES: ${{ secrets.INVITE_BEAN_HASHES }}
+          VITE_INVITE_WEBHOOK_URL: ${{ secrets.INVITE_WEBHOOK_URL }}
+          VITE_CONTACT_WEBHOOK_URL: ${{ secrets.CONTACT_WEBHOOK_URL }}
+          VITE_SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          VITE_BEANIES_ERROR_WEBHOOK_URL: ${{ vars.BEANIES_ERROR_WEBHOOK_URL }}
+          VITE_BEANIES_LOG_INGEST_URL: ${{ vars.BEANIES_LOG_INGEST_URL }}
+          VITE_BEANIES_LOG_INGEST_API_KEY: ${{ secrets.BEANIES_LOG_INGEST_API_KEY }}
+          VITE_AI_EXTRACT_URL: ${{ vars.AI_EXTRACT_URL }}
+          VITE_AI_EXTRACT_API_KEY: ${{ secrets.AI_EXTRACT_API_KEY }}
+          # NOTE: VITE_PLAUSIBLE_DOMAIN intentionally omitted — web analytics is a
+          # separate decision for the native app; add it here to enable Plausible
+          # in the shipped Android app.
+          VITE_BUILD_SHA: ${{ github.sha }}
 
       - name: Sync Capacitor (Android)
         run: npx cap sync android
