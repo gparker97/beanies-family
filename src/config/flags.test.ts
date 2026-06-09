@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { isFlagEnabled, setFlagOverride, clearFlagOverride, type DevFlag } from './flags';
+import {
+  isFlagEnabled,
+  setFlagOverride,
+  clearFlagOverride,
+  listFlags,
+  type DevFlag,
+} from './flags';
+import { FLAG_IDS } from './flagRegistry';
 
 // flags.ts reads import.meta.env.DEV at CALL time (not module load), so a plain
 // static import + vi.stubEnv('DEV', …) takes effect on the next call — no
@@ -76,5 +83,20 @@ describe('config/flags', () => {
     });
     expect(() => setFlagOverride(FLAG, true)).not.toThrow();
     expect(warn).toHaveBeenCalled();
+  });
+
+  it('listFlags returns one entry per registry flag with its committed state', () => {
+    const flags = listFlags();
+    expect(flags.map((f) => f.id)).toEqual([...FLAG_IDS]);
+    for (const f of flags) {
+      expect(f).toMatchObject({
+        id: expect.any(String),
+        label: expect.any(String),
+        description: expect.any(String),
+        committed: expect.any(Boolean),
+      });
+      // both flags ship committed-false today
+      expect(f.committed).toBe(false);
+    }
   });
 });
