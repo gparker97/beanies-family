@@ -54,7 +54,7 @@ jobs:
         run: npm run test:run
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         if: always()
         with:
           fail_ci_if_error: false
