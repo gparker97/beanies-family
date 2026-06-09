@@ -1,13 +1,13 @@
 ---
 name: beanies-pre-plan
-description: Standardized requirements-intake step that runs BEFORE beanies-plan. Collects complete, well-structured intent (via a copy/paste template or a Notion issue row), validates it, and hands a fully-populated initial prompt to beanies-plan so its 4-pass discipline starts from complete requirements. Use when the user says "pre-plan this", "intake this issue", "prep a plan for X", or invokes /beanies-pre-plan.
+description: Standardized requirements-intake step that runs BEFORE beanies-plan. Collects complete, well-structured intent (via a copy/paste template or a Notion issue row), reviews EVERY field, asks the user to resolve anything missing/unclear/TBC (writing resolved values back to the tracker) before building, and only after explicit user approval hands a fully-populated initial prompt to beanies-plan. Use when the user says "pre-plan this", "intake this issue", "prep a plan for X", or invokes /beanies-pre-plan.
 ---
 
 # beanies-pre-plan — Requirements Intake for beanies-plan
 
 `beanies-plan` refines _how_ work gets built through four review passes, but none of those passes can invent a missing requirement, an overlooked platform, or an unstated constraint. The quality ceiling of a plan is set _before_ Pass 1 runs — by the completeness of its initial prompt.
 
-This skill front-loads that completeness. It gathers intent into a standard structure, validates it, and hands a fully-populated prompt to `beanies-plan`. The result: `beanies-plan`'s clarifying-question round shrinks to genuine gaps only.
+This skill front-loads that completeness. It gathers intent into a standard structure, reviews and validates **every** field, resolves anything missing, unclear, or marked `TBC` with the user **before** building anything, and — only with the user's explicit go-ahead — hands a fully-populated prompt to `beanies-plan`. The result: `beanies-plan`'s clarifying-question round shrinks to genuine gaps only.
 
 **This skill is problem-side only.** It captures _what_ and _why_ — never _how_. The technical approach is `beanies-plan`'s job; pre-specifying it would short-circuit the 4-pass design reasoning. (The one near-the-line field, _Reuse hints / affected files_, is an optional pointer for the DRY pass — a place to look, not a solution to adopt.)
 
@@ -17,7 +17,7 @@ This skill front-loads that completeness. It gathers intent into a standard stru
 
 - **Via slash command:** `/beanies-pre-plan`
 - **Natural language:** "pre-plan this", "intake this issue", "prep a plan for X", "let's spec this before planning"
-- The skill chains INTO `beanies-plan` — it never replaces or modifies it.
+- The skill chains INTO `beanies-plan` — but **only after the user explicitly approves** the assembled prompt. It never auto-launches `beanies-plan`, and it never replaces or modifies it.
 
 > **Issue numbers always mean the Notion tracker, never GitHub.** Any bare issue reference — `#29`, `issue #29`, `id 29`, "the 29 issue" — resolves to the **`ID` (unique_id) of a row in the "Beanies Main Issue Tracker" Notion DB** (binding block below), and the skill runs in **NOTION mode**. These are NOT GitHub issue numbers and the skill must never `gh issue view` them. (GitHub issues are an _output_ of `beanies-plan`, gated by the Notion `github issue` passthrough — never an input here.) If the intended source is genuinely a GitHub issue or a pasted block, the user will say so explicitly.
 
@@ -57,7 +57,9 @@ This table is the ONE authoritative definition of the intake fields. The copy/pa
 
 **Notion conventions** (the DB is the authority for NOTION mode):
 
-- A property value of `"n/a"` (case-insensitive) or blank means **not provided** — treat it as empty, never as literal content.
+- **Review every field on the row — not just the mapped ones.** Read all intake columns before assembling, and flag for the clarify loop (step 5) anything that is blank-but-needed, marked `TBC`, internally contradictory, or that you do not fully understand.
+- A property value of `"n/a"` (case-insensitive) or blank means **deliberately not provided** — treat it as empty (carried as `—`), never as literal content. This is the ONLY acceptable "empty" state, and only for Optional fields.
+- A value of `"TBC"` / `"TBD"` / `"to be confirmed"` (case-insensitive) is a **placeholder that MUST be resolved before the prompt is built** — never carried through and never silently treated as empty. Resolve it from your own research and/or targeted user questions (step 5), then **write the resolved value back into that Notion property** (the pre-assembly write-back, see binding block) so the row itself is complete and matches the prompt.
 - `Device Type` / `View` are carried into the Surfaces lines **verbatim** (lossless); `Priority` is vocab-mapped to the canonical scale (binding block) so `beanies-plan` labeling is direct.
 - Several Notion fields concatenate into one canonical field (e.g. References = `References / Supporting Materials` + `Dependencies / Related Issues`). Drop any sub-part that is empty/`n/a`.
 
@@ -128,16 +130,18 @@ A flat, linear sequence of guarded steps. Each step has one job and one explicit
      - **No row matches** → list the closest titles / current `Not started` rows and ask which.
      - **Ambiguous (multiple matches)** → present candidates and ask which.
    - On success: map row properties onto the canonical fields via the _Notion property_ column (apply the `n/a`→empty, verbatim-Surfaces, Priority-vocab, and concatenation conventions above), and **capture the matched row id** for the write-back (step 6). If a needed value is truncated in the query result, re-read it with `API-retrieve-a-page`.
+   - **Then review EVERY intake column on the row** (not only the required/conditional ones). Capture, for step 5, any field that is `TBC`/`TBD`, blank-but-needed, internally contradictory, or otherwise unclear — these must be resolved (and `TBC`/incomplete ones written back) before anything is assembled.
 
-5. **Validate (shared — both modes).** Enforce the Required tier + the type-driven Conditional rows. For each genuinely blocking gap, ask ONE targeted question naming the missing field. Do not interrogate on Optionals. State which fields were auto-filled vs. left `—`, so nothing is silently dropped. (NOTION mode: a bug with no Repro is fine — note it and continue; Repro has no dedicated property.)
+5. **Validate & clarify — ALWAYS resolve before building (shared — both modes).** Review **all** fields. Block and ask the user targeted questions for EVERY one of: a missing Required field; a missing type-driven Conditional field; any field marked `TBC`/`TBD`; any value that is ambiguous, contradictory, or that you do not fully understand. Ask as many questions as it takes (batch them with `AskUserQuestion` where possible). **Do not assemble or write anything back until every requirement is clear and every question has been completely and fully answered.** Where you can resolve a gap yourself from the codebase/docs, do the research and confirm the resolution with the user rather than guessing silently. The ONLY fields you may leave unresolved are Optional fields the user has deliberately left blank/`n/a` (a clear, intentional omission) — but if even an Optional reads as unclear or is marked `TBC`, ask. State which fields were provided, which you resolved (and how — research vs. user answer), and which were intentionally left `—`, so nothing is silently dropped or invented. (NOTION mode: a bug with no Repro is acceptable if the rest is clear — note it and continue; Repro has no dedicated property.)
 
-6. **Assemble, write back (NOTION), hand off.** Fill the template with resolved values to produce the **assembled block**.
+6. **Assemble, write back (NOTION), and request approval.** Only reachable once step 5 is fully resolved. Fill the template with resolved values to produce the **assembled block**.
+   - **NOTION — backfill resolved intake columns FIRST.** For every field that was `TBC`/`TBD`/incomplete on the row and that you resolved in step 5, `API-patch-page` the resolved value into its Notion property (per the _Notion property_ column of the Canonical Field Table) **before** assembling the block — so the tracker row itself is complete and matches the prompt. Handle a failed patch by surfacing the field + value so the user can set it manually; never silently skip a backfill.
    - Append one directive line derived from the Notion `github issue` select (PASTE mode: omit unless the user stated a preference):
      - `create github issue` → `GitHub issue: CREATE — beanies-plan should open a GitHub issue per CLAUDE.md labeling.`
      - `do not create github issue` → `GitHub issue: SKIP — do not create a GitHub issue.`
    - **NOTION write-back (at handoff — the immediate writes, per the binding block):** on the captured row, `API-patch-page` to set **`beanies-plan prompt`** = the assembled block (rich_text) and **`Status`** = the _advance-to_ value (`In Progress`). Handle: **patch failed** → surface the error plus the exact text + target Status so the user can set them manually; **row id lost** → tell the user the prompt wasn't written back and give them the assembled block to paste. Never block the hand-off on the write-back. (The `plan file url` is NOT written here — it doesn't exist yet; see step 7.)
    - **Retain the captured row id** for the deferred step 7 write-back.
-   - **Hand off** to `beanies-plan` in-thread: invoke `/beanies-plan` with the assembled block as its initial prompt (`beanies-plan` captures it verbatim as its Phase 1 prompt). Confirm to the user that `beanies-plan` is taking over, and (NOTION mode) that the row was advanced to `In Progress` with the prompt written back — and that the `plan file url` will be written back once `beanies-plan` saves the plan (step 7).
+   - **STOP and request explicit approval — never auto-launch `beanies-plan`.** After the write-back, show the user the assembled block and confirm (NOTION mode) that the row was advanced to `In Progress` with the prompt + any backfilled columns written back. Then ask plainly, e.g.: _"Requirements are captured and written back to Notion #<ID>. Do you want to proceed to create the plan via `/beanies-plan`?"_ **Wait for the user's explicit go-ahead.** Only on an explicit yes do you invoke `/beanies-plan` in-thread with the assembled block as its Phase 1 prompt (`beanies-plan` captures it verbatim). If the user says no, defers, or wants changes, iterate on the intake (re-running step 5 as needed) — never proceed to planning without approval. When you do hand off, mention that the `plan file url` will be written back once `beanies-plan` saves the plan (step 7).
 
 7. **Deferred `plan file url` write-back (NOTION mode only — the one non-immediate write).** The hand-off created a standing obligation keyed to the captured row id. `beanies-plan` exits to plan mode, iterates with the user, and saves the file **only on approval** — so the plan path does not exist at hand-off, and the plan may be abandoned entirely. When — and only when — `beanies-plan` reports a saved `docs/plans/…` path **in the same thread**, `API-patch-page` the captured row to set **`plan file url`** = the file's GitHub blob URL on the default branch (`https://github.com/gparker97/beanies-family/blob/main/<saved path>` — it resolves once the plan is committed + pushed). Handle:
    - **Patch failed** → surface the error plus the exact url + row id so the user can set it manually.
@@ -163,8 +167,11 @@ Beanies Main Issue Tracker
 Status vocabulary: Not started · In Progress · Done
   query-for value (NOTION mode default read filter): "Not started"
   advance-to value (write at handoff):               "In Progress"
-Write-back — two phases:
-  At handoff (immediate):
+Write-back — three phases:
+  Pre-assembly (NOTION, only when step 5 resolved a TBC/incomplete intake column):
+    • <each resolved intake property> (matching type) ← value resolved via research / user answers
+         (write each backfilled column BEFORE assembling, so the row is complete + matches the prompt)
+  At handoff (immediate, AFTER explicit user approval to proceed):
     • beanies-plan prompt (rich_text) ← the assembled === BEANIES PRE-PLAN === block
          (Notion caps a rich_text segment at 2000 chars — split a longer block across
           multiple text objects in the same property so the patch doesn't 400.)
@@ -197,7 +204,7 @@ Device Type / View: carried verbatim into the Surfaces line (no remap)
 | ID                  | unique_id                                 | read-only — use to reference the issue to the user   |
 | Assignee / Raised By / Date | select / multi-select / date      | read-only metadata — ignored                         |
 
-**Access:** read via `API-query-data-source` on the recorded `data_source_id` (default filter Status = _query-for_); write-back via `API-patch-page` (at handoff: beanies-plan prompt + Status = _advance-to_; deferred: plan file url, after the plan saves). Use `API-retrieve-a-page` only if a property value is truncated in a query result.
+**Access:** read via `API-query-data-source` on the recorded `data_source_id` (default filter Status = _query-for_); write-back via `API-patch-page` (pre-assembly: any resolved `TBC`/incomplete intake column; at handoff, after explicit user approval: beanies-plan prompt + Status = _advance-to_; deferred: plan file url, after the plan saves). Use `API-retrieve-a-page` only if a property value is truncated in a query result.
 
 ---
 
@@ -208,9 +215,10 @@ Device Type / View: carried verbatim into the Surfaces line (no remap)
 - **Never modify `beanies-plan`.** The only coupling is the assembled prompt crossing the boundary in-thread (+ the captured row id, used for the at-handoff and the deferred write-backs). The `plan file url` write-back lives here, not in `beanies-plan`, so `beanies-plan` stays Notion-agnostic when invoked standalone.
 - **Single source of truth.** The Canonical Field Table is authoritative; template + Notion mapping + section mapping are projections. Changing a field is a one-row edit. The Status vocabulary, its transition, both Notion ids, the vocab maps, and the write-back contract live only in the binding block.
 - **Never fail silently.** Every Notion call, the paste parse, and the write-back have an explicit user-facing outcome.
-- **Respect the `n/a` convention.** A Notion value of `n/a`/blank is "not provided" — never carried as literal content.
-- **Keep it low-friction.** Required tier ~6 fields; Optionals are blankable; never interrogate on Optionals.
+- **Review every field; clarify before building.** Read ALL intake columns, not just the required ones. Ask the user about every missing Required/Conditional field, every `TBC`/incomplete column, and anything ambiguous, contradictory, or unclear — as many questions as needed — and **do not assemble or write back the prompt until all are completely and fully answered.** Keep the template itself small, but never skip a needed clarification for the sake of speed.
+- **Respect the `n/a` vs `TBC` distinction.** `n/a`/blank = deliberately not provided → leave as `—` (Optionals only). `TBC`/`TBD`/"to be confirmed" = MUST be resolved (research and/or ask), written back into the Notion column (pre-assembly write-back), and reflected in the prompt — never carried through as a placeholder and never treated as empty.
+- **Never auto-chain into `beanies-plan`.** After the prompt is written back to Notion, STOP and get the user's explicit approval before invoking `/beanies-plan`. No silent or automatic hand-off; if the user hasn't said yes, the skill ends after the write-back.
 - **Don't restate baked-in constraints.** DRY, no-silent-failures, MVO, rem-based text, i18n are already enforced by `beanies-plan` Pass 2/3 and `CLAUDE.md`. Only NON-default constraints belong in the Notes / Edge-cases fields.
-- **Write-back has two phases.** The prompt + Status writes fire at hand-off (immediate, non-blocking). The `plan file url` write is deferred to step 7 — it fires only after `beanies-plan` actually saves a plan file, and never for an abandoned plan. Surface any patch failure with the exact values so the user can apply them manually.
+- **Write-back has three phases.** (1) Pre-assembly: any `TBC`/incomplete intake column resolved in step 5 is written back into its own Notion property before the prompt is assembled. (2) At hand-off (only after explicit user approval to proceed): the assembled prompt + `Status = In Progress`. (3) Deferred to step 7: `plan file url`, only after `beanies-plan` actually saves a plan file, never for an abandoned plan. Surface any patch failure with the exact values so the user can apply them manually.
 - **Keep the issue DB separate from launch content.** This is product/issue tracking — distinct from "Post Tracker" and all launch/marketing material (Notion only, per `CLAUDE.md`).
 - **Cite real files, not symlinks.** Reference `start-session` (not the `good-morning` symlink) for the MCP-availability pattern.
