@@ -63,7 +63,10 @@ function featureFlagWriterDev() {
   return {
     name: 'beanies:feature-flag-writer',
     apply: 'serve' as const,
-    configureServer(server: { middlewares: { use: (path: string, fn: unknown) => void } }) {
+    configureServer(server: {
+      middlewares: { use: (path: string, fn: unknown) => void };
+      watcher: { unwatch: (paths: string) => void };
+    }) {
       server.middlewares.use(
         '/__feature-flags',
         (
@@ -102,6 +105,14 @@ function featureFlagWriterDev() {
                   json(400, result);
                   return;
                 }
+                // Stop Vite's watcher from firing on OUR OWN write — otherwise
+                // it sees the committed file (imported by flags.ts) change and
+                // triggers a full-page reload after every toggle, which defeats
+                // the deliberate manual "Reload to apply" flow (batch toggles,
+                // reload once). The in-memory `current` is the session's
+                // authoritative state; the on-disk file is for commit/deploy and
+                // is re-read on the next manual reload.
+                server.watcher.unwatch(filePath);
                 await writeFile(filePath, result.source, 'utf8');
                 current = result.nextState;
                 json(200, { ok: true });
