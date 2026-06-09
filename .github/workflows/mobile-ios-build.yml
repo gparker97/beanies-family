@@ -80,6 +80,11 @@ jobs:
           # Stamp the build so the diagnostic firehose identifies which build is
           # running, matching the Android lane.
           VITE_BUILD_SHA: ${{ github.sha }}
+          # Managed AI document-reader endpoint (Magic beans). Without these the
+          # managed tier degrades to `not_available` ("reading photos isn't set
+          # up yet") on-device. Same values the prod web bundle + release lanes ship.
+          VITE_AI_EXTRACT_URL: ${{ vars.AI_EXTRACT_URL }}
+          VITE_AI_EXTRACT_API_KEY: ${{ secrets.AI_EXTRACT_API_KEY }}
 
       - name: Sync Capacitor (iOS)
         # Copies the freshly built dist/ into ios/App/App/public and updates the
