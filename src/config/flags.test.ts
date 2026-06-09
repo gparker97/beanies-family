@@ -7,6 +7,14 @@ import {
   type DevFlag,
 } from './flags';
 import { FLAG_IDS } from './flagRegistry';
+import { COMMITTED_FLAGS } from './featureFlags.committed';
+
+// Pin committed state so these tests are deterministic no matter what the dev
+// Feature Flags tool has written to featureFlags.committed.ts (the real
+// prod-value behaviour is covered in flags.committed.test.ts).
+vi.mock('./featureFlags.committed', () => ({
+  COMMITTED_FLAGS: { aiPhotoExtract: false, aiTravelExtract: false },
+}));
 
 // flags.ts reads import.meta.env.DEV at CALL time (not module load), so a plain
 // static import + vi.stubEnv('DEV', …) takes effect on the next call — no
@@ -95,8 +103,9 @@ describe('config/flags', () => {
         description: expect.any(String),
         committed: expect.any(Boolean),
       });
-      // both flags ship committed-false today
-      expect(f.committed).toBe(false);
+      // committed reflects the committed file's actual value (not pinned to a
+      // specific true/false, so toggling a flag never breaks this test)
+      expect(f.committed).toBe(COMMITTED_FLAGS[f.id] === true);
     }
   });
 });
