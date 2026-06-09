@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
-// Raw source of the committed file (Vite ?raw import) — lets us assert the
-// generator reproduces it byte-for-byte (idempotent + prettier-clean).
+// Raw source of the committed file (Vite ?raw import) + its parsed values — lets
+// us assert the on-disk file is always in canonical generated form WITHOUT
+// pinning the true/false values (the dev Feature Flags tool changes those
+// legitimately, so a value-pinned test would break whenever a flag is toggled).
 import committedRaw from '../featureFlags.committed?raw';
+import { COMMITTED_FLAGS } from '../featureFlags.committed';
 import { applyFlagWrite, generateCommittedSource } from '../featureFlagWrite';
 import { FLAG_IDS, type DevFlag } from '../flagRegistry';
 
@@ -9,8 +12,11 @@ const allFalse = (): Record<DevFlag, boolean> =>
   Object.fromEntries(FLAG_IDS.map((id) => [id, false])) as Record<DevFlag, boolean>;
 
 describe('config/featureFlagWrite', () => {
-  it('generateCommittedSource matches the committed file byte-for-byte for the all-false state (idempotent + prettier-clean)', () => {
-    expect(generateCommittedSource(allFalse())).toBe(committedRaw);
+  it('the committed file on disk is in canonical generated form (format lock — value-agnostic)', () => {
+    // Regenerating from the file's OWN current values must reproduce it exactly.
+    // This catches format/prettier drift in the generator without pinning which
+    // flags happen to be on, so toggling a flag never breaks this test.
+    expect(generateCommittedSource(COMMITTED_FLAGS)).toBe(committedRaw);
   });
 
   it('emits keys sorted with the requested value', () => {
