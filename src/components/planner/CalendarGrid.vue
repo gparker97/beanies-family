@@ -5,7 +5,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { extractDatePart, formatNookDate } from '@/utils/date';
+import { extractDatePart, formatNookDate, toDateInputValue } from '@/utils/date';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { tripTypeEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
 import { relativeWeekLabelKey, type RelativeWeekLabelKey } from '@/utils/calendarWeek';
@@ -16,6 +16,7 @@ import MonthDayCard, {
   type CellVacation,
 } from '@/components/planner/MonthDayCard.vue';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
+import { useToday } from '@/composables/useToday';
 import type { FamilyActivity, HolidayOccurrence } from '@/types/models';
 
 const props = defineProps<{
@@ -46,7 +47,11 @@ const vacationStore = useVacationStore();
 const settingsStore = useSettingsStore();
 const holidayStore = useHolidayStore();
 
-const today = new Date();
+// Reactive "today" from the app-wide singleton — updates on a DST-safe midnight
+// timer + visibilitychange + bfcache restore. Using a frozen `new Date()` here
+// caused the "ghost today border": a tab left open across midnight kept marking
+// yesterday as today (and denied today its border). See issue #25.
+const { today: todayStr, startOfToday } = useToday();
 const currentYear = computed(() => props.referenceDate.getFullYear());
 const currentMonth = computed(() => props.referenceDate.getMonth());
 
@@ -71,11 +76,15 @@ const dayLabels = computed(() => {
   return Array.from({ length: 7 }, (_, i) => allDayLabels[(i + start) % 7]!());
 });
 
-const todayStr = computed(() => formatDate(today));
-
-function formatDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+// Single source of truth for "the reactive today falls inside the month the grid
+// is currently showing." Both the today-week-row tint and the mobile
+// scroll-to-today helper read this so the predicate can never drift between them.
+// Degrades to `false` (no row tint, no scroll) rather than throwing —
+// `startOfToday` is always a valid local-midnight Date.
+const todayInView = computed(() => {
+  const t = startOfToday.value;
+  return t.getMonth() === currentMonth.value && t.getFullYear() === currentYear.value;
+});
 
 // Get the week number (0-indexed row) of a date within the month
 function getWeekRow(dayDate: Date): number {
@@ -85,9 +94,8 @@ function getWeekRow(dayDate: Date): number {
 }
 
 const todayWeekRow = computed(() => {
-  if (today.getMonth() !== currentMonth.value || today.getFullYear() !== currentYear.value)
-    return -1;
-  return getWeekRow(today);
+  if (!todayInView.value) return -1;
+  return getWeekRow(startOfToday.value);
 });
 
 // Build grid cells
@@ -101,8 +109,8 @@ const calendarDays = computed<MonthDayCellData[]>(() => {
   // to query derived overlays (public holidays) that should show on padding
   // days too, not just within the calendar month.
   const totalGridCells = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7;
-  const gridStartStr = formatDate(new Date(year, month, 1 - startOffset));
-  const gridEndStr = formatDate(new Date(year, month, 1 - startOffset + totalGridCells - 1));
+  const gridStartStr = toDateInputValue(new Date(year, month, 1 - startOffset));
+  const gridEndStr = toDateInputValue(new Date(year, month, 1 - startOffset + totalGridCells - 1));
 
   const days: MonthDayCellData[] = [];
 
@@ -138,8 +146,8 @@ const calendarDays = computed<MonthDayCellData[]>(() => {
   }
 
   // Build a map of date -> travel-segment occurrences (flights, trains, etc).
-  const monthStartStr = formatDate(new Date(year, month, 1));
-  const monthEndStr = formatDate(new Date(year, month + 1, 0));
+  const monthStartStr = toDateInputValue(new Date(year, month, 1));
+  const monthEndStr = toDateInputValue(new Date(year, month + 1, 0));
   const dateSegments = new Map<string, TravelSegmentOccurrence[]>();
   for (const occ of vacationStore.travelSegmentOccurrencesInRange(monthStartStr, monthEndStr)) {
     if (!dateSegments.has(occ.date)) dateSegments.set(occ.date, []);
@@ -156,7 +164,7 @@ const calendarDays = computed<MonthDayCellData[]>(() => {
     const startD = new Date(vStart + 'T00:00:00');
     const endD = new Date(vEnd + 'T00:00:00');
     for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
-      const dateStr = formatDate(d);
+      const dateStr = toDateInputValue(d);
       if (!dateVacations.has(dateStr)) dateVacations.set(dateStr, []);
       dateVacations.get(dateStr)!.push({
         id: v.id,
@@ -179,7 +187,7 @@ const calendarDays = computed<MonthDayCellData[]>(() => {
   const prevMonth = new Date(year, month, 0);
   for (let i = startOffset - 1; i >= 0; i--) {
     const d = prevMonth.getDate() - i;
-    const dateStr = formatDate(new Date(year, month - 1, d));
+    const dateStr = toDateInputValue(new Date(year, month - 1, d));
     days.push({
       date: dateStr,
       day: d,
@@ -196,7 +204,7 @@ const calendarDays = computed<MonthDayCellData[]>(() => {
 
   // Current month days
   for (let d = 1; d <= lastDay.getDate(); d++) {
-    const dateStr = formatDate(new Date(year, month, d));
+    const dateStr = toDateInputValue(new Date(year, month, d));
     days.push({
       date: dateStr,
       day: d,
@@ -215,7 +223,7 @@ const calendarDays = computed<MonthDayCellData[]>(() => {
   const remaining = 7 - (days.length % 7);
   if (remaining < 7) {
     for (let d = 1; d <= remaining; d++) {
-      const dateStr = formatDate(new Date(year, month + 1, d));
+      const dateStr = toDateInputValue(new Date(year, month + 1, d));
       days.push({
         date: dateStr,
         day: d,
@@ -395,9 +403,7 @@ watch(
 function scrollMobileToToday(options: { force?: boolean; smooth?: boolean } = {}) {
   if (typeof window === 'undefined') return;
   if (window.matchMedia('(min-width: 768px)').matches) return; // md+ = desktop
-  if (today.getMonth() !== currentMonth.value || today.getFullYear() !== currentYear.value) {
-    return; // today isn't in the displayed month (period continuity)
-  }
+  if (!todayInView.value) return; // today isn't in the displayed month (period continuity)
   const root = swipeRef.value;
   // Resolve the scroll container by walking up from our own (attached) root —
   // `document.querySelector('main')` can be null during the route transition

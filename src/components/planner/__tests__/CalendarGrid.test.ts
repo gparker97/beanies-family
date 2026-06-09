@@ -29,6 +29,26 @@ vi.mock('@/stores/settingsStore', () => ({
   }),
 }));
 
+// Reactive "today" is mocked so the real composable's import-time singleton
+// capture (`const today = ref(localToday())`) can't make these date-pinned tests
+// flaky — `vi.setSystemTime` alone won't move that singleton. This canonical
+// factory re-reads `new Date()` on each `useToday()` call (i.e. at mount), so it
+// picks up the `vi.setSystemTime` set in `beforeEach`. (Pattern shared with
+// vacationStore.test.ts / TransactionsPage.test.ts.)
+vi.mock('@/composables/useToday', async () => {
+  const { ref, computed } = await import('vue');
+  const { toDateInputValue, getStartOfDay } = await import('@/utils/date');
+  return {
+    useToday: () => ({
+      today: ref(toDateInputValue(new Date())),
+      startOfToday: computed(() => getStartOfDay(new Date())),
+      isVisible: ref(true),
+      lastVisibleAt: ref(0),
+      lastHiddenAt: ref(0),
+    }),
+  };
+});
+
 const NOW = '2026-04-01T00:00:00.000Z';
 
 function flightSegment(overrides: Partial<VacationTravelSegment> = {}): VacationTravelSegment {
@@ -215,6 +235,23 @@ describe('CalendarGrid all-day lane', () => {
     const events = wrapper.emitted('view-activity');
     expect(events).toBeTruthy();
     expect(events![0]).toEqual(['a-click', '2026-04-14']);
+  });
+});
+
+describe('CalendarGrid today marker', () => {
+  it('draws the today border on exactly the current day and no other cell', () => {
+    // System time is pinned to 2026-04-15 in beforeEach; the mocked useToday
+    // re-reads new Date() at mount, so "today" resolves to 2026-04-15.
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
+
+    // The today marker is the `border-l-[3px]` class on the day-cell <button>
+    // (MonthDayCard.vue). Only the isToday branch emits it.
+    const marked = wrapper
+      .findAll('[data-date]')
+      .filter((el) => el.classes().includes('border-l-[3px]'));
+
+    expect(marked.length).toBe(1);
+    expect(marked[0]!.attributes('data-date')).toBe('2026-04-15');
   });
 });
 
