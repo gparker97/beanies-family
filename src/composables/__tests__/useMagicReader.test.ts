@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mutable mock state — hoisted so the vi.mock factories below can close over it.
 const h = vi.hoisted(() => ({
   canEdit: { value: true },
+  // Controllable flag state — defaults on (both readers shipped + committed-true).
+  flags: { aiPhotoExtract: true, aiTravelExtract: true } as Record<string, boolean>,
   closeQuickAdd: vi.fn(),
   closeSheetForNavigation: vi.fn(),
   hasMarker: { value: false },
@@ -13,6 +15,9 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/composables/usePermissions', () => ({
   usePermissions: () => ({ canEditActivities: h.canEdit }),
+}));
+vi.mock('@/config/flags', () => ({
+  isFlagEnabled: (flag: string) => h.flags[flag] === true,
 }));
 vi.mock('@/composables/useQuickAdd', () => ({
   closeQuickAdd: h.closeQuickAdd,
@@ -48,13 +53,15 @@ function resetPending(): void {
 beforeEach(() => {
   vi.clearAllMocks();
   h.canEdit.value = true;
+  h.flags.aiPhotoExtract = true;
+  h.flags.aiTravelExtract = true;
   h.currentPath.value = '/';
   h.hasMarker.value = false;
   resetPending();
 });
 
 describe('useMagicReader — gating', () => {
-  it('both readers are available when the member can edit activities (launched — no flag gating)', () => {
+  it('both readers available when the member can edit AND both flags are on', () => {
     h.canEdit.value = true;
     const r = useMagicReader();
     expect(r.canReadPhoto.value).toBe(true);
@@ -62,8 +69,36 @@ describe('useMagicReader — gating', () => {
     expect(r.canReadAny.value).toBe(true);
   });
 
-  it('both readers gated off when the member cannot edit activities', () => {
+  it('both readers gated off when the member cannot edit activities (regardless of flags)', () => {
     h.canEdit.value = false;
+    const r = useMagicReader();
+    expect(r.canReadPhoto.value).toBe(false);
+    expect(r.canReadDocument.value).toBe(false);
+    expect(r.canReadAny.value).toBe(false);
+  });
+
+  it('photo reader gated off by the aiPhotoExtract flag even with edit permission', () => {
+    h.canEdit.value = true;
+    h.flags.aiPhotoExtract = false;
+    const r = useMagicReader();
+    expect(r.canReadPhoto.value).toBe(false);
+    expect(r.canReadDocument.value).toBe(true); // travel flag still on
+    expect(r.canReadAny.value).toBe(true);
+  });
+
+  it('document reader gated off by the aiTravelExtract flag even with edit permission', () => {
+    h.canEdit.value = true;
+    h.flags.aiTravelExtract = false;
+    const r = useMagicReader();
+    expect(r.canReadDocument.value).toBe(false);
+    expect(r.canReadPhoto.value).toBe(true); // photo flag still on
+    expect(r.canReadAny.value).toBe(true);
+  });
+
+  it('canReadAny is false when both flags are off', () => {
+    h.canEdit.value = true;
+    h.flags.aiPhotoExtract = false;
+    h.flags.aiTravelExtract = false;
     const r = useMagicReader();
     expect(r.canReadPhoto.value).toBe(false);
     expect(r.canReadDocument.value).toBe(false);
