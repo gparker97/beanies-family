@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-09
+
+### Fixed
+
+- **The "today" highlight on the monthly calendar now always lands on the real today.** If you left the calendar open across midnight, the orange highlight could linger on yesterday (or appear on the wrong day). It now follows the actual current day automatically — including when you switch back to the app after a while.
+
 ## 2026-06-08
 
 ### Fixed
