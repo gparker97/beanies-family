@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
 import SettingsAdminOnlyNotice from '@/components/settings/SettingsAdminOnlyNotice.vue';
@@ -66,6 +66,14 @@ const { t } = useTranslation();
 const deploymentBadge = computed(() => getDeploymentBadge());
 const { canInstall, isInstalled, installApp } = usePWA();
 const { canManagePod, isOwner } = usePermissions();
+
+// Dev-only Feature Flags card (issue #31). Loaded via a DEV-gated dynamic import
+// so the card AND its write transport are dead-code-eliminated from the prod
+// bundle (same mechanism main.ts uses for the e2e dataBridge). In prod this is
+// `undefined`, so the template `v-if` renders nothing.
+const DevFlagsCard = import.meta.env.DEV
+  ? defineAsyncComponent(() => import('@/components/settings/DevFeatureFlagsCard.vue'))
+  : undefined;
 
 // On iOS / installed PWAs, "Move to Google Drive" would route through the
 // fragile popup OAuth path (the resume-via-redirect dance isn't wired for the
@@ -768,6 +776,11 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         />
       </div>
     </div>
+
+    <!-- ── Feature Flags (dev-only, owner/admin) ───────────────────────────
+         DevFlagsCard is undefined in prod (DEV-gated dynamic import above), so
+         this renders nothing and ships no flag-editing code to users. -->
+    <component :is="DevFlagsCard" v-if="DevFlagsCard && (isOwner || canManagePod)" />
 
     <!-- ── About Footer ────────────────────────────────────────────────── -->
     <div class="px-2 pb-4 text-center text-xs text-slate-400 dark:text-slate-500">
