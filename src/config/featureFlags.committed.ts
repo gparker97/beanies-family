@@ -6,6 +6,6 @@
 import type { DevFlag } from './flagRegistry';
 
 export const COMMITTED_FLAGS: Record<DevFlag, boolean> = {
-  aiPhotoExtract: false,
-  aiTravelExtract: false,
+  aiPhotoExtract: true,
+  aiTravelExtract: true,
 };

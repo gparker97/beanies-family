@@ -24,6 +24,7 @@ import { computed, onMounted, watch, type Ref } from 'vue';
 import { ref } from 'vue';
 import router from '@/router';
 import { usePermissions } from '@/composables/usePermissions';
+import { isFlagEnabled } from '@/config/flags';
 import {
   closeQuickAdd,
   closeSheetForNavigation,
@@ -130,16 +131,22 @@ export function useMagicReaderConsumer(
 
 /**
  * Gating computeds — the single source of truth for whether each reader is
- * available. The AI document readers launched 2026-06-07, so the only gate is
- * the activity-edit permission (the `aiPhotoExtract`/`aiTravelExtract` dev flags
- * that hid them pre-launch are no longer consulted). Consumed by both pages and
- * both magic components; pure, so unit-testable without mounting. Also re-exports
- * the dispatchers for convenience at call sites that already use the composable.
+ * available. Each reader is gated by BOTH the activity-edit permission AND its
+ * feature flag (issue #31 — the AI readers are the first flag-gated features):
+ * `aiPhotoExtract` gates the photo→activity reader, `aiTravelExtract` gates the
+ * document→trip reader. `isFlagEnabled` is dev-on for everything (so the readers
+ * stay visible while building locally) and reads the committed prod state in
+ * production — so a flag committed `false` + deploy is a real prod kill-switch.
+ * Flags are reload-to-apply (read once at call time), which is fine here: these
+ * computeds re-evaluate on the next load. Consumed by both pages and both magic
+ * components; pure, so unit-testable. Also re-exports the dispatchers.
  */
 export function useMagicReader() {
   const { canEditActivities } = usePermissions();
-  const canReadPhoto = computed(() => canEditActivities.value);
-  const canReadDocument = computed(() => canEditActivities.value);
+  const canReadPhoto = computed(() => canEditActivities.value && isFlagEnabled('aiPhotoExtract'));
+  const canReadDocument = computed(
+    () => canEditActivities.value && isFlagEnabled('aiTravelExtract')
+  );
   const canReadAny = computed(() => canReadPhoto.value || canReadDocument.value);
   return {
     canReadPhoto,
