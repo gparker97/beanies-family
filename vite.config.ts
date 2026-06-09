@@ -4,6 +4,12 @@ import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
+import { writeFile } from 'node:fs/promises';
+// Relative imports — the `@` alias defined below does not exist while this config
+// file is itself being loaded. Both modules are dependency-free (no Vue, no
+// `import.meta`) so importing them into the config graph is safe.
+import { applyFlagWrite } from './src/config/featureFlagWrite';
+import { COMMITTED_FLAGS } from './src/config/featureFlags.committed';
 
 /**
  * Fail an *official* production build that is missing an operational webhook.
@@ -38,10 +44,95 @@ function assertOfficialBuildEnv() {
   };
 }
 
+/**
+ * Dev-only writer for the committed feature-flag state (issue #31).
+ *
+ * `apply: 'serve'` + `configureServer` means this exists ONLY in the dev server
+ * — it is never part of a production build, so prod ships no write endpoint. The
+ * dev-only Feature Flags card POSTs `{ flag, enabled }` here; we validate via the
+ * pure `applyFlagWrite` core and rewrite src/config/featureFlags.committed.ts in
+ * full (deterministic template → always prettier-clean). The dev server is the
+ * only writer, so we keep the authoritative state in memory (seeded from the
+ * committed import) and merge each change onto it — no fragile .ts parsing.
+ */
+function featureFlagWriterDev() {
+  const filePath = fileURLToPath(
+    new URL('./src/config/featureFlags.committed.ts', import.meta.url)
+  );
+  let current: Record<string, boolean> = { ...COMMITTED_FLAGS };
+  return {
+    name: 'beanies:feature-flag-writer',
+    apply: 'serve' as const,
+    configureServer(server: { middlewares: { use: (path: string, fn: unknown) => void } }) {
+      server.middlewares.use(
+        '/__feature-flags',
+        (
+          req: { method?: string; on: (e: string, cb: (chunk?: unknown) => void) => void },
+          res: {
+            statusCode: number;
+            setHeader: (k: string, v: string) => void;
+            end: (body: string) => void;
+          }
+        ) => {
+          const json = (status: number, body: unknown) => {
+            res.statusCode = status;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(body));
+          };
+          if (req.method !== 'POST') {
+            json(405, { ok: false, error: 'Method not allowed (use POST).' });
+            return;
+          }
+          let raw = '';
+          req.on('data', (chunk) => {
+            raw += chunk;
+          });
+          req.on('end', () => {
+            void (async () => {
+              try {
+                let parsed: { flag?: unknown; enabled?: unknown };
+                try {
+                  parsed = JSON.parse(raw || '{}');
+                } catch {
+                  json(400, { ok: false, error: 'Invalid JSON body.' });
+                  return;
+                }
+                const result = applyFlagWrite(current, parsed.flag, parsed.enabled);
+                if (!result.ok) {
+                  json(400, result);
+                  return;
+                }
+                await writeFile(filePath, result.source, 'utf8');
+                current = result.nextState;
+                json(200, { ok: true });
+              } catch (err) {
+                console.error(
+                  `[feature-flag-writer] failed to write ${filePath} — check file ` +
+                    'permissions / disk space.',
+                  err
+                );
+                json(500, {
+                  ok: false,
+                  error: 'Failed to write the committed flags file (see dev server console).',
+                });
+              }
+            })();
+          });
+          req.on('error', (err) => {
+            console.error('[feature-flag-writer] request stream error', err);
+            json(400, { ok: false, error: 'Request error.' });
+          });
+        }
+      );
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     assertOfficialBuildEnv(),
+    featureFlagWriterDev(),
     wasm(),
     topLevelAwait(),
     vue(),
