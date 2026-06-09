@@ -171,7 +171,7 @@ Write-back — three phases:
   Pre-assembly (NOTION, only when step 5 resolved a TBC/incomplete intake column):
     • <each resolved intake property> (matching type) ← value resolved via research / user answers
          (write each backfilled column BEFORE assembling, so the row is complete + matches the prompt)
-  At handoff (immediate, AFTER explicit user approval to proceed):
+  At handoff (immediate — write these back, THEN ask the user for approval to proceed to planning):
     • beanies-plan prompt (rich_text) ← the assembled === BEANIES PRE-PLAN === block
          (Notion caps a rich_text segment at 2000 chars — split a longer block across
           multiple text objects in the same property so the patch doesn't 400.)
@@ -204,7 +204,7 @@ Device Type / View: carried verbatim into the Surfaces line (no remap)
 | ID                  | unique_id                                 | read-only — use to reference the issue to the user   |
 | Assignee / Raised By / Date | select / multi-select / date      | read-only metadata — ignored                         |
 
-**Access:** read via `API-query-data-source` on the recorded `data_source_id` (default filter Status = _query-for_); write-back via `API-patch-page` (pre-assembly: any resolved `TBC`/incomplete intake column; at handoff, after explicit user approval: beanies-plan prompt + Status = _advance-to_; deferred: plan file url, after the plan saves). Use `API-retrieve-a-page` only if a property value is truncated in a query result.
+**Access:** read via `API-query-data-source` on the recorded `data_source_id` (default filter Status = _query-for_); write-back via `API-patch-page` (pre-assembly: any resolved `TBC`/incomplete intake column; at handoff: beanies-plan prompt + Status = _advance-to_, then ask the user for approval to proceed; deferred: plan file url, after the plan saves). Use `API-retrieve-a-page` only if a property value is truncated in a query result.
 
 ---
 
@@ -219,6 +219,6 @@ Device Type / View: carried verbatim into the Surfaces line (no remap)
 - **Respect the `n/a` vs `TBC` distinction.** `n/a`/blank = deliberately not provided → leave as `—` (Optionals only). `TBC`/`TBD`/"to be confirmed" = MUST be resolved (research and/or ask), written back into the Notion column (pre-assembly write-back), and reflected in the prompt — never carried through as a placeholder and never treated as empty.
 - **Never auto-chain into `beanies-plan`.** After the prompt is written back to Notion, STOP and get the user's explicit approval before invoking `/beanies-plan`. No silent or automatic hand-off; if the user hasn't said yes, the skill ends after the write-back.
 - **Don't restate baked-in constraints.** DRY, no-silent-failures, MVO, rem-based text, i18n are already enforced by `beanies-plan` Pass 2/3 and `CLAUDE.md`. Only NON-default constraints belong in the Notes / Edge-cases fields.
-- **Write-back has three phases.** (1) Pre-assembly: any `TBC`/incomplete intake column resolved in step 5 is written back into its own Notion property before the prompt is assembled. (2) At hand-off (only after explicit user approval to proceed): the assembled prompt + `Status = In Progress`. (3) Deferred to step 7: `plan file url`, only after `beanies-plan` actually saves a plan file, never for an abandoned plan. Surface any patch failure with the exact values so the user can apply them manually.
+- **Write-back has three phases.** (1) Pre-assembly: any `TBC`/incomplete intake column resolved in step 5 is written back into its own Notion property before the prompt is assembled. (2) At hand-off: the assembled prompt + `Status = In Progress` are written back, THEN the user is asked for approval to proceed to planning. (3) Deferred to step 7: `plan file url`, only after `beanies-plan` actually saves a plan file, never for an abandoned plan. Surface any patch failure with the exact values so the user can apply them manually.
 - **Keep the issue DB separate from launch content.** This is product/issue tracking — distinct from "Post Tracker" and all launch/marketing material (Notion only, per `CLAUDE.md`).
 - **Cite real files, not symlinks.** Reference `start-session` (not the `good-morning` symlink) for the MCP-availability pattern.
