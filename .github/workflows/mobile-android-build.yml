@@ -70,6 +70,13 @@ jobs:
           # exactly which APK is running on-device — otherwise every debug build
           # reports "dev" and we can't tell a stale install from a fresh one.
           VITE_BUILD_SHA: ${{ github.sha }}
+          # Managed AI document-reader endpoint (Magic beans). Without these the
+          # managed tier degrades to `not_available` ("reading photos isn't set
+          # up yet"), so on-device testing of the AI readers fails on the debug
+          # APK even though the camera opens. Same values the prod web bundle +
+          # the release lanes already ship.
+          VITE_AI_EXTRACT_URL: ${{ vars.AI_EXTRACT_URL }}
+          VITE_AI_EXTRACT_API_KEY: ${{ secrets.AI_EXTRACT_API_KEY }}
 
       - name: Sync Capacitor (Android)
         run: npx cap sync android
