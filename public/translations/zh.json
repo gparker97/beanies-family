@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-10",
-    "translationCount": 3145
+    "translationCount": 3146
   },
   "translations": {
     "app.name": {
@@ -15729,6 +15729,11 @@
     "calendarSync.toast.destinationFailed.message": {
       "translation": "某些活动无法从旧日历中删除，因此更改已撤消。请重试。",
       "hash": "z6g8b6",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.primaryCalendar": {
+      "translation": "主日历",
+      "hash": "8x90lg",
       "lastUpdated": "2026-06-10"
     }
   }
