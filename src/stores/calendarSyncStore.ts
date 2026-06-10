@@ -363,13 +363,16 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       await runPooled(tasks, MAX_INFLIGHT);
       await settleConnectionStatus(connection, errors, changed);
 
-      // Diagnostic (prod-off feature) — surfaces what each connection actually did,
-      // so a per-account discrepancy is visible in the console rather than guessed at.
-      const kinds = errors.length ? [...new Set(errors.map((e) => e.kind))].join(',') : 'none';
-      console.warn(
-        `[calendarSync] reconciled ${connection.accountEmail} (cal=${calendarId}): ` +
-          `${plan.upserts.length} activities, ${plan.deletes.length} deletes, ${errors.length} errors [${kinds}]`
-      );
+      // Dev-only diagnostic — surfaces what each connection actually did so a
+      // per-account discrepancy is visible while developing. Keyed by connection id
+      // (never the account email) and silent in production. (F10)
+      if (import.meta.env.DEV) {
+        const kinds = errors.length ? [...new Set(errors.map((e) => e.kind))].join(',') : 'none';
+        console.debug(
+          `[calendarSync] reconciled ${connection.id} (cal=${calendarId}): ` +
+            `${plan.upserts.length} activities, ${plan.deletes.length} deletes, ${errors.length} errors [${kinds}]`
+        );
+      }
     });
   }
 
@@ -591,12 +594,10 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     const connection = await getCalendarConnectionById(connectionId);
     if (!connection) return [];
     // Fallback option mirrors the stored id so the picker always shows it selected.
+    // Empty summary → the Vue layer renders the localized "Primary calendar" label
+    // (i18n stays in the view, not the store). (F9)
     const fallback: CalendarSummary[] = [
-      {
-        id: connection.destinationCalendarId || 'primary',
-        summary: 'Primary calendar',
-        primary: true,
-      },
+      { id: connection.destinationCalendarId || 'primary', summary: '', primary: true },
     ];
     const hasScope = connection.grantedScopes.some((s) => s.includes('calendar.calendarlist'));
     if (!hasScope) return fallback;
