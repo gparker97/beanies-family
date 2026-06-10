@@ -36,7 +36,10 @@ watch(
       const cals = await store.listCalendarsFor(c.id);
       calendarOptions.value = {
         ...calendarOptions.value,
-        [c.id]: cals.map((cal) => ({ value: cal.id, label: cal.summary })),
+        [c.id]: cals.map((cal) => ({
+          value: cal.id,
+          label: cal.summary || t('calendarSync.primaryCalendar'),
+        })),
       };
     }
   },

@@ -6723,6 +6723,7 @@ const STRING_DEFS = {
       'connect a google calendar and your family beans are pushed to it automatically. beanies stays your source of truth. edits always happen here.',
   },
   'calendarSync.destinationLabel': { en: 'Calendar', beanie: 'calendar' },
+  'calendarSync.primaryCalendar': { en: 'Primary calendar', beanie: 'primary calendar' },
   'calendarSync.connectOnDesktop': {
     en: 'Open beanies in a desktop browser to connect a calendar. Once connected, it syncs on all your devices.',
     beanie:
