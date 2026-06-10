@@ -6773,6 +6773,15 @@ const STRING_DEFS = {
     beanie: 'beanies stopped syncing to this calendar.',
   },
   'calendarSync.toast.connectFailed.title': { en: "Couldn't connect", beanie: "couldn't connect" },
+  'calendarSync.toast.destinationFailed.title': {
+    en: "Couldn't switch calendar",
+    beanie: "couldn't switch calendar",
+  },
+  'calendarSync.toast.destinationFailed.message': {
+    en: 'Some events could not be removed from the old calendar, so the change was undone. Please try again.',
+    beanie:
+      'some beans could not be removed from the old calendar, so the change was undone. please try again.',
+  },
   'calendarSync.error.auth': {
     en: 'Reconnect needed. Please sign in again.',
     beanie: 'reconnect needed. please sign in again.',

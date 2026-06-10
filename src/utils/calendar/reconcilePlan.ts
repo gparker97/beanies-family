@@ -82,38 +82,28 @@ export function isPushable(activity: FamilyActivity, todayYmd: string): boolean 
 
 /**
  * Build the reconcile plan. Pure. `links` is this connection's existing links.
- * `targetActivityIds`, when provided, restricts the plan to a dirty subset (drain
- * pass); omit for a full scan. Deletes always cover the full link set so a
- * dropped/expired activity is cleaned up even on a dirty drain that includes it.
+ * `memberName` (optional) resolves member ids → names so the push hash reflects
+ * resolved names (a member rename re-pushes the affected activities — #32 F3).
  */
 export function planReconcile(
   activities: FamilyActivity[],
   links: CalendarEventLink[],
   todayYmd: string,
-  targetActivityIds?: ReadonlySet<string>
+  memberName?: (id: string) => string | undefined
 ): ReconcilePlan {
   const linkByActivity = new Map(links.map((l) => [l.activityId, l]));
   const pushable = activities.filter((a) => isPushable(a, todayYmd));
   const pushableIds = new Set(pushable.map((a) => a.id));
 
-  const consider = targetActivityIds
-    ? pushable.filter((a) => targetActivityIds.has(a.id))
-    : pushable;
-
-  const upserts: ReconcileUpsert[] = consider.map((activity) => ({
+  const upserts: ReconcileUpsert[] = pushable.map((activity) => ({
     activity,
     eventId: deterministicEventId(activity.id),
-    hash: computePushHash(activity),
+    hash: computePushHash(activity, memberName),
     existingHash: linkByActivity.get(activity.id)?.lastPushedHash,
   }));
 
   // A link whose activity is gone / inactive / out-of-window must be deleted.
-  // On a dirty drain, only consider links for the targeted activities (so we
-  // don't sweep the whole calendar); on a full scan, consider every link.
-  const deleteCandidates = targetActivityIds
-    ? links.filter((l) => targetActivityIds.has(l.activityId))
-    : links;
-  const deletes = deleteCandidates.filter((l) => !pushableIds.has(l.activityId));
+  const deletes = links.filter((l) => !pushableIds.has(l.activityId));
 
   return { upserts, deletes };
 }

@@ -22,6 +22,8 @@ const store = useCalendarSyncStore();
 
 const connecting = ref(false);
 const busyId = ref<string | null>(null);
+/** Bumped to remount the destination selects (revert to the store value on a failed switch). */
+const pickerRevertKey = ref(0);
 /** connectionId → destination calendar options for the picker. */
 const calendarOptions = ref<Record<string, Array<{ value: string; label: string }>>>({});
 
@@ -134,7 +136,16 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
   if (String(value) === connection.destinationCalendarId) return;
   busyId.value = connection.id;
   try {
-    await store.setDestinationCalendar(connection.id, String(value));
+    const { ok } = await store.setDestinationCalendar(connection.id, String(value));
+    if (!ok) {
+      // Switch aborted (old-calendar cleanup failed) — destination unchanged.
+      showToast(
+        'error',
+        t('calendarSync.toast.destinationFailed.title'),
+        t('calendarSync.toast.destinationFailed.message')
+      );
+      pickerRevertKey.value++; // remount the select so it re-reads the unchanged store value
+    }
   } finally {
     busyId.value = null;
   }
@@ -175,6 +186,7 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
 
           <BaseSelect
             v-if="calendarOptions[connection.id]?.length"
+            :key="`cal-${connection.id}-${pickerRevertKey}`"
             :model-value="connection.destinationCalendarId"
             :options="calendarOptions[connection.id]"
             :label="t('calendarSync.destinationLabel')"
