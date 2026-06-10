@@ -6711,6 +6711,96 @@ const STRING_DEFS = {
     en: 'How AI handles your documents',
     beanie: 'how ai handles your beans',
   },
+  // #32 Google Calendar integration
+  'settings.card.calendarSync': { en: 'Google Calendar', beanie: 'google calendar' },
+  'settings.card.calendarSyncDesc': {
+    en: 'Push your activities to your calendars',
+    beanie: 'push your beans to your calendars',
+  },
+  'calendarSync.intro': {
+    en: 'Connect a Google calendar and your family activities are pushed to it automatically. beanies stays your source of truth. Edits always happen here.',
+    beanie:
+      'connect a google calendar and your family beans are pushed to it automatically. beanies stays your source of truth. edits always happen here.',
+  },
+  'calendarSync.destinationLabel': { en: 'Calendar', beanie: 'calendar' },
+  'calendarSync.connectOnDesktop': {
+    en: 'Open beanies in a desktop browser to connect a calendar. Once connected, it syncs on all your devices.',
+    beanie:
+      'open beanies in a desktop browser to connect a calendar. once connected, it syncs on all your devices.',
+  },
+  'calendarSync.status.ok': { en: 'Synced', beanie: 'synced' },
+  'calendarSync.status.needsReconnect': { en: 'Reconnect needed', beanie: 'reconnect needed' },
+  'calendarSync.status.error': { en: 'Sync error', beanie: 'sync error' },
+  'calendarSync.status.disconnecting': { en: 'Removing…', beanie: 'removing…' },
+  'calendarSync.action.connect': {
+    en: 'Connect a Google calendar',
+    beanie: 'connect a google calendar',
+  },
+  'calendarSync.action.reconnect': { en: 'Reconnect', beanie: 'reconnect' },
+  'calendarSync.action.syncNow': { en: 'Sync now', beanie: 'sync now' },
+  'calendarSync.action.disconnect': { en: 'Disconnect', beanie: 'disconnect' },
+  'calendarSync.disconnect.title': {
+    en: 'Disconnect this calendar?',
+    beanie: 'disconnect this calendar?',
+  },
+  'calendarSync.disconnect.message': {
+    en: 'beanies will remove the events it added to this calendar. Your activities stay safe in beanies.',
+    beanie:
+      'beanies will remove the beans it added to this calendar. your activities stay safe in beanies.',
+  },
+  'calendarSync.disconnect.confirm': { en: 'Disconnect', beanie: 'disconnect' },
+  'calendarSync.toast.connected.title': { en: 'Calendar connected', beanie: 'calendar connected' },
+  'calendarSync.toast.connected.message': {
+    en: 'Your activities will sync to this calendar.',
+    beanie: 'your beans will sync to this calendar.',
+  },
+  'calendarSync.toast.reconnected.title': { en: 'Reconnected', beanie: 'reconnected' },
+  'calendarSync.toast.reconnected.message': {
+    en: 'Syncing resumed for this calendar.',
+    beanie: 'syncing resumed for this calendar.',
+  },
+  'calendarSync.toast.synced.title': { en: 'Synced', beanie: 'synced' },
+  'calendarSync.toast.synced.message': {
+    en: 'Your activities are up to date.',
+    beanie: 'your beans are up to date.',
+  },
+  'calendarSync.toast.disconnected.title': {
+    en: 'Calendar disconnected',
+    beanie: 'calendar disconnected',
+  },
+  'calendarSync.toast.disconnected.message': {
+    en: 'beanies stopped syncing to this calendar.',
+    beanie: 'beanies stopped syncing to this calendar.',
+  },
+  'calendarSync.toast.connectFailed.title': { en: "Couldn't connect", beanie: "couldn't connect" },
+  'calendarSync.error.auth': {
+    en: 'Reconnect needed. Please sign in again.',
+    beanie: 'reconnect needed. please sign in again.',
+  },
+  'calendarSync.error.forbidden': {
+    en: "beanies doesn't have permission for this calendar.",
+    beanie: "beanies doesn't have permission for this calendar.",
+  },
+  'calendarSync.error.notFound': {
+    en: 'The event was missing and will be recreated.',
+    beanie: 'the bean was missing and will be recreated.',
+  },
+  'calendarSync.error.conflict': {
+    en: 'The event already exists.',
+    beanie: 'the bean already exists.',
+  },
+  'calendarSync.error.rateLimited': {
+    en: 'Google is busy. beanies will retry shortly.',
+    beanie: 'google is busy. beanies will retry shortly.',
+  },
+  'calendarSync.error.transient': {
+    en: 'A temporary problem. beanies will retry.',
+    beanie: 'a temporary problem. beanies will retry.',
+  },
+  'calendarSync.error.unknown': {
+    en: 'Something went wrong syncing this calendar.',
+    beanie: 'something went wrong syncing this calendar.',
+  },
   'settings.ai.tierLabel': {
     en: 'How documents are processed',
     beanie: 'how documents are processed',

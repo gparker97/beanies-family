@@ -1,5 +1,69 @@
 import type { HelpArticle } from './types';
 
+// #32 Google Calendar integration — HELD until launch. Flip CALENDAR_SYNC_HELP_LIVE
+// to true (together with the `googleCalendarSync` feature flag) to publish this on
+// the Help Center. Kept type-checked (not commented out) so it can't rot.
+const CALENDAR_SYNC_HELP_LIVE = false;
+const CALENDAR_SYNC_ARTICLE: HelpArticle = {
+  slug: 'google-calendar-sync',
+  category: 'security',
+  title: 'How beanies Syncs Your Activities to Google Calendar',
+  excerpt:
+    'Connect a Google calendar and your family activities appear there automatically — one-way, with beanies as the source of truth.',
+  icon: '\u{1F4C5}',
+  readTime: 4,
+  updatedDate: '2026-06-10',
+  sections: [
+    { type: 'heading', content: 'How it works', level: 2, id: 'how-it-works' },
+    {
+      type: 'paragraph',
+      content:
+        'Connect a Google calendar in <strong>Settings → Google Calendar</strong> and beanies pushes your family activities straight into the calendar you already use. It is <strong>one-way</strong>: beanies stays the single source of truth and your activities flow out to your calendars, never the other way around. Make every change in beanies; the calendar simply mirrors it.',
+    },
+    { type: 'heading', content: 'It covers the whole family', level: 2, id: 'family-wide' },
+    {
+      type: 'paragraph',
+      content:
+        'A connected calendar is shared across your family. <strong>Every</strong> family activity is pushed to it, no matter who added it, so a connected calendar always shows the full family schedule, not just your own events.',
+    },
+    { type: 'heading', content: 'What gets sent', level: 2, id: 'what-gets-sent' },
+    {
+      type: 'paragraph',
+      content:
+        'beanies sends the activity’s title, date and time, and packs the extra details it tracks (who is going, drop-off and pick-up, instructor, cost, and notes) into the event’s description, formatted to read cleanly. Every event beanies creates is marked <strong>“Synced from beanies.family”</strong> and links back to the activity in the app.',
+    },
+    { type: 'heading', content: 'Editing and removing', level: 2, id: 'editing' },
+    {
+      type: 'list',
+      content: '',
+      items: [
+        'Edit an activity in beanies and the change syncs to your calendar.',
+        'If you edit a synced event directly in Google, beanies restores its own version on the next sync, so always edit in beanies.',
+        'Disconnect a calendar any time in Settings; beanies removes the events it added and stops syncing. Your activities stay safe in beanies.',
+      ],
+    },
+    { type: 'heading', content: 'When it syncs', level: 2, id: 'when' },
+    {
+      type: 'paragraph',
+      content:
+        'Syncing happens while beanies is open on any of your devices. Add an activity on your phone and it appears in your calendar shortly after; if the app was closed, it catches up the next time you open it.',
+    },
+    { type: 'heading', content: 'Your privacy', level: 2, id: 'privacy' },
+    {
+      type: 'paragraph',
+      content:
+        'beanies only ever creates and updates <strong>its own</strong> events; it never reads or changes anything else in your calendar. Events go from your device straight to your own Google account and never pass through a beanies server.',
+    },
+    {
+      type: 'infoBox',
+      content:
+        'Connecting a calendar lets beanies keep it in sync from any of your family’s devices, and the connection is shared with your family the same way your other family data is. Connect only the calendars you’re happy for your family to sync to.',
+      title: 'Shared with your family',
+      icon: '\u{1F465}',
+    },
+  ],
+};
+
 export const SECURITY_ARTICLES: HelpArticle[] = [
   {
     slug: 'how-your-data-is-encrypted',
@@ -446,4 +510,5 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  ...(CALENDAR_SYNC_HELP_LIVE ? [CALENDAR_SYNC_ARTICLE] : []),
 ];

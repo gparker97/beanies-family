@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-08",
-    "translationCount": 3111
+    "lastUpdated": "2026-06-10",
+    "translationCount": 3143
   },
   "translations": {
     "app.name": {
@@ -15560,6 +15560,166 @@
       "translation": "打开摄像头或文件选取器时出错。请重试。",
       "hash": "9sef55",
       "lastUpdated": "2026-06-08"
+    },
+    "settings.card.calendarSync": {
+      "translation": "Google日历",
+      "hash": "4v7ozp",
+      "lastUpdated": "2026-06-10"
+    },
+    "settings.card.calendarSyncDesc": {
+      "translation": "将活动推送至日历",
+      "hash": "3maqgv",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.intro": {
+      "translation": "关联Google日历，您的家庭活动将自动推送到该日历。Beanies始终是您的真实来源。编辑总是在这里进行。",
+      "hash": "usilru",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.destinationLabel": {
+      "translation": "历法",
+      "hash": "1vokgy",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.connectOnDesktop": {
+      "translation": "在桌面浏览器中打开beanies以连接日历。连接后，它会在您的所有设备上同步。",
+      "hash": "p8sio6",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.status.ok": {
+      "translation": "同步",
+      "hash": "tttyzq",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.status.needsReconnect": {
+      "translation": "需要重新连接",
+      "hash": "6lzfpe",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.status.error": {
+      "translation": "同步错误",
+      "hash": "rnnvrx",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.status.disconnecting": {
+      "translation": "正在删除",
+      "hash": "gofaqj",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.action.connect": {
+      "translation": "关联Google日历",
+      "hash": "ndkju8",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.action.reconnect": {
+      "translation": "重新连接",
+      "hash": "lihjux",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.action.syncNow": {
+      "translation": "立即同步",
+      "hash": "v37ai9",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.action.disconnect": {
+      "translation": "断开连接",
+      "hash": "tagr44",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.disconnect.title": {
+      "translation": "断开与此日历的连接？",
+      "hash": "6alzrx",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.disconnect.message": {
+      "translation": "beanies将删除它添加到此日历中的活动。戴着帽子，活动安全无虞。",
+      "hash": "2p8myp",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.disconnect.confirm": {
+      "translation": "断开连接",
+      "hash": "tagr44",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.toast.connected.title": {
+      "translation": "日历已连接",
+      "hash": "x01ozr",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.toast.connected.message": {
+      "translation": "您的活动将同步到此日历。",
+      "hash": "nowsxi",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.toast.reconnected.title": {
+      "translation": "重新接上",
+      "hash": "4ir2zu",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.toast.reconnected.message": {
+      "translation": "此日历的同步已恢复。",
+      "hash": "1jputj",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.toast.synced.title": {
+      "translation": "同步",
+      "hash": "tttyzq",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.toast.synced.message": {
+      "translation": "您的活动是最新的。",
+      "hash": "ao1u0e",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.toast.disconnected.title": {
+      "translation": "日历已断开连接",
+      "hash": "jm7r99",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.toast.disconnected.message": {
+      "translation": "beanies已停止同步到此日历。",
+      "hash": "f1ijf6",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.toast.connectFailed.title": {
+      "translation": "无法连接",
+      "hash": "uzdsis",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.error.auth": {
+      "translation": "需要重新连接。请重新登录。",
+      "hash": "n0c0vg",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.error.forbidden": {
+      "translation": "beanies对此日历没有权限。",
+      "hash": "1uyrv9",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.error.notFound": {
+      "translation": "事件缺失，将重新创建。",
+      "hash": "ho1rdj",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.error.conflict": {
+      "translation": "事件源已存在。",
+      "hash": "7vkx2t",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.error.rateLimited": {
+      "translation": "Google正忙。Beanies将很快重试。",
+      "hash": "bbqjuw",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.error.transient": {
+      "translation": "暂时出现问题。Beanies将重试。",
+      "hash": "5pmcq0",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.error.unknown": {
+      "translation": "同步此日历时出错。",
+      "hash": "74hdwg",
+      "lastUpdated": "2026-06-10"
     }
   }
 }

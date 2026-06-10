@@ -11,6 +11,8 @@ import BetaBadge from '@/components/ui/BetaBadge.vue';
 import { openDiscord } from '@/utils/discord';
 import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
 import AiSettings from '@/components/settings/AiSettings.vue';
+import CalendarSyncSettings from '@/components/settings/CalendarSyncSettings.vue';
+import { isFlagEnabled } from '@/config/flags';
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
 import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
 import BaseModal from '@/components/ui/BaseModal.vue';
@@ -99,6 +101,9 @@ const showFamilyData = ref(false);
 const showDataManagement = ref(false);
 const showTransferOwnership = ref(false);
 const showAi = ref(false);
+const showCalendarSync = ref(false);
+// #32: Google Calendar sync — flag-gated (googleCalendarSync), prod-off until launch.
+const calendarSyncEnabled = isFlagEnabled('googleCalendarSync');
 
 // #133: the AI surface launched (soft release, 2026-06-07) — was flag-gated, now always on
 // (labelled Beta). Kept as a named constant so the card/deep-link guards read clearly.
@@ -684,6 +689,14 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         <template #badge><BetaBadge /></template>
       </SettingsCard>
       <SettingsCard
+        v-if="calendarSyncEnabled"
+        icon="📅"
+        :title="t('settings.card.calendarSync')"
+        :description="t('settings.card.calendarSyncDesc')"
+        icon-bg="var(--tint-silk-20)"
+        @click="showCalendarSync = true"
+      />
+      <SettingsCard
         icon="💬"
         :title="t('settings.card.community')"
         :description="t('settings.card.communityDesc')"
@@ -810,6 +823,11 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
 
     <!-- ── beanies AI Modal (#133, flag-gated) ─────────────────────────── -->
     <AiSettings v-if="aiSurfaceEnabled" :open="showAi" @close="showAi = false" />
+    <CalendarSyncSettings
+      v-if="calendarSyncEnabled"
+      :open="showCalendarSync"
+      @close="showCalendarSync = false"
+    />
 
     <!-- ── Exchange Rates Warning Modal ─────────────────────────────────── -->
     <BaseModal :open="showRatesWarning" size="sm" layer="overlay" @close="showRatesWarning = false">

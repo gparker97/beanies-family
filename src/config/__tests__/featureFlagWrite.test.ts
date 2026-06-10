@@ -31,7 +31,11 @@ describe('config/featureFlagWrite', () => {
     const result = applyFlagWrite(allFalse(), 'aiPhotoExtract', true);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.nextState).toEqual({ aiPhotoExtract: true, aiTravelExtract: false });
+    expect(result.nextState).toEqual({
+      aiPhotoExtract: true,
+      aiTravelExtract: false,
+      googleCalendarSync: false,
+    });
     expect(result.source).toContain('aiPhotoExtract: true,');
   });
 
@@ -57,7 +61,11 @@ describe('config/featureFlagWrite', () => {
     const result = applyFlagWrite(stale, 'aiTravelExtract', true);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.nextState).toEqual({ aiPhotoExtract: false, aiTravelExtract: true });
+    expect(result.nextState).toEqual({
+      aiPhotoExtract: false,
+      aiTravelExtract: true,
+      googleCalendarSync: false,
+    });
     expect(Object.keys(result.nextState)).not.toContain('bogusOld');
     expect(result.source).not.toContain('bogusOld');
   });
