@@ -20,6 +20,8 @@ import type {
   Recipe,
   CookLogEntry,
   EmergencyContact,
+  CalendarConnection,
+  CalendarEventLink,
   Settings,
 } from './models';
 
@@ -58,6 +60,9 @@ export interface FamilyDocument {
    * cleanly in Automerge, so reading on one device clears the badge on another.
    */
   notificationReads: Record<string, Record<string, string>>;
+  // Google Calendar integration (#32) — family-wide connections + activity↔event links
+  calendarConnections: Record<string, CalendarConnection>;
+  calendarEventLinks: Record<string, CalendarEventLink>;
   settings: Settings | null;
 }
 

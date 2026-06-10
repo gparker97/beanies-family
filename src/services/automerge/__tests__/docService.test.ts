@@ -222,6 +222,8 @@ describe('docService', () => {
         cookLogs: {},
         emergencyContacts: {},
         notificationReads: {},
+        calendarConnections: {},
+        calendarEventLinks: {},
         settings: null,
       };
       const newDoc = Automerge.from(

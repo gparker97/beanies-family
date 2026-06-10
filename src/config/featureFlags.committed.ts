@@ -8,4 +8,5 @@ import type { DevFlag } from './flagRegistry';
 export const COMMITTED_FLAGS: Record<DevFlag, boolean> = {
   aiPhotoExtract: true,
   aiTravelExtract: true,
+  googleCalendarSync: false,
 };
