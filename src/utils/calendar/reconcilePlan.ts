@@ -6,6 +6,7 @@
 // the plan against the CalendarClient.
 
 import type { CalendarEventLink, FamilyActivity } from '@/types/models';
+import { addDaysYmd } from '@/utils/date';
 import { deterministicEventId } from './deterministicEventId';
 import { computePushHash } from './activityToGoogleEvent';
 
@@ -27,15 +28,6 @@ export interface ReconcilePlan {
   upserts: ReconcileUpsert[];
   /** Links whose activity is no longer pushable → remote event + link must be removed. */
   deletes: CalendarEventLink[];
-}
-
-/** `YYYY-MM-DD` + n days → `YYYY-MM-DD` (TZ-safe local arithmetic). */
-function addDaysYmd(ymd: string, days: number): string {
-  const [y, m, d] = ymd.slice(0, 10).split('-').map(Number);
-  const dt = new Date(y, m - 1, d + days);
-  const mm = String(dt.getMonth() + 1).padStart(2, '0');
-  const dd = String(dt.getDate()).padStart(2, '0');
-  return `${dt.getFullYear()}-${mm}-${dd}`;
 }
 
 /**
