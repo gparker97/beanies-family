@@ -174,6 +174,14 @@ export function addDays(date: Date, days: number): Date {
   return result;
 }
 
+/**
+ * `YYYY-MM-DD` (+/- n days) → `YYYY-MM-DD`, in the local timezone.
+ * Accepts a full ISO timestamp too (only the date part is used).
+ */
+export function addDaysYmd(ymd: string, days: number): string {
+  return toDateInputValue(addDays(parseLocalDate(ymd.slice(0, 10)), days));
+}
+
 export function addMonths(date: Date, months: number): Date {
   const result = new Date(date);
   result.setMonth(result.getMonth() + months);

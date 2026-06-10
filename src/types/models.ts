@@ -631,8 +631,6 @@ export interface CalendarConnection {
   lastReconciledBy?: string;
   /** Last classified error (for the Settings status line). */
   lastError?: string;
-  /** Transient-failure counter for parking (distinct from the device-local auth K-counter). */
-  consecutiveFailures?: number;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

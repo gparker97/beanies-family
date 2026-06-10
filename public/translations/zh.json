@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-10",
-    "translationCount": 3146
+    "translationCount": 3139
   },
   "translations": {
     "app.name": {
@@ -15684,41 +15684,6 @@
     "calendarSync.toast.connectFailed.title": {
       "translation": "无法连接",
       "hash": "uzdsis",
-      "lastUpdated": "2026-06-10"
-    },
-    "calendarSync.error.auth": {
-      "translation": "需要重新连接。请重新登录。",
-      "hash": "n0c0vg",
-      "lastUpdated": "2026-06-10"
-    },
-    "calendarSync.error.forbidden": {
-      "translation": "beanies对此日历没有权限。",
-      "hash": "1uyrv9",
-      "lastUpdated": "2026-06-10"
-    },
-    "calendarSync.error.notFound": {
-      "translation": "事件缺失，将重新创建。",
-      "hash": "ho1rdj",
-      "lastUpdated": "2026-06-10"
-    },
-    "calendarSync.error.conflict": {
-      "translation": "事件源已存在。",
-      "hash": "7vkx2t",
-      "lastUpdated": "2026-06-10"
-    },
-    "calendarSync.error.rateLimited": {
-      "translation": "Google正忙。Beanies将很快重试。",
-      "hash": "bbqjuw",
-      "lastUpdated": "2026-06-10"
-    },
-    "calendarSync.error.transient": {
-      "translation": "暂时出现问题。Beanies将重试。",
-      "hash": "5pmcq0",
-      "lastUpdated": "2026-06-10"
-    },
-    "calendarSync.error.unknown": {
-      "translation": "同步此日历时出错。",
-      "hash": "74hdwg",
       "lastUpdated": "2026-06-10"
     },
     "calendarSync.toast.destinationFailed.title": {

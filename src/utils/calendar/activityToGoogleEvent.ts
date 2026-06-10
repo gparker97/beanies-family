@@ -5,6 +5,7 @@
 
 import type { FamilyActivity } from '@/types/models';
 import { normalizeAssignees } from '@/utils/assignees';
+import { addDaysYmd } from '@/utils/date';
 import { buildRecurrenceRule } from './recurrenceRrule';
 import { buildEventDescription, type EventDescriptionContext } from './eventDescription';
 
@@ -36,15 +37,6 @@ export interface ActivityMapContext extends EventDescriptionContext {
 /** True when the activity has no specific time → an all-day Google event. */
 function isAllDayActivity(activity: FamilyActivity): boolean {
   return activity.isAllDay === true || !activity.startTime;
-}
-
-/** `YYYY-MM-DD` + n days → `YYYY-MM-DD` (TZ-safe via local Date arithmetic). */
-function addDaysYmd(ymd: string, days: number): string {
-  const [y, m, d] = ymd.slice(0, 10).split('-').map(Number);
-  const dt = new Date(y, m - 1, d + days);
-  const mm = String(dt.getMonth() + 1).padStart(2, '0');
-  const dd = String(dt.getDate()).padStart(2, '0');
-  return `${dt.getFullYear()}-${mm}-${dd}`;
 }
 
 function buildStartEnd(

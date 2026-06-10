@@ -12,7 +12,7 @@
 // tracked as follow-up.
 
 import type { ActivityRecurrence } from '@/types/models';
-import { getWeekdayOrdinalInMonth } from '@/utils/date';
+import { getWeekdayOrdinalInMonth, parseLocalDate } from '@/utils/date';
 
 /** RRULE day codes indexed by JS weekday (0=Sun..6=Sat) — matches `daysOfWeek`. */
 const RRULE_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
@@ -29,13 +29,14 @@ export interface RecurrenceInput {
   isAllDay?: boolean;
 }
 
-/** Parse the `YYYY-MM-DD` prefix into a LOCAL Date (no TZ shift). */
+/** Parse the `YYYY-MM-DD` prefix into a LOCAL Date (no TZ shift), failing loud on a
+ *  bad date so a malformed activity never silently produces a wrong RRULE anchor. */
 function parseYmd(value: string): Date {
-  const [y, m, d] = value.slice(0, 10).split('-').map(Number);
-  if (!y || !m || !d) {
+  const date = parseLocalDate(value.slice(0, 10));
+  if (Number.isNaN(date.getTime())) {
     throw new Error(`recurrenceRrule: invalid date "${value}" (expected YYYY-MM-DD)`);
   }
-  return new Date(y, m - 1, d);
+  return date;
 }
 
 /**
