@@ -49,8 +49,8 @@ describe('deterministicEventId', () => {
 });
 
 describe('buildRecurrenceRule', () => {
-  it('returns null for non-recurring', () => {
-    expect(buildRecurrenceRule({ recurrence: 'none', date: '2026-06-10' })).toBeNull();
+  it('returns [] for non-recurring (so a patch can clear a stale RRULE)', () => {
+    expect(buildRecurrenceRule({ recurrence: 'none', date: '2026-06-10' })).toEqual([]);
   });
 
   it('maps each kind to the correct RRULE', () => {
@@ -174,6 +174,25 @@ describe('activityToGoogleEvent', () => {
     });
     expect(ev.location).toBe('East Field');
   });
+
+  it('always sets recurrence to [] for a non-recurring activity (clears a stale RRULE on patch)', () => {
+    const ev = activityToGoogleEvent(makeActivity({ recurrence: 'none' }), ctx);
+    expect(ev.recurrence).toEqual([]);
+  });
+
+  it('rolls an overnight timed event end to the next day', () => {
+    const ev = activityToGoogleEvent(makeActivity({ startTime: '22:00', endTime: '02:00' }), ctx);
+    expect(ev.start).toEqual({ dateTime: '2026-06-10T22:00:00', timeZone: 'Asia/Singapore' });
+    expect(ev.end).toEqual({ dateTime: '2026-06-11T02:00:00', timeZone: 'Asia/Singapore' });
+  });
+
+  it('uses endDate for a multi-day timed event', () => {
+    const ev = activityToGoogleEvent(
+      makeActivity({ startTime: '09:00', endTime: '17:00', endDate: '2026-06-12' }),
+      ctx
+    );
+    expect(ev.end).toEqual({ dateTime: '2026-06-12T17:00:00', timeZone: 'Asia/Singapore' });
+  });
 });
 
 describe('computePushHash', () => {
@@ -182,6 +201,17 @@ describe('computePushHash', () => {
     expect(computePushHash(a)).toBe(computePushHash(makeActivity()));
     expect(computePushHash(a)).not.toBe(computePushHash(makeActivity({ title: 'Changed' })));
     expect(computePushHash(a)).not.toBe(computePushHash(makeActivity({ startTime: '09:00' })));
+  });
+
+  it('includes resolved member names — a rename changes the hash for a referencing activity only (F3)', () => {
+    const a = makeActivity({ assigneeIds: ['m1'] });
+    const before = (id: string) => ({ m1: 'Mia' })[id];
+    const after = (id: string) => ({ m1: 'Amelia' })[id];
+    // Renaming m1 changes the hash of an activity that references m1...
+    expect(computePushHash(a, before)).not.toBe(computePushHash(a, after));
+    // ...but not an activity that references no members.
+    const noPeople = makeActivity({ assigneeIds: [] });
+    expect(computePushHash(noPeople, before)).toBe(computePushHash(noPeople, after));
   });
 
   it('ignores fields that do not affect the pushed event', () => {

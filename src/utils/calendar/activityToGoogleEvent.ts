@@ -4,6 +4,7 @@
 // using the parent link; this mapper produces the base event + native RRULE.
 
 import type { FamilyActivity } from '@/types/models';
+import { normalizeAssignees } from '@/utils/assignees';
 import { buildRecurrenceRule } from './recurrenceRrule';
 import { buildEventDescription, type EventDescriptionContext } from './eventDescription';
 
@@ -14,7 +15,8 @@ export interface GoogleEventResource {
   location?: string;
   start: GoogleEventDateTime;
   end: GoogleEventDateTime;
-  recurrence?: string[];
+  /** Always present (`[]` when non-recurring) so a `patch` can CLEAR a stale RRULE. */
+  recurrence: string[];
   reminders: { useDefault: false; overrides: Array<{ method: 'popup'; minutes: number }> };
   /** Always 'confirmed' — on a patch this resurrects an event that was previously
    *  deleted (Google marks deleted events `cancelled` and reserves their id, so a
@@ -59,9 +61,13 @@ function buildStartEnd(
 
   const startTime = activity.startTime as string; // guaranteed by isAllDayActivity check
   const endTime = activity.endTime ?? startTime;
+  // End day: honor a multi-day endDate; for an overnight activity (end earlier than
+  // start, no explicit endDate) roll the end to the next day so end > start. (F5)
+  let endYmd = activity.endDate?.slice(0, 10) ?? startYmd;
+  if (!activity.endDate && endTime < startTime) endYmd = addDaysYmd(startYmd, 1);
   return {
     start: { dateTime: `${startYmd}T${startTime}:00`, timeZone },
-    end: { dateTime: `${startYmd}T${endTime}:00`, timeZone },
+    end: { dateTime: `${endYmd}T${endTime}:00`, timeZone },
   };
 }
 
@@ -91,11 +97,11 @@ export function activityToGoogleEvent(
     description: buildEventDescription(activity, ctx),
     start,
     end,
+    recurrence,
     reminders: buildReminders(activity),
     status: 'confirmed',
   };
   if (activity.location && activity.location.trim()) resource.location = activity.location;
-  if (recurrence) resource.recurrence = recurrence;
   return resource;
 }
 
@@ -105,7 +111,10 @@ export function activityToGoogleEvent(
  * deterministic; a change to any pushed-relevant field changes the hash.
  * (djb2 — fast, collision-rare enough for change detection, not security.)
  */
-export function computePushHash(activity: FamilyActivity): string {
+export function computePushHash(
+  activity: FamilyActivity,
+  memberName?: (id: string) => string | undefined
+): string {
   const relevant = {
     title: activity.title,
     date: activity.date,
@@ -130,10 +139,21 @@ export function computePushHash(activity: FamilyActivity): string {
     reminderMinutes: activity.reminderMinutes,
     isActive: activity.isActive,
   };
-  const json = JSON.stringify(relevant);
+  let payload = JSON.stringify(relevant);
+  // Fold the RESOLVED member names rendered into the description, so a member rename
+  // (which changes no activity field) still changes the hash and re-pushes only the
+  // activities that reference that member. (F3)
+  if (memberName) {
+    const ids = [
+      ...normalizeAssignees(activity),
+      activity.pickupMemberId,
+      activity.dropoffMemberId,
+    ].filter((id): id is string => !!id);
+    payload += '|names:' + ids.map((id) => memberName(id) ?? '').join(',');
+  }
   let hash = 5381;
-  for (let i = 0; i < json.length; i++) {
-    hash = (hash * 33) ^ json.charCodeAt(i);
+  for (let i = 0; i < payload.length; i++) {
+    hash = (hash * 33) ^ payload.charCodeAt(i);
   }
   // Unsigned hex.
   return (hash >>> 0).toString(16);

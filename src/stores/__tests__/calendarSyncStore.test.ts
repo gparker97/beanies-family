@@ -13,7 +13,8 @@ import {
 } from '@/services/automerge/repositories/calendarRepository';
 import { deterministicEventId } from '@/utils/calendar/deterministicEventId';
 import { useCalendarSyncStore, setCalendarClientForTesting } from '../calendarSyncStore';
-import type { CalendarClient } from '@/services/calendar/CalendarClient';
+import { CalendarApiError, type CalendarClient } from '@/services/calendar/CalendarClient';
+import { getCalendarEventLinksForConnection } from '@/services/automerge/repositories/calendarRepository';
 import type { CreateFamilyActivityInput } from '@/types/models';
 
 function makeFakeClient() {
@@ -130,6 +131,52 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
     await store.disconnect(connection.id);
     expect(calls.delete).toContain(eventId);
     expect(await getCalendarConnectionById(connection.id)).toBeUndefined();
+  });
+
+  it('aborts a destination switch when the old-calendar cleanup fails, keeping all links (F6)', async () => {
+    // Client inserts fine but every delete throws — the old-calendar cleanup can
+    // never complete, so the switch must abort with the destination + links intact.
+    const existing = new Set<string>();
+    const client: CalendarClient = {
+      async insertEvent(_c, _cal, eventId) {
+        existing.add(eventId);
+      },
+      async patchEvent() {},
+      async deleteEvent() {
+        throw new CalendarApiError('transient', 'boom');
+      },
+      async eventExists(_c, _cal, eventId) {
+        return existing.has(eventId);
+      },
+      async listCalendars() {
+        return [{ id: 'cal-old', summary: 'Old', primary: true }];
+      },
+    };
+    setCalendarClientForTesting(client);
+
+    const connection = await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'cal-old',
+      refreshToken: 'r',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.owned'],
+      status: 'ok',
+    });
+    const activity = await createActivity(activityInput());
+    const store = useCalendarSyncStore();
+
+    // Seed a link on the old calendar.
+    await store.syncNow();
+    expect(await getCalendarEventLink(connection.id, activity.id)).toBeDefined();
+
+    // Switch to a new calendar — the old-calendar delete throws → abort.
+    const result = await store.setDestinationCalendar(connection.id, 'cal-new');
+    expect(result).toEqual({ ok: false });
+
+    // Destination unchanged and the link is still present (reconcile self-heals).
+    expect((await getCalendarConnectionById(connection.id))?.destinationCalendarId).toBe('cal-old');
+    expect(await getCalendarEventLink(connection.id, activity.id)).toBeDefined();
+    expect((await getCalendarEventLinksForConnection(connection.id)).length).toBe(1);
   });
 
   it('normalizes a "primary" destination to the concrete calendar id for the picker', async () => {

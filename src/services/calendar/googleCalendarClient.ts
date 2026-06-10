@@ -135,6 +135,7 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
     };
 
     let lastErr: CalendarApiError | null = null;
+    let authRetried = false; // one-shot re-mint guard, outside the 429/5xx backoff budget (F4)
     for (let i = 0; i <= RETRY_BACKOFF_MS.length; i++) {
       let res: RawResponse;
       try {
@@ -152,7 +153,18 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
       if (res.ok) return res;
 
       const kind = classifyStatus(res.status);
-      if (kind === 'auth') tokenProvider.invalidate(connectionId);
+      if (kind === 'auth') {
+        tokenProvider.invalidate(connectionId);
+        // A per-request 401 is usually a just-expired access token, not a dead
+        // refresh token. Re-mint and retry ONCE (does not consume a backoff slot).
+        // A second 401 — or invalid_grant from the refresh path — falls through and
+        // throws 'auth', which parks the connection via the K-threshold. (F4)
+        if (!authRetried) {
+          authRetried = true;
+          i--;
+          continue;
+        }
+      }
 
       const err = new CalendarApiError(kind, `Google Calendar HTTP ${res.status}`, res.status);
       // Only 429 / 5xx are worth retrying; everything else is the caller's to handle.
