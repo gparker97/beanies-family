@@ -202,10 +202,15 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
 
     async eventExists(connectionId, calendarId, eventId) {
       try {
-        await authedFetch(connectionId, `/calendars/${enc(calendarId)}/events/${enc(eventId)}`, {
-          method: 'GET',
-        });
-        return true;
+        const res = await authedFetch(
+          connectionId,
+          `/calendars/${enc(calendarId)}/events/${enc(eventId)}`,
+          { method: 'GET' }
+        );
+        // A previously-deleted event returns HTTP 200 with status 'cancelled' (Google
+        // reserves the id) — treat it as missing so the engine resurrects it.
+        const data = (await res.json()) as { status?: string };
+        return data.status !== 'cancelled';
       } catch (e) {
         if (e instanceof CalendarApiError && e.kind === 'not_found') return false;
         throw e;
