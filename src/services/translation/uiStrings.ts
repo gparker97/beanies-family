@@ -6783,34 +6783,6 @@ const STRING_DEFS = {
     beanie:
       'some beans could not be removed from the old calendar, so the change was undone. please try again.',
   },
-  'calendarSync.error.auth': {
-    en: 'Reconnect needed. Please sign in again.',
-    beanie: 'reconnect needed. please sign in again.',
-  },
-  'calendarSync.error.forbidden': {
-    en: "beanies doesn't have permission for this calendar.",
-    beanie: "beanies doesn't have permission for this calendar.",
-  },
-  'calendarSync.error.notFound': {
-    en: 'The event was missing and will be recreated.',
-    beanie: 'the bean was missing and will be recreated.',
-  },
-  'calendarSync.error.conflict': {
-    en: 'The event already exists.',
-    beanie: 'the bean already exists.',
-  },
-  'calendarSync.error.rateLimited': {
-    en: 'Google is busy. beanies will retry shortly.',
-    beanie: 'google is busy. beanies will retry shortly.',
-  },
-  'calendarSync.error.transient': {
-    en: 'A temporary problem. beanies will retry.',
-    beanie: 'a temporary problem. beanies will retry.',
-  },
-  'calendarSync.error.unknown': {
-    en: 'Something went wrong syncing this calendar.',
-    beanie: 'something went wrong syncing this calendar.',
-  },
   'settings.ai.tierLabel': {
     en: 'How documents are processed',
     beanie: 'how documents are processed',

@@ -80,19 +80,17 @@ const MAX_INFLIGHT = 5;
 /** Device-local consecutive `invalid_grant` failures before parking the shared status. */
 const INVALID_GRANT_THRESHOLD = 2;
 
-/** User-facing error registry — exhaustive over CalendarErrorKind (i18n keys for Layer 6/7). */
+/** Error severity per CalendarErrorKind — drives reportError's severity on the
+ *  transition into `error`. Exhaustive over CalendarErrorKind. */
 export const CALENDAR_SYNC_ERRORS = {
-  auth: { messageKey: 'calendarSync.error.auth', severity: 'warning' },
-  forbidden: { messageKey: 'calendarSync.error.forbidden', severity: 'error' },
-  not_found: { messageKey: 'calendarSync.error.notFound', severity: 'warning' },
-  conflict: { messageKey: 'calendarSync.error.conflict', severity: 'warning' },
-  rate_limited: { messageKey: 'calendarSync.error.rateLimited', severity: 'warning' },
-  transient: { messageKey: 'calendarSync.error.transient', severity: 'warning' },
-  unknown: { messageKey: 'calendarSync.error.unknown', severity: 'error' },
-} as const satisfies Record<
-  CalendarErrorKind,
-  { messageKey: string; severity: 'warning' | 'error' }
->;
+  auth: 'warning',
+  forbidden: 'error',
+  not_found: 'warning',
+  conflict: 'warning',
+  rate_limited: 'warning',
+  transient: 'warning',
+  unknown: 'error',
+} as const satisfies Record<CalendarErrorKind, 'warning' | 'error'>;
 
 // ── Module-level engine state (per page/device, not in the CRDT) ──────────────
 
@@ -410,11 +408,9 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     const otherErrors = errors.filter((e) => e.kind !== 'auth');
     if (otherErrors.length > 0) {
       const worst = otherErrors[0];
-      const prevFailures = connection.consecutiveFailures ?? 0;
       await updateCalendarConnection(connection.id, {
         status: 'error',
         lastError: worst.kind,
-        consecutiveFailures: prevFailures + 1,
         lastReconciledAt: nowIso(),
         lastReconciledBy: deviceId,
       });
@@ -424,7 +420,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
           surface: 'calendar-sync',
           message: `[calendarSync] reconcile error (${worst.kind}): ${worst.message}`,
           error: worst,
-          severity: CALENDAR_SYNC_ERRORS[worst.kind].severity,
+          severity: CALENDAR_SYNC_ERRORS[worst.kind],
           context: { connectionId: connection.id },
         });
       }
@@ -445,7 +441,6 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     await updateCalendarConnection(connection.id, {
       status: 'ok',
       lastError: undefined,
-      consecutiveFailures: 0,
       lastSyncedAt: nowIso(),
       lastReconciledAt: nowIso(),
       lastReconciledBy: deviceId,
@@ -503,7 +498,6 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       grantedScopes: result.grantedScopes,
       status: 'ok',
       lastError: undefined,
-      consecutiveFailures: 0,
     });
     invalidGrantCounters.delete(connectionId);
     void reconcileConnection(connectionId, { verifyExisting: true, force: true });
