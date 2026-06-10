@@ -26,6 +26,11 @@ export const FLAG_REGISTRY = [
     label: 'Google Calendar sync',
     description: 'One-way push of family activities into connected Google calendars.',
   },
+  {
+    id: 'calendarClashNudge',
+    label: 'Calendar clash nudge',
+    description: 'Free/busy heads-up when an activity clashes with a connected calendar.',
+  },
 ] as const;
 
 /** Union of all known flag ids — derived from the registry (single source of truth). */

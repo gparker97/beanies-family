@@ -6,6 +6,7 @@
 import type { FamilyActivity } from '@/types/models';
 import { normalizeAssignees } from '@/utils/assignees';
 import { addDaysYmd } from '@/utils/date';
+import { resolveActivityDays, isAllDayActivity } from './activityDays';
 import { buildRecurrenceRule } from './recurrenceRrule';
 import { buildEventDescription, type EventDescriptionContext } from './eventDescription';
 
@@ -34,32 +35,20 @@ export interface ActivityMapContext extends EventDescriptionContext {
   timeZone: string;
 }
 
-/** True when the activity has no specific time → an all-day Google event. */
-function isAllDayActivity(activity: FamilyActivity): boolean {
-  return activity.isAllDay === true || !activity.startTime;
-}
-
 function buildStartEnd(
   activity: FamilyActivity,
   timeZone: string
 ): { start: GoogleEventDateTime; end: GoogleEventDateTime } {
-  const startYmd = activity.date.slice(0, 10);
+  const days = resolveActivityDays(activity);
 
-  if (isAllDayActivity(activity)) {
+  if (days.allDay) {
     // Google all-day end.date is EXCLUSIVE → add one day past the (inclusive) last day.
-    const lastDay = (activity.endDate ?? activity.date).slice(0, 10);
-    return { start: { date: startYmd }, end: { date: addDaysYmd(lastDay, 1) } };
+    return { start: { date: days.startYmd }, end: { date: addDaysYmd(days.endYmd, 1) } };
   }
 
-  const startTime = activity.startTime as string; // guaranteed by isAllDayActivity check
-  const endTime = activity.endTime ?? startTime;
-  // End day: honor a multi-day endDate; for an overnight activity (end earlier than
-  // start, no explicit endDate) roll the end to the next day so end > start. (F5)
-  let endYmd = activity.endDate?.slice(0, 10) ?? startYmd;
-  if (!activity.endDate && endTime < startTime) endYmd = addDaysYmd(startYmd, 1);
   return {
-    start: { dateTime: `${startYmd}T${startTime}:00`, timeZone },
-    end: { dateTime: `${endYmd}T${endTime}:00`, timeZone },
+    start: { dateTime: `${days.startYmd}T${days.startTime}:00`, timeZone },
+    end: { dateTime: `${days.endYmd}T${days.endTime}:00`, timeZone },
   };
 }
 

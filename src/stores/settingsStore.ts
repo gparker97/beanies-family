@@ -110,6 +110,11 @@ export const useSettingsStore = defineStore('settings', () => {
   const skipDocumentConsentPrompt = computed<boolean>(
     () => settings.value.skipDocumentConsentPrompt ?? false
   );
+  // #34: warn when an activity clashes with a connected calendar's free/busy.
+  // Family-scoped (synced); default ON (the freebusy scope is granted upfront).
+  const calendarClashNudgeEnabled = computed<boolean>(
+    () => settings.value.calendarClashNudgeEnabled ?? true
+  );
   const isTrustedDevice = computed(() => globalSettings.value.isTrustedDevice ?? false);
   const trustedDevicePromptShown = computed(
     () => globalSettings.value.trustedDevicePromptShown ?? false
@@ -327,6 +332,14 @@ export const useSettingsStore = defineStore('settings', () => {
       isLoading.value = false;
     }
   }
+
+  // #34: persist the clash-nudge toggle through the report-on-failure contract
+  // (toast + console + re-throw) so a failed settings write is never swallowed and
+  // the toggle control can revert its optimistic state.
+  const setCalendarClashNudgeEnabled = (enabled: boolean) =>
+    persistAiSetting('calendarSync.clashNudge.label', 'calendarClashNudgeEnabled', () =>
+      settingsRepo.setCalendarClashNudgeEnabled(enabled)
+    );
 
   const setAIProvider = (provider: AIProvider) =>
     persistAiSetting('settings.ai.byok.provider', 'aiProvider', () =>
@@ -631,6 +644,7 @@ export const useSettingsStore = defineStore('settings', () => {
     country,
     showPublicHolidays,
     skipDocumentConsentPrompt,
+    calendarClashNudgeEnabled,
     isTrustedDevice,
     trustedDevicePromptShown,
     passkeyPromptShown,
@@ -644,6 +658,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setTextSize,
     setSyncEnabled,
     setAutoSyncEnabled,
+    setCalendarClashNudgeEnabled,
     setAIProvider,
     setAITier,
     setAIApiKey,

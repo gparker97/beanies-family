@@ -38,6 +38,9 @@ function makeFakeClient() {
     async listCalendars() {
       return [{ id: 'primary', summary: 'Primary', primary: true }];
     },
+    async queryFreeBusy() {
+      return {};
+    },
   };
   return { client, calls };
 }
@@ -151,6 +154,9 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
       async listCalendars() {
         return [{ id: 'cal-old', summary: 'Old', primary: true }];
       },
+      async queryFreeBusy() {
+        return {};
+      },
     };
     setCalendarClientForTesting(client);
 
@@ -192,6 +198,9 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
           { id: 'owner@example.com', summary: 'owner@example.com', primary: true },
           { id: 'work', summary: 'Work', primary: false },
         ];
+      },
+      async queryFreeBusy() {
+        return {};
       },
     };
     setCalendarClientForTesting(client);

@@ -5,7 +5,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { extractDatePart, formatNookDate, toDateInputValue } from '@/utils/date';
+import { extractDatePart, formatNookDate, toDateInputValue, monthGridRange } from '@/utils/date';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { tripTypeEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
 import { relativeWeekLabelKey, type RelativeWeekLabelKey } from '@/utils/calendarWeek';
@@ -107,10 +107,12 @@ const calendarDays = computed<MonthDayCellData[]>(() => {
   const startOffset = (firstDay.getDay() - settingsStore.weekStartDay + 7) % 7;
   // Full grid date span (including the prev/next-month padding cells) — used
   // to query derived overlays (public holidays) that should show on padding
-  // days too, not just within the calendar month.
-  const totalGridCells = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7;
-  const gridStartStr = toDateInputValue(new Date(year, month, 1 - startOffset));
-  const gridEndStr = toDateInputValue(new Date(year, month, 1 - startOffset + totalGridCells - 1));
+  // days too, not just within the calendar month. Shared with the clash-window
+  // derivation via `monthGridRange` (one source of truth for the visible span).
+  const { startYmd: gridStartStr, endYmd: gridEndStr } = monthGridRange(
+    props.referenceDate,
+    settingsStore.weekStartDay
+  );
 
   const days: MonthDayCellData[] = [];
 

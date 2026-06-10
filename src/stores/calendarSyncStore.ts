@@ -50,15 +50,17 @@ import {
   type CalendarConnectResult,
 } from '@/services/calendar/calendarAuth';
 import {
-  createGoogleCalendarClient,
-  createGoogleTokenProvider,
-} from '@/services/calendar/googleCalendarClient';
+  getCalendarClient,
+  setCalendarClientForTesting,
+  resetCalendarClient,
+} from '@/services/calendar/clientInstance';
 import {
   CalendarApiError,
   type CalendarClient,
   type CalendarErrorKind,
   type CalendarSummary,
 } from '@/services/calendar/CalendarClient';
+import { runPooled } from '@/utils/calendar/runPooled';
 import {
   activityToGoogleEvent,
   type ActivityMapContext,
@@ -94,19 +96,13 @@ export const CALENDAR_SYNC_ERRORS = {
 
 // ── Module-level engine state (per page/device, not in the CRDT) ──────────────
 
-let clientImpl: CalendarClient | null = null;
 /** Device-local K-counter for invalid_grant (kept out of the CRDT — Pass 4). */
 const invalidGrantCounters = new Map<string, number>();
 
-/** Test seam — inject a fake CalendarClient. */
-export function setCalendarClientForTesting(client: CalendarClient | null): void {
-  clientImpl = client;
-}
-
-function getClient(): CalendarClient {
-  if (!clientImpl) clientImpl = createGoogleCalendarClient(createGoogleTokenProvider());
-  return clientImpl;
-}
+// The CalendarClient singleton lives in `clientInstance.ts` (shared with the clash
+// store). Re-export the test seam so this store's existing tests keep importing it
+// from here.
+export { setCalendarClientForTesting };
 
 function nowIso(): string {
   return toISODateString(new Date());
@@ -186,18 +182,6 @@ async function createOrResurrect(
       throw e;
     }
   }
-}
-
-/** Bounded-concurrency pool. Each task owns its try/catch; the pool never rejects. */
-async function runPooled(tasks: Array<() => Promise<void>>, limit: number): Promise<void> {
-  let next = 0;
-  const worker = async (): Promise<void> => {
-    while (next < tasks.length) {
-      const task = tasks[next++];
-      await task();
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -321,7 +305,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     if (!opts.force && shouldSkipForFreshness(connection)) return;
 
     await withConnectionLock(connectionId, async () => {
-      const client = getClient();
+      const client = getCalendarClient();
       const calendarId = connection.destinationCalendarId || 'primary';
       const memberName = makeMemberNameResolver(); // one memoized resolver for ctx + hash
       const ctx = buildMapContext(memberName);
@@ -514,7 +498,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
   async function finishDisconnect(connectionId: string): Promise<void> {
     const connection = await getCalendarConnectionById(connectionId);
     if (!connection) return;
-    const client = getClient();
+    const client = getCalendarClient();
     const calendarId = connection.destinationCalendarId || 'primary';
     const links = await getCalendarEventLinksForConnection(connectionId);
 
@@ -548,7 +532,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
   ): Promise<{ ok: boolean }> {
     const connection = await getCalendarConnectionById(connectionId);
     if (!connection || connection.destinationCalendarId === calendarId) return { ok: true };
-    const client = getClient();
+    const client = getCalendarClient();
     const oldCalendarId = connection.destinationCalendarId || 'primary';
     const links = await getCalendarEventLinksForConnection(connectionId);
 
@@ -596,7 +580,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     const hasScope = connection.grantedScopes.some((s) => s.includes('calendar.calendarlist'));
     if (!hasScope) return fallback;
     try {
-      const calendars = await getClient().listCalendars(connectionId);
+      const calendars = await getCalendarClient().listCalendars(connectionId);
       // CalendarList returns the primary calendar's REAL id (the account email),
       // never the literal alias 'primary' — so a connection still defaulting to
       // 'primary' wouldn't match any option and the picker shows blank. Normalize
@@ -668,7 +652,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     if (editDebounce) clearTimeout(editDebounce);
     editDebounce = null;
     // Reset module-level engine state so a new session/family starts clean (F7).
-    clientImpl = null;
+    resetCalendarClient();
     invalidGrantCounters.clear();
   }
 

@@ -12,6 +12,7 @@ import {
   relativeDayLabel,
   getWeekdayOrdinalInMonth,
   nthWeekdayOfMonth,
+  monthGridRange,
 } from '../date';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -388,4 +389,36 @@ describe('relativeDayLabel', () => {
     vi.setSystemTime(new Date(2026, 3, 22, 12, 0, 0));
     expect(relativeDayLabel('2026-04-21', t)).toBe('Yesterday');
   });
+});
+
+describe('monthGridRange (regression vs CalendarGrid inline math)', () => {
+  // The original inline formula that lived in CalendarGrid.vue — the extraction
+  // must reproduce it exactly so the visible grid span never drifts.
+  function legacy(referenceDate: Date, weekStartDay: number) {
+    const year = referenceDate.getFullYear();
+    const month = referenceDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startOffset = (firstDay.getDay() - weekStartDay + 7) % 7;
+    const totalGridCells = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7;
+    return {
+      startYmd: toDateInputValue(new Date(year, month, 1 - startOffset)),
+      endYmd: toDateInputValue(new Date(year, month, 1 - startOffset + totalGridCells - 1)),
+    };
+  }
+
+  const cases = [
+    new Date(2026, 5, 15), // June 2026
+    new Date(2026, 7, 1), // Aug 2026 (starts Sat → 6-week grid)
+    new Date(2026, 1, 10), // Feb 2026
+    new Date(2027, 0, 31), // Jan 2027
+  ];
+
+  for (const ref of cases) {
+    for (const weekStart of [0, 1]) {
+      it(`${ref.toDateString()} weekStart=${weekStart} matches the legacy grid bounds`, () => {
+        expect(monthGridRange(ref, weekStart)).toEqual(legacy(ref, weekStart));
+      });
+    }
+  }
 });

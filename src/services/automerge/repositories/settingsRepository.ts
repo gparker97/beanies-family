@@ -108,6 +108,10 @@ export async function setSyncEnabled(enabled: boolean): Promise<Settings> {
   return saveSettings({ syncEnabled: enabled });
 }
 
+export async function setCalendarClashNudgeEnabled(enabled: boolean): Promise<Settings> {
+  return saveSettings({ calendarClashNudgeEnabled: enabled });
+}
+
 export async function setAutoSyncEnabled(enabled: boolean): Promise<Settings> {
   return saveSettings({ autoSyncEnabled: enabled });
 }
