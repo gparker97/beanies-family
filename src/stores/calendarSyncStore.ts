@@ -60,6 +60,7 @@ import {
 import {
   activityToGoogleEvent,
   type ActivityMapContext,
+  type GoogleEventResource,
 } from '@/utils/calendar/activityToGoogleEvent';
 import { planReconcile, type ReconcileUpsert } from '@/utils/calendar/reconcilePlan';
 import type { CalendarConnection } from '@/types/models';
@@ -150,6 +151,28 @@ async function withConnectionLock(connectionId: string, fn: () => Promise<void>)
   });
 }
 
+/** Insert an event; if its id already exists, patch instead. The id can already
+ *  exist because a peer device created it, OR because the event was deleted and
+ *  Google reserves the id as a `cancelled` event — the resource's
+ *  `status: 'confirmed'` makes the patch RESURRECT it (otherwise it stays hidden). */
+async function createOrResurrect(
+  client: CalendarClient,
+  connectionId: string,
+  calendarId: string,
+  eventId: string,
+  resource: GoogleEventResource
+): Promise<void> {
+  try {
+    await client.insertEvent(connectionId, calendarId, eventId, resource);
+  } catch (e) {
+    if (e instanceof CalendarApiError && e.kind === 'conflict') {
+      await client.patchEvent(connectionId, calendarId, eventId, resource);
+    } else {
+      throw e;
+    }
+  }
+}
+
 /** Bounded-concurrency pool. Each task owns its try/catch; the pool never rejects. */
 async function runPooled(tasks: Array<() => Promise<void>>, limit: number): Promise<void> {
   let next = 0;
@@ -231,15 +254,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     const hasLink = u.existingHash !== undefined;
 
     if (!hasLink) {
-      try {
-        await client.insertEvent(connectionId, calendarId, u.eventId, resource);
-      } catch (e) {
-        if (e instanceof CalendarApiError && e.kind === 'conflict') {
-          await client.patchEvent(connectionId, calendarId, u.eventId, resource); // created by a peer
-        } else {
-          throw e;
-        }
-      }
+      await createOrResurrect(client, connectionId, calendarId, u.eventId, resource);
       await recordLink(connectionId, u.activity.id, u.eventId, u.hash);
       return;
     }
@@ -249,7 +264,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         await client.patchEvent(connectionId, calendarId, u.eventId, resource);
       } catch (e) {
         if (e instanceof CalendarApiError && e.kind === 'not_found') {
-          await client.insertEvent(connectionId, calendarId, u.eventId, resource); // remote-deleted
+          await createOrResurrect(client, connectionId, calendarId, u.eventId, resource);
         } else {
           throw e;
         }
@@ -258,11 +273,12 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       return;
     }
 
-    // Unchanged. On a verify pass, re-create if it was manually deleted in Google.
+    // Unchanged. On a verify pass, restore the event if it was deleted/cancelled
+    // in Google (eventExists treats a cancelled event as missing).
     if (verifyExisting) {
       const exists = await client.eventExists(connectionId, calendarId, u.eventId);
       if (!exists) {
-        await client.insertEvent(connectionId, calendarId, u.eventId, resource);
+        await createOrResurrect(client, connectionId, calendarId, u.eventId, resource);
         await recordLink(connectionId, u.activity.id, u.eventId, u.hash);
       }
     }
@@ -316,6 +332,14 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
 
       await runPooled(tasks, MAX_INFLIGHT);
       await settleConnectionStatus(connection, errors);
+
+      // Diagnostic (prod-off feature) — surfaces what each connection actually did,
+      // so a per-account discrepancy is visible in the console rather than guessed at.
+      const kinds = errors.length ? [...new Set(errors.map((e) => e.kind))].join(',') : 'none';
+      console.warn(
+        `[calendarSync] reconciled ${connection.accountEmail} (cal=${calendarId}): ` +
+          `${plan.upserts.length} activities, ${plan.deletes.length} deletes, ${errors.length} errors [${kinds}]`
+      );
     });
   }
 

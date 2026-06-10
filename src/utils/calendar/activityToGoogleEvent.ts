@@ -16,6 +16,10 @@ export interface GoogleEventResource {
   end: GoogleEventDateTime;
   recurrence?: string[];
   reminders: { useDefault: false; overrides: Array<{ method: 'popup'; minutes: number }> };
+  /** Always 'confirmed' — on a patch this resurrects an event that was previously
+   *  deleted (Google marks deleted events `cancelled` and reserves their id, so a
+   *  re-inserted deterministic id 409s and must be patched back to confirmed). */
+  status: 'confirmed';
 }
 
 export type GoogleEventDateTime =
@@ -88,6 +92,7 @@ export function activityToGoogleEvent(
     start,
     end,
     reminders: buildReminders(activity),
+    status: 'confirmed',
   };
   if (activity.location && activity.location.trim()) resource.location = activity.location;
   if (recurrence) resource.recurrence = recurrence;
