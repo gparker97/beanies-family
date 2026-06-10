@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-10",
-    "translationCount": 3139
+    "translationCount": 3144
   },
   "translations": {
     "app.name": {
@@ -15699,6 +15699,31 @@
     "calendarSync.primaryCalendar": {
       "translation": "主日历",
       "hash": "8x90lg",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.clashNudge.title": {
+      "translation": "如果与其他日历发生冲突，请向我发出警告",
+      "hash": "ucf0f9",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.clashNudge.hint": {
+      "translation": "beanies只会检查您是否忙碌，而不会检查活动内容。",
+      "hash": "rzv0r8",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.clashNudge.label": {
+      "translation": "冲突警告",
+      "hash": "ud8o96",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.clashNudge.unavailable": {
+      "translation": "请重新关联日历，并允许可订状态使用此功能。",
+      "hash": "5fimhz",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.clash.tooltipPrefix": {
+      "translation": "可能与发生冲突",
+      "hash": "sok8r8",
       "lastUpdated": "2026-06-10"
     }
   }

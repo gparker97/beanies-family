@@ -11,6 +11,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
+import { useCalendarClashStore } from '@/stores/calendarClashStore';
 import { isFlagEnabled } from '@/config/flags';
 
 /**
@@ -36,4 +37,6 @@ export function resetAllAppStores(): void {
   // doesn't keep running after sign-out / family-switch (F7). Flag-gated so the
   // store isn't instantiated when the feature is off.
   if (isFlagEnabled('googleCalendarSync')) useCalendarSyncStore().stop();
+  // Clear the read-only clash engine's ephemeral busy cache + decoration (#34).
+  if (isFlagEnabled('calendarClashNudge')) useCalendarClashStore().stop();
 }

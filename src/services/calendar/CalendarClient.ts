@@ -36,6 +36,13 @@ export interface CalendarSummary {
   primary: boolean;
 }
 
+/** A busy time block from a free/busy query — availability only, never event
+ *  details. `start`/`end` are RFC3339 instants (offset-bearing). (#34) */
+export interface BusyInterval {
+  start: string;
+  end: string;
+}
+
 /**
  * Mints short-lived access tokens per connection. The Google impl reads the
  * connection's refresh token from the CRDT, refreshes via the OAuth proxy, caches
@@ -75,4 +82,16 @@ export interface CalendarClient {
   eventExists(connectionId: string, calendarId: string, eventId: string): Promise<boolean>;
   /** List the account's calendars for the destination picker. */
   listCalendars(connectionId: string): Promise<CalendarSummary[]>;
+  /**
+   * Query free/busy for the given calendars over `[timeMinIso, timeMaxIso)`.
+   * Read-only, availability only — returns busy intervals per calendar id, never
+   * event details. A per-calendar failure (Google reports these in the 200 body,
+   * not as an HTTP error) is thrown as a classified `CalendarApiError`. (#34)
+   */
+  queryFreeBusy(
+    connectionId: string,
+    calendarIds: string[],
+    timeMinIso: string,
+    timeMaxIso: string
+  ): Promise<Record<string, BusyInterval[]>>;
 }

@@ -4,13 +4,15 @@ import { getActivityColor } from '@/stores/activityStore';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { normalizeAssignees } from '@/utils/assignees';
 import { toDateInputValue, formatNookDate, formatTime12 } from '@/utils/date';
+import { useClash } from '@/composables/useClash';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
+import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import type { FamilyActivity } from '@/types/models';
 
 const { t } = useTranslation();
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     activity: FamilyActivity;
     date: string;
@@ -18,6 +20,13 @@ withDefaults(
     showReminder?: boolean;
   }>(),
   { showDate: false, showReminder: false }
+);
+
+// External-calendar clash (#34) — undefined until/unless busy data lands for a
+// clashing timed occurrence. Resolved through the single `useClash` seam.
+const clash = useClash(
+  () => props.activity.id,
+  () => props.date
 );
 
 defineEmits<{ click: [] }>();
@@ -52,6 +61,7 @@ function formatDisplayDate(dateStr: string): string {
         >
           <span class="truncate">{{ activity.title }}</span>
           <PhotoIndicator :photo-ids="activity.photoIds" />
+          <ClashIndicator v-if="clash" :calendar-label="clash.calendarLabel" class="ml-1.5" />
         </h4>
         <span
           v-if="showDate"

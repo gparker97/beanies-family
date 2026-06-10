@@ -28,7 +28,16 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { getActivityFallbackEmoji, getActivityCategoryName } from '@/constants/activityCategories';
-import { formatDateFull, parseLocalDate, toDateInputValue } from '@/utils/date';
+import {
+  formatDateFull,
+  parseLocalDate,
+  toDateInputValue,
+  monthGridRange,
+  addDaysYmd,
+} from '@/utils/date';
+import { useWeekNavigation } from '@/composables/useCalendarNavigation';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useCalendarClashStore } from '@/stores/calendarClashStore';
 import { findDuplicateActivity, mergeExtractionIntoActivity } from '@/utils/activityDuplicate';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
@@ -98,6 +107,65 @@ const activeView = ref<PlannerView>('month');
 // off this (props down); navigation intents flow back up (events).
 const { referenceDate, label, goPrev, goNext, goToday } = usePlannerNavigation(activeView);
 const showInactive = ref(false);
+
+// ── External-calendar clash nudge (#34) ──────────────────────────────────────
+// Derive the VISIBLE window (the rendered grid, not the calendar month) + its
+// activity occurrences from the active view — reusing the shared range helpers so
+// the window can't drift from what the views render — and feed them to the
+// read-only clash store. Decoration is async + non-blocking; the store no-ops
+// unless the flag + toggle + freebusy scope are all present.
+const settingsStore = useSettingsStore();
+const clashStore = useCalendarClashStore();
+const { getWeekStart } = useWeekNavigation(referenceDate);
+
+const clashWindow = computed(() => {
+  const view = activeView.value;
+  let startYmd: string;
+  let endYmd: string;
+  if (view === 'month') {
+    ({ startYmd, endYmd } = monthGridRange(referenceDate.value, settingsStore.weekStartDay));
+  } else if (view === 'week') {
+    startYmd = toDateInputValue(getWeekStart(referenceDate.value));
+    endYmd = addDaysYmd(startYmd, 6);
+  } else {
+    startYmd = toDateInputValue(referenceDate.value);
+    endYmd = startYmd;
+  }
+  // Gather occurrences across every month the window spans (≤ ~42 days).
+  const occurrences: { activity: FamilyActivity; date: string }[] = [];
+  const end = parseLocalDate(endYmd);
+  let cursor = new Date(
+    parseLocalDate(startYmd).getFullYear(),
+    parseLocalDate(startYmd).getMonth(),
+    1
+  );
+  while (cursor <= end) {
+    for (const occ of activityStore.monthActivities(cursor.getFullYear(), cursor.getMonth())) {
+      if (occ.date >= startYmd && occ.date <= endYmd) occurrences.push(occ);
+    }
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+  }
+  return {
+    timeMinIso: parseLocalDate(startYmd).toISOString(),
+    // exclusive upper bound = start of the day after the last visible day
+    timeMaxIso: parseLocalDate(addDaysYmd(endYmd, 1)).toISOString(),
+    occurrences,
+  };
+});
+
+// Debounced so rapid prev/next navigation collapses to a single free/busy query.
+let clashDebounce: ReturnType<typeof setTimeout> | null = null;
+watch(
+  [clashWindow, () => clashStore.isAvailable],
+  () => {
+    if (clashDebounce) clearTimeout(clashDebounce);
+    clashDebounce = setTimeout(() => {
+      const w = clashWindow.value;
+      void clashStore.ensureBusyForWindow(w.timeMinIso, w.timeMaxIso, w.occurrences);
+    }, 300);
+  },
+  { immediate: true }
+);
 const showModal = ref(false);
 const editingActivity = ref<FamilyActivity | null>(null);
 const editingOccurrenceDate = ref<string | undefined>(undefined);

@@ -11,6 +11,7 @@ import { refreshCalendarToken } from './calendarAuth';
 import { delay, withTimeout } from '@/utils/timing';
 import {
   CalendarApiError,
+  type BusyInterval,
   type CalendarClient,
   type CalendarErrorKind,
   type CalendarSummary,
@@ -36,6 +37,15 @@ function classifyStatus(status: number): CalendarErrorKind {
 
 function isPermanentRefreshFailure(message: string): boolean {
   return message.includes('invalid_grant') || message.includes('expired or revoked');
+}
+
+/** Map a Google free/busy per-calendar error `reason` to a classified kind. The
+ *  free/busy endpoint returns HTTP 200 even when an individual calendar fails, so
+ *  this is the only place those failures surface. */
+function freeBusyReasonToKind(reason: string | undefined): CalendarErrorKind {
+  if (reason === 'notFound') return 'not_found';
+  if (reason === 'accessDenied' || reason === 'forbidden') return 'forbidden';
+  return 'unknown';
 }
 
 // ── Token provider ───────────────────────────────────────────────────────────
@@ -241,6 +251,33 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
           primary: c.primary === true,
         })
       );
+    },
+
+    async queryFreeBusy(connectionId, calendarIds, timeMinIso, timeMaxIso) {
+      const res = await authedFetch(connectionId, '/freeBusy', {
+        method: 'POST',
+        body: JSON.stringify({
+          timeMin: timeMinIso,
+          timeMax: timeMaxIso,
+          items: calendarIds.map((id) => ({ id })),
+        }),
+      });
+      const data = (await res.json()) as {
+        calendars?: Record<string, { busy?: BusyInterval[]; errors?: Array<{ reason?: string }> }>;
+      };
+      const out: Record<string, BusyInterval[]> = {};
+      for (const [calId, cal] of Object.entries(data.calendars ?? {})) {
+        // Per-calendar failure arrives in the 200 body — classify + throw, never drop.
+        if (cal.errors && cal.errors.length > 0) {
+          const reason = cal.errors[0]?.reason;
+          throw new CalendarApiError(
+            freeBusyReasonToKind(reason),
+            `free/busy failed for calendar ${calId}: ${reason ?? 'unknown'}`
+          );
+        }
+        out[calId] = cal.busy ?? [];
+      }
+      return out;
     },
   };
 }

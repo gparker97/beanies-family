@@ -1249,6 +1249,7 @@ export interface Settings {
   country?: CountryCode; // family's country of residence — drives public-holiday display on the planner
   showPublicHolidays?: boolean; // default true once `country` is set; lets the family hide holidays
   skipDocumentConsentPrompt?: boolean; // #133: when true, the photo→activity AI consent modal is auto-confirmed (default: ask). Family-scoped.
+  calendarClashNudgeEnabled?: boolean; // #34: warn when an activity clashes with a connected calendar's free/busy (default: true). Family-scoped.
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

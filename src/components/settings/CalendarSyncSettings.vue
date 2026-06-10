@@ -6,11 +6,15 @@
 import { ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
+import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
 import { BaseButton } from '@/components/ui';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { confirm } from '@/composables/useConfirm';
+import { isFlagEnabled } from '@/config/flags';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
+import { useCalendarClashStore } from '@/stores/calendarClashStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { CalendarConnection } from '@/types/models';
 
@@ -19,6 +23,20 @@ const emit = defineEmits<{ close: [] }>();
 
 const { t } = useTranslation();
 const store = useCalendarSyncStore();
+
+// #34 clash nudge — only surfaced when its flag is on (launch-coupled with sync).
+const clashNudgeFlagOn = isFlagEnabled('calendarClashNudge');
+const clashStore = useCalendarClashStore();
+const settingsStore = useSettingsStore();
+
+async function onToggleClash(enabled: boolean) {
+  try {
+    await settingsStore.setCalendarClashNudgeEnabled(enabled);
+  } catch {
+    // setCalendarClashNudgeEnabled already toasts + logs the failure; the toggle
+    // reverts automatically because its model-value reads the (unchanged) store.
+  }
+}
 
 const connecting = ref(false);
 const busyId = ref<string | null>(null);
@@ -219,6 +237,28 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
             </BaseButton>
           </div>
         </div>
+      </div>
+
+      <!-- Clash nudge toggle (#34) — shown once a calendar is connected. -->
+      <div
+        v-if="clashNudgeFlagOn && store.connections.length > 0"
+        class="rounded-2xl border border-[var(--tint-slate-05)] px-3 dark:border-slate-700"
+      >
+        <SettingToggleRow
+          :model-value="settingsStore.calendarClashNudgeEnabled"
+          :title="t('calendarSync.clashNudge.title')"
+          :hint="t('calendarSync.clashNudge.hint')"
+          :disabled="!clashStore.someConnectionHasFreebusy"
+          testid="calendar-clash-toggle"
+          @update:model-value="onToggleClash"
+        >
+          <p
+            v-if="!clashStore.someConnectionHasFreebusy"
+            class="mt-1 text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500"
+          >
+            {{ t('calendarSync.clashNudge.unavailable') }}
+          </p>
+        </SettingToggleRow>
       </div>
 
       <!-- Connect a new calendar -->
