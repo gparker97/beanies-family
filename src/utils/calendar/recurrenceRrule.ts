@@ -52,12 +52,17 @@ function untilClause(recurrenceEndDate: string, isAllDay: boolean): string {
 
 /**
  * Map an activity's recurrence to a Google `recurrence` array entry (a single
- * `RRULE:...` string), or `null` when the activity is non-recurring.
+ * `RRULE:...` string), or `[]` when the activity is non-recurring.
  * Pure. Returns the array Google's events resource expects (`recurrence: [...]`).
+ *
+ * NOTE: returns `[]` (not `null`) for `'none'` so the mapper ALWAYS sets
+ * `resource.recurrence` — an empty array on a `patch` CLEARS a stale RRULE when a
+ * recurring activity is edited to a one-off (Google patch is a partial update, so
+ * omitting the field would leave the old rule in place). See #32 review F2.
  */
-export function buildRecurrenceRule(input: RecurrenceInput): string[] | null {
+export function buildRecurrenceRule(input: RecurrenceInput): string[] {
   const { recurrence } = input;
-  if (recurrence === 'none') return null;
+  if (recurrence === 'none') return [];
 
   const start = parseYmd(input.date);
   const until =

@@ -20,11 +20,13 @@
 import { defineStore } from 'pinia';
 import { computed, watch } from 'vue';
 import { docVersion, getDoc, isDocLoaded } from '@/services/automerge/docService';
-import { toISODateString } from '@/utils/date';
+import { toISODateString, localToday } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
 import { reportError } from '@/utils/errorReporter';
 import { isFlagEnabled } from '@/config/flags';
 import { useToday } from '@/composables/useToday';
+import { useActivityStore } from '@/stores/activityStore';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import {
   usePollWhileVisible,
   type PollWhileVisibleHandle,
@@ -113,7 +115,7 @@ function nowIso(): string {
 }
 
 function todayYmd(): string {
-  return nowIso().slice(0, 10);
+  return localToday(); // LOCAL date — the push window must reflect the user's day, not UTC (F8)
 }
 
 function getDeviceId(): string {
@@ -129,12 +131,27 @@ function getDeviceId(): string {
   }
 }
 
-/** Member-name resolver + app origin + timezone for the event mapper. */
-function buildMapContext(): ActivityMapContext {
-  const members = isDocLoaded() ? getDoc().familyMembers : {};
-  const nameById = new Map(Object.values(members).map((m) => [m.id, m.name]));
+/**
+ * A per-reconcile member-name resolver, memoized so resolving 1–3 ids × N
+ * activities never re-scans `familyStore.members` (avoids O(N·M)). Reuses the
+ * single-source family resolver (`useMemberInfo`) — preserves `undefined` for
+ * unknown ids. Must be called within a store action (Pinia active).
+ */
+function makeMemberNameResolver(): (id: string) => string | undefined {
+  const { getMemberById } = useMemberInfo();
+  const cache = new Map<string, string | undefined>();
+  return (id) => {
+    if (cache.has(id)) return cache.get(id);
+    const name = getMemberById(id)?.name;
+    cache.set(id, name);
+    return name;
+  };
+}
+
+/** App origin + timezone for the event mapper, with the (shared) member resolver. */
+function buildMapContext(memberName: (id: string) => string | undefined): ActivityMapContext {
   return {
-    memberName: (id) => nameById.get(id),
+    memberName,
     appOrigin:
       typeof window !== 'undefined' ? window.location.origin : 'https://app.beanies.family',
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -240,8 +257,9 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     }
   }
 
-  /** Apply one upsert. `verifyExisting` does a remote-existence probe for unchanged
-   *  events (re-creates a manually-deleted one). Throws CalendarApiError on failure. */
+  /** Apply one upsert. Returns true iff it actually wrote to Google (used to decide
+   *  whether the connection record needs a status write — F1). `verifyExisting`
+   *  does a remote-existence probe for unchanged events. Throws on failure. */
   async function applyUpsert(
     client: CalendarClient,
     connectionId: string,
@@ -249,14 +267,14 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     u: ReconcileUpsert,
     ctx: ActivityMapContext,
     verifyExisting: boolean
-  ): Promise<void> {
+  ): Promise<boolean> {
     const resource = activityToGoogleEvent(u.activity, ctx);
     const hasLink = u.existingHash !== undefined;
 
     if (!hasLink) {
       await createOrResurrect(client, connectionId, calendarId, u.eventId, resource);
       await recordLink(connectionId, u.activity.id, u.eventId, u.hash);
-      return;
+      return true;
     }
 
     if (u.existingHash !== u.hash) {
@@ -270,7 +288,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         }
       }
       await recordLink(connectionId, u.activity.id, u.eventId, u.hash);
-      return;
+      return true;
     }
 
     // Unchanged. On a verify pass, restore the event if it was deleted/cancelled
@@ -280,8 +298,10 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       if (!exists) {
         await createOrResurrect(client, connectionId, calendarId, u.eventId, resource);
         await recordLink(connectionId, u.activity.id, u.eventId, u.hash);
+        return true;
       }
     }
+    return false;
   }
 
   /**
@@ -305,25 +325,35 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     await withConnectionLock(connectionId, async () => {
       const client = getClient();
       const calendarId = connection.destinationCalendarId || 'primary';
-      const ctx = buildMapContext();
+      const memberName = makeMemberNameResolver(); // one memoized resolver for ctx + hash
+      const ctx = buildMapContext(memberName);
       const activities = await getAllActivities();
       const links = await getCalendarEventLinksForConnection(connectionId);
-      const plan = planReconcile(activities, links, todayYmd());
+      const plan = planReconcile(activities, links, todayYmd(), memberName);
 
       const errors: CalendarApiError[] = [];
       const record = (e: unknown) => {
         errors.push(e instanceof CalendarApiError ? e : new CalendarApiError('unknown', String(e)));
       };
+      // Whether any actual Google write happened — gates the connection status write
+      // so a no-op reconcile doesn't churn the CRDT (and re-trigger itself). (F1)
+      let changed = false;
 
       const tasks: Array<() => Promise<void>> = [
-        ...plan.upserts.map(
-          (u) => () =>
-            applyUpsert(client, connectionId, calendarId, u, ctx, opts.verifyExisting).catch(record)
-        ),
+        ...plan.upserts.map((u) => async () => {
+          try {
+            if (await applyUpsert(client, connectionId, calendarId, u, ctx, opts.verifyExisting)) {
+              changed = true;
+            }
+          } catch (e) {
+            record(e);
+          }
+        }),
         ...plan.deletes.map((link) => async () => {
           try {
             await client.deleteEvent(connectionId, calendarId, link.googleEventId);
             await removeCalendarEventLinkById(connectionId, link.activityId);
+            changed = true;
           } catch (e) {
             record(e);
           }
@@ -331,7 +361,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       ];
 
       await runPooled(tasks, MAX_INFLIGHT);
-      await settleConnectionStatus(connection, errors);
+      await settleConnectionStatus(connection, errors, changed);
 
       // Diagnostic (prod-off feature) — surfaces what each connection actually did,
       // so a per-account discrepancy is visible in the console rather than guessed at.
@@ -346,7 +376,8 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
   /** Translate the batch's errors into the connection's status (shared-token-safe). */
   async function settleConnectionStatus(
     connection: CalendarConnection,
-    errors: CalendarApiError[]
+    errors: CalendarApiError[],
+    changed: boolean
   ): Promise<void> {
     const hasAuth = errors.some((e) => e.kind === 'auth');
 
@@ -397,7 +428,17 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       return;
     }
 
-    // Clean success → ok + freshness-claim.
+    // Clean success. If nothing changed AND the connection is already ok AND its
+    // freshness claim is still within the window, skip the write entirely — this is
+    // what stops a no-op reconcile from churning the CRDT / re-triggering itself (F1).
+    if (!changed && connection.status === 'ok') {
+      const lastAt = connection.lastReconciledAt
+        ? new Date(connection.lastReconciledAt).getTime()
+        : 0;
+      if (Date.now() - lastAt < FRESHNESS_WINDOW_MS) return;
+    }
+
+    // → ok + refresh the freshness-claim.
     await updateCalendarConnection(connection.id, {
       status: 'ok',
       lastError: undefined,
@@ -497,26 +538,51 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     }
   }
 
-  /** Change the destination calendar: remove events from the old one, then re-sync. */
-  async function setDestinationCalendar(connectionId: string, calendarId: string): Promise<void> {
+  /**
+   * Change the destination calendar — all-or-nothing (F6). Delete the old-calendar
+   * events FIRST; only if every delete succeeds do we drop the links, switch, and
+   * re-sync. On any failure we ABORT: `destinationCalendarId` stays on the old
+   * calendar and ALL links are kept (the next reconcile resurrects any already-
+   * deleted events on the old calendar — self-healing), so nothing is orphaned.
+   */
+  async function setDestinationCalendar(
+    connectionId: string,
+    calendarId: string
+  ): Promise<{ ok: boolean }> {
     const connection = await getCalendarConnectionById(connectionId);
-    if (!connection || connection.destinationCalendarId === calendarId) return;
+    if (!connection || connection.destinationCalendarId === calendarId) return { ok: true };
     const client = getClient();
     const oldCalendarId = connection.destinationCalendarId || 'primary';
     const links = await getCalendarEventLinksForConnection(connectionId);
 
+    // Delete-only pass. Keep ALL links until we know the old calendar is fully cleared.
+    let allCleared = true;
+    let failures = 0;
     const tasks = links.map((link) => async () => {
       try {
         await client.deleteEvent(connectionId, oldCalendarId, link.googleEventId);
       } catch {
-        /* best-effort cleanup of the old calendar */
+        allCleared = false;
+        failures++;
       }
-      await removeCalendarEventLinkById(connectionId, link.activityId);
     });
     await runPooled(tasks, MAX_INFLIGHT);
 
+    if (!allCleared) {
+      reportError({
+        surface: 'calendar-sync',
+        message: `[calendarSync] destination switch aborted: ${failures} old-calendar delete(s) failed`,
+        severity: 'warning',
+        context: { connectionId },
+      });
+      return { ok: false }; // destination + all links unchanged; reconcile self-heals
+    }
+
+    // Cleared → drop links, switch, re-sync onto the new calendar.
+    for (const link of links) await removeCalendarEventLinkById(connectionId, link.activityId);
     await updateCalendarConnection(connectionId, { destinationCalendarId: calendarId });
     void reconcileConnection(connectionId, { verifyExisting: true, force: true });
+    return { ok: true };
   }
 
   /** Calendars for the destination picker. Falls back to a primary-only option if the
@@ -581,9 +647,14 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       { fireImmediatelyOnVisible: true, surface: 'calendar-sync' }
     );
 
-    // Edits → a fast, no-verify push (debounced to coalesce bulk edits).
+    // Activity edits → a fast, no-verify push (debounced to coalesce bulk edits).
+    // Watch the ACTIVITY store specifically (not the doc-wide `docVersion`): the
+    // reconcile's own writes touch `calendarConnections`, not `activities`, so they
+    // can't re-trigger this — killing the self-loop and the cross-device ping-pong —
+    // and unrelated mutations (photos/transactions/…) no longer wake the engine. (F1)
+    const activityStore = useActivityStore();
     stopActivityWatch = watch(
-      () => (isDocLoaded() ? docVersion.value : 0),
+      () => activityStore.activities,
       () => {
         if (editDebounce) clearTimeout(editDebounce);
         editDebounce = setTimeout(() => {
@@ -601,6 +672,9 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     stopActivityWatch = null;
     if (editDebounce) clearTimeout(editDebounce);
     editDebounce = null;
+    // Reset module-level engine state so a new session/family starts clean (F7).
+    clientImpl = null;
+    invalidGrantCounters.clear();
   }
 
   return {

@@ -10,6 +10,8 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useHolidayStore } from '@/stores/holidayStore';
+import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
+import { isFlagEnabled } from '@/config/flags';
 
 /**
  * Reset every Pinia store that holds family-scoped state — call on sign-out and
@@ -30,4 +32,8 @@ export function resetAllAppStores(): void {
   useTodoStore().resetState();
   useActivityStore().resetState();
   useHolidayStore().resetState();
+  // Tear down the calendar sync engine (pollers + watchers + module state) so it
+  // doesn't keep running after sign-out / family-switch (F7). Flag-gated so the
+  // store isn't instantiated when the feature is off.
+  if (isFlagEnabled('googleCalendarSync')) useCalendarSyncStore().stop();
 }

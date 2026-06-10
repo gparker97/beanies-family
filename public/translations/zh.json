@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-10",
-    "translationCount": 3143
+    "translationCount": 3145
   },
   "translations": {
     "app.name": {
@@ -15719,6 +15719,16 @@
     "calendarSync.error.unknown": {
       "translation": "同步此日历时出错。",
       "hash": "74hdwg",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.toast.destinationFailed.title": {
+      "translation": "无法切换日历",
+      "hash": "w1wfok",
+      "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.toast.destinationFailed.message": {
+      "translation": "某些活动无法从旧日历中删除，因此更改已撤消。请重试。",
+      "hash": "z6g8b6",
       "lastUpdated": "2026-06-10"
     }
   }
