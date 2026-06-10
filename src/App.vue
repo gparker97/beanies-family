@@ -60,6 +60,8 @@ import { useRecipesStore } from '@/stores/recipesStore';
 import { useEmergencyContactsStore } from '@/stores/emergencyContactsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
+import { isFlagEnabled } from '@/config/flags';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
@@ -411,6 +413,14 @@ async function loadFamilyData() {
 
   // Initialize sync service (restores file handle if configured)
   await syncStore.initialize();
+
+  // #32 Google Calendar sync — start the background reconcile engine ONLY when the
+  // flag is on (when off, the store is never instantiated → zero pollers/watchers).
+  // Idempotent + tolerant: it reads connections live, so calling before the doc
+  // finishes loading is safe. Prod-off until launch.
+  if (isFlagEnabled('googleCalendarSync')) {
+    useCalendarSyncStore().start();
+  }
   initBreadcrumbs.push(
     `syncInit: configured=${syncStore.isConfigured}, needsPermission=${syncStore.needsPermission}`
   );
