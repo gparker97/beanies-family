@@ -6724,6 +6724,21 @@ const STRING_DEFS = {
   },
   'calendarSync.destinationLabel': { en: 'Calendar', beanie: 'calendar' },
   'calendarSync.primaryCalendar': { en: 'Primary calendar', beanie: 'primary calendar' },
+  // #34 clash nudge — toggle, availability caption, and the activity indicator.
+  'calendarSync.clashNudge.title': {
+    en: 'Warn me about clashes with my other calendars',
+    beanie: 'warn me about clashes with my other calendars',
+  },
+  'calendarSync.clashNudge.hint': {
+    en: "beanies only checks whether you're busy, never what the event is.",
+    beanie: "beanies only checks whether you're busy, never what the event is.",
+  },
+  'calendarSync.clashNudge.label': { en: 'Clash warnings', beanie: 'clash warnings' },
+  'calendarSync.clashNudge.unavailable': {
+    en: 'Reconnect your calendar and allow availability to use this.',
+    beanie: 'reconnect your calendar and allow availability to use this.',
+  },
+  'calendarSync.clash.tooltipPrefix': { en: 'May clash with', beanie: 'may clash with' },
   'calendarSync.connectOnDesktop': {
     en: 'Open beanies in a desktop browser to connect a calendar. Once connected, it syncs on all your devices.',
     beanie:

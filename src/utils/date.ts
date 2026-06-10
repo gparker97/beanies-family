@@ -182,6 +182,29 @@ export function addDaysYmd(ymd: string, days: number): string {
   return toDateInputValue(addDays(parseLocalDate(ymd.slice(0, 10)), days));
 }
 
+/**
+ * The inclusive date span of the rendered month grid for `referenceDate` — the
+ * 6-week grid INCLUDING the leading/trailing adjacent-month padding days, NOT the
+ * 1st→last of the calendar month. `weekStartDay` is 0=Sun..6=Sat. Single source of
+ * truth for "what days the month view actually shows" (consumed by the calendar
+ * grid and the clash-window derivation).
+ */
+export function monthGridRange(
+  referenceDate: Date,
+  weekStartDay: number
+): { startYmd: string; endYmd: string } {
+  const year = referenceDate.getFullYear();
+  const month = referenceDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startOffset = (firstDay.getDay() - weekStartDay + 7) % 7;
+  const totalGridCells = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7;
+  return {
+    startYmd: toDateInputValue(new Date(year, month, 1 - startOffset)),
+    endYmd: toDateInputValue(new Date(year, month, 1 - startOffset + totalGridCells - 1)),
+  };
+}
+
 export function addMonths(date: Date, months: number): Date {
   const result = new Date(date);
   result.setMonth(result.getMonth() + months);

@@ -34,6 +34,7 @@ describe('config/featureFlagWrite', () => {
     expect(result.nextState).toEqual({
       aiPhotoExtract: true,
       aiTravelExtract: false,
+      calendarClashNudge: false,
       googleCalendarSync: false,
     });
     expect(result.source).toContain('aiPhotoExtract: true,');
@@ -64,6 +65,7 @@ describe('config/featureFlagWrite', () => {
     expect(result.nextState).toEqual({
       aiPhotoExtract: false,
       aiTravelExtract: true,
+      calendarClashNudge: false,
       googleCalendarSync: false,
     });
     expect(Object.keys(result.nextState)).not.toContain('bogusOld');
