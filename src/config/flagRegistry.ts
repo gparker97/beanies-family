@@ -21,6 +21,11 @@ export const FLAG_REGISTRY = [
     label: 'AI travel extract',
     description: 'Magic beans reader: itinerary / booking document → trip.',
   },
+  {
+    id: 'googleCalendarSync',
+    label: 'Google Calendar sync',
+    description: 'One-way push of family activities into connected Google calendars.',
+  },
 ] as const;
 
 /** Union of all known flag ids — derived from the registry (single source of truth). */

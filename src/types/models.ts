@@ -599,6 +599,79 @@ export type UpdateFamilyActivityInput = Partial<
 >;
 
 // ---------------------------------------------------------------------------
+// Google Calendar Integration (#32) — one-way push of activities to external calendars
+// ---------------------------------------------------------------------------
+
+export type CalendarProvider = 'google';
+
+export type CalendarConnectionStatus = 'ok' | 'needs_reconnect' | 'error' | 'disconnecting';
+
+/**
+ * A connected external calendar (family-wide). Stored in the CRDT so every
+ * family device shares the connection AND its refresh token — so any device can
+ * keep the calendar fresh, and the token survives a local-storage clear. The
+ * refresh token is the connecter's own Google credential (family-trust boundary;
+ * the `.beanpod` is already AES-256-GCM encrypted). See the #32 plan, Layer 2.
+ */
+export interface CalendarConnection {
+  id: UUID;
+  provider: CalendarProvider;
+  accountEmail: string;
+  /** Destination calendar id within the account. 'primary' by default. */
+  destinationCalendarId: string;
+  /** Long-lived OAuth refresh token (lives in the encrypted .beanpod). */
+  refreshToken: string;
+  /** Scopes actually granted (granular consent can drop some, e.g. freebusy / calendarlist). */
+  grantedScopes: string[];
+  status: CalendarConnectionStatus;
+  /** ISO timestamp of the last reconcile that wrote/confirmed events. */
+  lastSyncedAt?: ISODateString;
+  /** Cross-device freshness-claim: when / by which device this was last reconciled. */
+  lastReconciledAt?: ISODateString;
+  lastReconciledBy?: string;
+  /** Last classified error (for the Settings status line). */
+  lastError?: string;
+  /** Transient-failure counter for parking (distinct from the device-local auth K-counter). */
+  consecutiveFailures?: number;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type CreateCalendarConnectionInput = Omit<
+  CalendarConnection,
+  'id' | 'createdAt' | 'updatedAt'
+>;
+export type UpdateCalendarConnectionInput = Partial<
+  Omit<CalendarConnection, 'id' | 'createdAt' | 'updatedAt'>
+>;
+
+/**
+ * Maps a beanies activity to the Google event beanies created for it within a
+ * connection. Lives in the CRDT → shared across devices; with the deterministic
+ * event id this yields cross-device dedup. `id` is the composite
+ * `${connectionId}:${activityId}` so lookups are O(1) and creation is idempotent.
+ */
+export interface CalendarEventLink {
+  id: UUID; // composite `${connectionId}:${activityId}`
+  connectionId: UUID;
+  activityId: UUID;
+  googleEventId: string;
+  /** Hash of the pushed-relevant activity fields; skip reconcile when unchanged. */
+  lastPushedHash: string;
+  lastPushedAt: ISODateString;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type CreateCalendarEventLinkInput = Omit<
+  CalendarEventLink,
+  'id' | 'createdAt' | 'updatedAt'
+>;
+export type UpdateCalendarEventLinkInput = Partial<
+  Omit<CalendarEventLink, 'id' | 'createdAt' | 'updatedAt'>
+>;
+
+// ---------------------------------------------------------------------------
 // Vacation Planning
 // ---------------------------------------------------------------------------
 
