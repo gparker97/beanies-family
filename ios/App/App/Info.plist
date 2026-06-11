@@ -34,11 +34,12 @@
 	<array>
 		<string>armv7</string>
 	</array>
+	<!-- iPhone: portrait-locked to match the PWA manifest (orientation:
+	     'portrait') and the Android activity. The app is designed phone-first
+	     and every layout is portrait. iPad keeps all orientations below. -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
