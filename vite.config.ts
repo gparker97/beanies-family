@@ -159,7 +159,13 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         scope: '/',
-        orientation: 'any',
+        // Portrait-locked: the app is designed phone-first and every layout is
+        // portrait. In an installed PWA the manifest `orientation` overrides the
+        // OS auto-rotate lock, so `'any'` rotated against users who had rotation
+        // locked (Discord early-adopter report, 2026-06-12). `'portrait'` keeps
+        // the installed app from flipping. Native parity lives in
+        // android/.../AndroidManifest.xml (android:screenOrientation).
+        orientation: 'portrait',
         categories: ['finance', 'productivity'],
         icons: [
           {
