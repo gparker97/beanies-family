@@ -32,7 +32,6 @@ const USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v2/userinfo';
 /** Calendar consent scopes. `userinfo.email` (non-sensitive) lets us label the connection. */
 export const CALENDAR_SCOPES = [
   'https://www.googleapis.com/auth/calendar.events.owned',
-  'https://www.googleapis.com/auth/calendar.freebusy',
   'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
   'https://www.googleapis.com/auth/userinfo.email',
 ] as const;

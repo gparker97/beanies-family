@@ -4,10 +4,12 @@ import {
   activityTimeRange,
   intervalsOverlap,
   computeClashes,
+  externalBusyIntervals,
   clashKey,
   type ActivityOccurrence,
   type ConnectionBusy,
 } from '../clashDetection';
+import type { EventTime } from '@/services/calendar/CalendarClient';
 
 function makeActivity(overrides: Partial<FamilyActivity> = {}): FamilyActivity {
   return {
@@ -87,40 +89,31 @@ describe('computeClashes', () => {
   });
 
   it('flags an overlapping timed occurrence, keyed via clashKey, naming the connection', () => {
-    const occurrences = [occ('a1', '2026-06-10', '14:00', '15:00')];
+    const date = '2026-06-10';
+    const occurrences = [occ('a1', date, '14:00', '15:00')];
     const busy: ConnectionBusy[] = [
       {
         connectionId: 'conn-1',
         calendarLabel: 'mum@example.com',
-        intervals: [{ start: '2026-06-10T14:30:00+08:00', end: '2026-06-10T16:00:00+08:00' }],
+        intervals: [{ startMs: localMs(date, '14:30'), endMs: localMs(date, '16:00') }],
       },
     ];
-    // Run in the +08:00 zone so the activity's local 14:00 lines up with the busy block.
     const clashes = computeClashes(occurrences, busy);
-    const key = clashKey('a1', '2026-06-10');
-    // Only assert presence/shape when the test host tz overlaps; the cross-offset
-    // case below pins the absolute-ms contract deterministically.
-    if (clashes.has(key)) {
-      expect(clashes.get(key)).toEqual({
-        connectionId: 'conn-1',
-        calendarLabel: 'mum@example.com',
-      });
-    }
+    expect(clashes.get(clashKey('a1', date))).toEqual({
+      connectionId: 'conn-1',
+      calendarLabel: 'mum@example.com',
+    });
   });
 
-  it('compares in ABSOLUTE ms — a busy block in another UTC offset still overlaps', () => {
-    // Activity 14:00–15:00 local. Busy block expressed in UTC that covers the SAME
-    // absolute instant as the local 14:30, regardless of the host timezone.
+  it('compares in ABSOLUTE ms — intervals are already ms (offset-correct upstream)', () => {
+    // Activity 14:00–15:00 local. Busy block expressed in absolute ms that covers
+    // the SAME instant as the local 14:30, regardless of the host timezone.
     const date = '2026-06-10';
-    const busyStartMs = localMs(date, '14:30');
-    const busyEndMs = localMs(date, '16:00');
     const busy: ConnectionBusy[] = [
       {
         connectionId: 'conn-1',
         calendarLabel: 'work',
-        intervals: [
-          { start: new Date(busyStartMs).toISOString(), end: new Date(busyEndMs).toISOString() },
-        ],
+        intervals: [{ startMs: localMs(date, '14:30'), endMs: localMs(date, '16:00') }],
       },
     ];
     const clashes = computeClashes([occ('a1', date, '14:00', '15:00')], busy);
@@ -136,12 +129,7 @@ describe('computeClashes', () => {
       {
         connectionId: 'conn-1',
         calendarLabel: 'work',
-        intervals: [
-          {
-            start: new Date(localMs(date, '15:00')).toISOString(),
-            end: new Date(localMs(date, '16:00')).toISOString(),
-          },
-        ],
+        intervals: [{ startMs: localMs(date, '15:00'), endMs: localMs(date, '16:00') }],
       },
     ];
     const clashes = computeClashes([occ('a1', date, '14:00', '15:00')], busy);
@@ -156,9 +144,52 @@ describe('computeClashes', () => {
       {
         connectionId: 'conn-1',
         calendarLabel: 'work',
-        intervals: [{ start: '2026-06-10T00:00:00Z', end: '2026-06-11T00:00:00Z' }],
+        intervals: [
+          { startMs: localMs('2026-06-10', '00:00'), endMs: localMs('2026-06-11', '00:00') },
+        ],
       },
     ];
     expect(computeClashes(occurrences, busy).size).toBe(0);
+  });
+});
+
+describe('externalBusyIntervals', () => {
+  const ev = (over: Partial<EventTime>): EventTime => ({
+    id: 'e1',
+    startMs: 1000,
+    endMs: 2000,
+    transparent: false,
+    ...over,
+  });
+
+  it('keeps an opaque external event (id not in the beanies set)', () => {
+    const out = externalBusyIntervals([ev({ id: 'other' })], new Set(['bxxx']));
+    expect(out).toEqual([{ startMs: 1000, endMs: 2000 }]);
+  });
+
+  it('drops a transparent (free-marked) event', () => {
+    const out = externalBusyIntervals([ev({ id: 'other', transparent: true })], new Set());
+    expect(out).toEqual([]);
+  });
+
+  it('drops a beanies one-off event matched by id', () => {
+    const out = externalBusyIntervals([ev({ id: 'bself' })], new Set(['bself']));
+    expect(out).toEqual([]);
+  });
+
+  it('drops a beanies recurring instance matched by recurringEventId', () => {
+    const out = externalBusyIntervals(
+      [ev({ id: 'bself_20260610T060000Z', recurringEventId: 'bself' })],
+      new Set(['bself'])
+    );
+    expect(out).toEqual([]);
+  });
+
+  it('keeps an external recurring instance whose master is NOT a beanies id', () => {
+    const out = externalBusyIntervals(
+      [ev({ id: 'work_x', recurringEventId: 'workmaster' })],
+      new Set(['bself'])
+    );
+    expect(out).toEqual([{ startMs: 1000, endMs: 2000 }]);
   });
 });

@@ -36,11 +36,23 @@ export interface CalendarSummary {
   primary: boolean;
 }
 
-/** A busy time block from a free/busy query — availability only, never event
- *  details. `start`/`end` are RFC3339 instants (offset-bearing). (#34) */
-export interface BusyInterval {
-  start: string;
-  end: string;
+/**
+ * A single external event's time window — TIMES ONLY. The `events.list` read uses
+ * a `fields` mask that omits summary/description/location/attendees, so event
+ * content never crosses the wire. `transparent` reflects `transparency: 'transparent'`
+ * (the owner marked the event "free", not busy). The `id` / `recurringEventId` are
+ * opaque identifiers used solely to exclude beanies' OWN synced events from clash
+ * detection — never displayed, persisted, or sent anywhere. (#34) */
+export interface EventTime {
+  /** Per-instance id (an expanded recurring instance has its own id). */
+  id: string;
+  /** For an expanded recurring instance, the master event id; else undefined. */
+  recurringEventId?: string;
+  /** Absolute start/end in ms (timed: from `dateTime`; all-day: local-midnight span). */
+  startMs: number;
+  endMs: number;
+  /** `transparency === 'transparent'` → owner marked it "free", not busy. */
+  transparent: boolean;
 }
 
 /**
@@ -83,15 +95,16 @@ export interface CalendarClient {
   /** List the account's calendars for the destination picker. */
   listCalendars(connectionId: string): Promise<CalendarSummary[]>;
   /**
-   * Query free/busy for the given calendars over `[timeMinIso, timeMaxIso)`.
-   * Read-only, availability only — returns busy intervals per calendar id, never
-   * event details. A per-calendar failure (Google reports these in the 200 body,
-   * not as an HTTP error) is thrown as a classified `CalendarApiError`. (#34)
+   * List event TIMES on one calendar over `[timeMinIso, timeMaxIso)`. Read-only,
+   * times only — the impl uses a `fields` mask so event content (title/notes/
+   * location/attendees) never returns. Recurring events are expanded into concrete
+   * instances (`singleEvents=true`), cancelled events excluded. Errors are thrown as
+   * classified `CalendarApiError` via the shared `authedFetch`. (#34)
    */
-  queryFreeBusy(
+  listEventTimes(
     connectionId: string,
-    calendarIds: string[],
+    calendarId: string,
     timeMinIso: string,
     timeMaxIso: string
-  ): Promise<Record<string, BusyInterval[]>>;
+  ): Promise<EventTime[]>;
 }

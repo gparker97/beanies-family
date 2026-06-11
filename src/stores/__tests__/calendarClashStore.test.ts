@@ -5,6 +5,7 @@ import { createCalendarConnection } from '@/services/automerge/repositories/cale
 import { setCalendarClientForTesting } from '@/services/calendar/clientInstance';
 import { CalendarApiError, type CalendarClient } from '@/services/calendar/CalendarClient';
 import type { ActivityOccurrence } from '@/utils/calendar/clashDetection';
+import { deterministicEventId } from '@/utils/calendar/deterministicEventId';
 import { useCalendarClashStore } from '../calendarClashStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 
@@ -12,7 +13,6 @@ const { reportErrorMock } = vi.hoisted(() => ({ reportErrorMock: vi.fn() }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: reportErrorMock }));
 
 const OWNED = 'https://www.googleapis.com/auth/calendar.events.owned';
-const FREEBUSY = 'https://www.googleapis.com/auth/calendar.freebusy';
 
 function localMs(ymd: string, hhmm: string): number {
   const [y, mo, d] = ymd.split('-').map(Number);
@@ -46,7 +46,7 @@ function timedOcc(
   };
 }
 
-function makeClient(queryFreeBusy: CalendarClient['queryFreeBusy']): CalendarClient {
+function makeClient(listEventTimes: CalendarClient['listEventTimes']): CalendarClient {
   return {
     async insertEvent() {},
     async patchEvent() {},
@@ -57,30 +57,31 @@ function makeClient(queryFreeBusy: CalendarClient['queryFreeBusy']): CalendarCli
     async listCalendars() {
       return [];
     },
-    queryFreeBusy,
+    listEventTimes,
   };
 }
 
-async function makeFreebusyConnection() {
+async function makeConnection() {
   return createCalendarConnection({
     provider: 'google',
     accountEmail: 'mum@example.com',
     destinationCalendarId: 'primary',
     refreshToken: 'r',
-    grantedScopes: [OWNED, FREEBUSY],
+    grantedScopes: [OWNED],
     status: 'ok',
   });
 }
 
 const WINDOW = ['2026-06-10T00:00:00Z', '2026-06-11T00:00:00Z'] as const;
-const overlappingBusy = () => ({
-  primary: [
-    {
-      start: new Date(localMs('2026-06-10', '14:30')).toISOString(),
-      end: new Date(localMs('2026-06-10', '16:00')).toISOString(),
-    },
-  ],
-});
+/** One opaque external event overlapping a 14:00–15:00 activity on 2026-06-10. */
+const overlappingEvents = () => [
+  {
+    id: 'work-1',
+    startMs: localMs('2026-06-10', '14:30'),
+    endMs: localMs('2026-06-10', '16:00'),
+    transparent: false,
+  },
+];
 
 describe('calendarClashStore (#34)', () => {
   beforeEach(() => {
@@ -95,31 +96,29 @@ describe('calendarClashStore (#34)', () => {
     localStorage.clear();
   });
 
-  it('partial grant (no freebusy scope) → unavailable, no queries', async () => {
-    await createCalendarConnection({
-      provider: 'google',
-      accountEmail: 'dad@example.com',
-      destinationCalendarId: 'primary',
-      refreshToken: 'r',
-      grantedScopes: [OWNED], // freebusy declined
-      status: 'ok',
-    });
-    const query = vi.fn(async () => ({}));
-    setCalendarClientForTesting(makeClient(query));
+  it('no connected calendar → unavailable, no reads', async () => {
+    const read = vi.fn(async () => []);
+    setCalendarClientForTesting(makeClient(read));
     const store = useCalendarClashStore();
     expect(store.isAvailable).toBe(false);
 
     await store.ensureBusyForWindow(WINDOW[0], WINDOW[1], [
       timedOcc('a1', '2026-06-10', '14:00', '15:00'),
     ]);
-    expect(query).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
     expect(store.clashFor('a1', '2026-06-10')).toBeUndefined();
   });
 
-  it('toggle off → unavailable, no queries', async () => {
-    await makeFreebusyConnection();
-    const query = vi.fn(async () => overlappingBusy());
-    setCalendarClientForTesting(makeClient(query));
+  it('available whenever a calendar is connected (events.owned is always granted)', async () => {
+    await makeConnection();
+    setCalendarClientForTesting(makeClient(vi.fn(async () => [])));
+    expect(useCalendarClashStore().isAvailable).toBe(true);
+  });
+
+  it('toggle off → unavailable, no reads', async () => {
+    await makeConnection();
+    const read = vi.fn(async () => overlappingEvents());
+    setCalendarClientForTesting(makeClient(read));
     await useSettingsStore().setCalendarClashNudgeEnabled(false);
     const store = useCalendarClashStore();
     expect(store.isAvailable).toBe(false);
@@ -127,47 +126,83 @@ describe('calendarClashStore (#34)', () => {
     await store.ensureBusyForWindow(WINDOW[0], WINDOW[1], [
       timedOcc('a1', '2026-06-10', '14:00', '15:00'),
     ]);
-    expect(query).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
   });
 
   it('happy path → clashFor resolves to the connection, decoration recomputed', async () => {
-    const conn = await makeFreebusyConnection();
-    const query = vi.fn(async () => overlappingBusy());
-    setCalendarClientForTesting(makeClient(query));
+    const conn = await makeConnection();
+    const read = vi.fn(async () => overlappingEvents());
+    setCalendarClientForTesting(makeClient(read));
     const store = useCalendarClashStore();
     expect(store.clashFor('a1', '2026-06-10')).toBeUndefined();
 
     await store.ensureBusyForWindow(WINDOW[0], WINDOW[1], [
       timedOcc('a1', '2026-06-10', '14:00', '15:00'),
     ]);
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledTimes(1);
     expect(store.clashFor('a1', '2026-06-10')).toEqual({
       connectionId: conn.id,
       calendarLabel: 'mum@example.com',
     });
   });
 
-  it('TTL reuse → same window within TTL issues no new query', async () => {
-    await makeFreebusyConnection();
-    const query = vi.fn(async () => overlappingBusy());
-    setCalendarClientForTesting(makeClient(query));
+  it('self-exclusion → beanies OWN synced event at the same time yields NO clash', async () => {
+    await makeConnection();
+    // The external calendar contains ONLY beanies' own pushed event for a1.
+    const read = vi.fn(async () => [
+      {
+        id: deterministicEventId('a1'),
+        startMs: localMs('2026-06-10', '14:00'),
+        endMs: localMs('2026-06-10', '15:00'),
+        transparent: false,
+      },
+    ]);
+    setCalendarClientForTesting(makeClient(read));
+    const store = useCalendarClashStore();
+
+    await store.ensureBusyForWindow(WINDOW[0], WINDOW[1], [
+      timedOcc('a1', '2026-06-10', '14:00', '15:00'),
+    ]);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(store.clashFor('a1', '2026-06-10')).toBeUndefined();
+  });
+
+  it('a corrupt activity id does not throw out of ensureBusyForWindow (guarded + reported)', async () => {
+    await makeConnection();
+    setCalendarClientForTesting(makeClient(vi.fn(async () => overlappingEvents())));
+    const store = useCalendarClashStore();
+
+    await expect(
+      store.ensureBusyForWindow(WINDOW[0], WINDOW[1], [
+        timedOcc('', '2026-06-10', '14:00', '15:00'), // blank id → deterministicEventId throws
+      ])
+    ).resolves.toBeUndefined();
+    // The blank-id occurrence is skipped from the self-exclusion set + reported once.
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock.mock.calls[0]![0]).toMatchObject({ surface: 'calendar-clash' });
+  });
+
+  it('TTL reuse → same window within TTL issues no new read', async () => {
+    await makeConnection();
+    const read = vi.fn(async () => overlappingEvents());
+    setCalendarClientForTesting(makeClient(read));
     const store = useCalendarClashStore();
     const occ = [timedOcc('a1', '2026-06-10', '14:00', '15:00')];
 
     await store.ensureBusyForWindow(WINDOW[0], WINDOW[1], occ);
     await store.ensureBusyForWindow(WINDOW[0], WINDOW[1], occ);
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledTimes(1);
   });
 
-  it('a concurrent same-window call while in flight does not duplicate the fetch', async () => {
-    await makeFreebusyConnection();
+  it('a concurrent same-window call while in flight does not duplicate the read', async () => {
+    await makeConnection();
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
-    const query = vi.fn(async () => {
+    const read = vi.fn(async () => {
       await gate;
-      return overlappingBusy();
+      return overlappingEvents();
     });
-    setCalendarClientForTesting(makeClient(query));
+    setCalendarClientForTesting(makeClient(read));
     const store = useCalendarClashStore();
     const occ = [timedOcc('a1', '2026-06-10', '14:00', '15:00')];
 
@@ -175,15 +210,15 @@ describe('calendarClashStore (#34)', () => {
     const p2 = store.ensureBusyForWindow(WINDOW[0], WINDOW[1], occ); // in-flight → short-circuits
     release();
     await Promise.all([p1, p2]);
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledTimes(1);
   });
 
-  it('a throwing free/busy query degrades silently but reports once (no bare catch)', async () => {
-    await makeFreebusyConnection();
-    const query = vi.fn(async () => {
+  it('a throwing read degrades silently but reports once (no bare catch)', async () => {
+    await makeConnection();
+    const read = vi.fn(async () => {
       throw new CalendarApiError('transient', 'boom');
     });
-    setCalendarClientForTesting(makeClient(query));
+    setCalendarClientForTesting(makeClient(read));
     const store = useCalendarClashStore();
 
     await expect(
@@ -197,8 +232,8 @@ describe('calendarClashStore (#34)', () => {
   });
 
   it('stop() clears the cache + decoration in one call', async () => {
-    await makeFreebusyConnection();
-    setCalendarClientForTesting(makeClient(vi.fn(async () => overlappingBusy())));
+    await makeConnection();
+    setCalendarClientForTesting(makeClient(vi.fn(async () => overlappingEvents())));
     const store = useCalendarClashStore();
     await store.ensureBusyForWindow(WINDOW[0], WINDOW[1], [
       timedOcc('a1', '2026-06-10', '14:00', '15:00'),
