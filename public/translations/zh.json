@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-11",
-    "translationCount": 3143
+    "translationCount": 3151
   },
   "translations": {
     "app.name": {
@@ -15720,6 +15720,46 @@
       "translation": "可能与发生冲突",
       "hash": "sok8r8",
       "lastUpdated": "2026-06-10"
+    },
+    "calendarSync.clash.overlapsCalendarPrefix": {
+      "translation": "与您的重叠",
+      "hash": "z4o7rt",
+      "lastUpdated": "2026-06-11"
+    },
+    "calendarSync.clash.calendarSuffix": {
+      "translation": "日历",
+      "hash": "2y6476",
+      "lastUpdated": "2026-06-11"
+    },
+    "calendarSync.clash.dismissHint": {
+      "translation": "如果您预料到的话，请忽略。",
+      "hash": "vkrmwn",
+      "lastUpdated": "2026-06-11"
+    },
+    "calendarSync.clash.thisIsOk": {
+      "translation": "没关系",
+      "hash": "79mxc",
+      "lastUpdated": "2026-06-11"
+    },
+    "calendarSync.clash.reschedule": {
+      "translation": "计划",
+      "hash": "2eezy4",
+      "lastUpdated": "2026-06-11"
+    },
+    "calendarSync.clash.whatsThis": {
+      "translation": "這是什麼？",
+      "hash": "n0sf5b",
+      "lastUpdated": "2026-06-11"
+    },
+    "calendarSync.clash.acknowledgedLine": {
+      "translation": "你可以接受这种重叠",
+      "hash": "ntikww",
+      "lastUpdated": "2026-06-11"
+    },
+    "calendarSync.clash.undo": {
+      "translation": "撤销",
+      "hash": "1klxg",
+      "lastUpdated": "2026-06-11"
     }
   }
 }

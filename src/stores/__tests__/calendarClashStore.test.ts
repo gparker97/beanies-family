@@ -140,10 +140,15 @@ describe('calendarClashStore (#34)', () => {
       timedOcc('a1', '2026-06-10', '14:00', '15:00'),
     ]);
     expect(read).toHaveBeenCalledTimes(1);
-    expect(store.clashFor('a1', '2026-06-10')).toEqual({
-      connectionId: conn.id,
-      calendarLabel: 'mum@example.com',
-    });
+    expect(store.clashFor('a1', '2026-06-10')).toEqual(
+      expect.objectContaining({
+        connectionId: conn.id,
+        calendarLabel: 'mum@example.com',
+        activityId: 'a1',
+        occurrenceDate: '2026-06-10',
+        fingerprint: expect.stringMatching(/^\d+-\d+$/),
+      })
+    );
   });
 
   it('self-exclusion → beanies OWN synced event at the same time yields NO clash', async () => {
