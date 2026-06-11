@@ -22,6 +22,7 @@ import type {
   EmergencyContact,
   CalendarConnection,
   CalendarEventLink,
+  OverlapAck,
   Settings,
 } from './models';
 
@@ -63,6 +64,12 @@ export interface FamilyDocument {
   // Google Calendar integration (#32) — family-wide connections + activity↔event links
   calendarConnections: Record<string, CalendarConnection>;
   calendarEventLinks: Record<string, CalendarEventLink>;
+  /**
+   * Acknowledged external-calendar overlaps (#34): `overlapAckKey(...)` → ack.
+   * Family-shared "this overlap is fine" memory; merges cleanly (one whole-object
+   * entry per unique key). See OverlapAck in models.ts.
+   */
+  overlapAcknowledgments: Record<string, OverlapAck>;
   settings: Settings | null;
 }
 

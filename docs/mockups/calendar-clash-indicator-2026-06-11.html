@@ -513,18 +513,35 @@
         line-height: 1.55;
         color: var(--ink-soft);
       }
-      .callout .ctext b {
+      .callout .ctext b,
+      .callout .ctitle b {
         color: var(--orange-deep);
-        font-weight: 600;
+        font-weight: 700;
       }
-      [data-theme='dark'] .callout .ctext b {
+      [data-theme='dark'] .callout .ctext b,
+      [data-theme='dark'] .callout .ctitle b {
         color: #ffb699;
       }
       .callout .cactions {
         display: flex;
+        align-items: center;
         gap: 8px;
         margin-top: 12px;
         flex-wrap: wrap;
+      }
+      /* Subtle help link — offloads the longer "why am I seeing this" to the article */
+      .callout .clink {
+        font-size: 12px;
+        color: var(--ink-soft);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        text-decoration-color: var(--hairline);
+        margin-left: 2px;
+        cursor: pointer;
+      }
+      .callout .clink:hover {
+        color: var(--orange-deep);
+        text-decoration-color: currentColor;
       }
       .btn {
         font-family: 'Outfit';
@@ -875,11 +892,11 @@
       <section class="reveal" style="animation-delay: 0.2s">
         <div class="sec-head"><span class="sec-num">5</span><h2 class="sec">The activity drawer — where you decide</h2></div>
         <p class="sec-sub">
-          Opening an activity is where the overlap gets its one sentence of explanation and its controls. A
-          warm callout names the calendar(s), restates the privacy promise in plain words, and offers
-          <b>“This is fine”</b> (quiets it everywhere) — or, for the rare true conflict, you just reschedule.
-          Once quieted, the callout collapses to a single reassuring line with an <b>Undo</b>, so the decision
-          is never a dead end.
+          Opening an activity is where the overlap gets its controls. A compact callout names the calendar
+          and offers <b>“This is OK”</b> (quiets it everywhere) or, for the rare true conflict,
+          <b>Reschedule</b>. A subtle <b>“What's this?”</b> link carries the longer privacy explanation off to
+          the help article, so the callout stays a glance, not a paragraph. Once quieted, it collapses to a
+          single reassuring line with an <b>Undo</b>, so the decision is never a dead end.
         </p>
         <div class="grid2">
           <div>
@@ -895,15 +912,13 @@
               <div class="dbody">
                 <div class="callout" id="calloutLive">
                   <span class="mark cmark" data-size="18"></span>
-                  <div>
-                    <div class="ctitle">Heads up — this overlaps another calendar</div>
-                    <div class="ctext">
-                      This time overlaps something on your <b>Work calendar</b>. beanies can only see
-                      <i>when</i> you're booked — never what it is. Totally fine if you expected it.
-                    </div>
+                  <div style="flex: 1">
+                    <div class="ctitle">Overlaps your <b>Work calendar</b></div>
+                    <div class="ctext">Dismiss if you expected it.</div>
                     <div class="cactions">
-                      <button class="btn btn-primary" id="ackBtn">This is fine</button>
+                      <button class="btn btn-primary" id="ackBtn">This is OK</button>
                       <button class="btn btn-ghost">Reschedule…</button>
+                      <a class="clink" href="#" onclick="return false">What's this?</a>
                     </div>
                   </div>
                 </div>

@@ -18,11 +18,21 @@ export interface BusyMs {
 }
 
 /** A single activity↔calendar clash. Names the connected calendar, never the
- *  other event's details. */
+ *  other event's details. Carries `activityId`/`occurrenceDate`/`fingerprint` so
+ *  the `useClash` seam can self-containedly join it to the acknowledge memory (#34)
+ *  without threading the lookup keys in separately. */
 export interface ClashInfo {
   connectionId: string;
   /** Human label of the connected calendar (e.g. the account email / calendar name). */
   calendarLabel: string;
+  /** The clashing activity. */
+  activityId: string;
+  /** `YYYY-MM-DD` of the clashing occurrence. */
+  occurrenceDate: string;
+  /** Activity occurrence time window, `${startMs}-${endMs}` — the acknowledge
+   *  fingerprint: when it changes (the activity is rescheduled) a quieted overlap
+   *  re-raises. */
+  fingerprint: string;
 }
 
 /** One occurrence of an activity on a concrete date (as expanded for the view). */
@@ -64,6 +74,18 @@ export function externalBusyIntervals(
  *  sides so the two never drift. */
 export function clashKey(activityId: string, occurrenceDate: string): string {
   return `${activityId}:${occurrenceDate}`;
+}
+
+/** Stable map key for an acknowledged overlap (#34): one entry per
+ *  (activity, occurrence-date, connection). The ONLY place this format is defined
+ *  — used on both the write (overlapAckStore) and read (isAcknowledged) sides so
+ *  the two never drift. Positional + same `:`-join style as `clashKey`. */
+export function overlapAckKey(
+  activityId: string,
+  occurrenceDate: string,
+  connectionId: string
+): string {
+  return `${activityId}:${occurrenceDate}:${connectionId}`;
 }
 
 /** Local wall-time `YYYY-MM-DD` + `HH:MM` → absolute ms. */
@@ -127,6 +149,9 @@ export function computeClashes(
         clashes.set(clashKey(occ.activity.id, occ.date), {
           connectionId: conn.connectionId,
           calendarLabel: conn.calendarLabel,
+          activityId: occ.activity.id,
+          occurrenceDate: occ.date,
+          fingerprint: `${range.startMs}-${range.endMs}`,
         });
         break; // first overlapping calendar wins
       }

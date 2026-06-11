@@ -224,6 +224,7 @@ describe('docService', () => {
         notificationReads: {},
         calendarConnections: {},
         calendarEventLinks: {},
+        overlapAcknowledgments: {},
         settings: null,
       };
       const newDoc = Automerge.from(

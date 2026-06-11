@@ -64,6 +64,9 @@ const clash = useClash(
   () => props.occurrence.activity.id,
   () => props.occurrence.date
 );
+/** Active (unacknowledged) overlap → the month chip wears a soft Heritage-Orange
+ *  ring (the loudest the tight month view gets; the dismiss lives in the drawer). */
+const isActiveClash = computed(() => !!clash.value && !clash.value.acknowledged);
 
 const categoryLabel = computed(
   () => getActivityCategoryById(props.occurrence.activity.category)?.name ?? ''
@@ -102,6 +105,7 @@ function onClick(event: MouseEvent) {
   <button
     type="button"
     class="font-inter text-secondary-500 flex w-full min-w-0 items-center gap-1 overflow-hidden rounded-md border-l-[3px] py-0.5 pr-1.5 pl-1 text-left text-xs leading-tight transition-opacity hover:opacity-80 dark:text-gray-200"
+    :class="{ 'ring-primary-500 ring-1': isActiveClash }"
     :style="{ borderLeftColor: classification.color, backgroundColor: bgColor }"
     :aria-label="ariaLabel"
     data-testid="month-chip"
@@ -123,7 +127,7 @@ function onClick(event: MouseEvent) {
 
     <span class="min-w-0 flex-1 truncate font-medium">{{ title }}</span>
 
-    <ClashIndicator :clash="clash" class="flex-shrink-0" />
+    <ClashIndicator :clash="clash" variant="mark" class="flex-shrink-0" />
 
     <!-- Right-edge avatar stack — mobile-only (`md:hidden`) and only for
          multi-person events (the left bar already says whose for solo). -->

@@ -94,6 +94,12 @@ const CLASH_NUDGE_ARTICLE: HelpArticle = {
       content:
         'beanies also recognises its own synced activities and skips them, so it never warns you about a clash with itself. Events you’ve marked as <strong>“free”</strong> (like some birthdays or public holidays) don’t count as a clash either.',
     },
+    { type: 'heading', content: 'Quieting an overlap', level: 2, id: 'quieting' },
+    {
+      type: 'paragraph',
+      content:
+        'Some overlaps are completely expected, and you don’t need to be reminded every time. Open the activity and tap <strong>“This is OK”</strong> — the warning shrinks to a small quiet mark, and that choice is remembered for your whole family across devices. Changed your mind? Open it again and tap <strong>Undo</strong>. Nothing is ever deleted: because a clash is worked out from live calendar data, beanies keeps the mark so a real conflict can never be hidden for good. And if you later <strong>reschedule</strong> the activity to a new time, the warning quietly comes back — so a brand-new overlap still gets your attention.',
+    },
     { type: 'heading', content: 'Turning it on or off', level: 2, id: 'toggle' },
     {
       type: 'paragraph',
