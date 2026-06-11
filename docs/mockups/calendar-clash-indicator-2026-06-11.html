@@ -1,0 +1,1052 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family — Calendar clash indicator (#34) design exploration</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Caveat:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ─── Brand tokens (CIG v2) ─────────────────────────────────────────── */
+      :root {
+        --orange: #f15d22;
+        --orange-deep: #d14d1a;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --slate-2: #34495e;
+        --silk: #aed6f1;
+        --cloud: #f8f9fa;
+        --green: #27ae60;
+
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-orange-22: rgba(241, 93, 34, 0.22);
+        --tint-silk-20: rgba(174, 214, 241, 0.2);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+        --tint-slate-10: rgba(44, 62, 80, 0.1);
+
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --card-hover: 0 8px 32px rgba(44, 62, 80, 0.1);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+
+        --sq: 24px;
+
+        --page-bg: var(--cloud);
+        --surface: #ffffff;
+        --ink: var(--slate);
+        --ink-soft: rgba(44, 62, 80, 0.55);
+        --ink-faint: rgba(44, 62, 80, 0.35);
+        --hairline: rgba(44, 62, 80, 0.08);
+      }
+      [data-theme='dark'] {
+        --page-bg: #1a252f;
+        --surface: #243342;
+        --ink: #ecf0f1;
+        --ink-soft: #bdc3c7;
+        --ink-faint: rgba(236, 240, 241, 0.4);
+        --hairline: rgba(236, 240, 241, 0.1);
+        --orange: #f4703b;
+        --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+        --tint-orange-8: rgba(244, 112, 59, 0.12);
+        --tint-orange-15: rgba(244, 112, 59, 0.2);
+        --tint-orange-22: rgba(244, 112, 59, 0.28);
+        --tint-slate-5: rgba(255, 255, 255, 0.04);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Inter', sans-serif;
+        background: var(--page-bg);
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
+        transition:
+          background 0.3s,
+          color 0.3s;
+      }
+      h1,
+      h2,
+      h3,
+      h4,
+      .outfit {
+        font-family: 'Outfit', sans-serif;
+      }
+
+      /* ─── Page chrome ───────────────────────────────────────────────────── */
+      .topbar {
+        background: linear-gradient(135deg, var(--slate) 0%, #1a252f 100%);
+        color: #fff;
+        padding: 28px clamp(20px, 5vw, 64px);
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+      }
+      .topbar .wordmark {
+        font-family: 'Outfit';
+        font-weight: 800;
+        font-size: 18px;
+        letter-spacing: -0.01em;
+      }
+      .topbar .wordmark .tld {
+        color: var(--orange);
+      }
+      .topbar h1 {
+        font-size: clamp(22px, 3vw, 30px);
+        font-weight: 800;
+        margin: 10px 0 6px;
+        letter-spacing: -0.02em;
+      }
+      .topbar p {
+        margin: 0;
+        color: #bdc7d1;
+        max-width: 70ch;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .controls {
+        display: flex;
+        gap: 10px;
+        margin-top: 18px;
+        flex-wrap: wrap;
+      }
+      .ctl {
+        font-family: 'Outfit';
+        font-weight: 600;
+        font-size: 12px;
+        color: #fff;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        padding: 8px 16px;
+        cursor: pointer;
+        transition: 0.18s;
+      }
+      .ctl:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .ctl.active {
+        background: var(--orange);
+        border-color: var(--orange);
+      }
+
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 40px clamp(16px, 4vw, 48px) 96px;
+      }
+      .lede {
+        font-size: 15px;
+        line-height: 1.65;
+        color: var(--ink-soft);
+        max-width: 72ch;
+        margin: 0 0 8px;
+      }
+      .lede b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      section {
+        margin-top: 56px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+      .sec-num {
+        font-family: 'Outfit';
+        font-weight: 800;
+        font-size: 13px;
+        color: #fff;
+        background: var(--orange);
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        flex: none;
+      }
+      h2.sec {
+        font-size: 20px;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .sec-sub {
+        color: var(--ink-soft);
+        font-size: 13.5px;
+        line-height: 1.6;
+        margin: 8px 0 22px 38px;
+        max-width: 70ch;
+      }
+
+      .panel {
+        background: var(--surface);
+        border-radius: var(--sq);
+        box-shadow: var(--card-shadow);
+        padding: 26px;
+        border: 1px solid var(--hairline);
+      }
+      .grid2 {
+        display: grid;
+        gap: 22px;
+        grid-template-columns: 1fr 1fr;
+      }
+      @media (max-width: 760px) {
+        .grid2 {
+          grid-template-columns: 1fr;
+        }
+      }
+      .cap {
+        font-family: 'Outfit';
+        font-weight: 600;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+        margin: 0 0 12px;
+      }
+      .state-row {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      /* ─── The overlap mark (the clash motif) ────────────────────────────── */
+      /* Two overlapping rounded shapes — "two things at one time." Heritage
+         Orange. Scales from 11px (month chip) to 18px (drawer). */
+      .mark {
+        display: inline-block;
+        flex: none;
+        color: var(--orange);
+        vertical-align: middle;
+      }
+      .mark svg {
+        display: block;
+      }
+      .mark.quiet {
+        opacity: 0.72;
+      }
+
+      /* ─── The clash chip (active state, where space allows) ─────────────── */
+      .clashchip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--tint-orange-15);
+        color: var(--orange-deep);
+        border: 1px solid var(--tint-orange-22);
+        border-radius: 999px;
+        padding: 3px 5px 3px 8px;
+        font-family: 'Outfit';
+        font-weight: 600;
+        font-size: 11px;
+        line-height: 1;
+        white-space: nowrap;
+      }
+      [data-theme='dark'] .clashchip {
+        color: #ffb699;
+      }
+      .clashchip .lbl {
+        max-width: 12ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .clashchip .x {
+        width: 15px;
+        height: 15px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        color: var(--orange);
+        font-size: 13px;
+        line-height: 1;
+        transition: 0.15s;
+        flex: none;
+      }
+      .clashchip .x:hover {
+        background: var(--tint-orange-22);
+      }
+
+      /* ─── Event-block "active" treatment: a soft orange focus ring ──────── */
+      .has-clash {
+        box-shadow: 0 0 0 1.5px var(--orange) inset;
+      }
+
+      /* ─── Surface frames (rendered to scale) ────────────────────────────── */
+      .frame {
+        background: var(--page-bg);
+        border-radius: 18px;
+        padding: 16px;
+        border: 1px solid var(--hairline);
+      }
+      [data-theme='dark'] .frame {
+        background: #18222c;
+      }
+
+      /* Month grid */
+      .month {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .daycell {
+        background: var(--surface);
+        border-radius: 14px;
+        padding: 8px;
+        min-height: 104px;
+        border: 1px solid var(--hairline);
+      }
+      .daycell .dnum {
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 12px;
+        color: var(--ink-soft);
+        margin-bottom: 6px;
+      }
+      .daycell.today .dnum {
+        color: var(--orange);
+      }
+      .chip {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        border-radius: 7px;
+        padding: 3px 5px;
+        font-family: 'Inter';
+        font-weight: 500;
+        font-size: 11px;
+        margin-bottom: 4px;
+        border-left: 3px solid;
+        color: var(--ink);
+        background: var(--tint-slate-5);
+        position: relative;
+      }
+      .chip .emoji {
+        font-size: 10px;
+      }
+      .chip .ctitle {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* Week / Day blocks */
+      .col {
+        background: var(--surface);
+        border-radius: 14px;
+        border: 1px solid var(--hairline);
+        padding: 10px;
+        min-height: 260px;
+        position: relative;
+      }
+      .colhead {
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 12px;
+        color: var(--ink-soft);
+        margin-bottom: 10px;
+      }
+      .colhead .dow {
+        color: var(--ink-faint);
+        font-weight: 600;
+      }
+      .block {
+        border-radius: 10px;
+        border-left: 3px solid;
+        padding: 7px 8px;
+        margin-bottom: 8px;
+        background: var(--tint-slate-5);
+        position: relative;
+      }
+      .block .btitle {
+        font-family: 'Outfit';
+        font-weight: 600;
+        font-size: 12.5px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .block .btime {
+        font-size: 10.5px;
+        color: var(--orange);
+        font-weight: 600;
+        margin-top: 2px;
+      }
+      .block .brow {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 6px;
+      }
+
+      /* Agenda card */
+      .agenda {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .acard {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--surface);
+        border-radius: 16px;
+        border-left: 4px solid;
+        padding: 10px 12px;
+        box-shadow: var(--card-shadow);
+      }
+      .acard .aemoji {
+        font-size: 15px;
+        flex: none;
+      }
+      .acard .abody {
+        min-width: 0;
+        flex: 1;
+      }
+      .acard .atitle {
+        font-family: 'Outfit';
+        font-weight: 600;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .acard .atime {
+        font-size: 11.5px;
+        color: var(--orange);
+        font-weight: 600;
+        margin-top: 2px;
+      }
+      .avatar {
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        font-size: 9px;
+        color: #fff;
+        font-weight: 700;
+        font-family: 'Outfit';
+        flex: none;
+      }
+
+      /* Drawer */
+      .drawer {
+        background: var(--surface);
+        border-radius: var(--sq);
+        box-shadow: var(--soft-shadow);
+        overflow: hidden;
+        border: 1px solid var(--hairline);
+        max-width: 460px;
+      }
+      .drawer .dhead {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--hairline);
+      }
+      .drawer .dicon {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        background: var(--tint-orange-8);
+        display: grid;
+        place-items: center;
+        font-size: 20px;
+        flex: none;
+      }
+      .drawer .dtitle {
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 17px;
+      }
+      .drawer .dsub {
+        font-size: 12px;
+        color: var(--ink-soft);
+        margin-top: 1px;
+      }
+      .drawer .dbody {
+        padding: 18px 20px 20px;
+        background: var(--page-bg);
+      }
+      [data-theme='dark'] .drawer .dbody {
+        background: rgba(0, 0, 0, 0.12);
+      }
+
+      /* The clash callout (inside the drawer) */
+      .callout {
+        background: var(--tint-orange-8);
+        border: 1px solid var(--tint-orange-22);
+        border-radius: 18px;
+        padding: 14px 14px 14px 16px;
+        display: flex;
+        gap: 12px;
+        position: relative;
+      }
+      .callout .cmark {
+        flex: none;
+        margin-top: 1px;
+      }
+      .callout .ctitle {
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--ink);
+        margin-bottom: 3px;
+      }
+      .callout .ctext {
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--ink-soft);
+      }
+      .callout .ctext b {
+        color: var(--orange-deep);
+        font-weight: 600;
+      }
+      [data-theme='dark'] .callout .ctext b {
+        color: #ffb699;
+      }
+      .callout .cactions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        font-family: 'Outfit';
+        font-weight: 600;
+        font-size: 12.5px;
+        border-radius: 12px;
+        padding: 8px 14px;
+        cursor: pointer;
+        border: none;
+        transition: 0.16s;
+      }
+      .btn-primary {
+        background: var(--orange);
+        color: #fff;
+      }
+      .btn-primary:hover {
+        background: var(--orange-deep);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--ink-soft);
+        border: 1px solid var(--hairline);
+      }
+      .btn-ghost:hover {
+        background: var(--tint-slate-5);
+      }
+
+      /* Acknowledged (quiet) state inside drawer */
+      .ackline {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 12.5px;
+        color: var(--ink-soft);
+        background: var(--tint-slate-5);
+        border-radius: 14px;
+        padding: 11px 14px;
+      }
+      .ackline .check {
+        color: var(--green);
+        font-weight: 700;
+      }
+      .ackline .undo {
+        margin-left: auto;
+        color: var(--orange);
+        font-weight: 600;
+        font-family: 'Outfit';
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .ackline .undo:hover {
+        text-decoration: underline;
+      }
+
+      .formline {
+        height: 10px;
+        background: var(--tint-slate-5);
+        border-radius: 6px;
+        margin-top: 14px;
+      }
+      .formline.s {
+        width: 55%;
+      }
+
+      .note {
+        font-size: 12.5px;
+        color: var(--ink-soft);
+        line-height: 1.55;
+        margin-top: 14px;
+        padding-left: 14px;
+        border-left: 2px solid var(--tint-orange-22);
+      }
+      .legend {
+        display: flex;
+        gap: 26px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+      }
+      .legend .li {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 13px;
+        color: var(--ink-soft);
+      }
+      .pill-tag {
+        font-family: 'Outfit';
+        font-weight: 600;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--orange-deep);
+        background: var(--tint-orange-15);
+        border-radius: 999px;
+        padding: 3px 9px;
+      }
+      [data-theme='dark'] .pill-tag {
+        color: #ffb699;
+      }
+      .hint {
+        font-family: 'Caveat';
+        font-size: 17px;
+        color: var(--ink-faint);
+      }
+      .tap {
+        cursor: pointer;
+      }
+      .reveal {
+        opacity: 0;
+        transform: translateY(8px);
+        animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+      }
+      @keyframes rise {
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .reveal {
+          animation: none;
+          opacity: 1;
+          transform: none;
+        }
+      }
+    </style>
+  </head>
+  <body data-theme="light">
+    <!-- overlap-mark SVG template (cloned by JS at various sizes) -->
+    <svg width="0" height="0" style="position: absolute">
+      <symbol id="overlap" viewBox="0 0 26 16">
+        <circle cx="9" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.7" opacity="0.85" />
+        <circle cx="17" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.7" opacity="0.85" />
+        <path d="M13 3.1 A6.2 6.2 0 0 1 13 12.9 A6.2 6.2 0 0 1 13 3.1 Z" fill="currentColor" opacity="0.9" />
+      </symbol>
+    </svg>
+
+    <div class="topbar">
+      <div class="wordmark">beanies<span class="tld">.family</span></div>
+      <h1>Calendar clash indicator — design exploration</h1>
+      <p>
+        Issue #34 · A calm, privacy-preserving heads-up when a family activity overlaps something on a
+        connected calendar. Names the calendar, never the event. Clear without nagging — and yours to
+        quiet, with nothing ever lost for good.
+      </p>
+      <div class="controls">
+        <button class="ctl active" id="themeBtn">◐ Light / Dark</button>
+        <button class="ctl" id="widthBtn">▭ Desktop / Mobile</button>
+        <span class="ctl" style="cursor: default; background: transparent; border-color: transparent; color: #8fa0ad">
+          Tip: click the × on a chip, or the quiet mark, to feel the minimize ↔ restore
+        </span>
+      </div>
+    </div>
+
+    <div class="wrap" id="wrap">
+      <p class="lede">
+        The mark itself is a small <b>overlap motif</b> — two rounded shapes sharing one moment — in Heritage
+        Orange. It carries one meaning everywhere: <b>two things at the same time</b>. It never uses Alert Red,
+        because a clash is information, not a failure. Two states do all the work:
+      </p>
+
+      <!-- ── 1. THE TWO STATES ─────────────────────────────────────────── -->
+      <section class="reveal">
+        <div class="sec-head"><span class="sec-num">1</span><h2 class="sec">Two states, one mark</h2></div>
+        <p class="sec-sub">
+          <b>Active</b> = a new overlap you haven't looked at: prominent enough to catch the eye, with the
+          calendar named and a one-tap dismiss. <b>Quiet</b> = you've acknowledged it: it shrinks to a small
+          persistent mark so it's never gone — tap it to bring the detail back. Acknowledging is remembered
+          for the whole family, and a <i>changed</i> overlap (you move the time, it now clashes with something
+          new) quietly becomes active again.
+        </p>
+        <div class="panel">
+          <div class="grid2">
+            <div>
+              <p class="cap">Active — unacknowledged</p>
+              <div class="state-row">
+                <span class="clashchip"
+                  ><span class="mark" data-size="13"></span><span class="lbl">Work calendar</span
+                  ><span class="x" title="Quiet this">×</span></span
+                >
+                <span class="hint">↖ catches the eye, names the source</span>
+              </div>
+            </div>
+            <div>
+              <p class="cap">Quiet — acknowledged</p>
+              <div class="state-row">
+                <span class="mark quiet tap" data-size="14" title="Overlaps your Work calendar — tap to review"></span>
+                <span class="hint">small, persistent, re-openable ↗</span>
+              </div>
+            </div>
+          </div>
+          <div class="legend" style="margin-top: 20px">
+            <div class="li"><span class="mark" data-size="12"></span> 12px — month chips</div>
+            <div class="li"><span class="mark" data-size="14"></span> 14px — week / day / agenda</div>
+            <div class="li"><span class="mark" data-size="18"></span> 18px — drawer callout</div>
+            <div class="li"><span class="pill-tag">Heritage Orange</span> never Alert Red</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 2. MONTH GRID ─────────────────────────────────────────────── -->
+      <section class="reveal" style="animation-delay: 0.05s">
+        <div class="sec-head"><span class="sec-num">2</span><h2 class="sec">Month grid — the tightest space</h2></div>
+        <p class="sec-sub">
+          No room for a pill here. Active overlaps get a soft Heritage-Orange focus ring around the chip plus
+          the mark; quiet ones keep just the mark. Tapping the chip opens the activity drawer, where the full
+          detail and the dismiss live. The orange "today" outline and member colours are untouched.
+        </p>
+        <div class="panel">
+          <div class="frame">
+            <div class="month">
+              <div class="daycell">
+                <div class="dnum">14</div>
+                <div class="chip" style="border-left-color: #3b82f6">
+                  <span class="emoji">⚽</span><span class="ctitle">Neil — Soccer</span>
+                </div>
+                <div class="chip" style="border-left-color: var(--terracotta)">
+                  <span class="emoji">🎹</span><span class="ctitle">Piano</span>
+                </div>
+              </div>
+              <div class="daycell today">
+                <div class="dnum">15 · today</div>
+                <div class="chip has-clash" style="border-left-color: #16a34a">
+                  <span class="emoji">🏊</span><span class="ctitle">Swim lesson</span>
+                  <span class="mark" data-size="12"></span>
+                </div>
+                <div class="chip" style="border-left-color: #3b82f6">
+                  <span class="emoji">📚</span><span class="ctitle">Library</span>
+                </div>
+              </div>
+              <div class="daycell">
+                <div class="dnum">16</div>
+                <div class="chip" style="border-left-color: var(--terracotta)">
+                  <span class="emoji">🎨</span><span class="ctitle">Art class</span>
+                  <span class="mark quiet" data-size="12" title="Quiet — overlaps Personal calendar"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="note">
+            <b>Active</b> (15th, “Swim lesson”): orange focus ring + mark. <b>Quiet</b> (16th, “Art class”): mark
+            only. The ring is the loudest the month view ever gets — proportional to a 104px-tall cell.
+          </p>
+        </div>
+      </section>
+
+      <!-- ── 3. WEEK + DAY ─────────────────────────────────────────────── -->
+      <section class="reveal" style="animation-delay: 0.1s">
+        <div class="sec-head"><span class="sec-num">3</span><h2 class="sec">Week &amp; day — room to name it</h2></div>
+        <p class="sec-sub">
+          Taller blocks can carry the full active chip inline — the calendar name and the dismiss × right on the
+          event. Quiet blocks fall back to the mark beside the title. The member-colour left bar stays the
+          primary "whose" cue; the overlap mark/chip is always secondary to it.
+        </p>
+        <div class="panel">
+          <div class="grid2">
+            <div>
+              <p class="cap">Week column</p>
+              <div class="frame">
+                <div class="col">
+                  <div class="colhead"><span class="dow">WED</span> 15</div>
+                  <div class="block has-clash" style="border-left-color: #16a34a">
+                    <div class="btitle">Swim lesson</div>
+                    <div class="btime">4:00 – 4:45pm</div>
+                    <div class="brow">
+                      <span class="clashchip"
+                        ><span class="mark" data-size="12"></span><span class="lbl">Work</span
+                        ><span class="x" title="Quiet this">×</span></span
+                      >
+                    </div>
+                  </div>
+                  <div class="block" style="border-left-color: #3b82f6">
+                    <div class="btitle">Library <span class="mark quiet" data-size="13" title="Quiet — Personal"></span></div>
+                    <div class="btime">5:00 – 5:30pm</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <p class="cap">Day column (per member)</p>
+              <div class="frame">
+                <div class="col">
+                  <div class="colhead">Maya</div>
+                  <div class="block has-clash" style="border-left-color: var(--terracotta)">
+                    <div class="btitle">Ballet</div>
+                    <div class="btime">4:15 – 5:15pm</div>
+                    <div class="brow">
+                      <span class="clashchip"
+                        ><span class="mark" data-size="12"></span><span class="lbl">Personal calendar</span
+                        ><span class="x" title="Quiet this">×</span></span
+                      >
+                    </div>
+                  </div>
+                  <div class="block" style="border-left-color: #9b59b6">
+                    <div class="btitle">Dentist <span class="mark quiet" data-size="13" title="Quiet — Work"></span></div>
+                    <div class="btime">5:30 – 6:00pm</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 4. AGENDA ─────────────────────────────────────────────────── -->
+      <section class="reveal" style="animation-delay: 0.15s">
+        <div class="sec-head"><span class="sec-num">4</span><h2 class="sec">Agenda list — the clearest read</h2></div>
+        <p class="sec-sub">
+          The list rows have the most horizontal room, so this is where the active chip reads most comfortably.
+          Same mechanic: chip names the calendar, × quiets it to the mark. This is the surface most people scan
+          for "what's on" — so the overlap is most legible exactly where it matters.
+        </p>
+        <div class="panel">
+          <div class="agenda" style="max-width: 480px">
+            <div class="acard has-clash" style="border-left-color: #16a34a">
+              <span class="aemoji">🏊</span>
+              <div class="abody">
+                <div class="atitle">Swim lesson</div>
+                <div class="atime">4:00 – 4:45pm</div>
+              </div>
+              <span class="clashchip"
+                ><span class="mark" data-size="13"></span><span class="lbl">Work calendar</span
+                ><span class="x" title="Quiet this">×</span></span
+              >
+              <span class="avatar" style="background: #16a34a">N</span>
+            </div>
+            <div class="acard" style="border-left-color: var(--terracotta)">
+              <span class="aemoji">🎨</span>
+              <div class="abody">
+                <div class="atitle">Art class <span class="mark quiet" data-size="14" title="Quiet — overlaps Personal calendar"></span></div>
+                <div class="atime">4:30 – 5:30pm</div>
+              </div>
+              <span class="avatar" style="background: var(--terracotta)">M</span>
+            </div>
+            <div class="acard" style="border-left-color: #3b82f6">
+              <span class="aemoji">📚</span>
+              <div class="abody">
+                <div class="atitle">Library</div>
+                <div class="atime">5:00 – 5:30pm</div>
+              </div>
+              <span class="avatar" style="background: #3b82f6">N</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 5. THE DRAWER ─────────────────────────────────────────────── -->
+      <section class="reveal" style="animation-delay: 0.2s">
+        <div class="sec-head"><span class="sec-num">5</span><h2 class="sec">The activity drawer — where you decide</h2></div>
+        <p class="sec-sub">
+          Opening an activity is where the overlap gets its one sentence of explanation and its controls. A
+          warm callout names the calendar(s), restates the privacy promise in plain words, and offers
+          <b>“This is fine”</b> (quiets it everywhere) — or, for the rare true conflict, you just reschedule.
+          Once quieted, the callout collapses to a single reassuring line with an <b>Undo</b>, so the decision
+          is never a dead end.
+        </p>
+        <div class="grid2">
+          <div>
+            <p class="cap">Active — the heads-up</p>
+            <div class="drawer">
+              <div class="dhead">
+                <div class="dicon">🏊</div>
+                <div>
+                  <div class="dtitle">Swim lesson</div>
+                  <div class="dsub">Wed 15 Jun · 4:00 – 4:45pm · Neil</div>
+                </div>
+              </div>
+              <div class="dbody">
+                <div class="callout" id="calloutLive">
+                  <span class="mark cmark" data-size="18"></span>
+                  <div>
+                    <div class="ctitle">Heads up — this overlaps another calendar</div>
+                    <div class="ctext">
+                      This time overlaps something on your <b>Work calendar</b>. beanies can only see
+                      <i>when</i> you're booked — never what it is. Totally fine if you expected it.
+                    </div>
+                    <div class="cactions">
+                      <button class="btn btn-primary" id="ackBtn">This is fine</button>
+                      <button class="btn btn-ghost">Reschedule…</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="formline"></div>
+                <div class="formline s"></div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <p class="cap">Acknowledged — quiet, with Undo</p>
+            <div class="drawer">
+              <div class="dhead">
+                <div class="dicon">🏊</div>
+                <div>
+                  <div class="dtitle">Swim lesson</div>
+                  <div class="dsub">Wed 15 Jun · 4:00 – 4:45pm · Neil</div>
+                </div>
+              </div>
+              <div class="dbody">
+                <div class="ackline">
+                  <span class="mark quiet" data-size="15"></span>
+                  <span><span class="check">✓</span> You're OK with this overlap · <b>Work calendar</b></span>
+                  <span class="undo">Undo</span>
+                </div>
+                <div class="formline"></div>
+                <div class="formline s"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="note" style="max-width: 72ch">
+          <b>Two calendars at once?</b> The callout pluralises — “overlaps your <b>Work</b> and <b>Personal</b>
+          calendars” — and quieting clears both. The copy never shows an event title, location, or guest —
+          only the calendar's own name, which you already see in Settings.
+        </p>
+      </section>
+
+      <!-- ── 6. RECOMMENDATION ─────────────────────────────────────────── -->
+      <section class="reveal" style="animation-delay: 0.25s">
+        <div class="sec-head"><span class="sec-num">6</span><h2 class="sec">What this needs to be real</h2></div>
+        <div class="panel">
+          <p class="lede" style="margin-bottom: 14px">
+            The visuals above are mostly recombinations of what already ships (the mark, the Heritage-Orange
+            tints, the chip pattern). The one genuinely new ingredient is <b>memory</b>:
+          </p>
+          <div class="legend" style="gap: 18px; flex-direction: column; align-items: stretch">
+            <div class="li" style="align-items: flex-start">
+              <span class="pill-tag" style="margin-top: 2px">NEW</span>
+              <span
+                ><b style="color: var(--ink)">Acknowledged-overlap memory.</b> A small family-shared set
+                remembering “you okayed this one,” keyed by activity + occurrence + which calendar — plus a
+                fingerprint of the overlap, so moving the activity onto a <i>new</i> clash re-raises it. Persists
+                across reload and devices.</span
+              >
+            </div>
+            <div class="li" style="align-items: flex-start">
+              <span class="pill-tag" style="margin-top: 2px; background: var(--tint-silk-20); color: var(--slate)">KEEP</span>
+              <span
+                ><b style="color: var(--ink)">Minimize, don't delete.</b> A clash is derived from live data; a
+                permanent "clear" could hide a real conflict forever. Quieting + Undo keeps you safe while still
+                getting it out of the way.</span
+              >
+            </div>
+            <div class="li" style="align-items: flex-start">
+              <span class="pill-tag" style="margin-top: 2px; background: var(--tint-silk-20); color: var(--slate)">REUSE</span>
+              <span
+                ><b style="color: var(--ink)">One component, future-proof.</b> The same mark + chip + callout can
+                later flag <i>beanies-vs-beanies</i> overlaps (two kids, one slot) — a separate, no-scope
+                feature — so the visual language is learned once.</span
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p class="lede" style="margin-top: 40px; text-align: center; color: var(--ink-faint)">
+        beanies.family · <i>every bean counts</i> · clash indicator exploration · 2026-06-11
+      </p>
+    </div>
+
+    <script>
+      // Clone the overlap mark at the requested pixel size into every .mark.
+      document.querySelectorAll('.mark[data-size]').forEach((el) => {
+        const s = +el.dataset.size;
+        el.innerHTML = `<svg width="${(s * 26) / 16}" height="${s}" aria-hidden="true"><use href="#overlap"/></svg>`;
+      });
+
+      // Theme + width toggles
+      const body = document.body;
+      document.getElementById('themeBtn').addEventListener('click', () => {
+        body.dataset.theme = body.dataset.theme === 'light' ? 'dark' : 'light';
+      });
+      const wrap = document.getElementById('wrap');
+      document.getElementById('widthBtn').addEventListener('click', (e) => {
+        const mobile = wrap.style.maxWidth === '420px';
+        wrap.style.maxWidth = mobile ? '' : '420px';
+        e.target.classList.toggle('active', !mobile);
+      });
+
+      // Minimize: clicking × on a chip swaps it for the quiet mark in place.
+      function wireChips() {
+        document.querySelectorAll('.clashchip .x').forEach((x) => {
+          x.onclick = (e) => {
+            e.stopPropagation();
+            const chip = x.closest('.clashchip');
+            const block = chip.closest('.has-clash');
+            const mark = document.createElement('span');
+            mark.className = 'mark quiet tap';
+            mark.dataset.size = '13';
+            mark.title = 'Quiet — tap to restore';
+            mark.innerHTML = `<svg width="21" height="13" aria-hidden="true"><use href="#overlap"/></svg>`;
+            const restore = chip.cloneNode(true);
+            mark.onclick = (ev) => {
+              ev.stopPropagation();
+              mark.replaceWith(restore);
+              if (block) block.classList.add('has-clash');
+              wireChips();
+            };
+            chip.replaceWith(mark);
+            if (block) block.classList.remove('has-clash');
+          };
+        });
+      }
+      wireChips();
+
+      // Drawer acknowledge → swap callout for the quiet ack line (+ undo)
+      const ackBtn = document.getElementById('ackBtn');
+      if (ackBtn) {
+        const callout = document.getElementById('calloutLive');
+        const original = callout.outerHTML;
+        ackBtn.onclick = () => {
+          const ack = document.createElement('div');
+          ack.className = 'ackline';
+          ack.innerHTML =
+            '<span class="mark quiet" data-size="15"><svg width="24" height="15"><use href="#overlap"/></svg></span><span><span class="check">✓</span> You\'re OK with this overlap · <b>Work calendar</b></span><span class="undo">Undo</span>';
+          ack.querySelector('.undo').onclick = () => {
+            ack.outerHTML = original;
+            document.getElementById('ackBtn').onclick = ackBtn.onclick;
+            location.reload();
+          };
+          callout.replaceWith(ack);
+        };
+      }
+    </script>
+  </body>
+</html>
