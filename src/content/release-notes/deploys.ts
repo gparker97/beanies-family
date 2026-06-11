@@ -17,6 +17,17 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.06.12',
+    date: '2026-06-12',
+    month: '12 june 2026',
+    spotlight: false,
+    summary: {
+      en: "The app now stays in portrait, so it won't flip when your phone's rotation is locked.",
+      beanie:
+        "the app now stays in portrait, so it won't flip when your phone's rotation is locked.",
+    },
+  },
+  {
     version: '2026.06.08',
     date: '2026-06-08',
     month: '8 june 2026',

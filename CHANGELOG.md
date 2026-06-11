@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-12
+
+### Fixed
+
+- **The app now stays in portrait and won't flip when your phone's rotation is locked.** On Android, the installed app could rotate even with your screen rotation locked, which was distracting. It's now locked to portrait so it stays put. (The same portrait lock is set for the installed app on phones across platforms.)
+
 ## 2026-06-09
 
 ### Fixed
