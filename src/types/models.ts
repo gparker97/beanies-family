@@ -669,6 +669,29 @@ export type UpdateCalendarEventLinkInput = Partial<
   Omit<CalendarEventLink, 'id' | 'createdAt' | 'updatedAt'>
 >;
 
+/**
+ * Family-shared "we acknowledged this calendar overlap" record (#34). When a
+ * family member taps "This is OK" on a clash, we remember it for the whole family
+ * (lives in the CRDT → syncs across devices). Keyed in the doc by
+ * `overlapAckKey(activityId, occurrenceDate, connectionId)` — exactly one entry
+ * per (activity, occurrence, connection). The `fingerprint` (the activity
+ * occurrence's own time window at ack time) is the value, not part of the key: if
+ * the activity is later rescheduled the fingerprint mismatches → the overlap
+ * re-raises, and a re-ack overwrites the same key (so the set stays bounded).
+ * Never stores any external-event identity — only times ever cross the wire.
+ */
+export interface OverlapAck {
+  activityId: string;
+  /** `YYYY-MM-DD` of the acknowledged occurrence. */
+  occurrenceDate: string;
+  connectionId: string;
+  /** Activity occurrence time window at ack time, `${startMs}-${endMs}`. */
+  fingerprint: string;
+  acknowledgedAt: ISODateString;
+  /** memberId of whoever said "this is OK". */
+  acknowledgedBy: string;
+}
+
 // ---------------------------------------------------------------------------
 // Vacation Planning
 // ---------------------------------------------------------------------------

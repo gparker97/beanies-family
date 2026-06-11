@@ -6,6 +6,7 @@ import {
   computeClashes,
   externalBusyIntervals,
   clashKey,
+  overlapAckKey,
   type ActivityOccurrence,
   type ConnectionBusy,
 } from '../clashDetection';
@@ -102,6 +103,9 @@ describe('computeClashes', () => {
     expect(clashes.get(clashKey('a1', date))).toEqual({
       connectionId: 'conn-1',
       calendarLabel: 'mum@example.com',
+      activityId: 'a1',
+      occurrenceDate: date,
+      fingerprint: `${localMs(date, '14:00')}-${localMs(date, '15:00')}`,
     });
   });
 
@@ -120,6 +124,9 @@ describe('computeClashes', () => {
     expect(clashes.get(clashKey('a1', date))).toEqual({
       connectionId: 'conn-1',
       calendarLabel: 'work',
+      activityId: 'a1',
+      occurrenceDate: date,
+      fingerprint: `${localMs(date, '14:00')}-${localMs(date, '15:00')}`,
     });
   });
 
@@ -191,5 +198,13 @@ describe('externalBusyIntervals', () => {
       new Set(['bself'])
     );
     expect(out).toEqual([{ startMs: 1000, endMs: 2000 }]);
+  });
+});
+
+describe('overlapAckKey', () => {
+  it('emits the exact composite (guards positional argument order)', () => {
+    // Exact string so a silent argument transposition fails CI rather than
+    // corrupting acknowledge keys at runtime.
+    expect(overlapAckKey('act', '2026-06-11', 'conn')).toBe('act:2026-06-11:conn');
   });
 });

@@ -36,6 +36,11 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
+import { useClash } from '@/composables/useClash';
+import { useOverlapAckStore } from '@/stores/overlapAckStore';
+import OverlapMark from '@/components/planner/OverlapMark.vue';
+import { openExternal } from '@/utils/openExternal';
+import { MARKETING_URL } from '@/utils/marketing';
 import type { FamilyActivity, DutyCompletion } from '@/types/models';
 
 type EditableField =
@@ -122,6 +127,41 @@ const activity = computed(() =>
     ? (activityStore.activities.find((a) => a.id === props.activity!.id) ?? props.activity)
     : null
 );
+
+// External-calendar clash (#34) — the drawer is where you decide. Reflects whatever
+// the planner already computed for the visible window (no fetch here); empty-string
+// fallbacks are harmless `Map.get` misses → no callout. Acknowledging writes the
+// family-shared memory; every surface then flips active→quiet reactively.
+const overlapAckStore = useOverlapAckStore();
+const clashOccurrenceDate = computed(
+  () => props.occurrenceDate ?? activity.value?.date?.split('T')[0] ?? ''
+);
+const clash = useClash(
+  () => activity.value?.id ?? '',
+  () => clashOccurrenceDate.value
+);
+
+function acknowledgeClash() {
+  if (!clash.value || !activity.value) return;
+  overlapAckStore.acknowledge(
+    activity.value.id,
+    clashOccurrenceDate.value,
+    clash.value.connectionId,
+    clash.value.fingerprint
+  );
+}
+function unacknowledgeClash() {
+  if (!clash.value || !activity.value) return;
+  overlapAckStore.unacknowledge(
+    activity.value.id,
+    clashOccurrenceDate.value,
+    clash.value.connectionId
+  );
+}
+function openClashHelp() {
+  // Synchronous in the handler (PWA popup-blocker constraint).
+  openExternal(`${MARKETING_URL}/help/security/external-calendar-clash-nudge`);
+}
 
 // Photo attachments — uses the live `activity` computed so prop swaps
 // (open the drawer for a different activity without remounting) re-sync
@@ -735,6 +775,70 @@ async function confirmReschedule() {
         >
           {{ recurrenceLabel }}
         </span>
+      </div>
+
+      <!-- External-calendar clash (#34): active callout (this-is-OK / reschedule /
+           what's-this) or, once quieted, the ack line with Undo. -->
+      <div v-if="clash" data-testid="clash-callout">
+        <div
+          v-if="!clash.acknowledged"
+          class="border-primary-500/20 bg-primary-500/8 flex gap-3 rounded-[14px] border p-3.5"
+        >
+          <OverlapMark class="text-primary-500 mt-0.5 h-4 w-auto flex-shrink-0" />
+          <div class="min-w-0 flex-1">
+            <p class="font-outfit text-sm font-bold text-[var(--color-text)] dark:text-gray-100">
+              {{ t('calendarSync.clash.overlapsCalendarPrefix') }}
+              <span class="text-primary-600 dark:text-primary-400">{{ clash.calendarLabel }}</span>
+              {{ t('calendarSync.clash.calendarSuffix') }}
+            </p>
+            <p class="mt-0.5 text-xs text-[var(--color-text-muted)]">
+              {{ t('calendarSync.clash.dismissHint') }}
+            </p>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                class="bg-primary-500 hover:bg-primary-600 font-outfit rounded-xl px-3.5 py-2 text-xs font-semibold text-white transition-colors"
+                data-testid="clash-ack"
+                @click="acknowledgeClash"
+              >
+                {{ t('calendarSync.clash.thisIsOk') }}
+              </button>
+              <button
+                type="button"
+                class="font-outfit rounded-xl border border-gray-200 px-3.5 py-2 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-700"
+                @click="toggleReschedule"
+              >
+                {{ t('calendarSync.clash.reschedule') }}
+              </button>
+              <button
+                type="button"
+                class="hover:text-primary-600 ml-0.5 text-xs text-[var(--color-text-muted)] underline underline-offset-2"
+                @click="openClashHelp"
+              >
+                {{ t('calendarSync.clash.whatsThis') }}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div
+          v-else
+          class="flex items-center gap-2.5 rounded-[14px] bg-[var(--tint-slate-5)] px-3.5 py-3 dark:bg-slate-700"
+          data-testid="clash-ack-line"
+        >
+          <OverlapMark class="text-primary-500 h-3.5 w-auto flex-shrink-0 opacity-70" />
+          <span class="min-w-0 flex-1 truncate text-xs text-[var(--color-text-muted)]">
+            <span class="font-semibold text-green-600">✓</span>
+            {{ t('calendarSync.clash.acknowledgedLine') }} ·
+            <span class="font-semibold">{{ clash.calendarLabel }}</span>
+          </span>
+          <button
+            type="button"
+            class="text-primary-600 dark:text-primary-400 font-outfit flex-shrink-0 text-xs font-semibold hover:underline"
+            @click="unacknowledgeClash"
+          >
+            {{ t('calendarSync.clash.undo') }}
+          </button>
+        </div>
       </div>
 
       <!-- Schedule summary box -->

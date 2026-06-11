@@ -1,19 +1,35 @@
 <script setup lang="ts">
-// Subtle external-calendar clash indicator (#34). PURELY presentational — receives
-// a resolved `ClashInfo` (or undefined) as a prop and self-gates: it renders a small
-// Heritage-Orange dot + accessible tooltip ONLY when a clash is present, otherwise
-// nothing. Self-gating (vs parent `v-if`) lets every call site resolve the clash
-// exactly ONCE — including the `v-for` grid surfaces, where there's no per-item local
-// binding. It does NOT read the clash store (store coupling lives only in `useClash`).
-// A gentle nudge, never Alert Red, never the other event's details.
+// External-calendar clash indicator (#34). PURELY presentational — receives a
+// resolved clash (or undefined) as a prop and self-gates: renders nothing when
+// there's no clash. Self-gating (vs a parent `v-if`) lets every call site — including
+// the `v-for` grid surfaces — resolve the clash exactly ONCE. It does NOT read any
+// store (coupling lives only in `useClash`).
+//
+// Two states, one mark (the active dismiss lives in the activity drawer, not here):
+//   • active  — unacknowledged: prominent. `variant="chip"` (week/day/agenda) shows
+//               a labelled pill naming the calendar; `variant="mark"` (month, tight)
+//               shows the solid mark (the chip's orange ring is applied by the host).
+//   • quiet   — acknowledged: a small faded mark, on every surface.
+// Heritage Orange throughout, never Alert Red — a clash is information, not a failure.
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
-import type { ClashInfo } from '@/utils/calendar/clashDetection';
+import OverlapMark from './OverlapMark.vue';
+import type { ResolvedClash } from '@/composables/useClash';
 
-const props = defineProps<{ clash?: ClashInfo }>();
+const props = withDefaults(defineProps<{ clash?: ResolvedClash; variant?: 'mark' | 'chip' }>(), {
+  variant: 'mark',
+});
 const { t } = useTranslation();
 
-const label = computed(() =>
+const state = computed<'quiet' | 'active-mark' | 'active-chip'>(() => {
+  if (!props.clash || props.clash.acknowledged) return 'quiet';
+  return props.variant === 'chip' ? 'active-chip' : 'active-mark';
+});
+
+/** Mark height by surface — standard Tailwind sizes (no arbitrary px). */
+const markSize = computed(() => (props.variant === 'chip' ? 'h-3.5' : 'h-3'));
+
+const tooltip = computed(() =>
   props.clash ? `${t('calendarSync.clash.tooltipPrefix')} ${props.clash.calendarLabel}` : ''
 );
 </script>
@@ -21,9 +37,21 @@ const label = computed(() =>
 <template>
   <span
     v-if="clash"
-    class="bg-primary-500 inline-block h-2 w-2 flex-shrink-0 rounded-full"
+    class="inline-flex flex-shrink-0 items-center"
     role="img"
-    :aria-label="label"
-    :title="label"
-  />
+    :aria-label="tooltip"
+    :title="tooltip"
+  >
+    <span
+      v-if="state === 'active-chip'"
+      class="bg-primary-500/15 text-primary-600 dark:text-primary-400 font-outfit inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-semibold"
+    >
+      <OverlapMark :class="[markSize, 'text-primary-500 w-auto']" />
+      <span class="max-w-24 truncate">{{ clash.calendarLabel }}</span>
+    </span>
+    <OverlapMark
+      v-else
+      :class="[markSize, 'text-primary-500 w-auto', { 'opacity-70': state === 'quiet' }]"
+    />
+  </span>
 </template>

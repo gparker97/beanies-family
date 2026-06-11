@@ -6735,6 +6735,23 @@ const STRING_DEFS = {
   },
   'calendarSync.clashNudge.label': { en: 'Clash warnings', beanie: 'clash warnings' },
   'calendarSync.clash.tooltipPrefix': { en: 'May clash with', beanie: 'may clash with' },
+  // #34 active/quiet redesign — drawer callout + quiet ack line. The calendar's
+  // own name (account email) is concatenated between prefix/suffix, never
+  // interpolated (t() takes no params).
+  'calendarSync.clash.overlapsCalendarPrefix': { en: 'Overlaps your', beanie: 'overlaps your' },
+  'calendarSync.clash.calendarSuffix': { en: 'calendar', beanie: 'calendar' },
+  'calendarSync.clash.dismissHint': {
+    en: 'Dismiss if you expected it.',
+    beanie: 'dismiss if you expected it.',
+  },
+  'calendarSync.clash.thisIsOk': { en: 'This is OK', beanie: 'this is ok' },
+  'calendarSync.clash.reschedule': { en: 'Reschedule…', beanie: 'reschedule…' },
+  'calendarSync.clash.whatsThis': { en: "What's this?", beanie: "what's this?" },
+  'calendarSync.clash.acknowledgedLine': {
+    en: "You're OK with this overlap",
+    beanie: "you're ok with this overlap",
+  },
+  'calendarSync.clash.undo': { en: 'Undo', beanie: 'undo' },
   'calendarSync.connectOnDesktop': {
     en: 'Open beanies in a desktop browser to connect a calendar. Once connected, it syncs on all your devices.',
     beanie:
