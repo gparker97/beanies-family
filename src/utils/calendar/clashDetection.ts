@@ -1,15 +1,21 @@
 // Pure clash-detection (#34) — no I/O, exhaustively unit-tested.
 //
 // Decides which beanies activity occurrences overlap a busy block on a connected
-// calendar, using ONLY free/busy intervals (never event details). All comparison
-// is in absolute ms: Google busy times are offset-bearing RFC3339 instants, while
-// activity times are local wall-time — converting both via `Date.getTime()` keeps
-// the overlap timezone-correct regardless of the busy block's source zone.
+// calendar, using ONLY event TIMES (never event content). All comparison is in
+// absolute ms: external event times arrive already converted to ms (timed from an
+// offset-bearing instant, all-day from a local-midnight span), while activity times
+// are local wall-time via `Date.getTime()` — so overlap stays timezone-correct.
 
 import type { FamilyActivity } from '@/types/models';
 import { parseLocalDate, addDaysYmd } from '@/utils/date';
-import type { BusyInterval } from '@/services/calendar/CalendarClient';
+import type { EventTime } from '@/services/calendar/CalendarClient';
 import { resolveActivityDays } from './activityDays';
+
+/** An absolute-ms busy block — what computeClashes compares activity ranges against. */
+export interface BusyMs {
+  startMs: number;
+  endMs: number;
+}
 
 /** A single activity↔calendar clash. Names the connected calendar, never the
  *  other event's details. */
@@ -26,11 +32,31 @@ export interface ActivityOccurrence {
   date: string;
 }
 
-/** Busy intervals + the display label, per connected calendar. */
+/** Busy intervals (absolute ms) + the display label, per connected calendar. */
 export interface ConnectionBusy {
   connectionId: string;
   calendarLabel: string;
-  intervals: BusyInterval[];
+  intervals: BusyMs[];
+}
+
+/**
+ * From a connection's raw event times, keep only the OTHER, busy commitments:
+ * drop transparent (owner-marked "free") and beanies-OWNED events (whose `id` or
+ * `recurringEventId` is in the supplied set — the self-clash fix). Returns
+ * absolute-ms intervals ready for `computeClashes`. Pure. (#34)
+ */
+export function externalBusyIntervals(
+  events: EventTime[],
+  beanieEventIds: ReadonlySet<string>
+): BusyMs[] {
+  return events
+    .filter((e) => !e.transparent)
+    .filter(
+      (e) =>
+        !beanieEventIds.has(e.id) &&
+        !(e.recurringEventId !== undefined && beanieEventIds.has(e.recurringEventId))
+    )
+    .map((e) => ({ startMs: e.startMs, endMs: e.endMs }));
 }
 
 /** Stable map key for a (activity, occurrence-date) pair. The ONLY place this
@@ -85,20 +111,12 @@ export function computeClashes(
   busyByConnection: ConnectionBusy[]
 ): Map<string, ClashInfo> {
   const clashes = new Map<string, ClashInfo>();
-  // Pre-parse busy intervals to ms once.
-  const parsed = busyByConnection.map((c) => ({
-    connectionId: c.connectionId,
-    calendarLabel: c.calendarLabel,
-    intervals: c.intervals.map((iv) => ({
-      startMs: new Date(iv.start).getTime(),
-      endMs: new Date(iv.end).getTime(),
-    })),
-  }));
-
+  // Intervals arrive already in absolute ms (the events.list path converts once) —
+  // no pre-parse needed here.
   for (const occ of occurrences) {
     const range = activityTimeRange(occ.activity, occ.date);
     if (!range) continue;
-    for (const conn of parsed) {
+    for (const conn of busyByConnection) {
       const hit = conn.intervals.some(
         (iv) =>
           Number.isFinite(iv.startMs) &&

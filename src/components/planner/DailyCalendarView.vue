@@ -21,6 +21,8 @@ import { extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import HolidayBanner from '@/components/planner/HolidayBanner.vue';
+import ClashIndicator from '@/components/planner/ClashIndicator.vue';
+import { useClashLookup } from '@/composables/useClash';
 import type { FamilyActivity, FamilyMember, TodoItem, HolidayOccurrence } from '@/types/models';
 
 /**
@@ -62,6 +64,10 @@ const referenceDate = computed(() => props.referenceDate);
 // Read-only derivations only — the mutating nav functions are intentionally
 // not destructured (the page owns the date; we never write a prop-derived ref).
 const { currentDay } = useDayNavigation(referenceDate);
+
+// External-calendar clash lookup (#34) — called inline per timed block (a composable
+// can't run inside a v-for). All store coupling stays in useClash.ts.
+const clashFor = useClashLookup();
 
 // ── Members (sorted, filtered) ─────────────────────────────────────────────
 
@@ -464,10 +470,11 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
                 @click.stop="emit('view-activity', activity.id, currentDay.dateStr)"
               >
                 <div
-                  class="font-outfit truncate text-xs font-semibold"
+                  class="font-outfit flex items-center truncate text-xs font-semibold"
                   style="color: var(--color-text)"
                 >
-                  {{ activity.title }}
+                  <span class="truncate">{{ activity.title }}</span>
+                  <ClashIndicator :clash="clashFor(activity.id, currentDay.dateStr)" class="ml-1" />
                 </div>
                 <div class="flex min-w-0 items-center gap-1">
                   <span class="text-primary-500 truncate text-[0.6875rem] leading-tight opacity-70">

@@ -9,18 +9,22 @@ import {
 } from '@/services/automerge/repositories/calendarRepository';
 import { refreshCalendarToken } from './calendarAuth';
 import { delay, withTimeout } from '@/utils/timing';
+import { parseLocalDate } from '@/utils/date';
 import {
   CalendarApiError,
-  type BusyInterval,
   type CalendarClient,
   type CalendarErrorKind,
   type CalendarSummary,
+  type EventTime,
   type TokenProvider,
 } from './CalendarClient';
 
 const CAL_API_BASE = 'https://www.googleapis.com/calendar/v3';
 const REQUEST_TIMEOUT_MS = 15_000;
 const RETRY_BACKOFF_MS = [500, 1500] as const; // → up to 3 attempts on transient/429
+/** Safety cap on event-list paging: 20 × 250 = 5000 events >> any ≤42-day window.
+ *  Structural guard against a non-terminating nextPageToken — never fires in practice. */
+const MAX_EVENT_PAGES = 20;
 
 /** Access-token expiry skew — refresh a little early so a request never races expiry. */
 const TOKEN_EXPIRY_SKEW_MS = 60_000;
@@ -39,13 +43,35 @@ function isPermanentRefreshFailure(message: string): boolean {
   return message.includes('invalid_grant') || message.includes('expired or revoked');
 }
 
-/** Map a Google free/busy per-calendar error `reason` to a classified kind. The
- *  free/busy endpoint returns HTTP 200 even when an individual calendar fails, so
- *  this is the only place those failures surface. */
-function freeBusyReasonToKind(reason: string | undefined): CalendarErrorKind {
-  if (reason === 'notFound') return 'not_found';
-  if (reason === 'accessDenied' || reason === 'forbidden') return 'forbidden';
-  return 'unknown';
+/** One `events.list` item, restricted to the masked fields (times-only read). */
+interface GoogleEventTimeItem {
+  id: string;
+  recurringEventId?: string;
+  status?: string;
+  transparency?: string;
+  start?: { dateTime?: string; date?: string };
+  end?: { dateTime?: string; date?: string };
+}
+
+/**
+ * Map one masked `events.list` item to an absolute-ms `[startMs, endMs)`. Timed
+ * events use the offset-bearing `dateTime`; all-day events use the zoneless `date`
+ * (Google's `end.date` is exclusive) resolved to the local-midnight span. Returns
+ * `null` ONLY for a structurally-malformed item (neither shape present) — the
+ * caller turns that into a `console.warn` (never a silent drop). Pure. (#34)
+ */
+export function eventItemToMs(
+  item: GoogleEventTimeItem
+): { startMs: number; endMs: number } | null {
+  const s = item.start;
+  const e = item.end;
+  if (s?.dateTime && e?.dateTime) {
+    return { startMs: new Date(s.dateTime).getTime(), endMs: new Date(e.dateTime).getTime() };
+  }
+  if (s?.date && e?.date) {
+    return { startMs: parseLocalDate(s.date).getTime(), endMs: parseLocalDate(e.date).getTime() };
+  }
+  return null;
 }
 
 // ── Token provider ───────────────────────────────────────────────────────────
@@ -253,30 +279,65 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
       );
     },
 
-    async queryFreeBusy(connectionId, calendarIds, timeMinIso, timeMaxIso) {
-      const res = await authedFetch(connectionId, '/freeBusy', {
-        method: 'POST',
-        body: JSON.stringify({
+    async listEventTimes(connectionId, calendarId, timeMinIso, timeMaxIso) {
+      const out: EventTime[] = [];
+      let pageToken: string | undefined;
+      let pages = 0;
+      do {
+        const params = new URLSearchParams({
           timeMin: timeMinIso,
           timeMax: timeMaxIso,
-          items: calendarIds.map((id) => ({ id })),
-        }),
-      });
-      const data = (await res.json()) as {
-        calendars?: Record<string, { busy?: BusyInterval[]; errors?: Array<{ reason?: string }> }>;
-      };
-      const out: Record<string, BusyInterval[]> = {};
-      for (const [calId, cal] of Object.entries(data.calendars ?? {})) {
-        // Per-calendar failure arrives in the 200 body — classify + throw, never drop.
-        if (cal.errors && cal.errors.length > 0) {
-          const reason = cal.errors[0]?.reason;
-          throw new CalendarApiError(
-            freeBusyReasonToKind(reason),
-            `free/busy failed for calendar ${calId}: ${reason ?? 'unknown'}`
-          );
+          singleEvents: 'true', // expand recurring → instances (gives times + recurringEventId)
+          showDeleted: 'false', // exclude cancelled
+          maxResults: '250',
+          // Field mask = the privacy guarantee: only times + the structural fields we
+          // filter on. Event content (summary/description/location/attendees) is never
+          // requested. `nextPageToken` MUST be included or paging stops after page 1.
+          fields: 'nextPageToken,items(id,recurringEventId,start,end,status,transparency)',
+        });
+        if (pageToken) params.set('pageToken', pageToken);
+        const res = await authedFetch(
+          connectionId,
+          `/calendars/${enc(calendarId)}/events?${params.toString()}`,
+          { method: 'GET' }
+        );
+        const data = (await res.json()) as {
+          nextPageToken?: string;
+          items?: GoogleEventTimeItem[];
+        };
+        for (const it of data.items ?? []) {
+          if (it.status === 'cancelled') continue; // backstop; showDeleted handles most
+          const range = eventItemToMs(it);
+          if (!range) {
+            // Never a silent drop. A malformed item is a data anomaly, so a console.warn
+            // here is the right altitude — the REST client holds no errorReporter
+            // dependency, and genuine fetch failures still bubble as CalendarApiError to
+            // the store's reportError. Should never fire (Google returns one shape).
+            console.warn('[calendarClash] events.list item has no usable start/end; skipping', {
+              calendarId,
+              eventId: it.id,
+            });
+            continue;
+          }
+          out.push({
+            id: it.id,
+            recurringEventId: it.recurringEventId,
+            startMs: range.startMs,
+            endMs: range.endMs,
+            transparent: it.transparency === 'transparent',
+          });
         }
-        out[calId] = cal.busy ?? [];
-      }
+        pageToken = data.nextPageToken;
+        pages += 1;
+        if (pageToken && pages >= MAX_EVENT_PAGES) {
+          // Enforced invariant: a non-terminating token can never spin the loop.
+          console.warn('[calendarClash] events.list exceeded MAX_EVENT_PAGES; truncating', {
+            calendarId,
+            pages,
+          });
+          break;
+        }
+      } while (pageToken);
       return out;
     },
   };

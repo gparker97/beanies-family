@@ -31,6 +31,8 @@ import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
 import HolidayChip from '@/components/planner/HolidayChip.vue';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
+import ClashIndicator from '@/components/planner/ClashIndicator.vue';
+import { useClashLookup } from '@/composables/useClash';
 import WeekStripNav, {
   type WeekStripDay,
   type WeekStripWeek,
@@ -65,6 +67,10 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+
+// External-calendar clash lookup (#34) — called inline per timed block (a composable
+// can't run inside a v-for). All store coupling stays in useClash.ts.
+const clashFor = useClashLookup();
 const { isMobile, isTablet } = useBreakpoint();
 const activityStore = useActivityStore();
 const familyStore = useFamilyStore();
@@ -836,6 +842,7 @@ function onStripDayClick(dateStr: string) {
                 >
                   <span class="truncate">{{ activity.title }}</span>
                   <PhotoIndicator :photo-ids="activity.photoIds" />
+                  <ClashIndicator :clash="clashFor(activity.id, day.dateStr)" class="ml-1" />
                 </div>
                 <div class="flex min-w-0 items-center gap-1">
                   <span class="text-primary-500 truncate text-[0.6875rem] leading-tight opacity-70">
