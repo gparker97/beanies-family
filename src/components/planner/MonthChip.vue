@@ -24,7 +24,9 @@ import { useActivityChipClass } from '@/composables/useActivityChipClass';
 import { getActivityCategoryById, getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { formatNameList, normalizeAssignees } from '@/utils/assignees';
 import { formatTime12 } from '@/utils/date';
+import { useClash } from '@/composables/useClash';
 import MemberChip from '@/components/ui/MemberChip.vue';
+import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import type { FamilyActivity } from '@/types/models';
 
 interface ActivityOccurrence {
@@ -56,6 +58,12 @@ const time = computed(() => {
 });
 
 const title = computed(() => props.occurrence.activity.title);
+
+// External-calendar clash (#34) — resolved through the single `useClash` seam.
+const clash = useClash(
+  () => props.occurrence.activity.id,
+  () => props.occurrence.date
+);
 
 const categoryLabel = computed(
   () => getActivityCategoryById(props.occurrence.activity.category)?.name ?? ''
@@ -114,6 +122,8 @@ function onClick(event: MouseEvent) {
     </span>
 
     <span class="min-w-0 flex-1 truncate font-medium">{{ title }}</span>
+
+    <ClashIndicator :clash="clash" class="flex-shrink-0" />
 
     <!-- Right-edge avatar stack — mobile-only (`md:hidden`) and only for
          multi-person events (the left bar already says whose for solo). -->

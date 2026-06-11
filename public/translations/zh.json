@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-10",
-    "translationCount": 3144
+    "lastUpdated": "2026-06-11",
+    "translationCount": 3143
   },
   "translations": {
     "app.name": {
@@ -15707,18 +15707,13 @@
       "lastUpdated": "2026-06-10"
     },
     "calendarSync.clashNudge.hint": {
-      "translation": "beanies只会检查您是否忙碌，而不会检查活动内容。",
-      "hash": "rzv0r8",
-      "lastUpdated": "2026-06-10"
+      "translation": "beanies只在您的活动时读取，而不是它们是什么。",
+      "hash": "xmdmz4",
+      "lastUpdated": "2026-06-11"
     },
     "calendarSync.clashNudge.label": {
       "translation": "冲突警告",
       "hash": "ud8o96",
-      "lastUpdated": "2026-06-10"
-    },
-    "calendarSync.clashNudge.unavailable": {
-      "translation": "请重新关联日历，并允许可订状态使用此功能。",
-      "hash": "5fimhz",
       "lastUpdated": "2026-06-10"
     },
     "calendarSync.clash.tooltipPrefix": {

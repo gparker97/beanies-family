@@ -13,7 +13,6 @@ import { showToast } from '@/composables/useToast';
 import { confirm } from '@/composables/useConfirm';
 import { isFlagEnabled } from '@/config/flags';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
-import { useCalendarClashStore } from '@/stores/calendarClashStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { CalendarConnection } from '@/types/models';
@@ -26,7 +25,6 @@ const store = useCalendarSyncStore();
 
 // #34 clash nudge — only surfaced when its flag is on (launch-coupled with sync).
 const clashNudgeFlagOn = isFlagEnabled('calendarClashNudge');
-const clashStore = useCalendarClashStore();
 const settingsStore = useSettingsStore();
 
 async function onToggleClash(enabled: boolean) {
@@ -248,17 +246,9 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
           :model-value="settingsStore.calendarClashNudgeEnabled"
           :title="t('calendarSync.clashNudge.title')"
           :hint="t('calendarSync.clashNudge.hint')"
-          :disabled="!clashStore.someConnectionHasFreebusy"
           testid="calendar-clash-toggle"
           @update:model-value="onToggleClash"
-        >
-          <p
-            v-if="!clashStore.someConnectionHasFreebusy"
-            class="mt-1 text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500"
-          >
-            {{ t('calendarSync.clashNudge.unavailable') }}
-          </p>
-        </SettingToggleRow>
+        />
       </div>
 
       <!-- Connect a new calendar -->

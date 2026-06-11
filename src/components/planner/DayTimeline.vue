@@ -24,6 +24,8 @@ import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import HolidayBanner from '@/components/planner/HolidayBanner.vue';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
+import ClashIndicator from '@/components/planner/ClashIndicator.vue';
+import { useClashLookup } from '@/composables/useClash';
 import type {
   FamilyActivity,
   FamilyMember,
@@ -70,6 +72,10 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+
+// External-calendar clash lookup (#34) — called inline per positioned event (a
+// composable can't run inside a v-for). All store coupling stays in useClash.ts.
+const clashFor = useClashLookup();
 
 // Bucket segments once per render — used by both untimed-row and timed-grid render paths.
 const segmentBuckets = computed(() => splitTimedUntimed(props.segments));
@@ -354,6 +360,10 @@ function handleSlotClick(hour: number): void {
               >
                 <span class="truncate">{{ ev.occurrence.activity.title }}</span>
                 <PhotoIndicator :photo-ids="ev.occurrence.activity.photoIds" />
+                <ClashIndicator
+                  :clash="clashFor(ev.occurrence.activity.id, ev.occurrence.date)"
+                  class="ml-1"
+                />
               </div>
               <div class="text-secondary-500/60 truncate text-[0.625rem] dark:text-gray-400">
                 {{ eventTimeLabel(ev.occurrence.activity)

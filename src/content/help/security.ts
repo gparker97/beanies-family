@@ -72,10 +72,10 @@ const CLASH_NUDGE_ARTICLE: HelpArticle = {
   category: 'security',
   title: 'Clash Warnings From Your Other Calendars',
   excerpt:
-    'beanies can gently warn you when a family activity overlaps something on a connected calendar — using only whether you’re busy, never what the event is.',
+    'beanies can gently warn you when a family activity overlaps something on a connected calendar — reading only when your events are, never what they are.',
   icon: '\u{1F4C5}',
   readTime: 3,
-  updatedDate: '2026-06-10',
+  updatedDate: '2026-06-11',
   sections: [
     { type: 'heading', content: 'What it does', level: 2, id: 'what-it-does' },
     {
@@ -83,22 +83,27 @@ const CLASH_NUDGE_ARTICLE: HelpArticle = {
       content:
         'Once you’ve connected a calendar, beanies can give you a gentle heads-up when a family activity lands at the same time as something already on that calendar — a work meeting, an appointment, anything beanies can’t otherwise see. It’s a subtle nudge on the planner, not an error or a blocker.',
     },
-    { type: 'heading', content: 'It only checks if you’re busy', level: 2, id: 'free-busy-only' },
+    { type: 'heading', content: 'It reads only when, never what', level: 2, id: 'times-only' },
     {
       type: 'paragraph',
       content:
-        'beanies uses Google’s <strong>free/busy</strong> check, which returns only whether a time is busy or free — never the title, location, guests, or any detail of the other event. beanies literally cannot see what the clashing event is, only that the time is taken. The check runs from your device straight to your own Google account and never passes through a beanies server, and nothing is saved.',
+        'To find a clash, beanies asks your calendar for just the <strong>start and end times</strong> of your events — using a request that lists times only and leaves out the title, notes, location, and guests. None of that content is ever requested or read, so it never reaches beanies. The check runs from your device straight to your own Google account, never passes through a beanies server, and nothing is saved.',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'beanies also recognises its own synced activities and skips them, so it never warns you about a clash with itself. Events you’ve marked as <strong>“free”</strong> (like some birthdays or public holidays) don’t count as a clash either.',
     },
     { type: 'heading', content: 'Turning it on or off', level: 2, id: 'toggle' },
     {
       type: 'paragraph',
       content:
-        'The warning is on by default once a calendar is connected. Turn it off any time in <strong>Settings → Google Calendar</strong> — the warnings disappear and beanies stops checking your availability. If you didn’t grant the availability permission when connecting, the option stays switched off until you reconnect and allow it.',
+        'The warning is on by default once a calendar is connected. Turn it off any time in <strong>Settings → Google Calendar</strong> — the warnings disappear and beanies stops reading your event times.',
     },
     {
       type: 'infoBox',
       content:
-        'beanies never writes anything to your calendar and never reads your events. The clash warning is read-only and availability-only — a heads-up, nothing more.',
+        'beanies never writes anything to your calendar. The clash warning is read-only and reads only your events’ times, never their content — a heads-up, nothing more.',
       title: 'Read-only and private',
       icon: '\u{1F512}',
     },
