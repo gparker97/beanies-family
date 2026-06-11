@@ -1,7 +1,7 @@
 // Acknowledged external-calendar overlaps (#34) — family-shared memory.
 //
-// A thin, stateless projection of `FamilyDocument.overlapAcknowledgments`: when a
-// family member taps "This is OK" on a clash, we remember it for the whole family
+// A thin, stateless projection of the family document's overlap-acknowledgments
+// map: when a member taps "This is OK" on a clash, we remember it for the whole family
 // (CRDT → syncs across devices, survives reload). Reads stay live by touching
 // `docVersion` (the canonical doc-projection idiom, mirroring notificationsStore);
 // writes go through ONE guarded writer so a missing doc / member is reported, never
