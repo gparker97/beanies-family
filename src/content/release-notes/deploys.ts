@@ -27,42 +27,8 @@ export const DEPLOY_NOTES: ReleaseNote[] = [
         "the app now stays in portrait, so it won't flip when your phone's rotation is locked.",
     },
   },
-  {
-    version: '2026.06.08',
-    date: '2026-06-08',
-    month: '8 june 2026',
-    spotlight: false,
-    summary: {
-      en: 'Your magic beans just got smarter at reading invites.',
-      beanie: 'your magic beans just got smarter at reading invites.',
-    },
-    features: [
-      {
-        title: { en: 'Everything you need to bring', beanie: 'everything you need to bring' },
-        description: {
-          en: "When beanies reads a school notice or invite, it now pulls the prep details - what to bring, what to wear, RSVPs - into the activity's notes, so the whole family is ready.",
-          beanie:
-            "when beanies reads a school notice or invite, it now pulls the prep details - what to bring, what to wear, rsvps - into the activity's notes, so the whole family is ready.",
-        },
-      },
-      {
-        title: { en: 'Smarter categories', beanie: 'smarter categories' },
-        description: {
-          en: 'beanies now picks the right category from your list, so a school learning journey lands as a field trip instead of uncategorized.',
-          beanie:
-            'beanies now picks the right category from your list, so a school learning journey lands as a field trip instead of uncategorized.',
-        },
-      },
-      {
-        title: { en: 'No more duplicates', beanie: 'no more duplicates' },
-        description: {
-          en: 'Scan the same invite twice and beanies offers to update the activity you already have, instead of quietly adding a duplicate.',
-          beanie:
-            'scan the same invite twice and beanies offers to update the activity you already have, instead of quietly adding a duplicate.',
-        },
-      },
-    ],
-  },
+  // 2026.06.08 "magic beans got smarter" note PARKED 2026-06-12 — AI reader is
+  // soft-launched, not announced. Copy preserved in `deploys.parked.ts`.
   {
     version: '2026.06.07.2',
     date: '2026-06-07',
@@ -91,44 +57,10 @@ export const DEPLOY_NOTES: ReleaseNote[] = [
       },
     ],
   },
-  {
-    version: '2026.06.07',
-    date: '2026-06-07',
-    month: '7 june 2026',
-    spotlight: true,
-    summary: {
-      en: 'New and in beta: let beanies read your invites and bookings for you.',
-      beanie: 'new and in beta: let beanies read your invites and bookings for you.',
-    },
-    features: [
-      {
-        icon: '✨',
-        title: {
-          en: 'Magic beans: beanies reads your invites and bookings (beta)',
-          beanie: 'magic beans: beanies reads your invites and bookings (beta)',
-        },
-        description: {
-          en: "Snap a photo or PDF of a party invite or a travel booking, and beanies pulls out the details and builds the entire trip or activity for you. Add multiple documents, images, or itineraries to add to an existing trip or create new ones - it's all under your control. Nothing is ever sent without you choosing first, and you can read exactly how your data is kept secure.",
-          beanie:
-            "snap a photo or pdf of a party invite or a travel booking, and beanies pulls out the details and builds the entire trip or activity for you. add multiple documents, images, or itineraries to add to an existing trip or create new ones - it's all under your control. nothing is ever sent without you choosing first, and you can read exactly how your data is kept secure.",
-        },
-        descriptionLink: {
-          phrase: {
-            en: 'you can read exactly how your data is kept secure',
-            beanie: 'you can read exactly how your data is kept secure',
-          },
-          href: 'https://beanies.family/help/security/how-beanies-ai-handles-your-photos',
-        },
-        cta: {
-          label: {
-            en: 'Learn more about magic beans',
-            beanie: 'learn more about magic beans',
-          },
-          href: 'https://beanies.family/help/security/how-beanies-ai-handles-your-photos',
-        },
-      },
-    ],
-  },
+  // 2026.06.07 "magic beans" launch spotlight PARKED 2026-06-12 — AI reader is
+  // soft-launched, not announced. Copy preserved in `deploys.parked.ts`.
+  // ⚠️ Re-launch under a FRESH version/date — re-adding 2026.06.07 won't
+  // re-announce (already seen; de-dupes by version). See deploys.parked.ts.
   {
     version: '2026.06.05',
     date: '2026-06-05',
