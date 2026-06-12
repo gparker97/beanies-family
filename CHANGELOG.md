@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **New blog post: "we've all been vibe coding the wrong way."** A founder piece on the endless ocean of cookie-cutter vibe-coded apps — and why the old data-harvesting playbook no longer makes sense now that building software is no longer the constraint. With an original illustration of the beanies rowing their own way through a sea of identical sign-up screens.
+
 - **The Beanie Lab.** A quiet, opt-in corner at the bottom of Settings for trying features that are still in the works. It's off by default; switch it on (just on this device) to take early features for a spin while we finish polishing them.
 - **A gentle tip to install the app on iPhone.** On iPhone (Safari, not yet installed), a one-time, dismissible tip now appears in the notifications bell suggesting you add beanies to your home screen — the installed app stays connected far more reliably. It never nags: dismiss it once and it's gone.
 
@@ -22,6 +24,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Blog image captions now sit centered under their photos.** The little italic caption lines beneath blog images were rendering as ordinary left-aligned paragraphs; they now display as proper captions — centered, smaller, and tucked under the image — across every post.
 - **The app now stays in portrait and won't flip when your phone's rotation is locked.** On Android, the installed app could rotate even with your screen rotation locked, which was distracting. It's now locked to portrait so it stays put. (The same portrait lock is set for the installed app on phones across platforms.)
 
 ## 2026-06-09
