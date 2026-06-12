@@ -22,6 +22,7 @@ import {
   setGoogleAccountEmail,
   TokenExpiredError,
 } from '@/services/google/googleAuth';
+import { clearDriveConnectionForAccount } from '@/services/google/driveTokenRecovery';
 import {
   readFile,
   updateFile,
@@ -284,6 +285,14 @@ export class GoogleDriveProvider implements StorageProvider {
    * Revoke OAuth token and clear caches.
    */
   async disconnect(): Promise<void> {
+    // B: a deliberate disconnect → also drop this account's beanpod-mirrored
+    // refresh token. Done HERE (a deliberate caller), NOT inside
+    // clearGoogleSessionState — that shared chokepoint is also hit by the
+    // transient account-mismatch correction, where deleting the shared token
+    // would be wrong ("park, don't delete"). Best-effort; never throws.
+    if (this.accountEmail) {
+      await clearDriveConnectionForAccount(this.accountEmail);
+    }
     await clearGoogleSessionState();
     clearFolderCache();
   }

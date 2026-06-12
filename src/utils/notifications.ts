@@ -56,6 +56,8 @@ export interface DeriveInput {
   tipsById: ReadonlyMap<string, BeanTip>;
   /** The one live community nudge (Discord), or null. Window-exempt; projected 1:1. */
   activeNudge: { messageIndex: number; issuedAt: number } | null;
+  /** The one-time iOS install nudge, or null. Window-exempt; projected 1:1. */
+  installNudge: { shownAt: number } | null;
   /** The current member's id→readAt slice of `notificationReads`. */
   readState: Record<string, string>;
   /** Rolling history window (days) for time-based kinds; whats-new is exempt. */
@@ -82,6 +84,8 @@ export const tipId = (id: string): string => `${TIP_PREFIX}${id}`;
 // cap (< message count) guarantees an index never repeats within a lifetime.
 export const communityNudgeId = (messageIndex: number): string =>
   `${COMMUNITY_NUDGE_PREFIX}${messageIndex}`;
+// Singleton id — the install nudge is one-time, so a stable id is all it needs.
+export const INSTALL_NUDGE_ID = 'install-nudge';
 
 // ── Internal pure date helpers (LOCAL time — avoids the UTC-midnight trap of
 //    `new Date('YYYY-MM-DD')`) ─────────────────────────────────────────────────
@@ -130,6 +134,7 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
     issuedTips,
     tipsById,
     activeNudge,
+    installNudge,
     readState,
     windowDays,
     occurrencesByDate,
@@ -367,6 +372,25 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
       });
     } catch (err) {
       console.warn('[deriveNotifications] skipped community nudge:', err);
+    }
+  }
+
+  // ── install nudge (window-exempt; one-time; projected 1:1) ───────────────────
+  // The iOS-Safari + not-installed + status gate already ran in `useInstallNudge`,
+  // so presence here = "chosen to surface." Singleton id → stable read-state.
+  if (installNudge) {
+    try {
+      const id = INSTALL_NUDGE_ID;
+      const issuedMs = installNudge.shownAt;
+      out.push({
+        id,
+        kind: 'installNudge',
+        title: '', // label resolves in the presentation layer
+        occurredAt: Number.isNaN(issuedMs) ? now.toISOString() : new Date(issuedMs).toISOString(),
+        read: isRead(id),
+      });
+    } catch (err) {
+      console.warn('[deriveNotifications] skipped install nudge:', err);
     }
   }
 

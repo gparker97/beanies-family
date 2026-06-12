@@ -22,6 +22,7 @@ import type {
   EmergencyContact,
   CalendarConnection,
   CalendarEventLink,
+  DriveConnection,
   OverlapAck,
   Settings,
 } from './models';
@@ -64,6 +65,12 @@ export interface FamilyDocument {
   // Google Calendar integration (#32) — family-wide connections + activity↔event links
   calendarConnections: Record<string, CalendarConnection>;
   calendarEventLinks: Record<string, CalendarEventLink>;
+  /**
+   * Google Drive refresh-token recovery copies, keyed per Google account by
+   * `driveConnectionId(email)`. Per-account (NOT family-wide); the local store
+   * is primary, this is additive recovery. See DriveConnection in models.ts.
+   */
+  driveConnections: Record<string, DriveConnection>;
   /**
    * Acknowledged external-calendar overlaps (#34): `overlapAckKey(...)` → ack.
    * Family-shared "this overlap is fine" memory; merges cleanly (one whole-object

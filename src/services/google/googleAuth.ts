@@ -23,7 +23,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 import { Browser } from '@capacitor/browser';
 import { App as CapacitorApp, type URLOpenListenerEvent } from '@capacitor/app';
-import { isNative } from '@/services/sync/capabilities';
+import { isNative, isIosOrIpadOs, isStandalone } from '@/services/sync/capabilities';
 
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
@@ -221,27 +221,12 @@ export function shouldUseRedirectAuth(): boolean {
   if (typeof window === 'undefined') return false;
   // Native (Capacitor): popups can't bridge postMessage back into the WebView,
   // and Google redirects to the verified App Link which the OS routes into the
-  // app (appUrlOpen) — never to a popup. The deep-link transport is the only
-  // one that works. This is the single source of truth for "use redirect auth";
-  // callers must not re-test `isNative()` separately. See ADR-029.
-  if (isNative()) return true;
-  const nav = window.navigator as
-    | (Navigator & { standalone?: boolean; maxTouchPoints?: number })
-    | undefined;
-  if (!nav) return false;
-  // iOS / iPadOS WebKit — popup/new-tab OAuth is fragile (see above).
-  // iPadOS 13+ Safari reports a desktop UA, so also detect "Mac with a
-  // touchscreen" (no real Mac has `maxTouchPoints > 1`).
-  const ua = nav.userAgent ?? '';
-  const isIOS =
-    /iP(hone|od|ad)/.test(ua) || (nav.platform === 'MacIntel' && (nav.maxTouchPoints ?? 0) > 1);
-  if (isIOS) return true;
-  // Installed PWA in standalone mode — popup→postMessage bridge is broken.
-  if (window.matchMedia?.('(display-mode: standalone)').matches) return true;
-  // iOS Safari "Add to Home Screen" PWAs use this older flag (kept for
-  // belt-and-suspenders; the iOS check above already covers them).
-  if (nav.standalone === true) return true;
-  return false;
+  // app (appUrlOpen) — never to a popup. iOS/iPadOS WebKit: popup/new-tab OAuth
+  // is fragile. Installed/standalone PWA: the popup→postMessage bridge is broken.
+  // This is the single source of truth for "use redirect auth"; callers must not
+  // re-test these separately. Detection primitives live in capabilities.ts.
+  // See ADR-029.
+  return isNative() || isIosOrIpadOs() || isStandalone();
 }
 
 /**
@@ -253,6 +238,19 @@ export function shouldUseRedirectAuth(): boolean {
 export async function tryGetSilentToken(): Promise<string | null> {
   if (isTokenValid()) return accessToken;
   return attemptSilentRefresh();
+}
+
+/**
+ * Prime the in-memory refresh token (and family id) so the next
+ * `attemptSilentRefresh()` uses it. Pure state setter — no I/O, no recovery
+ * logic — exposed so `driveTokenRecovery` can seed a refresh token recovered
+ * from the encrypted beanpod before a silent refresh, without reaching into
+ * this module's private state. The caller is responsible for also persisting it
+ * to the local store (`storeGoogleRefreshToken`) if it should survive a reload.
+ */
+export function primeRefreshToken(familyId: string, stored: StoredRefreshToken): void {
+  currentFamilyId = familyId;
+  currentRefreshToken = stored;
 }
 
 function getClientId(): string {

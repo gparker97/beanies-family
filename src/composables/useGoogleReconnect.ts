@@ -4,6 +4,7 @@ import {
   shouldUseRedirectAuth,
   startRedirectAuth,
 } from '@/services/google/googleAuth';
+import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 
 export function useGoogleReconnect() {
   const isReconnecting = ref(false);
@@ -24,6 +25,13 @@ export function useGoogleReconnect() {
     isReconnecting.value = true;
     reconnectError.value = null;
     try {
+      // B: try a silent recovery using the refresh token mirrored into the
+      // beanpod (account-matched to loginHint) BEFORE any consent screen. On
+      // success the connection is restored with no user interaction; on false
+      // we fall through to the unchanged forced-consent flow below.
+      if (await tryReconnectSilently(loginHint)) {
+        return true;
+      }
       // Standalone PWAs and iOS Safari can't bridge popup→postMessage back
       // to the app window, so the popup-based auth flow hangs silently.
       // Use full-page redirect auth instead — the page navigates to Google,

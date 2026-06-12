@@ -14,6 +14,7 @@ import WhatsNewBody from '@/components/notifications/WhatsNewBody.vue';
 import AnnouncementBody from '@/components/notifications/AnnouncementBody.vue';
 import TipBody from '@/components/notifications/TipBody.vue';
 import CommunityNudgeBody from '@/components/notifications/CommunityNudgeBody.vue';
+import InstallNudgeBody from '@/components/notifications/InstallNudgeBody.vue';
 
 type T = (key: UIStringKey) => string;
 
@@ -25,6 +26,7 @@ export const NOTIFICATION_KIND_PRESENTATION: Record<NotificationKind, KindPresen
   announcement: { accent: 'announcement', icon: '📣', detailBody: AnnouncementBody },
   tip: { accent: 'tip', icon: '💡', detailBody: TipBody },
   communityNudge: { accent: 'community-nudge', icon: '💬', detailBody: CommunityNudgeBody },
+  installNudge: { accent: 'install-nudge', icon: '📲', detailBody: InstallNudgeBody },
 };
 
 /** Tinted lead-icon background per accent (Nook-UI tints). */
@@ -36,6 +38,7 @@ export const ACCENT_TINT_CLASS: Record<KindPresentation['accent'], string> = {
   announcement: 'bg-[var(--tint-orange-8,rgba(241,93,34,0.08))]',
   tip: 'bg-[var(--tint-amber-10,rgba(245,188,80,0.10))]',
   'community-nudge': 'bg-[var(--tint-silk-20,rgba(174,214,241,0.2))]',
+  'install-nudge': 'bg-[var(--tint-silk-20,rgba(174,214,241,0.2))]',
 };
 
 /** The framing label shown on a row/detail, by kind (overdue is a `todo-due` variant). */
@@ -55,6 +58,8 @@ export function kindLabelKey(kind: NotificationKind, overdue?: boolean): UIStrin
       return 'notifications.kindTip';
     case 'communityNudge':
       return 'communityNudge.label';
+    case 'installNudge':
+      return 'installNudge.label';
   }
 }
 
@@ -64,6 +69,7 @@ export function notificationTitle(n: AppNotification, t: T): string {
   if (n.kind === 'whats-new') return t('notifications.kindWhatsNew');
   if (n.kind === 'tip') return t('notifications.kindTip');
   if (n.kind === 'communityNudge') return t('communityNudge.label');
+  if (n.kind === 'installNudge') return t('installNudge.label');
   return n.title;
 }
 
@@ -86,6 +92,8 @@ export function notificationSummary(n: AppNotification, t: T): string {
       return ''; // the bilingual tip line is resolved in useNotificationPresentation
     case 'communityNudge':
       return ''; // the bilingual nudge line is resolved in useNotificationPresentation
+    case 'installNudge':
+      return t('installNudge.tagline'); // static line; t() is beanie-aware
   }
 }
 

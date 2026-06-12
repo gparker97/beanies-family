@@ -83,6 +83,7 @@ function derive(overrides: Partial<DeriveInput>, now: Date = NOW) {
     issuedTips: [],
     tipsById: new Map<string, BeanTip>(),
     activeNudge: null,
+    installNudge: null,
     readState: {},
     windowDays: 30,
     occurrencesByDate: {},

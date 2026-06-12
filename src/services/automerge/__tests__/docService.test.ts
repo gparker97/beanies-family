@@ -224,6 +224,7 @@ describe('docService', () => {
         notificationReads: {},
         calendarConnections: {},
         calendarEventLinks: {},
+        driveConnections: {},
         overlapAcknowledgments: {},
         settings: null,
       };

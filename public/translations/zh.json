@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-11",
-    "translationCount": 3151
+    "lastUpdated": "2026-06-12",
+    "translationCount": 3157
   },
   "translations": {
     "app.name": {
@@ -15760,6 +15760,36 @@
       "translation": "撤销",
       "hash": "1klxg",
       "lastUpdated": "2026-06-11"
+    },
+    "installNudge.label": {
+      "translation": "安装应用",
+      "hash": "2x3yl",
+      "lastUpdated": "2026-06-12"
+    },
+    "installNudge.tagline": {
+      "translation": "让您的家庭数据保持可靠连接。",
+      "hash": "6r63ln",
+      "lastUpdated": "2026-06-12"
+    },
+    "installNudge.description": {
+      "translation": "将beanies添加到主屏幕，它将保持可靠地登录到您的数据-一段时间后不再要求重新连接。轻触“分享” ，然后轻触“添加到主屏幕”。",
+      "hash": "p62s86",
+      "lastUpdated": "2026-06-12"
+    },
+    "installNudge.showHow": {
+      "translation": "教我怎么做",
+      "hash": "w3zw2z",
+      "lastUpdated": "2026-06-12"
+    },
+    "installNudge.dismiss": {
+      "translation": "暂不",
+      "hash": "8bjtp3",
+      "lastUpdated": "2026-06-12"
+    },
+    "installNudge.installed": {
+      "translation": "已安装",
+      "hash": "4p21le",
+      "lastUpdated": "2026-06-12"
     }
   }
 }

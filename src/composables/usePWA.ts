@@ -1,4 +1,5 @@
 import { ref, readonly } from 'vue';
+import { isStandalone } from '@/services/sync/capabilities';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -26,9 +27,10 @@ function init() {
   if (initialized || typeof window === 'undefined') return;
   initialized = true;
 
-  // Detect if already installed (standalone mode)
+  // Detect if already installed (standalone mode). Initial value via the shared
+  // `isStandalone()` primitive; keep the media-query object for live changes.
   const standaloneQuery = window.matchMedia('(display-mode: standalone)');
-  isInstalled.value = standaloneQuery.matches || (navigator as any).standalone === true;
+  isInstalled.value = isStandalone();
 
   standaloneQuery.addEventListener('change', (e) => {
     isInstalled.value = e.matches;

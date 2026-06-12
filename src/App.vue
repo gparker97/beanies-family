@@ -698,11 +698,25 @@ onMounted(async () => {
     }
 
     // Request persistent storage so the browser won't evict IndexedDB
-    // (tokens, file handles). Installed PWAs are almost always granted.
+    // (tokens, file handles). Installed PWAs are almost always granted; a denial
+    // is the normal state on non-installed browsers (esp. iOS Safari, where ITP
+    // then evicts storage after ~7 days — the Drive-reconnect cause). We surface
+    // denials to telemetry (Plausible only — NOT reportError; denial is expected,
+    // not an error) so we can see how often eviction protection is missing.
     if (navigator.storage?.persist) {
-      navigator.storage.persist().then((granted) => {
-        if (granted) console.warn('[storage] Persistent storage granted');
-      });
+      navigator.storage
+        .persist()
+        .then((granted) => {
+          if (granted) {
+            console.warn('[storage] Persistent storage granted');
+          } else {
+            console.warn('[storage] Persistent storage denied (eviction possible)');
+            window.plausible?.('storage_persist_denied');
+          }
+        })
+        .catch((e) => {
+          console.warn('[storage] Persistent storage request failed', e);
+        });
     }
 
     // Step 2: Initialize auth (checks registry for existing families)

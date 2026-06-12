@@ -1055,6 +1055,19 @@ const STRING_DEFS = {
   'communityNudge.join': { en: 'Join us on Discord', beanie: 'join us on discord' },
   'communityNudge.snooze': { en: 'Not now', beanie: 'not now' },
   'communityNudge.joined': { en: "I'm already there!", beanie: "i'm already there!" },
+  'installNudge.label': { en: 'Install the app', beanie: 'plant beanies on your home screen' },
+  'installNudge.tagline': {
+    en: 'Keep your family data reliably connected.',
+    beanie: 'keep your beans reliably connected.',
+  },
+  'installNudge.description': {
+    en: 'Add beanies to your home screen and it stays reliably signed in to your data - no more being asked to reconnect after a while. Tap Share, then "Add to Home Screen".',
+    beanie:
+      'add beanies to your home screen and it stays reliably signed in to your beans - no more being asked to reconnect after a while. tap share, then "add to home screen".',
+  },
+  'installNudge.showHow': { en: 'Show me how', beanie: 'show me how!' },
+  'installNudge.dismiss': { en: 'Not now', beanie: 'not now' },
+  'installNudge.installed': { en: 'Already installed', beanie: "i've already done it!" },
   'nav.section.treehouse': { en: 'The Treehouse', beanie: 'family treehouse' },
   'nav.section.piggyBank': { en: 'The Piggy Bank', beanie: 'piggy bank' },
   'nav.nook': { en: 'Family Dashboard', beanie: 'family nook' },

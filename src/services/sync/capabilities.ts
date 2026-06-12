@@ -53,6 +53,45 @@ export function getPlatform(): 'web' | 'ios' | 'android' {
 }
 
 /**
+ * iOS / iPadOS WebKit, detected by UA. The single source of truth for "this is
+ * an Apple touch device" — consumed by `shouldUseRedirectAuth` (OAuth transport)
+ * and the install nudge. iPadOS 13+ Safari reports a desktop UA, so we also
+ * treat "Mac with a real touchscreen" (`maxTouchPoints > 1`) as iPadOS.
+ * Safe at module/SSR time (returns false if `navigator` is missing).
+ */
+export function isIosOrIpadOs(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const nav = navigator as Navigator & { maxTouchPoints?: number };
+  const ua = nav.userAgent ?? '';
+  return (
+    /iP(hone|od|ad)/.test(ua) || (nav.platform === 'MacIntel' && (nav.maxTouchPoints ?? 0) > 1)
+  );
+}
+
+/**
+ * Running as an installed/standalone PWA (home-screen launch), via the modern
+ * display-mode media query OR the legacy iOS `navigator.standalone` flag.
+ * Safe at module/SSR time.
+ */
+export function isStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  const nav = window.navigator as (Navigator & { standalone?: boolean }) | undefined;
+  return (
+    window.matchMedia?.('(display-mode: standalone)').matches === true || nav?.standalone === true
+  );
+}
+
+/**
+ * iOS Safari that is NOT installed to the home screen — the install nudge's gate
+ * and the population most affected by Safari ITP storage eviction (which wipes
+ * the Drive token after ~7 days of non-use on non-installed sites). An installed
+ * PWA is exempt, so this is exactly who benefits from installing.
+ */
+export function isIosSafariNotInstalled(): boolean {
+  return isIosOrIpadOs() && !isStandalone();
+}
+
+/**
  * Whether this environment can read/write local `.beanpod` files at all — the
  * web File System Access API (Chromium only) OR the native @capacitor/filesystem
  * plugin. This is the single predicate the local-file entry points must gate on;

@@ -669,6 +669,39 @@ export type UpdateCalendarEventLinkInput = Partial<
   Omit<CalendarEventLink, 'id' | 'createdAt' | 'updatedAt'>
 >;
 
+export type DriveProvider = 'google';
+
+/**
+ * A Google Drive refresh token stored in the encrypted `.beanpod` as a RECOVERY
+ * copy (see `driveTokenRecovery.ts`). Keyed in the doc by `driveConnectionId(email)`
+ * = the normalized account email.
+ *
+ * UNLIKE `CalendarConnection`, this is **per-account, NOT family-wide**: each
+ * member authenticates Drive as themselves, so a token for account A must never
+ * be used by a device acting as account B. The local IndexedDB store
+ * (`fileHandleStore`) remains the PRIMARY token home; this doc copy is purely
+ * additive — it lets a lost local token self-heal across the same Google
+ * account's devices and turns many forced-consent reconnects into silent ones.
+ * The `.beanpod` is already AES-256-GCM encrypted (family-trust boundary), same
+ * as the calendar token.
+ */
+export interface DriveConnection {
+  id: UUID; // driveConnectionId(accountEmail) — the normalized account email
+  provider: DriveProvider;
+  accountEmail: string;
+  /** Long-lived OAuth refresh token (lives in the encrypted .beanpod). */
+  refreshToken: string;
+  /** When the stored refresh token was issued (ms epoch); newer wins on reconcile. */
+  issuedAt: number | null;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type CreateDriveConnectionInput = Omit<DriveConnection, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdateDriveConnectionInput = Partial<
+  Omit<DriveConnection, 'id' | 'createdAt' | 'updatedAt'>
+>;
+
 /**
  * Family-shared "we acknowledged this calendar overlap" record (#34). When a
  * family member taps "This is OK" on a clash, we remember it for the whole family
