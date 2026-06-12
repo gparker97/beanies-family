@@ -17,6 +17,17 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.06.12.2',
+    date: '2026-06-12',
+    month: '12 june 2026',
+    spotlight: false,
+    summary: {
+      en: "We've made the connection to your family data file more reliable, so you'll be asked to reconnect and sign in far less often.",
+      beanie:
+        "we've made the connection to your family data file more reliable, so you'll be asked to reconnect and sign in far less often.",
+    },
+  },
+  {
     version: '2026.06.12',
     date: '2026-06-12',
     month: '12 june 2026',
