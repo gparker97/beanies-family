@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-06-12
 
+### Added
+
+- **A gentle tip to install the app on iPhone.** On iPhone (Safari, not yet installed), a one-time, dismissible tip now appears in the notifications bell suggesting you add beanies to your home screen — the installed app stays connected far more reliably. It never nags: dismiss it once and it's gone.
+
+### Changed
+
+- **The connection to your family data file is now more reliable.** You'll be asked to reconnect and sign in far less often — the data-file connection now recovers itself and reconnects quietly in the background where it used to need you to sign in to Google again. Most noticeable on iPhone.
+
 ### Fixed
 
 - **The app now stays in portrait and won't flip when your phone's rotation is locked.** On Android, the installed app could rotate even with your screen rotation locked, which was distracting. It's now locked to portrait so it stays put. (The same portrait lock is set for the installed app on phones across platforms.)
