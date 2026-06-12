@@ -22,9 +22,9 @@ export const DEPLOY_NOTES: ReleaseNote[] = [
     month: '12 june 2026',
     spotlight: false,
     summary: {
-      en: "We've made the connection to your family data file more reliable, so you'll be asked to reconnect and sign in far less often.",
+      en: "The connection to your family data file is now more reliable, so you'll be asked to reconnect and sign in far less often.",
       beanie:
-        "we've made the connection to your family data file more reliable, so you'll be asked to reconnect and sign in far less often.",
+        "the connection to your family data file is now more reliable, so you'll be asked to reconnect and sign in far less often.",
     },
   },
   {
