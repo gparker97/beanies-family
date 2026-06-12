@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-12",
-    "translationCount": 3157
+    "translationCount": 3163
   },
   "translations": {
     "app.name": {
@@ -15789,6 +15789,36 @@
     "installNudge.installed": {
       "translation": "已安装",
       "hash": "4p21le",
+      "lastUpdated": "2026-06-12"
+    },
+    "settings.beanieLab.title": {
+      "translation": "The Beanie Lab",
+      "hash": "3zafmg",
+      "lastUpdated": "2026-06-12"
+    },
+    "settings.beanieLab.blurb": {
+      "translation": "先睹为快，看看我们实验室最新、最伟大、最新鲜的一些产品。请记住，它们仍在开发中，因此它们可能会出现故障、徘徊或根本不起作用（还没有！ ）。",
+      "hash": "tzu35i",
+      "lastUpdated": "2026-06-12"
+    },
+    "settings.beanieLab.enableLabel": {
+      "translation": "启用实验性功能",
+      "hash": "351ins",
+      "lastUpdated": "2026-06-12"
+    },
+    "settings.beanieLab.enableHint": {
+      "translation": "仅此设备·默认情况下关闭",
+      "hash": "gdkzc2",
+      "lastUpdated": "2026-06-12"
+    },
+    "settings.beanieLab.testingTag": {
+      "translation": "测试",
+      "hash": "407ca8",
+      "lastUpdated": "2026-06-12"
+    },
+    "settings.beanieLab.empty": {
+      "translation": "翻转开关以显示实验室中正在酿造的东西。",
+      "hash": "fghtl9",
       "lastUpdated": "2026-06-12"
     }
   }

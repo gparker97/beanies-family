@@ -64,9 +64,12 @@ const CALENDAR_SYNC_ARTICLE: HelpArticle = {
   ],
 };
 
-// #34 External-calendar clash nudge — HELD until launch (launch-coupled with #32).
-// Flip CLASH_NUDGE_HELP_LIVE to true together with the `calendarClashNudge` flag.
-const CLASH_NUDGE_HELP_LIVE = false;
+// #34 External-calendar clash nudge — LIVE alongside the `calendarClashNudge`
+// flag (2026-06-12), so the "What's this?" link in the activity drawer resolves
+// for Beanie Lab testers. Flipping this publishes the article fully: a resolvable
+// page AND a listing in the help index + sitemap + llms-full (the calendar/clash
+// features themselves remain Lab-gated, so this is documentation only).
+const CLASH_NUDGE_HELP_LIVE = true;
 const CLASH_NUDGE_ARTICLE: HelpArticle = {
   slug: 'external-calendar-clash-nudge',
   category: 'security',

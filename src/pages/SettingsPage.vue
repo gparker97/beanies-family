@@ -7,12 +7,12 @@ import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import ChangePasswordSettings from '@/components/settings/ChangePasswordSettings.vue';
 import ProfileHeader from '@/components/settings/ProfileHeader.vue';
 import SettingsCard from '@/components/settings/SettingsCard.vue';
-import BetaBadge from '@/components/ui/BetaBadge.vue';
 import { openDiscord } from '@/utils/discord';
 import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
 import AiSettings from '@/components/settings/AiSettings.vue';
 import CalendarSyncSettings from '@/components/settings/CalendarSyncSettings.vue';
-import { isFlagEnabled } from '@/config/flags';
+import BeanieLabSection from '@/components/settings/BeanieLabSection.vue';
+import { useBeanieLab } from '@/composables/useBeanieLab';
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
 import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
 import BaseModal from '@/components/ui/BaseModal.vue';
@@ -102,12 +102,11 @@ const showDataManagement = ref(false);
 const showTransferOwnership = ref(false);
 const showAi = ref(false);
 const showCalendarSync = ref(false);
-// #32: Google Calendar sync — flag-gated (googleCalendarSync), prod-off until launch.
-const calendarSyncEnabled = isFlagEnabled('googleCalendarSync');
-
-// #133: the AI surface launched (soft release, 2026-06-07) — was flag-gated, now always on
-// (labelled Beta). Kept as a named constant so the card/deep-link guards read clearly.
-const aiSurfaceEnabled = true;
+// beanies AI (#133) and Google Calendar (#32/#34) now live inside The Beanie Lab —
+// a per-device opt-in. useBeanieLab is the single source of truth for their
+// visibility (Lab on + the feature's flag), shared with BeanieLabSection so the
+// cards and these drawer / deep-link guards can never disagree.
+const { aiVisible, calendarVisible } = useBeanieLab();
 
 // ── Deep-link: open a specific card from a route query (e.g. ?open=family-data)
 //    Generalizable — additional cards can opt in by extending the map below.
@@ -116,8 +115,12 @@ const cardOpenMap: Record<string, () => void> = {
     showFamilyData.value = true;
   },
   ai: () => {
-    // Guarded: the AI surface is flag-gated, so the deep-link no-ops when it's off.
-    if (aiSurfaceEnabled) showAi.value = true;
+    // Guarded: AI lives in the Beanie Lab, so the deep-link no-ops unless opted in.
+    if (aiVisible.value) showAi.value = true;
+  },
+  'calendar-sync': () => {
+    // Same gate as the Lab card (opt-in + googleCalendarSync flag).
+    if (calendarVisible.value) showCalendarSync.value = true;
   },
   appearance: () => {
     showAppearance.value = true;
@@ -679,24 +682,6 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         @click="showSecurity = true"
       />
       <SettingsCard
-        v-if="aiSurfaceEnabled"
-        icon="🤖"
-        :title="t('settings.card.ai')"
-        :description="t('settings.card.aiDesc')"
-        icon-bg="var(--tint-silk-20)"
-        @click="showAi = true"
-      >
-        <template #badge><BetaBadge /></template>
-      </SettingsCard>
-      <SettingsCard
-        v-if="calendarSyncEnabled"
-        icon="📅"
-        :title="t('settings.card.calendarSync')"
-        :description="t('settings.card.calendarSyncDesc')"
-        icon-bg="var(--tint-silk-20)"
-        @click="showCalendarSync = true"
-      />
-      <SettingsCard
         icon="💬"
         :title="t('settings.card.community')"
         :description="t('settings.card.communityDesc')"
@@ -790,6 +775,11 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       </div>
     </div>
 
+    <!-- ── The Beanie Lab (per-device opt-in to experimental features) ──────
+         Always rendered; quiet + collapsed by default. Houses the beanies AI
+         and Google Calendar surfaces, revealed only when the user opts in. -->
+    <BeanieLabSection @open-ai="showAi = true" @open-calendar="showCalendarSync = true" />
+
     <!-- ── Feature Flags (dev-only, owner/admin) ───────────────────────────
          DevFlagsCard is undefined in prod (DEV-gated dynamic import above), so
          this renders nothing and ships no flag-editing code to users. -->
@@ -821,10 +811,12 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     <!-- ── MODALS ────────────────────────────────────────────────────── -->
     <!-- ══════════════════════════════════════════════════════════════════ -->
 
-    <!-- ── beanies AI Modal (#133, flag-gated) ─────────────────────────── -->
-    <AiSettings v-if="aiSurfaceEnabled" :open="showAi" @close="showAi = false" />
+    <!-- ── beanies AI + Google Calendar drawers (Beanie Lab surfaces) ──────
+         Mount-gated on the same useBeanieLab computeds as their Lab cards, so a
+         drawer can never open while the Lab (or the calendar flag) is off. -->
+    <AiSettings v-if="aiVisible" :open="showAi" @close="showAi = false" />
     <CalendarSyncSettings
-      v-if="calendarSyncEnabled"
+      v-if="calendarVisible"
       :open="showCalendarSync"
       @close="showCalendarSync = false"
     />

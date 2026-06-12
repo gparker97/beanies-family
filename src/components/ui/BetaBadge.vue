@@ -7,8 +7,14 @@
  * Text is i18n so beanie-mode + zh apply.
  */
 import { useTranslation } from '@/composables/useTranslation';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
-defineProps<{ tone?: 'silk' | 'onAccent' }>();
+// `label` is a translation KEY (not a resolved string) so beanie-mode + zh stay
+// reactive inside the badge. Defaults to "Beta"; pass another key (e.g.
+// 'settings.beanieLab.testingTag') to reuse the exact pill for a "Testing" tag.
+withDefaults(defineProps<{ tone?: 'silk' | 'onAccent'; label?: UIStringKey }>(), {
+  label: 'common.beta',
+});
 
 const { t } = useTranslation();
 </script>
@@ -22,6 +28,6 @@ const { t } = useTranslation();
         : 'bg-[var(--tint-silk-20)] text-[var(--color-text)]'
     "
   >
-    {{ t('common.beta') }}
+    {{ t(label) }}
   </span>
 </template>

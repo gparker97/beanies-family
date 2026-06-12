@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **The Beanie Lab.** A quiet, opt-in corner at the bottom of Settings for trying features that are still in the works. It's off by default; switch it on (just on this device) to take early features for a spin while we finish polishing them.
 - **A gentle tip to install the app on iPhone.** On iPhone (Safari, not yet installed), a one-time, dismissible tip now appears in the notifications bell suggesting you add beanies to your home screen — the installed app stays connected far more reliably. It never nags: dismiss it once and it's gone.
 
 ### Changed

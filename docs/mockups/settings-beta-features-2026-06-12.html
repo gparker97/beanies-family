@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>beanies.family — Beta features section (mockup, 2026-06-12)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --orange: #F15D22;
+    --orange-soft: #FDEDE6;
+    --slate: #2C3E50;
+    --slate-60: rgba(44, 62, 80, 0.60);
+    --slate-45: rgba(44, 62, 80, 0.45);
+    --slate-30: rgba(44, 62, 80, 0.30);
+    --sky: #AED6F1;
+    --terracotta: #E67E22;
+    --cloud: #F8F9FA;
+    --card: #FFFFFF;
+    --line: rgba(44, 62, 80, 0.10);
+    --line-strong: rgba(44, 62, 80, 0.16);
+    --shadow: 0 1px 2px rgba(44,62,80,0.04), 0 6px 20px rgba(44,62,80,0.06);
+    --radius-card: 18px;
+    --radius-pill: 999px;
+  }
+  [data-theme="dark"] {
+    --slate: #E8EDF2;
+    --slate-60: rgba(232, 237, 242, 0.62);
+    --slate-45: rgba(232, 237, 242, 0.45);
+    --slate-30: rgba(232, 237, 242, 0.28);
+    --cloud: #1A242E;
+    --card: #243240;
+    --line: rgba(232, 237, 242, 0.10);
+    --line-strong: rgba(232, 237, 242, 0.18);
+    --orange-soft: rgba(241, 93, 34, 0.16);
+    --shadow: 0 1px 2px rgba(0,0,0,0.20), 0 8px 24px rgba(0,0,0,0.28);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(174,214,241,0.18), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(230,126,34,0.10), transparent 55%),
+      var(--cloud);
+    color: var(--slate);
+    min-height: 100vh;
+    padding: 40px 20px 80px;
+    transition: background 0.4s ease, color 0.4s ease;
+  }
+  h1, h2, h3, .font-display { font-family: 'Outfit', sans-serif; }
+
+  /* ---- top control bar (mockup chrome, not part of the app) ---- */
+  .controls {
+    max-width: 980px;
+    margin: 0 auto 28px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .controls .meta { font-size: 13px; color: var(--slate-45); }
+  .controls .meta b { color: var(--slate); font-weight: 600; }
+  .seg {
+    display: inline-flex;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    padding: 3px;
+    box-shadow: var(--shadow);
+  }
+  .seg button {
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--slate-60);
+    background: transparent;
+    border: 0;
+    padding: 7px 14px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .seg button.active { background: var(--slate); color: var(--cloud); }
+  [data-theme="dark"] .seg button.active { background: var(--orange); color: #fff; }
+
+  /* ---- phone / page frame ---- */
+  .stage { max-width: 980px; margin: 0 auto; display: flex; justify-content: center; }
+  .frame {
+    width: 100%;
+    background: var(--cloud);
+    border-radius: 28px;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    padding: 22px 22px 28px;
+    transition: max-width 0.35s ease;
+  }
+  .frame.mobile { max-width: 412px; }
+  .frame.desktop { max-width: 720px; }
+
+  .page-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 16px;
+  }
+
+  /* ---- generic settings card grid (context) ---- */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .frame.mobile .grid { grid-template-columns: 1fr 1fr; }
+  .scard {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    padding: 14px;
+    display: flex;
+    gap: 11px;
+    align-items: flex-start;
+    box-shadow: var(--shadow);
+  }
+  .scard .ico {
+    width: 34px; height: 34px;
+    flex: 0 0 34px;
+    border-radius: 11px;
+    display: grid; place-items: center;
+    font-size: 17px;
+    background: var(--cloud);
+    border: 1px solid var(--line);
+  }
+  .scard .t { font-family:'Outfit',sans-serif; font-weight: 600; font-size: 14px; line-height: 1.2; }
+  .scard .d { font-size: 11.5px; color: var(--slate-45); margin-top: 3px; line-height: 1.35; }
+
+  .section-label {
+    font-family: 'Outfit', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--slate-45);
+    margin: 22px 4px 10px;
+  }
+
+  /* ---- quick toggles (context) ---- */
+  .toggles {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .trow {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .trow:last-child { border-bottom: 0; }
+  .trow .lbl { font-size: 14px; font-weight: 500; }
+  .trow .sub { font-size: 11.5px; color: var(--slate-45); margin-top: 2px; }
+
+  /* ---- the switch ---- */
+  .sw {
+    position: relative;
+    width: 42px; height: 25px;
+    border-radius: var(--radius-pill);
+    background: var(--slate-30);
+    border: none;
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: background 0.22s ease;
+  }
+  .sw::after {
+    content: "";
+    position: absolute; top: 3px; left: 3px;
+    width: 19px; height: 19px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transition: transform 0.22s cubic-bezier(.34,1.56,.64,1);
+  }
+  .sw.on { background: var(--orange); }
+  .sw.on::after { transform: translateX(17px); }
+  .sw.sm { width: 36px; height: 21px; }
+  .sw.sm::after { width: 15px; height: 15px; }
+  .sw.sm.on::after { transform: translateX(15px); }
+
+  /* ============================================================
+     THE BETA DISCLOSURE  — the actual proposal
+     ============================================================ */
+  .beta {
+    margin-top: 14px;
+    border-radius: var(--radius-card);
+    border: 1px dashed var(--line-strong);
+    background: transparent;
+    overflow: hidden;
+    transition: background 0.3s ease, border-color 0.3s ease;
+  }
+  .beta.open {
+    background: var(--card);
+    border-style: solid;
+    border-color: var(--line);
+    box-shadow: var(--shadow);
+  }
+  .beta-head {
+    width: 100%;
+    display: flex; align-items: center; gap: 10px;
+    padding: 13px 16px;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: var(--slate-60);
+    text-align: left;
+  }
+  .beta.open .beta-head { color: var(--slate); }
+  /* ---- the animated lab beaker glyph ---- */
+  .lab-ico { width: 24px; height: 24px; flex: 0 0 24px; }
+  .lab-ico svg { width: 100%; height: 100%; overflow: visible; display: block; }
+  .lab-outline { stroke: var(--slate-45); transition: stroke 0.3s ease; }
+  .beta.open .lab-outline { stroke: var(--slate); }
+  .lab-liquid { fill: var(--terracotta); opacity: 0.55; transition: opacity 0.3s ease; }
+  .beta.open .lab-liquid { opacity: 0.85; }
+  .lab-leaf { fill: #5BA86B; opacity: 0.55; }
+  .beta.open .lab-leaf { opacity: 1; }
+  .lab-bubble { fill: #fff; opacity: 0; }
+  .beta.open .lab-bubble { animation: labBubble 2.2s ease-in infinite; }
+  .beta.open .lab-bubble.b2 { animation-delay: 0.75s; }
+  .beta.open .lab-bubble.b3 { animation-delay: 1.45s; }
+  @keyframes labBubble {
+    0%   { transform: translateY(0);     opacity: 0; }
+    25%  { opacity: 0.9; }
+    100% { transform: translateY(-6px);  opacity: 0; }
+  }
+  .lab-bolt { fill: var(--orange); opacity: 0; transform-origin: 19px 6px; }
+  .beta.open .lab-bolt { opacity: 1; animation: labZap 3.4s steps(1, end) infinite; }
+  @keyframes labZap {
+    0%, 86%, 100% { opacity: 1; }
+    88% { opacity: 0.15; }
+    90% { opacity: 1; }
+    92% { opacity: 0.3; }
+    94% { opacity: 1; }
+  }
+  .beta-head .title {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    flex: 1;
+  }
+  .beta-head .chev {
+    transition: transform 0.28s ease;
+    font-size: 12px;
+    opacity: 0.6;
+  }
+  .beta.open .beta-head .chev { transform: rotate(180deg); }
+
+  .beta-body {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease, opacity 0.3s ease;
+  }
+  .beta.open .beta-body { max-height: 640px; opacity: 1; }
+
+  .beta-inner { padding: 2px 16px 16px; }
+  .beta-blurb {
+    font-size: 12.5px;
+    color: var(--slate-45);
+    line-height: 1.45;
+    margin-bottom: 14px;
+  }
+  .beta-master {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 13px;
+    background: var(--cloud);
+    border: 1px solid var(--line);
+  }
+  .beta-master .lbl { font-family:'Outfit',sans-serif; font-weight: 600; font-size: 13.5px; }
+  .beta-master .sub { font-size: 11.5px; color: var(--slate-45); margin-top: 2px; }
+
+  /* revealed beta feature cards */
+  .beta-list {
+    margin-top: 12px;
+    display: grid;
+    gap: 10px;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.45s ease, opacity 0.35s ease, margin-top 0.3s ease;
+  }
+  .beta.on .beta-list { max-height: 360px; opacity: 1; }
+  .bcard {
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 14px;
+    border-radius: 13px;
+    background: var(--card);
+    border: 1px solid var(--line-strong);
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.2s ease;
+  }
+  .bcard:hover { transform: translateY(-1px); border-color: var(--orange); }
+  .bcard .ico {
+    width: 36px; height: 36px; flex: 0 0 36px;
+    border-radius: 11px; display: grid; place-items: center; font-size: 18px;
+    background: var(--cloud); border: 1px solid var(--line);
+  }
+  .bcard .body { flex: 1; min-width: 0; }
+  .bcard .name { font-family:'Outfit',sans-serif; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .bcard .desc { font-size: 11.5px; color: var(--slate-45); margin-top: 3px; line-height: 1.35; }
+  .bcard .go { color: var(--slate-30); font-size: 16px; }
+
+  .tag {
+    font-family: 'Inter', sans-serif;
+    font-size: 9.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--orange);
+    background: var(--orange-soft);
+    padding: 2px 7px;
+    border-radius: var(--radius-pill);
+    line-height: 1.4;
+  }
+
+  .beta-empty {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--slate-45);
+    font-style: italic;
+    text-align: center;
+    padding: 6px;
+  }
+  .beta.on .beta-empty { display: none; }
+
+  .footer-about {
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--slate-30);
+    margin-top: 24px;
+  }
+
+  .note {
+    max-width: 980px;
+    margin: 26px auto 0;
+    font-size: 12.5px;
+    color: var(--slate-45);
+    line-height: 1.6;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--orange);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .note b { color: var(--slate); font-weight: 600; }
+</style>
+</head>
+<body data-theme="light">
+  <div class="controls">
+    <div class="meta">
+      <b>Beta features section</b> — Settings mockup · 2026-06-12 ·
+      quiet bottom disclosure, per-device, OFF by default
+    </div>
+    <div style="display:flex; gap:10px;">
+      <div class="seg" id="seg-view">
+        <button data-view="mobile" class="active">Mobile</button>
+        <button data-view="desktop">Desktop</button>
+      </div>
+      <div class="seg" id="seg-theme">
+        <button data-theme-btn="light" class="active">Light</button>
+        <button data-theme-btn="dark">Dark</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="frame mobile" id="frame">
+      <div class="page-title">Settings</div>
+
+      <!-- context: a few normal cards -->
+      <div class="grid">
+        <div class="scard"><div class="ico">👤</div><div><div class="t">Your Account</div><div class="d">Name, email, role</div></div></div>
+        <div class="scard"><div class="ico">🎨</div><div><div class="t">Appearance</div><div class="d">Theme, text size</div></div></div>
+        <div class="scard"><div class="ico">🔒</div><div><div class="t">Security</div><div class="d">Privacy &amp; trust</div></div></div>
+        <div class="scard"><div class="ico">💬</div><div><div class="t">Community</div><div class="d">Connect with families</div></div></div>
+      </div>
+
+      <!-- context: quick toggles -->
+      <div class="section-label">Quick toggles</div>
+      <div class="toggles">
+        <div class="trow"><div><div class="lbl">Dark mode</div></div><button class="sw" onclick="this.classList.toggle('on')"></button></div>
+        <div class="trow"><div><div class="lbl">Beanie mode</div><div class="sub">Playful bean-themed copy</div></div><button class="sw" onclick="this.classList.toggle('on')"></button></div>
+        <div class="trow"><div><div class="lbl">Sound effects</div></div><button class="sw on" onclick="this.classList.toggle('on')"></button></div>
+        <div class="trow"><div><div class="lbl">Daily tips</div></div><button class="sw on" onclick="this.classList.toggle('on')"></button></div>
+      </div>
+
+      <!-- ===== THE BETA DISCLOSURE ===== -->
+      <div class="beta" id="beta">
+        <button class="beta-head" id="betaHead" aria-expanded="false">
+          <span class="lab-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <!-- flask body + neck -->
+              <path class="lab-outline" d="M10 3.5 L10 9 L4.8 18.6 Q4.2 20.5 6.4 20.5 L17.6 20.5 Q19.8 20.5 19.2 18.6 L14 9 L14 3.5"
+                    stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
+              <path class="lab-outline" d="M9 3.5 L15 3.5" stroke-width="1.4" stroke-linecap="round"/>
+              <!-- liquid -->
+              <path class="lab-liquid" d="M7.2 15 L16.8 15 L17.6 18.6 Q18 20 16.6 20 L7.4 20 Q6 20 6.4 18.6 Z"/>
+              <!-- sprouting bean leaf -->
+              <path class="lab-leaf" d="M12 9.2 C12 7.4 13.4 6.4 14.8 6.6 C14.8 8.2 13.6 9.2 12 9.2 Z"/>
+              <!-- bubbles -->
+              <circle class="lab-bubble"    cx="10" cy="17" r="0.9"/>
+              <circle class="lab-bubble b2" cx="13" cy="18" r="0.7"/>
+              <circle class="lab-bubble b3" cx="12" cy="16.5" r="0.6"/>
+              <!-- zap -->
+              <path class="lab-bolt" d="M19.4 3 L17.2 6.2 L18.7 6.4 L17.4 9 L20.2 5.4 L18.6 5.2 Z"/>
+            </svg>
+          </span>
+          <span class="title">The Beanie Lab</span>
+          <span class="chev">▼</span>
+        </button>
+        <div class="beta-body">
+          <div class="beta-inner">
+            <div class="beta-blurb">
+              Get a sneak peek at some of our latest and greatest, fresh from the lab.
+              Just keep in mind they're still in development, so they might act up,
+              wander off, or not work at all (yet!).
+            </div>
+
+            <div class="beta-master">
+              <div>
+                <div class="lbl">Enable experimental features</div>
+                <div class="sub">This device only · off by default</div>
+              </div>
+              <button class="sw" id="betaMaster"></button>
+            </div>
+
+            <div class="beta-list">
+              <div class="bcard">
+                <div class="ico">📅</div>
+                <div class="body">
+                  <div class="name">Google Calendar <span class="tag">Testing</span></div>
+                  <div class="desc">Sync family activities to your calendar, with overlap heads-ups.</div>
+                </div>
+                <div class="go">›</div>
+              </div>
+              <div class="bcard">
+                <div class="ico">🤖</div>
+                <div class="body">
+                  <div class="name">beanies AI <span class="tag">Testing</span></div>
+                  <div class="desc">Magic beans — read invites &amp; bookings into activities and trips.</div>
+                </div>
+                <div class="go">›</div>
+              </div>
+            </div>
+
+            <div class="beta-empty">Flip the switch to reveal what's brewing in the lab.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-about">beanies.family · v2026.06.12</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>How it behaves:</b> the “The Beanie Lab” row sits quietly below Quick toggles — collapsed, dashed outline, low-contrast,
+    no orange, the beaker glyph still. Tap to expand → the beaker starts bubbling and the lightning flickers, with a warm caution
+    + the <b>Enable experimental features</b> switch (off by default, per-device). Switch on → the <b>Google Calendar</b> and
+    <b>beanies AI</b> cards slide in, each tagged <b>Testing</b>; tapping one opens its normal settings drawer. Switch off → they
+    retract and AI/Calendar disappear from Settings entirely. The only persistent footprint for everyone else is one muted,
+    collapsed row at the bottom of the page.
+  </div>
+
+<script>
+  // view + theme chrome
+  const frame = document.getElementById('frame');
+  document.getElementById('seg-view').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    document.querySelectorAll('#seg-view button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    frame.classList.toggle('mobile', b.dataset.view === 'mobile');
+    frame.classList.toggle('desktop', b.dataset.view === 'desktop');
+  });
+  document.getElementById('seg-theme').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    document.querySelectorAll('#seg-theme button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    document.body.setAttribute('data-theme', b.dataset.themeBtn);
+  });
+
+  // disclosure
+  const beta = document.getElementById('beta');
+  const head = document.getElementById('betaHead');
+  head.addEventListener('click', () => {
+    const open = beta.classList.toggle('open');
+    head.setAttribute('aria-expanded', String(open));
+  });
+
+  // master toggle reveals beta cards
+  const master = document.getElementById('betaMaster');
+  master.addEventListener('click', () => {
+    master.classList.toggle('on');
+    beta.classList.toggle('on', master.classList.contains('on'));
+  });
+</script>
+</body>
+</html>
