@@ -57,7 +57,12 @@ export function useNotificationPresentation(notification: MaybeRefOrGetter<AppNo
   /** Whether the detail should render a rich body (whats-new / announcement / tip / nudge). */
   const hasRichBody = computed(() =>
     Boolean(
-      (release.value || announcement.value || tip.value || nudgeMessage.value) &&
+      (release.value ||
+        announcement.value ||
+        tip.value ||
+        nudgeMessage.value ||
+        // install nudge has a static body (no backing content registry)
+        n.value.kind === 'installNudge') &&
       presentation.value.detailBody
     )
   );

@@ -21,7 +21,8 @@ export type NotificationKind =
   | 'whats-new'
   | 'announcement'
   | 'tip'
-  | 'communityNudge';
+  | 'communityNudge'
+  | 'installNudge';
 
 export interface AppNotification {
   /** Deterministic stable id (e.g. `todo-due:<todoId>:<dueDate>`). */
@@ -65,7 +66,8 @@ export interface KindPresentation {
     | 'whats-new'
     | 'announcement'
     | 'tip'
-    | 'community-nudge';
+    | 'community-nudge'
+    | 'install-nudge';
   /** Emoji shown in the row's tinted lead icon. */
   icon: string;
   /** Custom detail body component; undefined ⇒ the default meta card. */

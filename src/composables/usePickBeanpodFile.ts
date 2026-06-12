@@ -6,6 +6,7 @@ import {
   tryGetSilentToken,
 } from '@/services/google/googleAuth';
 import { pickBeanpodFile, type PickBeanpodFileResult } from '@/services/google/drivePicker';
+import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 
 /**
  * Composable for re-picking a `.beanpod` file from Google Drive — used by
@@ -73,6 +74,11 @@ export function usePickBeanpodFile() {
         // explicitly confirms the account. First-time join flows can
         // accept a silent token (forceConsent=false).
         if (!forceConsent) {
+          // B: seed a beanpod-mirrored refresh token (account-matched) so the
+          // silent path can succeed without consent; harmless no-op if there's
+          // no doc token. Recovery surfaces (forceConsent=true) skip this so the
+          // user still explicitly confirms the account.
+          if (loginHint) await tryReconnectSilently(loginHint);
           token = await tryGetSilentToken();
         }
         if (!token) {

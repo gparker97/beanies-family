@@ -17,6 +17,7 @@ import {
   startRedirectAuth,
   isTokenValid,
 } from '@/services/google/googleAuth';
+import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import * as syncService from '@/services/sync/syncService';
 import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
@@ -54,6 +55,17 @@ export async function beginDriveAuthRedirectIfNeeded(
   opts: { forceReauth?: boolean } = {}
 ): Promise<boolean> {
   if (shouldUseRedirectAuth() && (opts.forceReauth || !isTokenValid())) {
+    // B: on a redirect surface (the iPhone case), try a silent recovery using
+    // the beanpod-mirrored refresh token before bouncing through Google. Wired
+    // with an EXPLICIT boolean (do NOT lean on isTokenValid() side-effects).
+    // Skipped when forceReauth (deliberate account switch needs the chooser).
+    // Resolve the account from the caller's hint, else the current provider's
+    // bound account — `loginHint` is often absent on the reconnect seam, and
+    // without this fallback the silent recovery would never fire there.
+    const expectedEmail = loginHint ?? syncService.getProvider()?.getAccountEmail() ?? undefined;
+    if (!opts.forceReauth && (await tryReconnectSilently(expectedEmail))) {
+      return false; // connection restored silently; caller proceeds with the token
+    }
     await startRedirectAuth(returnPath, loginHint);
     return true;
   }
