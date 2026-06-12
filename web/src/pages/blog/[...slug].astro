@@ -420,7 +420,13 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   padding: 8px;
   width: 100%;
 }
-.blog-prose img + em {
+/* Image captions. Posts author them as a separate italic paragraph after
+   the image (![img] / blank line / _caption_), which markdown renders as
+   two sibling <p>s — so the caption is matched via the paragraph pair,
+   not img + em (that shape only occurs when the caption shares the
+   image's paragraph; kept for completeness). */
+.blog-prose img + em,
+.blog-prose p:has(> img) + p:has(> em:only-child) > em {
   /* 70% deep slate over cloud-white clears WCAG AA 4.5:1 contrast for
      image captions; the previous 50% was ~3:1 and Lighthouse flagged it. */
   color: rgb(44 62 80 / 70%);
@@ -429,7 +435,17 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   font-feature-settings: 'ss01';
   font-size: 0.85rem;
   font-style: italic;
+  text-align: center;
+}
+
+.blog-prose img + em {
   margin-top: -0.6rem;
+}
+
+/* Pull the caption paragraph up against the image: the img carries
+   1.5rem bottom margin inside its own <p>, plus the <p>'s 1rem. */
+.blog-prose p:has(> img) + p:has(> em:only-child) {
+  margin-top: -1.6rem;
   text-align: center;
 }
 </style>
