@@ -83,6 +83,9 @@ export const useSettingsStore = defineStore('settings', () => {
     return globalSettings.value.beanieMode ?? true;
   });
   const soundEnabled = computed(() => globalSettings.value.soundEnabled ?? true);
+  // Per-device opt-in to The Beanie Lab (experimental features). Default OFF;
+  // never family-synced (lives in GlobalSettings, like beanieMode/soundEnabled).
+  const beanieLabEnabled = computed(() => globalSettings.value.beanieLabEnabled ?? false);
   const preferredCurrencies = computed(() => settings.value.preferredCurrencies ?? []);
   const effectiveDisplayCurrencies = computed(() => {
     const prefs = preferredCurrencies.value;
@@ -382,6 +385,44 @@ export const useSettingsStore = defineStore('settings', () => {
       settingsRepo.setAIApiKey(provider, key)
     );
 
+  /**
+   * Persist a single device-level (GlobalSettings) field through the same
+   * report-on-failure contract as persistDualSetting / persistAiSetting: reset
+   * error, attempt the write, and on failure surface a toast (field name + dev
+   * console diagnostic) and RE-THROW so the calling control can revert its
+   * optimistic state. Deliberately NOT the silent setSoundEnabled/setBeanieMode
+   * pattern (those only set error.value and swallow). Adding a new device-only
+   * preference is a one-line wrapper below.
+   */
+  async function persistGlobalSetting<K extends keyof GlobalSettings>(
+    label: UIStringKey,
+    key: K,
+    value: GlobalSettings[K]
+  ): Promise<void> {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+        [key]: value,
+      } as Partial<GlobalSettings>);
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : String(e);
+      const { t } = useTranslation();
+      showToast('error', t('settings.persistFailed'), t(label), {
+        error: e,
+        surface: 'settings-persist',
+        context: { field: String(key) },
+      });
+      console.error(`[settingsStore] persistGlobalSetting('${String(key)}') failed.`, e);
+      throw e instanceof Error ? e : new Error(String(e));
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  const setBeanieLabEnabled = (enabled: boolean) =>
+    persistGlobalSetting('settings.beanieLab.title', 'beanieLabEnabled', enabled);
+
   async function setExchangeRateAutoUpdate(enabled: boolean): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -636,6 +677,7 @@ export const useSettingsStore = defineStore('settings', () => {
     exchangeRateLastFetch,
     beanieMode,
     soundEnabled,
+    beanieLabEnabled,
     preferredCurrencies,
     effectiveDisplayCurrencies,
     customInstitutions,
@@ -664,6 +706,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setAIApiKey,
     setBeanieMode,
     setSoundEnabled,
+    setBeanieLabEnabled,
     setPreferredCurrencies,
     setOnboardingCompleted,
     setWeekStartDay,

@@ -6730,6 +6730,26 @@ const STRING_DEFS = {
     en: 'Push your activities to your calendars',
     beanie: 'push your beans to your calendars',
   },
+  // The Beanie Lab — per-device opt-in to experimental/in-development features.
+  'settings.beanieLab.title': { en: 'The Beanie Lab', beanie: 'the beanie lab' },
+  'settings.beanieLab.blurb': {
+    en: "Get a sneak peek at some of our latest and greatest, fresh from the lab. Just keep in mind they're still in development, so they might act up, wander off, or not work at all (yet!).",
+    beanie:
+      "get a sneak peek at some of our latest and greatest beans, fresh from the lab. just keep in mind they're still sprouting, so they might act up, wander off, or not work at all (yet!).",
+  },
+  'settings.beanieLab.enableLabel': {
+    en: 'Enable experimental features',
+    beanie: 'enable experimental features',
+  },
+  'settings.beanieLab.enableHint': {
+    en: 'This device only · off by default',
+    beanie: 'this device only · off by default',
+  },
+  'settings.beanieLab.testingTag': { en: 'Testing', beanie: 'testing' },
+  'settings.beanieLab.empty': {
+    en: "Flip the switch to reveal what's brewing in the lab.",
+    beanie: "flip the switch to reveal what's brewing in the lab.",
+  },
   'calendarSync.intro': {
     en: 'Connect a Google calendar and your family activities are pushed to it automatically. beanies stays your source of truth. Edits always happen here.',
     beanie:

@@ -40,6 +40,7 @@ export interface GlobalSettings {
   exchangeRateLastFetch: ISODateString | null;
   beanieMode?: boolean;
   soundEnabled?: boolean;
+  beanieLabEnabled?: boolean; // per-device opt-in to experimental features (The Beanie Lab); off by default, never family-synced
   isTrustedDevice?: boolean;
   trustedDevicePromptShown?: boolean;
   cachedFamilyKeys?: Record<string, string>;
