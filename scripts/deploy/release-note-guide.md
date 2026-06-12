@@ -71,6 +71,40 @@ Rules:
   A security deploy gets a generic line (e.g. `Security and privacy
 improvements.`); the real detail stays in commits / `CHANGELOG.md`.
 
+## 2b. Discord CTA on product/feature announcements (TEMPORARY — early-adopter phase)
+
+> **Active rule, started 2026-06-12.** Every **product / feature announcement**
+> ends with a Discord call-to-action, to route readers into the community + a
+> single feedback / issue-report channel during the soft-launch. Runs until the
+> early-adopter space is full (~100 families) **or greg says to stop** — then
+> remove this section and the trailing block.
+
+**Applies to:** significant / feature notes (the ones with a `features` block).
+**Does NOT apply to:** minor "bug fixes & improvements" summary-only notes, or
+silently-shipped deploys (no note) — those aren't announcements.
+
+When the note is an announcement, append this as the **last** `features[]` entry
+(after the real feature blocks):
+
+```ts
+{
+  icon: '💬',
+  title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+  description: {
+    en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+    beanie:
+      "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+  },
+  cta: {
+    label: { en: 'Join the Discord', beanie: 'join the discord' },
+    href: 'https://beanies.family/discord',
+  },
+},
+```
+
+(`href` is `DISCORD_URL` = `MARKETING_URL + '/discord'`; keep the literal in the
+static note. No em-dashes — hyphens only.)
+
 ## 3. Compute the version + display date
 
 - `version` = today's date dotted: `YYYY.MM.DD` (e.g. `2026.05.27`).
