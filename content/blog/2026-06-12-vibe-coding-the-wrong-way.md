@@ -30,7 +30,7 @@ But also:
 
 Millions have discovered vibe coding, which is amazing. What's not so amazing is that, from what I can tell, most of these apps are being built the same old (tired) way.
 
-Cloud-first, price-gated, freemium, data harvested, and all that fun stuff.
+Cloud-first, price-gated, freemium, data harvested, and all that fun stuff. And, for good measure, full of security holes.
 
 "Look at me, I can vibe-code an app into existence, give it a crazy complicated DB schema, tons of shady forms and tables, and any feature I can dream up, slap together a middling UI, and capture tons of valuable data that I can sell. All I need now is millions of unsuspecting users!"
 
