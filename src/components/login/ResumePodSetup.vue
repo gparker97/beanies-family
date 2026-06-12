@@ -193,7 +193,7 @@ async function handleAutoLoadSubmit() {
           surface: 'resumeSetup.podCorrupted',
           message: `Pod payload failed Automerge ${result.error.step} during resume`,
           error: result.error,
-          severity: 'error',
+          severity: 'critical',
           context: {
             file_id: result.fileId,
             family_id: result.familyId,
@@ -301,7 +301,7 @@ async function finalizePod(): Promise<boolean> {
     reportError({
       surface: 'resumeSetup.finalize',
       message: 'finalizePod reached with no authenticated session',
-      severity: 'error',
+      severity: 'critical',
     });
     return false;
   }
@@ -320,7 +320,7 @@ async function finalizePod(): Promise<boolean> {
       surface: `resumeSetup.${result.reason}`,
       message: `createNewFile failed during resume at step '${result.reason}': ${result.error.message}`,
       error: result.error,
-      severity: 'error',
+      severity: 'critical',
       context: { provider_type: syncStore.storageProviderType ?? null },
     });
     return false;

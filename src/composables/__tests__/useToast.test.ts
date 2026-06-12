@@ -141,8 +141,17 @@ describe('useToast — auto-report on error', () => {
     expect(call.error).toBe(err);
   });
 
-  it('marks the toast `reported: true` when reportError fires', () => {
+  it('a plain error toast reports to telemetry but is NOT marked reported (no page → no "support notified" line)', () => {
     showToast('error', 'Boom');
+    // Still reported to the firehose (telemetry path), but non-critical → no Slack page.
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock.mock.calls[0]![0].severity).toBeUndefined();
+    expect(toasts.value.at(-1)?.reported).toBe(false);
+  });
+
+  it('a critical error toast pages (severity: critical) and is marked reported', () => {
+    showToast('error', 'Boom', undefined, { critical: true });
+    expect(reportErrorMock.mock.calls[0]![0].severity).toBe('critical');
     expect(toasts.value.at(-1)?.reported).toBe(true);
   });
 

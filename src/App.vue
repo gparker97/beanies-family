@@ -359,7 +359,9 @@ async function safeRouterReplace(target: string, callerTag: string): Promise<voi
         reportError({
           surface: 'app.loadFamilyData.replaceLoopDetected',
           message: `router.replace('${target}') cancelled ${attempts}× in a row (caller=${callerTag}, type=${type}); aborting fallback to break reload loop`,
-          severity: 'error',
+          // Terminal: the fallback is aborted and the recovery overlay shown —
+          // the user is stranded in a boot loop. Page it.
+          severity: 'critical',
           context: { route_path: route.path },
         });
         // Set initError so the recovery overlay shows on this load.
@@ -784,7 +786,7 @@ onMounted(async () => {
           surface: 'app.redirectAuthCompletion',
           message: `Redirect-auth code exchange failed during app init: ${msg}`,
           error: e,
-          severity: 'error',
+          severity: 'critical',
           context: { route_path: route.path },
         });
       }
@@ -836,7 +838,7 @@ onMounted(async () => {
           surface: 'app.onboardingZombieState',
           message:
             'App boot found an authenticated session with no pod file — routing to resume-setup',
-          severity: 'error',
+          severity: 'critical',
           // fullPath preserves the query — useful for diagnosing how the
           // user reached a non-recovery route in zombie state.
           context: { route_path: route.fullPath },
@@ -974,7 +976,9 @@ onMounted(async () => {
         reportError({
           surface: 'app.postInitNoData',
           message: 'App init completed but no Automerge doc loaded — recovery overlay shown',
-          severity: 'error',
+          // Recovery overlay shown to a podCreated user = data unreachable. The
+          // onLoginFlowRoute guard above filters the historical false-fires.
+          severity: 'critical',
           context: { route_path: route.path },
         });
       } else {
@@ -1066,7 +1070,9 @@ onMounted(async () => {
           surface: 'app.chunkRecoveryFailed',
           message: `Chunk-load recovery exhausted after ${attempts} attempts: ${err instanceof Error ? err.message : String(err)}`,
           error: err,
-          severity: 'error',
+          // Recovery exhausted (overlay shown, user stuck on a broken bundle) —
+          // the comment above says to page; under the gate that means critical.
+          severity: 'critical',
           context: { route_path: route.fullPath },
         });
       } catch {

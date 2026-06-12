@@ -111,7 +111,7 @@ function enterErrorPhase(stepIdx: number, msg: string, err?: unknown): void {
     surface: 'setupProgress.firstSync',
     message: errorMessage.value,
     error: err,
-    severity: 'error',
+    severity: 'critical',
     context: {
       provider_type: syncStore.storageProviderType ?? null,
       save_failure_level: syncStore.saveFailureLevel ?? null,
@@ -191,7 +191,7 @@ async function runFromStep(startIdx: number) {
             surface: 'setupProgress.finalize',
             message: (e as Error)?.message || 'setupAutoSync/ensureRegistered threw',
             error: e,
-            severity: 'error',
+            severity: 'critical',
             context: { provider_type: syncStore.storageProviderType ?? null },
           });
         }
@@ -220,7 +220,7 @@ async function runFromStep(startIdx: number) {
       surface: 'setupProgress.unexpected',
       message: (e as Error)?.message || 'Unexpected error during pod setup',
       error: e,
-      severity: 'error',
+      severity: 'critical',
       context: { provider_type: syncStore.storageProviderType ?? null },
     });
     errorMessage.value = (e as Error)?.message || t('setupProgress.error.title');

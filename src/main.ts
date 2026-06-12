@@ -27,6 +27,8 @@ app.use(router);
 app.config.errorHandler = (err, instance, info) => {
   reportError({
     surface: 'vue-render',
+    // A Vue render/lifecycle throw breaks the UI (blank/broken component) — fatal.
+    severity: 'critical',
     message: err instanceof Error ? err.message : String(err),
     error: err,
     context: {
@@ -42,6 +44,8 @@ app.config.errorHandler = (err, instance, info) => {
 window.addEventListener('error', (event) => {
   reportError({
     surface: 'unhandled-error',
+    // An uncaught synchronous error escaped every call-site catch — fatal.
+    severity: 'critical',
     message: event.message || 'Uncaught error',
     error: event.error,
   });
@@ -64,6 +68,11 @@ window.addEventListener('unhandledrejection', (event) => {
     console.warn('[main] IDB transient — call-site retry should handle, leaving alone:', reason);
     return;
   }
+  // Deliberately NON-paging (no `severity: 'critical'`): unhandled rejections
+  // are background-prone and the dominant historical noise source. They're
+  // captured in telemetry + console; a genuinely-fatal async failure should be
+  // caught at its call site and reported `critical` there, not rely on this
+  // catch-all. The two allowlists above keep known browser transients out.
   reportError({
     surface: 'unhandled-promise-rejection',
     message: reason instanceof Error ? reason.message : String(reason),

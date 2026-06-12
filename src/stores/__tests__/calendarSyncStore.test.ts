@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { initDoc } from '@/services/automerge/docService';
 import { toISODateString } from '@/utils/date';
@@ -16,6 +16,10 @@ import { useCalendarSyncStore, setCalendarClientForTesting } from '../calendarSy
 import { CalendarApiError, type CalendarClient } from '@/services/calendar/CalendarClient';
 import { getCalendarEventLinksForConnection } from '@/services/automerge/repositories/calendarRepository';
 import type { CreateFamilyActivityInput } from '@/types/models';
+
+// Mock the reporter so we can assert the sustained-only paging severity without
+// hitting the real Slack webhook. Other tests in this file don't assert on it.
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
 function makeFakeClient() {
   const calls = { insert: [] as string[], patch: [] as string[], delete: [] as string[] };
@@ -110,6 +114,60 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
 
     // Connection settled to ok (no errors).
     expect((await getCalendarConnectionById(connection.id))?.status).toBe('ok');
+  });
+
+  it('pages Slack for a reconcile error only when sustained (critical on the 3rd, not before/after)', async () => {
+    const { reportError } = await import('@/utils/errorReporter');
+    const mockReport = vi.mocked(reportError);
+    mockReport.mockClear();
+
+    // insertEvent always 403s → every reconcile ends in a non-auth error.
+    const failing: CalendarClient = {
+      async insertEvent() {
+        throw new CalendarApiError('forbidden', 'Google Calendar HTTP 403', 403);
+      },
+      async patchEvent() {},
+      async deleteEvent() {},
+      async eventExists() {
+        return false;
+      },
+      async listCalendars() {
+        return [{ id: 'primary', summary: 'Primary', primary: true }];
+      },
+      async listEventTimes() {
+        return [];
+      },
+    };
+    setCalendarClientForTesting(failing);
+
+    await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'primary',
+      refreshToken: 'refresh-xyz',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.owned'],
+      status: 'ok',
+    });
+    await createActivity(activityInput());
+    const store = useCalendarSyncStore();
+
+    const severities = () =>
+      mockReport.mock.calls
+        .map((c) => c[0] as { surface: string; severity?: string })
+        .filter((a) => a.surface === 'calendar-sync')
+        .map((a) => a.severity);
+
+    await store.syncNow(); // n=1
+    await store.syncNow(); // n=2
+    await store.syncNow(); // n=3 → crosses threshold
+    await store.syncNow(); // n=4
+
+    const sev = severities();
+    expect(sev).toHaveLength(4);
+    expect(sev[0]).not.toBe('critical'); // transient — log-only
+    expect(sev[1]).not.toBe('critical');
+    expect(sev[2]).toBe('critical'); // sustained → pages exactly once
+    expect(sev[3]).not.toBe('critical'); // does not keep paging
   });
 
   it('disconnect removes events and drops the connection', async () => {

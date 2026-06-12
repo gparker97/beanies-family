@@ -241,7 +241,7 @@ async function handleChooseLocalStorage() {
       reportError({
         surface: 'createPod.selectLocalFile',
         message: r.error || 'Local file selection failed',
-        severity: 'error',
+        severity: 'critical',
         context: { provider_type: 'local' },
       });
     }
@@ -308,7 +308,7 @@ async function handleChooseGoogleDriveStorage() {
       reportError({
         surface: 'createPod.connectDrive',
         message: r.error || 'Google Drive connect failed',
-        severity: cancelled ? 'warning' : 'error',
+        severity: cancelled ? 'warning' : 'critical',
         context: { provider_type: 'google_drive' },
       });
       showDriveResultModal.value = true; // failure state — Try again / Use a local file
@@ -349,7 +349,7 @@ async function handleStep2Next() {
     reportError({
       surface: 'createPod.createNewFile',
       message: 'handleStep2Next reached with no authenticated owner',
-      severity: 'error',
+      severity: 'critical',
       context: { provider_type: storageType.value },
     });
     return;
@@ -367,7 +367,7 @@ async function handleStep2Next() {
     reportError({
       surface: 'createPod.createNewFile',
       message: 'storageSaved=true but syncStore is not configured — refusing to advance to step 3',
-      severity: 'error',
+      severity: 'critical',
       context: { provider_type: storageType.value },
     });
     return;
@@ -417,7 +417,7 @@ async function handleStep2Next() {
     surface: `createPod.${result.reason}`,
     message: `createNewFile failed at step '${result.reason}': ${result.error.message}`,
     error: result.error,
-    severity: 'error',
+    severity: 'critical',
     context: { provider_type: storageType.value },
   });
 }

@@ -39,7 +39,7 @@ import { logEvent } from '@/services/telemetry';
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-export type ErrorSeverity = 'error' | 'warning';
+export type ErrorSeverity = 'critical' | 'error' | 'warning';
 
 export interface ErrorReportInput {
   /** Surface where the error occurred — kebab-case, e.g. 'create-activity'. */
@@ -50,7 +50,14 @@ export interface ErrorReportInput {
   error?: unknown;
   /** Structured context — filtered through `redactContext` before send. */
   context?: Record<string, unknown>;
-  /** Defaults to 'error'. */
+  /**
+   * Telemetry log-level AND the Slack page-gate. ONLY `'critical'` pages
+   * #beanies-errors; `'error'` / `'warning'` / unspecified are telemetry +
+   * console only (the firehose still records them). Set `'critical'` ONLY when
+   * a user action failed or data is at risk (failed save, pod file couldn't be
+   * created, onboarding/render/engine break). Defaults to `'error'`
+   * (telemetry-only). To enumerate every Slack-paging site: `rg "severity: 'critical'"`.
+   */
   severity?: ErrorSeverity;
 }
 
@@ -242,15 +249,26 @@ function handleReport(input: ErrorReportInput): void {
   // telemetry fault can never break the Slack send below.
   try {
     logEvent({
+      // LogLevel has no 'critical', so map it to 'error' for the level, but
+      // carry the real severity in context so the firehose stays filterable
+      // ("which events actually paged Slack?" = severity === 'critical').
       level: input.severity === 'warning' ? 'warn' : 'error',
       surface: input.surface,
       message: input.message,
       error: input.error,
-      context: input.context,
+      context: { ...input.context, severity: input.severity ?? 'error' },
     });
   } catch (e) {
     console.warn('[errorReporter] telemetry mirror failed', e);
   }
+
+  // ── Slack page-gate ──────────────────────────────────────────────────────
+  // Telemetry above is the complete record (every severity). Slack is the
+  // critical-only subset: page a human ONLY when a user action failed or data
+  // is at risk. 'error'/'warning'/unspecified are captured in telemetry +
+  // console but never page. See the `severity` contract on ErrorReportInput;
+  // `rg "severity: 'critical'"` lists every paging site.
+  if (input.severity !== 'critical') return;
 
   if (shouldSuppress(input.surface, input.message)) return;
 
@@ -272,6 +290,9 @@ function handleReport(input: ErrorReportInput): void {
 // ─── Slack message formatting ────────────────────────────────────────────────
 
 function buildSlackMessage(input: ErrorReportInput, context: Record<string, unknown>): string {
+  // Post-gate, only `severity: 'critical'` reaches here (see handleReport), so
+  // this is always 'critical'. The fallback is dead but harmless — kept to avoid
+  // touching the summary-path siblings + their tests for zero behavioural gain.
   const severity = input.severity ?? 'error';
   const familyId = context.family_id ? String(context.family_id) : null;
   const familyName = context.family_name ?? null;
