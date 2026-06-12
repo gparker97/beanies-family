@@ -44,6 +44,10 @@ import {
   isTokenValid,
   isUserCancellation,
 } from '@/services/google/googleAuth';
+import {
+  registerDriveTokenMirror,
+  reconcileDriveTokenWithDoc,
+} from '@/services/google/driveTokenRecovery';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
 import { slackNotify } from '@/utils/slackNotify';
@@ -662,6 +666,7 @@ export const useSyncStore = defineStore('sync', () => {
           if (syncService.getProviderType() === 'google_drive') {
             setupTokenExpiryHandler();
             updateProviderEmailAfterLoad();
+            await reconcileDriveTokenForMember();
           }
 
           setupAutoSync();
@@ -918,6 +923,22 @@ export const useSyncStore = defineStore('sync', () => {
    * Used as a fallback when the beanpod file needs permission on page refresh.
    * Imports the family key directly from a base64-encoded raw key.
    */
+  /**
+   * Best-effort (B): reconcile the bound member's Drive refresh token between
+   * the local store and the encrypted beanpod, newer-`issuedAt` wins. Called
+   * AFTER `reloadAllStores()` so `currentMember.googleAccountEmail` is resolvable.
+   * Self-gates (no bound Drive account / no doc / no token → no-op) and never
+   * throws into the load path. See `driveTokenRecovery`.
+   */
+  async function reconcileDriveTokenForMember(): Promise<void> {
+    try {
+      const email = useFamilyStore().currentMember?.googleAccountEmail;
+      await reconcileDriveTokenWithDoc(email);
+    } catch (e) {
+      console.warn('[syncStore] Drive token reconcile skipped:', e);
+    }
+  }
+
   async function loadFromPersistenceCache(
     keyB64: string,
     activeFamilyId: string,
@@ -953,6 +974,7 @@ export const useSyncStore = defineStore('sync', () => {
       lastSync.value = toISODateString(new Date());
 
       await reloadAllStores();
+      await reconcileDriveTokenForMember();
       return { success: true };
     } catch (e) {
       console.warn('[syncStore] loadFromPersistenceCache failed:', e);
@@ -2511,6 +2533,9 @@ export const useSyncStore = defineStore('sync', () => {
    *   reflects that without user action.
    */
   function setupTokenExpiryHandler(): void {
+    // Drive is active here — register the best-effort refresh-token → beanpod
+    // mirror (idempotent; only ever fires on an interactive token acquisition).
+    registerDriveTokenMirror();
     if (!tokenExpiryUnsub) {
       tokenExpiryUnsub = onTokenPermanentlyExpired(() => {
         if (storageProviderType.value === 'google_drive') {

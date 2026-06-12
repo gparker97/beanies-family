@@ -10,11 +10,17 @@ vi.mock('@/services/sync/syncService', () => ({
   selectSyncFile: vi.fn(),
   selectNativeLocalFile: vi.fn(),
   setProvider: vi.fn(),
+  getProvider: vi.fn(() => null),
 }));
 vi.mock('@/services/google/googleAuth', () => ({
   shouldUseRedirectAuth: vi.fn(() => false),
   startRedirectAuth: vi.fn(),
   isTokenValid: vi.fn(() => true),
+}));
+// Silent recovery is exercised in driveTokenRecovery's own tests; here it is a
+// deterministic no-op so the redirect-path assertions are unaffected.
+vi.mock('@/services/google/driveTokenRecovery', () => ({
+  tryReconnectSilently: vi.fn(() => Promise.resolve(false)),
 }));
 vi.mock('@/services/sync/providers/googleDriveProvider', () => ({
   GoogleDriveProvider: { createNew: vi.fn() },

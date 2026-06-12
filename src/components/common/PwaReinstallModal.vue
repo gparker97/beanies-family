@@ -4,6 +4,7 @@ import BaseModal from '@/components/ui/BaseModal.vue';
 import { useStalePwaNotice } from '@/composables/useStalePwaNotice';
 import { useTranslation } from '@/composables/useTranslation';
 import { MARKETING_URL } from '@/utils/marketing';
+import { isIosOrIpadOs } from '@/services/sync/capabilities';
 
 const { t } = useTranslation();
 const { shouldShow, dismiss, trackInstallClicked } = useStalePwaNotice();
@@ -11,10 +12,10 @@ const { shouldShow, dismiss, trackInstallClicked } = useStalePwaNotice();
 type Platform = 'ios' | 'android' | 'desktop';
 
 const platform = computed<Platform>(() => {
-  if (typeof navigator === 'undefined') return 'desktop';
-  const ua = navigator.userAgent;
-  if (/iPhone|iPad|iPod/.test(ua)) return 'ios';
-  if (/Android/.test(ua)) return 'android';
+  // iOS arm via the shared primitive (also catches iPadOS-13+ desktop-UA Safari,
+  // which correctly shows the iOS install steps). Android/desktop stay inline.
+  if (isIosOrIpadOs()) return 'ios';
+  if (typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent)) return 'android';
   return 'desktop';
 });
 

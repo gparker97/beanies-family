@@ -17,6 +17,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useBeanTips } from '@/composables/useBeanTips';
 import { useCommunityNudge } from '@/composables/useCommunityNudge';
+import { useInstallNudge } from '@/composables/useInstallNudge';
 import { changeDoc, docVersion, getDoc, isDocLoaded } from '@/services/automerge/docService';
 import { getAllReleaseNotes, getReleaseNote, isSpotlightRelease } from '@/content/release-notes';
 import {
@@ -60,6 +61,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
   // the snapshot reads `issuedTips.value` on each recompute — no re-instantiation.
   const beanTips = useBeanTips();
   const communityNudge = useCommunityNudge();
+  const installNudge = useInstallNudge();
 
   // ── Derive-clock — advanced ONLY by tick() (the poll). Nothing else writes it.
   const now = ref<Date>(new Date());
@@ -102,6 +104,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       issuedTips: beanTips.issuedTips.value,
       tipsById: TIPS_BY_ID,
       activeNudge: communityNudge.activeNudge.value,
+      installNudge: installNudge.nudge.value,
       readState,
       windowDays: WINDOW_DAYS,
       occurrencesByDate,

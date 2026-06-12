@@ -63,6 +63,7 @@ export function initDoc(): Automerge.Doc<FamilyDocument> {
     notificationReads: {},
     calendarConnections: {},
     calendarEventLinks: {},
+    driveConnections: {},
     overlapAcknowledgments: {},
     settings: null,
   };
@@ -102,6 +103,7 @@ const ALL_COLLECTIONS: Array<Exclude<keyof FamilyDocument, 'settings'>> = [
   'notificationReads',
   'calendarConnections',
   'calendarEventLinks',
+  'driveConnections',
   'overlapAcknowledgments',
 ];
 
