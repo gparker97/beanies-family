@@ -364,7 +364,7 @@ router.beforeEach((to) => {
       reportError({
         surface: 'app.onboardingZombieState',
         message: `Authenticated session with no pod file reached a requiresAuth route (${to.path}) — routing to resume-setup`,
-        severity: 'error',
+        severity: 'critical',
         context: { route_path: to.path },
       });
     }

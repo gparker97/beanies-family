@@ -110,6 +110,7 @@ export async function flushQueue(): Promise<boolean> {
  */
 export function clearQueue(): void {
   pendingContent = null;
+  consecutiveFlushFailures = 0; // nothing queued → no streak
   clearFromSession();
   stopListening();
 }
@@ -146,6 +147,12 @@ let visibilityHandler: (() => void) | null = null;
 // alerts. The first trigger's reason wins for the failure report.
 let flushInFlight: Promise<void> | null = null;
 
+// Sustained-only paging: a single flush failure is usually a reconnect-race
+// transient that the next trigger / 5s retry clears. Only a queue that stays
+// stuck across consecutive attempts is genuine unsaved-data risk worth a page.
+let consecutiveFlushFailures = 0;
+const FLUSH_FAILURE_PAGE_THRESHOLD = 2;
+
 type FlushReason = 'online' | 'token-acquired' | 'visible' | 'startup';
 
 /**
@@ -177,11 +184,20 @@ function reportFlushFailure(reason: FlushReason, err: unknown): void {
     err instanceof TokenExpiredError
       ? (buildSilentRefreshAlertContext() as unknown as Record<string, unknown>)
       : undefined;
+  consecutiveFlushFailures += 1;
   reportError({
     surface: 'offline-queue-flush',
-    message: `flush rejected after ${reason}: ${inner.message}`,
+    // Page exactly once when the queue crosses the sustained threshold (===):
+    // unsaved user changes are genuinely stuck. Earlier/later failures are
+    // telemetry-only (a single transient on reconnect shouldn't page).
+    severity: consecutiveFlushFailures === FLUSH_FAILURE_PAGE_THRESHOLD ? 'critical' : undefined,
+    message: `flush rejected after ${reason}${
+      consecutiveFlushFailures >= FLUSH_FAILURE_PAGE_THRESHOLD
+        ? ` (sustained ×${consecutiveFlushFailures})`
+        : ''
+    }: ${inner.message}`,
     error: inner,
-    context,
+    context: { ...context, consecutiveFailures: consecutiveFlushFailures },
   });
 }
 
@@ -198,7 +214,9 @@ function tryFlush(reason: FlushReason): void {
   if (flushInFlight) return;
 
   const p = flushQueue().then(
-    () => {},
+    () => {
+      consecutiveFlushFailures = 0; // queue drained — streak resets
+    },
     (e) => reportFlushFailure(reason, e)
   );
   flushInFlight = p;

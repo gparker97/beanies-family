@@ -82,6 +82,8 @@ export async function wrapAsync<T>(
         });
         reportError({
           surface: 'wrapAsync:engine-panic',
+          // An Automerge engine panic means the data layer is broken — fatal.
+          severity: 'critical',
           message: rawMessage,
           error: e,
           context: action ? { action } : undefined,

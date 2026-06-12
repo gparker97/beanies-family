@@ -589,9 +589,10 @@ describe('offlineQueue', () => {
 
         const call = reportErrorMock.mock.calls.at(-1)?.[0];
         expect(call?.surface).toBe('offline-queue-flush');
-        // `context` field is omitted entirely on non-auth failures so the
-        // Slack alert doesn't get misleading diagnostic noise.
-        expect(call?.context).toBeUndefined();
+        // The misleading silent-refresh diagnostic blob is omitted on non-auth
+        // failures; only the always-present consecutive-failure count remains
+        // (it drives the sustained-page gate and is not auth-specific noise).
+        expect(call?.context).toEqual({ consecutiveFailures: 1 });
       });
     });
   });

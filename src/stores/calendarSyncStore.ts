@@ -82,8 +82,15 @@ const MAX_INFLIGHT = 5;
 /** Device-local consecutive `invalid_grant` failures before parking the shared status. */
 const INVALID_GRANT_THRESHOLD = 2;
 
-/** Error severity per CalendarErrorKind — drives reportError's severity on the
- *  transition into `error`. Exhaustive over CalendarErrorKind. */
+/** Device-local consecutive non-auth reconcile failures before a single Slack
+ *  page. A lone transient (e.g. a 403 right after connect) is background noise;
+ *  only a connection that STAYS broken is user-impacting (activities silently
+ *  not reaching Google Calendar). Mirrors INVALID_GRANT_THRESHOLD. */
+const RECONCILE_ERROR_THRESHOLD = 3;
+
+/** Telemetry log-level per CalendarErrorKind (NOT a page-gate). Paging for
+ *  non-auth reconcile errors is gated by RECONCILE_ERROR_THRESHOLD below — a
+ *  single error never pages regardless of this table. Exhaustive over CalendarErrorKind. */
 export const CALENDAR_SYNC_ERRORS = {
   auth: 'warning',
   forbidden: 'error',
@@ -98,6 +105,10 @@ export const CALENDAR_SYNC_ERRORS = {
 
 /** Device-local K-counter for invalid_grant (kept out of the CRDT — Pass 4). */
 const invalidGrantCounters = new Map<string, number>();
+
+/** Device-local K-counter for consecutive non-auth reconcile errors. Drives the
+ *  sustained-only Slack page; reset on clean success + wiped in stop(). */
+const reconcileErrorCounters = new Map<string, number>();
 
 // The CalendarClient singleton lives in `clientInstance.ts` (shared with the clash
 // store). Re-export the test seam so this store's existing tests keep importing it
@@ -383,6 +394,12 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
           context: { connectionId: connection.id },
         });
       }
+      // An auth failure interrupts any non-auth error streak, so the
+      // "consecutive non-auth reconciles" count must restart — otherwise a stale
+      // pre-auth count could cross the threshold on the first error after the
+      // auth issue self-heals (a false "sustained"). Auth is handled by the
+      // invalidGrant counter above.
+      reconcileErrorCounters.delete(connection.id);
       return;
     }
 
@@ -398,16 +415,21 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         lastReconciledAt: nowIso(),
         lastReconciledBy: deviceId,
       });
-      // Report once on transition into error.
-      if (connection.status !== 'error') {
-        reportError({
-          surface: 'calendar-sync',
-          message: `[calendarSync] reconcile error (${worst.kind}): ${worst.message}`,
-          error: worst,
-          severity: CALENDAR_SYNC_ERRORS[worst.kind],
-          context: { connectionId: connection.id },
-        });
-      }
+      // Sustained-only paging: count consecutive non-auth reconcile failures and
+      // page Slack exactly ONCE, when we cross the threshold (=== , not >=). A
+      // lone transient stays log-only (telemetry still records every reconcile);
+      // a connection that stays broken pages. Counter resets on clean success.
+      const n = (reconcileErrorCounters.get(connection.id) ?? 0) + 1;
+      reconcileErrorCounters.set(connection.id, n);
+      reportError({
+        surface: 'calendar-sync',
+        message: `[calendarSync] reconcile error (${worst.kind}): ${worst.message}${
+          n >= RECONCILE_ERROR_THRESHOLD ? ` (sustained ×${n})` : ''
+        }`,
+        error: worst,
+        severity: n === RECONCILE_ERROR_THRESHOLD ? 'critical' : CALENDAR_SYNC_ERRORS[worst.kind],
+        context: { connectionId: connection.id, consecutiveFailures: n },
+      });
       return;
     }
 
@@ -420,6 +442,12 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         : 0;
       if (Date.now() - lastAt < FRESHNESS_WINDOW_MS) return;
     }
+
+    // Clean success — the single point a connection is confirmed healthy, so the
+    // single reset site for the reconcile-error counter (no lockstep with the
+    // auth counter to drift). The no-op early-return above only fires when the
+    // connection is already `ok`, where the counter is already 0 — safe to skip.
+    reconcileErrorCounters.delete(connection.id);
 
     // → ok + refresh the freshness-claim.
     await updateCalendarConnection(connection.id, {
@@ -654,6 +682,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     // Reset module-level engine state so a new session/family starts clean (F7).
     resetCalendarClient();
     invalidGrantCounters.clear();
+    reconcileErrorCounters.clear();
   }
 
   return {

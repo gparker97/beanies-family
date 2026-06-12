@@ -260,6 +260,9 @@ export const useSyncStore = defineStore('sync', () => {
     showSaveFailureBanner.value = true;
     reportError({
       surface: 'save-failure-banner',
+      // The save-failure banner is surfaced to the user — their data isn't
+      // saving (data at risk). Already debounced/escalated, so paging here is signal.
+      severity: 'critical',
       message: deferred
         ? 'banner shown after deferred recovery window'
         : 'banner shown immediately (no recovery in flight)',
@@ -1725,6 +1728,9 @@ export const useSyncStore = defineStore('sync', () => {
 
       reportError({
         surface: 'cold-start-reconnect-escalation',
+        // Cold-start data load is stuck and the user must reconnect — they can't
+        // reach their data. Already deferred past the recovery window, so fatal.
+        severity: 'critical',
         message:
           'Cold-start data load stuck on auth-transient (silent refresh failed); ' +
           `banner surfaced after ${COLD_START_RECONNECT_DEFER_MS}ms defer window. ` +
@@ -2134,7 +2140,7 @@ export const useSyncStore = defineStore('sync', () => {
       const reason = e instanceof Error ? e.message : String(e);
       reportError({
         surface: 'storage-migration-failed',
-        severity: 'error',
+        severity: 'critical',
         message: reason,
         error: e,
         context: { from, to: target, step },

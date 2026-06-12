@@ -244,6 +244,7 @@ describe('wrapAsync — engine panic friendly-toast wrap', () => {
     // and the original Error attached so the stack lands in the alert.
     expect(reportError).toHaveBeenCalledWith({
       surface: 'wrapAsync:engine-panic',
+      severity: 'critical',
       message: rawMessage,
       error: original,
     });
@@ -281,6 +282,7 @@ describe('wrapAsync — engine panic friendly-toast wrap', () => {
 
     expect(reportError).toHaveBeenCalledWith({
       surface: 'wrapAsync:engine-panic',
+      severity: 'critical',
       message: 'recursive use of an object detected',
       error: original,
       context: { action: 'todoStore:createTodo' },
@@ -295,6 +297,7 @@ describe('wrapAsync — engine panic friendly-toast wrap', () => {
 
     expect(reportError).toHaveBeenCalledWith({
       surface: 'wrapAsync:engine-panic',
+      severity: 'critical',
       message: 'recursive use of an object detected',
       error: original,
       context: undefined,
