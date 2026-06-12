@@ -4,16 +4,16 @@ slug: vibe-coding-the-wrong-way
 date: 2026-06-12
 category: founder story
 coverImage: /blog/beanies-vibe-coding-ocean-of-apps.webp
-excerpt: 'We are swimming in an endless deep blue ocean of vibe coded apps - and most of them are being built the same old (tired) way. The world has changed; the privacy trade-off is dying.'
+excerpt: 'We are swimming in an endless deep blue sea of vibe coded apps - and most of them are being built the same old (tired) way. The world has changed; the privacy trade-off is dying.'
 subtitle: "why is everybody trying to do what's been done before, only faster?"
 featured: false
 author: greg
 draft: false
 ---
 
-We are swimming in an endless deep blue ocean of vibe coded apps. Trust me, I've checked.
+We are swimming in an endless deep blue sea of vibe coded apps. Trust me, I've checked.
 
-![an endless ocean of identical sign-up screens — and one little family rowing their own way](/blog/beanies-vibe-coding-ocean-of-apps.webp)
+![an endless sea of identical sign-up screens — and one little family rowing their own way](/blog/beanies-vibe-coding-ocean-of-apps.webp)
 
 _why does it sometimes feel like i'm on a beanie boat to nowhere?_
 
