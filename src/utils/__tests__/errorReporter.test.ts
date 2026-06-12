@@ -24,6 +24,13 @@ vi.mock('@/services/telemetry', () => ({
 
 import { reportError, __resetErrorReporterForTesting } from '../errorReporter';
 
+// Post-gate, only `severity: 'critical'` reaches Slack. The dedup/payload suites
+// below exercise the Slack path, so they report at critical via this thin wrapper
+// (keeps them focused without repeating `severity: 'critical'` at every call).
+// The gate itself (critical-only) has its own describe block at the bottom.
+const reportCritical = (input: Parameters<typeof reportError>[0]) =>
+  reportError({ severity: 'critical', ...input });
+
 describe('errorReporter', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
   let warnSpy: ReturnType<typeof vi.spyOn>;
@@ -45,13 +52,13 @@ describe('errorReporter', () => {
 
   describe('dedup — first occurrence sends; subsequent count-only', () => {
     it('first occurrence triggers a fetch', () => {
-      reportError({ surface: 'create-activity', message: 'boom' });
+      reportCritical({ surface: 'create-activity', message: 'boom' });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
     it('second occurrence within window does NOT fetch and warns dedup-counted', () => {
-      reportError({ surface: 'create-activity', message: 'boom' });
-      reportError({ surface: 'create-activity', message: 'boom' });
+      reportCritical({ surface: 'create-activity', message: 'boom' });
+      reportCritical({ surface: 'create-activity', message: 'boom' });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy).toHaveBeenCalledWith(
         '[errorReporter] dedup-counted',
@@ -62,22 +69,22 @@ describe('errorReporter', () => {
     });
 
     it('different surfaces with same message both fetch (no cross-surface dedup)', () => {
-      reportError({ surface: 'create-activity', message: 'boom' });
-      reportError({ surface: 'edit-activity', message: 'boom' });
+      reportCritical({ surface: 'create-activity', message: 'boom' });
+      reportCritical({ surface: 'edit-activity', message: 'boom' });
       expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
 
     it('nearly-identical messages (different IDs) collapse to one bucket', () => {
-      reportError({ surface: 'save', message: 'failed for record 123456' });
-      reportError({ surface: 'save', message: 'failed for record 789012' });
+      reportCritical({ surface: 'save', message: 'failed for record 123456' });
+      reportCritical({ surface: 'save', message: 'failed for record 789012' });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
     it('summary message fires at window close when count > 1', async () => {
       vi.useFakeTimers();
-      reportError({ surface: 'save', message: 'boom' });
-      reportError({ surface: 'save', message: 'boom' });
-      reportError({ surface: 'save', message: 'boom' });
+      reportCritical({ surface: 'save', message: 'boom' });
+      reportCritical({ surface: 'save', message: 'boom' });
+      reportCritical({ surface: 'save', message: 'boom' });
       expect(fetchSpy).toHaveBeenCalledTimes(1); // first only
 
       await vi.advanceTimersByTimeAsync(60_000 + 100);
@@ -90,7 +97,7 @@ describe('errorReporter', () => {
 
     it('no summary fires when count == 1 (single-shot error)', async () => {
       vi.useFakeTimers();
-      reportError({ surface: 'save', message: 'boom' });
+      reportCritical({ surface: 'save', message: 'boom' });
       await vi.advanceTimersByTimeAsync(60_000 + 100);
       expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
@@ -99,7 +106,7 @@ describe('errorReporter', () => {
   describe('cross-reload dedup — sessionStorage layer', () => {
     it('suppresses identical errors across simulated page reloads within the window', () => {
       // Initial page load: first occurrence fires.
-      reportError({ surface: 'app.postInitNoData', message: 'no doc loaded' });
+      reportCritical({ surface: 'app.postInitNoData', message: 'no doc loaded' });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
 
       // Simulate a page reload: in-memory buckets are gone but sessionStorage
@@ -109,7 +116,7 @@ describe('errorReporter', () => {
 
       // Same error fires again on the new page load — should be suppressed
       // by the sessionStorage layer, even though the in-memory bucket is fresh.
-      reportError({ surface: 'app.postInitNoData', message: 'no doc loaded' });
+      reportCritical({ surface: 'app.postInitNoData', message: 'no doc loaded' });
       expect(fetchSpy).toHaveBeenCalledTimes(1); // still just the first
       expect(warnSpy).toHaveBeenCalledWith(
         '[errorReporter] dedup-counted-across-reload',
@@ -121,7 +128,7 @@ describe('errorReporter', () => {
     it('allows a fresh fire after the dedup window elapses across reloads', () => {
       vi.useFakeTimers();
       // First fire on this tab.
-      reportError({ surface: 'app.postInitNoData', message: 'no doc' });
+      reportCritical({ surface: 'app.postInitNoData', message: 'no doc' });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
 
       // Simulate a reload AND advance past the dedup window.
@@ -129,15 +136,15 @@ describe('errorReporter', () => {
       vi.advanceTimersByTime(60_000 + 100);
 
       // Same error fires after the window — should NOT be suppressed.
-      reportError({ surface: 'app.postInitNoData', message: 'no doc' });
+      reportCritical({ surface: 'app.postInitNoData', message: 'no doc' });
       expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
 
     it('different surfaces are tracked independently across reloads', () => {
-      reportError({ surface: 'app.postInitNoData', message: 'no doc' });
+      reportCritical({ surface: 'app.postInitNoData', message: 'no doc' });
       __resetErrorReporterForTesting({ keepSessionStorage: true });
       // Different surface — should still fire.
-      reportError({ surface: 'create-activity', message: 'failed' });
+      reportCritical({ surface: 'create-activity', message: 'failed' });
       expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
   });
@@ -145,7 +152,7 @@ describe('errorReporter', () => {
   describe('failure handling — no silent paths', () => {
     it('does nothing if webhook URL is unset (and warns)', () => {
       vi.stubEnv('VITE_BEANIES_ERROR_WEBHOOK_URL', '');
-      reportError({ surface: 'x', message: 'y' });
+      reportCritical({ surface: 'x', message: 'y' });
       expect(fetchSpy).not.toHaveBeenCalled();
       // Now via slackPost — uses its own scope tag
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('webhook URL not configured'));
@@ -154,7 +161,7 @@ describe('errorReporter', () => {
     it('swallows fetch rejection without throwing (and warns)', async () => {
       fetchSpy.mockRejectedValueOnce(new Error('network down'));
       // Should not throw
-      expect(() => reportError({ surface: 'x', message: 'y' })).not.toThrow();
+      expect(() => reportCritical({ surface: 'x', message: 'y' })).not.toThrow();
       // Warn is async (inside the .catch); flush microtasks
       await Promise.resolve();
       await Promise.resolve();
@@ -169,10 +176,10 @@ describe('errorReporter', () => {
       const ctxMocked = vi.mocked(ctxMod.useFamilyContextStore);
       // Make context build try to re-enter
       ctxMocked.mockImplementationOnce(() => {
-        reportError({ surface: 'inner', message: 'inner-boom' });
+        reportCritical({ surface: 'inner', message: 'inner-boom' });
         return { activeFamilyId: null, activeFamilyName: null } as never;
       });
-      reportError({ surface: 'outer', message: 'outer-boom' });
+      reportCritical({ surface: 'outer', message: 'outer-boom' });
       // Outer fired; inner got blocked by the re-entry guard
       expect(warnSpy).toHaveBeenCalledWith('[errorReporter] re-entry blocked', 'inner');
     });
@@ -180,7 +187,7 @@ describe('errorReporter', () => {
 
   describe('payload structure', () => {
     it('includes surface, message, family info, and build SHA', () => {
-      reportError({ surface: 'create-activity', message: 'boom' });
+      reportCritical({ surface: 'create-activity', message: 'boom' });
       const body = JSON.parse((fetchSpy.mock.calls[0]![1] as RequestInit).body as string);
       expect(body.text).toContain('🚨');
       expect(body.text).toContain('create-activity');
@@ -190,16 +197,43 @@ describe('errorReporter', () => {
 
     it('includes the error stack when an Error is passed', () => {
       const err = new Error('detailed');
-      reportError({ surface: 'x', message: 'y', error: err });
+      reportCritical({ surface: 'x', message: 'y', error: err });
       const body = JSON.parse((fetchSpy.mock.calls[0]![1] as RequestInit).body as string);
       expect(body.text).toContain('*Stack:*');
       expect(body.text).toContain('Error: detailed');
     });
 
     it('handles missing Error gracefully', () => {
-      reportError({ surface: 'x', message: 'y' });
+      reportCritical({ surface: 'x', message: 'y' });
       const body = JSON.parse((fetchSpy.mock.calls[0]![1] as RequestInit).body as string);
       expect(body.text).not.toContain('*Stack:*');
+    });
+  });
+
+  // The contract guard: Slack pages critical-only; everything else is telemetry
+  // + console. This pins the default-quiet behaviour so a future refactor can't
+  // silently re-arm or disarm paging.
+  describe('Slack page-gate — critical-only (quiet by default)', () => {
+    it('does NOT page for unspecified / error / warning severity', () => {
+      reportError({ surface: 'background-a', message: 'noise' });
+      reportError({ surface: 'background-b', message: 'noise', severity: 'error' });
+      reportError({ surface: 'background-c', message: 'noise', severity: 'warning' });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('pages Slack only for critical severity', () => {
+      reportError({ surface: 'fatal-thing', message: 'boom', severity: 'critical' });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('mirrors EVERY severity into telemetry, even when Slack is gated out', async () => {
+      const { logEvent } = await import('@/services/telemetry');
+      vi.mocked(logEvent).mockClear(); // module mock accumulates across the suite
+      reportError({ surface: 'a', message: 'm1' }); // unspecified → telemetry only
+      reportError({ surface: 'b', message: 'm2', severity: 'warning' }); // telemetry only
+      reportError({ surface: 'c', message: 'm3', severity: 'critical' }); // telemetry + Slack
+      expect(vi.mocked(logEvent)).toHaveBeenCalledTimes(3);
+      expect(fetchSpy).toHaveBeenCalledTimes(1); // only the critical paged
     });
   });
 });

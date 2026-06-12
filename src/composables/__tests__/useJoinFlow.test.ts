@@ -473,10 +473,14 @@ describe('useJoinFlow', () => {
       const call = mockReportError.mock.calls[0]?.[0] as {
         surface: string;
         message: string;
+        severity: string;
         context: Record<string, unknown>;
       };
       expect(call.surface).toBe('join-flow:PICKER_FAILED');
       expect(call.message).toContain('google.picker is undefined');
+      // The registry marks PICKER_FAILED 'critical' — confirm recordError now
+      // forwards that severity so the join-fatal codes page under the gate.
+      expect(call.severity).toBe('critical');
       expect(call.context).toMatchObject({ error_code: 'PICKER_FAILED' });
     });
 

@@ -251,6 +251,10 @@ export function useJoinFlow() {
       surface: `join-flow:${code}`,
       message: detail ? `${code}: ${detail}` : code,
       error: err,
+      // Forward the per-code severity already declared on the registry so the
+      // genuinely-fatal join failures page Slack under the critical-only gate;
+      // recoverable codes (e.g. NO_UNCLAIMED_MEMBERS, 'warning') stay log-only.
+      severity: JOIN_ERRORS[code].severity,
       context: {
         error_code: code,
         file_id_tail: targetFileId.value || undefined,

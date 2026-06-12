@@ -28,6 +28,15 @@ export interface ToastActionOptions {
    */
   silent?: boolean;
   /**
+   * Page #beanies-errors for this toast (`severity: 'critical'`). Set ONLY for
+   * genuinely fatal / user-blocking errors that must reach a human (e.g. a save
+   * that failed and lost the user's work, a pod that couldn't be created).
+   * Default: the error is captured in telemetry + console but does NOT page —
+   * and the toast omits the "Support has been notified" line. No-op for
+   * non-error toasts and when `silent` is set.
+   */
+  critical?: boolean;
+  /**
    * Override the auto-detected surface name for the error report.
    * If unset, the reporter falls back to a generic 'app' surface.
    * Use kebab-case: 'create-activity', 'drive-sync-write', etc.
@@ -101,8 +110,14 @@ export function showToast(
         message: reportMessage,
         error: options?.error,
         context: options?.context,
+        // Toasts are user-visible but not automatically fatal — page only when
+        // the caller marks this critical. Otherwise telemetry + console capture
+        // it without paging support.
+        severity: options?.critical ? 'critical' : undefined,
       });
-      reported = true;
+      // `reported` drives the "Support has been notified" line — keep it
+      // truthful: a human is paged only when this toast was critical.
+      reported = !!options?.critical;
     } catch (e) {
       console.warn('[useToast] reportError threw — toast still rendering:', e);
     }

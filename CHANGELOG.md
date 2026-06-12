@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **Sharper behind-the-scenes error reporting.** Only genuinely disruptive problems (a failed save, a pod that couldn't be created, a broken screen) now raise an alert to our team — everything else is still captured for review but no longer pages us. No change to how the app works for you.
 - **The connection to your family data file is now more reliable.** You'll be asked to reconnect and sign in far less often — the data-file connection now recovers itself and reconnects quietly in the background where it used to need you to sign in to Google again. Most noticeable on iPhone.
 
 ### Fixed
