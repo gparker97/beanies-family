@@ -22,7 +22,7 @@ Check out these stats:
 - 13 of Product Hunt's [top 15 launches](https://www.producthunt.com/newsletters/archive/46593-all-the-ai-that-launched-in-2025) in 2025 were AI products
 - A full 25% of Y Combinator's latest batch shipped codebases that are [~95% AI-generated](https://techcrunch.com/2025/03/06/a-quarter-of-startups-in-ycs-current-cohort-have-codebases-that-are-almost-entirely-ai-generated/)
 - The top vibe-coding startups quadrupled to a combined [$36B+ valuation](https://www.vestbee.com/insights/articles/who-and-how-is-driving-the-vibe-coding-revolution) in 2025
-- Posts on reddit with the title "come check out awesome new app" are up roughly **1 billion** percent (Just a preliminary figure. Actual number may be higher.)
+- Posts on reddit with the title "come check out my awesome new app" are up roughly **1 billion** percent (Just a preliminary figure. Actual number may be higher.)
 
 But also:
 
