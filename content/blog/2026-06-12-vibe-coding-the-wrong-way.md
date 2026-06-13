@@ -38,7 +38,7 @@ It's just that simple, right?
 
 I've been building software since back in the days of manual, hand-cranked code. Which, to be fair, wasn't actually that long ago. It just _seems_ like a long time ago.
 
-Even in the old days, the actual _writing code_ portion of building a successful product was perhaps 20% of the work - and by the way - it's _always_ been the easy part. Vibe coding's just made it easier - while introducing a bunch of new pitfalls.
+Even in the old days, the actual _writing code_ portion of building a successful product was perhaps 20% of the work, and that's _always_ been the easy part. Vibe coding's just made it easier - while introducing a bunch of new pitfalls.
 
 The remaining 80%, by the way, never went away. AI hasn't changed how you make successful software, it's just made the coding part faster.
 
@@ -50,7 +50,7 @@ _But why, in this new world of endless possibilities, are we still swimming in a
 
 Because that's still where the big money is. Old habits die hard, and VCs continue to invest in the tried and true data models.
 
-Software companies and VC-backed startups love the standard, DB-centric, data harvesting approach. This works great, because you have ACID-level consistency for all your data, avoiding conflicts and maximizing data retention. But we all know the real reason everybody loves this model - because those companies own your valuable personal data. And as any successful software CEO knows, that data is worth its weight in gold (if you have enough of it).
+Software companies and VC-backed startups love the standard, DB-centric, data harvesting approach. This works great, because you have ACID-level consistency for all your data, avoiding conflicts and maximizing data retention. But we all know the real reason everybody loves this model - because those companies own your valuable data. And as any successful software CEO knows, that data is worth its weight in gold (if you have enough of it).
 
 This way of thinking made perfect sense when there was a huge barrier to building software (well, make that _working_ software). The company that did it best got the spoils - the benefit of capturing nearly the _entire market_, hoarding all that valuable user data, creating a beautifully consistent revenue stream.
 
@@ -62,21 +62,21 @@ Like the great composers of their day, builders can now create their own masterp
 
 _if AI had existed in beethoven's time, would there even be a symphony no. 5.0?_
 
-When I come across modern startups or vibe coded apps that follow the traditional model, my thought is always, "why would anybody agree to these terms in the new world?"
+When I come across modern startups or vibe coded apps that follow the traditional model, my thought is always, "Why would anybody agree to these terms in the new world?"
 
-Giving away your data has always been the trade-off you need to make for working with the market leader - the company that hired the best developers and built the best software. That trade-off no longer applies.
+Giving away your data has always been the trade-off you make for working with the market leader - the company that hired the best developers and built the best software. That trade-off no longer applies.
 
-You can now choose who you give your data to. And if you don't want to give it to anybody, you can do that too. If you _really_ want to, you can even build the software yourself. Who cares if it's a bit janky - it works, doesn't it?!
+You can now choose where your data goes. And if you don't want to give it to anybody, you can do that too. If you _really_ want to, you can even build the software yourself. Who cares if it's a bit janky - it works, doesn't it?!
 
-The trade-off sacrifice of my privacy in return for good software is no more. Or, at least, it's dying rapidly.
+I predict the trade-off sacrifice of privacy in return for good software will simply fade away.
 
-Software like social media, product aggregators, and the like will still retain their market domination, at least for a while. Those players have won their vertical already. But _pure SaaS_ is anyone's game. And that's both exciting and scary as hell.
+It's no longer necessary to think along the lines of "How much data can I capture?" Simply focus on building the best damn product you can build.
 
-It's no longer necessary to think along the lines of "how much data can I capture". Simply focus on building the best damn product you can build.
+Software like social networks, product aggregators, and the like will still retain their market domination, at least for a while. Those players have won their vertical already. But _pure SaaS_ is anyone's game. And that's both exciting and scary as hell.
 
 _But greg, how do I make money?!_
 
-Glad you asked! Charge your users a reasonable price for your product, rather than selling their data. Call me old fashioned, but I believe customers are still willing to pay for a product that is genuinely useful, and respects their privacy.
+Glad you asked! Charge your users a reasonable price for your product, rather than selling their data. Call me old fashioned, but I believe customers are still willing to pay for a product that is genuinely useful, while still respecting their privacy.
 
 We're living in a brave new world, builders. Let's get out and build in it.
 
