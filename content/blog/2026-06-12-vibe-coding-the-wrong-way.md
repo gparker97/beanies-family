@@ -60,7 +60,7 @@ Like the great composers of their day, builders can now create their own masterp
 
 ![an oil painting of beethoven composing at a laptop by candlelight](/blog/beethoven-vibe-coding-painting.webp)
 
-_if AI had existed in beethoven's time, would there even be a symphony no. 5.0?_
+_if AI had existed in beethoven's time, we might be listening to symphony no. 10,000,000 (in d minor)_
 
 When I come across modern startups or vibe coded apps that follow the traditional model, my thought is always, "Why would anybody agree to these terms in the new world?"
 
