@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-13
+
+### Changed
+
+- **The "vibe coding the wrong way" blog post got a same-week revision.** The piece now flows as one continuous argument (the 20%-coding/80%-everything-else thread), picked up two new illustrations — a Pitfall-style retro game animation and Beethoven composing at a laptop — and its stats now all link to sources that actually contain the numbers.
+
 ## 2026-06-12
 
 ### Added
