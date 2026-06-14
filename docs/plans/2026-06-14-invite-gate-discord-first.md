@@ -4,7 +4,14 @@
 > Related issues: None — direct implementation (greg, in-session)
 > Plan file: `docs/plans/2026-06-14-invite-gate-discord-first.md`
 > Mockup: `docs/mockups/invite-gate-discord-first-2026-06-14.html`
-> Status: **Proposed — awaiting greg's review. Not yet implemented.**
+> Status: **Approved (decisions locked 2026-06-14) — ready to implement on greg's go-ahead. Adds a create→invite funnel per greg's follow-up.**
+
+## Decisions (locked 2026-06-14)
+
+1. Event shape: a single **`invite_request_click`** event with a `method` prop (`'discord' | 'message'`). ✅
+2. Track the Slack send too (`method: 'message'` on a successful send), not just the Discord click. ✅
+3. Keep the Slack email form as the secondary fallback. ✅
+4. **New — create→invite funnel.** Also fire **`create_pod_click`** when the "plant a new pod" / create-family button is clicked, so we can measure how many start the create flow vs. how many actually ask for an invite at the gate. **Bail-out at the friction point ≈ `create_pod_click` − `invite_request_click`.**
 
 ## User Story
 
@@ -36,8 +43,20 @@ greg is steering early adopters toward **Discord** (there's a standing Discord-C
 4. **Confirmed mode** gains a "Join the Discord" CTA (the user already requested via email; nudge them to the community too).
 5. **Capability decoupling**: the Discord CTA shows whenever `features.marketingUrl` is available (it doesn't need the Slack webhook). The Slack "send a message" link shows only when `features.slackInvite`. If `slackInvite` is off, only Discord shows (the preferred state). If `marketingUrl` is somehow off, fall back to today's Slack-link-only behaviour so the gate is never a dead end.
 6. **i18n**: all new copy via `uiStrings.ts` (en + beanie), then `npm run translate` for zh. No hardcoded strings.
+7. **Create→invite funnel**: fire `create_pod_click` (no props) when the create-family card is clicked in `WelcomeGate.vue`. This is the top of the funnel; `invite_request_click` is the conversion at the friction point. No props needed — the funnel is just two event counts.
 
 ## Approach (files affected)
+
+### `src/components/login/WelcomeGate.vue`
+
+- The create choice is a `LoginChoiceCard` (`testid="create-pod-button"`) that does `@click="emit('navigate', 'create')"`. Wrap that in a tiny handler:
+  ```ts
+  function onCreatePod() {
+    window.plausible?.('create_pod_click');
+    emit('navigate', 'create');
+  }
+  ```
+  and bind `@click="onCreatePod"`. (Fire at the button itself — the truest "clicked create" measure — not in `LoginPage.handleNavigate`, which is also reached by non-button redirect paths like `handleRequestCreate`.)
 
 ### `src/utils/discord.ts`
 
@@ -87,10 +106,24 @@ Firing `window.plausible('invite_request_click', …)` starts collecting immedia
 
 - `src/utils/discord.ts` — extend `DiscordSurface` (modify)
 - `src/components/login/InviteGateOverlay.vue` — redesign no-token path + events (modify)
+- `src/components/login/WelcomeGate.vue` — `create_pod_click` on the create card (modify)
 - `src/services/translation/uiStrings.ts` — new/reworded keys (modify)
 - `public/translations/zh.json` — regenerated via `npm run translate` (modify)
 - `src/components/login/__tests__/InviteGateOverlay.test.ts` — new test (create)
+- `src/components/login/__tests__/WelcomeGate.test.ts` — new/extended test for the create-click event (create or extend)
 - `CHANGELOG.md` — user-facing entry (modify)
+
+## Plausible dashboard setup (manual — steps for greg)
+
+The app fires the events; goals are configured in the Plausible UI. To create each goal:
+
+1. Go to **plausible.io → the beanies.family site → Site Settings → Goals → "+ Add goal"**.
+2. Goal trigger: **Custom event**. Add these three (event name must match exactly):
+   - `create_pod_click` — top of funnel (create button clicked)
+   - `invite_request_click` — friction conversion (asked for an invite). Optionally break down by the `method` property (`discord` vs `message`) using a **property filter** in a report, or just read the total.
+   - (`discord_join_click` already exists from the shared `openDiscord` util — no action needed.)
+3. **Reading the bail-out**: compare the `create_pod_click` count to `invite_request_click` over the same period; the gap is the people who started creating a family but bailed at the invite-only friction. (Plausible's Funnels feature, if enabled on the plan, can chart `create_pod_click → invite_request_click` directly.)
+4. Property note: Plausible custom-event **properties** (`method`) show under the event's breakdown; no separate goal per method is needed.
 
 ## Help Center Coverage
 
@@ -116,12 +149,11 @@ Not required — this is a CTA/priority change to an existing gate, not a new fe
 2. **Manual visual QA** against the mockup: light + dark, the Discord CTA's blurple-on-white-ring glyph, hover lift, and that token entry remains the obvious path for invited users. Beanie-mode copy lowercases.
 3. `npm run validate` green.
 
-## Open Questions / Decisions (for greg)
+## Open Questions / Decisions
 
-1. **Event name** — `invite_request_click` with a `method` prop (`discord` | `message`). Good, or prefer separate event names (`invite_request_discord` / `invite_request_message`)? A single event + prop is cleaner for a Plausible funnel.
-2. **Track the Slack send too?** You asked specifically for "(a) every time the request invite link/button is clicked." I've proposed also firing on a successful Slack send (`method: 'message'`) for funnel symmetry. Say the word if you want **only** the Discord click tracked.
-3. **Keep the Slack form at all?** This plan keeps it as the secondary fallback (per your note). If you'd rather drop email collection entirely and go Discord-only, that's a smaller change (remove `request`/`confirmed` modes) — flag it.
-4. **Plausible goal** must be added in the dashboard by you (external); the code just fires the event.
+All resolved 2026-06-14 — see the **Decisions (locked)** block at the top: single `invite_request_click` + `method` prop (1✅), track the Slack send too (2✅), keep the Slack form as the fallback (3✅), and add a `create_pod_click` top-of-funnel event (4✅). Plausible goals are added by greg in the dashboard (steps above).
+
+**One residual ambiguity to confirm:** by "invite sends" greg means the _request-an-invite_ action at the gate (covered by `invite_request_click`). If he ALSO wants the **owner-side** invite wizard's "share magic link" send tracked (a different surface — `InviteWizardModal`), that's a small separate event (`invite_sent`) we can add — flagged, not assumed.
 
 ## Review Passes
 
