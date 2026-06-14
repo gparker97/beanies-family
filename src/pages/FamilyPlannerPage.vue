@@ -27,7 +27,8 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
-import { getActivityFallbackEmoji, getActivityCategoryName } from '@/constants/activityCategories';
+import { getActivityFallbackEmoji } from '@/constants/activityCategories';
+import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
 import {
   formatDateFull,
   parseLocalDate,
@@ -61,6 +62,7 @@ import type {
 } from '@/types/models';
 
 const { t } = useTranslation();
+const { categoryLabel } = useActivityCategoryLabel();
 const route = useRoute();
 const router = useRouter();
 const { canEditActivities } = usePermissions();
@@ -598,7 +600,7 @@ function showActivityCreatedConfirmation(data: CreateFamilyActivityInput) {
   const dateStr = formatDateFull(data.date);
   const details: ConfirmDetail[] = [
     { label: t('planner.field.title'), value: data.title },
-    { label: t('form.category'), value: getActivityCategoryName(data.category) },
+    { label: t('form.category'), value: categoryLabel(data.category) },
     { label: t('form.date'), value: dateStr },
   ];
   if (data.startTime) {

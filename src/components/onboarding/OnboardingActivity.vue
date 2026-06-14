@@ -15,7 +15,7 @@ import { toAssigneePayload } from '@/utils/assignees';
 import { useTranslation } from '@/composables/useTranslation';
 import { addHourToTime, formatTime12 } from '@/utils/date';
 import { ACTIVITY_PRESETS, type ActivityPreset } from '@/constants/activityPresets';
-import { getActivityCategoryName } from '@/constants/activityCategories';
+import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
 import { ErrorSurfaces } from './errorSurfaces';
 import type { CurrencyCode, ActivityCategory } from '@/types/models';
 
@@ -25,6 +25,7 @@ defineEmits<{
 }>();
 
 const { t, isBeanieMode } = useTranslation();
+const { categoryLabel } = useActivityCategoryLabel();
 const settingsStore = useSettingsStore();
 const familyStore = useFamilyStore();
 const activityStore = useActivityStore();
@@ -208,11 +209,7 @@ function formatActivityMeta(activity: AddedActivity): string {
           :icon="activity.icon"
           :title="activity.title"
           :meta="formatActivityMeta(activity)"
-          :tag="
-            isBeanieMode
-              ? getActivityCategoryName(activity.category).toLowerCase()
-              : getActivityCategoryName(activity.category)
-          "
+          :tag="categoryLabel(activity.category)"
           removable
           @remove="handleRemoveActivity(activity.id)"
         />

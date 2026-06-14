@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-14",
-    "translationCount": 3163
+    "translationCount": 3224
   },
   "translations": {
     "app.name": {
@@ -12906,11 +12906,6 @@
       "hash": "19rwli",
       "lastUpdated": "2026-05-03"
     },
-    "planner.group.entertainment": {
-      "translation": "娱乐",
-      "hash": "lhdeg8",
-      "lastUpdated": "2026-05-03"
-    },
     "planner.category.movie": {
       "translation": "电影",
       "hash": "18djbk",
@@ -12947,9 +12942,9 @@
       "lastUpdated": "2026-05-03"
     },
     "planner.category.other_entertainment": {
-      "translation": "其他娱乐行业",
-      "hash": "aim2tk",
-      "lastUpdated": "2026-05-03"
+      "translation": "其他有趣的事情",
+      "hash": "ccb90j",
+      "lastUpdated": "2026-06-14"
     },
     "family.role.ownerBadge": {
       "translation": "Pod所有者",
@@ -15820,6 +15815,316 @@
       "translation": "翻转开关以显示实验室中正在酿造的东西。",
       "hash": "fghtl9",
       "lastUpdated": "2026-06-12"
+    },
+    "planner.group.appointments": {
+      "translation": "预约",
+      "hash": "ruo8us",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.group.food": {
+      "translation": "食物",
+      "hash": "1b24e",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.group.fun": {
+      "translation": "趣味",
+      "hash": "1isf",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.group.pets": {
+      "translation": "宠物 ",
+      "hash": "1h8pg",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.group.religious": {
+      "translation": "宗教信仰",
+      "hash": "yfcdet",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.group.social": {
+      "translation": "社交媒体",
+      "hash": "tzitf7",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.group.work": {
+      "translation": "公司",
+      "hash": "1lwz5",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.group.other": {
+      "translation": "其他军火",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.dentist": {
+      "translation": "牙科医生",
+      "hash": "htk071",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.doctor": {
+      "translation": "医生",
+      "hash": "xxx54v",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.eye_exam": {
+      "translation": "眼 <x id=\"522\"/>考试",
+      "hash": "mjk26q",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.haircut": {
+      "translation": "扣减率",
+      "hash": "w41s74",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.therapy": {
+      "translation": "治療",
+      "hash": "57lnbd",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.other_appointment": {
+      "translation": "其他预约",
+      "hash": "4drzjl",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.gymnastics_competition": {
+      "translation": "体操比赛",
+      "hash": "qbl4fr",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.swimming_competition": {
+      "translation": "游泳比赛",
+      "hash": "moaebo",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.track_field": {
+      "translation": "徑賽 & 田賽",
+      "hash": "rjjkid",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.brunch": {
+      "translation": "早午餐",
+      "hash": "x1sn5a",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.coffee": {
+      "translation": "咖啡",
+      "hash": "xgx52k",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.dining_out": {
+      "translation": "外出就餐",
+      "hash": "exdsih",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.drinks": {
+      "translation": "饮料",
+      "hash": "xzo8aj",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.picnic": {
+      "translation": "郊遊",
+      "hash": "vhyc9u",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.other_food": {
+      "translation": "Other Food",
+      "hash": "sywv5a",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.arcade": {
+      "translation": "街机",
+      "hash": "wkf9dc",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.beach": {
+      "translation": "沙滩",
+      "hash": "124z7n",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.bowling": {
+      "translation": "保龄球",
+      "hash": "sq0qlc",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.playground": {
+      "translation": "游乐场/公园",
+      "hash": "q0ngg",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.pool": {
+      "translation": "泳池游泳",
+      "hash": "z7ccbh",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.zoo": {
+      "translation": "动物园/水族馆",
+      "hash": "mmqeqm",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.chess": {
+      "translation": "棋格",
+      "hash": "12qs4g",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.coding": {
+      "translation": "编码/机器人",
+      "hash": "8oiera",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.drama": {
+      "translation": "戏剧/表演",
+      "hash": "hh0k5i",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.voice": {
+      "translation": "歌喉",
+      "hash": "1qloq4",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.anniversary": {
+      "translation": "三周年活动",
+      "hash": "c0ya28",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.baby_shower": {
+      "translation": "婴儿淋浴",
+      "hash": "cek24",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.graduation": {
+      "translation": "毕业",
+      "hash": "s7u5wy",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.pet_grooming": {
+      "translation": "美容",
+      "hash": "9cm5ts",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.vet": {
+      "translation": "审查",
+      "hash": "1u9x",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.other_pet": {
+      "translation": "其他宠物",
+      "hash": "xnbnz",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.religious_class": {
+      "translation": "宗教课",
+      "hash": "xf19f1",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.worship": {
+      "translation": "崇拜/服务",
+      "hash": "y3024a",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.other_religious": {
+      "translation": "其他宗教信仰",
+      "hash": "pno9gr",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.field_trip": {
+      "translation": "实习",
+      "hash": "ti0o51",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.date_night": {
+      "translation": "约会之夜",
+      "hash": "h19lba",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.family_visit": {
+      "translation": "探亲",
+      "hash": "su0az3",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.playdate": {
+      "translation": "Playdate",
+      "hash": "w5bxtu",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.other_social": {
+      "translation": "其他社交链接",
+      "hash": "20jiyl",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.basketball": {
+      "translation": "籃球",
+      "hash": "q1buaj",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.football": {
+      "translation": "足球",
+      "hash": "7lgo7h",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.mma": {
+      "translation": "MMA",
+      "hash": "1mzl",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.multi_sport": {
+      "translation": "Multi Sport",
+      "hash": "1d9rw3",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.rugby": {
+      "translation": "英式橄榄球",
+      "hash": "1b80xn",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.soccer": {
+      "translation": "足球",
+      "hash": "tzixrr",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.taekwondo": {
+      "translation": "跆拳道",
+      "hash": "qxebua",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.conference": {
+      "translation": "多人會議",
+      "hash": "q10tl0",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.networking": {
+      "translation": "网络",
+      "hash": "p24wes",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.work_party": {
+      "translation": "办公派对",
+      "hash": "8fefeq",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.team_building": {
+      "translation": "团队建设/郊游",
+      "hash": "sya8ku",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.work_dinner": {
+      "translation": "工作晚餐",
+      "hash": "3vdsgx",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.work_drinks": {
+      "translation": "工作饮料",
+      "hash": "408r0q",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.other_work": {
+      "translation": "其他工作",
+      "hash": "sz7q01",
+      "lastUpdated": "2026-06-14"
+    },
+    "planner.category.other_activity": {
+      "translation": "其他项目",
+      "hash": "syms2p",
+      "lastUpdated": "2026-06-14"
     }
   }
 }
