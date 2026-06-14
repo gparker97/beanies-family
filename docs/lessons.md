@@ -4,6 +4,21 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## Feature-gate ONLY by request — and surface every gate in the Settings admin
+
+**Date:** 2026-06-14
+**Context:** Implementing the Discord-first invite gate, I gated the new Discord CTA on `features.marketingUrl` without being asked to gate anything. That flag is `ok(VITE_MARKETING_URL)` (env-var presence), which is set in neither local dev nor `deploy.yml`, so the CTA was hidden in **dev and prod** — the feature looked unshipped.
+
+**Two distinct systems (do not conflate):**
+
+- `src/config/features.ts` — **env-capability detection** (e.g. `slackInvite = ok(VITE_INVITE_WEBHOOK_URL)`: "is this wired?"). Not a toggle; not in Settings. A capability check a feature genuinely cannot work without is fine.
+- `src/config/flagRegistry.ts` + `featureFlags.committed.ts` — the **runtime DevFlag** system that renders in the dev-only Settings → Feature Flags card (#31). This is what "the feature flags section in settings" means.
+
+**Rules:**
+
+1. **Do not add a feature gate unless explicitly asked.** No ask → ship ungated. Don't invent capability gates a feature doesn't need (the Discord redirect resolves via `MARKETING_URL`'s built-in fallback — it never needed `VITE_MARKETING_URL`).
+2. **If a feature IS gated (by request) via a DevFlag, register it in `flagRegistry.ts` (+ committed state in `featureFlags.committed.ts`) in the same change**, so it appears and is toggleable in the Settings admin. A gate greg can't see or flip is worse than no gate.
+
 ## Default GitHub Actions config items to **variables**, not secrets
 
 **Date:** 2026-04-14
