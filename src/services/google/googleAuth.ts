@@ -65,6 +65,40 @@ let pendingAuthPromise: Promise<string> | null = null;
 // Cached Google account email
 let cachedEmail: string | null = null;
 
+// Session-epoch guard. Bumped exactly once per session teardown
+// (`clearGoogleSessionState` / `revokeToken`). Each async token-acquisition seam
+// snapshots it at the start and discards its result if the epoch advanced while
+// the network round-trip was in flight — so a token that resolves AFTER a
+// sign-out can never be committed into the cleared (or next) session. See
+// docs/plans/2026-06-14-session-epoch-guard-google-token.md.
+let sessionEpoch = 0;
+
+/** Current session epoch — consumed by driveTokenRecovery to guard its
+ *  doc→local adopt boundary across an async read. */
+export function getSessionEpoch(): number {
+  return sessionEpoch;
+}
+
+/**
+ * True if the session that started an acquisition (its `epochAtStart`) is still
+ * current. On a stale epoch (a sign-out/teardown interleaved): best-effort revoke
+ * the just-issued access token — a live Google credential that must die with the
+ * session — and return false so the caller discards WITHOUT committing. The
+ * `logEvent` (level 'info' — an EXPECTED discard) makes it observable, never a
+ * silent drop. (The level 'error' `auth-epoch-leak` backstop in
+ * `notifyTokenAcquired` is the separate "a guard was MISSED" signal.)
+ */
+function isSessionStillCurrent(epochAtStart: number, accessTokenToRevoke: string): boolean {
+  if (epochAtStart === sessionEpoch) return true;
+  fetch(`${GOOGLE_REVOKE_URL}?token=${accessTokenToRevoke}`, { method: 'POST' }).catch(() => {});
+  logEvent({
+    level: 'info',
+    surface: 'auth-epoch-discard',
+    message: 'discarded a Google token that resolved after sign-out (session epoch advanced)',
+  });
+  return false;
+}
+
 // Expiry callbacks — fire from the scheduled-refresh timer when the
 // pre-expiry refresh attempt fails AND the cause is permanent. Transient
 // (network blip / 5xx / `pendingSilentRefresh` race) does NOT fire these
@@ -562,6 +596,7 @@ export async function requestAccessToken(options?: {
  * so the two listeners don't collide.
  */
 async function attemptSilentAuthCode(clientId: string): Promise<string | null> {
+  const epochAtStart = sessionEpoch;
   let codeVerifier: string;
   let codeChallenge: string;
   try {
@@ -643,6 +678,9 @@ async function attemptSilentAuthCode(clientId: string): Promise<string | null> {
       return null;
     }
 
+    // Discard if a sign-out cleared the session while the exchange was in flight.
+    if (!isSessionStillCurrent(epochAtStart, tokens.access_token)) return null;
+
     accessToken = tokens.access_token;
     expiresAt = Date.now() + tokens.expires_in * 1000;
 
@@ -672,7 +710,7 @@ async function attemptSilentAuthCode(clientId: string): Promise<string | null> {
     // interactive=false: this acquisition was fully silent. Subscribers
     // (e.g. account-assertion) use this flag to distinguish a deliberate
     // user-driven sign-in from an incidental background acquisition.
-    notifyTokenAcquired(tokens.access_token, false).catch(() => {});
+    notifyTokenAcquired(tokens.access_token, false, epochAtStart).catch(() => {});
 
     console.info(
       `[googleAuth] silent auth-code succeeded — token acquired without consent prompt (expires in ${tokens.expires_in}s)`
@@ -693,6 +731,7 @@ async function performPopupAuth(
   popup: Window,
   options?: { forceConsent?: boolean; loginHint?: string }
 ): Promise<string> {
+  const epochAtStart = sessionEpoch;
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
@@ -713,6 +752,15 @@ async function performPopupAuth(
     throw new Error(
       'Google Drive file access was not granted. Please allow file access when prompted.'
     );
+  }
+
+  // Discard if a sign-out cleared the session while the exchange was in flight.
+  // This function returns `string`, so signal the discard via a cancellation-
+  // shaped error (isUserCancellation matches `user_cancel`) — callers treat it
+  // as a benign abandonment, not a surfaced failure. (The revoke + log happen
+  // inside isSessionStillCurrent.)
+  if (!isSessionStillCurrent(epochAtStart, tokens.access_token)) {
+    throw new Error('user_cancel: signed out during sign-in — token discarded');
   }
 
   // Update in-memory state
@@ -742,7 +790,7 @@ async function performPopupAuth(
   // Notify subscribers (assertion + telemetry hooks). Fire-and-forget:
   // never block token return on subscriber work. interactive=true — the
   // user explicitly went through the chooser/consent flow.
-  notifyTokenAcquired(tokens.access_token, true).catch(() => {});
+  notifyTokenAcquired(tokens.access_token, true, epochAtStart).catch(() => {});
 
   console.warn(`[googleAuth] Token acquired via PKCE, expires in ${tokens.expires_in}s`);
   return tokens.access_token;
@@ -855,6 +903,7 @@ export async function attemptSilentRefresh(): Promise<string | null> {
 }
 
 async function performSilentRefresh(): Promise<string | null> {
+  const epochAtStart = sessionEpoch;
   const clientId = getClientId();
 
   // If in-memory refreshToken was lost (page reload / SW update), try loading
@@ -934,6 +983,9 @@ async function performSilentRefresh(): Promise<string | null> {
         clientId,
       });
 
+      // Discard if a sign-out cleared the session while the refresh was in flight.
+      if (!isSessionStillCurrent(epochAtStart, tokens.access_token)) return null;
+
       accessToken = tokens.access_token;
       expiresAt = Date.now() + tokens.expires_in * 1000;
 
@@ -942,7 +994,7 @@ async function performSilentRefresh(): Promise<string | null> {
 
       // Notify subscribers (assertion + telemetry hooks). Fire-and-forget.
       // interactive=false — background refresh, no user gesture involved.
-      notifyTokenAcquired(tokens.access_token, false).catch(() => {});
+      notifyTokenAcquired(tokens.access_token, false, epochAtStart).catch(() => {});
 
       console.warn('[googleAuth] Silent refresh succeeded');
       // Clear stale diagnostics so a later failure doesn't surface old data.
@@ -1130,6 +1182,11 @@ export async function getValidTokenSilent(): Promise<string> {
  * before the previous family was fully adopted).
  */
 export async function revokeToken(): Promise<void> {
+  // Session teardown: bump the epoch so any in-flight acquisition discards its
+  // result, and clear any pending redirect-auth intent (Req 6).
+  sessionEpoch++;
+  clearRedirectIntent();
+
   // Revoke access token via Google's endpoint
   if (accessToken) {
     try {
@@ -1166,6 +1223,11 @@ export async function revokeToken(): Promise<void> {
  * and silently log them in as B on the next session. Always clear it.
  */
 export async function clearGoogleSessionState(): Promise<void> {
+  // Session teardown: bump the epoch FIRST so any acquisition in flight discards
+  // its result, and clear any pending redirect-auth intent (Req 6).
+  sessionEpoch++;
+  clearRedirectIntent();
+
   const tokenSnapshot = accessToken;
   const familyIdSnapshot = currentFamilyId;
 
@@ -1249,7 +1311,28 @@ export function onTokenAcquired(callback: AcquiredCallback): () => void {
  * (silent refresh). Subscriber errors are logged but never rethrown —
  * one bad subscriber must not break others.
  */
-async function notifyTokenAcquired(token: string, interactive: boolean): Promise<void> {
+async function notifyTokenAcquired(
+  token: string,
+  interactive: boolean,
+  expectedEpoch: number
+): Promise<void> {
+  // Single-chokepoint backstop: every guarded seam returns BEFORE reaching here
+  // when its epoch went stale, so a stale epoch observed here means a commit path
+  // skipped its `isSessionStillCurrent` guard (e.g. a future 5th acquisition seam
+  // added without it). Log loudly and return immediately — before the
+  // failure-counter reset and subscriber fan-out below — so a leaked stale
+  // acquisition has no side effects beyond this error signal. By design
+  // unreachable; reaching it IS the regression signal.
+  if (expectedEpoch !== sessionEpoch) {
+    logEvent({
+      level: 'error',
+      surface: 'auth-epoch-leak',
+      message:
+        'a Google token reached notifyTokenAcquired with a stale session epoch — a commit path is missing its guard',
+    });
+    return;
+  }
+
   // Any successful acquisition — silent refresh, popup, redirect — breaks
   // the silent-refresh failure streak. Reset before subscribers run so any
   // future refresh failure starts counting fresh from 0.
@@ -1265,6 +1348,16 @@ async function notifyTokenAcquired(token: string, interactive: boolean): Promise
       console.warn('[googleAuth] tokenAcquired callback error:', e);
     }
   }
+}
+
+/** Test-only: exercise `notifyTokenAcquired`'s epoch-leak backstop directly
+ *  (the branch is unreachable via the guarded seams by design). */
+export function __notifyTokenAcquiredForTesting(
+  token: string,
+  interactive: boolean,
+  expectedEpoch: number
+): Promise<void> {
+  return notifyTokenAcquired(token, interactive, expectedEpoch);
 }
 
 // --- Internal helpers ---
@@ -1469,6 +1562,22 @@ export function setGoogleAccountEmail(email: string | null): void {
 
 const REDIRECT_AUTH_KEY = 'beanies_redirect_auth';
 
+/**
+ * Clear any pending redirect-auth intent. Called on session teardown so an
+ * abandoned/signed-out redirect finds no intent when it returns post-reload and
+ * `completeRedirectAuth` no-ops — the redirect equivalent of the in-memory epoch
+ * guard, which cannot bridge a full page reload. Best-effort: sessionStorage can
+ * throw in private mode.
+ */
+function clearRedirectIntent(): void {
+  try {
+    sessionStorage.removeItem(REDIRECT_AUTH_CODE_KEY);
+    sessionStorage.removeItem(REDIRECT_AUTH_KEY);
+  } catch {
+    // private-mode / disabled storage — nothing more we can do.
+  }
+}
+
 interface RedirectAuthState {
   codeVerifier: string;
   returnPath: string;
@@ -1529,6 +1638,11 @@ export async function startRedirectAuth(returnPath: string, loginHint?: string):
  * was completed, or null if there was no pending auth.
  */
 export async function completeRedirectAuth(): Promise<string | null> {
+  // Snapshot captures a same-page-load teardown during the code exchange below.
+  // (The cross-reload orphan case — sign-out before the redirect returns — is
+  // handled separately: teardown clears the intent keys, so the read above
+  // finds nothing and we no-op.)
+  const epochAtStart = sessionEpoch;
   const code = sessionStorage.getItem(REDIRECT_AUTH_CODE_KEY);
   const stateJson = sessionStorage.getItem(REDIRECT_AUTH_KEY);
 
@@ -1554,6 +1668,9 @@ export async function completeRedirectAuth(): Promise<string | null> {
     throw new Error('Google Drive file access was not granted.');
   }
 
+  // Discard if a sign-out cleared the session while the exchange was in flight.
+  if (!isSessionStillCurrent(epochAtStart, tokens.access_token)) return null;
+
   // Update in-memory state
   accessToken = tokens.access_token;
   expiresAt = Date.now() + tokens.expires_in * 1000;
@@ -1577,7 +1694,7 @@ export async function completeRedirectAuth(): Promise<string | null> {
   scheduleAutoRefresh(tokens.expires_in);
   // interactive=true — user just returned from a full-page redirect to
   // Google's consent/chooser screen.
-  notifyTokenAcquired(tokens.access_token, true).catch(() => {});
+  notifyTokenAcquired(tokens.access_token, true, epochAtStart).catch(() => {});
 
   console.warn(`[googleAuth] Token acquired via redirect PKCE, expires in ${tokens.expires_in}s`);
   return tokens.access_token;
