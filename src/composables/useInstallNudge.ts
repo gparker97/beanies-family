@@ -13,12 +13,12 @@
  *   - status:  'pending' (show) | 'dismissed' (Not now / Show me how) | 'installed'
  *   - shownAt: epoch ms of first surfacing — stable `occurredAt` for the row
  */
-import { computed, ref, watch } from 'vue';
-import { useFamilyStore } from '@/stores/familyStore';
+import { computed } from 'vue';
 import { isIosSafariNotInstalled, isStandalone } from '@/services/sync/capabilities';
 import { openExternal } from '@/utils/openExternal';
 import { MARKETING_URL } from '@/utils/marketing';
 import { reportError } from '@/utils/errorReporter';
+import { createPerMemberStore } from '@/composables/perMemberStore';
 
 type InstallNudgeStatus = 'pending' | 'dismissed' | 'installed';
 
@@ -35,89 +35,45 @@ function emptyState(): InstallNudgeState {
   return { schemaVersion: SCHEMA_VERSION, status: 'pending', shownAt: null };
 }
 
-function storageKey(memberId: string): string {
-  return `bean-install-nudge-${memberId}`;
-}
+// ── Module singleton store (per member, swapped on member change) ─────────────
+const store = createPerMemberStore<InstallNudgeState>({
+  prefix: 'bean-install-nudge',
+  label: 'useInstallNudge',
+  saveSurface: 'install-nudge-save',
+  saveMessage: 'localStorage write failed for install-nudge',
+  empty: emptyState,
+  clearOnSignOut: true,
+  fromParsed: (parsed) => {
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      (parsed as { schemaVersion?: unknown }).schemaVersion === SCHEMA_VERSION
+    ) {
+      const obj = parsed as Record<string, unknown>;
+      const status = obj.status;
+      return {
+        state: {
+          schemaVersion: SCHEMA_VERSION,
+          status:
+            status === 'dismissed' || status === 'installed' || status === 'pending'
+              ? status
+              : 'pending',
+          shownAt: typeof obj.shownAt === 'number' ? obj.shownAt : null,
+        },
+      };
+    }
+    return { state: emptyState() };
+  },
+});
 
-function loadState(memberId: string): InstallNudgeState {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(storageKey(memberId));
-  } catch (err) {
-    console.warn('[useInstallNudge] localStorage read failed — using empty state', err);
-    return emptyState();
-  }
-  if (!raw) return emptyState();
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    console.warn('[useInstallNudge] localStorage parse failed — resetting', err);
-    return emptyState();
-  }
-
-  if (
-    typeof parsed === 'object' &&
-    parsed !== null &&
-    (parsed as { schemaVersion?: unknown }).schemaVersion === SCHEMA_VERSION
-  ) {
-    const obj = parsed as Record<string, unknown>;
-    const status = obj.status;
-    return {
-      schemaVersion: SCHEMA_VERSION,
-      status:
-        status === 'dismissed' || status === 'installed' || status === 'pending'
-          ? status
-          : 'pending',
-      shownAt: typeof obj.shownAt === 'number' ? obj.shownAt : null,
-    };
-  }
-  return emptyState();
-}
-
-function saveState(memberId: string, next: InstallNudgeState): void {
-  try {
-    localStorage.setItem(storageKey(memberId), JSON.stringify(next));
-  } catch (err) {
-    console.warn('[useInstallNudge] localStorage write failed', err);
-    reportError({
-      surface: 'install-nudge-save',
-      message: 'localStorage write failed for install-nudge',
-      error: err,
-      severity: 'warning',
-    });
-  }
-}
-
-// ── Module singleton state (per member, swapped on member change) ─────────────
-const state = ref<InstallNudgeState>(emptyState());
-let currentMemberId = '';
+const state = store.state;
 
 export function useInstallNudge() {
-  const familyStore = useFamilyStore();
-
-  watch(
-    () => familyStore.currentMemberId,
-    (id) => {
-      if (!id) {
-        // Sign-out → clear the module singleton so a prior member's nudge state
-        // never leaks into the next session before a new member id arrives.
-        currentMemberId = '';
-        state.value = emptyState();
-        return;
-      }
-      if (id !== currentMemberId) {
-        currentMemberId = id;
-        state.value = loadState(id);
-      }
-    },
-    { immediate: true }
-  );
+  store.useMemberSync();
 
   function commit(next: InstallNudgeState): void {
     state.value = next;
-    saveState(currentMemberId, next);
+    store.save(next);
   }
 
   /**
@@ -139,7 +95,7 @@ export function useInstallNudge() {
    */
   function ensureNudgeIssued(): void {
     try {
-      if (!currentMemberId) return;
+      if (!store.memberId()) return;
       // Installed since last time → retire the nudge for good.
       if (isStandalone()) {
         if (state.value.status === 'pending') commit({ ...state.value, status: 'installed' });

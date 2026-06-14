@@ -32,7 +32,7 @@
  *   - User-initiated `muteAllTips()` / `enableTips()` failures surface an
  *     error toast (which auto-reports via `useToast`).
  */
-import { ref, computed, watch } from 'vue';
+import { computed } from 'vue';
 import { ALL_TIPS, type BeanTip, type TipContext } from '@/content/tips';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -45,6 +45,7 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useToday } from '@/composables/useToday';
 import { reportError } from '@/utils/errorReporter';
 import { showToast } from '@/composables/useToast';
+import { createPerMemberStore } from '@/composables/perMemberStore';
 
 // ── Persistence types ────────────────────────────────────────────────────────
 
@@ -73,42 +74,17 @@ function emptyState(): TipStateV2 {
   };
 }
 
-// ── localStorage helpers ─────────────────────────────────────────────────────
+// ── State validation / migration ─────────────────────────────────────────────
 
-function storageKey(memberId: string): string {
-  return `bean-tips-${memberId}`;
-}
-
-/** Load and migrate the per-member tip state. Idempotent — re-reading a v2
- *  payload is a no-op; reading v1 produces the same v2 output every time and
- *  persists it immediately so the next session is already on v2. */
-function loadState(memberId: string): TipStateV2 {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(storageKey(memberId));
-  } catch (err) {
-    console.warn('[useBeanTips] localStorage read failed — using empty state', err);
-    return emptyState();
-  }
-  if (!raw) return emptyState();
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    console.warn('[useBeanTips] localStorage parse failed — resetting to empty state', err);
-    const fresh = emptyState();
-    saveState(memberId, fresh); // overwrite the corrupted blob
-    return fresh;
-  }
-
+/** Validate + migrate a parsed-JSON blob into a `TipStateV2` (+ persist hint).
+ *  Idempotent — re-reading a v2 payload is a no-op; reading v1 produces the same
+ *  v2 output every time and asks to persist so the next session is on v2. */
+function fromParsed(parsed: unknown): { state: TipStateV2; persist?: boolean } {
   // Hard shape gate before any field access — defends against null / scalar /
   // array payloads that would throw on `parsed.dismissedTips`.
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     console.warn('[useBeanTips] storage corrupted (non-object), resetting', parsed);
-    const fresh = emptyState();
-    saveState(memberId, fresh);
-    return fresh;
+    return { state: emptyState(), persist: true };
   }
 
   const obj = parsed as Record<string, unknown>;
@@ -137,55 +113,48 @@ function loadState(memberId: string): TipStateV2 {
     for (const id of legacyMuted) mutedSet.add(id);
 
     return {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      issuedTips,
-      mutedTipIds: [...mutedSet],
-      tipsEnabled: typeof obj.tipsEnabled === 'boolean' ? obj.tipsEnabled : true,
-      lastTipShownDate: typeof obj.lastTipShownDate === 'string' ? obj.lastTipShownDate : '',
+      state: {
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        issuedTips,
+        mutedTipIds: [...mutedSet],
+        tipsEnabled: typeof obj.tipsEnabled === 'boolean' ? obj.tipsEnabled : true,
+        lastTipShownDate: typeof obj.lastTipShownDate === 'string' ? obj.lastTipShownDate : '',
+      },
     };
   }
 
   // v1 (or unversioned): migrate dismissedTips → mutedTipIds, init issuedTips.
-  const migrated: TipStateV2 = {
-    schemaVersion: CURRENT_SCHEMA_VERSION,
-    issuedTips: [],
-    mutedTipIds: Array.isArray(obj.dismissedTips)
-      ? (obj.dismissedTips.filter((s): s is string => typeof s === 'string') as string[])
-      : [],
-    tipsEnabled: typeof obj.tipsEnabled === 'boolean' ? obj.tipsEnabled : true,
-    lastTipShownDate: typeof obj.lastTipShownDate === 'string' ? obj.lastTipShownDate : '',
+  return {
+    state: {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      issuedTips: [],
+      mutedTipIds: Array.isArray(obj.dismissedTips)
+        ? (obj.dismissedTips.filter((s): s is string => typeof s === 'string') as string[])
+        : [],
+      tipsEnabled: typeof obj.tipsEnabled === 'boolean' ? obj.tipsEnabled : true,
+      lastTipShownDate: typeof obj.lastTipShownDate === 'string' ? obj.lastTipShownDate : '',
+    },
+    // Persist v2 immediately so the next session reads v2.
+    persist: true,
   };
-  // Persist v2 immediately so the next session reads v2.
-  saveState(memberId, migrated);
-  return migrated;
-}
-
-/** Persist the v2 shape WITH a `dismissedTips` mirror for downgrade safety.
- *  Throws are caught + warned + reported (severity 'warning', no toast — writes
- *  happen on background issuance ticks, not user actions). */
-function saveState(memberId: string, state: TipStateV2): void {
-  try {
-    const persisted = {
-      ...state,
-      // Mirror — an older app version reading this still sees the muted set.
-      dismissedTips: state.mutedTipIds,
-    };
-    localStorage.setItem(storageKey(memberId), JSON.stringify(persisted));
-  } catch (err) {
-    console.warn('[useBeanTips] localStorage write failed', err);
-    reportError({
-      surface: 'bean-tips-save',
-      message: 'localStorage write failed for bean-tips',
-      error: err,
-      severity: 'warning',
-    });
-  }
 }
 
 // ── Module state (single source of truth per session) ────────────────────────
 
-const state = ref<TipStateV2>(emptyState());
-let currentMemberId = '';
+/** Persisted shape carries a `dismissedTips` mirror for downgrade safety — an
+ *  older app version reading this still sees the muted set. */
+const store = createPerMemberStore<TipStateV2, TipStateV2 & { dismissedTips: string[] }>({
+  prefix: 'bean-tips',
+  label: 'useBeanTips',
+  saveSurface: 'bean-tips-save',
+  saveMessage: 'localStorage write failed for bean-tips',
+  empty: emptyState,
+  fromParsed,
+  toPersisted: (s) => ({ ...s, dismissedTips: s.mutedTipIds }),
+  persistOnCorrupt: true,
+});
+
+const state = store.state;
 
 // ── Composable ───────────────────────────────────────────────────────────────
 
@@ -203,16 +172,7 @@ export function useBeanTips() {
   // Reload state when member changes — the module-level ref is atomically
   // swapped so any later call (issuance, mute, presentation) reads the new
   // member's state.
-  watch(
-    () => familyStore.currentMemberId,
-    (id) => {
-      if (id && id !== currentMemberId) {
-        currentMemberId = id;
-        state.value = loadState(id);
-      }
-    },
-    { immediate: true }
-  );
+  store.useMemberSync();
 
   const tipContext = computed<TipContext>(() => ({
     transactionCount: transactionsStore.transactions.length,
@@ -229,7 +189,7 @@ export function useBeanTips() {
   function ensureTodayTipIssued(): void {
     try {
       if (!state.value.tipsEnabled) return;
-      if (!currentMemberId) return;
+      if (!store.memberId()) return;
       if (!settingsStore.onboardingCompleted) return;
       if (state.value.lastTipShownDate === today.value) return;
 
@@ -254,7 +214,7 @@ export function useBeanTips() {
           : state.value.issuedTips,
       };
       state.value = next;
-      saveState(currentMemberId, next);
+      store.save(next);
     } catch (err) {
       // A bad tip `condition` callback should never break the notifications
       // daemon — caught here, reported, daemon stays clean.
@@ -270,12 +230,12 @@ export function useBeanTips() {
   /** Mute future tips. Existing `issuedTips` are preserved (history stays in
    *  the bell). User-initiated — persistence failures surface a toast. */
   function muteAllTips(): void {
-    if (!currentMemberId) return;
+    if (!store.memberId()) return;
     const prev = state.value;
     try {
       const next: TipStateV2 = { ...prev, tipsEnabled: false };
       state.value = next;
-      saveState(currentMemberId, next);
+      store.save(next);
     } catch (err) {
       // saveState catches its own throws — but belt-and-braces in case the
       // ref assignment or shape build throws (it shouldn't).
@@ -289,12 +249,12 @@ export function useBeanTips() {
 
   /** Re-enable tip issuance. User-initiated — persistence failures surface a toast. */
   function enableTips(): void {
-    if (!currentMemberId) return;
+    if (!store.memberId()) return;
     const prev = state.value;
     try {
       const next: TipStateV2 = { ...prev, tipsEnabled: true };
       state.value = next;
-      saveState(currentMemberId, next);
+      store.save(next);
     } catch (err) {
       state.value = prev;
       showToast('error', "Couldn't enable tips", err instanceof Error ? err.message : String(err), {
