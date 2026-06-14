@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Security
 
 - **Signing out now reliably throws away any Google token still mid-flight.** Closed a rare timing window where a sign-in or token-refresh that was still completing in the background when you signed out could write that "zombie" credential back into the just-cleared (or next) session. A session-epoch guard now discards — and best-effort revokes — any Google token that resolves after sign-out, on every acquisition path, so a signed-out (or different) account never inherits a prior session's token. No change to normal sign-in.
+- **Closed the last few timing sub-windows in that same sign-out path.** A follow-up hardening pass routes every token commit through one guarded checkpoint that re-checks right after writing to storage, and applies the same guard to the encrypted family-file copy of the token — so a credential can't linger on disk or sync to your other devices after you've signed out.
 
 ### Added
 
@@ -24,6 +25,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Asking for an invite now points to Discord first.** On the invite-only gate, the primary "request an invite" action is now joining the Discord community and asking there — no email required. Leaving your email for a personal reply is still available as a secondary option, now with a clear note that your email only ever goes to the beanies team. (We also added private analytics to see how many people start creating a family vs. ask for an invite at the gate.)
 - **Tightened the beanies AI privacy line in Settings to match what's shipped.** The managed-tier note now reads "encrypted in transit, data-minimized, and nothing is retained" — dropping the "your beanies never hold the key" clause, which describes the not-yet-shipped end-to-end-to-enclave encryption. The wording is now consistent with the Help Center and accurate today (en, beanie, and zh).
 - **Internal: consolidated the notification-nudge plumbing (no user-facing change).** The three bell nudges (install, community/Discord, daily tips) now share one per-member storage helper and one card layout instead of three near-identical copies, so they behave identically and are easier to maintain.
+- **Renamed the sidebar "Community on Discord" item to "Discord Beanies."**
+
+### Fixed
+
+- **Muting tips or updating a community prompt now tells you if it couldn't be saved.** If your device can't write the change (for example, private-browsing mode or full storage), beanies now shows an error and keeps the previous state, instead of looking like it saved when it didn't.
+- **Screen-reader labels on the month calendar now match your language.** The spoken category name for a calendar activity (e.g. in Chinese or beanie mode) was still announced in English; it now matches every other screen.
 
 ## 2026-06-13
 
