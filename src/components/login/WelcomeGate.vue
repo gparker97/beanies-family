@@ -19,6 +19,18 @@ const emit = defineEmits<{
 }>();
 
 /**
+ * Top of the create→invite funnel: record every "plant a new pod" click so we
+ * can compare it against `invite_request_click` at the invite gate and see how
+ * many start the create flow but bail at the invite-only friction. Fired here
+ * (the actual button) rather than in LoginPage's navigate handler, which is also
+ * reached by non-button redirect paths.
+ */
+function onCreatePod() {
+  window.plausible?.('create_pod_click');
+  emit('navigate', 'create');
+}
+
+/**
  * Split the prompt ("where would you like to begin?") around the accent word
  * ("begin") so the brand gradient can be applied to that single word without
  * putting HTML into the translation value. See `splitAroundAccent` for the
@@ -68,7 +80,7 @@ function promptParts() {
       testid="create-pod-button"
       :aria-label="t('loginV6.createTitle')"
       class="from-primary-500 to-terracotta-400 relative overflow-hidden rounded-3xl bg-gradient-to-br p-6 shadow-lg hover:shadow-xl"
-      @click="emit('navigate', 'create')"
+      @click="onCreatePod"
     >
       <!-- Soft radial highlight in the upper-right; adds depth to the gradient. -->
       <span

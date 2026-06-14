@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-14",
-    "translationCount": 3224
+    "translationCount": 3232
   },
   "translations": {
     "app.name": {
@@ -5777,9 +5777,9 @@
       "lastUpdated": "2026-03-07"
     },
     "inviteGate.requestDescription": {
-      "translation": "请介绍一下您自己，我们会尽快回复您。",
-      "hash": "c309b2",
-      "lastUpdated": "2026-03-07"
+      "translation": "不在Discord上？留下您的详细信息，我们会在名额开放时向您发送令牌。",
+      "hash": "8e54pw",
+      "lastUpdated": "2026-06-14"
     },
     "inviteGate.nameLabel": {
       "translation": "姓名",
@@ -16124,6 +16124,46 @@
     "planner.category.other_activity": {
       "translation": "其他项目",
       "hash": "syms2p",
+      "lastUpdated": "2026-06-14"
+    },
+    "inviteGate.notInvitedYet": {
+      "translation": "暂无邀请",
+      "hash": "tyq09",
+      "lastUpdated": "2026-06-14"
+    },
+    "inviteGate.requestOnDiscord": {
+      "translation": "在Discord上请求邀请",
+      "hash": "405hal",
+      "lastUpdated": "2026-06-14"
+    },
+    "inviteGate.discordHint": {
+      "translation": "加入社区，并在那里提问。无需发送电子邮件。",
+      "hash": "lciw5c",
+      "lastUpdated": "2026-06-14"
+    },
+    "inviteGate.noDiscord": {
+      "translation": "不使用Discord ？",
+      "hash": "p8pi2k",
+      "lastUpdated": "2026-06-14"
+    },
+    "inviteGate.sendMessage": {
+      "translation": "给我们发送消息",
+      "hash": "8vt872",
+      "lastUpdated": "2026-06-14"
+    },
+    "inviteGate.askOnDiscordInstead": {
+      "translation": "改为在Discord上提问",
+      "hash": "he3xm4",
+      "lastUpdated": "2026-06-14"
+    },
+    "inviteGate.privacyNote": {
+      "translation": "您的电子邮件仅发送给Beanies团队，以发送您的邀请。没有公开信息，也没有存储在应用中。",
+      "hash": "o3xz6n",
+      "lastUpdated": "2026-06-14"
+    },
+    "inviteGate.confirmedJoinDiscord": {
+      "translation": "加入Discord",
+      "hash": "flniiv",
       "lastUpdated": "2026-06-14"
     }
   }
