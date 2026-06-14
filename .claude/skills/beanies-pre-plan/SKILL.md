@@ -63,7 +63,7 @@ This table is the ONE authoritative definition of the intake fields. The copy/pa
 - `Device Type` / `View` are carried into the Surfaces lines **verbatim** (lossless); `Priority` is vocab-mapped to the canonical scale (binding block) so `beanies-plan` labeling is direct.
 - Several Notion fields concatenate into one canonical field (e.g. References = `References / Supporting Materials` + `Dependencies / Related Issues`). Drop any sub-part that is empty/`n/a`.
 
-Notion-only properties (workflow/meta state — NOT intake intent, NOT in the template) live in the binding block below: **Status**, **beanies-plan prompt** (immediate write-back target), **plan file url** (deferred write-back target), **github issue** (passthrough). The `ID`, `Assignee`, `Raised By`, and `Date` properties are read-only metadata the skill ignores (except `ID`, usable to reference the issue back to the user).
+Notion-only properties (workflow/meta state — NOT intake intent, NOT in the template) live in the binding block below: **Status**, **beanies-plan prompt** (immediate write-back target), **plan file url** (deferred write-back target), **github issue** (passthrough), **Feature gated?** (passthrough — the build-behind-a-feature-gate preference). The `ID`, `Assignee`, `Raised By`, and `Date` properties are read-only metadata the skill ignores (except `ID`, usable to reference the issue back to the user).
 
 ---
 
@@ -139,6 +139,9 @@ A flat, linear sequence of guarded steps. Each step has one job and one explicit
    - Append one directive line derived from the Notion `github issue` select (PASTE mode: omit unless the user stated a preference):
      - `create github issue` → `GitHub issue: CREATE — beanies-plan should open a GitHub issue per CLAUDE.md labeling.`
      - `do not create github issue` → `GitHub issue: SKIP — do not create a GitHub issue.`
+   - Append one directive line derived from the Notion `Feature gated?` select (gating is **by request only** — an empty value is the No-gate default; PASTE mode: omit unless the user stated a preference):
+     - `Yes - behind feature gate in settings` → `Feature gate: YES — build the feature behind a dev feature flag registered in src/config/flagRegistry.ts (+ committed prod state in src/config/featureFlags.committed.ts) so it appears and is toggleable in Settings → Feature Flags.`
+     - `No feature gate` (or empty) → `Feature gate: NO — ship ungated (the default; never add a gate that wasn't requested).`
    - **NOTION write-back (at handoff — the immediate writes, per the binding block):** on the captured row, `API-patch-page` to set **`beanies-plan prompt`** = the assembled block (rich_text) and **`Status`** = the _advance-to_ value (`In Progress`). Handle: **patch failed** → surface the error plus the exact text + target Status so the user can set them manually; **row id lost** → tell the user the prompt wasn't written back and give them the assembled block to paste. Never block the hand-off on the write-back. (The `plan file url` is NOT written here — it doesn't exist yet; see step 7.)
    - **Retain the captured row id** for the deferred step 7 write-back.
    - **STOP and request explicit approval — never auto-launch `beanies-plan`.** After the write-back, show the user the assembled block and confirm (NOTION mode) that the row was advanced to `In Progress` with the prompt + any backfilled columns written back. Then ask plainly, e.g.: _"Requirements are captured and written back to Notion #<ID>. Do you want to proceed to create the plan via `/beanies-plan`?"_ **Wait for the user's explicit go-ahead.** Only on an explicit yes do you invoke `/beanies-plan` in-thread with the assembled block as its Phase 1 prompt (`beanies-plan` captures it verbatim). If the user says no, defers, or wants changes, iterate on the intake (re-running step 5 as needed) — never proceed to planning without approval. When you do hand off, mention that the `plan file url` will be written back once `beanies-plan` saves the plan (step 7).
@@ -183,6 +186,11 @@ Write-back — three phases:
 github issue (select) → passthrough directive to beanies-plan:
   "create github issue"        → CREATE (beanies-plan opens the issue, CLAUDE.md labeling)
   "do not create github issue" → SKIP
+Feature gated? (select) → passthrough directive to beanies-plan (gating is BY REQUEST ONLY):
+  "Yes - behind feature gate in settings" → GATE (build behind a DevFlag registered in
+                                            src/config/flagRegistry.ts + featureFlags.committed.ts;
+                                            it then appears + is toggleable in Settings → Feature Flags)
+  "No feature gate" / empty               → NO GATE (ship ungated — the default)
 ```
 
 **Vocab maps** (Notion value → canonical, one-way — the skill never writes these back):
@@ -201,6 +209,7 @@ Device Type / View: carried verbatim into the Surfaces line (no remap)
 | beanies-plan prompt | rich_text                                 | immediate write-back target — the assembled block    |
 | plan file url       | url                                       | deferred write-back target — GitHub URL of the saved plan (step 7) |
 | github issue        | select (create / do not create)           | read → passthrough directive to beanies-plan         |
+| Feature gated?      | select (Yes - behind feature gate in settings / No feature gate) | read → passthrough directive to beanies-plan (empty = no gate, the default) |
 | ID                  | unique_id                                 | read-only — use to reference the issue to the user   |
 | Assignee / Raised By / Date | select / multi-select / date      | read-only metadata — ignored                         |
 
@@ -219,6 +228,7 @@ Device Type / View: carried verbatim into the Surfaces line (no remap)
 - **Respect the `n/a` vs `TBC` distinction.** `n/a`/blank = deliberately not provided → leave as `—` (Optionals only). `TBC`/`TBD`/"to be confirmed" = MUST be resolved (research and/or ask), written back into the Notion column (pre-assembly write-back), and reflected in the prompt — never carried through as a placeholder and never treated as empty.
 - **Never auto-chain into `beanies-plan`.** After the prompt is written back to Notion, STOP and get the user's explicit approval before invoking `/beanies-plan`. No silent or automatic hand-off; if the user hasn't said yes, the skill ends after the write-back.
 - **Don't restate baked-in constraints.** DRY, no-silent-failures, MVO, rem-based text, i18n are already enforced by `beanies-plan` Pass 2/3 and `CLAUDE.md`. Only NON-default constraints belong in the Notes / Edge-cases fields.
+- **Feature gating is by request only — the `Feature gated?` select IS the request.** `Yes - behind feature gate in settings` → the assembled prompt directs `beanies-plan` to build the feature behind a DevFlag registered in `src/config/flagRegistry.ts` (+ committed state in `featureFlags.committed.ts`), so it surfaces and is toggleable in Settings → Feature Flags. `No feature gate` or empty → ship ungated (the default). Never infer or add a gate that wasn't selected, and never gate via the env-capability `features.ts` checks (that is not the Settings feature-flags system). This passthrough is a delivery preference, not problem-side intent, so it lives in the binding block — not the Canonical Field Table.
 - **Write-back has three phases.** (1) Pre-assembly: any `TBC`/incomplete intake column resolved in step 5 is written back into its own Notion property before the prompt is assembled. (2) At hand-off: the assembled prompt + `Status = In Progress` are written back, THEN the user is asked for approval to proceed to planning. (3) Deferred to step 7: `plan file url`, only after `beanies-plan` actually saves a plan file, never for an abandoned plan. Surface any patch failure with the exact values so the user can apply them manually.
 - **Keep the issue DB separate from launch content.** This is product/issue tracking — distinct from "Post Tracker" and all launch/marketing material (Notion only, per `CLAUDE.md`).
 - **Cite real files, not symlinks.** Reference `start-session` (not the `good-morning` symlink) for the MCP-availability pattern.
