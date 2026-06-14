@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-06-14
 
+### Security
+
+- **Signing out now reliably throws away any Google token still mid-flight.** Closed a rare timing window where a sign-in or token-refresh that was still completing in the background when you signed out could write that "zombie" credential back into the just-cleared (or next) session. A session-epoch guard now discards — and best-effort revokes — any Google token that resolves after sign-out, on every acquisition path, so a signed-out (or different) account never inherits a prior session's token. No change to normal sign-in.
+
 ### Added
 
 - **A much richer set of activity categories.** "Entertainment" is now **Fun** — and it covers more of family life: beach, pool/swim, playground, zoo/aquarium, bowling, and arcade. Four new groups join the planner: **Work** (work dinner, work drinks, team building, conference, office party, networking), **Pets** (vet, grooming), **Social** (date night, playdate, family visit), and **Religious** (worship/service, religious class). Plus basketball, chess, coding/robotics, singing/voice, drama, graduation, baby shower, anniversary, therapy, and swimming/track/gymnastics competitions. The photo/document AI can auto-assign all of them, and any activity with a cost still maps to the right expense category. Every category and group name is now translated for Chinese (previously category names always showed in English).

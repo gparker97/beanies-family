@@ -1581,6 +1581,118 @@ describe('googleAuth (PKCE)', () => {
       expect(googleAuth.getGoogleAccountEmail()).toBe('test@example.com');
     });
   });
+
+  describe('session-epoch guard (post-sign-out zombie tokens)', () => {
+    const CLIENT = 'cid.apps.googleusercontent.com';
+
+    beforeEach(() => {
+      // isSessionStillCurrent fires a best-effort revoke fetch; mock it so the
+      // discard path doesn't hit the network.
+      globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+    });
+
+    it('completeRedirectAuth: a sign-out mid-exchange discards the token (no commit, no notify)', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', CLIENT);
+      const acquired = vi.fn();
+      googleAuth.onTokenAcquired(acquired);
+
+      const { exchangeCodeForTokens } = await import('../oauthProxy');
+      // Simulate the user signing out WHILE the code exchange is in flight.
+      (exchangeCodeForTokens as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => {
+        await googleAuth.clearGoogleSessionState();
+        return {
+          access_token: 'late-token',
+          refresh_token: 'late-refresh',
+          expires_in: 3600,
+          token_type: 'Bearer',
+          scope: 'drive.file userinfo.email',
+        };
+      });
+      sessionStorage.setItem('beanies_redirect_auth_code', 'code-123');
+      sessionStorage.setItem(
+        'beanies_redirect_auth',
+        JSON.stringify({ codeVerifier: 'v', returnPath: '/welcome' })
+      );
+
+      const result = await googleAuth.completeRedirectAuth();
+
+      expect(result).toBeNull();
+      expect(googleAuth.getAccessToken()).toBeNull();
+      expect(acquired).not.toHaveBeenCalled();
+      const { logEvent } = await import('@/services/telemetry');
+      expect(vi.mocked(logEvent)).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'auth-epoch-discard' })
+      );
+      vi.unstubAllEnvs();
+    });
+
+    it('completeRedirectAuth: no teardown → token commits as today', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', CLIENT);
+      globalThis.fetch = vi
+        .fn()
+        .mockResolvedValue({ ok: true, json: async () => ({ email: 'a@b.com' }) });
+      sessionStorage.setItem('beanies_redirect_auth_code', 'code-456');
+      sessionStorage.setItem(
+        'beanies_redirect_auth',
+        JSON.stringify({ codeVerifier: 'v', returnPath: '/welcome' })
+      );
+
+      const result = await googleAuth.completeRedirectAuth();
+
+      expect(result).toBe('mock-access-token');
+      expect(googleAuth.getAccessToken()).toBe('mock-access-token');
+      vi.unstubAllEnvs();
+    });
+
+    it('attemptSilentRefresh: a sign-out mid-refresh discards the token', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', CLIENT);
+      const acquired = vi.fn();
+      googleAuth.onTokenAcquired(acquired);
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
+      await googleAuth.initializeAuth('family-123');
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+      (refreshAccessToken as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => {
+        await googleAuth.clearGoogleSessionState();
+        return { access_token: 'late', expires_in: 3600, token_type: 'Bearer' };
+      });
+
+      const result = await googleAuth.attemptSilentRefresh();
+
+      expect(result).toBeNull();
+      expect(googleAuth.getAccessToken()).toBeNull();
+      expect(acquired).not.toHaveBeenCalled();
+      vi.unstubAllEnvs();
+    });
+
+    it('clearGoogleSessionState clears the redirect-intent sessionStorage keys', async () => {
+      sessionStorage.setItem('beanies_redirect_auth_code', 'code-x');
+      sessionStorage.setItem('beanies_redirect_auth', '{"codeVerifier":"v"}');
+      await googleAuth.clearGoogleSessionState();
+      expect(sessionStorage.getItem('beanies_redirect_auth_code')).toBeNull();
+      expect(sessionStorage.getItem('beanies_redirect_auth')).toBeNull();
+    });
+
+    it('notifyTokenAcquired backstop: a stale expectedEpoch logs an error and fires no subscriber', async () => {
+      const acquired = vi.fn();
+      googleAuth.onTokenAcquired(acquired);
+      // A stale expectedEpoch models a future seam committing without its guard.
+      await googleAuth.__notifyTokenAcquiredForTesting(
+        'leaked',
+        false,
+        googleAuth.getSessionEpoch() + 1
+      );
+      expect(acquired).not.toHaveBeenCalled();
+      const { logEvent } = await import('@/services/telemetry');
+      expect(vi.mocked(logEvent)).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'auth-epoch-leak', level: 'error' })
+      );
+    });
+  });
 });
 
 describe('isUserCancellation', () => {
