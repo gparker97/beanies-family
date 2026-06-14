@@ -4,7 +4,6 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import DiscordGlyph from '@/components/ui/DiscordGlyph.vue';
-import { features } from '@/config/features';
 import { useTranslation } from '@/composables/useTranslation';
 import { validateInviteToken } from '@/utils/inviteToken';
 import { isValidEmail } from '@/utils/email';
@@ -171,11 +170,11 @@ async function handleRequest() {
           {{ t('inviteGate.unlock') }}
         </BaseButton>
 
-        <!-- No-token path. Discord is the primary "request an invite" CTA (no
-             email needed) — always shown, since the Discord redirect resolves
-             via MARKETING_URL's built-in fallback and needs no env var. The
-             Slack message form is the secondary fallback (gated on its webhook).
-             -->
+        <!-- No-token path (always shown, faithful to the mockup). Discord is the
+             primary "request an invite" CTA (no email needed); "send us a
+             message" is the secondary email/Slack fallback. The actual Slack
+             POST guards a missing webhook at submit time (handleRequest), so the
+             link is never hidden behind an env var. -->
         <div
           class="font-outfit mt-5 mb-3 flex items-center gap-3 text-xs font-semibold tracking-wide text-gray-400 dark:text-gray-500"
         >
@@ -199,10 +198,7 @@ async function handleRequest() {
           {{ t('inviteGate.discordHint') }}
         </p>
 
-        <p
-          v-if="features.slackInvite"
-          class="mt-3 text-center text-sm text-gray-400 dark:text-gray-500"
-        >
+        <p class="mt-3 text-center text-sm text-gray-400 dark:text-gray-500">
           {{ t('inviteGate.noDiscord') }}
           <button
             class="text-primary-500 hover:text-primary-600 font-medium"
@@ -214,7 +210,7 @@ async function handleRequest() {
       </template>
 
       <!-- Request mode -->
-      <template v-else-if="mode === 'request' && features.slackInvite">
+      <template v-else-if="mode === 'request'">
         <h2 class="font-outfit mb-1 text-xl font-bold text-gray-900 dark:text-gray-100">
           {{ t('inviteGate.requestTitle') }}
         </h2>
@@ -303,12 +299,7 @@ async function handleRequest() {
             </span>
             {{ t('inviteGate.confirmedJoinDiscord') }}
           </button>
-          <BaseButton
-            v-if="features.marketingUrl"
-            variant="secondary"
-            class="w-full"
-            @click="goToMarketingHome"
-          >
+          <BaseButton variant="secondary" class="w-full" @click="goToMarketingHome">
             {{ t('inviteGate.backToHome') }}
           </BaseButton>
         </div>
