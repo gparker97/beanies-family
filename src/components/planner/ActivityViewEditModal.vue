@@ -15,7 +15,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { getCurrencyInfo } from '@/constants/currencies';
-import { getActivityCategoryName } from '@/constants/activityCategories';
+import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
 import { formatActivityRecurrence } from '@/utils/format';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import CreatedMeta from '@/components/common/CreatedMeta.vue';
@@ -68,7 +68,8 @@ const emit = defineEmits<{
   'activity-swapped': [newId: string];
 }>();
 
-const { t, isBeanieMode } = useTranslation();
+const { t } = useTranslation();
+const { categoryLabel } = useActivityCategoryLabel();
 const router = useRouter();
 const { playWhoosh } = useSounds();
 const activityStore = useActivityStore();
@@ -759,11 +760,7 @@ async function confirmReschedule() {
           :style="{ background: activityColor }"
         >
           {{ activity.icon }}
-          {{
-            isBeanieMode
-              ? getActivityCategoryName(activity.category).toLowerCase()
-              : getActivityCategoryName(activity.category)
-          }}
+          {{ categoryLabel(activity.category) }}
         </span>
         <span
           class="font-outfit inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
