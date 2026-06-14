@@ -22,7 +22,9 @@ import {
   primeRefreshToken,
   attemptSilentRefresh,
   isTokenValid,
+  getSessionEpoch,
 } from './googleAuth';
+import { logEvent } from '@/services/telemetry';
 import {
   getGoogleRefreshToken,
   storeGoogleRefreshToken,
@@ -142,8 +144,27 @@ export function __resetMirrorRegistrationForTesting(): void {
  * Restore the local primary copy from a doc token + prime in-memory so the next
  * silent refresh uses it. The single "adopt the doc token" step, shared by B3
  * and B5 so the persist/prime ordering can never drift between the two paths.
+ *
+ * Session-epoch guard: the caller captures `getSessionEpoch()` BEFORE its async
+ * doc read and passes it here. If a sign-out advanced the epoch in between, skip
+ * BOTH the local IDB store AND the in-memory prime — otherwise a token for a
+ * torn-down session would be written to disk (a cold-start zombie) as well as
+ * memory. See docs/plans/2026-06-14-session-epoch-guard-google-token.md.
  */
-async function restoreLocalFromDoc(familyId: string, docTok: StoredRefreshToken): Promise<void> {
+async function restoreLocalFromDoc(
+  familyId: string,
+  docTok: StoredRefreshToken,
+  expectedEpoch: number
+): Promise<void> {
+  if (expectedEpoch !== getSessionEpoch()) {
+    logEvent({
+      level: 'info',
+      surface: 'auth-epoch-discard',
+      message:
+        'skipped adopting the beanpod Drive token — signed out during recovery (epoch advanced)',
+    });
+    return;
+  }
   await storeGoogleRefreshToken(familyId, docTok.token, { issuedAt: docTok.issuedAt });
   primeRefreshToken(familyId, docTok);
 }
@@ -169,6 +190,9 @@ export async function reconcileDriveTokenWithDoc(
     const familyId = getActiveFamilyId();
     if (!familyId) return;
 
+    // Snapshot before the async reads so a sign-out mid-read skips the adopt.
+    const epochAtStart = getSessionEpoch();
+
     const [docTok, localTok] = await Promise.all([
       readDriveTokenFromDoc(boundEmail),
       getGoogleRefreshToken(familyId),
@@ -178,7 +202,7 @@ export async function reconcileDriveTokenWithDoc(
     if (docTok && localTok && docTok.token === localTok.token) return;
 
     if (docTok && (!localTok || isStrictlyNewer(docTok, localTok))) {
-      await restoreLocalFromDoc(familyId, docTok);
+      await restoreLocalFromDoc(familyId, docTok, epochAtStart);
     } else if (localTok && (!docTok || isStrictlyNewer(localTok, docTok))) {
       await upsertDriveConnection({
         provider: 'google',
@@ -218,6 +242,9 @@ export async function tryReconnectSilently(
     const familyId = getActiveFamilyId();
     if (!familyId) return false;
 
+    // Snapshot before any async read so a sign-out mid-reconnect skips the adopt.
+    const epochAtStart = getSessionEpoch();
+
     // 1. Try the EXISTING local token first. attemptSilentRefresh recovers it
     //    from the store when in-memory is empty; this path never overwrites a
     //    good local credential with the doc copy.
@@ -233,7 +260,7 @@ export async function tryReconnectSilently(
     const docTok = await readDriveTokenFromDoc(boundEmail);
     if (!docTok?.token) return false;
     if (local?.token === docTok.token) return false; // same token already failed
-    await restoreLocalFromDoc(familyId, docTok);
+    await restoreLocalFromDoc(familyId, docTok, epochAtStart);
     return (await attemptSilentRefresh()) !== null;
   } catch (error) {
     reportError({

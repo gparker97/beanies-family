@@ -11,12 +11,18 @@ import type { StoredRefreshToken } from '@/services/sync/fileHandleStore';
 const primeRefreshToken = vi.fn();
 const attemptSilentRefresh = vi.fn<() => Promise<string | null>>();
 let tokenValid = false;
+// Controllable session epoch — bump mid-flight to simulate a sign-out between the
+// async doc read and the adopt (the session-epoch guard).
+let mockSessionEpoch = 0;
 vi.mock('@/services/google/googleAuth', () => ({
   onTokenAcquired: () => () => {},
   primeRefreshToken: (...a: unknown[]) => primeRefreshToken(...a),
   attemptSilentRefresh: () => attemptSilentRefresh(),
   isTokenValid: () => tokenValid,
+  getSessionEpoch: () => mockSessionEpoch,
 }));
+const logEvent = vi.fn();
+vi.mock('@/services/telemetry', () => ({ logEvent: (...a: unknown[]) => logEvent(...a) }));
 
 const storeGoogleRefreshToken = vi
   .fn<(...a: unknown[]) => Promise<void>>()
@@ -46,8 +52,10 @@ beforeEach(() => {
   primeRefreshToken.mockClear();
   attemptSilentRefresh.mockReset();
   storeGoogleRefreshToken.mockClear();
+  logEvent.mockClear();
   localToken = null;
   tokenValid = false;
+  mockSessionEpoch = 0;
 });
 
 async function seedDoc(accountEmail: string, refreshToken: string, issuedAt: number | null) {
@@ -213,5 +221,24 @@ describe('tryReconnectSilently', () => {
     expect(await tryReconnectSilently('greg@example.com')).toBe(false);
     // Step 1 tried it once; step 2 short-circuits because the doc token is identical.
     expect(attemptSilentRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('session-epoch advances mid-reconnect (sign-out) → does NOT adopt the doc token', async () => {
+    localToken = { token: 'dead-local', issuedAt: 1000 };
+    await seedDoc('greg@example.com', 'doc-tok', 2000);
+    // The first silent-refresh (local) fails AND simulates a sign-out by bumping
+    // the session epoch — so when restoreLocalFromDoc checks, the snapshot is stale.
+    attemptSilentRefresh.mockImplementation(async () => {
+      mockSessionEpoch = 1;
+      return null;
+    });
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(false);
+    // The doc token must NOT have been written to local IDB or primed in memory.
+    expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
+    expect(primeRefreshToken).not.toHaveBeenCalled();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'auth-epoch-discard' })
+    );
   });
 });
