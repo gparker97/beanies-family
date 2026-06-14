@@ -2,7 +2,7 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-12",
+    "lastUpdated": "2026-06-14",
     "translationCount": 3163
   },
   "translations": {
@@ -15047,9 +15047,9 @@
       "lastUpdated": "2026-06-04"
     },
     "settings.ai.privacy.managed": {
-      "translation": "您的文档在经过认证的机密计算飞地中处理。仅发送必要数据，不会保留任何内容，您的 beanies 永远不会持有密钥。",
-      "hash": "l4wuh1",
-      "lastUpdated": "2026-06-04"
+      "translation": "您的文档在经过认证的机密计算飞地中处理。它在传输过程中被加密，数据最小化，并且不会保留任何内容。",
+      "hash": "gvraka",
+      "lastUpdated": "2026-06-14"
     },
     "settings.ai.privacy.byok": {
       "translation": "使用您自己的提供商密钥。文档直接从您的设备发送到您的提供商，因此 beanies 永远不会看到您的密钥或文档。",
