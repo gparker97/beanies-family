@@ -7,7 +7,7 @@ import {
   ACTIVITY_GROUP_EMOJI_MAP,
   ACTIVITY_EMOJI_MAP,
 } from '@/constants/activityCategories';
-import { useTranslation } from '@/composables/useTranslation';
+import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
 
 defineProps<{
   modelValue: string;
@@ -17,15 +17,15 @@ const emit = defineEmits<{
   'update:modelValue': [value: string];
 }>();
 
-const { isBeanieMode } = useTranslation();
+const { categoryLabel, groupLabel } = useActivityCategoryLabel();
 
 const groups = computed<ChipGroup[]>(() =>
   getActivityCategoriesGrouped().map((g) => ({
-    name: isBeanieMode.value ? g.name.toLowerCase() : g.name,
+    name: groupLabel(g.name),
     icon: ACTIVITY_GROUP_EMOJI_MAP[g.name] || '📌',
     items: g.categories.map((cat) => ({
       value: cat.id,
-      label: isBeanieMode.value ? cat.name.toLowerCase() : cat.name,
+      label: categoryLabel(cat.id),
       icon: ACTIVITY_EMOJI_MAP[cat.id] || '📌',
     })),
   }))

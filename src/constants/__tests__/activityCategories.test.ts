@@ -19,7 +19,12 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ACTIVITY_CATEGORIES, ACTIVITY_GROUP_EMOJI_MAP } from '@/constants/activityCategories';
+import {
+  ACTIVITY_CATEGORIES,
+  ACTIVITY_GROUP_EMOJI_MAP,
+  getActivityCategoryName,
+} from '@/constants/activityCategories';
+import { UI_STRINGS } from '@/services/translation/uiStrings';
 
 const PROJECT_ROOT = process.cwd();
 const MODELS_PATH = join(PROJECT_ROOT, 'src', 'types', 'models.ts');
@@ -97,5 +102,34 @@ describe('activity category presentation invariants', () => {
       byGroup.set(cat.group, seen);
     }
     expect(collisions).toEqual([]);
+  });
+});
+
+describe('activity category i18n keys mirror the constant', () => {
+  // Category/group display is resolved via `useActivityCategoryLabel` →
+  // `t('planner.category.<id>')` / `t('planner.group.<slug>')`, whose `en` value
+  // MUST equal the constant name (English is constant-driven; the keys add the
+  // zh layer). A missing/stale key would silently fall back, masking the gap —
+  // so pin it.
+  const en = UI_STRINGS as Record<string, string>;
+
+  it('every category id has a planner.category.<id> key whose en matches the name', () => {
+    const mismatches: string[] = [];
+    for (const cat of ACTIVITY_CATEGORIES) {
+      const got = en[`planner.category.${cat.id}`];
+      const want = getActivityCategoryName(cat.id);
+      if (got !== want) mismatches.push(`${cat.id}: key="${got ?? '(missing)'}" name="${want}"`);
+    }
+    expect(mismatches).toEqual([]);
+  });
+
+  it('every group has a planner.group.<slug> key whose en matches the group name', () => {
+    const groups = [...new Set(ACTIVITY_CATEGORIES.map((c) => c.group))];
+    const mismatches: string[] = [];
+    for (const g of groups) {
+      const got = en[`planner.group.${g.toLowerCase()}`];
+      if (got !== g) mismatches.push(`${g}: key="${got ?? '(missing)'}"`);
+    }
+    expect(mismatches).toEqual([]);
   });
 });

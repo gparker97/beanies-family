@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
-- **A much richer set of activity categories.** "Entertainment" is now **Fun** — and it covers more of family life: beach, pool/swim, playground, zoo/aquarium, bowling, and arcade. Four new groups join the planner: **Work** (work dinner, work drinks, team building, conference, office party, networking), **Pets** (vet, grooming), **Social** (date night, playdate, family visit), and **Religious** (worship/service, religious class). Plus basketball, chess, coding/robotics, singing/voice, drama, graduation, baby shower, anniversary, therapy, and swimming/track/gymnastics competitions. The photo/document AI can auto-assign all of them, and any activity with a cost still maps to the right expense category.
+- **A much richer set of activity categories.** "Entertainment" is now **Fun** — and it covers more of family life: beach, pool/swim, playground, zoo/aquarium, bowling, and arcade. Four new groups join the planner: **Work** (work dinner, work drinks, team building, conference, office party, networking), **Pets** (vet, grooming), **Social** (date night, playdate, family visit), and **Religious** (worship/service, religious class). Plus basketball, chess, coding/robotics, singing/voice, drama, graduation, baby shower, anniversary, therapy, and swimming/track/gymnastics competitions. The photo/document AI can auto-assign all of them, and any activity with a cost still maps to the right expense category. Every category and group name is now translated for Chinese (previously category names always showed in English).
 
 ### Changed
 
