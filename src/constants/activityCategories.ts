@@ -309,12 +309,7 @@ export interface ActivityCategoryGroup {
   categories: ActivityCategoryDef[];
 }
 
-/**
- * Return categories grouped by group name.
- * Groups are alphabetical with "Other" last.
- * Categories within each group are alphabetical with "Other *" items last.
- */
-export function getActivityCategoriesGrouped(): ActivityCategoryGroup[] {
+function buildActivityCategoriesGrouped(): ActivityCategoryGroup[] {
   const groupMap = new Map<string, ActivityCategoryDef[]>();
 
   for (const cat of ACTIVITY_CATEGORIES) {
@@ -341,6 +336,24 @@ export function getActivityCategoriesGrouped(): ActivityCategoryGroup[] {
   });
 
   return entries.map(([name, categories]) => ({ name, categories }));
+}
+
+/**
+ * The grouped+sorted view, derived purely from the immutable ACTIVITY_CATEGORIES, so
+ * it never changes at runtime — computed ONCE at module load (the Map build + the
+ * ~100-id localeCompare sort passes used to re-run on every picker recompute / locale
+ * toggle). Display *labels* (i18n / beanie) are applied separately by
+ * `useActivityCategoryLabel` at render. Treat the returned structure as READ-ONLY.
+ */
+const ACTIVITY_CATEGORIES_GROUPED = buildActivityCategoriesGrouped();
+
+/**
+ * Return categories grouped by group name.
+ * Groups are alphabetical with "Other" last.
+ * Categories within each group are alphabetical with "Other *" items last.
+ */
+export function getActivityCategoriesGrouped(): ActivityCategoryGroup[] {
+  return ACTIVITY_CATEGORIES_GROUPED;
 }
 
 /** Look up the color for a category, falling back to group-based color */

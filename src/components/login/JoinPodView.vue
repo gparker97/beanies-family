@@ -12,6 +12,7 @@ import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFileDrop } from '@/composables/useFileDrop';
 import { useClipboard } from '@/composables/useClipboard';
 import { isTemporaryEmail } from '@/utils/email';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { useJoinFlow, JOIN_ERRORS, type RecoveryAction } from '@/composables/useJoinFlow';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -32,7 +33,9 @@ const { copied: diagCopied, copy: diagCopy } = useClipboard();
 const verifySubtitle = computed(() => {
   if (!flow.targetFamilyId.value) return t('join.verifySubtitle');
   const fam = flow.registryEntry.value?.familyName;
-  return fam ? t('join.verifyInvited').replace('{family}', fam) : t('join.verifyInvitedGeneric');
+  return fam
+    ? fillTemplate(t('join.verifyInvited'), { family: fam })
+    : t('join.verifyInvitedGeneric');
 });
 
 type LoginView = 'create';
@@ -84,13 +87,10 @@ const currentErrorView = computed(() => {
   const err = flow.currentError.value;
   if (!err) return null;
   const meta = JOIN_ERRORS[err.code];
-  let message = t(meta.messageKey);
-  // Interpolate context (used by FILE_READ_FAILED, FILE_FAMILY_MISMATCH, etc.)
-  if (err.context) {
-    for (const [key, value] of Object.entries(err.context)) {
-      message = message.replace(`{${key}}`, String(value ?? ''));
-    }
-  }
+  // Interpolate context (used by FILE_READ_FAILED, FILE_FAMILY_MISMATCH, etc.) via
+  // fillTemplate so account/family-controlled values (e.g. {actualEmail}) insert
+  // literally and can't be mangled by `$`-replacement patterns.
+  const message = err.context ? fillTemplate(t(meta.messageKey), err.context) : t(meta.messageKey);
   return {
     code: err.code,
     severity: meta.severity,

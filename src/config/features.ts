@@ -33,10 +33,13 @@ export const features = {
   oauthProxy: ok(env.VITE_OAUTH_PROXY_URL) || ok(env.VITE_REGISTRY_API_URL),
   registry: ok(env.VITE_REGISTRY_API_URL) && ok(env.VITE_REGISTRY_API_KEY),
   inviteGate: ok(env.VITE_INVITE_BEAN_HASHES),
-  slackInvite: ok(env.VITE_INVITE_WEBHOOK_URL),
+  // NOTE: VITE_INVITE_WEBHOOK_URL and VITE_MARKETING_URL are NOT gated here — they
+  // are read directly at their point of use (InviteGateOverlay's `hasInviteWebhook`;
+  // `utils/marketing.ts`'s MARKETING_URL, which has its own apex fallback). A derived
+  // `features.*` flag for either would be dead, so it isn't added (feature-gate by
+  // request only).
   slackPodCreate: ok(env.VITE_SLACK_WEBHOOK_URL),
   errorReporter: ok(env.VITE_BEANIES_ERROR_WEBHOOK_URL),
-  marketingUrl: ok(env.VITE_MARKETING_URL),
   analytics: ok(env.VITE_PLAUSIBLE_DOMAIN),
   translationApiUpgrade: ok(env.VITE_MYMEMORY_EMAIL),
 } as const;
@@ -104,8 +107,8 @@ export function canInviteFamily(): boolean {
 
 // Discriminator for the "developer build" badge: only the two features that
 // require real infrastructure to wire up. Slack webhooks, error reporter,
-// invite gate, marketing URL, analytics, and translation upgrade are all
-// optional even on greg's local dev — they don't downgrade the badge.
+// invite gate, analytics, and translation upgrade are all optional even on
+// greg's local dev — they don't downgrade the badge.
 const ESSENTIAL: FeatureKey[] = ['drive', 'registry'];
 
 export type DeploymentMode = 'cloud' | 'self-host-full' | 'self-host-limited';

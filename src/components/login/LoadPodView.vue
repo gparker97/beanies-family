@@ -20,6 +20,7 @@ import {
 } from '@/services/google/googleAuth';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 import { supportsFileSystemAccess } from '@/services/sync/capabilities';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { LOAD_DRIVE_PATH } from './resumePaths';
 import {
   isPlatformAuthenticatorAvailable,
@@ -500,7 +501,9 @@ const viewState = computed<
 // LoginPage always supplies the picked family's name; `?? ''` is a defensive
 // floor that never triggers in practice.
 const reconnectHeadline = computed(() =>
-  t('loginV6.reconnectToLoad').replace('{familyName}', props.reconnectDriveFile?.familyName ?? '')
+  fillTemplate(t('loginV6.reconnectToLoad'), {
+    familyName: props.reconnectDriveFile?.familyName ?? '',
+  })
 );
 
 const { reconnectError, reconnect } = useGoogleReconnect();
@@ -793,7 +796,7 @@ async function handleDriveRefresh() {
         <h3 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
           {{
             pendingFamilyName
-              ? t('loginV6.unlockTitleWithFamily').replace('{familyName}', pendingFamilyName)
+              ? fillTemplate(t('loginV6.unlockTitleWithFamily'), { familyName: pendingFamilyName })
               : t('loginV6.unlockTitle')
           }}
         </h3>

@@ -13,26 +13,23 @@
  */
 import CelebrationDetail from '@/components/notifications/CelebrationDetail.vue';
 
-withDefaults(
-  defineProps<{
-    message: string;
-    /** Secondary actions rendered as subtle text buttons under the CTA. */
-    actions: { label: string; onClick: () => void }[];
-    medallionSrc?: string;
-  }>(),
-  { medallionSrc: '/brand/beanies_family_hugging_transparent_512x512.png' }
-);
+// Both nudges use the one hugging-beanies medallion — inlined (no caller overrides it).
+const MEDALLION_SRC = '/brand/beanies_family_hugging_transparent_512x512.png';
+
+defineProps<{
+  message: string;
+  /** Secondary actions rendered as subtle text buttons under the CTA. */
+  actions: { label: string; onClick: () => void }[];
+}>();
 
 defineEmits<{ cta: [] }>();
 </script>
 
 <template>
-  <CelebrationDetail date-label="" :medallion-src="medallionSrc">
+  <CelebrationDetail date-label="" :medallion-src="MEDALLION_SRC">
     <template #kick><slot name="kick" /></template>
 
-    <p class="nudge-message">
-      <slot name="message">{{ message }}</slot>
-    </p>
+    <p class="nudge-message">{{ message }}</p>
 
     <button type="button" class="nudge-cta" @click="$emit('cta')">
       <slot name="cta" />

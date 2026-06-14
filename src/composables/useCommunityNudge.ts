@@ -136,18 +136,24 @@ export function useCommunityNudge() {
 
   store.useMemberSync();
 
-  /** Persist `next`, rolling back + toasting on the (rare) failure. */
+  /**
+   * Persist `next` for a USER-INITIATED action, rolling back + toasting on the (rare)
+   * write failure. `store.save` returns `false` on a caught write failure (it never
+   * throws), so we surface it here rather than letting the UI show a phantom success.
+   * The single foreground failure path for this composable — join/snooze/markJoined
+   * all route through it.
+   */
   function commit(next: NudgeState, errTitle: string): void {
     const prev = state.value;
-    try {
-      state.value = next;
-      store.save(next);
-    } catch (err) {
+    state.value = next;
+    if (!store.save(next)) {
       state.value = prev;
-      showToast('error', errTitle, err instanceof Error ? err.message : String(err), {
-        surface: 'community-nudge',
-        error: err,
-      });
+      showToast(
+        'error',
+        errTitle,
+        'Your change could not be saved on this device. Check that storage is available (private mode / low disk can block it) and try again.',
+        { surface: 'community-nudge' }
+      );
     }
   }
 

@@ -82,18 +82,20 @@ describe('readPerMemberRaw', () => {
 });
 
 describe('writePerMemberState', () => {
-  it('persists JSON under the per-member key', () => {
-    writePerMemberState('demo', 'm1', { count: 3 }, 'demoStore', 'demo-save', 'msg');
+  it('persists JSON under the per-member key and returns true', () => {
+    const ok = writePerMemberState('demo', 'm1', { count: 3 }, 'demoStore', 'demo-save', 'msg');
+    expect(ok).toBe(true);
     expect(JSON.parse(localStorage.getItem('demo-m1')!)).toEqual({ count: 3 });
   });
-  it('warns + reportErrors (severity warning) on a write failure', () => {
+  it('warns + reportErrors (severity warning) AND returns false on a write failure', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     // happy-dom's localStorage methods aren't on Storage.prototype — spy on the
     // instance (mirrors the useBeanTips persistence-failure test).
     const setSpy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
       throw new Error('quota');
     });
-    writePerMemberState('demo', 'm1', { count: 3 }, 'demoStore', 'demo-save', 'msg');
+    const ok = writePerMemberState('demo', 'm1', { count: 3 }, 'demoStore', 'demo-save', 'msg');
+    expect(ok).toBe(false);
     expect(warn).toHaveBeenCalled();
     expect(reportError).toHaveBeenCalledWith(
       expect.objectContaining({ surface: 'demo-save', severity: 'warning' })
