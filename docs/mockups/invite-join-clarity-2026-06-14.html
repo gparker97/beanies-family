@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Invite + Join clarity (mockup) · beanies.family</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --orange: #f15d22;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --sky: #aed6f1;
+        --cloud: #f8f9fa;
+        --card: #fff;
+        --muted: rgb(44 62 80 / 58%);
+        --hair: rgb(44 62 80 / 9%);
+        --field-border: rgb(44 62 80 / 14%);
+        --tip-bg: #fff4ec;
+        --tip-border: rgb(241 93 34 / 22%);
+        --info-bg: rgb(174 214 241 / 24%);
+        --page: radial-gradient(120% 90% at 50% -10%, #fff4ec 0%, #f8f9fa 55%, #eef4fa 100%);
+        --join-bg: linear-gradient(160deg, #2c3e50 0%, #34495e 60%, #2c3e50 100%);
+      }
+      .dark {
+        --slate: #e2e8f0;
+        --cloud: #0f172a;
+        --card: #1e293b;
+        --muted: rgb(226 232 240 / 62%);
+        --hair: rgb(226 232 240 / 12%);
+        --field-border: rgb(226 232 240 / 16%);
+        --tip-bg: #2a1d16;
+        --tip-border: rgb(241 93 34 / 34%);
+        --info-bg: rgb(174 214 241 / 10%);
+        --page: radial-gradient(120% 90% at 50% -10%, #2a1d16 0%, #0f172a 55%, #0b1220 100%);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: Inter, sans-serif;
+        color: var(--slate);
+        background: var(--page);
+        -webkit-font-smoothing: antialiased;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.25rem;
+        padding: 2.25rem 1rem 4rem;
+        transition: background 0.4s;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: center;
+        font-family: Outfit, sans-serif;
+      }
+      .toolbar .grp {
+        display: flex;
+        gap: 0.25rem;
+        background: var(--card);
+        border: 1px solid var(--hair);
+        border-radius: 999px;
+        padding: 0.25rem;
+        box-shadow: 0 4px 14px rgb(44 62 80 / 6%);
+      }
+      .toolbar button {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.8rem;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        padding: 0.4rem 0.85rem;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .toolbar button.on {
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        color: #fff;
+      }
+      .demo-note {
+        font-size: 0.78rem;
+        color: var(--muted);
+        max-width: 33rem;
+        text-align: center;
+        line-height: 1.55;
+      }
+      .demo-note .new {
+        color: var(--orange);
+        font-weight: 600;
+      }
+
+      .card {
+        position: relative;
+        width: 100%;
+        max-width: 26rem;
+        background: var(--card);
+        border: 1px solid var(--hair);
+        border-radius: 26px;
+        padding: 1.6rem 1.5rem 1.4rem;
+        box-shadow: 0 22px 55px -20px rgb(44 62 80 / 26%);
+        animation: pop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @keyframes pop {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+      }
+      .mascot {
+        display: block;
+        width: 74px;
+        height: 74px;
+        margin: 0 auto 0.5rem;
+      }
+      h2.title {
+        font-family: Outfit, sans-serif;
+        font-weight: 800;
+        font-size: 1.3rem;
+        text-align: center;
+        margin: 0 0 0.3rem;
+      }
+      .lede {
+        text-align: center;
+        font-size: 0.88rem;
+        line-height: 1.5;
+        color: var(--muted);
+        margin: 0 auto 1.1rem;
+        max-width: 21rem;
+      }
+      label.fld {
+        display: block;
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin: 0 0 0.3rem;
+      }
+      .input {
+        width: 100%;
+        font-family: Inter, sans-serif;
+        font-size: 0.92rem;
+        color: var(--slate);
+        background: transparent;
+        border: 1.5px solid var(--field-border);
+        border-radius: 13px;
+        padding: 0.65rem 0.8rem;
+      }
+      .btn {
+        width: 100%;
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #fff;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        border: none;
+        border-radius: 14px;
+        padding: 0.85rem 1rem;
+        cursor: pointer;
+        box-shadow: 0 6px 16px rgb(241 93 34 / 28%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+      }
+      .btn.ghost {
+        background: none;
+        color: var(--muted);
+        box-shadow: none;
+        font-weight: 600;
+        font-size: 0.84rem;
+        padding: 0.5rem;
+      }
+
+      /* the NEW expectation callouts */
+      .tip {
+        display: flex;
+        gap: 0.6rem;
+        align-items: flex-start;
+        background: var(--tip-bg);
+        border: 1px solid var(--tip-border);
+        border-radius: 14px;
+        padding: 0.7rem 0.85rem;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        color: var(--slate);
+      }
+      .tip .ico {
+        font-size: 1.1rem;
+        line-height: 1.3;
+      }
+      .tip strong {
+        font-weight: 700;
+      }
+      .tip.info {
+        background: var(--info-bg);
+        border-color: transparent;
+        color: var(--muted);
+      }
+      .ringtag {
+        display: inline-block;
+        font-family: 'Caveat', cursive;
+        font-size: 1.05rem;
+        color: var(--orange);
+        transform: rotate(-3deg);
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        background: rgb(241 93 34 / 12%);
+        color: var(--orange);
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 0.25rem 0.6rem;
+        border-radius: 999px;
+      }
+      .step-strip {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin: 0 0 1rem;
+        font-family: Outfit, sans-serif;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .step-strip .dot {
+        width: 1.4rem;
+        height: 1.4rem;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 0.72rem;
+        background: var(--hair);
+        color: var(--muted);
+      }
+      .step-strip .dot.on {
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        color: #fff;
+      }
+      .step-strip .bar {
+        flex: 1;
+        height: 2px;
+        background: var(--hair);
+        position: relative;
+        overflow: hidden;
+        border-radius: 2px;
+      }
+      .step-strip .bar i {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, var(--orange), var(--terracotta));
+        transform-origin: left;
+      }
+      .qr {
+        width: 130px;
+        height: 130px;
+        margin: 0 auto 0.6rem;
+        border-radius: 14px;
+        background:
+          repeating-conic-gradient(var(--slate) 0% 25%, transparent 0% 50%) 0 / 16px 16px;
+        opacity: 0.85;
+        border: 6px solid var(--card);
+        box-shadow: 0 0 0 1px var(--hair);
+      }
+      .linkbox {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        border: 1.5px solid var(--field-border);
+        border-radius: 12px;
+        padding: 0.55rem 0.7rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+        font-family: Inter, sans-serif;
+      }
+      .linkbox .copy {
+        margin-left: auto;
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        color: var(--orange);
+        font-size: 0.8rem;
+        white-space: nowrap;
+      }
+      .chips {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        margin-top: 0.7rem;
+        font-size: 1.3rem;
+      }
+      .chips span {
+        width: 2.3rem;
+        height: 2.3rem;
+        border-radius: 50%;
+        background: var(--info-bg);
+        display: grid;
+        place-items: center;
+      }
+      .foot {
+        text-align: center;
+        font-size: 0.74rem;
+        color: var(--muted);
+        margin-top: 0.9rem;
+      }
+      .stack > * + * {
+        margin-top: 0.75rem;
+      }
+      .hide {
+        display: none !important;
+      }
+
+      /* join screen = dark slate panel like the real login */
+      .join {
+        background: var(--join-bg);
+        border: none;
+        color: #fff;
+      }
+      .join h2.title,
+      .join .lede {
+        color: #fff;
+      }
+      .join .lede {
+        color: rgb(255 255 255 / 70%);
+      }
+      .join .file {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        background: rgb(255 255 255 / 8%);
+        border: 1px solid rgb(255 255 255 / 12%);
+        border-radius: 13px;
+        padding: 0.7rem 0.8rem;
+        margin-bottom: 0.9rem;
+      }
+      .join .file .nm {
+        font-family: 'Inter', monospace;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #fff;
+      }
+      .join .file .lbl {
+        font-size: 0.7rem;
+        color: rgb(255 255 255 / 55%);
+      }
+      .join .why {
+        text-align: center;
+        font-size: 0.78rem;
+        color: rgb(255 255 255 / 60%);
+        margin-top: 0.7rem;
+        line-height: 1.45;
+      }
+      .join .found {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: rgb(76 175 80 / 18%);
+        color: #b6f0bb;
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.74rem;
+        padding: 0.3rem 0.7rem;
+        border-radius: 999px;
+        margin: 0 auto 0.8rem;
+      }
+      .badge-new {
+        position: absolute;
+        top: -9px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--orange);
+        color: #fff;
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 0.2rem 0.7rem;
+        border-radius: 999px;
+        box-shadow: 0 4px 10px rgb(241 93 34 / 35%);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <div class="grp" id="tabs">
+        <button data-p="s1" class="on">Wizard · Step 1</button>
+        <button data-p="s2">Wizard · Step 2</button>
+        <button data-p="join">Invitee · Join screen</button>
+      </div>
+      <div class="grp"><button id="themeBtn">◐ Theme</button></div>
+    </div>
+    <p class="demo-note">
+      Three screens in the invite/join flow, with the <span class="new">orange copy/callouts</span>
+      = the proposed additions. Goal: (1) owner knows the real invite is the <em>next screen's</em>
+      link, and the Google Drive email is ignorable; (2) invitee knows exactly what to do after
+      opening the link — and which <code>.beanpod</code> file to pick.
+    </p>
+
+    <!-- ───────── WIZARD STEP 1 ───────── -->
+    <div class="card" id="s1">
+      <span class="badge-new">proposed copy</span>
+      <div class="step-strip">
+        <span class="dot on">1</span>
+        <span class="bar"><i style="transform: scaleX(0)"></i></span>
+        <span class="dot">2</span>
+        <span>share access → send link</span>
+      </div>
+      <h2 class="title">Sharing with Joey?</h2>
+      <p class="lede">
+        Use the email they sign in to Google with — it's how they'll open the family pod.
+      </p>
+      <div class="stack">
+        <div>
+          <label class="fld">Their Google email</label>
+          <input class="input" value="joey@gmail.com" />
+        </div>
+        <label style="display: flex; gap: 0.5rem; font-size: 0.84rem; color: var(--muted)">
+          <input type="checkbox" checked />
+          <span><strong>joey@gmail.com</strong> is their Google account email for the pod</span>
+        </label>
+      </div>
+
+      <!-- NEW: expectation-setter -->
+      <div class="tip info" style="margin-top: 1rem">
+        <span class="ico">👉</span>
+        <span
+          ><span class="new" style="font-weight: 600">Next, you'll get a link + QR code</span> to
+          send Joey — that's how they actually join. Google will also email them a "file shared"
+          notice; <strong>they can ignore it.</strong></span
+        >
+      </div>
+
+      <button class="btn" style="margin-top: 1rem">Share &amp; get invite link →</button>
+      <p class="foot">🔒 Encrypted — only your family can read what's inside.</p>
+    </div>
+
+    <!-- ───────── WIZARD STEP 2 ───────── -->
+    <div class="card hide" id="s2">
+      <span class="badge-new">proposed copy</span>
+      <div class="step-strip">
+        <span class="dot">1</span>
+        <span class="bar"><i style="transform: scaleX(1)"></i></span>
+        <span class="dot on">2</span>
+        <span>send the link</span>
+      </div>
+      <h2 class="title">Invite link ready 🎉</h2>
+      <p class="lede">Set up for <strong>joey@gmail.com</strong> — they'll land in the right account automatically.</p>
+
+      <!-- NEW: the key callout -->
+      <div class="tip" style="margin-bottom: 1rem">
+        <span class="ico">✋</span>
+        <span
+          ><span class="new" style="font-weight: 700">Send Joey THIS link or QR</span> — it's the
+          only way in. Google also emailed them a "file shared" notice;
+          <strong>that one can be ignored.</strong></span
+        >
+      </div>
+
+      <div class="qr"></div>
+      <p style="text-align: center; margin: 0 0 0.9rem">
+        <span class="ringtag">scan to join.</span>
+      </p>
+
+      <div class="linkbox">
+        <span>🔗</span><span>beanies.family/join?fam=…</span><span class="copy">Copy</span>
+      </div>
+      <div class="chips">
+        <span>💬</span><span>✈️</span><span>💚</span><span>✉️</span>
+      </div>
+
+      <p class="foot">🔒 This link expires in 24 hours</p>
+      <button class="btn ghost" style="margin-top: 0.3rem">← Use a different email</button>
+    </div>
+
+    <!-- ───────── INVITEE JOIN SCREEN ───────── -->
+    <div class="card join hide" id="join">
+      <span class="badge-new">proposed copy</span>
+      <img
+        class="mascot"
+        src="https://app.beanies.family/brand/beanies_family_icon_transparent_384x384.png"
+        alt=""
+        onerror="this.style.display='none'"
+      />
+      <div style="text-align: center"><span class="found">✓ Family found!</span></div>
+      <h2 class="title">You're invited to join the Parkers 🎉</h2>
+      <!-- NEW: replaces the stale "you need a magic joining link from a family member" -->
+      <p class="lede">
+        <span class="new">One last step</span> — open your family's data file so you have access.
+      </p>
+
+      <!-- NEW: name the exact file to pick (we already know it from the link) -->
+      <div class="file">
+        <span style="font-size: 1.3rem">🫛</span>
+        <div>
+          <div class="lbl">After you tap, pick this file:</div>
+          <div class="nm">the-parkers.beanpod</div>
+        </div>
+      </div>
+
+      <button class="btn">Open your family file</button>
+      <p class="why">
+        <span class="new">This unlocks your family's data</span> so you can join. It opens your
+        Google Drive to pick the file above.
+      </p>
+    </div>
+
+    <script>
+      const panels = ['s1', 's2', 'join'].map((id) => document.getElementById(id));
+      function show(p) {
+        panels.forEach((el) => el.classList.toggle('hide', el.id !== p));
+        document
+          .querySelectorAll('#tabs button')
+          .forEach((b) => b.classList.toggle('on', b.dataset.p === p));
+      }
+      document
+        .querySelectorAll('#tabs button')
+        .forEach((b) => b.addEventListener('click', () => show(b.dataset.p)));
+      document
+        .getElementById('themeBtn')
+        .addEventListener('click', () => document.body.classList.toggle('dark'));
+    </script>
+  </body>
+</html>
