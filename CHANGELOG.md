@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-14
+
+### Changed
+
+- **Internal: consolidated the notification-nudge plumbing (no user-facing change).** The three bell nudges (install, community/Discord, daily tips) now share one per-member storage helper and one card layout instead of three near-identical copies, so they behave identically and are easier to maintain.
+
 ## 2026-06-13
 
 ### Changed

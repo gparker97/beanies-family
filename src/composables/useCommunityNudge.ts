@@ -14,13 +14,13 @@
  *   - `shownCount`   : lifetime shows (cap stops the funnel)
  *   - `joined`       : "I'm already there!" / Join → never nudge again (this device)
  */
-import { computed, ref, watch } from 'vue';
-import { useFamilyStore } from '@/stores/familyStore';
+import { computed } from 'vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
 import { openDiscord } from '@/utils/discord';
 import { COMMUNITY_NUDGE_COUNT } from '@/content/communityNudges';
+import { createPerMemberStore } from '@/composables/perMemberStore';
 
 export interface ActiveNudge {
   messageIndex: number;
@@ -54,32 +54,10 @@ function emptyState(): NudgeState {
   };
 }
 
-function storageKey(memberId: string): string {
-  return `bean-community-nudge-${memberId}`;
-}
-
-function loadState(memberId: string): NudgeState {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(storageKey(memberId));
-  } catch (err) {
-    console.warn('[useCommunityNudge] localStorage read failed — using empty state', err);
-    return emptyState();
-  }
-  if (!raw) return emptyState();
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    console.warn('[useCommunityNudge] localStorage parse failed — resetting', err);
-    const fresh = emptyState();
-    saveState(memberId, fresh);
-    return fresh;
-  }
-
-  // Hard shape gate — greenfield (no v1-in-the-wild), so anything unexpected
-  // (incl. unknown/missing schemaVersion) resets to a fresh seeded state.
+/** Validate a parsed-JSON blob into a `NudgeState`. Greenfield (no v1-in-the-
+ *  wild), so anything unexpected (incl. unknown/missing schemaVersion) resets to
+ *  a fresh seeded state, persisted to overwrite the bad blob. */
+function fromParsed(parsed: unknown): { state: NudgeState; persist?: boolean } {
   if (
     typeof parsed === 'object' &&
     parsed !== null &&
@@ -98,31 +76,16 @@ function loadState(memberId: string): NudgeState {
           }
         : null;
     return {
-      schemaVersion: SCHEMA_VERSION,
-      activeNudge,
-      nextDueAt: typeof obj.nextDueAt === 'number' ? obj.nextDueAt : 0,
-      shownCount: typeof obj.shownCount === 'number' ? obj.shownCount : 0,
-      joined: typeof obj.joined === 'boolean' ? obj.joined : false,
+      state: {
+        schemaVersion: SCHEMA_VERSION,
+        activeNudge,
+        nextDueAt: typeof obj.nextDueAt === 'number' ? obj.nextDueAt : 0,
+        shownCount: typeof obj.shownCount === 'number' ? obj.shownCount : 0,
+        joined: typeof obj.joined === 'boolean' ? obj.joined : false,
+      },
     };
   }
-
-  const fresh = emptyState();
-  saveState(memberId, fresh);
-  return fresh;
-}
-
-function saveState(memberId: string, next: NudgeState): void {
-  try {
-    localStorage.setItem(storageKey(memberId), JSON.stringify(next));
-  } catch (err) {
-    console.warn('[useCommunityNudge] localStorage write failed', err);
-    reportError({
-      surface: 'community-nudge-save',
-      message: 'localStorage write failed for community-nudge',
-      error: err,
-      severity: 'warning',
-    });
-  }
+  return { state: emptyState(), persist: true };
 }
 
 /**
@@ -155,31 +118,30 @@ export function decideIssue(
   };
 }
 
-// ── Module singleton state (per member, swapped on member change) ─────────────
-const state = ref<NudgeState>(emptyState());
-let currentMemberId = '';
+// ── Module singleton store (per member, swapped on member change) ─────────────
+const store = createPerMemberStore<NudgeState>({
+  prefix: 'bean-community-nudge',
+  label: 'useCommunityNudge',
+  saveSurface: 'community-nudge-save',
+  saveMessage: 'localStorage write failed for community-nudge',
+  empty: emptyState,
+  fromParsed,
+  persistOnCorrupt: true,
+});
+
+const state = store.state;
 
 export function useCommunityNudge() {
-  const familyStore = useFamilyStore();
   const settingsStore = useSettingsStore();
 
-  watch(
-    () => familyStore.currentMemberId,
-    (id) => {
-      if (id && id !== currentMemberId) {
-        currentMemberId = id;
-        state.value = loadState(id);
-      }
-    },
-    { immediate: true }
-  );
+  store.useMemberSync();
 
   /** Persist `next`, rolling back + toasting on the (rare) failure. */
   function commit(next: NudgeState, errTitle: string): void {
     const prev = state.value;
     try {
       state.value = next;
-      saveState(currentMemberId, next);
+      store.save(next);
     } catch (err) {
       state.value = prev;
       showToast('error', errTitle, err instanceof Error ? err.message : String(err), {
@@ -196,12 +158,12 @@ export function useCommunityNudge() {
    */
   function ensureNudgeIssued(): void {
     try {
-      if (!currentMemberId) return;
+      if (!store.memberId()) return;
       if (!settingsStore.onboardingCompleted) return;
       const { state: next, shown } = decideIssue(state.value, Date.now(), randomIntervalMs());
       if (next !== state.value) {
         state.value = next;
-        saveState(currentMemberId, next);
+        store.save(next);
       }
       if (shown) window.plausible?.('community_nudge_shown');
     } catch (err) {
