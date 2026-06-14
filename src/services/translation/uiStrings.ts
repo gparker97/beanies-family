@@ -1035,7 +1035,7 @@ const STRING_DEFS = {
   'contacts.action.call': { en: 'Call', beanie: 'call' },
   'contacts.action.email': { en: 'Email', beanie: 'email' },
   'nav.settings': { en: 'Settings', beanie: 'settings' },
-  'nav.community': { en: 'Community on Discord', beanie: 'community on discord' },
+  'nav.community': { en: 'Discord Beanies', beanie: 'discord beanies' },
   // ── Discord community (onboarding card, nudge, settings, open-failure) ──────
   'discord.openFailedTitle': { en: "Couldn't open Discord", beanie: "couldn't open discord" },
   'discord.openFailedBody': {
