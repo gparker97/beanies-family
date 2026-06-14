@@ -5686,8 +5686,8 @@ const STRING_DEFS = {
   'inviteGate.requestOne': { en: 'Request an invite', beanie: 'request an invite' },
   'inviteGate.requestTitle': { en: 'Request an Invite', beanie: 'request an invite' },
   'inviteGate.requestDescription': {
-    en: "Tell us a bit about yourself and we'll get back to you.",
-    beanie: "tell us a bit about yourself and we'll get back to you.",
+    en: "Not on Discord? Leave your details and we'll send you a token when a spot opens.",
+    beanie: "not on discord? leave your details and we'll send you a token when a spot opens.",
   },
   'inviteGate.nameLabel': { en: 'Name', beanie: 'name' },
   'inviteGate.namePlaceholder': { en: 'Your name', beanie: 'your name' },
@@ -5718,6 +5718,27 @@ const STRING_DEFS = {
     beanie: "thanks for your interest! we'll review your request and send you an invite bean soon.",
   },
   'inviteGate.backToHome': { en: 'Back to Home', beanie: 'back to home' },
+  'inviteGate.notInvitedYet': { en: 'Not invited yet?', beanie: 'not invited yet?' },
+  'inviteGate.requestOnDiscord': {
+    en: 'Ask for an Invite on Discord',
+    beanie: 'ask for an invite on discord',
+  },
+  'inviteGate.discordHint': {
+    en: 'Join the community and ask there. No email needed.',
+    beanie: 'join the community and ask there. no email needed.',
+  },
+  'inviteGate.noDiscord': { en: "Don't use Discord?", beanie: "don't use discord?" },
+  'inviteGate.sendMessage': { en: 'Send us a message', beanie: 'send us a message' },
+  'inviteGate.askOnDiscordInstead': {
+    en: 'Ask on Discord instead',
+    beanie: 'ask on discord instead',
+  },
+  'inviteGate.privacyNote': {
+    en: 'Your email goes only to the beanies team to send your invite. Nothing public, nothing stored in the app.',
+    beanie:
+      'your email goes only to the beanies team to send your invite. nothing public, nothing stored in the app.',
+  },
+  'inviteGate.confirmedJoinDiscord': { en: 'Join the Discord', beanie: 'join the discord' },
 
   // Linked asset accounts
   'accounts.linkedTo': { en: 'Linked to {asset}', beanie: 'linked to {asset}' },

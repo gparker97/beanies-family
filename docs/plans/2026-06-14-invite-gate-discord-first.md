@@ -4,7 +4,7 @@
 > Related issues: None — direct implementation (greg, in-session)
 > Plan file: `docs/plans/2026-06-14-invite-gate-discord-first.md`
 > Mockup: `docs/mockups/invite-gate-discord-first-2026-06-14.html`
-> Status: **Approved (decisions locked 2026-06-14) — ready to implement on greg's go-ahead. Adds a create→invite funnel per greg's follow-up.**
+> Status: **IMPLEMENTED 2026-06-14** (committed to `main`, not yet deployed). Adds a create→invite funnel per greg's follow-up.\*\*
 
 ## Decisions (locked 2026-06-14)
 

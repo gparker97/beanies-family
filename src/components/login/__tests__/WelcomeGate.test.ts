@@ -59,6 +59,20 @@ describe('WelcomeGate', () => {
       expect(events?.[0]).toEqual(['create']);
     });
 
+    it("fires the 'create_pod_click' Plausible funnel event on Create", async () => {
+      const plausible = vi.fn();
+      vi.stubGlobal('plausible', plausible);
+      try {
+        const wrapper = mount(WelcomeGate);
+        await wrapper.findAll('button')[0].trigger('click');
+        expect(plausible).toHaveBeenCalledWith('create_pod_click');
+        // and still navigates
+        expect(wrapper.emitted('navigate')?.[0]).toEqual(['create']);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
     it("emits navigate('load-pod') when Sign In is clicked", async () => {
       const wrapper = mount(WelcomeGate);
       await wrapper.findAll('button')[1].trigger('click');

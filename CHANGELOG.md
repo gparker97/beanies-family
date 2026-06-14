@@ -16,6 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **Asking for an invite now points to Discord first.** On the invite-only gate, the primary "request an invite" action is now joining the Discord community and asking there — no email required. Leaving your email for a personal reply is still available as a secondary option, now with a clear note that your email only ever goes to the beanies team. (We also added private analytics to see how many people start creating a family vs. ask for an invite at the gate.)
 - **Tightened the beanies AI privacy line in Settings to match what's shipped.** The managed-tier note now reads "encrypted in transit, data-minimized, and nothing is retained" — dropping the "your beanies never hold the key" clause, which describes the not-yet-shipped end-to-end-to-enclave encryption. The wording is now consistent with the Help Center and accurate today (en, beanie, and zh).
 - **Internal: consolidated the notification-nudge plumbing (no user-facing change).** The three bell nudges (install, community/Discord, daily tips) now share one per-member storage helper and one card layout instead of three near-identical copies, so they behave identically and are easier to maintain.
 
