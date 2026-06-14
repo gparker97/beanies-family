@@ -16182,13 +16182,13 @@
       "lastUpdated": "2026-06-14"
     },
     "inviteWizard.step1.nextHint": {
-      "translation": "接下来，您将收到发送给他们的链接和二维码，这是他们加入的方式。谷歌还会通过电子邮件向他们发送“文件共享”通知；他们可以忽略它。",
-      "hash": "fkvsbp",
+      "translation": "接下来，您将收到发送给他们的链接和二维码，这是他们加入的方式。",
+      "hash": "k7oyyl",
       "lastUpdated": "2026-06-14"
     },
     "inviteWizard.step2.useThisLink": {
-      "translation": "向他们发送此链接或二维码，这是唯一的入口。谷歌还向他们发送了一封“文件共享”通知，可以忽略。",
-      "hash": "hczgxd",
+      "translation": "向他们发送此链接或二维码-这是他们加入您的家庭舱的方式。",
+      "hash": "dxjdhm",
       "lastUpdated": "2026-06-14"
     }
   }

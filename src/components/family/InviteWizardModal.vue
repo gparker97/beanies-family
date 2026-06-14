@@ -608,7 +608,7 @@ function handleClose() {
         :style="{ backgroundColor: 'var(--tint-orange-8)' }"
         data-testid="invite-wizard-use-this-link"
       >
-        <span aria-hidden="true">✋</span>
+        <span aria-hidden="true">📤</span>
         <span>{{ t('inviteWizard.step2.useThisLink') }}</span>
       </div>
 
