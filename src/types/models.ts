@@ -432,6 +432,9 @@ export type ActivityCategory =
   | 'spelling_bee'
   | 'math_competition'
   | 'cubing'
+  | 'swimming_competition'
+  | 'track_field'
+  | 'gymnastics_competition'
   | 'other_competition'
   // Lessons
   | 'piano'
@@ -442,8 +445,12 @@ export type ActivityCategory =
   | 'art'
   | 'dance'
   | 'swimming'
+  | 'chess'
+  | 'coding'
+  | 'voice'
+  | 'drama'
   | 'other_lesson'
-  // Entertainment
+  // Fun
   | 'movie'
   | 'show'
   | 'concert'
@@ -451,6 +458,12 @@ export type ActivityCategory =
   | 'sporting_event'
   | 'museum'
   | 'festival'
+  | 'beach'
+  | 'pool'
+  | 'playground'
+  | 'zoo'
+  | 'bowling'
+  | 'arcade'
   | 'other_entertainment'
   // Food
   | 'brunch'
@@ -463,13 +476,40 @@ export type ActivityCategory =
   | 'birthday'
   | 'wedding'
   | 'bar_mitzvah'
+  | 'graduation'
+  | 'baby_shower'
+  | 'anniversary'
   | 'other_celebration'
   // Appointments
   | 'doctor'
   | 'dentist'
   | 'eye_exam'
   | 'haircut'
+  | 'therapy'
   | 'other_appointment'
+  // Work
+  | 'work_dinner'
+  | 'work_drinks'
+  | 'team_building'
+  | 'conference'
+  | 'work_party'
+  | 'networking'
+  | 'other_work'
+  // Pets
+  | 'vet'
+  | 'pet_grooming'
+  | 'other_pet'
+  // Social
+  | 'date_night'
+  | 'playdate'
+  | 'family_visit'
+  | 'other_social'
+  // Religious
+  | 'worship'
+  | 'religious_class'
+  | 'other_religious'
+  // Sports
+  | 'basketball'
   // Other
   | 'other_activity';
 /**

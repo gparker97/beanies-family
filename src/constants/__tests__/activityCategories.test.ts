@@ -19,7 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ACTIVITY_CATEGORIES } from '@/constants/activityCategories';
+import { ACTIVITY_CATEGORIES, ACTIVITY_GROUP_EMOJI_MAP } from '@/constants/activityCategories';
 
 const PROJECT_ROOT = process.cwd();
 const MODELS_PATH = join(PROJECT_ROOT, 'src', 'types', 'models.ts');
@@ -74,5 +74,28 @@ describe('activity category sources stay in sync', () => {
   it('every activityCategoryToExpenseCategory key is in ACTIVITY_CATEGORIES', () => {
     const orphans = [...mappingIds].filter((id) => !runtimeIds.has(id)).sort();
     expect(orphans).toEqual([]);
+  });
+});
+
+describe('activity category presentation invariants', () => {
+  it('every group used by a category has a header emoji', () => {
+    const usedGroups = [...new Set(ACTIVITY_CATEGORIES.map((c) => c.group))].sort();
+    const missing = usedGroups.filter((g) => !ACTIVITY_GROUP_EMOJI_MAP[g]);
+    // A missing entry would silently render the 📌 fallback in the picker instead
+    // of failing — so guard it here.
+    expect(missing).toEqual([]);
+  });
+
+  it('no two categories within a group share an exact color', () => {
+    const byGroup = new Map<string, Map<string, string>>();
+    const collisions: string[] = [];
+    for (const cat of ACTIVITY_CATEGORIES) {
+      const seen = byGroup.get(cat.group) ?? new Map<string, string>();
+      const prior = seen.get(cat.color);
+      if (prior) collisions.push(`${cat.group}: ${prior} & ${cat.id} both use ${cat.color}`);
+      seen.set(cat.color, cat.id);
+      byGroup.set(cat.group, seen);
+    }
+    expect(collisions).toEqual([]);
   });
 });
