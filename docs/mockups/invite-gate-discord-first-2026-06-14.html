@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Invite Gate — Discord-first (mockup) · beanies.family</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ───────────────── beanies.family CIG tokens ───────────────── */
+      :root {
+        --orange: #f15d22; /* Heritage Orange — actions/CTAs */
+        --terracotta: #e67e22; /* gradient partner */
+        --slate: #2c3e50; /* Deep Slate — text/anchor */
+        --sky: #aed6f1; /* Sky Silk — calm */
+        --cloud: #f8f9fa; /* Cloud White — bg */
+        --blurple: #5865f2; /* Discord — the ONE third-party colour */
+        --card: #ffffff;
+        --muted: rgb(44 62 80 / 55%);
+        --hair: rgb(44 62 80 / 9%);
+        --field-bg: #fff;
+        --field-border: rgb(44 62 80 / 14%);
+        --page: radial-gradient(120% 90% at 50% -10%, #fff4ec 0%, #f8f9fa 55%, #eef4fa 100%);
+      }
+      .dark {
+        --slate: #e2e8f0;
+        --cloud: #0f172a;
+        --card: #1e293b;
+        --muted: rgb(226 232 240 / 62%);
+        --hair: rgb(226 232 240 / 12%);
+        --field-bg: #0f172a;
+        --field-border: rgb(226 232 240 / 16%);
+        --page: radial-gradient(120% 90% at 50% -10%, #2a1d16 0%, #0f172a 55%, #0b1220 100%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+      body {
+        font-family: Inter, sans-serif;
+        color: var(--slate);
+        background: var(--page);
+        -webkit-font-smoothing: antialiased;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+        padding: 2.5rem 1rem 4rem;
+        transition:
+          background 0.4s,
+          color 0.3s;
+      }
+
+      /* ───────────────── demo chrome (not part of the app) ───────────────── */
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        justify-content: center;
+        font-family: Outfit, sans-serif;
+      }
+      .toolbar .grp {
+        display: flex;
+        gap: 0.25rem;
+        background: var(--card);
+        border: 1px solid var(--hair);
+        border-radius: 999px;
+        padding: 0.25rem;
+        box-shadow: 0 4px 14px rgb(44 62 80 / 6%);
+      }
+      .toolbar button {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.8rem;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        padding: 0.4rem 0.85rem;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: all 0.18s;
+      }
+      .toolbar button.on {
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        color: #fff;
+        box-shadow: 0 4px 12px rgb(241 93 34 / 28%);
+      }
+      .demo-note {
+        font-size: 0.78rem;
+        color: var(--muted);
+        max-width: 30rem;
+        text-align: center;
+        line-height: 1.5;
+      }
+
+      /* ───────────────── the modal ───────────────── */
+      .stage {
+        position: relative;
+        width: 100%;
+        max-width: 26rem;
+      }
+      .stage::before {
+        /* soft warm glow behind the card */
+        content: '';
+        position: absolute;
+        inset: -14% -8% auto -8%;
+        height: 60%;
+        background: radial-gradient(60% 100% at 50% 0%, rgb(241 93 34 / 16%), transparent 70%);
+        filter: blur(8px);
+        z-index: 0;
+      }
+      .card {
+        position: relative;
+        z-index: 1;
+        background: var(--card);
+        border: 1px solid var(--hair);
+        border-radius: 28px;
+        padding: 1.75rem 1.6rem 1.5rem;
+        box-shadow:
+          0 24px 60px -18px rgb(44 62 80 / 28%),
+          0 4px 14px rgb(44 62 80 / 8%);
+        animation: pop 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @keyframes pop {
+        from {
+          opacity: 0;
+          transform: translateY(10px) scale(0.985);
+        }
+      }
+
+      .mascot {
+        display: block;
+        width: 92px;
+        height: 92px;
+        margin: 0 auto 0.6rem;
+        filter: drop-shadow(0 6px 14px rgb(241 93 34 / 22%));
+      }
+      h2.title {
+        font-family: Outfit, sans-serif;
+        font-weight: 800;
+        font-size: 1.4rem;
+        letter-spacing: -0.01em;
+        text-align: center;
+        margin: 0 0 0.3rem;
+      }
+      .lede {
+        text-align: center;
+        font-size: 0.9rem;
+        line-height: 1.55;
+        color: var(--muted);
+        margin: 0 auto 1.25rem;
+        max-width: 19rem;
+      }
+
+      label.fld {
+        display: block;
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin: 0 0 0.35rem;
+      }
+      .input {
+        width: 100%;
+        font-family: Inter, sans-serif;
+        font-size: 0.95rem;
+        color: var(--slate);
+        background: var(--field-bg);
+        border: 1.5px solid var(--field-border);
+        border-radius: 14px;
+        padding: 0.7rem 0.85rem;
+        transition:
+          border-color 0.18s,
+          box-shadow 0.18s;
+      }
+      .input::placeholder {
+        color: rgb(44 62 80 / 38%);
+      }
+      .dark .input::placeholder {
+        color: rgb(226 232 240 / 34%);
+      }
+      .input:focus {
+        outline: none;
+        border-color: var(--orange);
+        box-shadow: 0 0 0 4px rgb(241 93 34 / 14%);
+      }
+      .stack > * + * {
+        margin-top: 0.7rem;
+      }
+
+      /* primary unlock (token) — solid orange */
+      .btn-primary {
+        width: 100%;
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #fff;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        border: none;
+        border-radius: 14px;
+        padding: 0.8rem 1rem;
+        cursor: pointer;
+        box-shadow: 0 6px 16px rgb(241 93 34 / 28%);
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s,
+          opacity 0.15s;
+      }
+      .btn-primary[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+      .btn-primary:not([disabled]):hover {
+        transform: translateY(-1px);
+        box-shadow: 0 9px 22px rgb(241 93 34 / 34%);
+      }
+
+      /* ── the new no-invite block ── */
+      .divide {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 1.3rem 0 1rem;
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+      }
+      .divide::before,
+      .divide::after {
+        content: '';
+        height: 1px;
+        flex: 1;
+        background: var(--hair);
+      }
+
+      /* Discord = the PRIMARY request path now. Brand pattern: orange gradient
+         CTA, blurple glyph riding a white ring (same as the community nudge). */
+      .btn-discord {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #fff;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        border: none;
+        border-radius: 14px;
+        padding: 0.85rem 1rem;
+        cursor: pointer;
+        box-shadow: 0 6px 16px rgb(241 93 34 / 28%);
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s;
+      }
+      .btn-discord:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 24px rgb(241 93 34 / 36%);
+      }
+      .btn-discord .ring {
+        background: #fff;
+        border-radius: 50%;
+        padding: 4px;
+        display: flex;
+        flex-shrink: 0;
+      }
+      .req-hint {
+        text-align: center;
+        font-size: 0.82rem;
+        color: var(--muted);
+        margin: 0.55rem auto 0;
+        line-height: 1.45;
+        max-width: 18rem;
+      }
+
+      /* secondary text link (the Slack message fallback) */
+      .linkrow {
+        text-align: center;
+        margin-top: 0.85rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      .tlink {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        color: var(--orange);
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        font-size: 0.85rem;
+      }
+      .tlink:hover {
+        text-decoration: underline;
+      }
+      .tlink.quiet {
+        color: var(--muted);
+      }
+      .tlink.quiet:hover {
+        color: var(--slate);
+      }
+
+      .closeX {
+        position: absolute;
+        top: 0.85rem;
+        right: 0.85rem;
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
+        border: none;
+        background: transparent;
+        color: rgb(44 62 80 / 40%);
+        font-size: 1.1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+      }
+      .closeX:hover {
+        background: rgb(44 62 80 / 7%);
+        color: var(--slate);
+      }
+      .dark .closeX {
+        color: rgb(226 232 240 / 45%);
+      }
+
+      .backlink {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.82rem;
+        color: var(--muted);
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        margin-bottom: 0.8rem;
+        display: inline-flex;
+        gap: 0.3rem;
+        align-items: center;
+      }
+      .backlink:hover {
+        color: var(--slate);
+      }
+
+      .privacy {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        padding: 0.65rem 0.75rem;
+        background: rgb(174 214 241 / 22%);
+        border-radius: 12px;
+        font-size: 0.76rem;
+        line-height: 1.45;
+        color: var(--muted);
+      }
+      .dark .privacy {
+        background: rgb(174 214 241 / 10%);
+      }
+
+      .confirm-emoji {
+        font-size: 2.4rem;
+        text-align: center;
+        margin-bottom: 0.3rem;
+      }
+      .hide {
+        display: none !important;
+      }
+      .caption {
+        text-align: center;
+        font-family: Outfit, sans-serif;
+        font-size: 0.72rem;
+        color: var(--muted);
+        margin-top: 0.4rem;
+      }
+    </style>
+  </head>
+  <body class="">
+    <div class="toolbar">
+      <div class="grp" id="modeTabs">
+        <button data-mode="token" class="on">1 · Invited (token)</button>
+        <button data-mode="request">2 · Message (Slack)</button>
+        <button data-mode="confirmed">3 · Sent</button>
+      </div>
+      <div class="grp">
+        <button id="themeBtn">◐ Theme</button>
+      </div>
+    </div>
+    <p class="demo-note">
+      Mockup of the redesigned <strong>Invite Gate</strong> (<code>InviteGateOverlay.vue</code>).
+      Discord is now the primary "request an invite" path (no email needed); the Slack message form
+      is the secondary fallback. Click the tabs to walk the three states.
+    </p>
+
+    <!-- ───────────── TOKEN MODE (default landing) ───────────── -->
+    <div class="stage" id="stage-token">
+      <div class="card">
+        <button class="closeX" title="Close">✕</button>
+        <img
+          class="mascot"
+          src="https://app.beanies.family/brand/beanies_family_icon_transparent_384x384.png"
+          alt="beanies family"
+          onerror="this.style.display='none'"
+        />
+        <h2 class="title">Invite Only</h2>
+        <p class="lede">
+          beanies is in a small early-adopter phase. Have an invite token? Drop it in. New here? Come
+          say hi.
+        </p>
+
+        <label class="fld" for="tok">Invite Bean</label>
+        <input class="input" id="tok" placeholder="Enter your token" />
+        <button class="btn-primary" style="margin-top: 0.8rem" disabled>Unlock</button>
+
+        <div class="divide">not invited yet?</div>
+
+        <!-- PRIMARY request path → Discord -->
+        <button class="btn-discord" id="discordCta">
+          <span class="ring">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#5865F2" aria-hidden="true">
+              <path
+                d="M20.317 4.369A19.79 19.79 0 0 0 16.558 3.2a.074.074 0 0 0-.079.037c-.34.6-.717 1.385-.98 2.001a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.997-2.001.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C1.235 8.018.572 11.578.9 15.093a.08.08 0 0 0 .031.055 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.891.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-4.06-.838-7.59-3.549-10.697a.06.06 0 0 0-.031-.028zM8.02 12.952c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.42 2.157-2.42 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.419-2.157 2.419zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.42 2.157-2.42 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.419-2.157 2.419z"
+              />
+            </svg>
+          </span>
+          Ask for an invite on Discord
+        </button>
+        <p class="req-hint">
+          Join the community and ask — no email needed. We hand out invites there daily.
+        </p>
+
+        <p class="linkrow">
+          Don't use Discord?
+          <button class="tlink" data-goto="request">Send us a message</button>
+        </p>
+      </div>
+    </div>
+
+    <!-- ───────────── REQUEST / MESSAGE MODE (Slack fallback) ───────────── -->
+    <div class="stage hide" id="stage-request">
+      <div class="card">
+        <button class="closeX" title="Close">✕</button>
+        <button class="backlink" data-goto="token">‹ Back</button>
+        <h2 class="title" style="text-align: left">Request an Invite</h2>
+        <p class="lede" style="text-align: left; margin-left: 0">
+          Not on Discord? Leave your details and we'll send you a token when a spot opens.
+        </p>
+
+        <div class="stack">
+          <div>
+            <label class="fld" for="rn">Name</label>
+            <input class="input" id="rn" placeholder="Your name" />
+          </div>
+          <div>
+            <label class="fld" for="re">Email</label>
+            <input class="input" id="re" type="email" placeholder="you@example.com" />
+          </div>
+          <div>
+            <label class="fld" for="rm">Message (optional)</label>
+            <input class="input" id="rm" placeholder="A line about your family…" />
+          </div>
+        </div>
+
+        <button class="btn-primary" style="margin-top: 1rem">Send Request</button>
+
+        <div class="privacy">
+          <span>🔒</span>
+          <span
+            >Your email goes only to the beanies team to send your invite — nothing public, nothing
+            stored in the app.</span
+          >
+        </div>
+
+        <p class="linkrow">
+          Prefer chat?
+          <button class="tlink" data-goto="token">Ask on Discord instead</button>
+        </p>
+      </div>
+    </div>
+
+    <!-- ───────────── CONFIRMED MODE ───────────── -->
+    <div class="stage hide" id="stage-confirmed">
+      <div class="card" style="text-align: center">
+        <button class="closeX" title="Close">✕</button>
+        <div class="confirm-emoji">🫘</div>
+        <h2 class="title">Request Sent!</h2>
+        <p class="lede">
+          Thanks! We'll be in touch by email soon. In the meantime, come hang out with other beanie
+          families on Discord.
+        </p>
+        <button class="btn-discord" style="margin-bottom: 0.7rem">
+          <span class="ring">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#5865F2" aria-hidden="true">
+              <path
+                d="M20.317 4.369A19.79 19.79 0 0 0 16.558 3.2a.074.074 0 0 0-.079.037c-.34.6-.717 1.385-.98 2.001a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.997-2.001.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C1.235 8.018.572 11.578.9 15.093a.08.08 0 0 0 .031.055 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.891.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-4.06-.838-7.59-3.549-10.697a.06.06 0 0 0-.031-.028zM8.02 12.952c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.42 2.157-2.42 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.419-2.157 2.419zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.42 2.157-2.42 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.419-2.157 2.419z"
+              />
+            </svg>
+          </span>
+          Join the Discord
+        </button>
+        <button class="tlink quiet" style="margin-top: 0.2rem">Back to Home</button>
+      </div>
+    </div>
+
+    <script>
+      // demo-only state switching
+      const stages = {
+        token: document.getElementById('stage-token'),
+        request: document.getElementById('stage-request'),
+        confirmed: document.getElementById('stage-confirmed'),
+      };
+      function show(mode) {
+        Object.entries(stages).forEach(([k, el]) => el.classList.toggle('hide', k !== mode));
+        document
+          .querySelectorAll('#modeTabs button')
+          .forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
+      }
+      document
+        .querySelectorAll('#modeTabs button')
+        .forEach((b) => b.addEventListener('click', () => show(b.dataset.mode)));
+      document
+        .querySelectorAll('[data-goto]')
+        .forEach((b) => b.addEventListener('click', () => show(b.dataset.goto)));
+      document.getElementById('discordCta').addEventListener('click', () => {
+        // In the app: openDiscord('invite-gate') + plausible('invite_request_click',{method:'discord'})
+        alert(
+          "→ opens Discord (openDiscord('invite-gate'))\n→ fires plausible 'invite_request_click' { method: 'discord' }"
+        );
+      });
+      // token field enables the Unlock button (demo)
+      const tok = document.getElementById('tok');
+      const unlock = stages.token.querySelector('.btn-primary');
+      tok.addEventListener('input', () => (unlock.disabled = !tok.value.trim()));
+
+      // theme
+      document
+        .getElementById('themeBtn')
+        .addEventListener('click', () => document.body.classList.toggle('dark'));
+    </script>
+  </body>
+</html>
