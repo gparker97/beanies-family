@@ -469,6 +469,19 @@ function handleClose() {
         </span>
       </label>
 
+      <!-- Sets expectations before sharing: the real invite is the NEXT screen's
+           link/QR, and Google's automatic "file shared" email is a red herring.
+           Drive-only — local-provider invites don't trigger a Google email. -->
+      <div
+        v-if="isDriveProvider"
+        class="flex items-start gap-2 rounded-2xl px-4 py-3 text-sm leading-relaxed text-gray-600 dark:text-gray-300"
+        :style="{ backgroundColor: 'var(--tint-orange-8)' }"
+        data-testid="invite-wizard-next-hint"
+      >
+        <span aria-hidden="true">👉</span>
+        <span>{{ t('inviteWizard.step1.nextHint') }}</span>
+      </div>
+
       <!-- Primary CTA -->
       <button
         type="button"
@@ -584,6 +597,19 @@ function handleClose() {
         <p class="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
           {{ step2Caption }}
         </p>
+      </div>
+
+      <!-- The key fix for the "Google Drive email" confusion: make it unmistakable
+           that THIS link/QR is how they join, and the auto-sent Google email is
+           not. Drive-only (local invites don't trigger a Google email). -->
+      <div
+        v-if="isDriveProvider"
+        class="text-secondary-500 flex items-start gap-2 rounded-2xl border border-[var(--color-primary)]/25 px-4 py-3 text-sm leading-relaxed dark:text-gray-200"
+        :style="{ backgroundColor: 'var(--tint-orange-8)' }"
+        data-testid="invite-wizard-use-this-link"
+      >
+        <span aria-hidden="true">✋</span>
+        <span>{{ t('inviteWizard.step2.useThisLink') }}</span>
       </div>
 
       <div

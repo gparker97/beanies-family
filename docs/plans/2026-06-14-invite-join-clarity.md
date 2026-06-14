@@ -3,7 +3,7 @@
 > Date: 2026-06-14
 > Related issues: None — direct implementation (greg, in-session, from 2 user reports)
 > Mockup: `docs/mockups/invite-join-clarity-2026-06-14.html`
-> Status: **Proposed — awaiting greg's review. Not yet implemented.**
+> Status: **IMPLEMENTED 2026-06-14** (committed to `main`, not deployed). All four open decisions approved by greg: CTA "Share & Get Invite Link"; step-2 retitled "Invite Link Ready"; family-name welcome (with name-less fallback); raw mono `.beanpod` filename.
 
 ## Context
 

@@ -3608,6 +3608,14 @@ const STRING_DEFS = {
     en: 'You need a magic joining link from a family member',
     beanie: 'you need a magic joining link from a family member',
   },
+  'join.verifyInvited': {
+    en: "You've been invited to join {family}!",
+    beanie: "you've been invited to join {family}!",
+  },
+  'join.verifyInvitedGeneric': {
+    en: "You've been invited to join your family!",
+    beanie: "you've been invited to join your family!",
+  },
   'join.lookingUp': { en: 'Looking up your family...', beanie: 'finding your pod...' },
   'join.familyFound': { en: 'Family found!', beanie: 'found your pod!' },
   'join.familyNotFound': {
@@ -3806,12 +3814,17 @@ const STRING_DEFS = {
 
   // Google Picker join flow
   'join.pickerPrompt.description': {
-    en: 'Select the shared .beanpod file from your Google Drive',
-    beanie: "pick your family's bean pod from google drive",
+    en: "One last step to join: open your family's data file from Google Drive so you have access.",
+    beanie:
+      "one last step to join: open your family's bean pod from google drive so you have access.",
+  },
+  'join.pickerPrompt.fileHint': {
+    en: 'After you tap, pick this file:',
+    beanie: 'after you tap, pick this file:',
   },
   'join.pickerPrompt.button': {
-    en: 'Select File from Drive',
-    beanie: 'pick from drive',
+    en: 'Open Your Family File',
+    beanie: 'open your family file',
   },
   'join.pickerPrompt.orManual': {
     en: 'Or load a file from your device',
@@ -3874,12 +3887,17 @@ const STRING_DEFS = {
     beanie: 'confirm to continue',
   },
   'inviteWizard.step1.cta.share': {
-    en: 'Share with {email}',
-    beanie: 'share with {email}',
+    en: 'Share & Get Invite Link',
+    beanie: 'share & get invite link',
   },
   'inviteWizard.step1.cta.confirm': {
     en: 'Confirm {email}',
     beanie: 'confirm {email}',
+  },
+  'inviteWizard.step1.nextHint': {
+    en: "Next, you'll get a link + QR to send them - that's how they join. Google will also email them a 'file shared' notice; they can ignore it.",
+    beanie:
+      "next, you'll get a link + qr to send them - that's how they join. google will also email them a 'file shared' notice; they can ignore it.",
   },
   'inviteWizard.step1.faq.toggle': {
     en: "You've got questions? We've got answers",
@@ -3913,8 +3931,13 @@ const STRING_DEFS = {
       'they\'ll need a free google account to access the family pod — it lives in google drive. setting one up takes about a minute at <a href="https://accounts.google.com" target="_blank" rel="noopener" class="wizard-faq-link">accounts.google.com</a>. for kids, <a href="https://families.google/familylink/" target="_blank" rel="noopener" class="wizard-faq-link">google family link</a> creates a free, parent-supervised gmail',
   },
   'inviteWizard.step2.title': {
-    en: 'Magic Link Ready',
-    beanie: 'magic link ready',
+    en: 'Invite Link Ready',
+    beanie: 'invite link ready',
+  },
+  'inviteWizard.step2.useThisLink': {
+    en: "Send them THIS link or QR - it's the only way in. Google also emailed them a 'file shared' notice; that one can be ignored.",
+    beanie:
+      "send them this link or qr - it's the only way in. google also emailed them a 'file shared' notice; that one can be ignored.",
   },
   'inviteWizard.step2.caption': {
     en: "Set up for {email} — they'll land in the right Google account automatically.",

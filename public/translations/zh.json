@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-14",
-    "translationCount": 3232
+    "translationCount": 3237
   },
   "translations": {
     "app.name": {
@@ -5472,14 +5472,14 @@
       "lastUpdated": "2026-03-06"
     },
     "join.pickerPrompt.description": {
-      "translation": "从您的Google云端硬盘中选择共享的.beanpod文件",
-      "hash": "8nmff1",
-      "lastUpdated": "2026-03-06"
+      "translation": "加入的最后一步：从Google云端硬盘打开您的家庭数据文件，以便您拥有访问权限。",
+      "hash": "ls8pd2",
+      "lastUpdated": "2026-06-14"
     },
     "join.pickerPrompt.button": {
-      "translation": "从驱动器中选择文件",
-      "hash": "b6mido",
-      "lastUpdated": "2026-03-06"
+      "translation": "打开您的家庭文件",
+      "hash": "bavpgf",
+      "lastUpdated": "2026-06-14"
     },
     "join.pickerPrompt.orManual": {
       "translation": "或从您的设备加载文件",
@@ -12192,9 +12192,9 @@
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.step1.cta.share": {
-      "translation": "通过电子邮件分享",
-      "hash": "tpm0ot",
-      "lastUpdated": "2026-04-26"
+      "translation": "分享并获取邀请链接",
+      "hash": "s5o7kk",
+      "lastUpdated": "2026-06-14"
     },
     "inviteWizard.step1.cta.confirm": {
       "translation": "确认电子邮件",
@@ -12237,9 +12237,9 @@
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.step2.title": {
-      "translation": "魔术链接就绪",
-      "hash": "zcwo6o",
-      "lastUpdated": "2026-04-26"
+      "translation": "邀请链接就绪",
+      "hash": "1i72ok",
+      "lastUpdated": "2026-06-14"
     },
     "inviteWizard.step2.caption": {
       "translation": "为{email}进行设置，他们将自动登录正确的Google帐户。",
@@ -16164,6 +16164,31 @@
     "inviteGate.confirmedJoinDiscord": {
       "translation": "加入Discord",
       "hash": "flniiv",
+      "lastUpdated": "2026-06-14"
+    },
+    "join.verifyInvited": {
+      "translation": "您已受邀加入{family} ！",
+      "hash": "c8pzoe",
+      "lastUpdated": "2026-06-14"
+    },
+    "join.verifyInvitedGeneric": {
+      "translation": "您已受邀与家人团聚！",
+      "hash": "rq7x8v",
+      "lastUpdated": "2026-06-14"
+    },
+    "join.pickerPrompt.fileHint": {
+      "translation": "轻触后，选择此文件：",
+      "hash": "wb4biv",
+      "lastUpdated": "2026-06-14"
+    },
+    "inviteWizard.step1.nextHint": {
+      "translation": "接下来，您将收到发送给他们的链接和二维码，这是他们加入的方式。谷歌还会通过电子邮件向他们发送“文件共享”通知；他们可以忽略它。",
+      "hash": "fkvsbp",
+      "lastUpdated": "2026-06-14"
+    },
+    "inviteWizard.step2.useThisLink": {
+      "translation": "向他们发送此链接或二维码，这是唯一的入口。谷歌还向他们发送了一封“文件共享”通知，可以忽略。",
+      "hash": "hczgxd",
       "lastUpdated": "2026-06-14"
     }
   }
