@@ -10,6 +10,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { delay } from '@/utils/timing';
 import { reportError } from '@/utils/errorReporter';
+import { fillTemplate } from '@/utils/fillTemplate';
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ complete: []; back: [] }>();
@@ -311,7 +312,7 @@ watch(
 
       <!-- Title -->
       <h2 class="font-outfit text-center text-xl font-bold text-[#2C3E50] dark:text-gray-100">
-        {{ t('setupProgress.title').replace('{name}', familyName) }}
+        {{ fillTemplate(t('setupProgress.title'), { name: familyName }) }}
       </h2>
       <p class="mb-6 text-center text-sm text-gray-400 dark:text-gray-500">
         {{ t('setupProgress.subtitle') }}
@@ -469,7 +470,7 @@ watch(
             {{ t('setupProgress.success.title') }}
           </h2>
           <p class="mt-1 text-sm text-gray-400 dark:text-gray-500">
-            {{ t('setupProgress.success.subtitle').replace('{name}', familyName) }}
+            {{ fillTemplate(t('setupProgress.success.subtitle'), { name: familyName }) }}
           </p>
 
           <BaseButton

@@ -6,7 +6,11 @@ import { useVacationStore } from '@/stores/vacationStore';
 import type { FamilyActivity, FamilyVacation, VacationTravelSegment } from '@/types/models';
 
 vi.mock('@/composables/useTranslation', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string) => key,
+    isBeanieMode: { value: false },
+    isEnglish: { value: true },
+  }),
 }));
 
 // Module-scope holder so individual tests can seed the activities the

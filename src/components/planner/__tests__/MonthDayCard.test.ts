@@ -15,6 +15,8 @@ vi.mock('@/composables/useTranslation', () => ({
       if (key === 'planner.moreEvents') return '{count} more activities';
       return key;
     },
+    isBeanieMode: { value: false },
+    isEnglish: { value: true },
   }),
 }));
 

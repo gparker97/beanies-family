@@ -170,6 +170,37 @@ async function restoreLocalFromDoc(
 }
 
 /**
+ * Mirror a local refresh token UP into the shared doc — the symmetric counterpart
+ * to `restoreLocalFromDoc`, so the epoch-guard/ordering can never drift between the
+ * two directions. The caller captures `getSessionEpoch()` BEFORE its async read and
+ * passes it here; if a sign-out advanced the epoch in between, skip the write so a
+ * torn-down session's token is never propagated into the synced beanpod (and thence
+ * to every device). Never throws on the guard path. See
+ * docs/plans/2026-06-14-code-review-fixes.md.
+ */
+async function mirrorLocalToDoc(
+  boundEmail: string,
+  localTok: StoredRefreshToken,
+  expectedEpoch: number
+): Promise<void> {
+  if (expectedEpoch !== getSessionEpoch()) {
+    logEvent({
+      level: 'info',
+      surface: 'auth-epoch-discard',
+      message:
+        'skipped mirroring the local Drive token into the beanpod — signed out during recovery (epoch advanced)',
+    });
+    return;
+  }
+  await upsertDriveConnection({
+    provider: 'google',
+    accountEmail: boundEmail,
+    refreshToken: localTok.token,
+    issuedAt: localTok.issuedAt,
+  });
+}
+
+/**
  * B3 — cold-start reconciliation. Keeps the doc copy and the local copy in sync
  * for the bound account, **strictly-newer-`issuedAt` wins** (a tie is a no-op):
  *  - identical tokens → nothing to do (no CRDT churn).
@@ -204,12 +235,9 @@ export async function reconcileDriveTokenWithDoc(
     if (docTok && (!localTok || isStrictlyNewer(docTok, localTok))) {
       await restoreLocalFromDoc(familyId, docTok, epochAtStart);
     } else if (localTok && (!docTok || isStrictlyNewer(localTok, docTok))) {
-      await upsertDriveConnection({
-        provider: 'google',
-        accountEmail: boundEmail,
-        refreshToken: localTok.token,
-        issuedAt: localTok.issuedAt,
-      });
+      // Epoch-guarded, symmetric with the adopt branch above: a sign-out mid-read
+      // must not propagate the torn-down session's token into the shared doc.
+      await mirrorLocalToDoc(boundEmail, localTok, epochAtStart);
     }
     // else: both present, tokens differ, neither strictly newer → ambiguous tie;
     // leave the doc copy untouched (do not destroy a possibly-good shared token).

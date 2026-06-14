@@ -21,7 +21,8 @@
 import { computed } from 'vue';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useActivityChipClass } from '@/composables/useActivityChipClass';
-import { getActivityCategoryById, getActivityFallbackEmoji } from '@/constants/activityCategories';
+import { getActivityFallbackEmoji } from '@/constants/activityCategories';
+import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
 import { formatNameList, normalizeAssignees } from '@/utils/assignees';
 import { formatTime12 } from '@/utils/date';
 import { useClash } from '@/composables/useClash';
@@ -44,6 +45,7 @@ const emit = defineEmits<{
 
 const { getMemberName } = useMemberInfo();
 const { classify } = useActivityChipClass();
+const { categoryLabel: resolveCategoryLabel } = useActivityCategoryLabel();
 
 const classification = computed(() => classify(props.occurrence.activity));
 
@@ -68,9 +70,9 @@ const clash = useClash(
  *  ring (the loudest the tight month view gets; the dismiss lives in the drawer). */
 const isActiveClash = computed(() => !!clash.value && !clash.value.acknowledged);
 
-const categoryLabel = computed(
-  () => getActivityCategoryById(props.occurrence.activity.category)?.name ?? ''
-);
+// Localized + beanie-aware (zh / beanie mode) — matches every other surface; the
+// raw constant name would announce English to screen-reader users in other locales.
+const categoryLabel = computed(() => resolveCategoryLabel(props.occurrence.activity.category));
 
 /**
  * Screen-reader announcement combining member name(s), category, time

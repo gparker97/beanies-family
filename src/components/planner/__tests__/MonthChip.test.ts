@@ -5,7 +5,11 @@ import MonthChip from '../MonthChip.vue';
 import type { FamilyActivity, FamilyMember } from '@/types/models';
 
 vi.mock('@/composables/useTranslation', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string) => key,
+    isBeanieMode: { value: false },
+    isEnglish: { value: true },
+  }),
 }));
 
 const MEMBERS: FamilyMember[] = [

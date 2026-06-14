@@ -1644,6 +1644,46 @@ describe('googleAuth (PKCE)', () => {
       vi.unstubAllEnvs();
     });
 
+    it('completeRedirectAuth: a sign-out DURING the refresh-token persist rolls back (no on-disk zombie)', async () => {
+      // A1/A2 — the persist-ordering TOCTOU. The pre-commit guard passes (epoch
+      // current at exchange time), then the sign-out interleaves while the IDB write
+      // is in flight. The post-persist re-check must roll back: clear the just-written
+      // token and null in-memory, so no refresh token survives for the dead session.
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', CLIENT);
+      const acquired = vi.fn();
+      googleAuth.onTokenAcquired(acquired);
+
+      const fhs = await import('@/services/sync/fileHandleStore');
+      (fhs.storeGoogleRefreshToken as ReturnType<typeof vi.fn>).mockClear();
+      (fhs.clearGoogleRefreshToken as ReturnType<typeof vi.fn>).mockClear();
+      // Sign out WHILE the refresh token is being persisted (db.put in flight).
+      (fhs.storeGoogleRefreshToken as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => {
+        await googleAuth.clearGoogleSessionState();
+      });
+
+      sessionStorage.setItem('beanies_redirect_auth_code', 'code-pp');
+      sessionStorage.setItem(
+        'beanies_redirect_auth',
+        JSON.stringify({ codeVerifier: 'v', returnPath: '/welcome' })
+      );
+
+      const result = await googleAuth.completeRedirectAuth();
+
+      expect(result).toBeNull();
+      expect(googleAuth.getAccessToken()).toBeNull();
+      expect(acquired).not.toHaveBeenCalled();
+      // Rollback cleared the just-written token and emitted the post-persist discard log.
+      expect(fhs.clearGoogleRefreshToken).toHaveBeenCalled();
+      const { logEvent } = await import('@/services/telemetry');
+      expect(vi.mocked(logEvent)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'auth-epoch-discard',
+          message: expect.stringContaining('post-persist rollback'),
+        })
+      );
+      vi.unstubAllEnvs();
+    });
+
     it('attemptSilentRefresh: a sign-out mid-refresh discards the token', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', CLIENT);
       const acquired = vi.fn();

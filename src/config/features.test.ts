@@ -72,22 +72,12 @@ describe('config/features', () => {
       const cases: Array<
         [
           string,
-          (
-            | 'inviteGate'
-            | 'slackInvite'
-            | 'slackPodCreate'
-            | 'errorReporter'
-            | 'marketingUrl'
-            | 'analytics'
-            | 'translationApiUpgrade'
-          ),
+          'inviteGate' | 'slackPodCreate' | 'errorReporter' | 'analytics' | 'translationApiUpgrade',
         ]
       > = [
         ['VITE_INVITE_BEAN_HASHES', 'inviteGate'],
-        ['VITE_INVITE_WEBHOOK_URL', 'slackInvite'],
         ['VITE_SLACK_WEBHOOK_URL', 'slackPodCreate'],
         ['VITE_BEANIES_ERROR_WEBHOOK_URL', 'errorReporter'],
-        ['VITE_MARKETING_URL', 'marketingUrl'],
         ['VITE_PLAUSIBLE_DOMAIN', 'analytics'],
         ['VITE_MYMEMORY_EMAIL', 'translationApiUpgrade'],
       ];

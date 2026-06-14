@@ -61,6 +61,23 @@ describe('InviteGateOverlay — no-token affordances', () => {
     expect(wrapper.text()).toContain('inviteGate.privacyNote');
   });
 
+  it('C3: with no webhook configured, "send us a message" routes to Discord (no dead-end form)', async () => {
+    // hasInviteWebhook is captured at setup, so stub the env BEFORE mount.
+    vi.stubEnv('VITE_INVITE_WEBHOOK_URL', '');
+    const wrapper = mount(InviteGateOverlay, { global: { stubs } });
+
+    await wrapper.get('button.text-primary-500').trigger('click');
+
+    // The message form never appears; the user is sent to Discord instead.
+    expect(wrapper.text()).not.toContain('inviteGate.requestTitle');
+    expect(openDiscordMock).toHaveBeenCalledWith('invite-gate');
+    expect(plausibleMock()).toHaveBeenCalledWith('invite_request_click', {
+      props: { method: 'discord' },
+    });
+
+    vi.unstubAllEnvs();
+  });
+
   it('a successful Slack send fires invite_request_click(message) and confirms', async () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 0 }));
     vi.stubGlobal('fetch', fetchMock);

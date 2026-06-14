@@ -227,41 +227,38 @@ export function useBeanTips() {
     }
   }
 
+  /**
+   * Persist a USER-INITIATED tip-state change, rolling back + toasting on the (rare)
+   * write failure. `store.save` returns `false` on a caught write failure (it never
+   * throws), so we surface it here rather than letting the UI show a phantom success.
+   * The single foreground failure path for this composable — mute/enable both route
+   * through it.
+   */
+  function commitTipState(next: TipStateV2, errTitle: string): void {
+    const prev = state.value;
+    state.value = next;
+    if (!store.save(next)) {
+      state.value = prev;
+      showToast(
+        'error',
+        errTitle,
+        'Your change could not be saved on this device. Check that storage is available (private mode / low disk can block it) and try again.',
+        { surface: 'bean-tips-toggle' }
+      );
+    }
+  }
+
   /** Mute future tips. Existing `issuedTips` are preserved (history stays in
    *  the bell). User-initiated — persistence failures surface a toast. */
   function muteAllTips(): void {
     if (!store.memberId()) return;
-    const prev = state.value;
-    try {
-      const next: TipStateV2 = { ...prev, tipsEnabled: false };
-      state.value = next;
-      store.save(next);
-    } catch (err) {
-      // saveState catches its own throws — but belt-and-braces in case the
-      // ref assignment or shape build throws (it shouldn't).
-      state.value = prev;
-      showToast('error', "Couldn't mute tips", err instanceof Error ? err.message : String(err), {
-        surface: 'bean-tips-toggle',
-        error: err,
-      });
-    }
+    commitTipState({ ...state.value, tipsEnabled: false }, "Couldn't mute tips");
   }
 
   /** Re-enable tip issuance. User-initiated — persistence failures surface a toast. */
   function enableTips(): void {
     if (!store.memberId()) return;
-    const prev = state.value;
-    try {
-      const next: TipStateV2 = { ...prev, tipsEnabled: true };
-      state.value = next;
-      store.save(next);
-    } catch (err) {
-      state.value = prev;
-      showToast('error', "Couldn't enable tips", err instanceof Error ? err.message : String(err), {
-        surface: 'bean-tips-toggle',
-        error: err,
-      });
-    }
+    commitTipState({ ...state.value, tipsEnabled: true }, "Couldn't enable tips");
   }
 
   return {

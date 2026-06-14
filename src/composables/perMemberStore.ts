@@ -59,8 +59,15 @@ export function readPerMemberRaw(prefix: string, memberId: string, label: string
 
 /**
  * Persist a per-member value. Never throws; on failure warns + `reportError`
- * (severity 'warning' — writes happen on background issuance ticks, not user
- * actions, so no toast).
+ * (severity 'warning') and returns `false`.
+ *
+ * Contract: returns `true` on a successful write, `false` on a caught write
+ * failure (quota exceeded / Safari private mode). **Background callers MAY ignore
+ * the result** (the `reportError` above is their signal — no toast for a write that
+ * wasn't user-initiated). **User-initiated callers MUST surface the failure**
+ * (toast + state rollback) — otherwise the UI shows success while nothing persisted,
+ * a silent failure. See `useCommunityNudge.commit` / `useBeanTips` for the foreground
+ * pattern.
  */
 export function writePerMemberState(
   prefix: string,
@@ -69,9 +76,10 @@ export function writePerMemberState(
   label: string,
   saveSurface: string,
   saveMessage: string
-): void {
+): boolean {
   try {
     localStorage.setItem(perMemberKey(prefix, memberId), JSON.stringify(value));
+    return true;
   } catch (err) {
     console.warn(`[${label}] localStorage write failed`, err);
     reportError({
@@ -80,6 +88,7 @@ export function writePerMemberState(
       error: err,
       severity: 'warning',
     });
+    return false;
   }
 }
 
@@ -122,8 +131,13 @@ export interface PerMemberStore<TState> {
   state: Ref<TState>;
   /** The current family member id ('' when none). */
   memberId: () => string;
-  /** Persist `next` for the current member (does NOT mutate `state`). */
-  save: (next: TState) => void;
+  /**
+   * Persist `next` for the current member (does NOT mutate `state`). Returns `true`
+   * on success, `false` on a caught write failure. Background callers MAY ignore the
+   * result; user-initiated callers MUST surface a `false` (toast + rollback) — see
+   * `writePerMemberState`'s contract.
+   */
+  save: (next: TState) => boolean;
   /** Install the family-member watch. Call inside the composable's setup. */
   useMemberSync: () => void;
 }
@@ -140,8 +154,8 @@ export function createPerMemberStore<TState, TPersisted = TState>(
   const state = ref<TState>(config.empty()) as Ref<TState>;
   let currentMemberId = '';
 
-  function save(memberId: string, next: TState): void {
-    writePerMemberState(
+  function save(memberId: string, next: TState): boolean {
+    return writePerMemberState(
       config.prefix,
       memberId,
       toPersisted(next),
