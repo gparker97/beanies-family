@@ -21,16 +21,25 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 import { useTranslation } from '@/composables/useTranslation';
 
 export function useActivityCategoryLabel() {
-  const { t, isBeanieMode } = useTranslation();
+  const { t, isBeanieMode, isEnglish } = useTranslation();
 
   /** Language-appropriate label for a category id. */
   function categoryLabel(id: string): string {
     const name = getActivityCategoryName(id);
     if (isBeanieMode.value) return name.toLowerCase();
+    // English is already the constant's source of truth — return it directly instead
+    // of round-tripping through `t()` (whose `en` value merely mirrors the constant).
+    // Only non-English locales need the translation layer.
+    if (isEnglish.value) return name;
     return t(`planner.category.${id}` as UIStringKey) || name;
   }
 
-  /** Language-appropriate label for a group name (e.g. `'Fun'`). */
+  /**
+   * Language-appropriate label for a group name (e.g. `'Fun'`). Intentionally keeps
+   * the always-`t()` path (unlike `categoryLabel`'s English shortcut above) — there
+   * are only a handful of groups, so the micro-optimization isn't worth diverging the
+   * two functions' shapes.
+   */
   function groupLabel(group: string): string {
     if (isBeanieMode.value) return group.toLowerCase();
     return t(`planner.group.${group.toLowerCase()}` as UIStringKey) || group;

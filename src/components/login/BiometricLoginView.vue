@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 
 const props = defineProps<{
   familyId: string;
@@ -129,7 +130,7 @@ async function handleBiometricLogin() {
       <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
         {{
           showNotYouLink && familyName
-            ? t('fastLogin.welcomeBackName').replace('{name}', familyName)
+            ? fillTemplate(t('fastLogin.welcomeBackName'), { name: familyName })
             : familyName || t('passkey.welcomeBack')
         }}
       </h2>

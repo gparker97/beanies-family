@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
-import DiscordGlyph from '@/components/ui/DiscordGlyph.vue';
+import InviteDiscordButton from '@/components/login/InviteDiscordButton.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { validateInviteToken } from '@/utils/inviteToken';
 import { isValidEmail } from '@/utils/email';
@@ -22,15 +22,36 @@ function goToMarketingHome() {
   window.location.href = `${MARKETING_URL}/`;
 }
 
+/** Whether a Slack/webhook endpoint is configured for the email-request fallback.
+ *  Prod injects it (deploy.yml); staging/preview builds may not. When absent, don't
+ *  route users into a message form that can only dead-end at submit — send them to
+ *  Discord instead. */
+const hasInviteWebhook = Boolean(import.meta.env.VITE_INVITE_WEBHOOK_URL);
+
+/** The invite-gate conversion funnel event. One definition so the event name and the
+ *  `method` prop shape can't drift between the two call sites (D6). */
+function recordInviteRequest(method: 'discord' | 'message') {
+  window.plausible?.('invite_request_click', { props: { method } });
+}
+
 /**
- * Primary "request an invite" path: open Discord (no email needed) and record
- * the conversion. `openDiscord` navigates synchronously inside the gesture and
- * fires its own `discord_join_click`; we add the dedicated `invite_request_click`
- * funnel event (`method: 'discord'`).
+ * Primary "request an invite" path: open Discord (no email needed) and record the
+ * conversion. `openDiscord` navigates synchronously inside the gesture and fires its
+ * own `discord_join_click`; we add the dedicated `invite_request_click` funnel event.
  */
 function handleRequestOnDiscord() {
   openDiscord('invite-gate');
-  window.plausible?.('invite_request_click', { props: { method: 'discord' } });
+  recordInviteRequest('discord');
+}
+
+/** Secondary "send us a message" path. Only opens the email/Slack form when a webhook
+ *  is actually configured; otherwise routes to Discord so there is no dead-end form. */
+function openMessageFallback() {
+  if (hasInviteWebhook) {
+    mode.value = 'request';
+  } else {
+    handleRequestOnDiscord();
+  }
 }
 
 /** Confirmed-mode "Join the Discord" — they already requested via email, so this
@@ -111,7 +132,7 @@ async function handleRequest() {
       }),
     });
     // Funnel conversion via the email/Slack fallback path.
-    window.plausible?.('invite_request_click', { props: { method: 'message' } });
+    recordInviteRequest('message');
     mode.value = 'confirmed';
   } catch (err) {
     console.warn('[inviteGate] Slack request webhook POST failed', err);
@@ -183,17 +204,11 @@ async function handleRequest() {
           <span class="h-px flex-1 bg-gray-200 dark:bg-slate-700"></span>
         </div>
 
-        <button
-          type="button"
-          class="font-outfit from-primary-500 to-terracotta-400 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br px-4 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-px hover:shadow-lg"
+        <InviteDiscordButton
+          :label="t('inviteGate.requestOnDiscord')"
           data-testid="invite-gate-discord"
           @click="handleRequestOnDiscord"
-        >
-          <span class="flex shrink-0 rounded-full bg-white p-1">
-            <DiscordGlyph :size="18" />
-          </span>
-          {{ t('inviteGate.requestOnDiscord') }}
-        </button>
+        />
         <p class="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
           {{ t('inviteGate.discordHint') }}
         </p>
@@ -202,7 +217,7 @@ async function handleRequest() {
           {{ t('inviteGate.noDiscord') }}
           <button
             class="text-primary-500 hover:text-primary-600 font-medium"
-            @click="mode = 'request'"
+            @click="openMessageFallback"
           >
             {{ t('inviteGate.sendMessage') }}
           </button>
@@ -289,16 +304,11 @@ async function handleRequest() {
           <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
             {{ t('inviteGate.confirmedDescription') }}
           </p>
-          <button
-            type="button"
-            class="font-outfit from-primary-500 to-terracotta-400 mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br px-4 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-px hover:shadow-lg"
+          <InviteDiscordButton
+            class="mb-2"
+            :label="t('inviteGate.confirmedJoinDiscord')"
             @click="joinDiscordOnly"
-          >
-            <span class="flex shrink-0 rounded-full bg-white p-1">
-              <DiscordGlyph :size="18" />
-            </span>
-            {{ t('inviteGate.confirmedJoinDiscord') }}
-          </button>
+          />
           <BaseButton variant="secondary" class="w-full" @click="goToMarketingHome">
             {{ t('inviteGate.backToHome') }}
           </BaseButton>

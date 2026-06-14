@@ -19,11 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  ACTIVITY_CATEGORIES,
-  ACTIVITY_GROUP_EMOJI_MAP,
-  getActivityCategoryName,
-} from '@/constants/activityCategories';
+import { ACTIVITY_CATEGORIES, ACTIVITY_GROUP_EMOJI_MAP } from '@/constants/activityCategories';
 import { UI_STRINGS } from '@/services/translation/uiStrings';
 
 const PROJECT_ROOT = process.cwd();
@@ -113,14 +109,15 @@ describe('activity category i18n keys mirror the constant', () => {
   // so pin it.
   const en = UI_STRINGS as Record<string, string>;
 
-  it('every category id has a planner.category.<id> key whose en matches the name', () => {
-    const mismatches: string[] = [];
-    for (const cat of ACTIVITY_CATEGORIES) {
-      const got = en[`planner.category.${cat.id}`];
-      const want = getActivityCategoryName(cat.id);
-      if (got !== want) mismatches.push(`${cat.id}: key="${got ?? '(missing)'}" name="${want}"`);
-    }
-    expect(mismatches).toEqual([]);
+  it('every category id has a planner.category.<id> key (zh source text)', () => {
+    // English category labels are now resolved from the constant directly
+    // (`useActivityCategoryLabel` short-circuits English), so the `en` value no longer
+    // has to MATCH the name — but the key must still EXIST so the zh
+    // `npm run translate` pipeline has source text for every id.
+    const missing = ACTIVITY_CATEGORIES.filter((cat) => !en[`planner.category.${cat.id}`]).map(
+      (c) => c.id
+    );
+    expect(missing).toEqual([]);
   });
 
   it('every group has a planner.group.<slug> key whose en matches the group name', () => {

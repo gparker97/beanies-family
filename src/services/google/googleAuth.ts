@@ -99,6 +99,119 @@ function isSessionStillCurrent(epochAtStart: number, accessTokenToRevoke: string
   return false;
 }
 
+/**
+ * Cancellation-shaped message used when an interactive acquisition is discarded
+ * because the session was torn down mid-flow. `performPopupAuth` returns `string`
+ * (string-or-throw), so it routes a discard through this channel; `isUserCancellation`
+ * matches `user_cancel`, so callers treat it as benign abandonment. Centralized here
+ * (one named constant) rather than re-derived as an inline literal at the throw site.
+ */
+const SESSION_DISCARDED_CANCEL = 'user_cancel: signed out during sign-in — token discarded';
+
+/**
+ * The single token-commit chokepoint shared by the three *persisting* acquisition
+ * seams (silent auth-code, popup, redirect). Centralizes, in one place a future
+ * seam can't skip: the pre-commit epoch re-check, the in-memory + IndexedDB writes,
+ * the POST-PERSIST epoch re-check + rollback, the auto-refresh schedule, and the
+ * subscriber notify.
+ *
+ * Post-persist rollback closes a TOCTOU: `storeGoogleRefreshToken` (db.put) and a
+ * concurrent sign-out's `clearGoogleRefreshToken` (db.delete) are independent
+ * auto-committing IDB ops on the same key, so a sign-out landing *during* the put
+ * could leave a refresh token on disk for a torn-down session (a cold-start zombie).
+ * Re-checking the epoch after the await and clearing on a stale epoch prevents that.
+ *
+ * Behaviour keyed on `interactive`:
+ *  - interactive (popup/redirect, prompt=consent): a persist failure THROWS (the
+ *    caller surfaces it); a missing refresh token is reported (consent should yield one).
+ *  - silent (auth-code): a persist failure is swallowed + logged (non-critical — the
+ *    next cold start just can't silent-refresh); a missing refresh token is expected.
+ *
+ * The seam still owns its own pre-exchange scope check and `epochAtStart` snapshot —
+ * this helper is the commit step only.
+ *
+ * @returns `{ committed: true, token }` on success, or `{ committed: false }` when the
+ *   session was torn down (the access token was best-effort revoked by
+ *   `isSessionStillCurrent`/the rollback, and any persisted refresh token rolled back).
+ */
+async function commitAcquiredToken(args: {
+  tokens: { access_token: string; expires_in: number; refresh_token?: string };
+  interactive: boolean;
+  epochAtStart: number;
+  storageKey: string;
+}): Promise<{ committed: true; token: string } | { committed: false }> {
+  const { tokens, interactive, epochAtStart, storageKey } = args;
+
+  // Pre-commit guard: discard if a sign-out cleared the session while the exchange
+  // was in flight (best-effort revoke + info log happen inside isSessionStillCurrent).
+  if (!isSessionStillCurrent(epochAtStart, tokens.access_token)) return { committed: false };
+
+  accessToken = tokens.access_token;
+  expiresAt = Date.now() + tokens.expires_in * 1000;
+
+  let wrotePersisted = false;
+  if (tokens.refresh_token) {
+    const issuedAt = Date.now();
+    currentRefreshToken = { token: tokens.refresh_token, issuedAt };
+    try {
+      await storeGoogleRefreshToken(storageKey, tokens.refresh_token, { issuedAt });
+      wrotePersisted = true;
+    } catch (e) {
+      if (interactive) throw e; // surface to the caller (existing popup/redirect behaviour)
+      // Silent: non-critical — the next cold start just can't silent-refresh. Surface
+      // to the firehose to catch IDB-write regressions before reconnect-banner cascades.
+      console.warn('[googleAuth] silent: failed to persist refresh token (non-critical)', e);
+      logEvent({
+        level: 'warn',
+        surface: 'refresh-token-persist',
+        message: `silent: failed to persist refresh token: ${e instanceof Error ? e.message : String(e)}`,
+        error: e,
+        context: { action: 'persist-refresh-token' },
+      });
+    }
+  } else if (interactive) {
+    // Consent should have returned a refresh token; if not, offline access wasn't
+    // established. Surface instead of silently continuing.
+    reportError({
+      surface: 'auth-no-refresh-token',
+      severity: 'warning',
+      message: 'interactive auth returned no refresh token; offline access not established',
+    });
+  }
+
+  // Post-persist re-check (closes the persist-ordering TOCTOU). An advanced epoch
+  // means a sign-out interleaved during the IDB write above — roll back: revoke the
+  // live access token, clear the just-written refresh token, and null in-memory. No
+  // subscriber/email side-effects have run yet, so there is nothing else to undo.
+  if (epochAtStart !== sessionEpoch) {
+    fetch(`${GOOGLE_REVOKE_URL}?token=${tokens.access_token}`, { method: 'POST' }).catch(() => {});
+    if (wrotePersisted) {
+      try {
+        await clearGoogleRefreshToken(storageKey);
+      } catch (e) {
+        console.warn('[googleAuth] post-persist rollback: failed to clear refresh token', e);
+      }
+    }
+    accessToken = null;
+    expiresAt = 0;
+    currentRefreshToken = null;
+    logEvent({
+      level: 'info',
+      surface: 'auth-epoch-discard',
+      message:
+        'discarded a Google token whose session was torn down during the refresh-token persist (post-persist rollback)',
+    });
+    return { committed: false };
+  }
+
+  scheduleAutoRefresh(tokens.expires_in);
+  // Fire-and-forget: never block token return on subscriber work. The epoch-leak
+  // backstop inside notifyTokenAcquired stays as the "a guard was MISSED" signal.
+  notifyTokenAcquired(tokens.access_token, interactive, epochAtStart).catch(() => {});
+
+  return { committed: true, token: tokens.access_token };
+}
+
 // Expiry callbacks — fire from the scheduled-refresh timer when the
 // pre-expiry refresh attempt fails AND the cause is permanent. Transient
 // (network blip / 5xx / `pendingSilentRefresh` race) does NOT fire these
@@ -678,44 +791,21 @@ async function attemptSilentAuthCode(clientId: string): Promise<string | null> {
       return null;
     }
 
-    // Discard if a sign-out cleared the session while the exchange was in flight.
-    if (!isSessionStillCurrent(epochAtStart, tokens.access_token)) return null;
-
-    accessToken = tokens.access_token;
-    expiresAt = Date.now() + tokens.expires_in * 1000;
-
-    if (tokens.refresh_token) {
-      const issuedAt = Date.now();
-      currentRefreshToken = { token: tokens.refresh_token, issuedAt };
-      const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
-      try {
-        await storeGoogleRefreshToken(storageKey, tokens.refresh_token, { issuedAt });
-      } catch (e) {
-        console.warn('[googleAuth] silent: failed to persist refresh token (non-critical)', e);
-        // Console-only until now — a failed persist means the next cold start
-        // can't silently refresh. Surface to the firehose to catch IDB-write
-        // regressions before they become reconnect-banner cascades.
-        logEvent({
-          level: 'warn',
-          surface: 'refresh-token-persist',
-          message: `silent: failed to persist refresh token: ${e instanceof Error ? e.message : String(e)}`,
-          error: e,
-          context: { action: 'persist-refresh-token' },
-        });
-      }
-    }
-
-    scheduleAutoRefresh(tokens.expires_in);
-
-    // interactive=false: this acquisition was fully silent. Subscribers
-    // (e.g. account-assertion) use this flag to distinguish a deliberate
-    // user-driven sign-in from an incidental background acquisition.
-    notifyTokenAcquired(tokens.access_token, false, epochAtStart).catch(() => {});
+    // Commit via the shared chokepoint (epoch re-check → persist → post-persist
+    // rollback → schedule → notify). interactive=false: a missing refresh token is
+    // expected for silent flows and a persist failure is non-fatal.
+    const result = await commitAcquiredToken({
+      tokens,
+      interactive: false,
+      epochAtStart,
+      storageKey: currentFamilyId ?? PENDING_FAMILY_KEY,
+    });
+    if (!result.committed) return null;
 
     console.info(
       `[googleAuth] silent auth-code succeeded — token acquired without consent prompt (expires in ${tokens.expires_in}s)`
     );
-    return tokens.access_token;
+    return result.token;
   } catch (e) {
     console.warn('[googleAuth] silent auth-code token exchange failed (non-critical)', e);
     return null;
@@ -754,46 +844,27 @@ async function performPopupAuth(
     );
   }
 
-  // Discard if a sign-out cleared the session while the exchange was in flight.
-  // This function returns `string`, so signal the discard via a cancellation-
-  // shaped error (isUserCancellation matches `user_cancel`) — callers treat it
-  // as a benign abandonment, not a surfaced failure. (The revoke + log happen
-  // inside isSessionStillCurrent.)
-  if (!isSessionStillCurrent(epochAtStart, tokens.access_token)) {
-    throw new Error('user_cancel: signed out during sign-in — token discarded');
+  // Commit via the shared chokepoint. interactive=true: a persist failure throws
+  // (surfaced to the caller) and a missing refresh token is reported. Interactive
+  // connect/reconnect callers force prompt=consent, so Google returns a
+  // refresh_token; when no family is active yet (login page) it is stored under the
+  // pending key so it survives the page refresh (see `initializeAuth`).
+  const result = await commitAcquiredToken({
+    tokens,
+    interactive: true,
+    epochAtStart,
+    storageKey: currentFamilyId ?? PENDING_FAMILY_KEY,
+  });
+  if (!result.committed) {
+    // Signed out mid-flow — benign. This function's contract is string-or-throw, so
+    // route the discard through the shared cancellation channel (isUserCancellation
+    // matches SESSION_DISCARDED_CANCEL); callers treat it as abandonment. The access
+    // token was already best-effort revoked inside commitAcquiredToken.
+    throw new Error(SESSION_DISCARDED_CANCEL);
   }
-
-  // Update in-memory state
-  accessToken = tokens.access_token;
-  expiresAt = Date.now() + tokens.expires_in * 1000;
-
-  // Store refresh token. Interactive connect/reconnect callers force
-  // prompt=consent, so Google returns a refresh_token. When no family is active
-  // yet (login page), store under the pending key so it survives the page
-  // refresh and is migrated once a family is adopted (see `initializeAuth`).
-  if (tokens.refresh_token) {
-    const issuedAt = Date.now();
-    currentRefreshToken = { token: tokens.refresh_token, issuedAt };
-    const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
-    await storeGoogleRefreshToken(storageKey, tokens.refresh_token, { issuedAt });
-  } else {
-    reportError({
-      surface: 'auth-no-refresh-token',
-      severity: 'warning',
-      message: 'popup auth returned no refresh token; offline access not established',
-    });
-  }
-
-  // Schedule auto-refresh
-  scheduleAutoRefresh(tokens.expires_in);
-
-  // Notify subscribers (assertion + telemetry hooks). Fire-and-forget:
-  // never block token return on subscriber work. interactive=true — the
-  // user explicitly went through the chooser/consent flow.
-  notifyTokenAcquired(tokens.access_token, true, epochAtStart).catch(() => {});
 
   console.warn(`[googleAuth] Token acquired via PKCE, expires in ${tokens.expires_in}s`);
-  return tokens.access_token;
+  return result.token;
 }
 
 /**
@@ -1566,15 +1637,29 @@ const REDIRECT_AUTH_KEY = 'beanies_redirect_auth';
  * Clear any pending redirect-auth intent. Called on session teardown so an
  * abandoned/signed-out redirect finds no intent when it returns post-reload and
  * `completeRedirectAuth` no-ops — the redirect equivalent of the in-memory epoch
- * guard, which cannot bridge a full page reload. Best-effort: sessionStorage can
- * throw in private mode.
+ * guard, which cannot bridge a full page reload.
+ *
+ * Residual limitation (by design, not a regression): the `sessionEpoch` counter is
+ * in-memory and resets to 0 on a full reload, so it cannot guard a redirect that
+ * returns *after* a reload. Clearing the intent keys here is the only bridge. If the
+ * removal itself fails (private-mode / disabled storage), an abandoned intent can
+ * survive the reload and be completed into a torn-down session — so we surface the
+ * failure (warn + reportError) rather than swallowing it. This reduces, but cannot
+ * fully eliminate, the cross-reload window.
  */
 function clearRedirectIntent(): void {
   try {
     sessionStorage.removeItem(REDIRECT_AUTH_CODE_KEY);
     sessionStorage.removeItem(REDIRECT_AUTH_KEY);
-  } catch {
-    // private-mode / disabled storage — nothing more we can do.
+  } catch (e) {
+    console.warn('[googleAuth] failed to clear redirect-auth intent on teardown', e);
+    reportError({
+      surface: 'redirect-intent-clear',
+      severity: 'warning',
+      message:
+        'Failed to clear pending redirect-auth intent on teardown; an abandoned redirect could complete after a reload',
+      error: e instanceof Error ? e : new Error(String(e)),
+    });
   }
 }
 
@@ -1668,36 +1753,19 @@ export async function completeRedirectAuth(): Promise<string | null> {
     throw new Error('Google Drive file access was not granted.');
   }
 
-  // Discard if a sign-out cleared the session while the exchange was in flight.
-  if (!isSessionStillCurrent(epochAtStart, tokens.access_token)) return null;
-
-  // Update in-memory state
-  accessToken = tokens.access_token;
-  expiresAt = Date.now() + tokens.expires_in * 1000;
-
-  if (tokens.refresh_token) {
-    const issuedAt = Date.now();
-    currentRefreshToken = { token: tokens.refresh_token, issuedAt };
-    const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
-    await storeGoogleRefreshToken(storageKey, tokens.refresh_token, { issuedAt });
-  } else {
-    // No refresh token despite an interactive redirect — `startRedirectAuth`
-    // forces prompt=consent, so this should not happen; if it does, offline
-    // access wasn't established. Surface it instead of silently continuing.
-    reportError({
-      surface: 'auth-no-refresh-token',
-      severity: 'warning',
-      message: 'redirect auth returned no refresh token; offline access not established',
-    });
-  }
-
-  scheduleAutoRefresh(tokens.expires_in);
-  // interactive=true — user just returned from a full-page redirect to
-  // Google's consent/chooser screen.
-  notifyTokenAcquired(tokens.access_token, true, epochAtStart).catch(() => {});
+  // Commit via the shared chokepoint. interactive=true: a persist failure throws and
+  // a missing refresh token is reported (`startRedirectAuth` forces prompt=consent, so
+  // a refresh_token should be present).
+  const result = await commitAcquiredToken({
+    tokens,
+    interactive: true,
+    epochAtStart,
+    storageKey: currentFamilyId ?? PENDING_FAMILY_KEY,
+  });
+  if (!result.committed) return null;
 
   console.warn(`[googleAuth] Token acquired via redirect PKCE, expires in ${tokens.expires_in}s`);
-  return tokens.access_token;
+  return result.token;
 }
 
 // ─── Native (Capacitor) deep-link OAuth completion ──────────────────────────

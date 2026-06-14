@@ -28,8 +28,14 @@ const storeGoogleRefreshToken = vi
   .fn<(...a: unknown[]) => Promise<void>>()
   .mockResolvedValue(undefined);
 let localToken: StoredRefreshToken | null = null;
+// Optional side-effect fired when the local refresh token is read — lets a test
+// simulate a sign-out (epoch bump) landing DURING reconcile's Promise.all read.
+let onLocalRead: (() => void) | null = null;
 vi.mock('@/services/sync/fileHandleStore', () => ({
-  getGoogleRefreshToken: () => Promise.resolve(localToken),
+  getGoogleRefreshToken: () => {
+    onLocalRead?.();
+    return Promise.resolve(localToken);
+  },
   storeGoogleRefreshToken: (...a: unknown[]) => storeGoogleRefreshToken(...a),
 }));
 
@@ -54,6 +60,7 @@ beforeEach(() => {
   storeGoogleRefreshToken.mockClear();
   logEvent.mockClear();
   localToken = null;
+  onLocalRead = null;
   tokenValid = false;
   mockSessionEpoch = 0;
 });
@@ -120,6 +127,25 @@ describe('reconcileDriveTokenWithDoc', () => {
     expect(primeRefreshToken).not.toHaveBeenCalled();
     expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
     expect((await getDriveConnectionByAccount('greg@example.com'))?.refreshToken).toBe('local-tok');
+  });
+
+  it('A3: a sign-out mid-read does NOT mirror the local token into the shared doc', async () => {
+    // Local strictly newer than doc → the mirror branch. A sign-out (epoch bump)
+    // lands during the Promise.all read; the symmetric mirrorLocalToDoc guard must
+    // skip the upsert so a torn-down session's token never reaches the synced doc.
+    await seedDoc('greg@example.com', 'doc-tok', 1000);
+    localToken = { token: 'local-tok', issuedAt: 2000 };
+    onLocalRead = () => {
+      mockSessionEpoch = 1;
+    };
+
+    await reconcileDriveTokenWithDoc('greg@example.com');
+
+    // Doc copy untouched — still the seeded value, not the (signed-out) local token.
+    expect((await getDriveConnectionByAccount('greg@example.com'))?.refreshToken).toBe('doc-tok');
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'auth-epoch-discard' })
+    );
   });
 
   it('cross-account: a doc entry for another account is never used', async () => {

@@ -299,20 +299,47 @@ describe('useBeanTips — condition gating', () => {
   });
 });
 
-describe('useBeanTips — persistence-failure observability', () => {
-  it('setItem throw triggers console.warn + reportError', async () => {
+describe('useBeanTips — persistence-failure observability (B1)', () => {
+  it('BACKGROUND tick: a setItem throw warns + reportErrors but shows NO toast', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     // happy-dom's localStorage methods aren't on Storage.prototype — spy on
     // the instance directly.
     const setSpy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
       throw new Error('quota exceeded');
     });
+    showToast.mockClear();
     const { ensureTodayTipIssued } = await freshUseBeanTips();
     ensureTodayTipIssued();
     expect(warn).toHaveBeenCalled();
     expect(reportError).toHaveBeenCalledWith(
       expect.objectContaining({ surface: 'bean-tips-save' })
     );
+    // Background issuance must stay quiet — no user-facing toast.
+    expect(showToast).not.toHaveBeenCalled();
+    setSpy.mockRestore();
+    warn.mockRestore();
+  });
+
+  it('USER ACTION (muteAllTips): a setItem throw shows an error toast AND rolls back', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { muteAllTips, tipsEnabled } = await freshUseBeanTips();
+    showToast.mockClear();
+    // Fail the write only for the user action (state was already loaded/seeded).
+    const setSpy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+
+    muteAllTips();
+
+    // Toast surfaced (no silent failure) and the in-memory state rolled back so the
+    // UI doesn't show a phantom "muted".
+    expect(showToast).toHaveBeenCalledWith(
+      'error',
+      "Couldn't mute tips",
+      expect.any(String),
+      expect.objectContaining({ surface: 'bean-tips-toggle' })
+    );
+    expect(tipsEnabled.value).toBe(true);
     setSpy.mockRestore();
     warn.mockRestore();
   });
