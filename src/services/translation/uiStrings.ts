@@ -3895,9 +3895,8 @@ const STRING_DEFS = {
     beanie: 'confirm {email}',
   },
   'inviteWizard.step1.nextHint': {
-    en: "Next, you'll get a link + QR to send them - that's how they join. Google will also email them a 'file shared' notice; they can ignore it.",
-    beanie:
-      "next, you'll get a link + qr to send them - that's how they join. google will also email them a 'file shared' notice; they can ignore it.",
+    en: "Next, you'll get a link + QR to send them - that's how they join.",
+    beanie: "next, you'll get a link + qr to send them - that's how they join.",
   },
   'inviteWizard.step1.faq.toggle': {
     en: "You've got questions? We've got answers",
@@ -3935,9 +3934,8 @@ const STRING_DEFS = {
     beanie: 'invite link ready',
   },
   'inviteWizard.step2.useThisLink': {
-    en: "Send them THIS link or QR - it's the only way in. Google also emailed them a 'file shared' notice; that one can be ignored.",
-    beanie:
-      "send them this link or qr - it's the only way in. google also emailed them a 'file shared' notice; that one can be ignored.",
+    en: "Send them this link or QR - it's how they join your family pod.",
+    beanie: "send them this link or qr - it's how they join your family pod.",
   },
   'inviteWizard.step2.caption': {
     en: "Set up for {email} — they'll land in the right Google account automatically.",
