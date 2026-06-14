@@ -6853,9 +6853,9 @@ const STRING_DEFS = {
   'settings.ai.tier.onDevice': { en: 'On your device', beanie: 'on your device' },
   'settings.ai.comingSoon': { en: ' (coming soon)', beanie: ' (coming soon)' },
   'settings.ai.privacy.managed': {
-    en: 'Your document is processed in an attested confidential-compute enclave. It is data-minimized, nothing is retained, and your beanies never hold the key.',
+    en: 'Your document is processed in an attested confidential-compute enclave. It is encrypted in transit, data-minimized, and nothing is retained.',
     beanie:
-      'your document is processed in an attested confidential-compute enclave. it is data-minimized, nothing is retained, and your beanies never hold the key.',
+      'your document is processed in an attested confidential-compute enclave. it is encrypted in transit, data-minimized, and nothing is retained.',
   },
   'settings.ai.privacy.byok': {
     en: 'Your own provider key is used. The document goes straight from your device to your provider, so beanies never sees your key or your document.',
