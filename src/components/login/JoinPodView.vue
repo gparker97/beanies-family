@@ -23,6 +23,18 @@ const familyContextStore = useFamilyContextStore();
 const flow = useJoinFlow();
 const { copied: diagCopied, copy: diagCopy } = useClipboard();
 
+/**
+ * Verify-screen subtitle. If the invitee arrived via an invite link (the URL
+ * carries a family id), they already HAVE the magic link — so welcome them (with
+ * the family name once the registry lookup resolves) instead of the stale "you
+ * need a magic joining link" line, which only makes sense with no link.
+ */
+const verifySubtitle = computed(() => {
+  if (!flow.targetFamilyId.value) return t('join.verifySubtitle');
+  const fam = flow.registryEntry.value?.familyName;
+  return fam ? t('join.verifyInvited').replace('{family}', fam) : t('join.verifyInvitedGeneric');
+});
+
 type LoginView = 'create';
 
 const emit = defineEmits<{
@@ -304,7 +316,7 @@ onMounted(() => {
           {{ t('join.verifyTitle') }}
         </h2>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {{ t('join.verifySubtitle') }}
+          {{ verifySubtitle }}
         </p>
       </div>
 
@@ -350,12 +362,25 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Google Drive Picker CTA — primary path for any drive-backed invite -->
+        <!-- Google Drive Picker CTA — primary path for any drive-backed invite.
+             Reframed as the required final step, and (when the invite link
+             carried the file name) names the exact .beanpod to pick. -->
         <template v-if="flow.targetProvider.value === 'google_drive'">
-          <div class="space-y-3 text-center">
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+          <div class="space-y-3">
+            <p class="text-center text-sm text-slate-600 dark:text-slate-400">
               {{ t('join.pickerPrompt.description') }}
             </p>
+            <div
+              v-if="flow.expectedFileName.value"
+              class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-700/50"
+            >
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ t('join.pickerPrompt.fileHint') }}
+              </p>
+              <p class="font-mono text-sm font-medium text-slate-800 dark:text-slate-100">
+                {{ flow.expectedFileName.value }}
+              </p>
+            </div>
             <BaseButton class="w-full" @click="flow.handleAuthTap">
               {{ t('join.pickerPrompt.button') }}
             </BaseButton>
