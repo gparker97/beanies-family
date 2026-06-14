@@ -3,10 +3,12 @@ import { ref, onMounted } from 'vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import DiscordGlyph from '@/components/ui/DiscordGlyph.vue';
 import { features } from '@/config/features';
 import { useTranslation } from '@/composables/useTranslation';
 import { validateInviteToken } from '@/utils/inviteToken';
 import { isValidEmail } from '@/utils/email';
+import { openDiscord } from '@/utils/discord';
 import { MARKETING_URL } from '@/utils/marketing';
 
 const emit = defineEmits<{
@@ -19,6 +21,23 @@ const { t } = useTranslation();
 
 function goToMarketingHome() {
   window.location.href = `${MARKETING_URL}/`;
+}
+
+/**
+ * Primary "request an invite" path: open Discord (no email needed) and record
+ * the conversion. `openDiscord` navigates synchronously inside the gesture and
+ * fires its own `discord_join_click`; we add the dedicated `invite_request_click`
+ * funnel event (`method: 'discord'`).
+ */
+function handleRequestOnDiscord() {
+  openDiscord('invite-gate');
+  window.plausible?.('invite_request_click', { props: { method: 'discord' } });
+}
+
+/** Confirmed-mode "Join the Discord" — they already requested via email, so this
+ *  is a plain community open (no `invite_request_click`). */
+function joinDiscordOnly() {
+  openDiscord('invite-gate');
 }
 
 type Mode = 'token' | 'request' | 'confirmed';
@@ -92,6 +111,8 @@ async function handleRequest() {
         text: `*New Invite Request*\n*Name:* ${reqName.value.trim()}\n*Email:* ${reqEmail.value.trim()}${reqMessage.value.trim() ? `\n*Message:* ${reqMessage.value.trim()}` : ''}`,
       }),
     });
+    // Funnel conversion via the email/Slack fallback path.
+    window.plausible?.('invite_request_click', { props: { method: 'message' } });
     mode.value = 'confirmed';
   } catch (err) {
     console.warn('[inviteGate] Slack request webhook POST failed', err);
@@ -150,8 +171,51 @@ async function handleRequest() {
           {{ t('inviteGate.unlock') }}
         </BaseButton>
 
+        <!-- No-token path. Discord is the primary "request an invite" CTA (no
+             email needed); the Slack message form is the secondary fallback.
+             Falls back to the plain Slack link only when the marketing URL
+             (and thus the Discord redirect) is unavailable, so the gate is
+             never a dead end. -->
+        <template v-if="features.marketingUrl">
+          <div
+            class="font-outfit mt-5 mb-3 flex items-center gap-3 text-xs font-semibold tracking-wide text-gray-400 dark:text-gray-500"
+          >
+            <span class="h-px flex-1 bg-gray-200 dark:bg-slate-700"></span>
+            {{ t('inviteGate.notInvitedYet') }}
+            <span class="h-px flex-1 bg-gray-200 dark:bg-slate-700"></span>
+          </div>
+
+          <button
+            type="button"
+            class="font-outfit from-primary-500 to-terracotta-400 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br px-4 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-px hover:shadow-lg"
+            data-testid="invite-gate-discord"
+            @click="handleRequestOnDiscord"
+          >
+            <span class="flex shrink-0 rounded-full bg-white p-1">
+              <DiscordGlyph :size="18" />
+            </span>
+            {{ t('inviteGate.requestOnDiscord') }}
+          </button>
+          <p class="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
+            {{ t('inviteGate.discordHint') }}
+          </p>
+
+          <p
+            v-if="features.slackInvite"
+            class="mt-3 text-center text-sm text-gray-400 dark:text-gray-500"
+          >
+            {{ t('inviteGate.noDiscord') }}
+            <button
+              class="text-primary-500 hover:text-primary-600 font-medium"
+              @click="mode = 'request'"
+            >
+              {{ t('inviteGate.sendMessage') }}
+            </button>
+          </p>
+        </template>
+
         <p
-          v-if="features.slackInvite"
+          v-else-if="features.slackInvite"
           class="mt-4 text-center text-sm text-gray-400 dark:text-gray-500"
         >
           {{ t('inviteGate.noToken') }}
@@ -207,14 +271,31 @@ async function handleRequest() {
           {{ t('inviteGate.sendRequest') }}
         </BaseButton>
 
-        <p class="mt-3 text-center">
-          <button
-            class="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-            @click="mode = 'token'"
-          >
-            {{ t('inviteGate.haveToken') }}
-          </button>
-        </p>
+        <div
+          class="mt-3 flex items-start gap-2 rounded-xl bg-sky-50 p-3 text-xs leading-relaxed text-gray-500 dark:bg-sky-900/20 dark:text-gray-400"
+        >
+          <span aria-hidden="true">🔒</span>
+          <span>{{ t('inviteGate.privacyNote') }}</span>
+        </div>
+
+        <div class="mt-3 space-y-1 text-center">
+          <p v-if="features.marketingUrl">
+            <button
+              class="text-primary-500 hover:text-primary-600 text-sm font-medium"
+              @click="handleRequestOnDiscord"
+            >
+              {{ t('inviteGate.askOnDiscordInstead') }}
+            </button>
+          </p>
+          <p>
+            <button
+              class="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              @click="mode = 'token'"
+            >
+              {{ t('inviteGate.haveToken') }}
+            </button>
+          </p>
+        </div>
       </template>
 
       <!-- Confirmed mode -->
@@ -227,6 +308,17 @@ async function handleRequest() {
           <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
             {{ t('inviteGate.confirmedDescription') }}
           </p>
+          <button
+            v-if="features.marketingUrl"
+            type="button"
+            class="font-outfit from-primary-500 to-terracotta-400 mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br px-4 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-px hover:shadow-lg"
+            @click="joinDiscordOnly"
+          >
+            <span class="flex shrink-0 rounded-full bg-white p-1">
+              <DiscordGlyph :size="18" />
+            </span>
+            {{ t('inviteGate.confirmedJoinDiscord') }}
+          </button>
           <BaseButton
             v-if="features.marketingUrl"
             variant="secondary"

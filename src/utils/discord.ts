@@ -12,7 +12,13 @@ import { useTranslationStore } from '@/stores/translationStore';
 export const DISCORD_URL = `${MARKETING_URL}/discord`;
 
 /** Where a Discord open was triggered from — drives Plausible segmentation. */
-export type DiscordSurface = 'onboarding' | 'nudge' | 'settings' | 'nav' | 'announcement';
+export type DiscordSurface =
+  | 'onboarding'
+  | 'nudge'
+  | 'settings'
+  | 'nav'
+  | 'announcement'
+  | 'invite-gate';
 
 /**
  * Open the Discord community and record which surface drove it.
