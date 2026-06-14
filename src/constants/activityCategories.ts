@@ -18,6 +18,7 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
   { id: 'doctor', name: 'Doctor', emoji: '🩺', color: '#EF4444', group: 'Appointments' },
   { id: 'eye_exam', name: 'Eye Exam', emoji: '👁️', color: '#B91C1C', group: 'Appointments' },
   { id: 'haircut', name: 'Haircut', emoji: '💇', color: '#F87171', group: 'Appointments' },
+  { id: 'therapy', name: 'Therapy', emoji: '🛋️', color: '#FCA5A5', group: 'Appointments' },
   {
     id: 'other_appointment',
     name: 'Other Appointment',
@@ -42,10 +43,31 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
     group: 'Competitions',
   },
   {
+    id: 'gymnastics_competition',
+    name: 'Gymnastics Competition',
+    emoji: '🤸',
+    color: '#EAB308',
+    group: 'Competitions',
+  },
+  {
     id: 'spelling_bee',
     name: 'Spelling Bee',
     emoji: '🐝',
     color: '#F59E0B',
+    group: 'Competitions',
+  },
+  {
+    id: 'swimming_competition',
+    name: 'Swimming Competition',
+    emoji: '🏊',
+    color: '#FBBF24',
+    group: 'Competitions',
+  },
+  {
+    id: 'track_field',
+    name: 'Track & Field',
+    emoji: '🏃',
+    color: '#FCD34D',
     group: 'Competitions',
   },
   {
@@ -69,32 +91,32 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
     group: 'Educational',
   },
 
-  // Entertainment
-  { id: 'movie', name: 'Movie', emoji: '🎬', color: '#DB2777', group: 'Entertainment' },
-  { id: 'show', name: 'Show / Musical', emoji: '🎭', color: '#EC4899', group: 'Entertainment' },
-  { id: 'concert', name: 'Concert', emoji: '🎵', color: '#BE185D', group: 'Entertainment' },
-  { id: 'theme_park', name: 'Theme Park', emoji: '🎢', color: '#E11D48', group: 'Entertainment' },
+  // Fun (was Entertainment — id `other_entertainment` kept for data continuity)
+  { id: 'arcade', name: 'Arcade', emoji: '🕹️', color: '#AD1457', group: 'Fun' },
+  { id: 'beach', name: 'Beach', emoji: '🏖️', color: '#F06292', group: 'Fun' },
+  { id: 'bowling', name: 'Bowling', emoji: '🎳', color: '#C2185B', group: 'Fun' },
+  { id: 'concert', name: 'Concert', emoji: '🎵', color: '#BE185D', group: 'Fun' },
+  { id: 'movie', name: 'Movie', emoji: '🎬', color: '#DB2777', group: 'Fun' },
+  { id: 'museum', name: 'Museum', emoji: '🏛️', color: '#9D174D', group: 'Fun' },
+  { id: 'festival', name: 'Festival / Fair', emoji: '🎪', color: '#F472B6', group: 'Fun' },
+  { id: 'playground', name: 'Playground / Park', emoji: '🛝', color: '#F48FB1', group: 'Fun' },
+  { id: 'pool', name: 'Pool / Swim', emoji: '🏊', color: '#EC407A', group: 'Fun' },
+  { id: 'show', name: 'Show / Musical', emoji: '🎭', color: '#EC4899', group: 'Fun' },
   {
     id: 'sporting_event',
     name: 'Sporting Event',
     emoji: '🏟️',
     color: '#BE123C',
-    group: 'Entertainment',
+    group: 'Fun',
   },
-  { id: 'museum', name: 'Museum', emoji: '🏛️', color: '#9D174D', group: 'Entertainment' },
-  {
-    id: 'festival',
-    name: 'Festival / Fair',
-    emoji: '🎪',
-    color: '#F472B6',
-    group: 'Entertainment',
-  },
+  { id: 'theme_park', name: 'Theme Park', emoji: '🎢', color: '#E11D48', group: 'Fun' },
+  { id: 'zoo', name: 'Zoo / Aquarium', emoji: '🦁', color: '#880E4F', group: 'Fun' },
   {
     id: 'other_entertainment',
-    name: 'Other Entertainment',
+    name: 'Other Fun Thing',
     emoji: '✨',
     color: '#831843',
-    group: 'Entertainment',
+    group: 'Fun',
   },
 
   // Food
@@ -106,8 +128,11 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
   { id: 'other_food', name: 'Other Food', emoji: '🍴', color: '#155E75', group: 'Food' },
 
   // Party
+  { id: 'anniversary', name: 'Anniversary', emoji: '💍', color: '#FB923C', group: 'Party' },
+  { id: 'baby_shower', name: 'Baby Shower', emoji: '🍼', color: '#FCD34D', group: 'Party' },
   { id: 'bar_mitzvah', name: 'Bar Mitzvah', emoji: '✡️', color: '#D97706', group: 'Party' },
   { id: 'birthday', name: 'Birthday Party', emoji: '🎂', color: '#F15D22', group: 'Party' },
+  { id: 'graduation', name: 'Graduation', emoji: '🎓', color: '#FBBF24', group: 'Party' },
   { id: 'wedding', name: 'Wedding', emoji: '💒', color: '#E67E22', group: 'Party' },
   {
     id: 'other_celebration',
@@ -119,7 +144,11 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
 
   // Lessons
   { id: 'art', name: 'Art', emoji: '🎨', color: '#818CF8', group: 'Lessons' },
+  { id: 'chess', name: 'Chess', emoji: '♟️', color: '#5C6BC0', group: 'Lessons' },
+  { id: 'coding', name: 'Coding / Robotics', emoji: '🤖', color: '#3F51B5', group: 'Lessons' },
   { id: 'dance', name: 'Dance / Ballet', emoji: '💃', color: '#A78BFA', group: 'Lessons' },
+  { id: 'drama', name: 'Drama / Acting', emoji: '🎭', color: '#9FA8DA', group: 'Lessons' },
+  { id: 'voice', name: 'Singing / Voice', emoji: '🎤', color: '#7986CB', group: 'Lessons' },
   { id: 'drum', name: 'Drum', emoji: '🥁', color: '#3B82F6', group: 'Lessons' },
   { id: 'guitar', name: 'Guitar', emoji: '🎸', color: '#93C5FD', group: 'Lessons' },
   { id: 'music', name: 'Music', emoji: '🎵', color: '#2563EB', group: 'Lessons' },
@@ -161,6 +190,7 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
   // Sports
   { id: 'badminton', name: 'Badminton', emoji: '🏸', color: '#16A34A', group: 'Sports' },
   { id: 'baseball', name: 'Baseball', emoji: '⚾', color: '#166534', group: 'Sports' },
+  { id: 'basketball', name: 'Basketball', emoji: '🏀', color: '#65A30D', group: 'Sports' },
   { id: 'football', name: 'Football', emoji: '🏈', color: '#86EFAC', group: 'Sports' },
   { id: 'golf_activity', name: 'Golf', emoji: '⛳', color: '#15803D', group: 'Sports' },
   { id: 'gymnastics', name: 'Gymnastics', emoji: '🤸', color: '#10B981', group: 'Sports' },
@@ -179,6 +209,49 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
     color: '#14B8A6',
     group: 'Sports',
   },
+
+  // Pets
+  { id: 'pet_grooming', name: 'Grooming', emoji: '✂️', color: '#C2410C', group: 'Pets' },
+  { id: 'vet', name: 'Vet', emoji: '🩺', color: '#EA580C', group: 'Pets' },
+  { id: 'other_pet', name: 'Other Pet', emoji: '🐾', color: '#9A3412', group: 'Pets' },
+
+  // Religious
+  {
+    id: 'religious_class',
+    name: 'Religious Class',
+    emoji: '📿',
+    color: '#4338CA',
+    group: 'Religious',
+  },
+  { id: 'worship', name: 'Worship / Service', emoji: '🙏', color: '#4F46E5', group: 'Religious' },
+  {
+    id: 'other_religious',
+    name: 'Other Religious',
+    emoji: '⛪',
+    color: '#6366F1',
+    group: 'Religious',
+  },
+
+  // Social
+  { id: 'date_night', name: 'Date Night', emoji: '💑', color: '#C026D3', group: 'Social' },
+  { id: 'family_visit', name: 'Family Visit', emoji: '👵', color: '#D946EF', group: 'Social' },
+  { id: 'playdate', name: 'Playdate', emoji: '🧒', color: '#A21CAF', group: 'Social' },
+  { id: 'other_social', name: 'Other Social', emoji: '🧑‍🤝‍🧑', color: '#86198F', group: 'Social' },
+
+  // Work
+  { id: 'conference', name: 'Conference', emoji: '🎤', color: '#1E293B', group: 'Work' },
+  { id: 'networking', name: 'Networking', emoji: '🧑‍💼', color: '#94A3B8', group: 'Work' },
+  {
+    id: 'team_building',
+    name: 'Team Building / Outing',
+    emoji: '🤝',
+    color: '#64748B',
+    group: 'Work',
+  },
+  { id: 'work_dinner', name: 'Work Dinner', emoji: '🍽️', color: '#475569', group: 'Work' },
+  { id: 'work_drinks', name: 'Work Drinks', emoji: '🍻', color: '#334155', group: 'Work' },
+  { id: 'work_party', name: 'Office Party', emoji: '🎊', color: '#52525B', group: 'Work' },
+  { id: 'other_work', name: 'Other Work', emoji: '🏢', color: '#0F172A', group: 'Work' },
 
   // Other (always last group)
   { id: 'other_activity', name: 'Other Activity', emoji: '📌', color: '#6B7280', group: 'Other' },
@@ -206,12 +279,16 @@ export const ACTIVITY_GROUP_EMOJI_MAP: Record<string, string> = {
   Appointments: '🩺',
   Competitions: '🏆',
   Educational: '📚',
-  Entertainment: '🎬',
+  Fun: '🎈',
   Food: '🍽️',
   Lessons: '🎵',
   Party: '🎉',
+  Pets: '🐾',
+  Religious: '⛪',
   School: '🏫',
+  Social: '🧑‍🤝‍🧑',
   Sports: '⚽',
+  Work: '💼',
   Other: '📌',
 };
 
