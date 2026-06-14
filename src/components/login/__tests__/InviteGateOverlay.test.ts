@@ -94,21 +94,20 @@ describe('InviteGateOverlay — Discord-first request', () => {
 });
 
 describe('InviteGateOverlay — capability matrix', () => {
-  it('marketingUrl on, slackInvite off → Discord CTA only, no message link', () => {
+  it('Discord CTA is always shown (ungated — the redirect resolves via MARKETING_URL fallback)', () => {
+    flags.marketingUrl = false; // even with the env var absent
+    const wrapper = mount(InviteGateOverlay, { global: { stubs } });
+    expect(wrapper.find('[data-testid="invite-gate-discord"]').exists()).toBe(true);
+  });
+
+  it('slackInvite off → Discord CTA only, no "send a message" link', () => {
     flags.slackInvite = false;
     const wrapper = mount(InviteGateOverlay, { global: { stubs } });
     expect(wrapper.find('[data-testid="invite-gate-discord"]').exists()).toBe(true);
     expect(wrapper.text()).not.toContain('inviteGate.sendMessage');
   });
 
-  it('marketingUrl off, slackInvite on → no Discord CTA, falls back to the Slack link', () => {
-    flags.marketingUrl = false;
-    const wrapper = mount(InviteGateOverlay, { global: { stubs } });
-    expect(wrapper.find('[data-testid="invite-gate-discord"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain('inviteGate.requestOne');
-  });
-
-  it('both on → Discord CTA primary plus the secondary message link', () => {
+  it('slackInvite on → Discord CTA primary plus the secondary message link', () => {
     const wrapper = mount(InviteGateOverlay, { global: { stubs } });
     expect(wrapper.find('[data-testid="invite-gate-discord"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('inviteGate.sendMessage');
