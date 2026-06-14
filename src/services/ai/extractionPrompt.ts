@@ -16,7 +16,7 @@ import type {
   TravelSegmentDraft,
 } from './types';
 
-export const PROMPT_VERSION = '2026-06-08.1';
+export const PROMPT_VERSION = '2026-06-14.1';
 
 /**
  * The activity-category taxonomy rendered for the model to pick `category` from.
@@ -30,15 +30,19 @@ export const PROMPT_VERSION = '2026-06-08.1';
  * test fails — regenerate by that recipe, update all three copies, and bump `PROMPT_VERSION`.
  */
 export const CATEGORY_OPTIONS_TEXT = [
-  'Appointments: dentist (Dentist), doctor (Doctor), eye_exam (Eye Exam), haircut (Haircut), other_appointment (Other Appointment)',
-  'Competitions: cubing (Cubing Competition), math_competition (Math Competition), spelling_bee (Spelling Bee), other_competition (Other Competition)',
+  'Appointments: dentist (Dentist), doctor (Doctor), eye_exam (Eye Exam), haircut (Haircut), therapy (Therapy), other_appointment (Other Appointment)',
+  'Competitions: cubing (Cubing Competition), gymnastics_competition (Gymnastics Competition), math_competition (Math Competition), spelling_bee (Spelling Bee), swimming_competition (Swimming Competition), track_field (Track & Field), other_competition (Other Competition)',
   'Educational: language (Language), math (Math), science (Science), tutoring (Tutoring), other_educational (Other Educational)',
-  'Entertainment: concert (Concert), festival (Festival / Fair), movie (Movie), museum (Museum), show (Show / Musical), sporting_event (Sporting Event), theme_park (Theme Park), other_entertainment (Other Entertainment)',
   'Food: brunch (Brunch), coffee (Coffee), dining_out (Dining Out), drinks (Drinks), picnic (Picnic), other_food (Other Food)',
-  'Lessons: art (Art), dance (Dance / Ballet), drum (Drum), guitar (Guitar), music (Music), piano (Piano), swimming (Swimming), trumpet (Trumpet), other_lesson (Other Lesson)',
-  'Party: bar_mitzvah (Bar Mitzvah), birthday (Birthday Party), wedding (Wedding), other_celebration (Other Celebration)',
+  'Fun: arcade (Arcade), beach (Beach), bowling (Bowling), concert (Concert), festival (Festival / Fair), movie (Movie), museum (Museum), playground (Playground / Park), pool (Pool / Swim), show (Show / Musical), sporting_event (Sporting Event), theme_park (Theme Park), zoo (Zoo / Aquarium), other_entertainment (Other Fun Thing)',
+  'Lessons: art (Art), chess (Chess), coding (Coding / Robotics), dance (Dance / Ballet), drama (Drama / Acting), drum (Drum), guitar (Guitar), music (Music), piano (Piano), voice (Singing / Voice), swimming (Swimming), trumpet (Trumpet), other_lesson (Other Lesson)',
+  'Party: anniversary (Anniversary), baby_shower (Baby Shower), bar_mitzvah (Bar Mitzvah), birthday (Birthday Party), graduation (Graduation), wedding (Wedding), other_celebration (Other Celebration)',
+  'Pets: pet_grooming (Grooming), vet (Vet), other_pet (Other Pet)',
+  'Religious: religious_class (Religious Class), worship (Worship / Service), other_religious (Other Religious)',
   'School: after_school (After School Activity), field_trip (Field Trip), school_recital (School Recital / Presentation), other_school (Other School Activity)',
-  'Sports: badminton (Badminton), baseball (Baseball), football (Football), golf_activity (Golf), gymnastics (Gymnastics), mma (MMA), multi_sport (Multi Sport), rugby (Rugby), soccer (Soccer), taekwondo (Taekwondo), tennis (Tennis), gym_activity (Training), yoga_activity (Yoga / Pilates), other_sports_activity (Other Sports)',
+  'Social: date_night (Date Night), family_visit (Family Visit), playdate (Playdate), other_social (Other Social)',
+  'Sports: badminton (Badminton), baseball (Baseball), basketball (Basketball), football (Football), golf_activity (Golf), gymnastics (Gymnastics), mma (MMA), multi_sport (Multi Sport), rugby (Rugby), soccer (Soccer), taekwondo (Taekwondo), tennis (Tennis), gym_activity (Training), yoga_activity (Yoga / Pilates), other_sports_activity (Other Sports)',
+  'Work: conference (Conference), networking (Networking), work_party (Office Party), team_building (Team Building / Outing), work_dinner (Work Dinner), work_drinks (Work Drinks), other_work (Other Work)',
   'Other: other_activity (Other Activity)',
 ].join('\n');
 

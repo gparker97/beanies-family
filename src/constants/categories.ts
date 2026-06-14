@@ -761,6 +761,10 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     art: 'art_lessons',
     dance: 'dance_lessons',
     swimming: 'other_lessons',
+    chess: 'other_lessons',
+    coding: 'other_lessons',
+    drama: 'other_lessons',
+    voice: 'music_lessons',
     other_lesson: 'other_lessons',
     // Educational → Tuition
     tutoring: 'tuition',
@@ -782,11 +786,15 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     gymnastics: 'sports_team',
     mma: 'sports_team',
     taekwondo: 'sports_team',
+    basketball: 'sports_team',
     other_sports_activity: 'other_sports',
-    // Competitions → Education
+    // Competitions → Education (academic) / Sports (athletic)
     spelling_bee: 'other_education',
     math_competition: 'other_education',
     cubing: 'other_education',
+    swimming_competition: 'other_sports',
+    track_field: 'other_sports',
+    gymnastics_competition: 'other_sports',
     other_competition: 'other_education',
     // School → School Fees
     after_school: 'school_fees',
@@ -797,6 +805,9 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     birthday: 'entertainment',
     wedding: 'entertainment',
     bar_mitzvah: 'entertainment',
+    graduation: 'entertainment',
+    baby_shower: 'entertainment',
+    anniversary: 'entertainment',
     other_celebration: 'entertainment',
     // Food → Food (expense)
     dining_out: 'dining_out',
@@ -805,7 +816,7 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     coffee: 'coffee',
     picnic: 'other_food',
     other_food: 'other_food',
-    // Entertainment → Entertainment (expense)
+    // Fun → Entertainment (expense)
     movie: 'entertainment',
     show: 'entertainment',
     concert: 'entertainment',
@@ -813,13 +824,41 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     sporting_event: 'entertainment',
     museum: 'entertainment',
     festival: 'entertainment',
+    beach: 'entertainment',
+    pool: 'entertainment',
+    playground: 'entertainment',
+    zoo: 'entertainment',
+    bowling: 'entertainment',
+    arcade: 'entertainment',
     other_entertainment: 'other_entertainment',
     // Appointments → Medical / Personal
     doctor: 'healthcare',
     dentist: 'dental',
     eye_exam: 'healthcare',
     haircut: 'personal_care',
+    therapy: 'healthcare',
     other_appointment: 'other_personal',
+    // Work → neutral / dining
+    work_dinner: 'dining_out',
+    work_drinks: 'dining_out',
+    team_building: 'other_expense',
+    conference: 'other_expense',
+    work_party: 'entertainment',
+    networking: 'other_expense',
+    other_work: 'other_expense',
+    // Pets → Pets (expense)
+    vet: 'pets',
+    pet_grooming: 'pets',
+    other_pet: 'pets',
+    // Social → Entertainment / Family / Personal
+    date_night: 'entertainment',
+    playdate: 'other_personal',
+    family_visit: 'other_family',
+    other_social: 'other_personal',
+    // Religious → Charity / Education
+    worship: 'other_charity',
+    religious_class: 'other_education',
+    other_religious: 'other_charity',
     // Other
     other_activity: 'other_expense',
   };
