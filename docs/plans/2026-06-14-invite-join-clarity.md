@@ -3,6 +3,8 @@
 > Date: 2026-06-14
 > Related issues: None — direct implementation (greg, in-session, from 2 user reports)
 > Mockup: `docs/mockups/invite-join-clarity-2026-06-14.html`
+> **Follow-up (2026-06-14):** greg opted to **suppress the Google Drive notification email** at the source (`sendNotificationEmail=false` in `shareFileWithEmail`, `driveService.ts`) — it was confusing and useless. With the email gone, the two wizard callouts were trimmed to the key messages only (dropped the "Google will email them a 'file shared' notice" sentences); step-2 callout icon ✋→📤. The invitee still gets Drive access (file shows in "Shared with me") and joins via the custom link.
+>
 > Status: **IMPLEMENTED 2026-06-14** (committed to `main`, not deployed). All four open decisions approved by greg: CTA "Share & Get Invite Link"; step-2 retitled "Invite Link Ready"; family-name welcome (with name-less fallback); raw mono `.beanpod` filename.
 
 ## Context

@@ -608,6 +608,9 @@ describe('driveService', () => {
 
       const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
       expect(call[0]).toContain('/files/file-123/permissions');
+      // Google's automatic "shared a file with you" email is suppressed — the
+      // invitee joins via our custom invite link, not the Drive email.
+      expect(call[0]).toContain('sendNotificationEmail=false');
       expect(call[1]?.method).toBe('POST');
       const body = JSON.parse(call[1]?.body as string);
       expect(body).toEqual({

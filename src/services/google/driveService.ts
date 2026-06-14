@@ -388,6 +388,12 @@ export async function deleteFile(token: string, fileId: string): Promise<void> {
 
 /**
  * Share a file with another user via email (Google Drive permissions API).
+ *
+ * `sendNotificationEmail=false` suppresses Google's automatic "shared a file
+ * with you" email. The invitee joins via our custom invite link (which is the
+ * only path that actually opens beanies) — the Google email just linked to Drive
+ * and confused people, so we don't send it. The file still appears in the
+ * invitee's Drive "Shared with me"; they simply aren't emailed about it.
  */
 export async function shareFileWithEmail(
   token: string,
@@ -395,11 +401,15 @@ export async function shareFileWithEmail(
   email: string,
   role: 'reader' | 'writer' = 'writer'
 ): Promise<void> {
-  await driveRequest(token, `${DRIVE_API}/files/${fileId}/permissions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'user', role, emailAddress: email.trim() }),
-  });
+  await driveRequest(
+    token,
+    `${DRIVE_API}/files/${fileId}/permissions?sendNotificationEmail=false`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'user', role, emailAddress: email.trim() }),
+    }
+  );
 }
 
 /**
