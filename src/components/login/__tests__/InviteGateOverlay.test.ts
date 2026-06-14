@@ -53,12 +53,16 @@ describe('InviteGateOverlay — no-token affordances', () => {
     });
   });
 
-  it('the secondary "send us a message" link opens the Slack request form', async () => {
+  it('the secondary "send us a message" link opens the Slack request form (webhook configured)', async () => {
+    // hasInviteWebhook is captured at setup from VITE_INVITE_WEBHOOK_URL — stub it
+    // explicitly so the form-opening path is deterministic in CI (no .env.local there).
+    vi.stubEnv('VITE_INVITE_WEBHOOK_URL', 'https://hooks.slack.test/x');
     const wrapper = mount(InviteGateOverlay, { global: { stubs } });
     expect(wrapper.text()).not.toContain('inviteGate.requestTitle');
     await wrapper.get('button.text-primary-500').trigger('click');
     expect(wrapper.text()).toContain('inviteGate.requestTitle');
     expect(wrapper.text()).toContain('inviteGate.privacyNote');
+    vi.unstubAllEnvs();
   });
 
   it('C3: with no webhook configured, "send us a message" routes to Discord (no dead-end form)', async () => {
