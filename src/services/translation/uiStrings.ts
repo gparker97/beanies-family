@@ -2935,6 +2935,11 @@ const STRING_DEFS = {
     en: 'Another pod setup is already in progress. Please wait a moment and try again.',
     beanie: 'another pod setup is already in progress. please wait a moment and try again.',
   },
+  'createPod.failedReasonExistingPod': {
+    en: "Your family already has a pod, so we didn't create a new one. Try loading your existing pod instead — your data is safe.",
+    beanie:
+      "your family already has a pod, so we didn't create a new one. try loading your existing pod instead — your data is safe.",
+  },
   'createPod.duplicateFile': {
     en: "A pod file with this family name already exists in your Google Drive. Please pick a different family name and try again — we won't touch the existing file.",
     beanie:
@@ -3444,6 +3449,32 @@ const STRING_DEFS = {
     en: "We couldn't reach our family servers right now — please pick where your pod lives below, or try again in a moment.",
     beanie:
       "we couldn't reach our family servers right now — please pick where your pod lives below, or try again in a moment.",
+  },
+  'resumeSetup.retryBody': {
+    en: "We found your family but couldn't reach your pod file just now. This is usually temporary — let's try again.",
+    beanie:
+      "we found your family but couldn't reach your pod file just now. this is usually temporary — let's try again.",
+  },
+  'resumeSetup.retryCta': {
+    en: 'Try again',
+    beanie: 'try again',
+  },
+  'resumeSetup.startNewCta': {
+    en: 'Start a new pod instead',
+    beanie: 'start a new pod instead',
+  },
+  'resumeSetup.startNewConfirmTitle': {
+    en: 'Start a new pod?',
+    beanie: 'start a new pod?',
+  },
+  'resumeSetup.startNewConfirmMessage': {
+    en: "Your family already has a pod we just couldn't reach. Starting a new one means your existing pod won't be loaded here. Only do this if you're sure you want to start fresh.",
+    beanie:
+      "your family already has a pod we just couldn't reach. starting a new one means your existing pod won't be loaded here. only do this if you're sure you want to start fresh.",
+  },
+  'resumeSetup.startNewConfirmCta': {
+    en: 'Start a new pod',
+    beanie: 'start a new pod',
   },
   'resumeSetup.podCorrupted': {
     en: "Your pod file appears damaged and can't be opened. Please contact support@beanies.family with the diagnostic details below — we may be able to help.",
