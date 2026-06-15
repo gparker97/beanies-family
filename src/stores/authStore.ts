@@ -250,7 +250,22 @@ export const useAuthStore = defineStore('auth', () => {
   // `syncStore.createNewFile` (via `markPodCreated`) sets it.
   const podCreated = ref(restorePodCreated());
 
-  /** Record that the `.beanpod` file now physically exists (called by syncStore). */
+  /**
+   * Record that the session has a real `.beanpod` (drives `needsPodSetup` and
+   * the onboarding-zombie routing). Idempotent + cheap.
+   *
+   * CONTRACT — call this at EVERY terminus that successfully creates OR reads a
+   * pod, so `podCreated` tracks reality rather than relying on key-absence. A
+   * loader that forgets it strands the user on the create-recovery screen and
+   * false-fires `app.onboardingZombieState`. Current callers (all in syncStore):
+   *   1. createNewFile (create)              — the point of no return
+   *   2. completeAutoLoad (registry resume)  — password recovery
+   *   3. decryptPendingFileWithKey (join/invite cached-key decrypt)
+   *   4. loadFromFile (decrypt-with-current-FK success)
+   *   5. loadFromPersistenceCache (cache hit, both permission branches)
+   * `syncStore.podCreatedTermini.test.ts` asserts each public loader marks on
+   * success — a new loader added without the call fails that suite.
+   */
   function markPodCreated(): void {
     podCreated.value = true;
     persistPodCreated(true);
@@ -464,6 +479,15 @@ export const useAuthStore = defineStore('auth', () => {
     memberName: string;
     subscribeNewsletter?: boolean;
   }): Promise<{ success: boolean; error?: string }> {
+    // Idempotency guard: a session already exists (the user re-entered the
+    // create flow — WelcomeGate→Create again, browser-back to /create, or any
+    // future re-call). Re-running would mint a SECOND family via createFamily()
+    // and orphan the first. Return success without side effects; do NOT re-set
+    // `freshSignIn` — re-navigation is not a fresh sign-in. The primary guard
+    // lives in CreatePodView.handleStep1Next (which also skips the duplicate
+    // Slack ping + newsletter); this is the store-layer backstop.
+    if (currentUser.value) return { success: true };
+
     isLoading.value = true;
     error.value = null;
     newsletterOptIn.value =

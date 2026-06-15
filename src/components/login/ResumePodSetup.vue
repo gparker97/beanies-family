@@ -46,6 +46,7 @@ import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
 import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
+import { confirm } from '@/composables/useConfirm';
 
 const { t } = useTranslation();
 const authStore = useAuthStore();
@@ -66,7 +67,7 @@ const emit = defineEmits<{
  * registered pod (genuinely-new families). `finishing` is the spinner shown
  * during a critical write — both auto-load decrypt and create-pod write.
  */
-type Phase = 'probing' | 'auto-load' | 'identity' | 'storage' | 'finishing';
+type Phase = 'probing' | 'auto-load' | 'identity' | 'storage' | 'finishing' | 'retry';
 const phase = ref<Phase>('probing');
 
 const ownerName = ref('');
@@ -120,8 +121,23 @@ onMounted(async () => {
   // `currentUser.displayName` (set by signUp) when the doc isn't loaded yet.
   ownerName.value = authStore.displayName;
 
-  // Now the discriminator: is this scenario (b) — registry says we already
-  // have a pod — or scenario (a) — genuinely new? Branch the UI accordingly.
+  await runProbe();
+});
+
+/**
+ * Registry probe + phase routing. Extracted from onMounted so the `retry`
+ * screen's "Try again" can re-run it.
+ *
+ * `no-registry-entry` → `identity` (genuinely-new family — create is correct).
+ * `registry-error` / `load-failed` → `retry` (a pod fileId is/was known but we
+ * couldn't reach it). We deliberately do NOT fall through to the destructive
+ * create path here — re-creating would orphan the real pod (the 2026-05-15
+ * incident). The retry screen offers a non-destructive re-probe, and an
+ * explicit confirm-gated "start a new pod" for the rare genuine give-up.
+ */
+async function runProbe() {
+  formError.value = null;
+  phase.value = 'probing';
   const probeResult = await syncStore.attemptResumeFromRegistry();
   switch (probeResult.kind) {
     case 'auto-loadable':
@@ -130,12 +146,10 @@ onMounted(async () => {
       phase.value = 'auto-load';
       return;
     case 'no-registry-entry':
-      // Scenario (a) — fall through to the original (destructive) create flow.
+      // Scenario (a) — genuinely new family; fall through to the create flow.
       phase.value = 'identity';
       return;
     case 'registry-error':
-      // Same fallback as no-registry-entry but surface a quieter hint so the
-      // user knows why we couldn't auto-load. Reported for telemetry.
       reportError({
         surface: 'resumeSetup.registryLookupFailed',
         message: `Registry lookup failed during resume: ${probeResult.error.message}`,
@@ -143,12 +157,12 @@ onMounted(async () => {
         severity: 'warning',
       });
       formError.value = t('resumeSetup.registryError');
-      phase.value = 'identity';
+      phase.value = 'retry';
       return;
     case 'load-failed':
       // Registry had a fileId but the Drive load failed (token denied, 404,
-      // network). Report and let the user try the manual storage flow —
-      // they may pick the right file or fall back to local.
+      // network). A real pod exists — offer a non-destructive retry, NOT the
+      // create path.
       reportError({
         surface: 'resumeSetup.autoLoadFetchFailed',
         message: `Auto-load envelope fetch failed during resume: ${probeResult.error.message}`,
@@ -156,10 +170,33 @@ onMounted(async () => {
         severity: 'error',
       });
       formError.value = t('resumeSetup.couldNotFindPod');
-      phase.value = 'identity';
+      phase.value = 'retry';
       return;
   }
-});
+}
+
+/** "Try again" on the retry screen — re-run the registry probe. */
+async function handleRetry() {
+  if (busy.value) return;
+  await runProbe();
+}
+
+/**
+ * "Start a new pod instead" on the retry screen — the rare genuine give-up
+ * (the real pod is unreachable AND the user accepts starting fresh). Gated
+ * behind an explicit destructive confirm so it's opt-in, never the default.
+ */
+async function handleStartNewPodFromRetry() {
+  const ok = await confirm({
+    title: 'resumeSetup.startNewConfirmTitle',
+    message: 'resumeSetup.startNewConfirmMessage',
+    variant: 'danger',
+    confirmLabel: 'resumeSetup.startNewConfirmCta',
+  });
+  if (!ok) return;
+  formError.value = null;
+  phase.value = 'identity';
+}
 
 // ─── Non-destructive auto-load path ─────────────────────────────────────────
 
@@ -314,6 +351,23 @@ async function finalizePod(): Promise<boolean> {
     familyContextStore.activeFamilyName ?? 'My Family'
   );
   if (!result.ok) {
+    if (result.reason === 'existing-pod') {
+      // The registry has a real pod after all — the create guard refused to
+      // overwrite it. Route back to the non-destructive retry screen (re-probe
+      // will now find the fileId and offer auto-load) rather than showing a
+      // generic create-failure. Not a critical page — this is the guard working.
+      console.warn('[ResumePodSetup] createNewFile refused (existing-pod) — routing to retry');
+      reportError({
+        surface: 'resumeSetup.existingPodRefused',
+        message: `createNewFile refused during resume — existing pod present: ${result.error.message}`,
+        error: result.error,
+        severity: 'warning',
+        context: { provider_type: syncStore.storageProviderType ?? null },
+      });
+      formError.value = t('resumeSetup.couldNotFindPod');
+      phase.value = 'retry';
+      return false;
+    }
     formError.value = t('setup.fileCreateFailed');
     console.error(`[ResumePodSetup] createNewFile failed (reason=${result.reason}):`, result.error);
     reportError({
@@ -486,6 +540,30 @@ async function handleConnectLocal() {
         {{ t('resumeSetup.unlockPod') }}
       </BaseButton>
     </form>
+
+    <!-- Retry: a real pod fileId is/was known but we couldn't reach it. Offer a
+         non-destructive re-probe; "start a new pod" is confirm-gated + secondary. -->
+    <div v-else-if="phase === 'retry'" class="space-y-4">
+      <div
+        class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-slate-700/50 dark:text-gray-300"
+      >
+        🫘 {{ familyName }}
+      </div>
+      <p class="text-center text-sm text-gray-600 dark:text-gray-300">
+        {{ t('resumeSetup.retryBody') }}
+      </p>
+      <BaseButton class="w-full" :disabled="busy" :loading="busy" @click="handleRetry">
+        {{ t('resumeSetup.retryCta') }}
+      </BaseButton>
+      <button
+        type="button"
+        class="w-full text-center text-xs text-gray-500 underline decoration-1 underline-offset-4 transition-colors hover:text-gray-700 disabled:opacity-60 dark:text-gray-400 dark:hover:text-gray-200"
+        :disabled="busy"
+        @click="handleStartNewPodFromRetry"
+      >
+        {{ t('resumeSetup.startNewCta') }}
+      </button>
+    </div>
 
     <!-- Identity (fallback for scenario (a)) -->
     <form v-else-if="phase === 'identity'" class="space-y-4" @submit.prevent="handleIdentityNext">

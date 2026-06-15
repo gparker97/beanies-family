@@ -673,6 +673,9 @@ export const useSyncStore = defineStore('sync', () => {
           }
 
           setupAutoSync();
+          // A real pod was decrypted and loaded — establish the podCreated
+          // invariant (see markPodCreated's contract doc-comment in authStore).
+          useAuthStore().markPodCreated();
           return { success: true };
         } catch (e) {
           console.warn('[syncStore] Failed to decrypt with current FK, may need re-auth:', e);
@@ -978,6 +981,9 @@ export const useSyncStore = defineStore('sync', () => {
 
       await reloadAllStores();
       await reconcileDriveTokenForMember();
+      // A real pod was loaded from cache — establish the podCreated invariant
+      // (covers both the normal and preservePermissionState branches above).
+      useAuthStore().markPodCreated();
       return { success: true };
     } catch (e) {
       console.warn('[syncStore] loadFromPersistenceCache failed:', e);
@@ -1158,6 +1164,36 @@ export const useSyncStore = defineStore('sync', () => {
           `createNewFile precondition failed: owner member ${memberId} not in family store`
         ),
       };
+    }
+
+    // Existing-pod guard (belt-and-braces above the Drive-only name-collision
+    // check; also covers the local-file path). If the registry already holds a
+    // `fileId` for this family, a real pod exists — creating would orphan it.
+    // Scoped to `entry?.fileId` (NOT entry presence) so a genuinely-new family
+    // (registered only later, at the `register` step below) is never blocked.
+    // `lookupFamily` already returns null on any error / when the registry is
+    // off, so this try/catch is defence-in-depth: a lookup failure must NOT
+    // block a legitimate create — log and proceed (write/verify/register still
+    // guard true collisions).
+    try {
+      const existing = await registry.lookupFamily(familyId);
+      if (existing?.fileId) {
+        return {
+          ok: false,
+          reason: 'existing-pod',
+          error: new Error(
+            `createNewFile refused: registry already has a pod for family ${familyId} (fileId present)`
+          ),
+        };
+      }
+    } catch (e) {
+      console.warn('[syncStore] createNewFile existing-pod lookup failed; proceeding:', e);
+      reportError({
+        surface: 'syncStore.createNewFile.lookupFailed',
+        message: `existing-pod lookup failed before create (proceeding): ${(e as Error).message}`,
+        error: e,
+        severity: 'warning',
+      });
     }
 
     criticalWriteState.value = { kind: 'creating' };
@@ -1424,6 +1460,9 @@ export const useSyncStore = defineStore('sync', () => {
       await reloadAllStores();
       setupAutoSync();
 
+      // A real pod was decrypted (the invite/join cached-key path) — establish
+      // the podCreated invariant so a joinee is never routed to create recovery.
+      useAuthStore().markPodCreated();
       return { success: true };
     } catch (e) {
       return { success: false, error: (e as Error).message };

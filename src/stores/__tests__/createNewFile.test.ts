@@ -366,6 +366,32 @@ describe('pod creation: full end-to-end flow', () => {
     expect(result.error).toBeUndefined();
   });
 
+  it('signUp is idempotent — a second call with an existing session does NOT create a second family', async () => {
+    const authStore = useAuthStore();
+    const familyContext = await import('@/services/familyContext');
+    vi.mocked(familyContext.createNewFamily).mockClear();
+
+    const first = await authStore.signUp({
+      email: 'test@example.com',
+      password: 'password123',
+      familyName: 'Test Family',
+      memberName: 'Test User',
+    });
+    expect(first.success).toBe(true);
+    expect(familyContext.createNewFamily).toHaveBeenCalledTimes(1);
+
+    // Re-entry (e.g. Back→step1→Next, or WelcomeGate→Create again). Must NOT
+    // mint a second family / orphan the first.
+    const second = await authStore.signUp({
+      email: 'test@example.com',
+      password: 'password123',
+      familyName: 'Different Name',
+      memberName: 'Test User',
+    });
+    expect(second.success).toBe(true);
+    expect(familyContext.createNewFamily).toHaveBeenCalledTimes(1); // still 1 — no duplicate
+  });
+
   /**
    * Full 3-step pod creation as CreatePodView performs it:
    *   1. signUp (creates family + member in Automerge doc)
@@ -539,6 +565,48 @@ describe('pod creation: full end-to-end flow', () => {
     expect(result.reason).toBe('register');
     expect(syncStore.criticalWriteState.kind).toBe('idle');
     expect(useAuthStore().podCreated).toBe(false);
+  });
+
+  it('returns reason="existing-pod" and writes nothing when the registry already has a fileId for this family', async () => {
+    const { memberId } = await signUpAndConfigureStorage();
+    const syncStore = useSyncStore();
+    const registry = await import('@/services/registry/registryService');
+    // A real pod already exists for this family (e.g. a partial prior create
+    // that registered, or a name-mismatch second attempt). createNewFile must
+    // refuse rather than orphan it.
+    vi.mocked(registry.lookupFamily).mockResolvedValueOnce({ fileId: 'existing-file-id' } as never);
+    mockProvider.write.mockClear();
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      'pod-password',
+      memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('existing-pod');
+    // Refused BEFORE any write + before flipping the critical-write state.
+    expect(mockProvider.write).not.toHaveBeenCalled();
+    expect(syncStore.criticalWriteState.kind).toBe('idle');
+    expect(useAuthStore().podCreated).toBe(false);
+  });
+
+  it('proceeds with create when the existing-pod lookup throws (fail-open, must not block a new family)', async () => {
+    const { memberId } = await signUpAndConfigureStorage();
+    const syncStore = useSyncStore();
+    const registry = await import('@/services/registry/registryService');
+    vi.mocked(registry.lookupFamily).mockRejectedValueOnce(new Error('registry 503'));
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      'pod-password',
+      memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+    // A lookup failure must NOT block a legitimate create.
+    expect(result.ok).toBe(true);
+    expect(useAuthStore().podCreated).toBe(true);
   });
 
   it('returns reason="concurrent-write" when called while another createNewFile is in flight', async () => {
