@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-15",
-    "translationCount": 3244
+    "translationCount": 3248
   },
   "translations": {
     "app.name": {
@@ -14587,9 +14587,9 @@
       "lastUpdated": "2026-05-20"
     },
     "setup.localFileUnsupported": {
-      "translation": "此浏览器无法保存到本地文件。请改用Google云端硬盘（在此处工作并同步到您的家人） ，或在Chrome或Edge中打开beanies.family。",
-      "hash": "l1dhkx",
-      "lastUpdated": "2026-05-21"
+      "translation": "此浏览器无法保存到本地文件。请改用Google云端硬盘，它在这里工作并同步到您的家人。（在计算机上， Chrome或Edge也支持本地文件。）",
+      "hash": "r7b4lb",
+      "lastUpdated": "2026-06-15"
     },
     "auth.localFileUnsupported": {
       "translation": "此浏览器无法加载本地文件。请改用Google云端硬盘（在此处工作并同步到您的家人） ，或在Chrome或Edge中打开beanies.family。",
@@ -16224,6 +16224,26 @@
     "resumeSetup.startNewConfirmCta": {
       "translation": "启动新Pod",
       "hash": "8tyv6g",
+      "lastUpdated": "2026-06-15"
+    },
+    "selfHost.localUnsupported": {
+      "translation": "此浏览器无法存储本地文件。在电脑上的Chrome或Edge中打开beanies.family以设置您的Pod。",
+      "hash": "13vibj",
+      "lastUpdated": "2026-06-15"
+    },
+    "auth.storageBlocked": {
+      "translation": "您的浏览器阻止了本地存储，因此我们无法创建您的家庭。这通常发生在隐私浏览中，请关闭隐私浏览，或使用普通窗口，然后重试。",
+      "hash": "muo5y5",
+      "lastUpdated": "2026-06-15"
+    },
+    "oauth.storageErrorTitle": {
+      "translation": "登录无法完成",
+      "hash": "zi8pjm",
+      "lastUpdated": "2026-06-15"
+    },
+    "oauth.storageErrorBody": {
+      "translation": "您的浏览器在登录期间阻止存储（这通常发生在隐私浏览中）。请在正常窗口中重试。",
+      "hash": "iuxwue",
       "lastUpdated": "2026-06-15"
     }
   }

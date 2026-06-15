@@ -44,6 +44,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
+import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
 import { confirm } from '@/composables/useConfirm';
@@ -613,11 +614,26 @@ async function handleConnectLocal() {
       >
         {{ t('storage.connectGoogleDrive') }}
       </BaseButton>
-      <BaseButton variant="outline" class="w-full" :disabled="busy" @click="handleLocalFileClick">
+      <!-- Local file only where the File System Access API exists (Chromium
+           desktop / native). On iOS WebKit + Firefox it dead-ends; hide it when
+           Drive is available, or show a clear message in the self-host case. -->
+      <BaseButton
+        v-if="canUseLocalFiles()"
+        variant="outline"
+        class="w-full"
+        :disabled="busy"
+        @click="handleLocalFileClick"
+      >
         {{
           syncStore.isGoogleDriveAvailable ? t('storage.useLocalInstead') : t('storage.localFile')
         }}
       </BaseButton>
+      <p
+        v-else-if="!syncStore.isGoogleDriveAvailable"
+        class="text-center text-xs text-gray-500 dark:text-gray-400"
+      >
+        {{ t('selfHost.localUnsupported') }}
+      </p>
     </div>
 
     <!-- Finishing (in-flight critical write — auto-load decrypt or create-pod) -->

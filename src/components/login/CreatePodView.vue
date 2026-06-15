@@ -16,6 +16,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
+import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isUserCancellation } from '@/services/google/googleAuth';
 import { slackNotify } from '@/utils/slackNotify';
 import { reportError } from '@/utils/errorReporter';
@@ -44,6 +45,10 @@ const familyName = ref('');
 const name = ref('');
 const email = ref('');
 const ownerRole = ref<'parent' | 'child'>('parent');
+const ownerRoleOptions = computed(() => [
+  { value: 'parent', label: t('loginV6.parentBean') },
+  { value: 'child', label: t('loginV6.littleBean') },
+]);
 const password = ref('');
 const confirmPassword = ref('');
 const subscribeNewsletter = ref(true);
@@ -215,6 +220,19 @@ async function handleStep1Next() {
 
 function handleLocalFileClick() {
   showLocalFileWarning.value = true;
+}
+
+/**
+ * Keep the focused field (and its nearby CTA) in view when the mobile on-screen
+ * keyboard opens. iOS Safari overlays the keyboard; Android Chrome resizes the
+ * viewport — `scrollIntoView({ block: 'center' })` handles both. Deferred so the
+ * keyboard has begun affecting the viewport before we scroll. Only for text
+ * controls (buttons/selects don't raise the keyboard).
+ */
+function handleFieldFocus(e: FocusEvent) {
+  const el = e.target as HTMLElement | null;
+  if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return;
+  setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 150);
 }
 
 /** "Use Google Drive instead" from the local-file warning modal. */
@@ -537,6 +555,7 @@ function handleBack() {
   -->
   <div
     class="mx-auto max-w-[540px] rounded-3xl bg-gradient-to-b from-white to-[#fffaf3] p-8 shadow-xl dark:bg-slate-800 dark:from-slate-800 dark:to-slate-800"
+    @focusin="handleFieldFocus"
   >
     <!-- Back button -->
     <button
@@ -650,13 +669,9 @@ function handleBack() {
               >
                 {{ t('form.type') }}
               </label>
-              <select
-                v-model="ownerRole"
-                class="focus:border-primary-500 focus:ring-primary-500 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
-              >
-                <option value="parent">{{ t('loginV6.parentBean') }}</option>
-                <option value="child">{{ t('loginV6.littleBean') }}</option>
-              </select>
+              <!-- BaseSelect (not a raw <select>): its control inherits the
+                   16px body size, so iOS Safari doesn't auto-zoom on focus. -->
+              <BaseSelect v-model="ownerRole" :options="ownerRoleOptions" />
             </div>
           </div>
           <BaseInput
@@ -823,8 +838,11 @@ function handleBack() {
               </svg>
               {{ t('storage.savingToLocalFile') }}
             </p>
+            <!-- Only offer the local-file path where the File System Access API
+                 exists (Chromium desktop / native). On iOS WebKit + Firefox it
+                 always dead-ends, so we hide it rather than fail post-click. -->
             <button
-              v-else
+              v-else-if="canUseLocalFiles()"
               type="button"
               class="font-outfit text-secondary-500/60 hover:text-secondary-500 cursor-pointer text-sm underline decoration-1 underline-offset-4 transition-colors disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-400 dark:hover:text-gray-200"
               :disabled="isSavingStorage"
@@ -862,8 +880,18 @@ function handleBack() {
             >
           </div>
 
-          <!-- Local file (functional but muted) -->
+          <!-- Local file (functional but muted). Only offered where the File
+               System Access API exists; otherwise a clear message (this is the
+               self-host case where Drive isn't available, so we can't point to
+               it — direct the user to a Chromium desktop browser instead). -->
+          <div
+            v-if="!canUseLocalFiles()"
+            class="font-outfit flex h-[88px] flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50 px-2.5 text-center text-xs text-gray-500 dark:bg-slate-700/40 dark:text-gray-400"
+          >
+            {{ t('selfHost.localUnsupported') }}
+          </div>
           <button
+            v-else
             class="flex h-[88px] flex-col items-center justify-center rounded-[14px] border-2 px-2.5 transition-all"
             :class="
               storageType === 'local'

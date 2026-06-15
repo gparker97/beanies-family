@@ -10,6 +10,7 @@
  */
 import { onMounted } from 'vue';
 import { REDIRECT_AUTH_CODE_KEY } from '@/services/google/googleAuth';
+import { reportError } from '@/utils/errorReporter';
 
 onMounted(() => {
   const params = new URLSearchParams(window.location.search);
@@ -29,11 +30,20 @@ onMounted(() => {
     return;
   }
 
-  // Redirect mode — save code and redirect back to the original page
-  const stateJson = sessionStorage.getItem('beanies_redirect_auth');
+  // Redirect mode — save code and redirect back to the original page. The
+  // sessionStorage read itself can THROW in iOS Safari Private Browsing (the
+  // same context that loses the state across the Google round-trip), so guard
+  // it — a throw is treated identically to "state missing".
+  let stateJson: string | null = null;
+  try {
+    stateJson = sessionStorage.getItem('beanies_redirect_auth');
+  } catch (e) {
+    console.warn('[OAuthCallback] sessionStorage read failed (private browsing?):', e);
+  }
+
   if (stateJson && code) {
-    sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY, code);
     try {
+      sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY, code);
       const state = JSON.parse(stateJson);
       window.location.href = state.returnPath || '/';
     } catch {
@@ -42,9 +52,28 @@ onMounted(() => {
     return;
   }
 
-  // Error or unexpected state — redirect home
+  // We have an auth `code` but couldn't recover the redirect state — the
+  // sessionStorage write from `startRedirectAuth` didn't survive (or threw),
+  // which is the iOS-Private-Browsing failure mode. Don't silently drop the
+  // code at `/`; send the user to an actionable error surface + report it.
+  if (code) {
+    reportError({
+      surface: 'oauth.redirectStateLost',
+      message:
+        'OAuth redirect returned with a code but no sessionStorage state — likely Private Browsing blocked storage during the redirect',
+      severity: 'warning',
+    });
+    window.location.href = '/welcome?authError=storage';
+    return;
+  }
+
+  // Error or genuinely unexpected state (no code) — redirect home.
   if (error) {
-    sessionStorage.removeItem('beanies_redirect_auth');
+    try {
+      sessionStorage.removeItem('beanies_redirect_auth');
+    } catch {
+      // sessionStorage unavailable — nothing to clean up.
+    }
   }
   window.location.href = '/';
 });

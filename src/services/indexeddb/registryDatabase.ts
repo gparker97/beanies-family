@@ -88,3 +88,19 @@ export async function closeRegistryDatabase(): Promise<void> {
 export function getRegistryDatabaseName(): string {
   return REGISTRY_DB_NAME;
 }
+
+/**
+ * Whether an error from opening/writing this IndexedDB registry indicates the
+ * browser is BLOCKING storage rather than a transient/logic failure. The
+ * canonical case is iOS Safari Private Browsing (and Firefox private mode),
+ * which throw on IndexedDB access; quota exhaustion surfaces the same way.
+ * Callers use this to show a specific "storage is blocked" message instead of
+ * a generic failure. (Distinct from `classifyFileError`, which is specific to
+ * the File System Access API.)
+ */
+export function isStorageBlockedError(e: unknown): boolean {
+  return (
+    e instanceof Error &&
+    ['InvalidStateError', 'SecurityError', 'QuotaExceededError'].includes(e.name)
+  );
+}
