@@ -13,7 +13,13 @@ import {
   buildTransportationTitle,
 } from '@/utils/vacation';
 import { isTravellerSubset, resolveSegmentTravellers } from '@/utils/segmentTravellers';
+import { useTranslationStore } from '@/stores/translationStore';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
+
+/** Translator threaded into the detail-row builders so labels + enum values
+ *  localize (they render in the read-only timeline, not just the edit modal). */
+type T = (key: UIStringKey) => string;
 
 // ── Shared types ────────────────────────────────────────────────────────────
 
@@ -179,136 +185,161 @@ function enrichRows(rows: DetailRow[]): DetailRow[] {
   return rows;
 }
 
-export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
+export function travelDetailRows(seg: VacationTravelSegment, t: T): DetailRow[] {
   const rows: DetailRow[] = [];
   const isF = seg.type?.startsWith('flight');
   if (isF) {
-    if (seg.airline) rows.push({ label: 'airline', value: seg.airline });
+    if (seg.airline) rows.push({ label: t('segmentRow.airline'), value: seg.airline });
     if (seg.flightNumber)
-      rows.push({ label: 'flight #', value: seg.flightNumber, field: 'flightNumber' });
-    if (seg.departureAirport) rows.push({ label: 'from', value: seg.departureAirport });
-    if (seg.arrivalAirport) rows.push({ label: 'to', value: seg.arrivalAirport });
-    if (seg.terminal) rows.push({ label: 'terminal', value: seg.terminal });
+      rows.push({
+        label: t('segmentRow.flightNumber'),
+        value: seg.flightNumber,
+        field: 'flightNumber',
+      });
+    if (seg.departureAirport)
+      rows.push({ label: t('segmentRow.from'), value: seg.departureAirport });
+    if (seg.arrivalAirport) rows.push({ label: t('segmentRow.to'), value: seg.arrivalAirport });
+    if (seg.terminal) rows.push({ label: t('segmentRow.terminal'), value: seg.terminal });
     if (seg.departureDate)
       rows.push({
-        label: 'date',
+        label: t('segmentRow.date'),
         value: seg.departureDate,
         field: 'departureDate',
         inputType: 'date',
       });
     if (seg.departureTime)
       rows.push({
-        label: 'departs',
+        label: t('segmentRow.departs'),
         value: seg.departureTime,
         field: 'departureTime',
         inputType: 'time',
       });
     if (seg.arrivalTime)
       rows.push({
-        label: seg.arrivesNextDay ? 'arrives (+1)' : 'arrives',
+        label: seg.arrivesNextDay ? t('segmentRow.arrivesNextDay') : t('segmentRow.arrives'),
         value: seg.arrivalTime,
         field: 'arrivalTime',
         inputType: 'time',
       });
   } else if (seg.type === 'cruise') {
-    if (seg.cruiseLine) rows.push({ label: 'cruise line', value: seg.cruiseLine });
-    if (seg.shipName) rows.push({ label: 'ship', value: seg.shipName });
-    if (seg.departurePort) rows.push({ label: 'port', value: seg.departurePort });
-    if (seg.terminal) rows.push({ label: 'terminal', value: seg.terminal });
+    if (seg.cruiseLine) rows.push({ label: t('segmentRow.cruiseLine'), value: seg.cruiseLine });
+    if (seg.shipName) rows.push({ label: t('segmentRow.ship'), value: seg.shipName });
+    if (seg.departurePort) rows.push({ label: t('segmentRow.port'), value: seg.departurePort });
+    if (seg.terminal) rows.push({ label: t('segmentRow.terminal'), value: seg.terminal });
     if (seg.cabinNumber)
-      rows.push({ label: 'cabin', value: seg.cabinNumber, field: 'cabinNumber' });
+      rows.push({ label: t('segmentRow.cabin'), value: seg.cabinNumber, field: 'cabinNumber' });
     if (seg.embarkationDate)
       rows.push({
-        label: 'embark',
+        label: t('segmentRow.embark'),
         value: seg.embarkationDate,
         field: 'embarkationDate',
         inputType: 'date',
       });
     if (seg.embarkationTime)
       rows.push({
-        label: 'depart time',
+        label: t('segmentRow.departTime'),
         value: seg.embarkationTime,
         field: 'embarkationTime',
         inputType: 'time',
       });
     if (seg.disembarkationDate)
       rows.push({
-        label: 'disembark',
+        label: t('segmentRow.disembark'),
         value: seg.disembarkationDate,
         field: 'disembarkationDate',
         inputType: 'date',
       });
   } else if (seg.type === 'car') {
-    if (seg.carType) rows.push({ label: 'car type', value: seg.carType.replace(/_/g, ' ') });
-    if (seg.carLabel) rows.push({ label: 'car', value: seg.carLabel, field: 'carLabel' });
+    if (seg.carType)
+      rows.push({
+        label: t('segmentRow.carType'),
+        value: t(('vacation.carType.' + seg.carType) as UIStringKey),
+      });
+    if (seg.carLabel)
+      rows.push({ label: t('segmentRow.car'), value: seg.carLabel, field: 'carLabel' });
     if (seg.departureDate)
       rows.push({
-        label: 'date',
+        label: t('segmentRow.date'),
         value: seg.departureDate,
         field: 'departureDate',
         inputType: 'date',
       });
     if (seg.leavingTime)
       rows.push({
-        label: 'leaving',
+        label: t('segmentRow.leaving'),
         value: seg.leavingTime,
         field: 'leavingTime',
         inputType: 'time',
       });
   } else if (seg.type === 'activity') {
     if (seg.activityCategory)
-      rows.push({ label: 'type', value: seg.activityCategory.replace(/_/g, ' ') });
+      rows.push({
+        label: t('segmentRow.type'),
+        value: t(('vacation.activityCategory.' + seg.activityCategory) as UIStringKey),
+      });
     if (seg.description)
-      rows.push({ label: 'details', value: seg.description, field: 'description' });
+      rows.push({ label: t('segmentRow.details'), value: seg.description, field: 'description' });
     if (seg.departureDate)
       rows.push({
-        label: 'date',
+        label: t('segmentRow.date'),
         value: seg.departureDate,
         field: 'departureDate',
         inputType: 'date',
       });
     if (seg.startTime)
-      rows.push({ label: 'time', value: seg.startTime, field: 'startTime', inputType: 'time' });
-    if (seg.duration) rows.push({ label: 'duration', value: seg.duration, field: 'duration' });
-    if (seg.location) rows.push({ label: 'location', value: seg.location, mapLink: true });
+      rows.push({
+        label: t('segmentRow.time'),
+        value: seg.startTime,
+        field: 'startTime',
+        inputType: 'time',
+      });
+    if (seg.duration)
+      rows.push({ label: t('segmentRow.duration'), value: seg.duration, field: 'duration' });
+    if (seg.location)
+      rows.push({ label: t('segmentRow.location'), value: seg.location, mapLink: true });
   } else {
     // Train / Ferry
-    if (seg.operator) rows.push({ label: 'operator', value: seg.operator });
-    if (seg.route) rows.push({ label: 'route', value: seg.route });
-    if (seg.departureStation) rows.push({ label: 'from', value: seg.departureStation });
-    if (seg.arrivalStation) rows.push({ label: 'to', value: seg.arrivalStation });
+    if (seg.operator) rows.push({ label: t('segmentRow.operator'), value: seg.operator });
+    if (seg.route) rows.push({ label: t('segmentRow.route'), value: seg.route });
+    if (seg.departureStation)
+      rows.push({ label: t('segmentRow.from'), value: seg.departureStation });
+    if (seg.arrivalStation) rows.push({ label: t('segmentRow.to'), value: seg.arrivalStation });
     if (seg.departureDate)
       rows.push({
-        label: 'date',
+        label: t('segmentRow.date'),
         value: seg.departureDate,
         field: 'departureDate',
         inputType: 'date',
       });
     if (seg.departureTime)
       rows.push({
-        label: 'departs',
+        label: t('segmentRow.departs'),
         value: seg.departureTime,
         field: 'departureTime',
         inputType: 'time',
       });
     if (seg.arrivalTime)
       rows.push({
-        label: 'arrives',
+        label: t('segmentRow.arrives'),
         value: seg.arrivalTime,
         field: 'arrivalTime',
         inputType: 'time',
       });
   }
   if (seg.bookingReference)
-    rows.push({ label: 'booking ref', value: seg.bookingReference, copyable: true });
-  if (seg.link) rows.push({ label: 'link', value: seg.link, isLink: true });
-  if (seg.notes) rows.push({ label: 'notes', value: seg.notes, field: 'notes' });
+    rows.push({ label: t('segmentRow.bookingRef'), value: seg.bookingReference, copyable: true });
+  if (seg.link) rows.push({ label: t('segmentRow.link'), value: seg.link, isLink: true });
+  if (seg.notes) rows.push({ label: t('segmentRow.notes'), value: seg.notes, field: 'notes' });
   return enrichRows(rows);
 }
 
 // ── Composable ──────────────────────────────────────────────────────────────
 
 export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undefined>) {
+  // Reading `t` inside the computeds below makes them re-evaluate on a language
+  // switch, so the read-only timeline localizes live.
+  const { t } = useTranslationStore();
+
   const accommodationGaps = computed(() => {
     const v = vacation.value;
     if (!v) return [];
@@ -342,7 +373,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         status: seg.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
         stepNumber: 2,
-        detailRows: travelDetailRows(seg),
+        detailRows: travelDetailRows(seg, t),
         arrayIndex: i,
         photoIds: seg.photoIds,
         ...travellersFor(seg.travellerIds),
@@ -353,29 +384,35 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
       const acc = v.accommodations[i]!;
       const date = acc.checkInDate || '';
       const rows: DetailRow[] = [];
-      if (acc.address) rows.push({ label: 'address', value: acc.address, mapLink: true });
+      if (acc.address)
+        rows.push({ label: t('segmentRow.address'), value: acc.address, mapLink: true });
       if (acc.checkInDate)
         rows.push({
-          label: 'check-in',
+          label: t('segmentRow.checkIn'),
           value: acc.checkInDate,
           field: 'checkInDate',
           inputType: 'date',
         });
       if (acc.checkOutDate)
         rows.push({
-          label: 'check-out',
+          label: t('segmentRow.checkOut'),
           value: acc.checkOutDate,
           field: 'checkOutDate',
           inputType: 'date',
         });
-      if (acc.roomType) rows.push({ label: 'room', value: acc.roomType });
+      if (acc.roomType) rows.push({ label: t('segmentRow.room'), value: acc.roomType });
       if (acc.confirmationNumber)
-        rows.push({ label: 'confirmation', value: acc.confirmationNumber, copyable: true });
+        rows.push({
+          label: t('segmentRow.confirmation'),
+          value: acc.confirmationNumber,
+          copyable: true,
+        });
       if (acc.contactPhone)
-        rows.push({ label: 'phone', value: acc.contactPhone, field: 'contactPhone' });
-      if (acc.breakfastIncluded) rows.push({ label: 'breakfast', value: 'included' });
-      if (acc.link) rows.push({ label: 'link', value: acc.link, isLink: true });
-      if (acc.notes) rows.push({ label: 'notes', value: acc.notes, field: 'notes' });
+        rows.push({ label: t('segmentRow.phone'), value: acc.contactPhone, field: 'contactPhone' });
+      if (acc.breakfastIncluded)
+        rows.push({ label: t('segmentRow.breakfast'), value: t('segmentRow.included') });
+      if (acc.link) rows.push({ label: t('segmentRow.link'), value: acc.link, isLink: true });
+      if (acc.notes) rows.push({ label: t('segmentRow.notes'), value: acc.notes, field: 'notes' });
 
       const kvParts: string[] = [];
       if (acc.checkInDate && acc.checkOutDate)
@@ -405,57 +442,64 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
       const date = trans.pickupDate || trans.departureDate || '';
       const rows: DetailRow[] = [];
       if (trans.agencyAddress)
-        rows.push({ label: 'address', value: trans.agencyAddress, mapLink: true });
-      if (trans.operator) rows.push({ label: 'operator', value: trans.operator });
-      if (trans.route) rows.push({ label: 'route', value: trans.route });
-      if (trans.departureStation) rows.push({ label: 'from', value: trans.departureStation });
-      if (trans.arrivalStation) rows.push({ label: 'to', value: trans.arrivalStation });
+        rows.push({ label: t('segmentRow.address'), value: trans.agencyAddress, mapLink: true });
+      if (trans.operator) rows.push({ label: t('segmentRow.operator'), value: trans.operator });
+      if (trans.route) rows.push({ label: t('segmentRow.route'), value: trans.route });
+      if (trans.departureStation)
+        rows.push({ label: t('segmentRow.from'), value: trans.departureStation });
+      if (trans.arrivalStation)
+        rows.push({ label: t('segmentRow.to'), value: trans.arrivalStation });
       if (trans.pickupDate)
         rows.push({
-          label: 'pickup date',
+          label: t('segmentRow.pickupDate'),
           value: trans.pickupDate,
           field: 'pickupDate',
           inputType: 'date',
         });
       if (trans.pickupTime)
         rows.push({
-          label: 'pickup time',
+          label: t('segmentRow.pickupTime'),
           value: trans.pickupTime,
           field: 'pickupTime',
           inputType: 'time',
         });
       if (trans.returnDate)
         rows.push({
-          label: 'return date',
+          label: t('segmentRow.returnDate'),
           value: trans.returnDate,
           field: 'returnDate',
           inputType: 'date',
         });
       if (trans.returnTime)
         rows.push({
-          label: 'return time',
+          label: t('segmentRow.returnTime'),
           value: trans.returnTime,
           field: 'returnTime',
           inputType: 'time',
         });
       if (trans.departureDate && !trans.pickupDate)
         rows.push({
-          label: 'date',
+          label: t('segmentRow.date'),
           value: trans.departureDate,
           field: 'departureDate',
           inputType: 'date',
         });
       if (trans.departureTime && !trans.pickupTime)
         rows.push({
-          label: 'departs',
+          label: t('segmentRow.departs'),
           value: trans.departureTime,
           field: 'departureTime',
           inputType: 'time',
         });
       if (trans.bookingReference)
-        rows.push({ label: 'booking ref', value: trans.bookingReference, copyable: true });
-      if (trans.link) rows.push({ label: 'link', value: trans.link, isLink: true });
-      if (trans.notes) rows.push({ label: 'notes', value: trans.notes, field: 'notes' });
+        rows.push({
+          label: t('segmentRow.bookingRef'),
+          value: trans.bookingReference,
+          copyable: true,
+        });
+      if (trans.link) rows.push({ label: t('segmentRow.link'), value: trans.link, isLink: true });
+      if (trans.notes)
+        rows.push({ label: t('segmentRow.notes'), value: trans.notes, field: 'notes' });
 
       const kvParts: string[] = [];
       if (trans.route) kvParts.push(trans.route);

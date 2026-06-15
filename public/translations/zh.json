@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-15",
-    "translationCount": 3374
+    "translationCount": 3415
   },
   "translations": {
     "app.name": {
@@ -16874,6 +16874,211 @@
     "beanTips.enableFailedTitle": {
       "translation": "无法启用小费功能",
       "hash": "yu6gdr",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.airline": {
+      "translation": "航空公司",
+      "hash": "b4lr1a",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.flightNumber": {
+      "translation": "飞行",
+      "hash": "vk2zkj",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.from": {
+      "translation": "从",
+      "hash": "1b4cq",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.to": {
+      "translation": "To",
+      "hash": "23f",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.terminal": {
+      "translation": "Terminal",
+      "hash": "igspr8",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.date": {
+      "translation": "更改日期",
+      "hash": "19hvy",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.departs": {
+      "translation": "出发",
+      "hash": "hssd29",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.arrives": {
+      "translation": "到达",
+      "hash": "fdyp24",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.arrivesNextDay": {
+      "translation": "入住（ +1 ）",
+      "hash": "r13t7j",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.cruiseLine": {
+      "translation": "游轮路线",
+      "hash": "uthm81",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.ship": {
+      "translation": "舰体",
+      "hash": "1j7mk",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.port": {
+      "translation": "端口",
+      "hash": "1hg2p",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.cabin": {
+      "translation": "内室",
+      "hash": "12m8qx",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.embark": {
+      "translation": "Embark | By <a href=\"https://www.gouwo8.com\" target=\"_blank\" rel=\"noopener\">狗窝吧汉化</a>",
+      "hash": "ydu5c0",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.departTime": {
+      "translation": "出发时间：",
+      "hash": "z2umhl",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.disembark": {
+      "translation": "下船",
+      "hash": "w1kw9a",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.carType": {
+      "translation": "车类型",
+      "hash": "38d7e",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.car": {
+      "translation": "car",
+      "hash": "1g38",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.leaving": {
+      "translation": "办公室",
+      "hash": "sde5qs",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.type": {
+      "translation": "类型",
+      "hash": "1k7dm",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.details": {
+      "translation": "家具详情",
+      "hash": "hqldjy",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.time": {
+      "translation": "时间",
+      "hash": "1jvfx",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.duration": {
+      "translation": "课时",
+      "hash": "vvi6vg",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.location": {
+      "translation": "位置",
+      "hash": "wibidx",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.operator": {
+      "translation": "物资专员",
+      "hash": "77j1vg",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.route": {
+      "translation": "<g id=\"Bold\">专业：</g>",
+      "hash": "1b4ht5",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.bookingRef": {
+      "translation": "预订编号",
+      "hash": "x5b0h8",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.link": {
+      "translation": "链接",
+      "hash": "1erkq",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.notes": {
+      "translation": "注 意 事 项",
+      "hash": "18xach",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.address": {
+      "translation": "通讯地址",
+      "hash": "8js9uc",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.checkIn": {
+      "translation": "已签到",
+      "hash": "qhhdm2",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.checkOut": {
+      "translation": "退房",
+      "hash": "vbdt07",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.room": {
+      "translation": "房间",
+      "hash": "1ipyz",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.confirmation": {
+      "translation": "兑换确认",
+      "hash": "xlhy23",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.phone": {
+      "translation": "联系电话",
+      "hash": "19wb4e",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.breakfast": {
+      "translation": "早\t餐",
+      "hash": "1rfliz",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.included": {
+      "translation": "已包含",
+      "hash": "2k84ik",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.pickupDate": {
+      "translation": "截取日期",
+      "hash": "t9enci",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.pickupTime": {
+      "translation": "取件时间",
+      "hash": "t9p0wh",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.returnDate": {
+      "translation": "返回天数",
+      "hash": "217726",
+      "lastUpdated": "2026-06-15"
+    },
+    "segmentRow.returnTime": {
+      "translation": "返回 时间",
+      "hash": "21hkm5",
       "lastUpdated": "2026-06-15"
     }
   }
