@@ -8,6 +8,7 @@ import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useCategoryLabel } from '@/composables/useCategoryLabel';
 import { useFormModal } from '@/composables/useFormModal';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -36,6 +37,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const { categoryLabel, groupLabel } = useCategoryLabel();
 const settingsStore = useSettingsStore();
 const transactionsStore = useTransactionsStore();
 const { convertToDisplay } = useCurrencyDisplay();
@@ -286,7 +288,7 @@ watch(mode, () => {
             <span
               class="min-w-[80px] flex-1 text-sm font-semibold text-slate-600 dark:text-slate-300"
             >
-              {{ group.name }}
+              {{ groupLabel(group.name) }}
             </span>
 
             <!-- Category amounts exist: read-only sum (expanded or collapsed) -->
@@ -336,7 +338,7 @@ watch(mode, () => {
               >
                 <span class="text-sm">{{ CATEGORY_EMOJI_MAP[cat.id] || '' }}</span>
                 <span class="min-w-[80px] flex-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ cat.name }}
+                  {{ categoryLabel(cat.id) }}
                 </span>
                 <div class="w-28">
                   <AmountInput

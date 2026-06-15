@@ -9,6 +9,7 @@ import ShowFiguresPrompt from '@/components/ui/ShowFiguresPrompt.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
+import { useCategoryLabel } from '@/composables/useCategoryLabel';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { confirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
@@ -32,6 +33,7 @@ const settingsStore = useSettingsStore();
 const { isUnlocked, MASK } = usePrivacyMode();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
 const { t } = useTranslation();
+const { budgetCategoryLabel } = useCategoryLabel();
 const { syncHighlightClass } = useSyncHighlight();
 
 // Modals
@@ -419,7 +421,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                     : CATEGORY_EMOJI_MAP[cat.categoryId] || ''
                 }}</span>
                 <span class="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ cat.name }}
+                  {{ budgetCategoryLabel(cat.categoryId) }}
                 </span>
               </div>
               <div class="text-right">

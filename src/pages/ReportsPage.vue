@@ -36,6 +36,7 @@ import {
   formatMonthYearShort,
 } from '@/utils/date';
 import { useTranslation } from '@/composables/useTranslation';
+import { useCategoryLabel } from '@/composables/useCategoryLabel';
 import { accountNetWorthMultiplier } from '@/utils/finance';
 import type {
   CurrencyCode,
@@ -47,6 +48,7 @@ import type {
 } from '@/types/models';
 
 const { t } = useTranslation();
+const { categoryLabel } = useCategoryLabel();
 
 // Rescale Chart.js text when the user toggles Settings → Appearance → Text size.
 const netWorthChartRef = ref<InstanceType<typeof Line> | null>(null);
@@ -128,7 +130,7 @@ const selectedIncomeExpenseRange = ref('1y');
 // Category filter for income/expenses
 const categoryOptions = computed(() => [
   { value: 'all', label: t('reports.allCategories') },
-  ...ALL_CATEGORIES.map((c) => ({ value: c.id, label: c.name })),
+  ...ALL_CATEGORIES.map((c) => ({ value: c.id, label: categoryLabel(c.id) })),
 ]);
 const selectedCategory = ref('all');
 
@@ -529,7 +531,7 @@ const incomeExpenseChartData = computed(() => {
       incomeColors[incomeColorIndex % incomeColors.length] ??
       'rgba(34, 197, 94, 0.85)';
     datasets.push({
-      label: category?.name ?? categoryId,
+      label: categoryLabel(categoryId),
       data: monthlyAmounts,
       backgroundColor: color,
       borderColor: color,
@@ -549,7 +551,7 @@ const incomeExpenseChartData = computed(() => {
       expenseColors[expenseColorIndex % expenseColors.length] ??
       'rgba(239, 68, 68, 0.85)';
     datasets.push({
-      label: category?.name ?? categoryId,
+      label: categoryLabel(categoryId),
       data: monthlyAmounts,
       backgroundColor: color,
       borderColor: color,

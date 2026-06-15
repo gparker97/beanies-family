@@ -17,6 +17,7 @@ import { useMonthOverMonthCashFlow } from '@/composables/useMonthOverMonthCashFl
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { getAccountTypeIcon, getAssetTypeIcon } from '@/constants/icons';
 import { getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
@@ -397,7 +398,11 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
                 {{ account.name }}
               </p>
               <p class="text-secondary-500/35 text-xs dark:text-gray-500">
-                {{ account.institution || getAccountTypeIcon(account.type)?.label || account.type }}
+                {{
+                  account.institution ||
+                  t(('accounts.type.' + account.type) as UIStringKey) ||
+                  account.type
+                }}
               </p>
             </div>
             <CurrencyAmount

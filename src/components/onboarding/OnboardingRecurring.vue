@@ -24,7 +24,7 @@ defineEmits<{
   back: [];
 }>();
 
-const { t, isBeanieMode } = useTranslation();
+const { t } = useTranslation();
 const settingsStore = useSettingsStore();
 const accountsStore = useAccountsStore();
 const recurringStore = useRecurringStore();
@@ -200,13 +200,13 @@ function formatFrequency(freq: RecurringFrequency): string {
           <div class="flex flex-wrap gap-1.5">
             <button
               v-for="preset in RECURRING_INCOME_PRESETS"
-              :key="preset.label"
+              :key="preset.labelKey"
               class="ob-chip ob-chip-income"
-              :class="{ 'ob-chip-active-income': selectedPreset?.label === preset.label }"
+              :class="{ 'ob-chip-active-income': selectedPreset?.labelKey === preset.labelKey }"
               @click="selectRecurringPreset(preset)"
             >
               <span class="text-sm">{{ preset.icon }}</span>
-              {{ isBeanieMode ? preset.label.toLowerCase() : preset.label }}
+              {{ t(preset.labelKey) }}
             </button>
           </div>
         </div>
@@ -217,13 +217,13 @@ function formatFrequency(freq: RecurringFrequency): string {
           <div class="flex flex-wrap gap-1.5">
             <button
               v-for="preset in RECURRING_EXPENSE_PRESETS"
-              :key="preset.label"
+              :key="preset.labelKey"
               class="ob-chip ob-chip-expense"
-              :class="{ 'ob-chip-active-expense': selectedPreset?.label === preset.label }"
+              :class="{ 'ob-chip-active-expense': selectedPreset?.labelKey === preset.labelKey }"
               @click="selectRecurringPreset(preset)"
             >
               <span class="text-sm">{{ preset.icon }}</span>
-              {{ isBeanieMode ? preset.label.toLowerCase() : preset.label }}
+              {{ t(preset.labelKey) }}
             </button>
           </div>
         </div>

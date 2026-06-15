@@ -93,6 +93,8 @@ vi.mock('@/composables/useToday', async () => {
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
+    isEnglish: { value: true },
+    isBeanieMode: { value: false },
   }),
 }));
 

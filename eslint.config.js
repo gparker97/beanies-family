@@ -9,6 +9,7 @@ import pluginSecurity from 'eslint-plugin-security';
 import pluginNoSecrets from 'eslint-plugin-no-secrets';
 import pluginSDL from '@microsoft/eslint-plugin-sdl';
 import tseslint from 'typescript-eslint';
+import noBareRenderStrings from './eslint-rules/no-bare-render-strings.js';
 
 export default [
   js.configs.recommended,
@@ -297,6 +298,32 @@ export default [
     files: ['src/components/settings/DevFeatureFlagsCard.vue'],
     rules: {
       'vue/no-bare-strings-in-template': 'off',
+    },
+  },
+  {
+    // i18n enforcement for the `.ts` blind spot: `vue/no-bare-strings-in-template`
+    // only sees `.vue` templates, so user-facing English baked into rendered data
+    // sources (`constants/*`, `composables/*`) escapes it. This catches bare
+    // display strings on label/title/etc. keys. Fix by routing through t()
+    // (see useCategoryLabel), or allowlist genuine brand/product tokens below.
+    files: ['src/constants/**/*.ts', 'src/composables/**/*.ts'],
+    ignores: ['**/__tests__/**', '**/*.test.ts', '**/*.spec.ts'],
+    plugins: { 'beanies-i18n': { rules: { 'no-bare-render-strings': noBareRenderStrings } } },
+    rules: {
+      'beanies-i18n/no-bare-render-strings': [
+        'error',
+        {
+          allowlist: [
+            // Brand + third-party product names — never translated.
+            'beanies.family',
+            'Google Drive',
+            'OneDrive',
+            'iCloud',
+            'Dropbox',
+            'Google',
+          ],
+        },
+      ],
     },
   },
   {
