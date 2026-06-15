@@ -4,6 +4,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import type { ComboboxOption } from '@/components/ui/BaseCombobox.vue';
+import { useTranslation } from '@/composables/useTranslation';
 
 /** Persist a custom institution name if it's not already known */
 export async function persistCustomInstitutionIfNeeded(name: string | undefined) {
@@ -18,6 +19,7 @@ export async function persistCustomInstitutionIfNeeded(name: string | undefined)
 
 export function useInstitutionOptions() {
   const settingsStore = useSettingsStore();
+  const { t } = useTranslation();
 
   const options = computed<ComboboxOption[]>(() => {
     const predefined = INSTITUTIONS.map((inst) => ({
@@ -38,7 +40,7 @@ export function useInstitutionOptions() {
 
     merged.push({
       value: OTHER_INSTITUTION_VALUE,
-      label: 'Other',
+      label: t('form.other'),
       isCustom: false,
     });
 

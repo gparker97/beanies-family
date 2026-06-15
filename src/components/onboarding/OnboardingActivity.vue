@@ -221,13 +221,13 @@ function formatActivityMeta(activity: AddedActivity): string {
       <div class="mb-3 flex flex-wrap gap-1.5">
         <button
           v-for="preset in ACTIVITY_PRESETS"
-          :key="preset.label"
+          :key="preset.labelKey"
           class="ob-chip"
-          :class="{ 'ob-chip-selected': selectedPreset?.label === preset.label }"
+          :class="{ 'ob-chip-selected': selectedPreset?.labelKey === preset.labelKey }"
           @click="selectPreset(preset)"
         >
           <span class="text-sm">{{ preset.icon }}</span>
-          {{ isBeanieMode ? preset.label.toLowerCase() : preset.label }}
+          {{ t(preset.labelKey) }}
         </button>
       </div>
 

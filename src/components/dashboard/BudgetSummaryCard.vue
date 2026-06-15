@@ -5,6 +5,7 @@ import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
+import { useCategoryLabel } from '@/composables/useCategoryLabel';
 import { CATEGORY_EMOJI_MAP } from '@/constants/categories';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -17,6 +18,7 @@ const settingsStore = useSettingsStore();
 const { isUnlocked, MASK } = usePrivacyMode();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
 const { t } = useTranslation();
+const { budgetCategoryLabel } = useCategoryLabel();
 
 const hasBudget = computed(() => !!budgetStore.activeBudget);
 const budgetAmount = computed(() => budgetStore.effectiveBudgetAmount);
@@ -181,7 +183,7 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
                       : 'text-secondary-500 dark:text-gray-200'
                   "
                 >
-                  {{ cat.name }}
+                  {{ budgetCategoryLabel(cat.categoryId) }}
                 </span>
               </div>
               <span

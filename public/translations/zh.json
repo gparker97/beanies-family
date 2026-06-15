@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-15",
-    "translationCount": 3415
+    "translationCount": 3514
   },
   "translations": {
     "app.name": {
@@ -453,8 +453,8 @@
     },
     "accounts.type.credit_card": {
       "translation": "信用卡",
-      "hash": "5zidk9",
-      "lastUpdated": "2026-03-01"
+      "hash": "lkxejb",
+      "lastUpdated": "2026-06-15"
     },
     "accounts.type.investment": {
       "translation": "投资帐户",
@@ -5077,34 +5077,34 @@
       "lastUpdated": "2026-03-01"
     },
     "accounts.type.retirement_roth_ira": {
-      "translation": "roth ira",
-      "hash": "lmuvr",
-      "lastUpdated": "2026-03-01"
+      "translation": "Roth IRA",
+      "hash": "gu0bt",
+      "lastUpdated": "2026-06-15"
     },
     "accounts.type.retirement_bene_ira": {
-      "translation": "bene ira",
-      "hash": "rui3jm",
-      "lastUpdated": "2026-03-01"
+      "translation": "Bene IRA",
+      "hash": "swyyr6",
+      "lastUpdated": "2026-06-15"
     },
     "accounts.type.retirement_kids_ira": {
-      "translation": "kida ira",
-      "hash": "dzi67h",
-      "lastUpdated": "2026-03-01"
+      "translation": "儿童IRA",
+      "hash": "cn50bf",
+      "lastUpdated": "2026-06-15"
     },
     "accounts.type.retirement": {
       "translation": "退休",
-      "hash": "c2wwsn",
-      "lastUpdated": "2026-03-01"
+      "hash": "kvxyjd",
+      "lastUpdated": "2026-06-15"
     },
     "accounts.type.education_529": {
       "translation": "大学基金(529)",
-      "hash": "smtf37",
-      "lastUpdated": "2026-03-01"
+      "hash": "l0yx2b",
+      "lastUpdated": "2026-06-15"
     },
     "accounts.type.education_savings": {
       "translation": "教育储蓄",
-      "hash": "nl9lxd",
-      "lastUpdated": "2026-03-01"
+      "hash": "psujun",
+      "lastUpdated": "2026-06-15"
     },
     "accounts.cat.bank": {
       "translation": "银行",
@@ -17079,6 +17079,501 @@
     "segmentRow.returnTime": {
       "translation": "返回 时间",
       "hash": "21hkm5",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.freelance": {
+      "translation": "自由职业",
+      "hash": "q5uysv",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.salary": {
+      "translation": "薪资",
+      "hash": "u72cd2",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.consultancy": {
+      "translation": "咨询",
+      "hash": "d4ui3z",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_employment": {
+      "translation": "其他就业收入",
+      "hash": "qgvykz",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.dividends": {
+      "translation": "股息",
+      "hash": "6sy7gk",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.investments": {
+      "translation": "投资回报",
+      "hash": "xrb46u",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_investment": {
+      "translation": "其他投资收益",
+      "hash": "jk1co6",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.rental": {
+      "translation": "租金收入",
+      "hash": "geh9gl",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_property": {
+      "translation": "其他财产收入",
+      "hash": "vmsftw",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.gifts": {
+      "translation": "收到的礼物",
+      "hash": "76a4pq",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.refunds": {
+      "translation": "退款",
+      "hash": "pjptet",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_income": {
+      "translation": "其他收入",
+      "hash": "2qgcuf",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.donations": {
+      "translation": "捐款",
+      "hash": "c92ynz",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.gifts_given": {
+      "translation": "赠送的礼物",
+      "hash": "qd434w",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_charity": {
+      "translation": "其他慈善",
+      "hash": "xnk4oo",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.tuition": {
+      "translation": "导师/学费",
+      "hash": "nhu0zl",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.school_fees": {
+      "translation": "学费",
+      "hash": "mh3n6v",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_education": {
+      "translation": "其他教育",
+      "hash": "hdwn6g",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.music_lessons": {
+      "translation": "音乐课程",
+      "hash": "4iwy68",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.art_lessons": {
+      "translation": "美术课",
+      "hash": "bf837i",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.dance_lessons": {
+      "translation": "舞蹈课",
+      "hash": "s94waa",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_lessons": {
+      "translation": "其他课程",
+      "hash": "q9ok4r",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.entertainment": {
+      "translation": "娱乐",
+      "hash": "lhdeg8",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.hobbies": {
+      "translation": "兴趣爱好",
+      "hash": "pljqk0",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_entertainment": {
+      "translation": "其他娱乐",
+      "hash": "aim2tk",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.childcare": {
+      "translation": "托儿",
+      "hash": "vkpk3x",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.pets": {
+      "translation": "宠物",
+      "hash": "1h8pg",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_family": {
+      "translation": "其他家庭",
+      "hash": "4ckabw",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.debt_payment": {
+      "translation": "债务偿还",
+      "hash": "n0w1on",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.insurance": {
+      "translation": "保险",
+      "hash": "yclp6i",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.taxes": {
+      "translation": "税费",
+      "hash": "1bz721",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.credit_card_spending": {
+      "translation": "信用卡消费",
+      "hash": "9ydskz",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_financial": {
+      "translation": "其他金融",
+      "hash": "s3w7y1",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.coffee": {
+      "translation": "咖啡/零食",
+      "hash": "x3vb2i",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.dining_out": {
+      "translation": "外出就餐",
+      "hash": "exdsih",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.groceries": {
+      "translation": "食品杂货",
+      "hash": "25dit",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_food": {
+      "translation": "其他食品",
+      "hash": "sywv5a",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.home_maintenance": {
+      "translation": "房屋维护",
+      "hash": "6w4hg2",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.rent": {
+      "translation": "租金/房屋贷款",
+      "hash": "c8u1jg",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.utilities": {
+      "translation": "水电费",
+      "hash": "igj21i",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_housing": {
+      "translation": "其他住宅",
+      "hash": "rocw37",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.healthcare": {
+      "translation": "医疗保健",
+      "hash": "n1i1df",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.dental": {
+      "translation": "牙科",
+      "hash": "xsm7pu",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_medical": {
+      "translation": "其他医疗费用",
+      "hash": "kl2wyh",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_expense": {
+      "translation": "其它费用",
+      "hash": "3hz3t4",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.clothing": {
+      "translation": "服装/购物",
+      "hash": "snppv3",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.personal_care": {
+      "translation": "个人护理",
+      "hash": "lu7pwx",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_personal": {
+      "translation": "其他个人",
+      "hash": "5r4vww",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.sports_equipment": {
+      "translation": "运动设备",
+      "hash": "fhi0x9",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.sports_team": {
+      "translation": "运动队/练习",
+      "hash": "u49ioi",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.golf": {
+      "translation": "高尔夫",
+      "hash": "1bp1e",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.gym": {
+      "translation": "健身房/健身中心",
+      "hash": "84je6q",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.yoga": {
+      "translation": "瑜伽/普拉提",
+      "hash": "vyjxqr",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_sports": {
+      "translation": "其他体育项目",
+      "hash": "21b6j3",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.software": {
+      "translation": "软件",
+      "hash": "mvzdfr",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.streaming": {
+      "translation": "流媒体",
+      "hash": "rx79du",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_subscriptions": {
+      "translation": "其他订阅",
+      "hash": "e2x6li",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.car_maintenance": {
+      "translation": "汽车/自行车保养",
+      "hash": "3mzv8v",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.car_payment": {
+      "translation": "汽车还款",
+      "hash": "i4wz9i",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.gas": {
+      "translation": "汽油/燃料",
+      "hash": "xhdvgy",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.public_transit": {
+      "translation": "公共交通",
+      "hash": "kaom4",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.taxi": {
+      "translation": "出租车/叫车",
+      "hash": "efvwof",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_transportation": {
+      "translation": "其他运输",
+      "hash": "hsaoxo",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.flights": {
+      "translation": "机票",
+      "hash": "yugk9c",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.hotel": {
+      "translation": "酒店",
+      "hash": "15mis4",
+      "lastUpdated": "2026-06-15"
+    },
+    "category.other_travel": {
+      "translation": "其他旅费",
+      "hash": "2j7iwa",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.charity": {
+      "translation": "慈善",
+      "hash": "va00w8",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.education": {
+      "translation": "教育",
+      "hash": "sc02a0",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.employment": {
+      "translation": "就业",
+      "hash": "za2igk",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.entertainment": {
+      "translation": "娱乐",
+      "hash": "lhdeg8",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.family": {
+      "translation": "家庭",
+      "hash": "yohf9g",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.financial": {
+      "translation": "财务",
+      "hash": "vz4exj",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.food": {
+      "translation": "食物",
+      "hash": "1b24e",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.housing": {
+      "translation": "住房",
+      "hash": "passar",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.investments": {
+      "translation": "投资",
+      "hash": "m47b34",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.lessons": {
+      "translation": "课程",
+      "hash": "sn8nx7",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.medical": {
+      "translation": "医疗",
+      "hash": "rxwntb",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.other": {
+      "translation": "其他",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.personal": {
+      "translation": "个人",
+      "hash": "8ec3fk",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.property": {
+      "translation": "房产",
+      "hash": "fcswzv",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.sports": {
+      "translation": "运动",
+      "hash": "tyr5up",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.subscriptions": {
+      "translation": "订阅",
+      "hash": "oy7e3u",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.transportation": {
+      "translation": "交通",
+      "hash": "fc9sp8",
+      "lastUpdated": "2026-06-15"
+    },
+    "categoryGroup.travel": {
+      "translation": "旅行",
+      "hash": "tguthi",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.piano": {
+      "translation": "钢琴",
+      "hash": "19wnqh",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.tennis": {
+      "translation": "网球",
+      "hash": "tns079",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.art": {
+      "translation": "艺术",
+      "hash": "1f0j",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.dance": {
+      "translation": "舞蹈",
+      "hash": "136a37",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.tutoring": {
+      "translation": "家教",
+      "hash": "49k5cc",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.birthday": {
+      "translation": "生日",
+      "hash": "ir5zml",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.afterSchool": {
+      "translation": "放学后",
+      "hash": "65fkaw",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.other": {
+      "translation": "其他",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.salary": {
+      "translation": "薪资",
+      "hash": "u72cd2",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.sideIncome": {
+      "translation": "副业收入",
+      "hash": "z2uh76",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.rent": {
+      "translation": "房租",
+      "hash": "1iijd",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.car": {
+      "translation": "汽车",
+      "hash": "1g38",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.utilities": {
+      "translation": "水电费",
+      "hash": "igj21i",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.phone": {
+      "translation": "电话费",
+      "hash": "19wb4e",
+      "lastUpdated": "2026-06-15"
+    },
+    "activityPreset.insurance": {
+      "translation": "保险",
+      "hash": "yclp6i",
       "lastUpdated": "2026-06-15"
     }
   }

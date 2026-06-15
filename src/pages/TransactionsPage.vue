@@ -25,7 +25,7 @@ import { chooseScope } from '@/composables/useRecurringEditScope';
 import { useProjectedTransactions } from '@/composables/useProjectedTransactions';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { showToast } from '@/composables/useToast';
-import { getCategoryById } from '@/constants/categories';
+import { useCategoryLabel } from '@/composables/useCategoryLabel';
 import { getCurrencyInfo } from '@/constants/currencies';
 import {
   formatFrequency,
@@ -72,6 +72,7 @@ const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
 const { getMemberNameByAccountId, getMemberColorByAccountId } = useMemberInfo();
 const { t } = useTranslation();
+const { categoryLabel } = useCategoryLabel();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 
@@ -381,8 +382,7 @@ const subtitle = computed(
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function getCategoryName(categoryId: string): string {
-  const category = getCategoryById(categoryId);
-  return category?.name || categoryId;
+  return categoryLabel(categoryId);
 }
 
 function formatDateGroupHeader(dateKey: string): string {
