@@ -27,6 +27,11 @@
  * - `concurrent-write` — another createNewFile or loadFromGoogleDrive is
  *   already in flight. Should be unreachable in well-behaved UI; surfaced
  *   as a typed reason so misuses are loud, not racy.
+ * - `existing-pod` — the registry already holds a `fileId` for this family, so
+ *   creating would orphan/overwrite the real pod. This is the belt-and-braces
+ *   guard above the Drive-only name-collision check; it also covers the
+ *   local-file path. The correct response is recovery (re-load the existing
+ *   pod), not creation — see ResumePodSetup's `retry` phase.
  */
 export type CreatePodFailureReason =
   | 'precondition'
@@ -34,7 +39,8 @@ export type CreatePodFailureReason =
   | 'verify'
   | 'persist'
   | 'register'
-  | 'concurrent-write';
+  | 'concurrent-write'
+  | 'existing-pod';
 
 export type CreatePodResult =
   | { ok: true }

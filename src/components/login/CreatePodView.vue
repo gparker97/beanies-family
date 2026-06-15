@@ -126,6 +126,16 @@ const stepLabels = [
 async function handleStep1Next() {
   formError.value = null;
 
+  // Idempotency guard: if a session already exists, the owner already signed up
+  // (e.g. they hit Back from step 2 to step 1, then Next again). Re-running
+  // signUp would orphan the first family + re-fire the Slack ping / newsletter.
+  // Just advance to the storage step with the family we already created.
+  // (Renaming the family after creation is out of scope — see the plan.)
+  if (authStore.currentUser) {
+    currentStep.value = 2;
+    return;
+  }
+
   if (!familyName.value || !name.value || !email.value || !password.value) {
     formError.value = t('auth.fillAllFields');
     return;
@@ -410,6 +420,7 @@ async function handleStep2Next() {
     write: 'createPod.failedReasonWrite',
     precondition: 'createPod.failedReasonPrecondition',
     'concurrent-write': 'createPod.failedReasonConcurrent',
+    'existing-pod': 'createPod.failedReasonExistingPod',
   };
   formError.value = t(reasonKey[result.reason] as Parameters<typeof t>[0]);
   console.error(`[CreatePodView] createNewFile failed (reason=${result.reason}):`, result.error);

@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-14",
-    "translationCount": 3237
+    "lastUpdated": "2026-06-15",
+    "translationCount": 3244
   },
   "translations": {
     "app.name": {
@@ -16190,6 +16190,41 @@
       "translation": "向他们发送此链接或二维码-这是他们加入您的家庭舱的方式。",
       "hash": "dxjdhm",
       "lastUpdated": "2026-06-14"
+    },
+    "createPod.failedReasonExistingPod": {
+      "translation": "您的家人已经有了一个吊舱，因此我们没有创建新的吊舱。请尝试加载现有的Pod ，因为您的数据是安全的。",
+      "hash": "cwouxk",
+      "lastUpdated": "2026-06-15"
+    },
+    "resumeSetup.retryBody": {
+      "translation": "我们找到了您的家人，但刚才无法访问您的pod文件。这通常是暂时的，请重试。",
+      "hash": "maar73",
+      "lastUpdated": "2026-06-15"
+    },
+    "resumeSetup.retryCta": {
+      "translation": "再接再厉",
+      "hash": "agecuz",
+      "lastUpdated": "2026-06-15"
+    },
+    "resumeSetup.startNewCta": {
+      "translation": "改为启动新的Pod",
+      "hash": "ujoatm",
+      "lastUpdated": "2026-06-15"
+    },
+    "resumeSetup.startNewConfirmTitle": {
+      "translation": "启动一个新的pod ？",
+      "hash": "abfdef",
+      "lastUpdated": "2026-06-15"
+    },
+    "resumeSetup.startNewConfirmMessage": {
+      "translation": "您的家人已经有一个我们无法到达的吊舱。启动新Pod意味着您现有的Pod将不会在此处加载。只有当您确定要重新开始时，才执行此操作。",
+      "hash": "q60sbz",
+      "lastUpdated": "2026-06-15"
+    },
+    "resumeSetup.startNewConfirmCta": {
+      "translation": "启动新Pod",
+      "hash": "8tyv6g",
+      "lastUpdated": "2026-06-15"
     }
   }
 }
