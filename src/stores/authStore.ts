@@ -318,7 +318,35 @@ export const useAuthStore = defineStore('auth', () => {
         return;
       }
 
-      // No family exists — user needs to create or join one
+      // No family in the LOCAL registry. Normally a brand-new user — BUT on iOS
+      // Safari, ITP can evict the IndexedDB registry independently of the
+      // localStorage session (~7-day partition). If a persisted session still
+      // exists, this is a RETURNING user whose registry was evicted, not a new
+      // one — restore the session so they land on the resume/recovery flow
+      // (which re-loads their pod via the REMOTE registry) rather than being
+      // dumped on the WelcomeGate as brand-new. Guarded so a restore failure can
+      // never throw out of boot (a thrown boot is worse than a mis-route).
+      try {
+        const saved = restoreSession();
+        if (saved) {
+          currentUser.value = saved;
+          isAuthenticated.value = true;
+          hasFamilies.value = true;
+          // Don't over-trust the (possibly-evicted) podCreated flag — the
+          // authoritative value is established by the load attempt
+          // (markPodCreated on success); the recovery flow handles a pod that
+          // can't be loaded.
+          podCreated.value = restorePodCreated();
+        }
+      } catch (e) {
+        console.warn('[authStore] session restore on empty registry failed:', e);
+        reportError({
+          surface: 'authStore.initializeAuth.restoreOnEmptyRegistry',
+          message: `Session restore on empty registry failed (falling back to WelcomeGate): ${e instanceof Error ? e.message : String(e)}`,
+          error: e,
+          severity: 'warning',
+        });
+      }
       isInitialized.value = true;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to initialize auth';

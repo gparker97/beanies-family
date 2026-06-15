@@ -107,6 +107,9 @@ vi.mock('@/services/indexeddb/registryDatabase', () => ({
     put: vi.fn(async () => {}),
     delete: vi.fn(async () => {}),
   })),
+  isStorageBlockedError: (e: unknown) =>
+    e instanceof Error &&
+    ['InvalidStateError', 'SecurityError', 'QuotaExceededError'].includes(e.name),
 }));
 
 // Family context service — mock the IDB-dependent parts
@@ -680,5 +683,57 @@ describe('pod creation: full end-to-end flow', () => {
     });
     expect(newMember).not.toBeNull();
     expect(newMember!.name).toBe('Child Bean');
+  });
+});
+
+describe('authStore.initializeAuth — session restore vs registry (B5, iOS ITP eviction)', () => {
+  const SESSION_KEY = 'beanies_auth_session';
+  const sampleUser = {
+    memberId: 'm-1',
+    email: 'returning@example.com',
+    familyId: 'fam-1',
+    role: 'owner',
+  };
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('(i) common case: registry has families + a session → restores the session (unchanged path)', async () => {
+    const registryDb = await import('@/services/indexeddb/registryDatabase');
+    vi.mocked(registryDb.getRegistryDatabase).mockResolvedValueOnce({
+      getAll: vi.fn(async () => [{ id: 'fam-1', name: 'Fam' }]),
+    } as never);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sampleUser));
+
+    const authStore = useAuthStore();
+    await authStore.initializeAuth();
+
+    expect(authStore.isAuthenticated).toBe(true);
+    expect(authStore.currentUser?.email).toBe('returning@example.com');
+  });
+
+  it('(ii) common case: empty registry + NO session → stays unauthenticated (WelcomeGate)', async () => {
+    // default mock: getAll → []
+    const authStore = useAuthStore();
+    await authStore.initializeAuth();
+
+    expect(authStore.isAuthenticated).toBe(false);
+    expect(authStore.currentUser).toBeNull();
+    expect(authStore.isInitialized).toBe(true);
+  });
+
+  it('(iii) ITP case: empty registry BUT a localStorage session survives → restores instead of WelcomeGate-as-new', async () => {
+    // default mock: getAll → [] (registry evicted), but the session persists.
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sampleUser));
+
+    const authStore = useAuthStore();
+    await authStore.initializeAuth();
+
+    expect(authStore.isAuthenticated).toBe(true);
+    expect(authStore.currentUser?.email).toBe('returning@example.com');
+    expect(authStore.hasFamilies).toBe(true);
   });
 });
