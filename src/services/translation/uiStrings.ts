@@ -6466,6 +6466,44 @@ const STRING_DEFS = {
     beanie: 'no accommodation booked for this night',
   },
   'travel.hint': { en: 'Helpful Hint', beanie: 'helpful hint' },
+  'travel.hint.accommodationOverlap': {
+    en: 'Overlaps with "{title}" - double-booked nights?',
+    beanie: 'overlaps with "{title}" - double-booked nights?',
+  },
+  'travel.hint.accommodationDuringCruise': {
+    en: 'Overlaps with "{title}" - cruise includes accommodation',
+    beanie: 'overlaps with "{title}" - cruise includes accommodation',
+  },
+  'travel.hint.cruiseHasAccommodation': {
+    en: '"{title}" booked during cruise - cruise includes accommodation',
+    beanie: '"{title}" booked during cruise - cruise includes accommodation',
+  },
+  'travel.hint.flightDuringCruise': {
+    en: 'Scheduled during "{title}" - is this intentional?',
+    beanie: 'scheduled during "{title}" - is this intentional?',
+  },
+  'travel.hint.cruiseHasFlight': {
+    en: '"{title}" scheduled during cruise',
+    beanie: '"{title}" scheduled during cruise',
+  },
+  'travel.hint.nightFlightEarly': {
+    en: "Departs at {time} - just after midnight. Double-check the date to make sure you're travelling on the right day.",
+    beanie:
+      "departs at {time} - just after midnight. double-check the date to make sure you're travelling on the right day.",
+  },
+  'travel.hint.nightFlightLate': {
+    en: 'Departs at {time} - just before midnight. Make sure you have the correct departure date and allow extra time.',
+    beanie:
+      'departs at {time} - just before midnight. make sure you have the correct departure date and allow extra time.',
+  },
+  'travel.hint.beforeTripStart': {
+    en: 'Scheduled before trip start ({date})',
+    beanie: 'scheduled before trip start ({date})',
+  },
+  'travel.hint.afterTripEnd': {
+    en: 'Scheduled after trip end ({date})',
+    beanie: 'scheduled after trip end ({date})',
+  },
   'travel.ideas': { en: 'Trip Ideas', beanie: 'beanie trip ideas' },
   'travel.ideasTeaser': { en: 'Ideas', beanie: 'ideas' },
   'travel.ideasTeaserHint': {
