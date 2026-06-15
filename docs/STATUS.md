@@ -11,11 +11,11 @@
 >
 > **(2) Deploy (Vue only; `WEB: no`, `MOBILE: no`).** Main CI + Security green, `deploy.yml` green (~2m14s), `app.beanies.family` 200. **One CI fix round:** the first run failed on `InviteGateOverlay.test.ts` — the C3 form-open path became webhook-dependent and the test relied on `.env.local` (absent in CI), so it passed in the pre-push gate but failed in CI; fixed by stubbing `VITE_INVITE_WEBHOOK_URL` in the test (`8f8cbbf1`). Release note `2026.06.14` "Reliability and behind-the-scenes improvements." (minor, badge only). CHANGELOG updated for 2026-06-14.
 >
-> **Pending / Next Session.** _Validated 2026-06-14 evening: removed the **HIGH-EFFORT CODE REVIEW** item — executed + all 15 findings fixed + deployed this session. #241 + #249 re-checked: both still OPEN._
+> **Pending / Next Session.** _Validated 2026-06-15: **#249** Dependabot PR (shell-quote + concurrently) merged (`40f88cb9`) — cleared the critical shell-quote advisory; dropped from carried list. #241 re-checked: still OPEN._
 >
 > - **Google OAuth verification:** YouTube demo + app submitted 2026-06-14 for the new Calendar scopes; awaiting Google. Until approved: unverified warning + 100-user cap; Calendar/AI gated behind The Beanie Lab.
 > - **Beanie Lab next:** when launching Calendar/AI publicly, decide whether to drop the Lab gate or keep it as the beta channel; re-announce AI under a FRESH version/date.
-> - **Carried (still apply):** **#241** Reports nav (OPEN); re-launch parked AI announcements (fresh version/date); deferred deps (astro 5→6, pdfjs-dist 4→6, capacitor 8.4.0 trio); `ChoiceModal` tech-debt migration; app-store DUNS (~early July); 1 open Dependabot PR **#249** (shell-quote + concurrently).
+> - **Carried (still apply):** **#241** Reports nav (OPEN); re-launch parked AI announcements (fresh version/date); deferred deps (astro 5→6, pdfjs-dist 4→6, capacitor 8.4.0 trio); `ChoiceModal` tech-debt migration; app-store DUNS (~early July).
 
 > **Last updated:** 2026-06-14 (Sunday — **a busy local session: shipped the #36 session-epoch guard (post-sign-out zombie-token fix), expanded the activity taxonomy (+zh), reworked the invite/invite-gate flows for clarity, suppressed the Google "file shared" email, and locked a feature-gate-by-request policy. NOTHING DEPLOYED — all 14 commits are on `main` awaiting greg's deploy + a high-effort code review next session. Working tree clean. Latest commit `177163bb`.**)
 >
