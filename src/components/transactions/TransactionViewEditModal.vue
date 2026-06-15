@@ -565,7 +565,7 @@ async function handleDelete() {
           <span>{{ linkedActivity.icon }} {{ linkedActivity.title }}</span>
           <span
             class="text-xs text-[var(--color-text-muted)] opacity-0 transition-opacity group-hover:opacity-100"
-            >&rarr; view</span
+            >&rarr; {{ t('action.view') }}</span
           >
         </button>
       </FormFieldGroup>
@@ -580,7 +580,7 @@ async function handleDelete() {
           <span>{{ linkedLoan.type === 'asset' ? '🏠' : '🏦' }} {{ linkedLoan.name }}</span>
           <span
             class="text-xs text-[var(--color-text-muted)] opacity-0 transition-opacity group-hover:opacity-100"
-            >&rarr; view</span
+            >&rarr; {{ t('action.view') }}</span
           >
         </button>
       </FormFieldGroup>

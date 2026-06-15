@@ -344,7 +344,8 @@ async function handleDelete() {
           class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-sky-700 dark:text-sky-300"
           style="background: var(--tint-silk-20)"
         >
-          💭 {{ t('todo.someday') }}
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
+          <span aria-hidden="true">💭</span> {{ t('todo.someday') }}
         </span>
         <span
           v-else

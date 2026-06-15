@@ -20,6 +20,7 @@ import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { canInviteFamily } from '@/config/features';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useSayingsStore } from '@/stores/sayingsStore';
 import { useAllergiesStore } from '@/stores/allergiesStore';
@@ -302,7 +303,9 @@ const severeAllergyCount = computed(
             >
               {{ roleLabel }}
             </span>
-            <span v-if="ageLabel !== null">· age {{ ageLabel }}</span>
+            <span v-if="ageLabel !== null">{{
+              fillTemplate(t('family.card.age'), { age: ageLabel })
+            }}</span>
             <span
               v-if="member.requiresPassword && !member.isPet"
               class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[0.625rem] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"

@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 
 const syncStore = useSyncStore();
 const { t } = useTranslation();
@@ -22,21 +23,21 @@ const statusConfig = computed(() => {
       return {
         icon: 'sync',
         color: 'text-blue-500',
-        title: 'Saving...',
+        title: t('common.saving'),
         animate: true,
       };
     case 'error':
       return {
         icon: 'error',
         color: 'text-red-500',
-        title: `Save error: ${syncStore.error}`,
+        title: fillTemplate(t('googleDrive.saveErrorTitle'), { error: syncStore.error }),
         animate: false,
       };
     case 'needs-permission':
       return {
         icon: 'warning',
         color: 'text-yellow-500',
-        title: 'Click to grant file permission and load latest data',
+        title: t('googleDrive.grantPermissionTitle'),
         animate: true,
         pulse: true,
       };
@@ -47,7 +48,9 @@ const statusConfig = computed(() => {
       return {
         icon: 'check',
         color: 'text-green-500',
-        title: `Data saved to ${syncStore.fileName}${emailSuffix}`,
+        title: fillTemplate(t('googleDrive.dataSavedTitle'), {
+          file: `${syncStore.fileName}${emailSuffix}`,
+        }),
         animate: false,
       };
     }
@@ -110,7 +113,7 @@ async function handleClick() {
       <span class="absolute inset-0 animate-ping rounded-full bg-yellow-400 opacity-30" />
       <img
         src="/brand/beanies_impact_bullet_transparent_192x192.png"
-        alt="Needs permission"
+        :alt="t('googleDrive.needsPermission')"
         class="relative h-5 w-5"
       />
     </div>

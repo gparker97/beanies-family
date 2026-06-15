@@ -34,8 +34,9 @@ const { t } = useTranslation();
         <div
           class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[13px] text-xl"
           style="background: var(--tint-orange-8)"
+          aria-hidden="true"
         >
-          💾
+          {{ '💾' }}
         </div>
         <h3 class="font-outfit text-base leading-snug font-bold text-gray-900 dark:text-gray-100">
           {{ t('storage.localFileWarningTitle') }}
@@ -45,7 +46,7 @@ const { t } = useTranslation();
         {{ t('storage.localFileWarning') }}
       </p>
       <p class="mb-2.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-        💻 {{ t('storage.localFileBestOnDesktop') }}
+        <span aria-hidden="true">{{ '💻' }}</span> {{ t('storage.localFileBestOnDesktop') }}
       </p>
       <p class="mb-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
         🔒 {{ t('storage.localFileWarningEncryption') }}

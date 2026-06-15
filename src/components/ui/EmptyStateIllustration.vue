@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { useReducedMotion } from '@/composables/useReducedMotion';
+import { useTranslation } from '@/composables/useTranslation';
+
+const { t } = useTranslation();
 
 type EmptyStateVariant =
   | 'accounts'
@@ -29,7 +32,7 @@ const prefersReducedMotion = useReducedMotion();
       class="relative h-full w-full"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="A beanie looking at an empty piggy bank"
+      :aria-label="t('emptyState.aria.piggyBank')"
     >
       <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
       <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
@@ -128,7 +131,7 @@ const prefersReducedMotion = useReducedMotion();
       class="relative h-full w-full"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="A beanie shrugging with empty pockets"
+      :aria-label="t('emptyState.aria.emptyPockets')"
     >
       <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
       <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
@@ -195,7 +198,7 @@ const prefersReducedMotion = useReducedMotion();
       class="relative h-full w-full"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="A beanie scratching its head near a blank calendar"
+      :aria-label="t('emptyState.aria.blankCalendar')"
     >
       <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
       <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
@@ -290,7 +293,7 @@ const prefersReducedMotion = useReducedMotion();
       class="relative h-full w-full"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="A beanie dreaming about a treasure chest"
+      :aria-label="t('emptyState.aria.treasureChest')"
     >
       <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
       <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
@@ -363,7 +366,7 @@ const prefersReducedMotion = useReducedMotion();
       class="relative h-full w-full"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="A beanie looking up at a flag on a hill"
+      :aria-label="t('emptyState.aria.flagOnHill')"
     >
       <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
       <!-- Hill -->
@@ -417,7 +420,7 @@ const prefersReducedMotion = useReducedMotion();
       class="relative h-full w-full"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="A beanie with a magnifying glass looking at an empty chart"
+      :aria-label="t('emptyState.aria.emptyChart')"
     >
       <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
       <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
@@ -506,7 +509,7 @@ const prefersReducedMotion = useReducedMotion();
       class="relative h-full w-full"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="A beanie waving hello"
+      :aria-label="t('emptyState.aria.wavingHello')"
     >
       <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
       <!-- Parent bean waving -->
@@ -567,7 +570,7 @@ const prefersReducedMotion = useReducedMotion();
       class="relative h-full w-full"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="A beanie planning a budget"
+      :aria-label="t('emptyState.aria.planningBudget')"
     >
       <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
       <!-- Beanie with pencil -->

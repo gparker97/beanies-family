@@ -490,7 +490,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
                   <div
                     v-if="normalizeAssignees(activity).length > 0"
                     class="ml-auto flex flex-shrink-0 -space-x-1"
-                    aria-label="Assigned to"
+                    :aria-label="t('planner.assignedTo')"
                   >
                     <MemberChip
                       v-for="mid in normalizeAssignees(activity).slice(0, isTablet ? 3 : 2)"

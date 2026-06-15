@@ -911,8 +911,11 @@ function addQuickIdea() {
               <span
                 class="font-outfit text-[0.625rem] font-semibold whitespace-nowrap text-[#00B4D8]"
               >
-                {{ vacationProgress(vacation).booked }}/{{ vacationProgress(vacation).total }}
-                booked
+                {{
+                  t('travel.bookedShort')
+                    .replace('{booked}', String(vacationProgress(vacation).booked))
+                    .replace('{total}', String(vacationProgress(vacation).total))
+                }}
               </span>
             </div>
 
@@ -1192,8 +1195,11 @@ function addQuickIdea() {
               />
             </div>
             <span class="font-outfit text-xs font-semibold whitespace-nowrap text-[#00B4D8]">
-              {{ vacationProgress(selectedVacation).booked }} of
-              {{ vacationProgress(selectedVacation).total }} booked
+              {{
+                t('travel.bookedOf')
+                  .replace('{booked}', String(vacationProgress(selectedVacation).booked))
+                  .replace('{total}', String(vacationProgress(selectedVacation).total))
+              }}
             </span>
           </div>
 
@@ -1472,13 +1478,13 @@ function addQuickIdea() {
                               v-if="hintMap.get(item.id)?.nightFlight === 'early-morning'"
                               class="font-outfit shrink-0 text-xs text-[var(--color-text-muted)]"
                             >
-                              🌙 early morning
+                              🌙 {{ t('travel.flight.earlyMorning') }}
                             </span>
                             <span
                               v-else-if="hintMap.get(item.id)?.nightFlight === 'late-night'"
                               class="font-outfit shrink-0 text-xs text-[var(--color-text-muted)]"
                             >
-                              🌙 late night
+                              🌙 {{ t('travel.flight.lateNight') }}
                             </span>
                           </div>
 
@@ -1662,7 +1668,9 @@ function addQuickIdea() {
                 {{ t('travel.ideas') }}
               </h3>
               <div class="text-[0.6875rem] text-gray-400">
-                {{ selectedVacation.ideas.length }} ideas
+                {{
+                  t('travel.ideasCount').replace('{count}', String(selectedVacation.ideas.length))
+                }}
               </div>
             </div>
           </div>
@@ -1671,7 +1679,7 @@ function addQuickIdea() {
           <div
             class="font-outfit mt-4 mb-2 text-[0.625rem] font-semibold tracking-[0.08em] text-gray-300 uppercase"
           >
-            ideas & wishes
+            {{ t('travel.ideasAndWishes') }}
           </div>
 
           <div class="space-y-2">
@@ -1848,7 +1856,7 @@ function addQuickIdea() {
         v-if="copied"
         class="font-outfit fixed bottom-6 left-1/2 z-[70] -translate-x-1/2 rounded-lg bg-[var(--color-text)] px-3 py-1.5 text-xs font-semibold text-white shadow-lg"
       >
-        copied!
+        {{ t('vacation.copied') }}
       </div>
     </Transition>
   </div>

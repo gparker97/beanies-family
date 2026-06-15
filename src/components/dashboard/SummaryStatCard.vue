@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay, formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useCountUp } from '@/composables/useCountUp';
+import { useTranslation } from '@/composables/useTranslation';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import ShowFiguresPrompt from '@/components/ui/ShowFiguresPrompt.vue';
 import type { CurrencyCode } from '@/types/models';
@@ -42,7 +43,7 @@ const emit = defineEmits<{
 
 const props = withDefaults(defineProps<Props>(), {
   changeAmount: 0,
-  changeLabel: 'vs last month',
+  changeLabel: undefined,
   tint: 'green',
   dark: false,
   testId: undefined,
@@ -64,6 +65,9 @@ const activeRing = computed(() => {
 
 const { isUnlocked, MASK } = usePrivacyMode();
 const { convertToDisplay } = useCurrencyDisplay();
+const { t } = useTranslation();
+
+const displayChangeLabel = computed(() => props.changeLabel ?? t('dashboard.vsLastMonth'));
 
 const converted = computed(() => convertToDisplay(props.amount, props.currency));
 const changeConverted = computed(() =>
@@ -210,7 +214,7 @@ const changeColor = computed(() => {
         class="text-xs"
         :class="dark ? 'opacity-35' : 'text-secondary-500 opacity-30 dark:text-gray-400'"
       >
-        {{ changeLabel }}
+        {{ displayChangeLabel }}
       </span>
     </div>
 

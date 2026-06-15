@@ -2,7 +2,10 @@
 import { computed } from 'vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
+import { useTranslation } from '@/composables/useTranslation';
 import type { CurrencyCode } from '@/types/models';
+
+const { t } = useTranslation();
 
 const props = withDefaults(
   defineProps<{
@@ -78,7 +81,7 @@ const prefix = computed(() => {
         <span
           v-if="converted.conversionFailed"
           class="mr-1 text-yellow-500"
-          title="Exchange rate not available"
+          :title="t('currency.rateUnavailable')"
         >
           <svg class="inline-block h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
             <path

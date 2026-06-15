@@ -28,7 +28,7 @@ const features = [
             class="relative h-full w-full"
             xmlns="http://www.w3.org/2000/svg"
             role="img"
-            aria-label="A beanie character looking through a telescope"
+            :aria-label="t('forecast.illustrationAlt')"
           >
             <!-- Ground shadow -->
             <ellipse cx="100" cy="170" rx="55" ry="8" fill="#AED6F1" opacity="0.3" />

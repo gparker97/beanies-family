@@ -169,7 +169,7 @@ function formatActivityMeta(activity: AddedActivity): string {
   const parts: string[] = [activity.memberNames];
   if (activity.days.length) parts.push(formatDaysShort(activity.days));
   if (activity.startTime) parts.push(formatTime12(activity.startTime));
-  if (activity.fee) parts.push(`$${activity.fee}/mo`);
+  if (activity.fee) parts.push(`$${activity.fee}${t('onboarding.perMonthSuffix')}`);
   return parts.filter(Boolean).join(' · ');
 }
 </script>
@@ -181,14 +181,16 @@ function formatActivityMeta(activity: AddedActivity): string {
       <div
         class="ob-float-emoji"
         style="animation-delay: 0.8s; font-size: 1.375rem; left: 50px; top: 130px"
+        aria-hidden="true"
       >
-        ⚽
+        {{ '⚽' }}
       </div>
       <div
         class="ob-float-emoji"
         style="animation-delay: 0.4s; bottom: 100px; font-size: 1.25rem; right: 60px"
+        aria-hidden="true"
       >
-        🎨
+        {{ '🎨' }}
       </div>
     </template>
 

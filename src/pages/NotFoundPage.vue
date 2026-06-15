@@ -27,7 +27,7 @@ function goHome() {
           class="relative h-full w-full"
           xmlns="http://www.w3.org/2000/svg"
           role="img"
-          aria-label="A confused beanie character looking lost"
+          :aria-label="t('notFound.illustrationAlt')"
         >
           <!-- Ground shadow -->
           <ellipse cx="100" cy="168" rx="50" ry="8" fill="#AED6F1" opacity="0.3" />
@@ -166,7 +166,7 @@ function goHome() {
 
       <!-- 404 code - subtle background -->
       <p class="font-headline text-8xl font-bold text-orange-100 select-none dark:text-[#243342]">
-        404
+        {{ t('notFound.code') }}
       </p>
 
       <!-- Heading -->

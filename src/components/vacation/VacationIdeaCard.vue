@@ -351,7 +351,7 @@ function patch(fields: Partial<VacationIdea>) {
             v-if="voters.length === familyStore.humans.length && familyStore.humans.length > 1"
             class="font-outfit ml-1 text-xs font-medium text-[var(--color-text-muted)]"
           >
-            everyone!
+            {{ t('vacation.everyone') }}
           </span>
         </div>
       </FormFieldGroup>

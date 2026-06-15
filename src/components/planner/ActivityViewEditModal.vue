@@ -893,7 +893,8 @@ async function confirmReschedule() {
               {{ t('modal.time') }}
             </span>
             <span class="font-outfit text-primary-500 text-sm font-semibold">
-              ☀️ {{ t('planner.allDay') }}
+              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
+              <span aria-hidden="true">☀️</span> {{ t('planner.allDay') }}
             </span>
           </div>
           <div v-else-if="activity.startTime" class="flex items-center gap-2">
@@ -1417,10 +1418,15 @@ async function confirmReschedule() {
                     linkedRecurringItem.amount.toLocaleString('en-US', {
                       minimumFractionDigits: 2,
                     })
-                  }}/{{ linkedRecurringItem.frequency === 'yearly' ? 'yr' : 'mo' }}</span
+                  }}{{
+                    linkedRecurringItem.frequency === 'yearly'
+                      ? t('planner.unit.perYearAbbrev')
+                      : t('planner.unit.perMonthAbbrev')
+                  }}</span
                 >
                 <span v-if="linkedPayFromAccount" class="text-[var(--color-text-muted)]">
-                  &middot; from {{ linkedPayFromAccount.name }}
+                  &middot;
+                  {{ t('planner.fromAccount').replace('{name}', linkedPayFromAccount.name) }}
                 </span>
               </div>
               <button

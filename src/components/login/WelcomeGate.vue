@@ -194,7 +194,7 @@ function promptParts() {
             class="bg-secondary-500/[0.07] mb-2 flex h-9 w-9 items-center justify-center rounded-xl text-lg dark:bg-slate-700"
             aria-hidden="true"
           >
-            👋
+            {{ '👋' }}
           </div>
           <p class="font-outfit text-sm font-bold tracking-tight text-gray-900 dark:text-gray-100">
             {{ t('loginV6.signInTitle') }}
@@ -227,7 +227,7 @@ function promptParts() {
             class="bg-sky-silk-300/30 dark:bg-sky-silk-300/10 mb-2 flex h-9 w-9 items-center justify-center rounded-xl text-lg"
             aria-hidden="true"
           >
-            💌
+            {{ '💌' }}
           </div>
           <p class="font-outfit text-sm font-bold tracking-tight text-gray-900 dark:text-gray-100">
             {{ t('loginV6.joinTitle') }}

@@ -439,7 +439,11 @@ const saveLabel = computed(() => {
           <span class="cele-emoji">✅</span>
           <span class="cele-lbl">{{ t('vacation.celebration.booked') }}</span>
           <span class="cele-val text-[#27ae60]">
-            {{ celebrationProgress.booked }} of {{ celebrationProgress.total }} items
+            {{
+              t('vacation.celebration.bookedOfItems')
+                .replace('{n}', String(celebrationProgress.booked))
+                .replace('{total}', String(celebrationProgress.total))
+            }}
           </span>
         </div>
         <div v-if="celebrationTodoCount > 0" class="cele-row">

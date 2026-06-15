@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useTranslation } from '@/composables/useTranslation';
+
+const { t } = useTranslation();
+
 interface Props {
   icon?: string;
   title: string;
@@ -41,7 +45,7 @@ const emit = defineEmits<{
       <button
         type="button"
         class="flex-shrink-0 rounded-full p-1 opacity-60 transition-opacity hover:opacity-100"
-        aria-label="Dismiss"
+        :aria-label="t('action.dismiss')"
         @click="emit('dismiss')"
       >
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

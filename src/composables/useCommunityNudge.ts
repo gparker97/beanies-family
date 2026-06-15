@@ -17,6 +17,7 @@
 import { computed } from 'vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { showToast } from '@/composables/useToast';
+import { useTranslationStore } from '@/stores/translationStore';
 import { reportError } from '@/utils/errorReporter';
 import { openDiscord } from '@/utils/discord';
 import { COMMUNITY_NUDGE_COUNT } from '@/content/communityNudges';
@@ -148,12 +149,9 @@ export function useCommunityNudge() {
     state.value = next;
     if (!store.save(next)) {
       state.value = prev;
-      showToast(
-        'error',
-        errTitle,
-        'Your change could not be saved on this device. Check that storage is available (private mode / low disk can block it) and try again.',
-        { surface: 'community-nudge' }
-      );
+      showToast('error', errTitle, useTranslationStore().t('error.localSaveFailed.help'), {
+        surface: 'community-nudge',
+      });
     }
   }
 

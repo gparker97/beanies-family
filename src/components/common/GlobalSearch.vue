@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
@@ -108,7 +109,8 @@ const results = computed<SearchResult[]>(() => {
     if (a.parentActivityId) continue;
     if (matches(q, a.title, a.description, a.location, a.category)) {
       const cat = getActivityCategoryById(a.category);
-      const recLabel = a.recurrence !== 'none' ? 'recurring' : 'one-time';
+      const recLabel =
+        a.recurrence !== 'none' ? t('search.subtitle.recurring') : t('search.subtitle.oneTime');
       const datePart = a.date ? formatDateShort(a.date) : '';
       const catPart = cat?.name || '';
       const parts = [recLabel, catPart, datePart].filter(Boolean);
@@ -139,7 +141,7 @@ const results = computed<SearchResult[]>(() => {
   for (const todo of todoStore.todos) {
     if (matches(q, todo.title, todo.description)) {
       const parts: string[] = [];
-      if (todo.completed) parts.push('✓ done');
+      if (todo.completed) parts.push(t('search.subtitle.done'));
       if (todo.dueDate) parts.push(formatDateShort(todo.dueDate));
       all.push({
         id: todo.id,
@@ -172,7 +174,7 @@ const results = computed<SearchResult[]>(() => {
         id: tx.id,
         type: 'transaction',
         title: tx.description,
-        subtitle: `${tx.type} · ${tx.currency} ${tx.amount}${tx.date ? ' · ' + formatDateShort(tx.date) : ''}`,
+        subtitle: `${t(('transactions.type.' + tx.type) as any)} · ${tx.currency} ${tx.amount}${tx.date ? ' · ' + formatDateShort(tx.date) : ''}`,
         icon: getTransactionVisual(tx).icon,
       });
     }
@@ -185,7 +187,11 @@ const results = computed<SearchResult[]>(() => {
         id: g.id,
         type: 'goal',
         title: g.name,
-        subtitle: g.isCompleted ? '✓ achieved' : `${g.priority} priority`,
+        subtitle: g.isCompleted
+          ? t('search.subtitle.achieved')
+          : fillTemplate(t('search.subtitle.priority'), {
+              priority: t(('goals.priority.' + g.priority) as any),
+            }),
         icon: '🎯',
       });
     }
@@ -198,7 +204,7 @@ const results = computed<SearchResult[]>(() => {
         id: a.id,
         type: 'asset',
         title: a.name,
-        subtitle: a.type.replace(/_/g, ' '),
+        subtitle: t(('assets.type.' + a.type) as any),
         icon: assetTypeIcons[a.type] || '💎',
       });
     }
@@ -211,7 +217,7 @@ const results = computed<SearchResult[]>(() => {
         id: m.id,
         type: 'member',
         title: m.name,
-        subtitle: m.role,
+        subtitle: t(('family.role.' + m.role) as any),
         icon: '👤',
         color: m.color,
       });
@@ -330,7 +336,11 @@ const resultCount = computed(() => results.value.length);
               <span
                 class="font-outfit inline-flex items-center rounded-full bg-gradient-to-r from-[var(--tint-orange-8)] to-[rgba(230,126,34,0.06)] px-2.5 py-0.5 text-[0.625rem] font-semibold text-[var(--heritage-orange)]"
               >
-                {{ resultCount }} {{ resultCount === 1 ? 'result' : 'results' }}
+                {{
+                  resultCount === 1
+                    ? fillTemplate(t('search.resultCount'), { count: resultCount })
+                    : fillTemplate(t('search.resultCountPlural'), { count: resultCount })
+                }}
               </span>
             </div>
             <div class="mx-4 border-b border-[var(--tint-slate-5)] dark:border-slate-700" />
@@ -420,7 +430,9 @@ const resultCount = computed(() => results.value.length);
               <p class="font-outfit text-sm font-semibold text-gray-400 dark:text-gray-500">
                 {{ t('search.noResults') }}
               </p>
-              <p class="mt-1 text-xs text-gray-300 dark:text-gray-600">try a different keyword</p>
+              <p class="mt-1 text-xs text-gray-300 dark:text-gray-600">
+                {{ t('search.noResultsHint') }}
+              </p>
             </div>
 
             <!-- Empty state (no query yet) -->
@@ -431,7 +443,7 @@ const resultCount = computed(() => results.value.length);
                 🫘
               </div>
               <p class="font-outfit text-xs font-medium text-gray-400 dark:text-gray-500">
-                find your beans...
+                {{ t('search.emptyHint') }}
               </p>
             </div>
           </div>

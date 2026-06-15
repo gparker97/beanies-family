@@ -150,7 +150,7 @@ const sections = computed<GoalSection[]>(() => {
     if (familyGoals.length > 0) {
       memberSections.push({
         key: 'family',
-        label: 'Family',
+        label: t('common.family'),
         goals: familyGoals,
         addDefaults: { memberId: '__shared__' },
         header: { kind: 'member', memberId: null },
@@ -747,7 +747,7 @@ async function deleteCompletedGoal(id: string) {
                 <template v-else>🏠</template>
               </div>
               <span class="text-sm text-white/70">
-                {{ getMemberName(goal.memberId, 'Family') }}
+                {{ getMemberName(goal.memberId, t('common.family')) }}
               </span>
             </div>
             <span

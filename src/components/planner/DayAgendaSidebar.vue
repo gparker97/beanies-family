@@ -193,7 +193,11 @@ function formatGroupDate(dateStr: string): string {
             {{ activeVacation.name }}
           </span>
           <span class="text-xs" style="color: var(--vacation-teal); opacity: 0.7">
-            day {{ vacationDayNumber }} of {{ vacationTotalDays }}
+            {{
+              t('planner.vacationDayOf')
+                .replace('{day}', String(vacationDayNumber))
+                .replace('{total}', String(vacationTotalDays))
+            }}
           </span>
         </div>
         <span class="font-outfit text-xs font-semibold" style="color: var(--vacation-teal)">

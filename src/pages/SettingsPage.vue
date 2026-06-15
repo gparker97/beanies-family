@@ -1024,7 +1024,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
 
         <!-- Selection count -->
         <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-          {{ preferredCount }} / 4 {{ t('settings.selected') }}
+          {{ t('settings.preferredSelectedCount').replace('{count}', String(preferredCount)) }}
         </p>
       </div>
 

@@ -409,13 +409,13 @@ watch(
   }
 );
 
-const reminderChipOptions = [
-  { value: '0', label: 'None' },
-  { value: '15', label: '15 min' },
-  { value: '30', label: '30 min' },
-  { value: '60', label: '1 hour' },
-  { value: '1440', label: '1 day' },
-];
+const reminderChipOptions = computed(() => [
+  { value: '0', label: t('planner.reminder.none') },
+  { value: '15', label: t('planner.reminder.15min') },
+  { value: '30', label: t('planner.reminder.30min') },
+  { value: '60', label: t('planner.reminder.1hour') },
+  { value: '1440', label: t('planner.reminder.1day') },
+]);
 
 const hasCost = computed(() => (feeAmount.value ?? 0) > 0);
 
@@ -981,7 +981,9 @@ function handleSave() {
           </span>
           <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
             {{ formatCurrencyWithCode(perSessionCost, (feeCurrency || 'USD') as any) }}
-            <span class="font-normal opacity-50"> ({{ totalSessions }} sessions) </span>
+            <span class="font-normal opacity-50">
+              {{ t('planner.fee.sessionsCount').replace('{count}', String(totalSessions)) }}
+            </span>
           </span>
         </div>
 
@@ -1002,7 +1004,8 @@ function handleSave() {
             {{ t('planner.fee.calculatedMonthly') }}
           </span>
           <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
-            {{ formatCurrencyWithCode(calculatedMonthly, (feeCurrency || 'USD') as any) }}/mo
+            {{ formatCurrencyWithCode(calculatedMonthly, (feeCurrency || 'USD') as any)
+            }}{{ t('planner.unit.perMonthAbbrev') }}
           </span>
           <InfoHintBadge :text="t('planner.fee.monthlyCalcHint')" />
         </div>

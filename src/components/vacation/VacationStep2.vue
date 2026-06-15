@@ -419,7 +419,7 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
               >
                 <BaseInput
                   :model-value="seg.flightNumber ?? ''"
-                  :placeholder="'e.g. 1842'"
+                  :placeholder="t('vacation.field.flightNumberPlaceholder')"
                   class="vacation-teal-input"
                   @update:model-value="updateSegment(idx, 'flightNumber', String($event))"
                 />
@@ -457,7 +457,7 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
                     "
                     @click="updateSegment(idx, 'arrivesNextDay', !(seg.arrivesNextDay ?? false))"
                   >
-                    +1
+                    {{ t('vacation.field.nextDayBadge') }}
                   </button>
                 </div>
               </FormFieldGroup>
@@ -620,7 +620,7 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
           <FormFieldGroup :label="t('vacation.field.carLabel')">
             <BaseInput
               :model-value="seg.carLabel ?? ''"
-              placeholder="e.g. Tesla Model Y"
+              :placeholder="t('vacation.field.carLabelPlaceholder')"
               class="vacation-teal-input"
               @update:model-value="updateSegment(idx, 'carLabel', String($event))"
             />

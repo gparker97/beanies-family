@@ -65,9 +65,11 @@ const completedByMember = computed(() => {
       <button
         class="flex h-8 w-8 items-center justify-center rounded-[10px] text-sm opacity-40 transition-opacity hover:opacity-70"
         style="background: rgb(255 255 255 / 50%)"
+        :aria-label="t('todo.undo')"
         @click="emit('toggle', todo.id)"
       >
-        ↩️
+        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
+        <span aria-hidden="true">↩️</span>
       </button>
     </div>
   </div>

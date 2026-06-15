@@ -104,6 +104,7 @@ const timeAgo = computed(() => {
         class="font-outfit text-sm font-semibold text-[var(--color-text)]"
         :class="compact ? 'truncate' : 'md:text-base'"
       >
+        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
         <span v-if="isSomeday" aria-hidden="true">💭&nbsp;</span>{{ todo.title }}
       </p>
 
@@ -189,9 +190,11 @@ const timeAgo = computed(() => {
       <button
         class="flex h-8 w-8 items-center justify-center rounded-[10px] text-sm opacity-40 transition-opacity hover:opacity-70"
         :style="actionPillStyle"
+        :aria-label="t('action.delete')"
         @click.stop="emit('delete', todo.id)"
       >
-        🗑️
+        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
+        <span aria-hidden="true">🗑️</span>
       </button>
     </div>
   </div>

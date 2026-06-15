@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-15",
-    "translationCount": 3248
+    "translationCount": 3374
   },
   "translations": {
     "app.name": {
@@ -16244,6 +16244,636 @@
     "oauth.storageErrorBody": {
       "translation": "您的浏览器在登录期间阻止存储（这通常发生在隐私浏览中）。请在正常窗口中重试。",
       "hash": "iuxwue",
+      "lastUpdated": "2026-06-15"
+    },
+    "plausibleExclude.title.justDone": {
+      "translation": "完成—您已被排除在外",
+      "hash": "uu5fdx",
+      "lastUpdated": "2026-06-15"
+    },
+    "plausibleExclude.title.already": {
+      "translation": "已排除",
+      "hash": "sj4nua",
+      "lastUpdated": "2026-06-15"
+    },
+    "plausibleExclude.title.unavailable": {
+      "translation": "localStorage不可用",
+      "hash": "gp8sg",
+      "lastUpdated": "2026-06-15"
+    },
+    "plausibleExclude.title.checking": {
+      "translation": "搜索中...",
+      "hash": "kf0w5o",
+      "lastUpdated": "2026-06-15"
+    },
+    "plausibleExclude.body.justDone": {
+      "translation": "Plausible将不再在app.beanies.family上跟踪此浏览器。在您使用的每个设备/浏览器上重复此操作。",
+      "hash": "xilux8",
+      "lastUpdated": "2026-06-15"
+    },
+    "plausibleExclude.body.already": {
+      "translation": "此浏览器已被排除在app.beanies.family的Plausible分析之外。无需执行任何操作。",
+      "hash": "bp5beb",
+      "lastUpdated": "2026-06-15"
+    },
+    "plausibleExclude.body.unavailable": {
+      "translation": "您的浏览器阻止了localStorage （私有模式？ ）。请在正常的浏览器窗口中尝试。",
+      "hash": "i1mh74",
+      "lastUpdated": "2026-06-15"
+    },
+    "plausibleExclude.backToApp": {
+      "translation": "返回应用",
+      "hash": "wwwpom",
+      "lastUpdated": "2026-06-15"
+    },
+    "plausibleExclude.status.justDone": {
+      "translation": "plausible_ignore设置为true",
+      "hash": "ur909b",
+      "lastUpdated": "2026-06-15"
+    },
+    "plausibleExclude.status.already": {
+      "translation": "plausible_ignore = true",
+      "hash": "21933p",
+      "lastUpdated": "2026-06-15"
+    },
+    "plausibleExclude.status.failed": {
+      "translation": "无法设置标记",
+      "hash": "92r9oq",
+      "lastUpdated": "2026-06-15"
+    },
+    "notFound.illustrationAlt": {
+      "translation": "一个迷茫的豆豆角色看起来迷路了",
+      "hash": "sy00k",
+      "lastUpdated": "2026-06-15"
+    },
+    "notFound.code": {
+      "translation": "404",
+      "hash": "13qw",
+      "lastUpdated": "2026-06-15"
+    },
+    "noAccess.illustrationAlt": {
+      "translation": "挂锁旁边的豆豆字符",
+      "hash": "f1ztph",
+      "lastUpdated": "2026-06-15"
+    },
+    "forecast.illustrationAlt": {
+      "translation": "通过望远镜观察的豆豆角色",
+      "hash": "82glxj",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.preferredSelectedCount": {
+      "translation": "已选择{count}/4",
+      "hash": "8lpln3",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.bookedShort": {
+      "translation": "已预订{booked}/{total}",
+      "hash": "gaegcp",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.bookedOf": {
+      "translation": "已预订{booked}个，共{total}个",
+      "hash": "ewqntj",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.flight.earlyMorning": {
+      "translation": "早晨",
+      "hash": "j2t43d",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.flight.lateNight": {
+      "translation": "大半夜",
+      "hash": "tl4gm6",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.ideasCount": {
+      "translation": "{count}个创意",
+      "hash": "qovbp7",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.ideasAndWishes": {
+      "translation": "想法和愿望",
+      "hash": "ajao8j",
+      "lastUpdated": "2026-06-15"
+    },
+    "assets.perMonth": {
+      "translation": "/月",
+      "hash": "nz3169",
+      "lastUpdated": "2026-06-15"
+    },
+    "assets.fromAccount": {
+      "translation": "從電子郵件",
+      "hash": "5wjffx",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.exchangeRates.title": {
+      "translation": "汇率",
+      "hash": "m4rsye",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.exchangeRates.lastUpdated": {
+      "translation": "最新更新：",
+      "hash": "a5oufd",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.exchangeRates.stale": {
+      "translation": "价格可能已过时",
+      "hash": "vahv7h",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.exchangeRates.updating": {
+      "translation": "更新...",
+      "hash": "k7r494",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.exchangeRates.refresh": {
+      "translation": "刷新率",
+      "hash": "u7f4y6",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.exchangeRates.autoUpdate": {
+      "translation": "更新评价",
+      "hash": "t2rgp2",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.exchangeRates.autoUpdateHint": {
+      "translation": "每天在应用程序启动时自动获取新费率",
+      "hash": "jupza1",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.exchangeRates.currentRates": {
+      "translation": "当前费率（基数： {base} ）",
+      "hash": "jmhssz",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.exchangeRates.currency": {
+      "translation": "货币",
+      "hash": "al2er5",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.exchangeRates.rate": {
+      "translation": "Rate（快慢差率）",
+      "hash": "1ifpc",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.exchangeRates.empty": {
+      "translation": "尚未加载汇率",
+      "hash": "b75u08",
+      "lastUpdated": "2026-06-15"
+    },
+    "settings.exchangeRates.fetch": {
+      "translation": "获取费率",
+      "hash": "c1slt9",
+      "lastUpdated": "2026-06-15"
+    },
+    "vacation.field.nextDayBadge": {
+      "translation": "1",
+      "hash": "12e",
+      "lastUpdated": "2026-06-15"
+    },
+    "vacation.field.flightNumberPlaceholder": {
+      "translation": "例如： 1842",
+      "hash": "h2wjpn",
+      "lastUpdated": "2026-06-15"
+    },
+    "vacation.field.carLabelPlaceholder": {
+      "translation": "例如：特斯拉Model Y",
+      "hash": "imp0nd",
+      "lastUpdated": "2026-06-15"
+    },
+    "vacation.field.durationPlaceholder": {
+      "translation": "例如： 2小时",
+      "hash": "jbyslt",
+      "lastUpdated": "2026-06-15"
+    },
+    "vacation.field.locationPlaceholder": {
+      "translation": "例如：市中心、海滩...",
+      "hash": "ol4yal",
+      "lastUpdated": "2026-06-15"
+    },
+    "vacation.celebration.bookedOfItems": {
+      "translation": "{n}/{total}个项目",
+      "hash": "1rcaan",
+      "lastUpdated": "2026-06-15"
+    },
+    "vacation.itemsNeedBooking.one": {
+      "translation": "{n}件商品需要预订",
+      "hash": "dczti9",
+      "lastUpdated": "2026-06-15"
+    },
+    "vacation.itemsNeedBooking.other": {
+      "translation": "{n}个项目需要预订",
+      "hash": "6k6rgb",
+      "lastUpdated": "2026-06-15"
+    },
+    "vacation.nightsUnaccommodated.one": {
+      "translation": "{n}晚未入住",
+      "hash": "7vhqlw",
+      "lastUpdated": "2026-06-15"
+    },
+    "vacation.nightsUnaccommodated.other": {
+      "translation": "{n}晚未入住",
+      "hash": "wi5app",
+      "lastUpdated": "2026-06-15"
+    },
+    "vacation.bookedCount": {
+      "translation": "已预订{n}/{total}",
+      "hash": "j6osux",
+      "lastUpdated": "2026-06-15"
+    },
+    "vacation.everyone": {
+      "translation": "诸位！",
+      "hash": "2i44ye",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.schedulingHint": {
+      "translation": "日程安排提示",
+      "hash": "e5hevh",
+      "lastUpdated": "2026-06-15"
+    },
+    "action.visitLink": {
+      "translation": "访问链接",
+      "hash": "1g8ixb",
+      "lastUpdated": "2026-06-15"
+    },
+    "planner.assignedTo": {
+      "translation": "分配对象",
+      "hash": "en1afn",
+      "lastUpdated": "2026-06-15"
+    },
+    "planner.reminderSet": {
+      "translation": "提醒集",
+      "hash": "26dq6s",
+      "lastUpdated": "2026-06-15"
+    },
+    "planner.fromAccount": {
+      "translation": "從電子郵件",
+      "hash": "5wjffx",
+      "lastUpdated": "2026-06-15"
+    },
+    "planner.vacationDayOf": {
+      "translation": "第{day}天，共{total}天",
+      "hash": "gvd0r1",
+      "lastUpdated": "2026-06-15"
+    },
+    "planner.fee.sessionsCount": {
+      "translation": "({count}个课次)",
+      "hash": "h989bh",
+      "lastUpdated": "2026-06-15"
+    },
+    "planner.unit.perMonthAbbrev": {
+      "translation": "/月",
+      "hash": "11jl",
+      "lastUpdated": "2026-06-15"
+    },
+    "planner.unit.perYearAbbrev": {
+      "translation": "Yr",
+      "hash": "11u0",
+      "lastUpdated": "2026-06-15"
+    },
+    "planner.reminder.none": {
+      "translation": "无",
+      "hash": "1g5zs",
+      "lastUpdated": "2026-06-15"
+    },
+    "planner.reminder.15min": {
+      "translation": "15 min",
+      "hash": "o0zbrq",
+      "lastUpdated": "2026-06-15"
+    },
+    "planner.reminder.30min": {
+      "translation": "30分钟",
+      "hash": "owbllb",
+      "lastUpdated": "2026-06-15"
+    },
+    "planner.reminder.1hour": {
+      "translation": "1小时",
+      "hash": "nqpo4z",
+      "lastUpdated": "2026-06-15"
+    },
+    "planner.reminder.1day": {
+      "translation": "1天",
+      "hash": "rkh7x",
+      "lastUpdated": "2026-06-15"
+    },
+    "header.greetingFallbackName": {
+      "translation": "那里",
+      "hash": "1top5w",
+      "lastUpdated": "2026-06-15"
+    },
+    "header.profileAvatar": {
+      "translation": "個人檔案",
+      "hash": "mev895",
+      "lastUpdated": "2026-06-15"
+    },
+    "header.profileFallbackName": {
+      "translation": "用户",
+      "hash": "1kpnv",
+      "lastUpdated": "2026-06-15"
+    },
+    "search.resultCount": {
+      "translation": "{count}个结果",
+      "hash": "t8lbpw",
+      "lastUpdated": "2026-06-15"
+    },
+    "search.resultCountPlural": {
+      "translation": "%{count} 个结果",
+      "hash": "h03map",
+      "lastUpdated": "2026-06-15"
+    },
+    "search.noResultsHint": {
+      "translation": "尝试其他关键词",
+      "hash": "22pb6q",
+      "lastUpdated": "2026-06-15"
+    },
+    "search.emptyHint": {
+      "translation": "找到你的豆子...",
+      "hash": "szgeep",
+      "lastUpdated": "2026-06-15"
+    },
+    "search.subtitle.recurring": {
+      "translation": "重复性开支",
+      "hash": "ja22fx",
+      "lastUpdated": "2026-06-15"
+    },
+    "search.subtitle.oneTime": {
+      "translation": "一次性",
+      "hash": "wcozis",
+      "lastUpdated": "2026-06-15"
+    },
+    "search.subtitle.done": {
+      "translation": "完成",
+      "hash": "mdejkh",
+      "lastUpdated": "2026-06-15"
+    },
+    "search.subtitle.achieved": {
+      "translation": "已实现",
+      "hash": "rh5z8g",
+      "lastUpdated": "2026-06-15"
+    },
+    "search.subtitle.priority": {
+      "translation": "{priority}优先级",
+      "hash": "21brra",
+      "lastUpdated": "2026-06-15"
+    },
+    "googleDrive.saveErrorTitle": {
+      "translation": "错误：{error}",
+      "hash": "p664dh",
+      "lastUpdated": "2026-06-15"
+    },
+    "googleDrive.grantPermissionTitle": {
+      "translation": "单击以授予文件权限并加载最新数据",
+      "hash": "kfw3ww",
+      "lastUpdated": "2026-06-15"
+    },
+    "googleDrive.dataSavedTitle": {
+      "translation": "数据已保存到{file}",
+      "hash": "tf4rd0",
+      "lastUpdated": "2026-06-15"
+    },
+    "googleDrive.needsPermission": {
+      "translation": "需要权限",
+      "hash": "sx4nyq",
+      "lastUpdated": "2026-06-15"
+    },
+    "currency.rateUnavailable": {
+      "translation": "暂未获取到汇率",
+      "hash": "wpuwef",
+      "lastUpdated": "2026-06-15"
+    },
+    "goals.progressOf": {
+      "translation": "{target}的{current}",
+      "hash": "uo6xy1",
+      "lastUpdated": "2026-06-15"
+    },
+    "dashboard.familyNetWorth": {
+      "translation": "家庭净值",
+      "hash": "h7lb3j",
+      "lastUpdated": "2026-06-15"
+    },
+    "dashboard.vsLastMonth": {
+      "translation": "对比上月",
+      "hash": "8bhol5",
+      "lastUpdated": "2026-06-15"
+    },
+    "dashboard.period.thisWeek": {
+      "translation": "本星期",
+      "hash": "a88896",
+      "lastUpdated": "2026-06-15"
+    },
+    "dashboard.period.thisMonth": {
+      "translation": "本月",
+      "hash": "x3y936",
+      "lastUpdated": "2026-06-15"
+    },
+    "dashboard.period.past3Months": {
+      "translation": "过去的3个月",
+      "hash": "uuad3i",
+      "lastUpdated": "2026-06-15"
+    },
+    "dashboard.period.thisYear": {
+      "translation": "今年",
+      "hash": "a86ydd",
+      "lastUpdated": "2026-06-15"
+    },
+    "dashboard.period.allTime": {
+      "translation": "所有時間",
+      "hash": "ss054c",
+      "lastUpdated": "2026-06-15"
+    },
+    "family.card.age": {
+      "translation": "·年龄{age}",
+      "hash": "41mthr",
+      "lastUpdated": "2026-06-15"
+    },
+    "family.ageLabel": {
+      "translation": "年龄{age}",
+      "hash": "62wvzs",
+      "lastUpdated": "2026-06-15"
+    },
+    "inviteWizard.qrAlt": {
+      "translation": "QR Code",
+      "hash": "kqc2a4",
+      "lastUpdated": "2026-06-15"
+    },
+    "inviteShare.familyImageAlt": {
+      "translation": "beanies家族",
+      "hash": "93vurh",
+      "lastUpdated": "2026-06-15"
+    },
+    "emptyState.aria.piggyBank": {
+      "translation": "一只豆豆，看着一个空小猪窝",
+      "hash": "o1mu2h",
+      "lastUpdated": "2026-06-15"
+    },
+    "emptyState.aria.emptyPockets": {
+      "translation": "空口袋耸耸肩的豆豆",
+      "hash": "h4jicb",
+      "lastUpdated": "2026-06-15"
+    },
+    "emptyState.aria.blankCalendar": {
+      "translation": "一只豆子在空白日历附近挠头",
+      "hash": "sonqt8",
+      "lastUpdated": "2026-06-15"
+    },
+    "emptyState.aria.treasureChest": {
+      "translation": "豆豆梦见宝箱",
+      "hash": "bmf3n6",
+      "lastUpdated": "2026-06-15"
+    },
+    "emptyState.aria.flagOnHill": {
+      "translation": "一只豆子抬头看着山上的旗帜",
+      "hash": "xgc9c6",
+      "lastUpdated": "2026-06-15"
+    },
+    "emptyState.aria.emptyChart": {
+      "translation": "戴着放大镜的豆豆，看着一张空图表",
+      "hash": "263ffb",
+      "lastUpdated": "2026-06-15"
+    },
+    "emptyState.aria.wavingHello": {
+      "translation": "挥舞着打招呼的豆豆",
+      "hash": "j3ezh9",
+      "lastUpdated": "2026-06-15"
+    },
+    "emptyState.aria.planningBudget": {
+      "translation": "规划预算的豆豆",
+      "hash": "y8j27m",
+      "lastUpdated": "2026-06-15"
+    },
+    "datepicker.prevMonth": {
+      "translation": "上个月",
+      "hash": "tzru47",
+      "lastUpdated": "2026-06-15"
+    },
+    "datepicker.nextMonth": {
+      "translation": "下月",
+      "hash": "c6wkb1",
+      "lastUpdated": "2026-06-15"
+    },
+    "combobox.custom": {
+      "translation": "自定义",
+      "hash": "xkgi35",
+      "lastUpdated": "2026-06-15"
+    },
+    "combobox.removeCustom": {
+      "translation": "删除自定义机构",
+      "hash": "c949z9",
+      "lastUpdated": "2026-06-15"
+    },
+    "combobox.noResults": {
+      "translation": "未找到结果",
+      "hash": "myz3kp",
+      "lastUpdated": "2026-06-15"
+    },
+    "multiSelect.selectAll": {
+      "translation": "全选",
+      "hash": "5jzyil",
+      "lastUpdated": "2026-06-15"
+    },
+    "multiSelect.noOptions": {
+      "translation": "没有可用的选项",
+      "hash": "md2fd4",
+      "lastUpdated": "2026-06-15"
+    },
+    "celebration.letsGo": {
+      "translation": "全体舰队，火速触发！",
+      "hash": "i5hk3k",
+      "lastUpdated": "2026-06-15"
+    },
+    "celebration.madeMistakeUndo": {
+      "translation": "犯了个错误",
+      "hash": "clleh3",
+      "lastUpdated": "2026-06-15"
+    },
+    "invite.qrAlt": {
+      "translation": "邀请二维码",
+      "hash": "1u7dd7",
+      "lastUpdated": "2026-06-15"
+    },
+    "assets.notesPlaceholder": {
+      "translation": "有关此资产的其他详细信息...",
+      "hash": "4ivtpy",
+      "lastUpdated": "2026-06-15"
+    },
+    "medications.forLabel": {
+      "translation": "对于",
+      "hash": "1ind",
+      "lastUpdated": "2026-06-15"
+    },
+    "medications.startedOn": {
+      "translation": "开课日期 - {date}",
+      "hash": "1ghg99",
+      "lastUpdated": "2026-06-15"
+    },
+    "medications.endsOn": {
+      "translation": "结束于{date}",
+      "hash": "i10yck",
+      "lastUpdated": "2026-06-15"
+    },
+    "login.beaniesCelebratingAlt": {
+      "translation": "豆豆庆祝",
+      "hash": "qa7rkb",
+      "lastUpdated": "2026-06-15"
+    },
+    "login.beaniesFamilyIconAlt": {
+      "translation": "beanies家族",
+      "hash": "93vurh",
+      "lastUpdated": "2026-06-15"
+    },
+    "onboarding.beaniesHuggingAlt": {
+      "translation": "beanies全家拥抱",
+      "hash": "i2qv7y",
+      "lastUpdated": "2026-06-15"
+    },
+    "onboarding.perMonthSuffix": {
+      "translation": "/月",
+      "hash": "11jl",
+      "lastUpdated": "2026-06-15"
+    },
+    "onboarding.perDaySuffix": {
+      "translation": "/天",
+      "hash": "w4y5",
+      "lastUpdated": "2026-06-15"
+    },
+    "onboarding.perYearSuffix": {
+      "translation": "Yr",
+      "hash": "11u0",
+      "lastUpdated": "2026-06-15"
+    },
+    "goalLink.allocPreview": {
+      "translation": "剩余{remaining}的{amount}",
+      "hash": "3ws739",
+      "lastUpdated": "2026-06-15"
+    },
+    "error.localSaveFailed.help": {
+      "translation": "您的更改无法保存在此设备上。请检查存储空间是否可用（私有模式/低磁盘可能会阻止存储空间） ，然后重试。",
+      "hash": "udbo8",
+      "lastUpdated": "2026-06-15"
+    },
+    "error.unexpectedError": {
+      "translation": "出现意外错误。",
+      "hash": "yfoxev",
+      "lastUpdated": "2026-06-15"
+    },
+    "toast.actionFailed.title": {
+      "translation": "那没有工作。",
+      "hash": "m1edrc",
+      "lastUpdated": "2026-06-15"
+    },
+    "toast.actionFailed.help": {
+      "translation": "请重试。",
+      "hash": "ku2bhl",
+      "lastUpdated": "2026-06-15"
+    },
+    "beanTips.muteFailedTitle": {
+      "translation": "无法将小费设为静音",
+      "hash": "un1zon",
+      "lastUpdated": "2026-06-15"
+    },
+    "beanTips.enableFailedTitle": {
+      "translation": "无法启用小费功能",
+      "hash": "yu6gdr",
       "lastUpdated": "2026-06-15"
     }
   }

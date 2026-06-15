@@ -25,6 +25,10 @@ vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: () => ({ baseCurrency: 'USD' }),
 }));
 
+vi.mock('@/composables/useTranslation', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+
 function mountWith(readOnly: boolean) {
   return mount(ExchangeRateSettings, { props: { standalone: false, readOnly } });
 }

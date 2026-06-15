@@ -54,7 +54,7 @@ async function handleStart() {
     <!-- Hero image -->
     <img
       src="/brand/beanies_family_hugging_transparent_512x512.png"
-      alt="beanies family hugging"
+      :alt="t('onboarding.beaniesHuggingAlt')"
       class="ob-hero-img ob-float-anim"
     />
 

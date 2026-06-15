@@ -41,7 +41,7 @@ function goToToday() {
   >
     <button
       type="button"
-      aria-label="Previous month"
+      :aria-label="t('datepicker.prevMonth')"
       class="rounded-lg p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200"
       @click="prev"
     >
@@ -54,7 +54,7 @@ function goToToday() {
     </span>
     <button
       type="button"
-      aria-label="Next month"
+      :aria-label="t('datepicker.nextMonth')"
       class="rounded-lg p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200"
       @click="next"
     >

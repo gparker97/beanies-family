@@ -14,10 +14,13 @@ vi.mock('@/utils/errorReporter', () => ({
 
 vi.mock('@/stores/translationStore', () => ({
   useTranslationStore: () => ({
-    t: (key: string) =>
-      key === 'error.unexpectedFailure'
-        ? 'Something went wrong'
-        : 'Please refresh and try again. Support has been notified.',
+    t: (key: string) => {
+      if (key === 'error.unexpectedFailure') return 'Something went wrong';
+      if (key === 'error.unexpectedFailureHelp')
+        return 'Please refresh and try again. Support has been notified.';
+      if (key === 'error.unexpectedError') return 'An unexpected error occurred';
+      return key;
+    },
   }),
 }));
 

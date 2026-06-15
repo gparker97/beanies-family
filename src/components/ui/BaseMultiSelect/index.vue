@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useTranslation } from '@/composables/useTranslation';
+
+const { t } = useTranslation();
 
 interface Option {
   value: string;
@@ -179,7 +182,7 @@ onUnmounted(() => {
         class="w-full border-b border-gray-100 px-3 py-2 text-left text-sm text-blue-600 transition-colors hover:bg-gray-100 dark:border-slate-700 dark:text-blue-400 dark:hover:bg-slate-700"
         @click="selectAll"
       >
-        Select All
+        {{ t('multiSelect.selectAll') }}
       </button>
 
       <!-- Options -->
@@ -235,7 +238,7 @@ onUnmounted(() => {
 
       <!-- Empty state -->
       <div v-if="options.length === 0" class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
-        No options available
+        {{ t('multiSelect.noOptions') }}
       </div>
     </div>
   </div>

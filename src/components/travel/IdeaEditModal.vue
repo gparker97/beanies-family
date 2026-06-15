@@ -229,7 +229,7 @@ function handleSave() {
           <BeanieDatePicker v-model="suggestedDate" />
         </FormFieldGroup>
         <FormFieldGroup :label="t('vacation.field.location')">
-          <BaseInput v-model="location" placeholder="e.g. Downtown, Beach..." />
+          <BaseInput v-model="location" :placeholder="t('vacation.field.locationPlaceholder')" />
         </FormFieldGroup>
       </div>
 
@@ -249,14 +249,14 @@ function handleSave() {
             target="_blank"
             rel="noopener noreferrer"
             class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(0,180,216,0.08)] text-sm transition-colors hover:bg-[rgba(0,180,216,0.15)]"
-            title="Visit link"
+            :title="t('action.visitLink')"
           >
             🔗
           </a>
         </div>
         <!-- Link preview card -->
         <div v-if="linkPreviewLoading" class="mt-2 flex items-center gap-2 text-xs text-gray-400">
-          <span class="animate-pulse">counting beans...</span>
+          <span class="animate-pulse">{{ t('action.loading') }}</span>
         </div>
         <a
           v-else-if="linkPreview && normalizedLink"
