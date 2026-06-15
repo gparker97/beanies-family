@@ -115,8 +115,11 @@ Do **not** trigger a production deploy from this skill — dependency bumps ride
 
 A table — one row per PR:
 
-| PR | dependency | from → to | bump | dep type | verdict | action taken |
-|----|-----------|-----------|------|----------|---------|--------------|
+| PR | dependency | from → to | bump | dep type | verdict | action taken | recommendation | notes |
+|----|-----------|-----------|------|----------|---------|--------------|----------------|-------|
+
+- **recommendation** — the clear call for this PR: **Merge** or **Close** (those are the two normal outcomes). Use **Rebase** only when the sole blocker is a stale branch with no other decision pending. Always state one — even for a held PR, give the recommendation you'd act on once greg signs off (e.g. a held major you've vetted as safe is **Merge**; a held major with real breakage risk is **Close**).
+- **notes** — one brief phrase explaining the recommendation (e.g. "critical CVE fix, breaking changes inert on Node 24", "ESLint-10 ERESOLVE-blocked on peers", "dev-only patch, green CI").
 
 Then a short tally: **N merged · M closed · K held · J rebased**. For each **held** PR, one line stating exactly what greg needs to decide. For each **closed** PR, one line with the revisit condition. If you proposed a `dependabot.yml` ignore entry, show the diff and ask for confirmation.
 
