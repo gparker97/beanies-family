@@ -14,6 +14,7 @@ import JoinPodView from '@/components/login/JoinPodView.vue';
 import BiometricLoginView from '@/components/login/BiometricLoginView.vue';
 import InviteGateOverlay from '@/components/login/InviteGateOverlay.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { showToast } from '@/composables/useToast';
 import { features } from '@/config/features';
 import { useSyncStore } from '@/stores/syncStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -170,6 +171,13 @@ async function replaceOrSurface(target: string, callerTag: string): Promise<void
 }
 
 onMounted(async () => {
+  // Surface an OAuth-redirect storage failure (iOS Private Browsing lost the
+  // PKCE state during the round-trip — OAuthCallbackPage routes here with
+  // ?authError=storage rather than silently dropping the code).
+  if (route.query.authError === 'storage') {
+    showToast('error', t('oauth.storageErrorTitle'), t('oauth.storageErrorBody'), { silent: true });
+  }
+
   // Wait for App.vue's `authStore.initializeAuth()` to finish before
   // reading auth state. Vue fires children's onMounted BEFORE the parent
   // (App.vue), so our hooks race the parent's async init — without this
