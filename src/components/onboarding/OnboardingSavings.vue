@@ -93,7 +93,7 @@ const sliderLabels = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
             </span>
             <div class="text-right">
               <span v-if="totalIncome > 0" class="font-heading text-sm font-semibold opacity-40">
-                ${{ savingsAmount.toLocaleString() }}/mo
+                {{ '$' }}{{ savingsAmount.toLocaleString() }}{{ t('onboarding.perMonthSuffix') }}
               </span>
               <div class="font-heading text-xs font-medium opacity-35">
                 {{ t('onboarding.ofMyIncome') }}

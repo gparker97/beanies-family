@@ -2,6 +2,8 @@
 import { computed } from 'vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 import type { CurrencyCode } from '@/types/models';
 
 interface Props {
@@ -29,6 +31,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const { isUnlocked, MASK } = usePrivacyMode();
 const { convertToDisplay } = useCurrencyDisplay();
+const { t } = useTranslation();
 
 const currentConverted = computed(() => convertToDisplay(props.currentAmount, props.currency));
 const targetConverted = computed(() => convertToDisplay(props.targetAmount, props.currency));
@@ -71,7 +74,12 @@ const tintBg = computed(() => {
       </div>
       <div class="text-secondary-500/40 mt-0.5 text-xs dark:text-gray-400">
         <template v-if="isUnlocked">
-          {{ currentConverted.displayFormatted }} of {{ targetConverted.displayFormatted }}
+          {{
+            fillTemplate(t('goals.progressOf'), {
+              current: currentConverted.displayFormatted,
+              target: targetConverted.displayFormatted,
+            })
+          }}
         </template>
         <template v-else>{{ MASK }}</template>
       </div>

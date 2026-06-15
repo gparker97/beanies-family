@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { reportError } from '@/utils/errorReporter';
+import { useTranslationStore } from '@/stores/translationStore';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -180,11 +181,19 @@ export async function invokeToastAction(id: number): Promise<void> {
     await fn();
   } catch (err) {
     console.error('[useToast] toast action handler threw:', err);
-    showToast(
-      'error',
-      "Hmm, that didn't work",
-      err instanceof Error ? err.message : 'Please try again.'
-    );
+    // Translate the failure copy, but degrade to English if Pinia isn't active
+    // yet — `invokeToastAction` is a foundational util that must never crash on
+    // a translation lookup (it would swallow the user's error feedback).
+    let title = 'Something went wrong';
+    let help = err instanceof Error ? err.message : 'Please try again.';
+    try {
+      const tStore = useTranslationStore();
+      title = tStore.t('toast.actionFailed.title');
+      if (!(err instanceof Error)) help = tStore.t('toast.actionFailed.help');
+    } catch {
+      // Pinia not available — keep the English fallback above.
+    }
+    showToast('error', title, help);
   }
 }
 

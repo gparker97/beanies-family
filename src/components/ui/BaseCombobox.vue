@@ -379,7 +379,7 @@ function clearSelection() {
           v-if="isOtherMode && customText"
           class="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-slate-700 dark:text-gray-400"
         >
-          Custom
+          {{ t('combobox.custom') }}
         </span>
         <!-- Clear button -->
         <button
@@ -497,13 +497,13 @@ function clearSelection() {
               <span
                 class="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-slate-700 dark:text-gray-400"
               >
-                Custom
+                {{ t('combobox.custom') }}
               </span>
               <button
                 type="button"
                 :data-testid="`combobox-remove-${option.value}`"
                 class="rounded p-0.5 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                title="Remove custom institution"
+                :title="t('combobox.removeCustom')"
                 @click.stop="removeCustomOption(option)"
               >
                 <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -538,7 +538,7 @@ function clearSelection() {
             v-if="filteredOptions.items.length === 0"
             class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400"
           >
-            No results found
+            {{ t('combobox.noResults') }}
           </div>
 
           <!-- Cap hint — shown when the filtered match count exceeds the

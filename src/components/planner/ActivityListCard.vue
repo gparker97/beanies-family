@@ -89,9 +89,12 @@ function formatDisplayDate(dateStr: string): string {
         <span
           v-if="showReminder && activity.reminderMinutes > 0"
           class="text-secondary-500/30 text-xs dark:text-gray-500"
-          title="Reminder set"
+          :title="t('planner.reminderSet')"
+          aria-hidden="true"
         >
+          <!-- eslint-disable vue/no-bare-strings-in-template -->
           &#x1F514;
+          <!-- eslint-enable vue/no-bare-strings-in-template -->
         </span>
         <span class="flex-1" />
         <MemberChip v-for="mid in normalizeAssignees(activity)" :key="mid" :member-id="mid" />

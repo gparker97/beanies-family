@@ -626,7 +626,7 @@ function handleClose() {
         <div v-if="inviteFlow.inviteQrUrl.value" class="mx-auto inline-block">
           <img
             :src="inviteFlow.inviteQrUrl.value"
-            alt="QR code"
+            :alt="t('inviteWizard.qrAlt')"
             class="h-44 w-44 rounded-3xl border-2 border-white bg-white p-2 shadow-md"
             data-testid="invite-wizard-qr"
           />

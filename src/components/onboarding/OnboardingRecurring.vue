@@ -157,9 +157,9 @@ async function handleRemoveRecurring(itemId: string) {
 }
 
 function formatFrequency(freq: RecurringFrequency): string {
-  if (freq === 'daily') return '/day';
-  if (freq === 'yearly') return '/yr';
-  return '/mo';
+  if (freq === 'daily') return t('onboarding.perDaySuffix');
+  if (freq === 'yearly') return t('onboarding.perYearSuffix');
+  return t('onboarding.perMonthSuffix');
 }
 </script>
 
@@ -176,8 +176,9 @@ function formatFrequency(freq: RecurringFrequency): string {
       <div
         class="ob-float-emoji"
         style="animation-delay: 0.4s; bottom: 100px; font-size: 1.25rem; right: 60px"
+        aria-hidden="true"
       >
-        🛒
+        {{ '🛒' }}
       </div>
     </template>
 

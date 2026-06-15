@@ -262,7 +262,7 @@ function handleSlotClick(hour: number): void {
         <div
           v-if="normalizeAssignees(occ.activity).length > 0"
           class="flex flex-shrink-0 -space-x-1"
-          aria-label="Assigned to"
+          :aria-label="t('planner.assignedTo')"
         >
           <MemberChip
             v-for="mid in normalizeAssignees(occ.activity).slice(0, 3)"
@@ -376,7 +376,7 @@ function handleSlotClick(hour: number): void {
             <div
               v-if="normalizeAssignees(ev.occurrence.activity).length > 0"
               class="flex flex-shrink-0 -space-x-1"
-              aria-label="Assigned to"
+              :aria-label="t('planner.assignedTo')"
             >
               <MemberChip
                 v-for="mid in normalizeAssignees(ev.occurrence.activity).slice(0, 3)"

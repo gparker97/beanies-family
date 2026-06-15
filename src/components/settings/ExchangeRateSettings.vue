@@ -4,6 +4,9 @@ import { BaseCard, BaseButton } from '@/components/ui';
 import { useExchangeRates } from '@/composables/useExchangeRates';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useTranslation } from '@/composables/useTranslation';
+
+const { t } = useTranslation();
 
 /**
  * `readOnly` locks the family-shared *auto-update preference* (a config toggle)
@@ -57,14 +60,14 @@ function formatRate(rate: number): string {
 <template>
   <component
     :is="props.standalone ? BaseCard : 'div'"
-    :title="props.standalone ? 'Exchange Rates' : undefined"
+    :title="props.standalone ? t('settings.exchangeRates.title') : undefined"
   >
     <div class="space-y-4">
       <!-- Last update info -->
       <div class="flex items-center justify-between">
         <div>
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            Last updated:
+            {{ t('settings.exchangeRates.lastUpdated') }}
             <span
               :class="
                 isStale
@@ -76,7 +79,7 @@ function formatRate(rate: number): string {
             </span>
           </p>
           <p v-if="isStale" class="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
-            Rates may be outdated
+            {{ t('settings.exchangeRates.stale') }}
           </p>
         </div>
         <BaseButton variant="secondary" size="sm" :disabled="isUpdating" @click="handleRefresh">
@@ -87,9 +90,9 @@ function formatRate(rate: number): string {
               class="h-4 w-4 animate-spin"
               style="animation-duration: 1.8s"
             />
-            Updating...
+            {{ t('settings.exchangeRates.updating') }}
           </span>
-          <span v-else>Refresh Rates</span>
+          <span v-else>{{ t('settings.exchangeRates.refresh') }}</span>
         </BaseButton>
       </div>
 
@@ -103,9 +106,11 @@ function formatRate(rate: number): string {
         class="flex items-center justify-between border-t border-gray-100 py-2 dark:border-slate-700"
       >
         <div>
-          <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Auto-update rates</p>
+          <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('settings.exchangeRates.autoUpdate') }}
+          </p>
           <p class="text-xs text-gray-500 dark:text-gray-400">
-            Automatically fetch new rates daily on app start
+            {{ t('settings.exchangeRates.autoUpdateHint') }}
           </p>
         </div>
         <button
@@ -135,14 +140,18 @@ function formatRate(rate: number): string {
         class="border-t border-gray-100 pt-4 dark:border-slate-700"
       >
         <p class="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-          Current rates (base: {{ settingsStore.baseCurrency }})
+          {{
+            t('settings.exchangeRates.currentRates').replace('{base}', settingsStore.baseCurrency)
+          }}
         </p>
         <div class="max-h-64 overflow-y-auto">
           <table class="w-full text-sm">
             <thead class="sticky top-0 bg-white dark:bg-slate-800">
               <tr class="text-left text-gray-500 dark:text-gray-400">
-                <th class="pb-2 font-medium">Currency</th>
-                <th class="pb-2 text-right font-medium">Rate</th>
+                <th class="pb-2 font-medium">{{ t('settings.exchangeRates.currency') }}</th>
+                <th class="pb-2 text-right font-medium">
+                  {{ t('settings.exchangeRates.rate') }}
+                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-slate-700">
@@ -181,9 +190,11 @@ function formatRate(rate: number): string {
             d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">No exchange rates loaded yet</p>
+        <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
+          {{ t('settings.exchangeRates.empty') }}
+        </p>
         <BaseButton variant="secondary" size="sm" :disabled="isUpdating" @click="handleRefresh">
-          Fetch Rates
+          {{ t('settings.exchangeRates.fetch') }}
         </BaseButton>
       </div>
     </div>

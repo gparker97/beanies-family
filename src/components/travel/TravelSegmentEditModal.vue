@@ -599,7 +599,10 @@ async function handleSave() {
                 :required="validation.isRequired('flightNumber')"
                 :error="validation.showError('flightNumber')"
               >
-                <BaseInput v-model="flightNumber" placeholder="e.g. 1842" />
+                <BaseInput
+                  v-model="flightNumber"
+                  :placeholder="t('vacation.field.flightNumberPlaceholder')"
+                />
               </FormFieldGroup>
             </div>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -632,7 +635,7 @@ async function handleSave() {
                     "
                     @click="arrivesNextDay = !arrivesNextDay"
                   >
-                    +1
+                    {{ t('vacation.field.nextDayBadge') }}
                   </button>
                 </div>
               </FormFieldGroup>
@@ -771,7 +774,7 @@ async function handleSave() {
             <BeanieTimeInput v-model="leavingTime" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.carLabel')">
-            <BaseInput v-model="carLabel" placeholder="e.g. Tesla Model Y" />
+            <BaseInput v-model="carLabel" :placeholder="t('vacation.field.carLabelPlaceholder')" />
           </FormFieldGroup>
         </div>
         <FormFieldGroup
@@ -803,7 +806,10 @@ async function handleSave() {
             <BeanieTimeInput v-model="startTime" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.duration')">
-            <BaseInput v-model="activityDuration" placeholder="e.g. 2 hours" />
+            <BaseInput
+              v-model="activityDuration"
+              :placeholder="t('vacation.field.durationPlaceholder')"
+            />
           </FormFieldGroup>
         </div>
 
@@ -817,7 +823,7 @@ async function handleSave() {
               target="_blank"
               rel="noopener noreferrer"
               class="absolute top-1/2 right-2 -translate-y-1/2 text-sm opacity-40 transition-opacity hover:opacity-80"
-              title="Open in Maps"
+              :title="t('planner.openInMaps')"
               @click.stop
             >
               📍
@@ -930,7 +936,7 @@ async function handleSave() {
             target="_blank"
             rel="noopener noreferrer"
             class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(0,180,216,0.08)] text-sm transition-colors hover:bg-[rgba(0,180,216,0.15)]"
-            title="Visit link"
+            :title="t('action.visitLink')"
           >
             🔗
           </a>

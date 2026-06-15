@@ -268,9 +268,17 @@ onUnmounted(() => {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-const DAY_ABBREVS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_ABBREV_KEYS = [
+  'planner.day.sun',
+  'planner.day.mon',
+  'planner.day.tue',
+  'planner.day.wed',
+  'planner.day.thu',
+  'planner.day.fri',
+  'planner.day.sat',
+] as const;
 function dayAbbrev(date: Date): string {
-  return DAY_ABBREVS[date.getDay()]!;
+  return t(DAY_ABBREV_KEYS[date.getDay()]!);
 }
 
 function getTimedForDay(dateStr: string): Occurrence[] {
@@ -862,7 +870,7 @@ function onStripDayClick(dateStr: string) {
                   <div
                     v-if="normalizeAssignees(activity).length > 0"
                     class="ml-auto flex flex-shrink-0 -space-x-1"
-                    aria-label="Assigned to"
+                    :aria-label="t('planner.assignedTo')"
                   >
                     <MemberChip
                       v-for="mid in normalizeAssignees(activity).slice(0, isTablet ? 3 : 2)"

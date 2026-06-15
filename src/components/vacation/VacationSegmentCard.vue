@@ -113,7 +113,7 @@ async function handleDelete() {
         <span
           v-if="hint || status === 'pending'"
           class="shrink-0 text-sm text-amber-400"
-          title="Scheduling hint"
+          :title="t('travel.schedulingHint')"
         >
           ⚠️
         </span>

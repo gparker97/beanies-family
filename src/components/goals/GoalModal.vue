@@ -35,15 +35,15 @@ const settingsStore = useSettingsStore();
 
 // Goal type icon chip options
 const GOAL_ICON_OPTIONS = [
-  { value: '🐷', label: 'Savings', icon: '🐷' },
-  { value: '🎯', label: 'Debt Payoff', icon: '🎯' },
-  { value: '📈', label: 'Investment', icon: '📈' },
-  { value: '✈️', label: 'Vacation', icon: '✈️' },
-  { value: '🚗', label: 'Vehicle', icon: '🚗' },
-  { value: '🏠', label: 'Home', icon: '🏠' },
-  { value: '🎓', label: 'Education', icon: '🎓' },
-  { value: '🛟', label: 'Emergency Fund', icon: '🛟' },
-  { value: '🛍️', label: 'Other Purchase', icon: '🛍️' },
+  { value: '🐷', label: t('goals.type.savings'), icon: '🐷' },
+  { value: '🎯', label: t('goals.type.debt_payoff'), icon: '🎯' },
+  { value: '📈', label: t('goals.type.investment'), icon: '📈' },
+  { value: '✈️', label: t('goals.type.vacation'), icon: '✈️' },
+  { value: '🚗', label: t('goals.type.vehicle'), icon: '🚗' },
+  { value: '🏠', label: t('goals.type.home'), icon: '🏠' },
+  { value: '🎓', label: t('goals.type.education'), icon: '🎓' },
+  { value: '🛟', label: t('goals.type.emergency'), icon: '🛟' },
+  { value: '🛍️', label: t('goals.type.purchase'), icon: '🛍️' },
 ];
 
 const emojiToType: Record<string, GoalType> = {

@@ -68,7 +68,7 @@ export async function wrapAsync<T>(
     }
     return result;
   } catch (e) {
-    const rawMessage = e instanceof Error ? e.message : 'An unexpected error occurred';
+    const rawMessage = e instanceof Error ? e.message : safeT()('unexpectedError');
     error.value = rawMessage;
     if (errorToast) {
       if (isEnginePanic(rawMessage)) {
@@ -107,17 +107,24 @@ export async function wrapAsync<T>(
  * up — but the cost of a stray crash here is the user seeing nothing
  * when their action fails, so we degrade to hardcoded English.
  */
-function safeT(): (key: 'unexpectedFailure' | 'unexpectedFailureHelp') => string {
+type SafeTKey = 'unexpectedFailure' | 'unexpectedFailureHelp' | 'unexpectedError';
+
+function fallbackT(key: SafeTKey): string {
+  if (key === 'unexpectedFailure') return 'Something went wrong';
+  if (key === 'unexpectedFailureHelp')
+    return 'Please refresh and try again. Support has been notified.';
+  return 'An unexpected error occurred';
+}
+
+function safeT(): (key: SafeTKey) => string {
   try {
     const store = useTranslationStore();
-    return (key) =>
-      key === 'unexpectedFailure'
-        ? store.t('error.unexpectedFailure')
-        : store.t('error.unexpectedFailureHelp');
+    return (key) => {
+      if (key === 'unexpectedFailure') return store.t('error.unexpectedFailure');
+      if (key === 'unexpectedFailureHelp') return store.t('error.unexpectedFailureHelp');
+      return store.t('error.unexpectedError');
+    };
   } catch {
-    return (key) =>
-      key === 'unexpectedFailure'
-        ? 'Something went wrong'
-        : 'Please refresh and try again. Support has been notified.';
+    return fallbackT;
   }
 }

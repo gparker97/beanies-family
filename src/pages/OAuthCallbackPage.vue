@@ -11,6 +11,9 @@
 import { onMounted } from 'vue';
 import { REDIRECT_AUTH_CODE_KEY } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
+import { useTranslation } from '@/composables/useTranslation';
+
+const { t } = useTranslation();
 
 onMounted(() => {
   const params = new URLSearchParams(window.location.search);
@@ -81,6 +84,6 @@ onMounted(() => {
 
 <template>
   <div class="flex h-screen items-center justify-center bg-[#F8F9FA]">
-    <p class="font-outfit text-lg text-[#2C3E50]">counting beans...</p>
+    <p class="font-outfit text-lg text-[#2C3E50]">{{ t('auth.loadingFile') }}</p>
   </div>
 </template>

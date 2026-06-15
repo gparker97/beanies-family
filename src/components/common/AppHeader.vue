@@ -57,7 +57,8 @@ const { switchLanguage } = useLanguageSwitcher();
 // ── Page title / Dashboard greeting ──────────────────────────────────────
 const isNookOrDashboard = computed(() => route.name === 'Dashboard' || route.name === 'Nook');
 const memberName = computed(
-  () => familyStore.currentMember?.name || familyStore.owner?.name || 'there'
+  () =>
+    familyStore.currentMember?.name || familyStore.owner?.name || t('header.greetingFallbackName')
 );
 
 // Greeting + date both depend on the current wall-clock day. They reference
@@ -268,7 +269,7 @@ async function confirmSignOutAndClearData() {
               :color="currentMember?.color || '#3b82f6'"
               :photo-url="currentMember ? getMemberAvatarUrl(currentMember) : null"
               size="sm"
-              :aria-label="currentMember?.name || 'Profile'"
+              :aria-label="currentMember?.name || t('header.profileAvatar')"
               data-testid="header-avatar-mobile"
               @photo-error="currentMember && markMemberAvatarError(currentMember)"
             />
@@ -293,7 +294,11 @@ async function confirmSignOutAndClearData() {
                 />
                 <div class="min-w-0 flex-1">
                   <p class="font-outfit truncate text-sm font-semibold text-white">
-                    {{ currentMember?.name || authStore.currentUser?.email || 'User' }}
+                    {{
+                      currentMember?.name ||
+                      authStore.currentUser?.email ||
+                      t('header.profileFallbackName')
+                    }}
                   </p>
                   <p
                     v-if="familyContextStore.activeFamilyName"
@@ -615,7 +620,7 @@ async function confirmSignOutAndClearData() {
               :color="currentMember?.color || '#3b82f6'"
               :photo-url="currentMember ? getMemberAvatarUrl(currentMember) : null"
               size="sm"
-              :aria-label="currentMember?.name || 'Profile'"
+              :aria-label="currentMember?.name || t('header.profileAvatar')"
               data-testid="header-avatar"
               @photo-error="currentMember && markMemberAvatarError(currentMember)"
             />
@@ -641,7 +646,11 @@ async function confirmSignOutAndClearData() {
                 />
                 <div class="min-w-0 flex-1">
                   <p class="font-outfit truncate text-sm font-semibold text-white">
-                    {{ currentMember?.name || authStore.currentUser?.email || 'User' }}
+                    {{
+                      currentMember?.name ||
+                      authStore.currentUser?.email ||
+                      t('header.profileFallbackName')
+                    }}
                   </p>
                   <p
                     v-if="familyContextStore.activeFamilyName"

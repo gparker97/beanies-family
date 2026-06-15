@@ -106,13 +106,25 @@ const gapCount = computed(() => computeAccommodationGaps(props.vacation).length)
         v-if="unbookedCount > 0"
         class="inline-flex items-center rounded-lg bg-[var(--vacation-gold-tint)] px-2 py-0.5 text-[0.625rem] font-semibold text-amber-700 dark:text-amber-300"
       >
-        ⏳ {{ unbookedCount }} {{ unbookedCount === 1 ? 'item needs' : 'items need' }} booking
+        ⏳
+        {{
+          (unbookedCount === 1
+            ? t('vacation.itemsNeedBooking.one')
+            : t('vacation.itemsNeedBooking.other')
+          ).replace('{n}', String(unbookedCount))
+        }}
       </span>
       <span
         v-if="gapCount > 0"
         class="inline-flex items-center rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--heritage-orange)]"
       >
-        🏨 {{ gapCount }} {{ gapCount === 1 ? 'night' : 'nights' }} unaccommodated
+        🏨
+        {{
+          (gapCount === 1
+            ? t('vacation.nightsUnaccommodated.one')
+            : t('vacation.nightsUnaccommodated.other')
+          ).replace('{n}', String(gapCount))
+        }}
       </span>
     </div>
   </div>

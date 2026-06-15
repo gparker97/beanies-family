@@ -48,17 +48,17 @@ const { options: institutionOptions, removeCustomInstitution } = useInstitutionO
 const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
 
 // Asset type emoji chip options
-const ASSET_TYPE_OPTIONS = [
-  { value: '🏠', label: 'Real Estate', icon: '🏠' },
-  { value: '🚗', label: 'Vehicle', icon: '🚗' },
-  { value: '⛵', label: 'Boat', icon: '⛵' },
-  { value: '💎', label: 'Jewelry', icon: '💎' },
-  { value: '💻', label: 'Electronics', icon: '💻' },
-  { value: '🔧', label: 'Equipment', icon: '🔧' },
-  { value: '🎨', label: 'Art', icon: '🎨' },
-  { value: '📦', label: 'Collectible', icon: '📦' },
-  { value: '📋', label: 'Other', icon: '📋' },
-];
+const ASSET_TYPE_OPTIONS = computed(() => [
+  { value: '🏠', label: t('assets.type.real_estate'), icon: '🏠' },
+  { value: '🚗', label: t('assets.type.vehicle'), icon: '🚗' },
+  { value: '⛵', label: t('assets.type.boat'), icon: '⛵' },
+  { value: '💎', label: t('assets.type.jewelry'), icon: '💎' },
+  { value: '💻', label: t('assets.type.electronics'), icon: '💻' },
+  { value: '🔧', label: t('assets.type.equipment'), icon: '🔧' },
+  { value: '🎨', label: t('assets.type.art'), icon: '🎨' },
+  { value: '📦', label: t('assets.type.collectible'), icon: '📦' },
+  { value: '📋', label: t('assets.type.other'), icon: '📋' },
+]);
 
 const emojiToType: Record<string, AssetType> = {
   '🏠': 'real_estate',
@@ -304,7 +304,7 @@ function handleDelete() {
         v-model="notes"
         type="text"
         class="w-full border-none bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
-        placeholder="Additional details about this asset..."
+        :placeholder="t('assets.notesPlaceholder')"
       />
     </FormFieldGroup>
 

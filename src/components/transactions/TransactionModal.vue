@@ -278,31 +278,31 @@ const accountOptions = computed(() =>
 
 const effectiveCategoryType = computed(() => (direction.value === 'in' ? 'income' : 'expense'));
 
-const frequencyOptions = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'yearly', label: 'Yearly' },
-];
+const frequencyOptions = computed(() => [
+  { value: 'daily', label: t('form.frequency.daily') },
+  { value: 'monthly', label: t('form.frequency.monthly') },
+  { value: 'yearly', label: t('form.frequency.yearly') },
+]);
 
 const dayOfMonthOptions = Array.from({ length: 28 }, (_, i) => ({
   value: String(i + 1),
   label: String(i + 1),
 }));
 
-const monthOptions = [
-  { value: '1', label: 'January' },
-  { value: '2', label: 'February' },
-  { value: '3', label: 'March' },
-  { value: '4', label: 'April' },
-  { value: '5', label: 'May' },
-  { value: '6', label: 'June' },
-  { value: '7', label: 'July' },
-  { value: '8', label: 'August' },
-  { value: '9', label: 'September' },
-  { value: '10', label: 'October' },
-  { value: '11', label: 'November' },
-  { value: '12', label: 'December' },
-];
+const monthOptions = computed(() => [
+  { value: '1', label: t('month.january') },
+  { value: '2', label: t('month.february') },
+  { value: '3', label: t('month.march') },
+  { value: '4', label: t('month.april') },
+  { value: '5', label: t('month.may') },
+  { value: '6', label: t('month.june') },
+  { value: '7', label: t('month.july') },
+  { value: '8', label: t('month.august') },
+  { value: '9', label: t('month.september') },
+  { value: '10', label: t('month.october') },
+  { value: '11', label: t('month.november') },
+  { value: '12', label: t('month.december') },
+]);
 
 const canSave = computed(
   () => description.value.trim().length > 0 && amount.value !== undefined && amount.value > 0
@@ -654,7 +654,7 @@ function dismissLinkPrompt() {
         <span
           class="font-outfit from-primary-500 to-terracotta-400 inline-flex items-center rounded-[11px] bg-gradient-to-r px-4 py-2 text-xs font-semibold text-white shadow-sm"
         >
-          🧡 {{ t('modal.moneyOut') }}
+          <span aria-hidden="true">{{ '🧡' }}</span> {{ t('modal.moneyOut') }}
         </span>
         <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
         <InfoHintBadge :text="t('txLink.hintDirection')" />
@@ -1062,9 +1062,18 @@ function dismissLinkPrompt() {
               />
             </FormFieldGroup>
             <p v-if="goalAllocPreview" class="font-outfit text-xs text-[var(--color-text-muted)]">
-              → {{ formatCurrencyWithCode(goalAllocPreview.amount, goalAllocPreview.currency) }} of
-              {{ formatCurrencyWithCode(goalAllocPreview.remaining, goalAllocPreview.currency) }}
-              remaining
+              →
+              {{
+                t('goalLink.allocPreview')
+                  .replace(
+                    '{amount}',
+                    formatCurrencyWithCode(goalAllocPreview.amount, goalAllocPreview.currency)
+                  )
+                  .replace(
+                    '{remaining}',
+                    formatCurrencyWithCode(goalAllocPreview.remaining, goalAllocPreview.currency)
+                  )
+              }}
               <span v-if="goalAllocPreview.capped" class="text-orange-500">
                 ({{ t('goalLink.capped') }})
               </span>
