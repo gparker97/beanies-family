@@ -563,6 +563,11 @@ describe('prefillTransportationDates', () => {
 // ── computeTimelineHints — detectOutOfRange ──
 
 describe('computeTimelineHints — detectOutOfRange', () => {
+  // Hint messages are translation keys resolved via `t`; the stub returns the
+  // key unchanged, so these tests assert the structured `outOfRange` flag
+  // (the contract consumers filter on) rather than the message text.
+  const t = ((k: string) => k) as unknown as Parameters<typeof computeTimelineHints>[1];
+
   it('flags a flight whose departureDate is before trip start', () => {
     const v = makeVacation({
       startDate: '2026-06-05',
@@ -571,8 +576,8 @@ describe('computeTimelineHints — detectOutOfRange', () => {
         makeTravelSegment({ id: 's-early', type: 'flight_outbound', departureDate: '2026-06-01' }),
       ],
     });
-    const hints = computeTimelineHints(v);
-    expect(hints.get('s-early')?.message).toContain('before trip start');
+    const hints = computeTimelineHints(v, t);
+    expect(hints.get('s-early')?.outOfRange).toBe('before-start');
   });
 
   it('flags an accommodation whose check-in is after trip end', () => {
@@ -581,8 +586,8 @@ describe('computeTimelineHints — detectOutOfRange', () => {
       endDate: '2026-06-10',
       accommodations: [makeAccommodation({ id: 'a-late', checkInDate: '2026-06-20' })],
     });
-    const hints = computeTimelineHints(v);
-    expect(hints.get('a-late')?.message).toContain('after trip end');
+    const hints = computeTimelineHints(v, t);
+    expect(hints.get('a-late')?.outOfRange).toBe('after-end');
   });
 
   it('flags transportation outside the window', () => {
@@ -593,8 +598,8 @@ describe('computeTimelineHints — detectOutOfRange', () => {
         makeTransportation({ id: 't-early', type: 'bus', departureDate: '2026-06-01' }),
       ],
     });
-    const hints = computeTimelineHints(v);
-    expect(hints.get('t-early')?.message).toContain('before trip start');
+    const hints = computeTimelineHints(v, t);
+    expect(hints.get('t-early')?.outOfRange).toBe('before-start');
   });
 
   it('does not flag segments inside the window', () => {
@@ -605,7 +610,7 @@ describe('computeTimelineHints — detectOutOfRange', () => {
         makeTravelSegment({ id: 's-in', type: 'flight_outbound', departureDate: '2026-06-05' }),
       ],
     });
-    const hints = computeTimelineHints(v);
+    const hints = computeTimelineHints(v, t);
     expect(hints.get('s-in')).toBeUndefined();
   });
 
@@ -615,7 +620,7 @@ describe('computeTimelineHints — detectOutOfRange', () => {
       endDate: undefined,
       travelSegments: [makeTravelSegment({ id: 's-dateless', departureDate: '2026-06-01' })],
     });
-    const hints = computeTimelineHints(v);
+    const hints = computeTimelineHints(v, t);
     expect(hints.get('s-dateless')).toBeUndefined();
   });
 });
