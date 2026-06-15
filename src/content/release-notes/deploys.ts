@@ -17,6 +17,47 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.06.15',
+    date: '2026-06-15',
+    month: '15 june 2026',
+    spotlight: true,
+    summary: {
+      en: 'A smoother, more reliable setup - and a more fully translated app.',
+      beanie: 'a smoother, more reliable setup - and a more fully translated app.',
+    },
+    features: [
+      {
+        title: { en: 'Smoother sign-up and joining', beanie: 'smoother sign-up and joining' },
+        description: {
+          en: 'Creating a family - or joining one by invite - is more reliable now, with fixes for a sign-up screen that could get stuck, especially on iPhone and Safari.',
+          beanie:
+            'creating a family - or joining one by invite - is more reliable now, with fixes for a sign-up screen that could get stuck, especially on iphone and safari.',
+        },
+      },
+      {
+        title: { en: 'Fuller Chinese translation', beanie: 'fuller chinese translation' },
+        description: {
+          en: 'If you use beanies in Chinese, the whole app is now translated - we cleaned up screens that were still showing English or garbled text.',
+          beanie:
+            'if you use beanies in chinese, the whole app is now translated - we cleaned up screens that were still showing english or garbled text.',
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.06.14',
     date: '2026-06-14',
     month: '14 june 2026',
