@@ -8,7 +8,7 @@ import {
   type RegisterPasskeyResult,
 } from '@/services/auth/passkeyService';
 import type { PasskeySecret } from '@/types/models';
-import { getRegistryDatabase } from '@/services/indexeddb/registryDatabase';
+import { getRegistryDatabase, isStorageBlockedError } from '@/services/indexeddb/registryDatabase';
 import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
 import { useFamilyContextStore } from './familyContextStore';
@@ -555,6 +555,21 @@ export const useAuthStore = defineStore('auth', () => {
 
       return { success: true };
     } catch (e) {
+      // iOS Safari Private Browsing (and Firefox private mode) block IndexedDB,
+      // so the family/registry writes above throw. Surface a specific, actionable
+      // message naming the real obstacle instead of a generic failure, and report
+      // it so we can see how often onboarding is blocked this way.
+      if (isStorageBlockedError(e)) {
+        reportError({
+          surface: 'authStore.signUp.storageBlocked',
+          message: `signUp failed — storage blocked (likely Private Browsing): ${(e as Error).name}`,
+          error: e,
+          severity: 'warning',
+        });
+        const blockedMessage = useTranslationStore().t('auth.storageBlocked');
+        error.value = blockedMessage;
+        return { success: false, error: blockedMessage };
+      }
       const message = e instanceof Error ? e.message : 'Sign up failed';
       error.value = message;
       return { success: false, error: message };

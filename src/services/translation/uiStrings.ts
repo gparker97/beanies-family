@@ -2245,6 +2245,11 @@ const STRING_DEFS = {
     beanie: 'google drive sync needs an oauth proxy. see SELF_HOSTING.md → path b.',
   },
   'selfHost.notConfigured': { en: 'Not configured', beanie: 'not configured' },
+  'selfHost.localUnsupported': {
+    en: "This browser can't store a local file. Open beanies.family in Chrome or Edge on a computer to set up your pod.",
+    beanie:
+      "this browser can't store a local file. open beanies.family in chrome or edge on a computer to set up your pod.",
+  },
 
   // Form labels
   'form.name': { en: 'Name', beanie: 'name' },
@@ -2900,9 +2905,9 @@ const STRING_DEFS = {
     beanie: 'failed to create file. please try again.',
   },
   'setup.localFileUnsupported': {
-    en: "This browser can't save to a local file. Use Google Drive instead (it works here and syncs to your family), or open beanies.family in Chrome or Edge.",
+    en: "This browser can't save to a local file. Use Google Drive instead — it works here and syncs to your family. (On a computer, Chrome or Edge also support local files.)",
     beanie:
-      "this browser can't save to a local file. use google drive instead (it works here and syncs to your family), or open beanies.family in chrome or edge.",
+      "this browser can't save to a local file. use google drive instead — it works here and syncs to your family. (on a computer, chrome or edge also support local files.)",
   },
 
   // Create-pod failures — one key per `CreatePodFailureReason` so the user
@@ -2949,6 +2954,20 @@ const STRING_DEFS = {
   // Auth
   'auth.signingIn': { en: 'Signing in...', beanie: 'signing in...' },
   'auth.creatingAccount': { en: 'Creating account...', beanie: 'creating account...' },
+  'auth.storageBlocked': {
+    en: "Your browser is blocking local storage, so we couldn't create your family. This usually happens in Private Browsing — turn it off, or use a normal window, and try again.",
+    beanie:
+      "your browser is blocking local storage, so we couldn't create your family. this usually happens in private browsing — turn it off, or use a normal window, and try again.",
+  },
+  'oauth.storageErrorTitle': {
+    en: "Sign-in couldn't finish",
+    beanie: "sign-in couldn't finish",
+  },
+  'oauth.storageErrorBody': {
+    en: 'Your browser blocked storage during sign-in (this usually happens in Private Browsing). Please try again in a normal window.',
+    beanie:
+      'your browser blocked storage during sign-in (this usually happens in private browsing). please try again in a normal window.',
+  },
   'auth.signOut': { en: 'Sign Out', beanie: 'sign out' },
   'auth.signOutConfirmTitle': { en: 'Sign Out', beanie: 'sign out' },
   'auth.signOutConfirmMessage': {
