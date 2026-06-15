@@ -42,6 +42,8 @@ vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
+    isEnglish: { value: true },
+    isBeanieMode: { value: false },
   }),
 }));
 

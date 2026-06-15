@@ -11,7 +11,8 @@ import { useAssetsStore } from '@/stores/assetsStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { findLoanDetails } from '@/utils/loanPayment';
-import { getCategoryById, CATEGORY_EMOJI_MAP } from '@/constants/categories';
+import { CATEGORY_EMOJI_MAP } from '@/constants/categories';
+import { useCategoryLabel } from '@/composables/useCategoryLabel';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { formatDate } from '@/utils/date';
 import { useRecurringStore } from '@/stores/recurringStore';
@@ -42,6 +43,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const { categoryLabel } = useCategoryLabel();
 const { playWhoosh } = useSounds();
 const transactionsStore = useTransactionsStore();
 const accountsStore = useAccountsStore();
@@ -178,11 +180,6 @@ watch(
 );
 
 // Computed display values
-const categoryInfo = computed(() => {
-  if (!transaction.value) return null;
-  return getCategoryById(transaction.value.category);
-});
-
 const categoryEmoji = computed(() => {
   if (!transaction.value) return '';
   return CATEGORY_EMOJI_MAP[transaction.value.category] ?? '';
@@ -488,7 +485,7 @@ async function handleDelete() {
         >
           <template #view>
             <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">
-              {{ categoryEmoji }} {{ categoryInfo?.name ?? transaction.category }}
+              {{ categoryEmoji }} {{ categoryLabel(transaction.category) }}
             </span>
           </template>
           <template #edit>
