@@ -62,24 +62,30 @@ describe('terminal display', () => {
   });
 
   describe('expanded details — travelDetailRows', () => {
+    // Labels are translation keys resolved via `t`; the stub returns the key
+    // unchanged so the row assertions stay readable.
+    const t = ((k: string) => k) as unknown as Parameters<typeof travelDetailRows>[1];
+
     it('adds a read-only terminal row for flights', () => {
-      const row = travelDetailRows(flight({ terminal: 'Terminal 2' })).find(
-        (r) => r.label === 'terminal'
+      const row = travelDetailRows(flight({ terminal: 'Terminal 2' }), t).find(
+        (r) => r.label === 'segmentRow.terminal'
       );
-      expect(row).toEqual({ label: 'terminal', value: 'Terminal 2' });
+      expect(row).toEqual({ label: 'segmentRow.terminal', value: 'Terminal 2' });
       // read-only: no inline-edit field binding
       expect(row?.field).toBeUndefined();
     });
 
     it('adds a read-only terminal row for cruises', () => {
-      const row = travelDetailRows(cruise({ terminal: 'Cruise Terminal A' })).find(
-        (r) => r.label === 'terminal'
+      const row = travelDetailRows(cruise({ terminal: 'Cruise Terminal A' }), t).find(
+        (r) => r.label === 'segmentRow.terminal'
       );
-      expect(row).toEqual({ label: 'terminal', value: 'Cruise Terminal A' });
+      expect(row).toEqual({ label: 'segmentRow.terminal', value: 'Cruise Terminal A' });
     });
 
     it('omits the terminal row when absent', () => {
-      expect(travelDetailRows(flight()).some((r) => r.label === 'terminal')).toBe(false);
+      expect(travelDetailRows(flight(), t).some((r) => r.label === 'segmentRow.terminal')).toBe(
+        false
+      );
     });
   });
 });
