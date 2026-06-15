@@ -355,7 +355,7 @@ const isTomorrowDisabled = computed(() => {
           >
             <button
               type="button"
-              aria-label="Previous month"
+              :aria-label="t('datepicker.prevMonth')"
               class="rounded-lg p-1 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
               @click="prevMonth"
             >
@@ -366,7 +366,7 @@ const isTomorrowDisabled = computed(() => {
             </span>
             <button
               type="button"
-              aria-label="Next month"
+              :aria-label="t('datepicker.nextMonth')"
               class="rounded-lg p-1 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
               @click="nextMonth"
             >

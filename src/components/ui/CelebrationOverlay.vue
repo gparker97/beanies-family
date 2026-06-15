@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useCelebration } from '@/composables/useCelebration';
+import { useTranslation } from '@/composables/useTranslation';
 
+const { t } = useTranslation();
 const { toasts, activeModal, dismissModal } = useCelebration();
 </script>
 
@@ -43,7 +45,7 @@ const { toasts, activeModal, dismissModal } = useCelebration();
               class="bg-primary-500 hover:bg-primary-600 mt-6 rounded-2xl px-8 py-2.5 font-medium text-white transition-colors"
               @click="dismissModal"
             >
-              Let's go!
+              {{ t('celebration.letsGo') }}
             </button>
             <button
               v-if="activeModal.onUndo"
@@ -54,7 +56,7 @@ const { toasts, activeModal, dismissModal } = useCelebration();
                 dismissModal();
               "
             >
-              made a mistake? undo
+              {{ t('celebration.madeMistakeUndo') }}
             </button>
           </div>
         </Transition>

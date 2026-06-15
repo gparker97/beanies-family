@@ -82,7 +82,7 @@ async function selectLanguage(code: LanguageCode) {
       <div class="mb-8 text-center">
         <img
           src="/brand/beanies_celebrating_line_transparent_600x600.png"
-          alt="beanies celebrating"
+          :alt="t('login.beaniesCelebratingAlt')"
           class="mx-auto -mb-[7.5rem] w-full max-w-sm"
         />
         <h1 class="font-outfit text-5xl font-bold">

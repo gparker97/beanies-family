@@ -59,6 +59,15 @@ vi.mock('@/stores/vacationStore', () => ({
 vi.mock('@/stores/accountsStore', () => ({
   useAccountsStore: () => ({ accounts: [] }),
 }));
+vi.mock('@/stores/translationStore', () => ({
+  useTranslationStore: () => ({
+    t: (key: string) => {
+      if (key === 'beanTips.muteFailedTitle') return "Couldn't mute tips";
+      if (key === 'beanTips.enableFailedTitle') return "Couldn't enable tips";
+      return key;
+    },
+  }),
+}));
 
 // Trimmed catalogue — the real ALL_TIPS has 21 entries; for state-machine
 // tests we only need a small deterministic set.

@@ -63,7 +63,7 @@ const { t } = useTranslation();
           <!-- Beanies family hugging illustration -->
           <img
             src="/brand/beanies_family_hugging_transparent_192x192.png"
-            alt="Beanies family"
+            :alt="t('inviteShare.familyImageAlt')"
             class="h-16 w-16 flex-shrink-0 drop-shadow-sm"
           />
 

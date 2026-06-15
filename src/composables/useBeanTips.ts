@@ -45,6 +45,7 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useToday } from '@/composables/useToday';
 import { reportError } from '@/utils/errorReporter';
 import { showToast } from '@/composables/useToast';
+import { useTranslationStore } from '@/stores/translationStore';
 import { createPerMemberStore } from '@/composables/perMemberStore';
 
 // ── Persistence types ────────────────────────────────────────────────────────
@@ -239,12 +240,9 @@ export function useBeanTips() {
     state.value = next;
     if (!store.save(next)) {
       state.value = prev;
-      showToast(
-        'error',
-        errTitle,
-        'Your change could not be saved on this device. Check that storage is available (private mode / low disk can block it) and try again.',
-        { surface: 'bean-tips-toggle' }
-      );
+      showToast('error', errTitle, useTranslationStore().t('error.localSaveFailed.help'), {
+        surface: 'bean-tips-toggle',
+      });
     }
   }
 
@@ -252,13 +250,19 @@ export function useBeanTips() {
    *  the bell). User-initiated — persistence failures surface a toast. */
   function muteAllTips(): void {
     if (!store.memberId()) return;
-    commitTipState({ ...state.value, tipsEnabled: false }, "Couldn't mute tips");
+    commitTipState(
+      { ...state.value, tipsEnabled: false },
+      useTranslationStore().t('beanTips.muteFailedTitle')
+    );
   }
 
   /** Re-enable tip issuance. User-initiated — persistence failures surface a toast. */
   function enableTips(): void {
     if (!store.memberId()) return;
-    commitTipState({ ...state.value, tipsEnabled: true }, "Couldn't enable tips");
+    commitTipState(
+      { ...state.value, tipsEnabled: true },
+      useTranslationStore().t('beanTips.enableFailedTitle')
+    );
   }
 
   return {

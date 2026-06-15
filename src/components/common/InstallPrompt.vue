@@ -77,7 +77,7 @@ function handleDismiss() {
         </div>
         <button
           class="flex-shrink-0 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
-          aria-label="Close"
+          :aria-label="t('action.close')"
           @click="handleDismiss"
         >
           &#x2715;

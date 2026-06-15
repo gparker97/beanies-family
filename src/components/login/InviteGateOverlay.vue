@@ -164,7 +164,7 @@ async function handleRequest() {
       <template v-if="mode === 'token'">
         <img
           src="/brand/beanies_family_icon_transparent_384x384.png"
-          alt="beanies family"
+          :alt="t('login.beaniesFamilyIconAlt')"
           class="mx-auto mb-3 h-28 w-28"
         />
         <h2 class="font-outfit mb-1 text-center text-xl font-bold text-gray-900 dark:text-gray-100">

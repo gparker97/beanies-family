@@ -26,7 +26,7 @@ const { t } = useTranslation();
         >
           <img
             :src="qrUrl"
-            alt="Invite QR code"
+            :alt="t('invite.qrAlt')"
             class="h-48 w-48 rounded-2xl"
             data-testid="invite-qr"
           />

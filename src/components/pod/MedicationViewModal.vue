@@ -37,6 +37,7 @@ import { confirm } from '@/composables/useConfirm';
 import { getMemberRoleLabel } from '@/composables/useMemberInfo';
 import { formatLogEntryTime, relativeDayLabel, toDateInputValue } from '@/utils/date';
 import { groupByDate } from '@/utils/groupByDate';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { getDailyDoseStatus } from '@/utils/doseLimit';
 import type { AvatarVariant } from '@/constants/avatars';
 import type { Medication } from '@/types/models';
@@ -166,8 +167,8 @@ const scheduleMeta = computed(() => {
   if (!m) return '';
   if (m.ongoing) return '';
   const parts: string[] = [];
-  if (m.startDate) parts.push(`started ${m.startDate}`);
-  if (m.endDate) parts.push(`ends ${m.endDate}`);
+  if (m.startDate) parts.push(fillTemplate(t('medications.startedOn'), { date: m.startDate }));
+  if (m.endDate) parts.push(fillTemplate(t('medications.endsOn'), { date: m.endDate }));
   return parts.join(' · ');
 });
 </script>
@@ -247,7 +248,7 @@ const scheduleMeta = computed(() => {
           <p
             class="font-outfit text-[0.625rem] font-semibold tracking-[0.14em] text-[var(--color-text-muted)] uppercase"
           >
-            For
+            {{ t('medications.forLabel') }}
           </p>
           <p class="font-outfit truncate text-sm font-semibold text-[#2C3E50] dark:text-gray-100">
             {{ memberName

@@ -118,7 +118,11 @@ function handleClick() {
         />
       </div>
       <span class="font-outfit text-[0.625rem] font-semibold whitespace-nowrap text-[#00B4D8]">
-        {{ progress.booked }}/{{ progress.total }} booked
+        {{
+          t('vacation.bookedCount')
+            .replace('{n}', String(progress.booked))
+            .replace('{total}', String(progress.total))
+        }}
       </span>
     </div>
 
@@ -127,7 +131,13 @@ function handleClick() {
       <span
         class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2.5 py-0.5 text-[0.5625rem] font-semibold text-[var(--heritage-orange)]"
       >
-        🏨 {{ gapCount }} {{ gapCount === 1 ? 'night' : 'nights' }} unaccommodated
+        🏨
+        {{
+          (gapCount === 1
+            ? t('vacation.nightsUnaccommodated.one')
+            : t('vacation.nightsUnaccommodated.other')
+          ).replace('{n}', String(gapCount))
+        }}
       </span>
     </div>
 

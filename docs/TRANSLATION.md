@@ -2,6 +2,24 @@
 
 Comprehensive guide for the beanies.family translation pipeline.
 
+## Enforcement — no hardcoded UI strings (CI-blocking)
+
+**Every user-visible string in the app must go through `t()`.** Partial translation (some strings localized, some bare English) is worse than none: it leaves multi-language users confused and is a real drop-off cause. This is enforced, not just documented.
+
+- **ESLint rule `vue/no-bare-strings-in-template` (error)** in `eslint.config.js` fails CI on any hardcoded text node OR user-facing attribute (`title`, `aria-label`, `alt`, `placeholder`) in a `.vue` template. To fix a flag: move the string to `uiStrings.ts` and bind it — `{{ t('key') }}` for text, `:title="t('key')"` for attributes.
+- **Allowlist** (in the rule config): brand terms (`beanies.family`, `.beanpod`), third-party product names (Google Drive, PDF, OneDrive…), non-linguistic symbols, and **decorative emoji/glyphs** (they render identically in every language, so carry no translatable content). A NEW decorative glyph trips the rule → add it to the allowlist _intentionally_ (this keeps the decorative-glyph set reviewed). Prefer `aria-hidden="true"` on glyphs that sit next to real text.
+- **Dev-only UI** (`src/components/settings/DevFeatureFlagsCard.vue`, rendered only under `import.meta.env.DEV`) is exempt via a scoped `files` override — its copy is developer-facing.
+- **Out of scope**: the Astro marketing site (`web/`), blog, and help center are English-first by decision and are not linted by this rule.
+
+**The rule cannot see script-level strings** (it only checks templates) — these are review-enforced:
+
+- `showToast('error', title, message)`, `confirm({ title, message })`, `setFatal(...)` args, and any option-label array rendered in a template must use `t()`.
+- In `.ts` files (composables/services), use `useTranslationStore().t('key')`. In a **foundational** util that may run before Pinia is active, wrap the lookup in `try/catch` with an English fallback so a translation lookup can never swallow the user's feedback (see `invokeToastAction` in `useToast.ts` / `safeT` in `useStoreActions.ts`).
+
+**Interpolation:** `t()` takes ONLY a key — no params object. Use `fillTemplate(t('key'), { name })` (`@/utils/fillTemplate`); keys hold `{placeholder}` tokens, which the translator preserves. Pluralization uses explicit `.one`/`.other` key pairs, chosen in-template by count (no ICU plurals).
+
+After adding/renaming keys, run `npm run translate` to generate the other languages before committing.
+
 ## How It Works
 
 ```

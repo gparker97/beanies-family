@@ -97,8 +97,11 @@ async function toggleComplete(todoId: string) {
     <div
       class="pointer-events-none absolute -top-[10px] -right-[10px] text-[4rem] opacity-[0.04]"
       style="transform: rotate(-15deg)"
+      aria-hidden="true"
     >
+      <!-- eslint-disable vue/no-bare-strings-in-template -->
       📝
+      <!-- eslint-enable vue/no-bare-strings-in-template -->
     </div>
 
     <!-- Quick-add bar -->

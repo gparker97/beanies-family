@@ -22,6 +22,7 @@ import { computed } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { getMemberAvatarUrl } from '@/composables/useMemberInfo';
 import { isUnshareableEmail } from '@/utils/email';
@@ -127,7 +128,7 @@ function handleSelect(tile: Tile): void {
               <span>{{ roleLabel(tile.member) }}</span>
               <template v-if="ageOf(tile.member) !== null">
                 <span aria-hidden="true">·</span>
-                <span>age {{ ageOf(tile.member) }}</span>
+                <span>{{ fillTemplate(t('family.ageLabel'), { age: ageOf(tile.member) }) }}</span>
               </template>
               <template v-if="tile.state === null">
                 <span aria-hidden="true">·</span>

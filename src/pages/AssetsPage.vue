@@ -524,7 +524,7 @@ const appreciationSubtitle = computed(() => {
                     :currency="asset.currency"
                     type="neutral"
                     size="sm"
-                  /><span class="font-semibold">/month</span>
+                  /><span class="font-semibold">{{ t('assets.perMonth') }}</span>
                 </div>
                 <div v-if="asset.loan.interestRate">
                   @
@@ -582,7 +582,13 @@ const appreciationSubtitle = computed(() => {
                     v-if="getLinkedPayFromAccount(asset)"
                     class="text-[var(--color-text-muted)]"
                   >
-                    &middot; from {{ getLinkedPayFromAccount(asset)!.name }}
+                    &middot;
+                    {{
+                      t('assets.fromAccount').replace(
+                        '{name}',
+                        getLinkedPayFromAccount(asset)!.name
+                      )
+                    }}
                   </span>
                 </div>
               </div>

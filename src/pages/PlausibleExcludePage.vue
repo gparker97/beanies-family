@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useTranslation } from '@/composables/useTranslation';
+
+const { t } = useTranslation();
 
 type Status = 'pending' | 'just-done' | 'already' | 'unavailable';
 
@@ -37,32 +40,31 @@ onMounted(() => {
       <h1>
         {{
           status === 'just-done'
-            ? "done — you're excluded"
+            ? t('plausibleExclude.title.justDone')
             : status === 'already'
-              ? 'already excluded'
+              ? t('plausibleExclude.title.already')
               : status === 'unavailable'
-                ? 'localStorage unavailable'
-                : 'checking...'
+                ? t('plausibleExclude.title.unavailable')
+                : t('plausibleExclude.title.checking')
         }}
       </h1>
       <p v-if="status === 'just-done'">
-        this browser will no longer be tracked by plausible on app.beanies.family. repeat on each
-        device/browser you use. <a href="/">back to the app</a>
+        {{ t('plausibleExclude.body.justDone') }}
+        <a href="/">{{ t('plausibleExclude.backToApp') }}</a>
       </p>
       <p v-else-if="status === 'already'">
-        this browser is already excluded from plausible analytics on app.beanies.family. nothing to
-        do.
+        {{ t('plausibleExclude.body.already') }}
       </p>
       <p v-else-if="status === 'unavailable'">
-        your browser blocked localStorage (private mode?). try from a normal browser window.
+        {{ t('plausibleExclude.body.unavailable') }}
       </p>
       <div v-if="status !== 'pending'" class="status" :class="`status-${status}`">
         {{
           status === 'just-done'
-            ? 'plausible_ignore set to true'
+            ? t('plausibleExclude.status.justDone')
             : status === 'already'
-              ? 'plausible_ignore = true'
-              : 'could not set flag'
+              ? t('plausibleExclude.status.already')
+              : t('plausibleExclude.status.failed')
         }}
       </div>
     </div>

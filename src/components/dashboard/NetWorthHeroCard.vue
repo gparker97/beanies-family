@@ -50,7 +50,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   changeAmount: 0,
   changePercent: 0,
-  label: 'Family Net Worth',
+  label: undefined,
   selectedPeriod: '1M',
   historyData: () => [],
   chartError: null,
@@ -91,6 +91,8 @@ const formattedChange = computed(() =>
 );
 
 const isPositiveChange = computed(() => props.changeAmount >= 0);
+
+const displayLabel = computed(() => props.label ?? t('dashboard.familyNetWorth'));
 
 const periods: { key: PeriodKey; label: string }[] = [
   { key: '1W', label: '1W' },
@@ -276,17 +278,17 @@ const chartDataWithDot = computed(() => {
 const periodLabel = computed(() => {
   switch (props.selectedPeriod) {
     case '1W':
-      return 'this week';
+      return t('dashboard.period.thisWeek');
     case '1M':
-      return 'this month';
+      return t('dashboard.period.thisMonth');
     case '3M':
-      return 'past 3 months';
+      return t('dashboard.period.past3Months');
     case '1Y':
-      return 'this year';
+      return t('dashboard.period.thisYear');
     case 'all':
-      return 'all time';
+      return t('dashboard.period.allTime');
     default:
-      return 'this month';
+      return t('dashboard.period.thisMonth');
   }
 });
 </script>
@@ -304,7 +306,7 @@ const periodLabel = computed(() => {
       <div class="min-w-0">
         <div class="mb-2 flex items-center gap-1.5">
           <div class="font-outfit text-xs font-semibold tracking-[0.15em] uppercase opacity-50">
-            {{ label }}
+            {{ displayLabel }}
           </div>
           <InfoHintBadge v-if="hint" :text="hint" dark />
         </div>
