@@ -38,9 +38,9 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), replace: replaceMock }),
 }));
 
-// LoginPage imports RESUME_SETUP_PATH from connectStorage, which transitively
-// pulls the Drive provider/sync service — mock it down to the one constant.
-vi.mock('@/services/sync/connectStorage', () => ({ RESUME_SETUP_PATH: '/welcome?resume=setup' }));
+// RESUME_SETUP_PATH now lives in the lightweight resumePaths.ts (no heavy
+// Drive/sync graph), so LoginPage no longer imports connectStorage — no mock
+// needed for it.
 
 vi.mock('@/utils/errorReporter', () => ({ reportError: reportErrorMock }));
 

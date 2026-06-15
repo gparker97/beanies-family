@@ -15,6 +15,7 @@ import BiometricLoginView from '@/components/login/BiometricLoginView.vue';
 import InviteGateOverlay from '@/components/login/InviteGateOverlay.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
+import { isNavigationCancelled } from '@/utils/appChrome';
 import { features } from '@/config/features';
 import { useSyncStore } from '@/stores/syncStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -23,8 +24,11 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
-import { RESUME_LOAD_DRIVE, isPodlessRecoveryQuery } from '@/components/login/resumePaths';
-import { RESUME_SETUP_PATH } from '@/services/sync/connectStorage';
+import {
+  RESUME_LOAD_DRIVE,
+  isPodlessRecoveryQuery,
+  RESUME_SETUP_PATH,
+} from '@/components/login/resumePaths';
 import { reportError } from '@/utils/errorReporter';
 
 const router = useRouter();
@@ -143,19 +147,22 @@ stopResumeWatch = watchEffect(() => {
 async function replaceOrSurface(target: string, callerTag: string): Promise<void> {
   try {
     const result = await router.replace(target);
-    if (result && typeof (result as { type?: number }).type === 'number') {
-      const type = (result as { type: number }).type;
+    if (isNavigationCancelled(result)) {
       console.warn(
-        `[LoginPage] router.replace('${target}') from ${callerTag} was cancelled by a guard (type=${type})`
+        `[LoginPage] router.replace('${target}') from ${callerTag} was cancelled by a guard (type=${result.type})`
       );
       reportError({
         surface: 'login.podlessRescue.replaceCancelled',
-        message: `router.replace('${target}') was cancelled by a guard (caller=${callerTag}, type=${type})`,
+        message: `router.replace('${target}') was cancelled by a guard (caller=${callerTag}, type=${result.type})`,
         severity: 'warning',
         context: { route_path: route.fullPath },
       });
     }
   } catch (e) {
+    // A THROW (vs a NavigationFailure) means the URL never changed, so the
+    // reactive resume watchEffect can't rescue the view — the user would be
+    // stuck on a chrome-less page. Escalate to a hard recovery: drop them on
+    // the welcome gate (actionable) rather than a dead screen.
     console.error(`[LoginPage] router.replace('${target}') from ${callerTag} threw:`, e);
     reportError({
       surface: 'login.podlessRescue.replaceThrew',
@@ -164,6 +171,7 @@ async function replaceOrSurface(target: string, callerTag: string): Promise<void
       severity: 'warning',
       context: { route_path: route.fullPath },
     });
+    activeView.value = 'welcome';
   } finally {
     // Never leave the user on a dead spinner — clear it regardless of outcome.
     isInitializing.value = false;

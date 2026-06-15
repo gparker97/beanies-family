@@ -101,7 +101,7 @@ function promptParts() {
            row below. Earlier top-4/right-4/py-1 caused the pill's bottom
            edge to meet the chevron's top edge with zero gap on desktop. -->
       <span
-        class="font-outfit absolute top-3 right-3 rounded-full border border-white/25 bg-white/20 px-2.5 py-[3px] text-[0.625rem] font-semibold tracking-[0.04em] text-white uppercase backdrop-blur-md"
+        class="font-outfit absolute top-3 right-3 rounded-full border border-white/25 bg-white/20 px-2.5 py-[3px] text-xs font-semibold tracking-[0.04em] text-white uppercase backdrop-blur-md"
       >
         {{ t('loginV6.createPill') }}
       </span>
@@ -155,7 +155,7 @@ function promptParts() {
         class="h-px flex-1 bg-gradient-to-r from-transparent via-gray-400/30 to-transparent dark:via-gray-500/30"
       ></span>
       <span
-        class="font-outfit text-[0.6875rem] font-medium tracking-[0.15em] text-gray-500/70 uppercase dark:text-gray-400/70"
+        class="font-outfit text-xs font-medium tracking-[0.15em] text-gray-500/70 uppercase dark:text-gray-400/70"
       >
         {{ t('loginV6.orDivider') }}
       </span>

@@ -23,3 +23,40 @@ export function shouldShowAppLayout(
   if (flags.needsPodSetup) return false; // never frame a podless / mid-onboarding session
   return route.meta?.noChrome !== true;
 }
+
+/**
+ * Routes where an authenticated session with no pod yet is EXPECTED (the
+ * onboarding entry points). Used to suppress the `app.onboardingZombieState`
+ * alert — a podless session here is normal, not an anomaly.
+ *
+ * This is a DERIVED predicate keyed on the route NAME, deliberately NOT a second
+ * `meta` flag: `meta.noChrome` answers "render the shell?" and is also set on
+ * NotFound + PlausibleExclude, where a podless session genuinely IS anomalous
+ * and SHOULD still alert. One source of truth (this name list), no overlapping
+ * booleans to drift. The recovery screen `/welcome?resume=setup` resolves to the
+ * `Welcome` name, so it is covered here without inspecting the query.
+ */
+const PODLESS_EXPECTED_ROUTE_NAMES: ReadonlyArray<string> = [
+  'Welcome',
+  'Login',
+  'JoinFamily',
+  'CreateFamily',
+  'OpenFromDrive',
+];
+
+export function isPodlessExpectedRoute(
+  route: Pick<RouteLocationNormalizedLoaded, 'name'>
+): boolean {
+  return typeof route.name === 'string' && PODLESS_EXPECTED_ROUTE_NAMES.includes(route.name);
+}
+
+/**
+ * Whether a `router.replace()`/`push()` result is a cancelled navigation. Vue
+ * Router RESOLVES (does not reject) with a `NavigationFailure` when a guard
+ * blocks a nav; the failure object always carries a numeric `type`. Detect it
+ * that way without importing `isNavigationFailure`. Shared by App.vue's
+ * `safeRouterReplace` and LoginPage's `replaceOrSurface`.
+ */
+export function isNavigationCancelled(result: unknown): result is { type: number } {
+  return !!result && typeof (result as { type?: number }).type === 'number';
+}

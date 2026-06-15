@@ -24,8 +24,11 @@ import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities
 import { withTimeout } from '@/utils/timing';
 import { FileNameCollisionError } from '@/types/sync';
 
-/** Path the OAuth redirect returns to — `LoginPage` shows the resume-setup screen here. */
-export const RESUME_SETUP_PATH = '/welcome?resume=setup';
+// `RESUME_SETUP_PATH` now lives in the lightweight `resumePaths.ts` (so it can
+// be imported without this module's heavy Drive/sync graph). Imported for this
+// module's own use + re-exported for back-compat with existing importers.
+import { RESUME_SETUP_PATH } from '@/components/login/resumePaths';
+export { RESUME_SETUP_PATH };
 
 /**
  * Begin a redirect/deep-link OAuth flow IFF the current surface needs one and we
