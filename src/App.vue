@@ -29,6 +29,9 @@ import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
 import { formatDeviceInfo } from '@/utils/diagnostics';
 import { reportError } from '@/utils/errorReporter';
+import { shouldShowAppLayout } from '@/utils/appChrome';
+import { isPodlessRecoveryQuery } from '@/components/login/resumePaths';
+import { RESUME_SETUP_PATH } from '@/services/sync/connectStorage';
 import { withTimeout } from '@/utils/timing';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
@@ -266,20 +269,16 @@ async function handleGoogleReconnected() {
  * Read the current encrypted file to get the raw blob for passkey registration.
  * Works with any storage provider (local file or Google Drive).
  */
-const showLayout = computed(() => {
-  // Don't show sidebar/header unless signed in and on an app page
-  if (!authStore.isAuthenticated) return false;
-  const noLayoutPages = [
-    'NotFound',
-    'Welcome',
-    'Login',
-    'JoinFamily',
-    'BeanstalkBlog',
-    'BeanstalkPost',
-    'PlausibleExclude',
-  ];
-  return !noLayoutPages.includes(route.name as string);
-});
+// Show the app shell (sidebar/header) only when signed in, with a pod, on a
+// route that opts into chrome (`meta.noChrome` !== true). The `needsPodSetup`
+// guard is the root-cause fix for the create-pod remount race — see
+// `shouldShowAppLayout` + `docs/plans/2026-06-15-onboarding-remount-race.md`.
+const showLayout = computed(() =>
+  shouldShowAppLayout(route, {
+    isAuthenticated: authStore.isAuthenticated,
+    needsPodSetup: authStore.needsPodSetup,
+  })
+);
 
 /**
  * Awaited `router.replace` with structured failure handling.
@@ -822,18 +821,20 @@ onMounted(async () => {
     // screen rather than letting an empty `/nook` render. (The router-level
     // guard handles this for SPA navigations; this is the fresh-page-load
     // path, after async auth hydration completes.)
-    if (!authStore.needsAuth && !authStore.podCreated) {
+    if (authStore.needsPodSetup) {
       initBreadcrumbs.push('auth: authenticated but no pod file — routing to resume-setup');
-      const onResumeScreen = route.path === '/welcome' && route.query.resume === 'setup';
-      // Only alert when the user is NOT already on the recovery screen.
-      // A cold reload (e.g. PWA reopen) while mid-recovery would otherwise
-      // fire this every boot even though the system is working as designed.
-      // The router-guard alert in src/router/index.ts:362 still fires when
-      // a user navigates TO a protected route in zombie state — that's the
-      // signal we genuinely want to track. (Caught 2026-05-18 from the HK
-      // pilot's recovery-flow boot triggering an error-channel alert on a
-      // page that was rendering correctly.)
-      if (!onResumeScreen) {
+      // Only alert when this is a genuinely UNEXPECTED zombie. A podless
+      // session is the NORMAL mid-flow state on the onboarding routes
+      // (`/create`, `/open` — `meta.noChrome`) and on the recovery screen
+      // (`?resume=setup`/`?resume=load-drive`), so suppress the page there.
+      // The router-guard alert in src/router/index.ts still fires when a user
+      // navigates TO a protected route in zombie state — that's the signal we
+      // genuinely want. (2026-05-18: HK pilot's recovery boot tripped this on a
+      // correctly-rendering page; 2026-06-15: the create wizard tripped it on
+      // every signup, masking a remount race.)
+      const expectedPodless =
+        route.meta?.noChrome === true || isPodlessRecoveryQuery(route.query.resume);
+      if (!expectedPodless) {
         reportError({
           surface: 'app.onboardingZombieState',
           message:
@@ -843,7 +844,12 @@ onMounted(async () => {
           // user reached a non-recovery route in zombie state.
           context: { route_path: route.fullPath },
         });
-        await router.replace('/welcome?resume=setup');
+      }
+      // Steer non-recovery surfaces to resume-setup (keep the recovery path),
+      // via the hardened wrapper so a guard-cancelled nav surfaces rather than
+      // silently resolving. Already on a recovery query → no redundant replace.
+      if (!isPodlessRecoveryQuery(route.query.resume)) {
+        await safeRouterReplace(RESUME_SETUP_PATH, 'app.boot.onboardingZombie');
       }
       isInitializing.value = false;
       return;
