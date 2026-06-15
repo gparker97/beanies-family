@@ -29,9 +29,12 @@ import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
 import { formatDeviceInfo } from '@/utils/diagnostics';
 import { reportError } from '@/utils/errorReporter';
-import { shouldShowAppLayout } from '@/utils/appChrome';
-import { isPodlessRecoveryQuery } from '@/components/login/resumePaths';
-import { RESUME_SETUP_PATH } from '@/services/sync/connectStorage';
+import {
+  shouldShowAppLayout,
+  isPodlessExpectedRoute,
+  isNavigationCancelled,
+} from '@/utils/appChrome';
+import { isPodlessRecoveryQuery, RESUME_SETUP_PATH } from '@/components/login/resumePaths';
 import { withTimeout } from '@/utils/timing';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
@@ -310,13 +313,11 @@ async function safeRouterReplace(target: string, callerTag: string): Promise<voi
   try {
     const result = await router.replace(target);
     // Vue Router returns `undefined` on success, `NavigationFailure` when a
-    // guard blocked the nav (incl. our critical-write guard). The failure
-    // object always has a numeric `type` field — detect it that way without
-    // pulling in the type-guard from vue-router. If the navigation was
-    // aborted, fall back to `location.replace` so the user lands at the
-    // correct path on init.
-    if (result && typeof (result as { type?: number }).type === 'number') {
-      const type = (result as { type: number }).type;
+    // guard blocked the nav (incl. our critical-write guard). If the navigation
+    // was aborted, fall back to `location.replace` so the user lands at the
+    // correct path on init. (Shared `isNavigationCancelled` — see appChrome.ts.)
+    if (isNavigationCancelled(result)) {
+      const type = result.type;
       console.warn(
         `[App] router.replace('${target}') from ${callerTag} was cancelled by a guard (type=${type}); falling back to location.replace`
       );
@@ -832,9 +833,13 @@ onMounted(async () => {
       // genuinely want. (2026-05-18: HK pilot's recovery boot tripped this on a
       // correctly-rendering page; 2026-06-15: the create wizard tripped it on
       // every signup, masking a remount race.)
-      const expectedPodless =
-        route.meta?.noChrome === true || isPodlessRecoveryQuery(route.query.resume);
-      if (!expectedPodless) {
+      // Suppress on routes where a podless session is EXPECTED (the onboarding
+      // entry points, incl. the `Welcome` recovery screen) — keyed on route name
+      // via `isPodlessExpectedRoute`, NOT `meta.noChrome` (which also covers
+      // NotFound/PlausibleExclude, where a podless session IS anomalous and
+      // should still alert).
+      const onRecoveryQuery = isPodlessRecoveryQuery(route.query.resume);
+      if (!isPodlessExpectedRoute(route)) {
         reportError({
           surface: 'app.onboardingZombieState',
           message:
@@ -848,7 +853,7 @@ onMounted(async () => {
       // Steer non-recovery surfaces to resume-setup (keep the recovery path),
       // via the hardened wrapper so a guard-cancelled nav surfaces rather than
       // silently resolving. Already on a recovery query → no redundant replace.
-      if (!isPodlessRecoveryQuery(route.query.resume)) {
+      if (!onRecoveryQuery) {
         await safeRouterReplace(RESUME_SETUP_PATH, 'app.boot.onboardingZombie');
       }
       isInitializing.value = false;

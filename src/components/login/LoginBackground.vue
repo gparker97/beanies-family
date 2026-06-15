@@ -54,7 +54,7 @@ async function selectLanguage(code: LanguageCode) {
         <span class="text-xs text-gray-600 dark:text-gray-300">{{
           currentLanguageInfo?.nativeName
         }}</span>
-        <span class="text-[0.5rem] text-gray-400">▼</span>
+        <span class="text-xs text-gray-400">▼</span>
       </button>
       <div
         v-if="showLangMenu"
