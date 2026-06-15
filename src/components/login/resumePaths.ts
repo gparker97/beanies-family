@@ -22,12 +22,20 @@ export const RESUME_LOAD_DRIVE = 'load-drive';
 export const LOAD_DRIVE_PATH = `/welcome?resume=${RESUME_LOAD_DRIVE}`;
 
 /**
- * `route.query.resume` value for the create / resume-setup continuation. The
- * full path (`RESUME_SETUP_PATH`) lives in `connectStorage.ts`; this is the bare
- * query token so the magic string `'setup'` is named once across the app
+ * `route.query.resume` value for the create / resume-setup continuation — the
+ * bare query token so the magic string `'setup'` is named once across the app
  * (App.vue boot, the router guard, and LoginPage).
  */
 export const RESUME_SETUP = 'setup';
+
+/**
+ * Full OAuth-redirect return path for the create / resume-setup continuation —
+ * `LoginPage` shows the resume-setup screen here. Lives in this lightweight
+ * module (not `connectStorage.ts`, which drags in the Drive provider + sync
+ * service) so App.vue / LoginPage / tests can import the constant without the
+ * heavy graph. `connectStorage.ts` re-exports it for back-compat.
+ */
+export const RESUME_SETUP_PATH = `/welcome?resume=${RESUME_SETUP}`;
 
 /**
  * Whether a `route.query.resume` value puts LoginPage into a deliberate

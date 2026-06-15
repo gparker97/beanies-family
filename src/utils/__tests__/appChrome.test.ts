@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { RouteLocationNormalizedLoaded } from 'vue-router';
-import { shouldShowAppLayout } from '../appChrome';
+import { shouldShowAppLayout, isPodlessExpectedRoute, isNavigationCancelled } from '../appChrome';
 
 /** Minimal route stub — only `meta` is read by the helper. */
 function route(meta: Record<string, unknown> = {}): Pick<RouteLocationNormalizedLoaded, 'meta'> {
@@ -46,5 +46,34 @@ describe('shouldShowAppLayout', () => {
     expect(shouldShowAppLayout(route({ noChrome: true, name: 'SomeFutureRoute' }), authed)).toBe(
       false
     );
+  });
+});
+
+describe('isPodlessExpectedRoute', () => {
+  function namedRoute(name: string | null) {
+    return { name } as Pick<RouteLocationNormalizedLoaded, 'name'>;
+  }
+
+  it('is true for the onboarding entry routes (podless is normal there)', () => {
+    for (const n of ['Welcome', 'Login', 'JoinFamily', 'CreateFamily', 'OpenFromDrive']) {
+      expect(isPodlessExpectedRoute(namedRoute(n))).toBe(true);
+    }
+  });
+
+  it('is false for NotFound / PlausibleExclude / app routes (podless IS anomalous → still alert)', () => {
+    expect(isPodlessExpectedRoute(namedRoute('NotFound'))).toBe(false);
+    expect(isPodlessExpectedRoute(namedRoute('PlausibleExclude'))).toBe(false);
+    expect(isPodlessExpectedRoute(namedRoute('Nook'))).toBe(false);
+    expect(isPodlessExpectedRoute(namedRoute(null))).toBe(false);
+  });
+});
+
+describe('isNavigationCancelled', () => {
+  it('is true for a NavigationFailure (numeric type), false otherwise', () => {
+    expect(isNavigationCancelled({ type: 8 })).toBe(true);
+    expect(isNavigationCancelled(undefined)).toBe(false); // success
+    expect(isNavigationCancelled(null)).toBe(false);
+    expect(isNavigationCancelled({})).toBe(false);
+    expect(isNavigationCancelled({ type: 'x' })).toBe(false);
   });
 });
