@@ -394,7 +394,7 @@ const plannedIdeas = computed(() => selectedVacation.value?.ideas.filter((i) => 
 
 /** Hints keyed by item ID — used to tint affected segment cards */
 const hintMap = computed(() =>
-  selectedVacation.value ? computeTimelineHints(selectedVacation.value) : new Map()
+  selectedVacation.value ? computeTimelineHints(selectedVacation.value, t) : new Map()
 );
 
 /**

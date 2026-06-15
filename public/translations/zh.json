@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-15",
-    "translationCount": 3514
+    "translationCount": 3523
   },
   "translations": {
     "app.name": {
@@ -17574,6 +17574,51 @@
     "activityPreset.insurance": {
       "translation": "保险",
       "hash": "yclp6i",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.hint.accommodationOverlap": {
+      "translation": "与“{title}”重叠-重复预订的晚数？",
+      "hash": "zaxu37",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.hint.accommodationDuringCruise": {
+      "translation": "与“{title}”重叠-邮轮包括住宿",
+      "hash": "e7f2zx",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.hint.cruiseHasAccommodation": {
+      "translation": "邮轮期间预订的“{title}” -邮轮包括住宿",
+      "hash": "sr00el",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.hint.flightDuringCruise": {
+      "translation": "计划在“{title}”期间-这是有意的吗？",
+      "hash": "at9cz5",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.hint.cruiseHasFlight": {
+      "translation": "邮轮期间安排的“{title}”",
+      "hash": "bjul9h",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.hint.nightFlightEarly": {
+      "translation": "出发时间为{time} -午夜后。请仔细检查日期，确保您在正确的日期出行。",
+      "hash": "8iemj8",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.hint.nightFlightLate": {
+      "translation": "出发时间为{time} -午夜前。请确保您有正确的出发日期，并留出额外的时间。",
+      "hash": "mb4qr7",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.hint.beforeTripStart": {
+      "translation": "已安排在行程开始前（ {date} ）",
+      "hash": "buji6g",
+      "lastUpdated": "2026-06-15"
+    },
+    "travel.hint.afterTripEnd": {
+      "translation": "已安排在行程结束后（ {date} ）",
+      "hash": "g6g8dy",
       "lastUpdated": "2026-06-15"
     }
   }
