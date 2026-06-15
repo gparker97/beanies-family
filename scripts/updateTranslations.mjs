@@ -156,6 +156,47 @@ function saveTranslationFile(language, data) {
 }
 
 /**
+ * Guard against garbage MyMemory output.
+ *
+ * The free MyMemory endpoint intermittently returns junk for short UI labels:
+ * injected HTML/SVG markup (incl. gambling-spam `<a href>` links), phonetic
+ * dictionary dumps, mangled escape sequences, and placeholder artifacts. Blindly
+ * trusting it shipped strings like a `<a href="...gouwo8.com">` spam link in the
+ * cruise "Embark" label and a dictionary definition for "Crypto". This rejects
+ * such output so the caller falls back to English (always safe, and fixable by
+ * hand in the JSON later) instead of persisting garbage.
+ *
+ * Returns a reason string if suspicious, or null if the translation looks clean.
+ */
+export function suspiciousTranslationReason(source, translated) {
+  // 1. Control characters (tabs/newlines) never belong in a UI label.
+  if (/[\t\r\n\x00-\x08\x0b\x0c]/.test(translated)) return 'control characters';
+
+  // 2. Markup in the translation that the English source did not have — injected.
+  const tagRe = /<\/?[a-zA-Z][^>]*>|<[a-zA-Z]+\s+[a-zA-Z]/;
+  if (tagRe.test(translated) && !tagRe.test(source)) return 'injected HTML/markup';
+
+  // 3. Placeholder/escape artifacts MyMemory leaks (<x id>, <ph>, <g id>, \ u2192).
+  if (/<(?:x|ph|g)\b/i.test(translated) && !/<(?:x|ph|g)\b/i.test(source))
+    return 'placeholder artifact';
+  if (/\\\s*u\s*\{?[0-9a-fA-F]{2,}/.test(translated) && !/\\\s*u/.test(source))
+    return 'mangled escape sequence';
+
+  // 4. URLs the source didn't contain (spam links).
+  if (/https?:\/\//i.test(translated) && !/https?:\/\//i.test(source)) return 'injected URL';
+
+  // 5. Phonetic dictionary dump (e.g. "crypto\n英 ['krɪptəʊ] ... n. ...").
+  if (/[英美]\s*\[|\bn\.\s|；.*；.*；/.test(translated) && source.length < 40)
+    return 'dictionary-definition dump';
+
+  // 6. Implausibly long output for a short label (junk padding).
+  if (source.length <= 24 && translated.length > source.length * 6 + 24)
+    return 'implausible length';
+
+  return null;
+}
+
+/**
  * Translate text using MyMemory API
  */
 async function translate(text, targetLang) {
@@ -183,6 +224,14 @@ async function translate(text, targetLang) {
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'");
+
+    // Reject garbage output (HTML injection, spam links, dictionary dumps, etc.)
+    // — fall back to English, which is always safe and hand-fixable in the JSON.
+    const reason = suspiciousTranslationReason(text, decoded);
+    if (reason) {
+      console.warn(`   ⚠ Rejected suspicious translation for "${text}" (${reason}): "${decoded}"`);
+      return text;
+    }
 
     return decoded;
   } catch (error) {

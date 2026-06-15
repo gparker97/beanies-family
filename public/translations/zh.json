@@ -87,7 +87,7 @@
       "lastUpdated": "2026-03-03"
     },
     "status.excluded": {
-      "translation": "Excluded",
+      "translation": "已排除",
       "hash": "y1p2i2",
       "lastUpdated": "2026-03-03"
     },
@@ -337,7 +337,7 @@
       "lastUpdated": "2026-03-03"
     },
     "recurring.items": {
-      "translation": "<strong>重复项目</strong>",
+      "translation": "重复项目",
       "hash": "lib2ir",
       "lastUpdated": "2026-03-03"
     },
@@ -432,7 +432,7 @@
       "lastUpdated": "2026-03-03"
     },
     "accounts.accountType": {
-      "translation": "Account Type",
+      "translation": "账户类型",
       "hash": "jsfurx",
       "lastUpdated": "2026-03-03"
     },
@@ -1207,7 +1207,7 @@
       "lastUpdated": "2026-03-03"
     },
     "form.description": {
-      "translation": "Description",
+      "translation": "描述",
       "hash": "xqskk",
       "lastUpdated": "2026-03-03"
     },
@@ -1702,7 +1702,7 @@
       "lastUpdated": "2026-03-03"
     },
     "month.june": {
-      "translation": "<g id=\"775\">6 </g><g id=\"778\">月 </g><g id=\"782\">12 </g><g id=\"785\">日</g>",
+      "translation": "六月",
       "hash": "1dqhu",
       "lastUpdated": "2026-03-03"
     },
@@ -2347,7 +2347,7 @@
       "lastUpdated": "2026-02-24"
     },
     "auth.yourNamePlaceholder": {
-      "translation": "HUGO ZOE",
+      "translation": "张三",
       "hash": "4mmf8u",
       "lastUpdated": "2026-02-24"
     },
@@ -2592,7 +2592,7 @@
       "lastUpdated": "2026-03-03"
     },
     "loginV6.badgeLove": {
-      "translation": " Built with",
+      "translation": "用爱打造",
       "hash": "ni5cie",
       "lastUpdated": "2026-03-03"
     },
@@ -3347,7 +3347,7 @@
       "lastUpdated": "2026-03-03"
     },
     "todo.description": {
-      "translation": "Description",
+      "translation": "描述",
       "hash": "xqskk",
       "lastUpdated": "2026-03-03"
     },
@@ -4102,7 +4102,7 @@
       "lastUpdated": "2026-03-03"
     },
     "planner.day.sun": {
-      "translation": "Sun",
+      "translation": "周日",
       "hash": "1sfg",
       "lastUpdated": "2026-03-03"
     },
@@ -4377,7 +4377,7 @@
       "lastUpdated": "2026-03-03"
     },
     "modal.accountType": {
-      "translation": "Account Type",
+      "translation": "账户类型",
       "hash": "jsfurx",
       "lastUpdated": "2026-03-03"
     },
@@ -4732,7 +4732,7 @@
       "lastUpdated": "2026-03-03"
     },
     "budget.quickAdd.description": {
-      "translation": "Description",
+      "translation": "描述",
       "hash": "xqskk",
       "lastUpdated": "2026-03-03"
     },
@@ -5157,7 +5157,7 @@
       "lastUpdated": "2026-03-03"
     },
     "accounts.subtype.crypto": {
-      "translation": "crypto\n\n英 ['krɪptəʊ]   美 ['krɪptoʊ]  \nn.\n（尤指信仰共产主义的）秘密成员;",
+      "translation": "加密货币",
       "hash": "xiwvdt",
       "lastUpdated": "2026-03-03"
     },
@@ -5257,7 +5257,7 @@
       "lastUpdated": "2026-03-03"
     },
     "recurring.scopeThisAndFuture": {
-      "translation": "This & All Future",
+      "translation": "本次及未来全部",
       "hash": "zc34xq",
       "lastUpdated": "2026-03-03"
     },
@@ -6177,7 +6177,7 @@
       "lastUpdated": "2026-03-08"
     },
     "onboarding.welcomeCta": {
-      "translation": "Let's Get This Pod Rolling\\ u {1F96B}",
+      "translation": "让我们开始吧 🫛",
       "hash": "wa3hdy",
       "lastUpdated": "2026-03-08"
     },
@@ -6337,7 +6337,7 @@
       "lastUpdated": "2026-03-08"
     },
     "onboarding.completeSubtitle": {
-      "translation": "去照顾你的小豆子\\ u2014我们会处理剩下的。\\ u {1F96B}",
+      "translation": "去照顾你的小豆子\\ u2014我们会处理剩下的。🫛",
       "hash": "im0nwh",
       "lastUpdated": "2026-03-08"
     },
@@ -6462,7 +6462,7 @@
       "lastUpdated": "2026-03-08"
     },
     "todo.links": {
-      "translation": "Links",
+      "translation": "链接",
       "hash": "17pqxl",
       "lastUpdated": "2026-03-08"
     },
@@ -6787,7 +6787,7 @@
       "lastUpdated": "2026-03-14"
     },
     "dashboard.breakdown.crypto": {
-      "translation": "crypto\n\n英 ['krɪptəʊ]   美 ['krɪptoʊ]  \nn.\n（尤指信仰共产主义的）秘密成员;",
+      "translation": "加密货币",
       "hash": "xiwvdt",
       "lastUpdated": "2026-03-14"
     },
@@ -7637,7 +7637,7 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.field.route": {
-      "translation": "<g id=\"Bold\">专业：</g>",
+      "translation": "路线",
       "hash": "1b4ht5",
       "lastUpdated": "2026-03-20"
     },
@@ -8227,7 +8227,7 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.field.title": {
-      "translation": "Title",
+      "translation": "标题",
       "hash": "1c4854",
       "lastUpdated": "2026-03-20"
     },
@@ -8542,7 +8542,7 @@
       "lastUpdated": "2026-03-21"
     },
     "vacation.field.activityCategory": {
-      "translation": "Activity Type",
+      "translation": "活动类型",
       "hash": "4wetsl",
       "lastUpdated": "2026-03-21"
     },
@@ -9212,7 +9212,7 @@
       "lastUpdated": "2026-04-16"
     },
     "pwaReinstall.iosStep1": {
-      "translation": "长按主屏<strong></strong>幕上的旧beanies.family图标，然后轻点<strong>删除应用</strong>\\ u2192<strong>从主屏幕删除</strong>",
+      "translation": "长按主屏<strong></strong>幕上的旧beanies.family图标，然后轻点<strong>删除应用</strong>→<strong>从主屏幕删除</strong>",
       "hash": "vwvgaa",
       "lastUpdated": "2026-04-16"
     },
@@ -9222,7 +9222,7 @@
       "lastUpdated": "2026-04-16"
     },
     "pwaReinstall.iosStep3": {
-      "translation": "点击<strong>分享</strong>按钮\\ u2192<strong>添加到主屏幕</strong>",
+      "translation": "点击<strong>分享</strong>按钮→<strong>添加到主屏幕</strong>",
       "hash": "oqykul",
       "lastUpdated": "2026-04-16"
     },
@@ -9242,7 +9242,7 @@
       "lastUpdated": "2026-04-16"
     },
     "pwaReinstall.androidStep3": {
-      "translation": "轻触三点菜单\\ u2192<strong>安装应用</strong>（或<strong>添加到主屏幕</strong>）",
+      "translation": "轻触三点菜单→<strong>安装应用</strong>（或<strong>添加到主屏幕</strong>）",
       "hash": "b3kc61",
       "lastUpdated": "2026-04-16"
     },
@@ -9252,7 +9252,7 @@
       "lastUpdated": "2026-04-16"
     },
     "pwaReinstall.desktopStep1": {
-      "translation": "删除旧应用：在Chrome中，访问<strong>chrome://apps</strong> ，右键单<strong>击</strong>beanies.family\\ u2192<strong>从Chrome中删除</strong>",
+      "translation": "删除旧应用：在Chrome中，访问<strong>chrome://apps</strong> ，右键单<strong>击</strong>beanies.family→<strong>从Chrome中删除</strong>",
       "hash": "m1smj7",
       "lastUpdated": "2026-04-16"
     },
@@ -9262,7 +9262,7 @@
       "lastUpdated": "2026-04-16"
     },
     "pwaReinstall.desktopStep3": {
-      "translation": "点击地址栏中的安装图标（或三点菜单\\ u2192<strong>安装</strong>）",
+      "translation": "点击地址栏中的安装图标（或三点菜单→<strong>安装</strong>）",
       "hash": "i4oedw",
       "lastUpdated": "2026-04-16"
     },
@@ -9282,7 +9282,7 @@
       "lastUpdated": "2026-04-16"
     },
     "pwaReinstall.seeFullGuide": {
-      "translation": "查看完整的安装指南\\ u2192",
+      "translation": "查看完整的安装指南→",
       "hash": "4q87zl",
       "lastUpdated": "2026-04-16"
     },
@@ -9652,7 +9652,7 @@
       "lastUpdated": "2026-04-19"
     },
     "favorites.category.song": {
-      "translation": "Song",
+      "translation": "歌曲",
       "hash": "1jcxh",
       "lastUpdated": "2026-04-19"
     },
@@ -9772,7 +9772,7 @@
       "lastUpdated": "2026-04-19"
     },
     "memberNotes.field.title": {
-      "translation": "<g id=\"Bold\">课程名称</g>",
+      "translation": "标题",
       "hash": "1c4854",
       "lastUpdated": "2026-04-19"
     },
@@ -10102,7 +10102,7 @@
       "lastUpdated": "2026-04-19"
     },
     "careSafety.stats.allergies": {
-      "translation": "allergies",
+      "translation": "过敏",
       "hash": "1cmo7y",
       "lastUpdated": "2026-04-19"
     },
@@ -10957,7 +10957,7 @@
       "lastUpdated": "2026-04-19"
     },
     "family.card.fave": {
-      "translation": "Fave",
+      "translation": "最爱",
       "hash": "1arwq",
       "lastUpdated": "2026-04-19"
     },
@@ -10987,12 +10987,12 @@
       "lastUpdated": "2026-04-19"
     },
     "family.card.allergies": {
-      "translation": "allergies",
+      "translation": "过敏",
       "hash": "1cmo7y",
       "lastUpdated": "2026-04-19"
     },
     "family.card.med": {
-      "translation": "med",
+      "translation": "用药",
       "hash": "2bbg",
       "lastUpdated": "2026-04-19"
     },
@@ -12637,7 +12637,7 @@
       "lastUpdated": "2026-05-14"
     },
     "onboarding.invite.send": {
-      "translation": "发送\\ u2192",
+      "translation": "发送→",
       "hash": "djcnc9",
       "lastUpdated": "2026-04-28"
     },
@@ -12672,7 +12672,7 @@
       "lastUpdated": "2026-04-28"
     },
     "onboarding.next": {
-      "translation": "下一步\\ u2192",
+      "translation": "下一步→",
       "hash": "us1qqq",
       "lastUpdated": "2026-04-28"
     },
@@ -13027,7 +13027,7 @@
       "lastUpdated": "2026-05-03"
     },
     "transferOwnership.reauthWrongPassword": {
-      "translation": "密码不正确。<x id=\"1\"/>请再试一次。",
+      "translation": "密码不正确。请再试一次。",
       "hash": "dchse3",
       "lastUpdated": "2026-05-03"
     },
@@ -13157,7 +13157,7 @@
       "lastUpdated": "2026-05-04"
     },
     "changePassword.newPasswordPlaceholder": {
-      "translation": "<ph x=\"1\"/> \"选取新密码\"",
+      "translation": "选取新密码",
       "hash": "5xr5vn",
       "lastUpdated": "2026-05-04"
     },
@@ -13342,7 +13342,7 @@
       "lastUpdated": "2026-05-07"
     },
     "milestone.field.title": {
-      "translation": "<g id=\"Bold\">课程名称</g>",
+      "translation": "标题",
       "hash": "1c4854",
       "lastUpdated": "2026-05-07"
     },
@@ -13607,7 +13607,7 @@
       "lastUpdated": "2026-05-14"
     },
     "milestone.group.firsts": {
-      "translation": "Firsts",
+      "translation": "第一次",
       "hash": "ysz6jn",
       "lastUpdated": "2026-05-07"
     },
@@ -14182,7 +14182,7 @@
       "lastUpdated": "2026-05-15"
     },
     "planner.weekday.short.sun": {
-      "translation": "Sun",
+      "translation": "周日",
       "hash": "1sfg",
       "lastUpdated": "2026-05-15"
     },
@@ -15072,7 +15072,7 @@
       "lastUpdated": "2026-06-04"
     },
     "settings.ai.byok.apiKeyPlaceholder": {
-      "translation": "%sk",
+      "translation": "sk-...",
       "hash": "ex9thj",
       "lastUpdated": "2026-06-04"
     },
@@ -15307,7 +15307,7 @@
       "lastUpdated": "2026-06-06"
     },
     "vacation.field.terminal": {
-      "translation": "Terminal",
+      "translation": "航站楼",
       "hash": "igspr8",
       "lastUpdated": "2026-06-06"
     },
@@ -15867,7 +15867,7 @@
       "lastUpdated": "2026-06-14"
     },
     "planner.category.eye_exam": {
-      "translation": "眼 <x id=\"522\"/>考试",
+      "translation": "眼科检查",
       "hash": "mjk26q",
       "lastUpdated": "2026-06-14"
     },
@@ -15927,7 +15927,7 @@
       "lastUpdated": "2026-06-14"
     },
     "planner.category.other_food": {
-      "translation": "Other Food",
+      "translation": "其他食品",
       "hash": "sywv5a",
       "lastUpdated": "2026-06-14"
     },
@@ -16042,7 +16042,7 @@
       "lastUpdated": "2026-06-14"
     },
     "planner.category.playdate": {
-      "translation": "Playdate",
+      "translation": "玩伴聚会",
       "hash": "w5bxtu",
       "lastUpdated": "2026-06-14"
     },
@@ -16067,7 +16067,7 @@
       "lastUpdated": "2026-06-14"
     },
     "planner.category.multi_sport": {
-      "translation": "Multi Sport",
+      "translation": "多项运动",
       "hash": "1d9rw3",
       "lastUpdated": "2026-06-14"
     },
@@ -16527,7 +16527,7 @@
       "lastUpdated": "2026-06-15"
     },
     "planner.unit.perYearAbbrev": {
-      "translation": "Yr",
+      "translation": "/年",
       "hash": "11u0",
       "lastUpdated": "2026-06-15"
     },
@@ -16537,7 +16537,7 @@
       "lastUpdated": "2026-06-15"
     },
     "planner.reminder.15min": {
-      "translation": "15 min",
+      "translation": "15分钟",
       "hash": "o0zbrq",
       "lastUpdated": "2026-06-15"
     },
@@ -16692,7 +16692,7 @@
       "lastUpdated": "2026-06-15"
     },
     "inviteWizard.qrAlt": {
-      "translation": "QR Code",
+      "translation": "二维码",
       "hash": "kqc2a4",
       "lastUpdated": "2026-06-15"
     },
@@ -16837,7 +16837,7 @@
       "lastUpdated": "2026-06-15"
     },
     "onboarding.perYearSuffix": {
-      "translation": "Yr",
+      "translation": "/年",
       "hash": "11u0",
       "lastUpdated": "2026-06-15"
     },
@@ -16882,7 +16882,7 @@
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.flightNumber": {
-      "translation": "飞行",
+      "translation": "航班号",
       "hash": "vk2zkj",
       "lastUpdated": "2026-06-15"
     },
@@ -16892,17 +16892,17 @@
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.to": {
-      "translation": "To",
+      "translation": "到",
       "hash": "23f",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.terminal": {
-      "translation": "Terminal",
+      "translation": "航站楼",
       "hash": "igspr8",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.date": {
-      "translation": "更改日期",
+      "translation": "日期",
       "hash": "19hvy",
       "lastUpdated": "2026-06-15"
     },
@@ -16917,37 +16917,37 @@
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.arrivesNextDay": {
-      "translation": "入住（ +1 ）",
+      "translation": "到达（+1天）",
       "hash": "r13t7j",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.cruiseLine": {
-      "translation": "游轮路线",
+      "translation": "邮轮公司",
       "hash": "uthm81",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.ship": {
-      "translation": "舰体",
+      "translation": "船名",
       "hash": "1j7mk",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.port": {
-      "translation": "端口",
+      "translation": "港口",
       "hash": "1hg2p",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.cabin": {
-      "translation": "内室",
+      "translation": "舱房",
       "hash": "12m8qx",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.embark": {
-      "translation": "Embark | By <a href=\"https://www.gouwo8.com\" target=\"_blank\" rel=\"noopener\">狗窝吧汉化</a>",
+      "translation": "登船",
       "hash": "ydu5c0",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.departTime": {
-      "translation": "出发时间：",
+      "translation": "出发时间",
       "hash": "z2umhl",
       "lastUpdated": "2026-06-15"
     },
@@ -16957,17 +16957,17 @@
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.carType": {
-      "translation": "车类型",
+      "translation": "车型",
       "hash": "38d7e",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.car": {
-      "translation": "car",
+      "translation": "汽车",
       "hash": "1g38",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.leaving": {
-      "translation": "办公室",
+      "translation": "出发",
       "hash": "sde5qs",
       "lastUpdated": "2026-06-15"
     },
@@ -16977,7 +16977,7 @@
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.details": {
-      "translation": "家具详情",
+      "translation": "详情",
       "hash": "hqldjy",
       "lastUpdated": "2026-06-15"
     },
@@ -16987,7 +16987,7 @@
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.duration": {
-      "translation": "课时",
+      "translation": "时长",
       "hash": "vvi6vg",
       "lastUpdated": "2026-06-15"
     },
@@ -16997,12 +16997,12 @@
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.operator": {
-      "translation": "物资专员",
+      "translation": "运营商",
       "hash": "77j1vg",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.route": {
-      "translation": "<g id=\"Bold\">专业：</g>",
+      "translation": "路线",
       "hash": "1b4ht5",
       "lastUpdated": "2026-06-15"
     },
@@ -17017,7 +17017,7 @@
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.notes": {
-      "translation": "注 意 事 项",
+      "translation": "备注",
       "hash": "18xach",
       "lastUpdated": "2026-06-15"
     },
@@ -17027,7 +17027,7 @@
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.checkIn": {
-      "translation": "已签到",
+      "translation": "入住",
       "hash": "qhhdm2",
       "lastUpdated": "2026-06-15"
     },
@@ -17042,7 +17042,7 @@
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.confirmation": {
-      "translation": "兑换确认",
+      "translation": "确认号",
       "hash": "xlhy23",
       "lastUpdated": "2026-06-15"
     },
@@ -17052,7 +17052,7 @@
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.breakfast": {
-      "translation": "早\t餐",
+      "translation": "早餐",
       "hash": "1rfliz",
       "lastUpdated": "2026-06-15"
     },
@@ -17062,22 +17062,22 @@
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.pickupDate": {
-      "translation": "截取日期",
+      "translation": "取车日期",
       "hash": "t9enci",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.pickupTime": {
-      "translation": "取件时间",
+      "translation": "取车时间",
       "hash": "t9p0wh",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.returnDate": {
-      "translation": "返回天数",
+      "translation": "返回日期",
       "hash": "217726",
       "lastUpdated": "2026-06-15"
     },
     "segmentRow.returnTime": {
-      "translation": "返回 时间",
+      "translation": "返回时间",
       "hash": "21hkm5",
       "lastUpdated": "2026-06-15"
     },
