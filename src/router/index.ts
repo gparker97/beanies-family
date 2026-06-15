@@ -14,6 +14,19 @@ import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
 import { QUICK_ADD_CONTEXT_KEYS } from '@/constants/quickAddItems';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
+import { isPodlessRecoveryQuery } from '@/components/login/resumePaths';
+
+// First `RouteMeta` augmentation in the repo. Intentionally PARTIAL — it types
+// only `noChrome` (consumed by `shouldShowAppLayout` + App.vue's boot block).
+// The other meta fields (`requiresAuth`, `requiresFinance`, `titleKey`,
+// `hideQuickAdd`, …) remain on vue-router's default `unknown`-indexed `RouteMeta`
+// by design; typing them all is a separate, speculative change out of scope here.
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** When true, the route renders WITHOUT the app shell (sidebar/header). */
+    noChrome?: boolean;
+  }
+}
 
 /** Route that cross-origin-redirects to the Astro marketing site, preserving the full path. */
 function externalRedirect(path: string, name: string): RouteRecordRaw {
@@ -50,26 +63,26 @@ const routes: RouteRecordRaw[] = [
     path: '/welcome',
     name: 'Welcome',
     component: () => import('@/pages/LoginPage.vue'),
-    meta: { titleKey: 'login.welcome', requiresAuth: false, hideQuickAdd: true },
+    meta: { titleKey: 'login.welcome', requiresAuth: false, hideQuickAdd: true, noChrome: true },
   },
   {
     path: '/login',
     name: 'Login',
     component: () => import('@/pages/LoginPage.vue'),
-    meta: { titleKey: 'login.title', requiresAuth: false, hideQuickAdd: true },
+    meta: { titleKey: 'login.title', requiresAuth: false, hideQuickAdd: true, noChrome: true },
   },
   {
     path: '/join',
     name: 'JoinFamily',
     component: () => import('@/pages/LoginPage.vue'),
-    meta: { titleKey: 'join.title', requiresAuth: false, hideQuickAdd: true },
+    meta: { titleKey: 'join.title', requiresAuth: false, hideQuickAdd: true, noChrome: true },
     props: { initialView: 'join' },
   },
   {
     path: '/create',
     name: 'CreateFamily',
     component: () => import('@/pages/LoginPage.vue'),
-    meta: { titleKey: 'create.title', requiresAuth: false, hideQuickAdd: true },
+    meta: { titleKey: 'create.title', requiresAuth: false, hideQuickAdd: true, noChrome: true },
     props: { initialView: 'create' },
   },
   {
@@ -80,7 +93,12 @@ const routes: RouteRecordRaw[] = [
     path: '/open',
     name: 'OpenFromDrive',
     component: () => import('@/pages/OpenFromDrivePage.vue'),
-    meta: { titleKey: 'openFromDrive.title', requiresAuth: false, hideQuickAdd: true },
+    meta: {
+      titleKey: 'openFromDrive.title',
+      requiresAuth: false,
+      hideQuickAdd: true,
+      noChrome: true,
+    },
   },
   {
     path: '/dashboard',
@@ -241,7 +259,7 @@ const routes: RouteRecordRaw[] = [
     path: '/plausible-exclude',
     name: 'PlausibleExclude',
     component: () => import('@/pages/PlausibleExcludePage.vue'),
-    meta: { requiresAuth: false, hideQuickAdd: true },
+    meta: { requiresAuth: false, hideQuickAdd: true, noChrome: true },
   },
   externalRedirect('/help/:pathMatch(.*)*', 'HelpRedirect'),
   externalRedirect('/privacy', 'PrivacyRedirect'),
@@ -258,7 +276,7 @@ const routes: RouteRecordRaw[] = [
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/pages/NotFoundPage.vue'),
-    meta: { titleKey: 'notFound.title', hideQuickAdd: true },
+    meta: { titleKey: 'notFound.title', hideQuickAdd: true, noChrome: true },
   },
 ];
 
@@ -310,12 +328,12 @@ router.beforeEach((to) => {
   if (!ALREADY_AUTH_REDIRECT_FROM.has(to.path)) return;
   const authStore = useAuthStore();
   if (!authStore.isAuthenticated) return;
-  if (!authStore.podCreated) {
+  if (authStore.needsPodSetup) {
     // Already on a resume screen — let them stay. `setup` is the create/recovery
     // continuation; `load-drive` is the Drive-load OAuth return that re-opens the
     // file picker (ADR-029). Rewriting the latter to `setup` would strand a
     // returning-but-podless user on resume-setup instead of the picker.
-    if (to.query.resume === 'setup' || to.query.resume === 'load-drive') return;
+    if (isPodlessRecoveryQuery(to.query.resume)) return;
     return { name: 'Welcome', query: { resume: 'setup' } };
   }
   return { name: 'Nook' };
@@ -358,7 +376,7 @@ router.beforeEach((to) => {
   }
   // Authenticated, but the `.beanpod` file doesn't exist yet — route to the
   // resume-setup recovery screen instead of letting an empty `/nook` render.
-  if (!authStore.podCreated) {
+  if (authStore.needsPodSetup) {
     if (!zombieStateReported) {
       zombieStateReported = true;
       reportError({

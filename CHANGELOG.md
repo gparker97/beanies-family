@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-15
+
+### Fixed
+
+- **Fixed a serious bug that could freeze family creation on an endless "counting beans" spinner.** After entering your details on the first step of creating a family, the app could intermittently flash the sidebar and hang on a spinner instead of moving on to the storage step — leaving new families stuck. The cause was an internal screen-reload race triggered the moment your account was created; the app now keeps the sign-in screen stable until your family file actually exists, and the create screen rescues itself if it ever lands in that in-between state. It also stops a harmless-but-noisy internal alert from firing on every normal sign-up.
+
 ## 2026-06-14
 
 ### Security

@@ -258,6 +258,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Getters
   const needsAuth = computed(() => !isAuthenticated.value);
+  /**
+   * Authenticated session whose `.beanpod` file does not exist yet — the
+   * half-finished-onboarding ("zombie") state (signup done but storage not
+   * chosen/written, or an iOS Drive OAuth redirect mid-flight). Single source
+   * of truth for this condition, consumed by the router guards, App.vue boot,
+   * the app-chrome layout helper, and LoginPage's self-rescue.
+   */
+  const needsPodSetup = computed(() => !needsAuth.value && !podCreated.value);
   const displayName = computed(() => {
     if (!currentUser.value) return '';
     const familyStore = useFamilyStore();
@@ -1052,6 +1060,7 @@ export const useAuthStore = defineStore('auth', () => {
     podCreated,
     // Getters
     needsAuth,
+    needsPodSetup,
     displayName,
     // Actions
     markPodCreated,

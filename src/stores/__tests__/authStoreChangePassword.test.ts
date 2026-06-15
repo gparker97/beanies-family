@@ -202,3 +202,32 @@ describe('authStore.changePassword', () => {
     expect(syncNowMock).toHaveBeenCalledWith(true);
   });
 });
+
+describe('authStore.needsPodSetup', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it('is false when not authenticated (no session to recover)', () => {
+    const store = useAuthStore();
+    store.isAuthenticated = false;
+    expect(store.needsPodSetup).toBe(false);
+  });
+
+  it('is true when authenticated but the pod file does not exist yet', () => {
+    const store = useAuthStore();
+    store.isAuthenticated = true;
+    store.podCreated = false;
+    expect(store.needsPodSetup).toBe(true);
+  });
+
+  it('is false once markPodCreated() flips podCreated true', () => {
+    const store = useAuthStore();
+    store.isAuthenticated = true;
+    store.podCreated = false;
+    expect(store.needsPodSetup).toBe(true);
+    store.markPodCreated();
+    expect(store.needsPodSetup).toBe(false);
+  });
+});

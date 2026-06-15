@@ -22,7 +22,9 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
-import { RESUME_LOAD_DRIVE } from '@/components/login/resumePaths';
+import { RESUME_LOAD_DRIVE, isPodlessRecoveryQuery } from '@/components/login/resumePaths';
+import { RESUME_SETUP_PATH } from '@/services/sync/connectStorage';
+import { reportError } from '@/utils/errorReporter';
 
 const router = useRouter();
 const route = useRoute();
@@ -127,6 +129,46 @@ stopResumeWatch = watchEffect(() => {
   stopResumeWatch();
 });
 
+/**
+ * Hardened `router.replace` for the podless self-rescue below. App.vue's
+ * `safeRouterReplace` is component-local (closes over its init/overlay state),
+ * so we use a small local equivalent rather than couple to it. Mirrors App.vue's
+ * numeric-`type` NavigationFailure convention: vue-router resolves (does not
+ * reject) with a `NavigationFailure` when a guard cancels the nav. On a
+ * cancel/throw we surface a warning (never a silent failure) and the `finally`
+ * always clears the spinner so the user is never stranded — the reactive
+ * `watchEffect` above still flips `activeView` once the URL settles.
+ */
+async function replaceOrSurface(target: string, callerTag: string): Promise<void> {
+  try {
+    const result = await router.replace(target);
+    if (result && typeof (result as { type?: number }).type === 'number') {
+      const type = (result as { type: number }).type;
+      console.warn(
+        `[LoginPage] router.replace('${target}') from ${callerTag} was cancelled by a guard (type=${type})`
+      );
+      reportError({
+        surface: 'login.podlessRescue.replaceCancelled',
+        message: `router.replace('${target}') was cancelled by a guard (caller=${callerTag}, type=${type})`,
+        severity: 'warning',
+        context: { route_path: route.fullPath },
+      });
+    }
+  } catch (e) {
+    console.error(`[LoginPage] router.replace('${target}') from ${callerTag} threw:`, e);
+    reportError({
+      surface: 'login.podlessRescue.replaceThrew',
+      message: `router.replace('${target}') threw during podless self-rescue (caller=${callerTag})`,
+      error: e,
+      severity: 'warning',
+      context: { route_path: route.fullPath },
+    });
+  } finally {
+    // Never leave the user on a dead spinner — clear it regardless of outcome.
+    isInitializing.value = false;
+  }
+}
+
 onMounted(async () => {
   // Wait for App.vue's `authStore.initializeAuth()` to finish before
   // reading auth state. Vue fires children's onMounted BEFORE the parent
@@ -167,15 +209,20 @@ onMounted(async () => {
     return;
   }
 
-  // Zombie state without `?resume=setup` in the URL — App.vue's onMounted
-  // is about to `router.replace` us there. Keep the loading spinner up and
-  // bail out of the family-init / single-family-auto-select logic; the
-  // reactive watchEffect above will flip activeView to 'resume-setup' once
-  // the redirect lands. Without this, onMounted would press on, possibly
-  // call `handleFamilySelected(singleFamily)` on a pod that doesn't exist,
-  // and either error out or land the user on the wrong view before the
-  // watch could rescue them.
-  if (authStore.isAuthenticated && !authStore.podCreated) {
+  // Zombie state (authenticated, no pod). Bail out of the family-init /
+  // single-family-auto-select logic — pressing on would call
+  // `handleFamilySelected(singleFamily)` on a pod that doesn't exist.
+  if (authStore.needsPodSetup) {
+    // Already on a deliberate recovery surface (resume-setup, or the Drive-load
+    // picker re-open, ADR-029)? The reactive watchEffect above flips activeView
+    // and clears isInitializing — just bail.
+    if (isPodlessRecoveryQuery(route.query.resume)) return;
+    // Otherwise we were (re)mounted podless without recovery context — e.g. the
+    // create-pod remount race, or a direct deep-link to /create after signup.
+    // App.vue's boot redirect does NOT re-run on a remount, so SELF-RESCUE to
+    // resume-setup rather than leaving the spinner up forever. `replaceOrSurface`
+    // clears isInitializing in all outcomes (no silent failure, no dead spinner).
+    await replaceOrSurface(RESUME_SETUP_PATH, 'LoginPage.onMounted.podlessRescue');
     return;
   }
 
