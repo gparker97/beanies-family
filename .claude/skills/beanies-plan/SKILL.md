@@ -25,6 +25,7 @@ This skill creates comprehensive, implementation-ready plans and optionally GitH
 2. **Ask clarifying questions** if requirements are ambiguous. Do not assume — ask.
 3. **Default to direct implementation — no GitHub issue.** This is a one-dev project; tickets are overhead unless the user explicitly says "create an issue" / "file a ticket" / "open a ticket for this". If the user does ask for an issue, create one per Phase 5; otherwise the plan stands alone in `docs/plans/` with the full prompt history embedded.
 4. Record all follow-up prompts, redirections, and refinements. Every user message that shapes the plan is part of the record.
+5. **Mockup-aware intake.** If the prompt carries an approved mockup — a `Mockup:` line (the channel `beanies-pre-plan` uses) or a `docs/mockups/…` file the user points at — **read that file in full before drafting**; it is primary design input for Pass 1 (see Phase 2.1 → _Mockup-driven drafting_). If the prompt makes clear a mockup is expected but none is provided (e.g. `beanies-plan` was invoked standalone, bypassing `beanies-pre-plan`), generate one first: invoke `/frontend-design:frontend-design` clamped to `.claude/skills/beanies-theme/SKILL.md` + the CIG (the CIG always wins over the generator's defaults), producing a self-contained `docs/mockups/<concept>-YYYY-MM-DD.html`; iterate to the user's explicit approval; commit only the approved file; then draft from it. Writing `mockup file url` back to the Notion tracker is `beanies-pre-plan`'s responsibility, never this skill's — `beanies-plan` stays Notion-agnostic.
 
 ### Phase 2: Build the Plan Through Four Review Passes
 
@@ -47,6 +48,12 @@ Key principles:
 - **No if**: the work is a bug fix, refactor, internal cleanup, performance pass, dependency bump, brand/typography tweak, or a UI polish that doesn't change *what* the user can do.
 
 If yes, the plan **must** include a `## Help Center Coverage` section (see format below) that specifies which article(s) are affected and follows the `/beanies-help-docs` skill's article-type conventions. The corresponding article work is part of the implementation acceptance criteria — not a follow-up.
+
+**Mockup-driven drafting (only when an approved mockup informs this work).** When Phase 1 surfaced a mockup (a `Mockup:` line or a `docs/mockups/…` file), Pass 1 must translate that design faithfully into a CIG-compliant plan rather than re-inventing the UI. Read the mockup file, then draft under this instruction (the canonical mockup→plan directive — edit it here if it needs to change):
+
+> This plan implements an approved mockup. Read the mockup file in full before drafting. Strive for simplicity and elegance in both the plan and the implementation, and follow all DRY conventions. Reproduce the mockup's design intent faithfully — its layout, visual hierarchy, spacing rhythm, component structure, tone, and the specific interactions it demonstrates — so the shipped UI is recognizably the same design. At the same time, every concrete style token (colors, typography and font sizes, radii, shadows, spacing, modal/component patterns) MUST come from the beanies theme + CIG (`.claude/skills/beanies-theme/SKILL.md`), not from whatever aesthetic the mockup's generator happened to choose. Where the mockup and the beanies UI theme / CIG disagree, the CIG ALWAYS wins — translate the mockup's intent into CIG-compliant equivalents rather than copying its raw values. Map each region of the mockup to existing components, composables, and utilities first (DRY) before proposing anything new. Call out any place where faithfully reproducing the mockup would violate the CIG, accessibility, i18n, or the rem-based text rule, and resolve it in favour of the rule. Ask any clarifying questions before drafting; once everything is clear, prepare the plan.
+
+The plan's `## Approach` should reference the mockup path, and `## Files Affected` should list the approved `docs/mockups/<file>.html` as part of the change. The mockup is design input — the four review passes still run normally on the resulting plan.
 
 #### Phase 2.2 — Pass 2: DRY + Error Handling (fresh subagent)
 
@@ -142,6 +149,7 @@ These prompts are the source of truth for what Passes 2, 3, and 4 actually do. P
 > Date: YYYY-MM-DD
 > Related issues: #<number> (or "None — direct implementation")
 > Plan file: `docs/plans/YYYY-MM-DD-<slug>.md`
+> Mockup: `docs/mockups/<file>.html` (include this line only when an approved mockup drove the plan; omit otherwise)
 
 ## User Story
 
@@ -324,6 +332,7 @@ Follow the project's labeling conventions from `CLAUDE.md`:
 - **NEVER lose prompts.** Every user message that shaped the plan is recorded.
 - **ALWAYS include assumptions.** These are critical for deferred implementation.
 - **ALWAYS include acceptance criteria and testing plan.** These define "done".
+- **Mockups inform Pass 1; the CIG always wins; stay Notion-agnostic.** When an approved mockup is present (via a `Mockup:` line or a `docs/mockups/…` path in the prompt), read it and draft to it using the _Mockup-driven drafting_ directive in Phase 2.1 — faithfully reproducing its design intent but sourcing every concrete style token from `.claude/skills/beanies-theme/SKILL.md` + the CIG (the CIG wins on any conflict). The mockup reaches this skill ONLY through the prompt + the repo file — never read the Notion tracker for it (writing `mockup file url` back is `beanies-pre-plan`'s job). If invoked standalone where a mockup is expected but absent, generate one first via `/frontend-design:frontend-design` (CIG-clamped), get approval, commit only the approved file, then draft.
 - **ALWAYS assess Help Center coverage.** If the work introduces a distinct user-facing feature (or meaningfully changes behavior an existing article documents), include the `## Help Center Coverage` section in the plan AND treat the article as part of the same change — not a follow-up. Skip the section entirely for bug fixes, refactors, polish, and similar work.
 - **ALWAYS create 2-way links** between the plan file and the GitHub issue (if one was created).
 - **ALWAYS add labels** to GitHub issues per the project conventions (when one is created).
