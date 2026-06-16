@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-16
+
+### Changed
+
+- **The Beanie Lab section now hides itself when it's empty.** The experimental-features area at the bottom of Settings only appears when there's at least one feature to try — if every Lab feature is ever retired, the section (and its spacing) disappears cleanly instead of leaving an empty header behind. The Lab stays a permanent part of the app; this is just a tidiness guard, and it has no visible effect today while features are present.
+
 ## 2026-06-15
 
 ### Fixed
