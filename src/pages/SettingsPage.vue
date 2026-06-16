@@ -106,7 +106,7 @@ const showCalendarSync = ref(false);
 // a per-device opt-in. useBeanieLab is the single source of truth for their
 // visibility (Lab on + the feature's flag), shared with BeanieLabSection so the
 // cards and these drawer / deep-link guards can never disagree.
-const { aiVisible, calendarVisible } = useBeanieLab();
+const { hasAnyLabFeature, aiVisible, calendarVisible } = useBeanieLab();
 
 // ── Deep-link: open a specific card from a route query (e.g. ?open=family-data)
 //    Generalizable — additional cards can opt in by extending the map below.
@@ -115,7 +115,8 @@ const cardOpenMap: Record<string, () => void> = {
     showFamilyData.value = true;
   },
   ai: () => {
-    // Guarded: AI lives in the Beanie Lab, so the deep-link no-ops unless opted in.
+    // Guarded: AI lives in the Beanie Lab — no-ops unless opted in AND a reader
+    // flag (aiPhotoExtract / aiTravelExtract) is alive.
     if (aiVisible.value) showAi.value = true;
   },
   'calendar-sync': () => {
@@ -776,9 +777,16 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     </div>
 
     <!-- ── The Beanie Lab (per-device opt-in to experimental features) ──────
-         Always rendered; quiet + collapsed by default. Houses the beanies AI
-         and Google Calendar surfaces, revealed only when the user opts in. -->
-    <BeanieLabSection @open-ai="showAi = true" @open-calendar="showCalendarSync = true" />
+         Quiet + collapsed by default; houses the beanies AI and Google Calendar
+         surfaces, revealed only when the user opts in. Mount-gated on
+         hasAnyLabFeature so the section disappears (no empty header/glyph/toggle)
+         when zero Lab features are available — the Lab stays conceptually
+         permanent, this is just a display-time emptiness guard (#35). -->
+    <BeanieLabSection
+      v-if="hasAnyLabFeature"
+      @open-ai="showAi = true"
+      @open-calendar="showCalendarSync = true"
+    />
 
     <!-- ── Feature Flags (dev-only, owner/admin) ───────────────────────────
          DevFlagsCard is undefined in prod (DEV-gated dynamic import above), so
