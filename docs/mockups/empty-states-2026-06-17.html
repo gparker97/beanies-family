@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Empty-state beanies — refreshed mascots + new "lists" scene · #33</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ho: #f15d22;
+        --ho-deep: #d14d1a;
+        --terra: #e67e22;
+        --slate: #2c3e50;
+        --silk: #aed6f1;
+        --cloud: #f8f9fa;
+        --success: #27ae60;
+        --blush: #f5a9a0;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        color: var(--slate);
+        background:
+          radial-gradient(1100px 560px at 82% -8%, rgba(174, 214, 241, 0.25), transparent),
+          radial-gradient(900px 480px at -8% 104%, rgba(241, 93, 34, 0.07), transparent),
+          var(--cloud);
+        padding: 40px 24px 80px;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1 {
+        font-family: 'Outfit';
+        font-weight: 800;
+        font-size: 1.7rem;
+        text-align: center;
+      }
+      h1 .fam {
+        color: var(--ho);
+      }
+      .sub {
+        text-align: center;
+        color: rgba(44, 62, 80, 0.6);
+        font-size: 0.9rem;
+        margin: 6px auto 0;
+        max-width: 640px;
+      }
+      .hero {
+        max-width: 560px;
+        margin: 36px auto 0;
+        background: #fff;
+        border-radius: 28px;
+        box-shadow: 0 10px 40px rgba(44, 62, 80, 0.08);
+        padding: 34px 28px 30px;
+        text-align: center;
+      }
+      .hero .ring {
+        width: 168px;
+        height: 168px;
+        margin: 0 auto 14px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 50% 42%, #fff5ef, rgba(255, 245, 239, 0));
+        display: grid;
+        place-items: center;
+      }
+      .hero h2 {
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 1.15rem;
+      }
+      .hero p {
+        color: rgba(44, 62, 80, 0.6);
+        font-size: 0.92rem;
+        margin: 5px 0 16px;
+      }
+      .newbtn {
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 0.86rem;
+        color: #fff;
+        background: linear-gradient(135deg, var(--ho), var(--terra));
+        border: 0;
+        border-radius: 14px;
+        padding: 11px 18px;
+        box-shadow: 0 6px 16px rgba(241, 93, 34, 0.3);
+      }
+      .ghdr {
+        max-width: 1080px;
+        margin: 52px auto 0;
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 1.05rem;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .gnote {
+        max-width: 1080px;
+        margin: 4px auto 18px;
+        color: rgba(44, 62, 80, 0.6);
+        font-size: 0.84rem;
+      }
+      .grid {
+        max-width: 1080px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 18px;
+      }
+      .cell {
+        background: #fff;
+        border-radius: 22px;
+        box-shadow: 0 6px 24px rgba(44, 62, 80, 0.06);
+        padding: 18px 14px 14px;
+        text-align: center;
+      }
+      .cell .ring {
+        width: 132px;
+        height: 132px;
+        margin: 0 auto 8px;
+        border-radius: 50%;
+        background: #fff6f0;
+        display: grid;
+        place-items: center;
+      }
+      .cell .lbl {
+        font-family: 'Outfit';
+        font-weight: 600;
+        font-size: 0.78rem;
+      }
+      .cell .cap {
+        color: rgba(44, 62, 80, 0.5);
+        font-size: 0.68rem;
+        margin-top: 2px;
+      }
+      .legend {
+        max-width: 1080px;
+        margin: 44px auto 0;
+        background: #fff;
+        border-radius: 22px;
+        box-shadow: 0 6px 24px rgba(44, 62, 80, 0.06);
+        padding: 22px 26px;
+        font-size: 0.86rem;
+        line-height: 1.7;
+        color: rgba(44, 62, 80, 0.82);
+      }
+      .legend h3 {
+        font-family: 'Outfit';
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+      @media (max-width: 760px) {
+        .grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Empty-state <span class="fam">beanies</span> — refreshed</h1>
+    <p class="sub">
+      The current empty-state art uses pale-blue blobs with no hats. These redraw the beanie to
+      match the real mascot: an orange bean body, a knitted Sky-Silk pom-pom hat (the brand pun),
+      big sparkle eyes, blush cheeks, and a happy open smile. Plus a brand-new scene for empty
+      Beanie&nbsp;Lists.
+    </p>
+
+    <!-- ============ NEW: empty Beanie Lists ============ -->
+    <div class="hero">
+      <div class="ring">
+        <!-- LISTS: a beanie hugging a fresh checklist (comic style) -->
+        <svg viewBox="0 0 160 160" width="156" height="156" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A cheerful beanie with a fresh checklist">
+          <ellipse cx="78" cy="148" rx="50" ry="7" fill="#AED6F1" opacity="0.3" />
+
+          <!-- LEFT arm (raised, cheering) — drawn behind the body -->
+          <g stroke="#5a3a26" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M46 92 Q32 84 30 68" fill="none" stroke="#5a3a26" stroke-width="8.5" />
+            <path d="M46 92 Q32 84 30 68" fill="none" stroke="url(#body)" stroke-width="5.2" />
+            <circle cx="30" cy="66" r="5" fill="url(#body)" />
+          </g>
+
+          <!-- clipboard -->
+          <g stroke="#5a3a26" stroke-width="2.4" stroke-linejoin="round">
+            <rect x="90" y="72" width="46" height="60" rx="8" fill="#fdfdfd" />
+            <rect x="101" y="65" width="24" height="11" rx="5.5" fill="#E67E22" />
+            <rect x="107" y="60" width="11" height="8" rx="2.5" fill="#5a3a26" stroke="none" />
+          </g>
+          <!-- checklist rows -->
+          <g>
+            <circle cx="100" cy="89" r="4.2" fill="#27AE60" stroke="#1c7d44" stroke-width="1" />
+            <path d="M97.8 89 l1.7 1.9 l3.2-3.6" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+            <line x1="109" y1="89" x2="129" y2="89" stroke="#cdd4da" stroke-width="3" stroke-linecap="round" />
+            <circle cx="100" cy="103" r="4.2" fill="#27AE60" stroke="#1c7d44" stroke-width="1" />
+            <path d="M97.8 103 l1.7 1.9 l3.2-3.6" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+            <line x1="109" y1="103" x2="126" y2="103" stroke="#cdd4da" stroke-width="3" stroke-linecap="round" />
+            <!-- the invite line -->
+            <circle cx="100" cy="117" r="4.2" fill="none" stroke="#F15D22" stroke-width="1.8" stroke-dasharray="2.6 2.2" />
+            <line x1="109" y1="117" x2="122" y2="117" stroke="#F15D22" stroke-width="3" stroke-linecap="round" stroke-dasharray="3.4 2.6" opacity="0.75" />
+          </g>
+
+          <!-- BODY -->
+          <g>
+            <!-- feet -->
+            <ellipse cx="54" cy="129" rx="6" ry="4" fill="url(#body)" stroke="#5a3a26" stroke-width="2.4" />
+            <ellipse cx="68" cy="130" rx="6" ry="4" fill="url(#body)" stroke="#5a3a26" stroke-width="2.4" />
+            <!-- bean body -->
+            <path d="M40 98 C35 70 49 50 62 49 C78 48 87 61 86 82 C85 108 75 124 58 124 C46 124 44 113 40 98 Z" fill="url(#body)" stroke="#5a3a26" stroke-width="2.6" stroke-linejoin="round" />
+            <!-- soft belly highlight -->
+            <path d="M48 70 C44 86 46 104 56 110 C50 96 50 80 58 66 C53 64 50 66 48 70 Z" fill="#fff" opacity="0.18" />
+            <!-- bottom-right core shadow for roundness -->
+            <path d="M86 82 C85 108 75 124 58 124 C72 120 80 104 80 86 C82 84 84 82 86 82 Z" fill="#c9461a" opacity="0.4" />
+
+            <!-- RIGHT arm hugging the clipboard -->
+            <g>
+              <path d="M80 98 Q92 98 95 106" fill="none" stroke="#5a3a26" stroke-width="8.5" stroke-linecap="round" />
+              <path d="M80 98 Q92 98 95 106" fill="none" stroke="url(#body)" stroke-width="5.2" stroke-linecap="round" />
+              <circle cx="95" cy="107" r="5" fill="url(#body)" stroke="#5a3a26" stroke-width="2.2" />
+            </g>
+
+            <!-- knitted beanie hat (rounded cubic dome — chunky, pom on the crown) -->
+            <g>
+              <clipPath id="domeLists"><path d="M43 61 C43 36 53 26 65 26 C77 26 87 36 87 61 Z" /></clipPath>
+              <!-- pom stalk + pom behind the dome so it nestles in -->
+              <circle cx="65" cy="24" r="6.4" fill="#dcefff" stroke="#5a3a26" stroke-width="2.2" />
+              <circle cx="62.5" cy="22" r="2.1" fill="#fff" opacity="0.9" />
+              <path d="M43 61 C43 36 53 26 65 26 C77 26 87 36 87 61 Z" fill="url(#hat)" stroke="#5a3a26" stroke-width="2.4" stroke-linejoin="round" />
+              <g clip-path="url(#domeLists)" stroke="#94c2e6" stroke-width="1.7" opacity="0.75">
+                <line x1="51" y1="29" x2="51" y2="61" />
+                <line x1="58" y1="27" x2="58" y2="61" />
+                <line x1="65" y1="26" x2="65" y2="61" />
+                <line x1="72" y1="27" x2="72" y2="61" />
+                <line x1="79" y1="29" x2="79" y2="61" />
+              </g>
+              <!-- folded brim -->
+              <rect x="41" y="58" width="48" height="11" rx="5.5" fill="#c2e0f5" stroke="#5a3a26" stroke-width="2.4" />
+              <line x1="48" y1="59" x2="48" y2="68" stroke="#94c2e6" stroke-width="1.3" opacity="0.7" />
+              <line x1="58" y1="59" x2="58" y2="68" stroke="#94c2e6" stroke-width="1.3" opacity="0.7" />
+              <line x1="72" y1="59" x2="72" y2="68" stroke="#94c2e6" stroke-width="1.3" opacity="0.7" />
+              <line x1="82" y1="59" x2="82" y2="68" stroke="#94c2e6" stroke-width="1.3" opacity="0.7" />
+            </g>
+
+            <!-- FACE -->
+            <g>
+              <!-- brows -->
+              <path d="M51 73 Q56 70 60 72" stroke="#5a3a26" stroke-width="1.8" fill="none" stroke-linecap="round" />
+              <path d="M70 72 Q74 70 78 73" stroke="#5a3a26" stroke-width="1.8" fill="none" stroke-linecap="round" />
+              <!-- eyes -->
+              <ellipse cx="57" cy="82" rx="5.6" ry="6.6" fill="#2a2622" />
+              <circle cx="55" cy="79.6" r="2" fill="#fff" />
+              <circle cx="59" cy="83.5" r="1" fill="#fff" opacity="0.85" />
+              <ellipse cx="73" cy="81" rx="5.6" ry="6.6" fill="#2a2622" />
+              <circle cx="71" cy="78.6" r="2" fill="#fff" />
+              <circle cx="75" cy="82.5" r="1" fill="#fff" opacity="0.85" />
+              <!-- blush -->
+              <ellipse cx="49" cy="91" rx="4.4" ry="2.8" fill="#F5938A" opacity="0.7" />
+              <ellipse cx="80" cy="90" rx="4.4" ry="2.8" fill="#F5938A" opacity="0.7" />
+              <!-- open happy smile with a tongue -->
+              <path d="M59 92 Q65.5 101 72 91 Q65.5 96 59 92 Z" fill="#3a2622" stroke="#5a3a26" stroke-width="1.4" stroke-linejoin="round" />
+              <path d="M62 94.5 Q65.5 98.5 69 94.3 Q65.5 96.5 62 94.5 Z" fill="#F2766B" />
+            </g>
+          </g>
+
+          <!-- sparkles -->
+          <path d="M128 52 l1.6 3.6 l3.6 1.6 l-3.6 1.6 l-1.6 3.6 l-1.6 -3.6 l-3.6 -1.6 l3.6 -1.6 Z" fill="#F1B24A" />
+          <circle cx="120" cy="44" r="1.8" fill="#F1B24A" opacity="0.8" />
+
+          <defs>
+            <radialGradient id="body" cx="0.36" cy="0.3" r="0.85">
+              <stop offset="0%" stop-color="#FF7E47" />
+              <stop offset="55%" stop-color="#F15D22" />
+              <stop offset="100%" stop-color="#DB4D17" />
+            </radialGradient>
+            <linearGradient id="hat" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#cfeaff" />
+              <stop offset="100%" stop-color="#aed6f1" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <h2>No lists yet</h2>
+      <p>Start your first family list to get organized.</p>
+      <button class="newbtn">＋ New list</button>
+    </div>
+
+    <!-- ============ Refreshed existing scenes (proof) ============ -->
+    <div class="ghdr">🎨 Refreshed existing empty states</div>
+    <div class="gnote">
+      Same concepts as today, redrawn on the new mascot. Old vs new is a big jump: the beanie now
+      actually wears its hat. Showing four representative scenes — the rest follow the same kit.
+    </div>
+    <div class="grid">
+      <!-- ACCOUNTS: beanie peeking at an empty piggy bank -->
+      <div class="cell">
+        <div class="ring">
+          <svg viewBox="0 0 160 160" width="124" height="124" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Beanie and an empty piggy bank">
+            <ellipse cx="80" cy="142" rx="44" ry="6" fill="#AED6F1" opacity="0.3" />
+            <!-- piggy bank outline (empty) -->
+            <g opacity="0.55">
+              <ellipse cx="108" cy="104" rx="24" ry="19" fill="none" stroke="#F15D22" stroke-width="2" stroke-dasharray="4 3" />
+              <ellipse cx="98" cy="98" rx="3" ry="2.4" fill="none" stroke="#F15D22" stroke-width="1.4" stroke-dasharray="3 2" />
+              <rect x="102" y="85" width="12" height="3" rx="1.5" fill="none" stroke="#F15D22" stroke-width="1.4" stroke-dasharray="3 2" />
+              <line x1="100" y1="122" x2="98" y2="128" stroke="#F15D22" stroke-width="1.4" stroke-dasharray="3 2" stroke-linecap="round" />
+              <line x1="116" y1="122" x2="118" y2="128" stroke="#F15D22" stroke-width="1.4" stroke-dasharray="3 2" stroke-linecap="round" />
+              <text x="106" y="108" font-family="Outfit" font-weight="700" font-size="12" fill="#F15D22" text-anchor="middle" opacity="0.7">?</text>
+            </g>
+            <!-- beanie -->
+            <g>
+              <path d="M40 100 C36 74 48 54 60 53 C74 52 82 64 81 84 C80 108 72 124 56 124 C45 124 43 114 40 100 Z" fill="#F15D22" />
+              <path d="M40 100 C36 74 48 54 60 53 C74 52 82 64 81 84 C80 108 72 124 56 124 C45 124 43 114 40 100 Z" fill="url(#g1)" opacity="0.5" />
+              <ellipse cx="50" cy="126" rx="5" ry="3.2" fill="#E0531C" />
+              <ellipse cx="62" cy="127" rx="5" ry="3.2" fill="#E0531C" />
+              <!-- hat -->
+              <path d="M44 64 Q60 40 78 62 L44 64 Z" fill="#AED6F1" />
+              <path d="M52 51 L50 64 M60 47 L60 64 M68 49 L70 64" stroke="#9cc7e8" stroke-width="1.1" opacity="0.6" />
+              <rect x="41" y="63" width="40" height="8" rx="4" fill="#c2e0f5" />
+              <circle cx="61" cy="37" r="5.6" fill="#cfe8f8" />
+              <!-- face, peeking right -->
+              <circle cx="56" cy="84" r="5.2" fill="#2C3E50" />
+              <circle cx="54.6" cy="82.4" r="1.6" fill="#fff" />
+              <circle cx="69" cy="83" r="5.2" fill="#2C3E50" />
+              <circle cx="67.6" cy="81.4" r="1.6" fill="#fff" />
+              <ellipse cx="49" cy="92" rx="3.6" ry="2.4" fill="#F5A9A0" opacity="0.6" />
+              <ellipse cx="75" cy="91" rx="3.6" ry="2.4" fill="#F5A9A0" opacity="0.6" />
+              <path d="M59 92 Q63 96 67 92" stroke="#2C3E50" stroke-width="1.6" fill="none" stroke-linecap="round" />
+            </g>
+            <defs>
+              <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff" stop-opacity="0.5" /><stop offset="55%" stop-color="#fff" stop-opacity="0" /></linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="lbl">No accounts</div>
+        <div class="cap">peeking at an empty piggy bank</div>
+      </div>
+
+      <!-- GOALS: beanie gazing up at a flag on a hill -->
+      <div class="cell">
+        <div class="ring">
+          <svg viewBox="0 0 160 160" width="124" height="124" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Beanie looking up at a goal flag">
+            <ellipse cx="80" cy="142" rx="44" ry="6" fill="#AED6F1" opacity="0.3" />
+            <path d="M64 142 Q108 64 150 142" fill="#AED6F1" opacity="0.16" />
+            <line x1="120" y1="92" x2="120" y2="68" stroke="#2C3E50" stroke-width="1.8" />
+            <path d="M120 68 L138 74 L120 80 Z" fill="#F15D22" opacity="0.85" />
+            <path d="M132 60 l1 2.4 l2.4 1 l-2.4 1 l-1 2.4 l-1 -2.4 l-2.4 -1 l2.4 -1 Z" fill="#F1B24A" opacity="0.8" />
+            <!-- beanie (terracotta) -->
+            <g>
+              <path d="M34 106 C30 82 42 62 54 61 C68 60 76 72 75 92 C74 116 66 130 50 130 C40 130 37 120 34 106 Z" fill="#E67E22" />
+              <path d="M34 106 C30 82 42 62 54 61 C68 60 76 72 75 92 C74 116 66 130 50 130 C40 130 37 120 34 106 Z" fill="url(#g2)" opacity="0.45" />
+              <ellipse cx="44" cy="132" rx="5" ry="3.2" fill="#cf6e1a" />
+              <ellipse cx="56" cy="133" rx="5" ry="3.2" fill="#cf6e1a" />
+              <path d="M38 72 Q54 48 72 70 L38 72 Z" fill="#AED6F1" />
+              <path d="M46 59 L44 72 M54 55 L54 72 M62 57 L64 72" stroke="#9cc7e8" stroke-width="1.1" opacity="0.6" />
+              <rect x="35" y="71" width="40" height="8" rx="4" fill="#c2e0f5" />
+              <circle cx="55" cy="45" r="5.6" fill="#cfe8f8" />
+              <!-- eyes looking up -->
+              <circle cx="49" cy="90" r="5.2" fill="#2C3E50" />
+              <circle cx="48" cy="87.6" r="1.7" fill="#fff" />
+              <circle cx="62" cy="89" r="5.2" fill="#2C3E50" />
+              <circle cx="61" cy="86.6" r="1.7" fill="#fff" />
+              <ellipse cx="42" cy="98" rx="3.6" ry="2.4" fill="#F5A9A0" opacity="0.6" />
+              <ellipse cx="68" cy="97" rx="3.6" ry="2.4" fill="#F5A9A0" opacity="0.6" />
+              <path d="M52 99 Q56 103 60 99" stroke="#2C3E50" stroke-width="1.6" fill="none" stroke-linecap="round" />
+            </g>
+            <defs>
+              <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff" stop-opacity="0.5" /><stop offset="55%" stop-color="#fff" stop-opacity="0" /></linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="lbl">No goals</div>
+        <div class="cap">eyeing the flag on the hill</div>
+      </div>
+
+      <!-- DASHBOARD: two beanies holding hands, waving -->
+      <div class="cell">
+        <div class="ring">
+          <svg viewBox="0 0 160 160" width="124" height="124" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two beanies holding hands">
+            <ellipse cx="80" cy="142" rx="46" ry="6" fill="#AED6F1" opacity="0.3" />
+            <!-- parent (slate) -->
+            <g>
+              <path d="M30 104 C26 78 39 58 52 57 C67 56 75 69 74 90 C73 116 64 130 47 130 C37 130 33 118 30 104 Z" fill="#2C3E50" />
+              <path d="M30 104 C26 78 39 58 52 57 C67 56 75 69 74 90 C73 116 64 130 47 130 C37 130 33 118 30 104 Z" fill="url(#g3)" opacity="0.18" />
+              <ellipse cx="42" cy="132" rx="5" ry="3.2" fill="#22303d" />
+              <ellipse cx="54" cy="133" rx="5" ry="3.2" fill="#22303d" />
+              <path d="M34 68 Q51 44 70 66 L34 68 Z" fill="#E67E22" />
+              <path d="M42 55 L40 68 M51 51 L51 68 M60 53 L62 68" stroke="#cf6e1a" stroke-width="1.1" opacity="0.6" />
+              <rect x="31" y="67" width="41" height="8" rx="4" fill="#ef9a51" />
+              <circle cx="51" cy="41" r="5.6" fill="#f0a868" />
+              <circle cx="46" cy="88" r="5" fill="#fff" /><circle cx="46" cy="88" r="3" fill="#2C3E50" /><circle cx="45" cy="86.6" r="1.2" fill="#fff" />
+              <circle cx="60" cy="87" r="5" fill="#fff" /><circle cx="60" cy="87" r="3" fill="#2C3E50" /><circle cx="59" cy="85.6" r="1.2" fill="#fff" />
+              <ellipse cx="39" cy="96" rx="3.6" ry="2.4" fill="#F5A9A0" opacity="0.5" />
+              <ellipse cx="66" cy="95" rx="3.6" ry="2.4" fill="#F5A9A0" opacity="0.5" />
+              <path d="M49 96 Q54 102 59 95 Q54 99 49 96 Z" fill="#fff" />
+              <!-- waving arm -->
+              <path d="M72 86 Q86 70 82 58" stroke="#2C3E50" stroke-width="6" fill="none" stroke-linecap="round" />
+              <circle cx="82" cy="57" r="4" fill="#2C3E50" />
+            </g>
+            <!-- child (orange) -->
+            <g>
+              <path d="M92 116 C90 98 99 84 108 83 C118 82 124 92 123 106 C122 124 115 134 102 134 C93 134 94 126 92 116 Z" fill="#F15D22" />
+              <ellipse cx="101" cy="135" rx="4" ry="2.7" fill="#E0531C" />
+              <ellipse cx="110" cy="136" rx="4" ry="2.7" fill="#E0531C" />
+              <path d="M95 92 Q107 76 121 92 L95 92 Z" fill="#AED6F1" />
+              <rect x="93" y="91" width="30" height="6.4" rx="3.2" fill="#c2e0f5" />
+              <circle cx="103" cy="106" r="4" fill="#2C3E50" /><circle cx="102" cy="104.6" r="1.3" fill="#fff" />
+              <circle cx="114" cy="105" r="4" fill="#2C3E50" /><circle cx="113" cy="103.6" r="1.3" fill="#fff" />
+              <ellipse cx="98" cy="112" rx="3" ry="2" fill="#F5A9A0" opacity="0.6" />
+              <ellipse cx="119" cy="111" rx="3" ry="2" fill="#F5A9A0" opacity="0.6" />
+              <path d="M105 112 Q109 115 113 112" stroke="#2C3E50" stroke-width="1.4" fill="none" stroke-linecap="round" />
+            </g>
+            <!-- held hands -->
+            <circle cx="85" cy="110" r="4" fill="#F15D22" />
+            <defs>
+              <linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff" stop-opacity="0.5" /><stop offset="55%" stop-color="#fff" stop-opacity="0" /></linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="lbl">Welcome (dashboard)</div>
+        <div class="cap">hand-in-hand, never separated</div>
+      </div>
+
+      <!-- REPORTS: beanie with a magnifying glass -->
+      <div class="cell">
+        <div class="ring">
+          <svg viewBox="0 0 160 160" width="124" height="124" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Beanie inspecting an empty chart">
+            <ellipse cx="80" cy="142" rx="44" ry="6" fill="#AED6F1" opacity="0.3" />
+            <g>
+              <path d="M34 104 C30 78 42 58 54 57 C68 56 76 68 75 88 C74 112 66 128 50 128 C40 128 37 118 34 104 Z" fill="#F15D22" />
+              <path d="M34 104 C30 78 42 58 54 57 C68 56 76 68 75 88 C74 112 66 128 50 128 C40 128 37 118 34 104 Z" fill="url(#g4)" opacity="0.5" />
+              <ellipse cx="44" cy="130" rx="5" ry="3.2" fill="#E0531C" />
+              <ellipse cx="56" cy="131" rx="5" ry="3.2" fill="#E0531C" />
+              <path d="M38 68 Q54 44 72 66 L38 68 Z" fill="#AED6F1" />
+              <path d="M46 55 L44 68 M54 51 L54 68 M62 53 L64 68" stroke="#9cc7e8" stroke-width="1.1" opacity="0.6" />
+              <rect x="35" y="67" width="40" height="8" rx="4" fill="#c2e0f5" />
+              <circle cx="55" cy="41" r="5.6" fill="#cfe8f8" />
+              <circle cx="49" cy="88" r="5.2" fill="#2C3E50" /><circle cx="47.6" cy="86.4" r="1.6" fill="#fff" />
+              <circle cx="62" cy="87" r="5.2" fill="#2C3E50" /><circle cx="60.6" cy="85.4" r="1.6" fill="#fff" />
+              <ellipse cx="42" cy="96" rx="3.6" ry="2.4" fill="#F5A9A0" opacity="0.6" />
+              <ellipse cx="68" cy="95" rx="3.6" ry="2.4" fill="#F5A9A0" opacity="0.6" />
+              <path d="M52 96 Q56 100 60 96" stroke="#2C3E50" stroke-width="1.6" fill="none" stroke-linecap="round" />
+              <!-- arm to magnifier -->
+              <path d="M74 92 Q88 82 96 78" stroke="#F15D22" stroke-width="6" fill="none" stroke-linecap="round" />
+            </g>
+            <circle cx="108" cy="74" r="14" fill="#AED6F1" opacity="0.16" />
+            <circle cx="108" cy="74" r="14" fill="none" stroke="#2C3E50" stroke-width="2.6" />
+            <line x1="98" y1="84" x2="90" y2="92" stroke="#2C3E50" stroke-width="3.2" stroke-linecap="round" />
+            <g opacity="0.4">
+              <rect x="101" y="76" width="3.4" height="7" rx="1" fill="none" stroke="#F15D22" stroke-width="1" stroke-dasharray="2 2" />
+              <rect x="107" y="72" width="3.4" height="11" rx="1" fill="none" stroke="#F15D22" stroke-width="1" stroke-dasharray="2 2" />
+              <rect x="113" y="74" width="3.4" height="9" rx="1" fill="none" stroke="#F15D22" stroke-width="1" stroke-dasharray="2 2" />
+            </g>
+            <defs>
+              <linearGradient id="g4" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff" stop-opacity="0.5" /><stop offset="55%" stop-color="#fff" stop-opacity="0" /></linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="lbl">No reports</div>
+        <div class="cap">inspecting an empty chart</div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <h3>The mascot kit (what changed)</h3>
+      <p>
+        <strong>Body:</strong> a real bean/egg silhouette (path, not a flat ellipse) in Heritage
+        Orange / Terracotta / Deep Slate, with a soft top-left sheen. <strong>Hat:</strong> the
+        signature — a knitted Sky-Silk cap with vertical ribs, a folded brim, and a pom-pom; every
+        beanie wears one. <strong>Face:</strong> big round eyes with twin white sparkle highlights,
+        blush cheeks, an open happy smile. <strong>Limbs:</strong> two little feet, and a stubby arm
+        when the scene needs one (hugging the clipboard, holding the magnifier). The
+        <strong>hands-held</strong> dashboard keeps the golden rule — beanies never separated. New
+        <strong>lists</strong> scene: a beanie hugging a fresh checklist (two ticked, one dashed
+        invite line) — an empty screen as an invitation to start.
+      </p>
+    </div>
+  </body>
+</html>

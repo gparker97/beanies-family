@@ -12,7 +12,8 @@ type EmptyStateVariant =
   | 'goals'
   | 'reports'
   | 'dashboard'
-  | 'budget';
+  | 'budget'
+  | 'lists';
 
 defineProps<{
   variant: EmptyStateVariant;
@@ -618,6 +619,233 @@ const prefersReducedMotion = useReducedMotion();
         <linearGradient id="emptySheen8" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="white" stop-opacity="0.6" />
           <stop offset="100%" stop-color="white" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+    </svg>
+
+    <!-- Lists: a cheerful beanie hugging a fresh checklist (#33) -->
+    <svg
+      v-else-if="variant === 'lists'"
+      viewBox="0 0 160 160"
+      class="relative h-full w-full"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      :aria-label="t('emptyState.aria.freshChecklist')"
+    >
+      <ellipse cx="78" cy="148" rx="50" ry="7" fill="#AED6F1" opacity="0.3" />
+      <!-- clipboard (behind the beanie so the hugging hand sits on top) -->
+      <g stroke="#5a3a26" stroke-width="2.4" stroke-linejoin="round">
+        <rect x="90" y="72" width="46" height="60" rx="8" fill="#fdfdfd" />
+        <rect x="101" y="65" width="24" height="11" rx="5.5" fill="#E67E22" />
+        <rect x="107" y="60" width="11" height="8" rx="2.5" fill="#5a3a26" stroke="none" />
+      </g>
+      <circle cx="100" cy="89" r="4.2" fill="#27AE60" stroke="#1c7d44" stroke-width="1" />
+      <path
+        d="M97.8 89 l1.7 1.9 l3.2-3.6"
+        stroke="#fff"
+        stroke-width="1.6"
+        fill="none"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <line
+        x1="109"
+        y1="89"
+        x2="129"
+        y2="89"
+        stroke="#cdd4da"
+        stroke-width="3"
+        stroke-linecap="round"
+      />
+      <circle cx="100" cy="103" r="4.2" fill="#27AE60" stroke="#1c7d44" stroke-width="1" />
+      <path
+        d="M97.8 103 l1.7 1.9 l3.2-3.6"
+        stroke="#fff"
+        stroke-width="1.6"
+        fill="none"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <line
+        x1="109"
+        y1="103"
+        x2="126"
+        y2="103"
+        stroke="#cdd4da"
+        stroke-width="3"
+        stroke-linecap="round"
+      />
+      <circle
+        cx="100"
+        cy="117"
+        r="4.2"
+        fill="none"
+        stroke="#F15D22"
+        stroke-width="1.8"
+        stroke-dasharray="2.6 2.2"
+      />
+      <line
+        x1="109"
+        y1="117"
+        x2="122"
+        y2="117"
+        stroke="#F15D22"
+        stroke-width="3"
+        stroke-linecap="round"
+        stroke-dasharray="3.4 2.6"
+        opacity="0.75"
+      />
+      <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
+        <!-- left arm (raised, cheering) -->
+        <path
+          d="M46 92 Q32 84 30 68"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M46 92 Q32 84 30 68"
+          fill="none"
+          stroke="url(#beanBody)"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <circle cx="30" cy="66" r="5" fill="url(#beanBody)" />
+        <!-- feet -->
+        <ellipse
+          cx="54"
+          cy="129"
+          rx="6"
+          ry="4"
+          fill="url(#beanBody)"
+          stroke="#5a3a26"
+          stroke-width="2.4"
+        />
+        <ellipse
+          cx="68"
+          cy="130"
+          rx="6"
+          ry="4"
+          fill="url(#beanBody)"
+          stroke="#5a3a26"
+          stroke-width="2.4"
+        />
+        <!-- bean body -->
+        <path
+          d="M40 98 C35 70 49 50 62 49 C78 48 87 61 86 82 C85 108 75 124 58 124 C46 124 44 113 40 98 Z"
+          fill="url(#beanBody)"
+          stroke="#5a3a26"
+          stroke-width="2.6"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M48 70 C44 86 46 104 56 110 C50 96 50 80 58 66 C53 64 50 66 48 70 Z"
+          fill="#fff"
+          opacity="0.18"
+        />
+        <path
+          d="M86 82 C85 108 75 124 58 124 C72 120 80 104 80 86 C82 84 84 82 86 82 Z"
+          fill="#c9461a"
+          opacity="0.4"
+        />
+        <!-- right arm hugging the clipboard -->
+        <path
+          d="M80 98 Q92 98 95 106"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M80 98 Q92 98 95 106"
+          fill="none"
+          stroke="url(#beanBody)"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <circle cx="95" cy="107" r="5" fill="url(#beanBody)" stroke="#5a3a26" stroke-width="2.2" />
+        <!-- knitted beanie hat -->
+        <clipPath id="listsDome">
+          <path d="M43 61 C43 36 53 26 65 26 C77 26 87 36 87 61 Z" />
+        </clipPath>
+        <circle cx="65" cy="24" r="6.4" fill="#dcefff" stroke="#5a3a26" stroke-width="2.2" />
+        <circle cx="62.5" cy="22" r="2.1" fill="#fff" opacity="0.9" />
+        <path
+          d="M43 61 C43 36 53 26 65 26 C77 26 87 36 87 61 Z"
+          fill="url(#beanHat)"
+          stroke="#5a3a26"
+          stroke-width="2.4"
+          stroke-linejoin="round"
+        />
+        <g clip-path="url(#listsDome)" stroke="#94c2e6" stroke-width="1.7" opacity="0.75">
+          <line x1="51" y1="29" x2="51" y2="61" />
+          <line x1="58" y1="27" x2="58" y2="61" />
+          <line x1="65" y1="26" x2="65" y2="61" />
+          <line x1="72" y1="27" x2="72" y2="61" />
+          <line x1="79" y1="29" x2="79" y2="61" />
+        </g>
+        <rect
+          x="41"
+          y="58"
+          width="48"
+          height="11"
+          rx="5.5"
+          fill="#c2e0f5"
+          stroke="#5a3a26"
+          stroke-width="2.4"
+        />
+        <line x1="48" y1="59" x2="48" y2="68" stroke="#94c2e6" stroke-width="1.3" opacity="0.7" />
+        <line x1="58" y1="59" x2="58" y2="68" stroke="#94c2e6" stroke-width="1.3" opacity="0.7" />
+        <line x1="72" y1="59" x2="72" y2="68" stroke="#94c2e6" stroke-width="1.3" opacity="0.7" />
+        <line x1="82" y1="59" x2="82" y2="68" stroke="#94c2e6" stroke-width="1.3" opacity="0.7" />
+        <!-- face -->
+        <path
+          d="M51 73 Q56 70 60 72"
+          stroke="#5a3a26"
+          stroke-width="1.8"
+          fill="none"
+          stroke-linecap="round"
+        />
+        <path
+          d="M70 72 Q74 70 78 73"
+          stroke="#5a3a26"
+          stroke-width="1.8"
+          fill="none"
+          stroke-linecap="round"
+        />
+        <ellipse cx="57" cy="82" rx="5.6" ry="6.6" fill="#2a2622" />
+        <circle cx="55" cy="79.6" r="2" fill="#fff" />
+        <circle cx="59" cy="83.5" r="1" fill="#fff" opacity="0.85" />
+        <ellipse cx="73" cy="81" rx="5.6" ry="6.6" fill="#2a2622" />
+        <circle cx="71" cy="78.6" r="2" fill="#fff" />
+        <circle cx="75" cy="82.5" r="1" fill="#fff" opacity="0.85" />
+        <ellipse cx="49" cy="91" rx="4.4" ry="2.8" fill="#F5938A" opacity="0.7" />
+        <ellipse cx="80" cy="90" rx="4.4" ry="2.8" fill="#F5938A" opacity="0.7" />
+        <path
+          d="M59 92 Q65.5 101 72 91 Q65.5 96 59 92 Z"
+          fill="#3a2622"
+          stroke="#5a3a26"
+          stroke-width="1.4"
+          stroke-linejoin="round"
+        />
+        <path d="M62 94.5 Q65.5 98.5 69 94.3 Q65.5 96.5 62 94.5 Z" fill="#F2766B" />
+      </g>
+      <!-- sparkles -->
+      <path
+        d="M128 52 l1.6 3.6 l3.6 1.6 l-3.6 1.6 l-1.6 3.6 l-1.6 -3.6 l-3.6 -1.6 l3.6 -1.6 Z"
+        fill="#F1B24A"
+      />
+      <circle cx="120" cy="44" r="1.8" fill="#F1B24A" opacity="0.8" />
+      <defs>
+        <radialGradient id="beanBody" cx="0.36" cy="0.3" r="0.85">
+          <stop offset="0%" stop-color="#FF7E47" />
+          <stop offset="55%" stop-color="#F15D22" />
+          <stop offset="100%" stop-color="#DB4D17" />
+        </radialGradient>
+        <linearGradient id="beanHat" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#cfeaff" />
+          <stop offset="100%" stop-color="#aed6f1" />
         </linearGradient>
       </defs>
     </svg>
