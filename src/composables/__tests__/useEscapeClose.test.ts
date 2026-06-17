@@ -96,6 +96,46 @@ describe('useEscapeClose', () => {
     scope.stop();
   });
 
+  it('closes only the TOP-MOST overlay when several are stacked', () => {
+    const baseOpen = ref(true);
+    const baseClose = vi.fn();
+    const topOpen = ref(true);
+    const topClose = vi.fn();
+    const scope = effectScope();
+    scope.run(() => {
+      useEscapeClose(baseOpen, baseClose); // registered first (underneath)
+      useEscapeClose(topOpen, topClose); // registered last (on top)
+    });
+
+    pressKey('Escape');
+    expect(topClose).toHaveBeenCalledTimes(1);
+    expect(baseClose).not.toHaveBeenCalled();
+
+    scope.stop();
+  });
+
+  it('falls back to the next overlay once the top one closes', async () => {
+    const baseOpen = ref(true);
+    const baseClose = vi.fn();
+    const topOpen = ref(true);
+    const topClose = vi.fn();
+    const scope = effectScope();
+    scope.run(() => {
+      useEscapeClose(baseOpen, baseClose);
+      useEscapeClose(topOpen, topClose);
+    });
+
+    // Top overlay closes (e.g. its close button) → it leaves the stack.
+    topOpen.value = false;
+    await Promise.resolve();
+
+    pressKey('Escape');
+    expect(topClose).not.toHaveBeenCalled();
+    expect(baseClose).toHaveBeenCalledTimes(1);
+
+    scope.stop();
+  });
+
   it('logs and degrades when addEventListener throws', () => {
     const original = window.addEventListener;
     vi.spyOn(window, 'addEventListener').mockImplementation(() => {
