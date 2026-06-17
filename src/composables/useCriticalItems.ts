@@ -1,6 +1,7 @@
 import { computed } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { useListStore } from '@/stores/listStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { isMedicationActive, useMedicationsStore } from '@/stores/medicationsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
@@ -11,13 +12,15 @@ import { formatTime12, formatDateShort, addDays, toISODateString } from '@/utils
 import { useToday } from '@/composables/useToday';
 import { normalizeAssignees, formatNameList } from '@/utils/assignees';
 import { isTodoOverdue } from '@/utils/todo';
-import { classifyAudience, isDutyDone } from '@/utils/audience';
+import { classifyAudience, classifyOwnerAudience, isDutyDone } from '@/utils/audience';
+import { isListDue } from '@/utils/listLifecycle';
+import { isFlagEnabled } from '@/config/flags';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export interface CriticalItem {
   id: string;
-  type: 'todo' | 'activity' | 'medication' | 'holiday';
+  type: 'todo' | 'activity' | 'medication' | 'holiday' | 'list';
   message: string;
   icon: string;
   time: string; // HH:mm for sorting, '' if untimed
@@ -68,9 +71,29 @@ const ACTIVITY_FORCHILD_KEYS = {
   untimed: 'nook.criticalActivityForChildNoTime',
 } satisfies Record<'timed' | 'untimed', UIStringKey>;
 
+// Beanie Lists (#33) — briefing message keys (owner / for-child / unassigned ×
+// due-state), mirroring the to-do tables. `classifyOwnerAudience`'s 'assignee'
+// kind (= you own it) maps to the owner table.
+const LIST_OWNER_KEYS = {
+  overdue: 'lists.briefing.owner.overdue',
+  today: 'lists.briefing.owner.today',
+  noDue: 'lists.briefing.owner.noDue',
+} satisfies Record<DateState, UIStringKey>;
+const LIST_FORCHILD_KEYS = {
+  overdue: 'lists.briefing.forChild.overdue',
+  today: 'lists.briefing.forChild.today',
+  noDue: 'lists.briefing.forChild.noDue',
+} satisfies Record<DateState, UIStringKey>;
+const LIST_UNASSIGNED_KEYS = {
+  overdue: 'lists.briefing.unassigned.overdue',
+  today: 'lists.briefing.unassigned.today',
+  noDue: 'lists.briefing.unassigned.noDue',
+} satisfies Record<DateState, UIStringKey>;
+
 export function useCriticalItems() {
   const familyStore = useFamilyStore();
   const todoStore = useTodoStore();
+  const listStore = useListStore();
   const activityStore = useActivityStore();
   const medicationsStore = useMedicationsStore();
   const holidayStore = useHolidayStore();
@@ -273,6 +296,53 @@ export function useCriticalItems() {
         completable: true,
         completed: false, // open todos are never completed (completed ones are filtered out)
       });
+    }
+
+    // ── Beanie Lists for the current member (whole lists, never items) ──
+    // Gated behind `familyLists`; flag off → no list items at all. Uses the
+    // shared `isListDue` predicate (so the briefing rule can't diverge from the
+    // tile/store) and the single-owner audience classifier.
+    if (isFlagEnabled('familyLists')) {
+      for (const list of listStore.activeLists) {
+        const audience = classifyOwnerAudience(list.ownerId, currentMember, getMemberById);
+        if (audience.kind === 'hidden') continue;
+        const due = isListDue(list, todayStr.value); // 'overdue' | 'today' | 'noDue' | null
+        if (due === null) continue; // future-dated or recurring → not on the plate
+
+        const remaining = list.items.filter((i) => !i.completed).length;
+        const dateLabel = due === 'overdue' && list.dueDate ? formatDateShort(list.dueDate) : '';
+
+        let message: string;
+        if (audience.kind === 'assignee') {
+          message = buildMessage(LIST_OWNER_KEYS[due], {
+            list: list.title,
+            date: dateLabel,
+            remaining: String(remaining),
+          });
+        } else if (audience.kind === 'forChild') {
+          message = buildMessage(LIST_FORCHILD_KEYS[due], {
+            children: formatNameList(audience.childNames),
+            list: list.title,
+            date: dateLabel,
+            remaining: String(remaining),
+          });
+        } else {
+          message = buildMessage(LIST_UNASSIGNED_KEYS[due], {
+            list: list.title,
+            date: dateLabel,
+            remaining: String(remaining),
+          });
+        }
+
+        items.push({
+          id: list.id,
+          type: 'list',
+          message,
+          icon: due === 'overdue' ? '⏰' : '🧾',
+          time: '', // untimed — tapping opens /lists?view=<id>
+          completable: false,
+        });
+      }
     }
 
     // Sort: timed items first (ascending), untimed last
