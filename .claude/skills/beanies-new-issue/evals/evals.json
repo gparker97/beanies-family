@@ -1,0 +1,26 @@
+{
+  "skill_name": "beanies-new-issue",
+  "evals": [
+    {
+      "id": 0,
+      "name": "cramped-mobile-calendar-feature",
+      "prompt": "the activities monthly calendar feels really cramped on mobile — the day cells are tiny and you can't read the event titles, they just get cut off. we should make it more usable on phones, maybe show a better view when there are lots of activities in a day. can you log this so we can plan it later",
+      "expected_output": "A complete proposed issue (preview, no row created): classified as a Feature; Surfaces platforms include mobile (Mobile Browser/PWA), area includes the activities / activities monthly calendar View; Objective + Scope grounded in the real calendar component (found via research); generate mockup? proposed Yes (visual surface); Priority proposed; Reuse Hints point at the real calendar files; clear provenance; stops at the approval gate.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "sync-toast-spins-forever-bug",
+      "prompt": "getting a weird bug — sometimes the 'Saving...' toast just spins forever and never flips to saved. happened twice this week, both times on my iphone running the installed PWA. the data actually seems fine after I reload the app, it's just the toast that gets stuck. file this as a bug",
+      "expected_output": "A complete proposed issue (preview, no row created): classified as a Bug; Current Behavior (toast stuck on Saving...) and Expected Behavior (resolves to saved/last-saved) filled; repro detail (twice this week, iOS PWA, data fine after reload) folded into References; Surfaces platform includes Mobile (PWA)/iOS; generate mockup? proposed No; research points at the relevant sync/save store + toast code; provenance shown; stops at the approval gate.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "data-export-backup-feature",
+      "prompt": "idea for the backlog: families should be able to export all their data to something portable like CSV or a zip, so they've got a backup outside the .beanpod file and could move to a spreadsheet if they ever wanted. not urgent. add it to the tracker",
+      "expected_output": "A complete proposed issue (preview, no row created): classified as a Feature; Objective + User Story about portable export/backup; Scope concrete; Priority proposed Low/Future (user said not urgent); area View likely settings; research surfaces any existing export/.beanpod handling into References/Reuse Hints; dedupe check performed; provenance shown; stops at the approval gate.",
+      "files": []
+    }
+  ]
+}
