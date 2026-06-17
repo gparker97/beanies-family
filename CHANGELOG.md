@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-17
+
+### Changed
+
+- **"Family To-Do" is now just "To-Dos."** The planner tab and page were renamed to sharpen the distinction between a single task and a whole checklist (the latter is coming as Beanie Lists). Nothing about your tasks changed — same page, same link.
+
+### Added
+
+- **Beanie Lists is in development** behind a feature flag (not yet visible). A new Treehouse page for categorized family checklists — one-off or auto-resetting/recurring, one owner each, seeded from templates (groceries, packing, chores, before-school, party prep), with due lists surfacing in your daily briefing and a celebration when a list is finished. It is committed behind the `familyLists` flag (off in production), so there is no visible change yet.
+
 ## 2026-06-16
 
 ### Changed
