@@ -135,6 +135,7 @@ Because the six-level scale and all Tailwind spacing/sizing utilities are rem-ba
 - Recipe "grandma's notes" callouts
 - Informal taglines like the "shhh…" on the Family Cookbook page
 - Hand-written hint text inside form modals (e.g. "pick a family recipe or type one in 🍝")
+- **Page welcome subtitle** (added 2026-06 with Beanie Lists, #33): a single warm, handwritten subtitle under the header of a warm Treehouse page (e.g. "what are we tackling together? 🌱"). Heritage-Orange, one per page, accent only. Implemented by the shared `PageWelcomeSubtitle.vue` (`src/components/ui/`) — pass a `t()` key as `:text`. Applied on Beanie Lists + the To-Dos page; **do not** use it as a real label or on more than one element per page.
 
 **Forbidden uses** (never):
 - UI labels, form field labels, navigation, section headers
