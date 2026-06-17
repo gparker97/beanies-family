@@ -1,6 +1,37 @@
 # Project Status
 
-> **Last updated:** 2026-06-17 (Wednesday, latest — **finished the #33 trip/activity LINKING that the earlier block had deferred, fixed two reported bugs, redesigned the linked-list embed, and made linked lists open in-place. Pushing the full session to `origin/main` now (18 commits). Working tree clean on `main`. NOTHING DEPLOYED (`familyLists` still committed `false`, verified). Latest commits `752d7832` (link picker + embed) → `d26f1a83` (central-load + no-doc guard) → `1e8090f7` (trusted-device Google) → `245ea5e0`/`3a518a84` (embed on the view drawer only) → `6a49a2a5` (category-tinted embed redesign) → `9d4879c8` (in-place open + stack-aware Escape).**)
+> **Last updated:** 2026-06-17 (Wednesday, latest — **ran the requested MAX-EFFORT `/code-review` over the whole prior session's batch (`6ffc3d03..HEAD`, 19 commits, 70 files, +5656/−435 — the #33 Beanie Lists build + the trusted-device auth change + the shared `useEscapeClose` rewrite). READ-ONLY session: NOTHING was changed, committed, or deployed; working tree clean on `main`, in sync with `origin/main`; `familyLists` still committed `false`. greg reviewed the findings and chose "just the report" — NO fixes applied. ⭐ greg will RE-RUN `/code-review` next session, so the findings below are recorded here (the raw workflow output lived only in `/tmp` and is ephemeral).**)
+>
+> ### Code-review result — 20 distinct findings (11 correctness, 9 quality)
+>
+> Method: a Workflow harness — 10 finder angles (5 correctness + reuse/simplification/efficiency/altitude/conventions) → dedup → 1-vote 3-state verify → gap sweep. Note: the first run's 5 quality angles 529-failed mid-run and were recovered in a second focused workflow, so coverage is complete. The two riskiest changes — the `googleAuth.ts` trusted-device token-preservation and the `useEscapeClose` module-stack rewrite — came through **clean** apart from one test-isolation nit.
+>
+> **⭐ Must-fix BEFORE flipping `familyLists` on:**
+>
+> 1. **`list-completed` notification is NOT flag-gated** (`src/utils/notifications.ts:239`) — the briefing gates on `isFlagEnabled('familyLists')` (`useCriticalItems.ts:305`) but the notification deriver does not; `loadLists()` runs unconditionally in central load (`syncStore.ts:1660`), so a completed list synced from a flag-on device fires a bell notification routing to the flag-blocked `/lists` in prod. **Fail-open leak.** (CONFIRMED)
+> 2. **Filed one-off → recurring leaves completion stamps set** (`ListDetailModal.vue:83`) — `setLifecycle('recurring')` never clears `completed`/`completedBy`/`completedAt`, so the deriver (checks `!completed`, not `isRecurring`) keeps firing `list-completed`, violating the documented "recurring lists never file" invariant. (CONFIRMED)
+> 3. **Member filter silently ignored on Lists page + dead `filtered*` getters** (`listStore.ts:75`, correctness #7 / quality Q2) — `filteredLists`/`filteredActiveLists`/`filteredCompletedLists` are exported with ZERO consumers; `BeanieListsPage` uses the unfiltered getters, so the global member filter does nothing on Lists (every sibling page honors it). Wire them up or delete. (CONFIRMED)
+>
+> **Other CONFIRMED correctness bugs:** 4) recurring→one-off doesn't re-derive filing, an all-checked list stays unfiled (`ListDetailModal.vue:94`); 5) `removeItem` never re-derives completion — deleting the last open item leaves a 100%-done list unfiled (`listStore.ts:266`); 6) linked activity/trip name resolves only from upcoming/windowed/member-filtered getters → blank name + can't link past/far/other-member entities (`ListDetailModal.vue:162`); 7) `?view=<id>` deep-link never clears query on close → re-tapping the same notification doesn't reopen (`BeanieListsPage.vue:31`); 8) "Finished by " trailing-space label when the finisher member was deleted (`notificationKinds.ts:92`); 9) `useEscapeClose` tests share module state with no `beforeEach` reset (`useEscapeClose.test.ts`).
+> **PLAUSIBLE correctness:** `reconcileRecurringLists` redundant resets under concurrent passes (idempotent today, `listStore.ts:332`); `ListDetailModal` `layer` prop inconsistent across call sites (no triggerable collision today, `:209`).
+>
+> **CONFIRMED quality:** Q1 `classifyOwnerAudience` duplicates `classifyAudience` (`audience.ts:60` — the file's own header forbids it; normalize ownerId→[ownerId] and delegate); Q3 category-pill selector duplicated 3× (`NewListSheet`/`ListDetailModal`/`BeanieListsPage` — extract `<ListCategoryPills>`); Q4 trip/activity link-picker block duplicated (`ListDetailModal.vue:173`); Q5 list-progress math duplicated (`LinkedLists.vue` vs `ListTile.vue` — extract `useListProgress`); Q6 hand-rolled `.replace()` instead of `fillTemplate` (`useCriticalItems.ts:380` + `notificationKinds.ts:92` — CLAUDE.md i18n standard); Q7 redundant `isOpen` computed + a comment promising a reset watcher that doesn't exist (`NewListSheet.vue:60`); **Q8 sub-12px / arbitrary-rem font sizes** (`NewListSheet.vue:104` `text-[0.6875rem]`; `ListDetailModal.vue` `.lbl` `0.66rem`, `.link-chip` `0.74rem`, `text-[0.7rem]` L374/403) — direct CLAUDE.md violation (min `text-xs`/12px, no `text-[X.Xrem]`) AND breaks Large reading mode; **⚠️ CI stylelint only matches `text-[Npx]`, not rem, so these slipped past CI — doc-enforced only.** **PLAUSIBLE quality:** Q9 `BaseSidePanel` keeps its own z-index/`layer` table divergent from `BaseModal` (drift cost; silent-downgrade refuted by TS).
+>
+> _No CHANGELOG entry: read-only review, nothing user-visible. Nothing deployed. `familyLists` still `false`._
+>
+> **Pending / Next Session.** _Validated 2026-06-17 (this morning + this session): `familyLists` still committed `false`, #241 OPEN, Dependabot #250/#251 open — all carried items still apply; nothing shipped this read-only session._
+>
+> - **⭐⭐ RE-RUN `/code-review` next session** (greg's explicit ask) — over the same range `6ffc3d03..HEAD` (or extend if new commits land). The 20 findings above are the prior baseline to compare against. If the re-review confirms, the **must-fix set (#1, #2, #3) gates ungating `familyLists`**; #4–#8 + Q6/Q8 are cheap contained follow-ups (Q8 is a CLAUDE.md violation CI can't catch). NONE fixed yet.
+> - **#33 Beanie Lists** — dogfood behind the flag (ON in dev); decide on ungating (after the must-fix set) + the deferred Help Center article before going live.
+> - **#40 Helpful Hints** — Notion `Not started`; run `/beanies-pre-plan #40` when prioritized.
+> - **#39** visibility + secret notes; **#38** Qwen translation engine — Notion intake done; pre-plan/plan when prioritized.
+> - **Dependabot** #250 (dev) + #251 (prod) — run `/review-dependabot-prs`.
+> - **Google OAuth verification** — awaiting Google (unverified warning + 100-user cap; Calendar/AI gated behind The Beanie Lab).
+> - **Carried:** #241 Reports nav (OPEN); deferred deps (astro 5→6, pdfjs-dist 4→6, capacitor 8.4.0 trio); `ChoiceModal` tech-debt; app-store DUNS (~early July).
+
+---
+
+> **Last updated:** 2026-06-17 (Wednesday, earlier-latest — **finished the #33 trip/activity LINKING that the earlier block had deferred, fixed two reported bugs, redesigned the linked-list embed, and made linked lists open in-place. Pushing the full session to `origin/main` now (18 commits). Working tree clean on `main`. NOTHING DEPLOYED (`familyLists` still committed `false`, verified). Latest commits `752d7832` (link picker + embed) → `d26f1a83` (central-load + no-doc guard) → `1e8090f7` (trusted-device Google) → `245ea5e0`/`3a518a84` (embed on the view drawer only) → `6a49a2a5` (category-tinted embed redesign) → `9d4879c8` (in-place open + stack-aware Escape).**)
 >
 > ### ⭐⭐ NEXT SESSION — RUN A CODE REVIEW ON THIS ENTIRE SESSION'S CHANGES ⭐⭐
 >
