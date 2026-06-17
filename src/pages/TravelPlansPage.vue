@@ -8,6 +8,7 @@ import VacationSegmentCard from '@/components/vacation/VacationSegmentCard.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import VacationIdeaCard from '@/components/vacation/VacationIdeaCard.vue';
 import LinkedLists from '@/components/lists/LinkedLists.vue';
+import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import TripDatesHeader from '@/components/travel/TripDatesHeader.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
@@ -341,6 +342,10 @@ async function onAttachmentRemove(photoId: string): Promise<void> {
   viewerPhotoIds.value = nextIds;
   await vacationStore.updateSegmentPhotoIds(vacationId, segmentId, nextIds);
 }
+
+// Linked Beanie List opened from the embed — shown as a drawer over this page
+// (no navigation), so closing it leaves the user on the trip. `null` = closed.
+const linkedListId = ref<string | null>(null);
 
 // Ideas state
 const quickIdeaText = ref('');
@@ -1747,7 +1752,7 @@ function addQuickIdea() {
           <!-- Beanie Lists linked to this trip (#33) — rendered like ideas -->
           <LinkedLists
             :vacation-id="selectedVacation.id"
-            @open="(id: string) => router.push({ path: '/lists', query: { view: id } })"
+            @open="(id: string) => (linkedListId = id)"
           />
         </div>
       </div>
@@ -1822,6 +1827,9 @@ function addQuickIdea() {
         closeIdeaEdit();
       "
     />
+
+    <!-- Linked Beanie List drawer — opened from the embed, overlays the page (#33) -->
+    <ListDetailModal :list-id="linkedListId" @close="linkedListId = null" />
 
     <!-- Add travel plans from a document (#30): consent gate, picker, review modal, overlay -->
     <DocumentExtractConsentModal

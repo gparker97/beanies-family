@@ -19,6 +19,12 @@ interface Props {
   customHeader?: boolean;
   /** Render as a centered modal or a right-side drawer. */
   variant?: 'modal' | 'drawer';
+  /**
+   * Stacking layer, forwarded to the underlying container. 'overlay' makes
+   * this modal/drawer sit above another open one (e.g. a list drawer opened
+   * from inside the activity drawer). Defaults to 'base'.
+   */
+  layer?: 'base' | 'overlay';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -32,6 +38,7 @@ const props = withDefaults(defineProps<Props>(), {
   showDelete: false,
   customHeader: false,
   variant: 'modal',
+  layer: 'base',
 });
 
 const emit = defineEmits<{
@@ -66,6 +73,7 @@ const containerProps = computed(() => {
       open: props.open,
       size: drawerSizeMap[props.size] ?? ('medium' as DrawerSize),
       closable: !props.isSubmitting,
+      layer: props.layer,
     };
   }
   return {
@@ -74,6 +82,7 @@ const containerProps = computed(() => {
     closable: !props.isSubmitting,
     fullscreenMobile: true,
     customHeader: props.customHeader,
+    layer: props.layer,
   };
 });
 </script>
