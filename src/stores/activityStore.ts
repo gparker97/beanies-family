@@ -474,6 +474,9 @@ export const useActivityStore = defineStore('activities', () => {
         const success = await activityRepo.deleteActivity(id);
         if (success) {
           activities.value = activities.value.filter((a) => a.id !== id);
+          // Clear any Beanie List link to this activity (no orphan reference).
+          const { useListStore } = await import('@/stores/listStore');
+          await useListStore().clearLinksFor('activity', id);
         }
         return success;
       },

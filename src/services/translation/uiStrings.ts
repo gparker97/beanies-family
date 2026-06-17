@@ -4296,6 +4296,15 @@ const STRING_DEFS = {
   'lists.category.trips': { en: 'Trips & Packing', beanie: 'trips & packing' },
   'lists.category.projects': { en: 'Projects & Honey-dos', beanie: 'projects & honey-dos' },
   'lists.category.me': { en: 'Just for Me', beanie: 'just for me' },
+  // Short category labels — used in filter chips + new-list pills (full names stay on tiles/meta)
+  'lists.categoryShort.home': { en: 'Home', beanie: 'home' },
+  'lists.categoryShort.out': { en: 'Out', beanie: 'out' },
+  'lists.categoryShort.kids': { en: 'Kids', beanie: 'kids' },
+  'lists.categoryShort.health': { en: 'Health', beanie: 'health' },
+  'lists.categoryShort.celebrations': { en: 'Celebrate', beanie: 'celebrate' },
+  'lists.categoryShort.trips': { en: 'Trips', beanie: 'trips' },
+  'lists.categoryShort.projects': { en: 'Projects', beanie: 'projects' },
+  'lists.categoryShort.me': { en: 'Just for Me', beanie: 'just for me' },
   // Status pills
   'lists.status.due': { en: 'Due {date}', beanie: 'due {date}' },
   'lists.status.overdue': { en: 'Overdue', beanie: 'overdue' },
@@ -4316,6 +4325,24 @@ const STRING_DEFS = {
   'lists.detail.freq.weekly': { en: 'Weekly', beanie: 'weekly' },
   'lists.detail.freq.monthly': { en: 'Monthly', beanie: 'monthly' },
   'lists.detail.dueDateLabel': { en: 'Due date', beanie: 'due date' },
+  'lists.detail.setDueDate': { en: 'Set a due date', beanie: 'set a due date' },
+  'lists.detail.linkLabel': { en: 'Link', beanie: 'link' },
+  'lists.detail.linkTrip': { en: 'Link to a trip', beanie: 'link to a trip' },
+  'lists.detail.linkActivity': { en: 'Link to an activity', beanie: 'link to an activity' },
+  'lists.detail.linkedToTrip': { en: 'On trip: {name}', beanie: 'on trip: {name}' },
+  'lists.detail.linkedToActivity': { en: 'On activity: {name}', beanie: 'on activity: {name}' },
+  'lists.detail.unlink': { en: 'Unlink', beanie: 'unlink' },
+  'lists.detail.noUpcomingTrips': { en: 'No upcoming trips', beanie: 'no upcoming trips' },
+  'lists.detail.noUpcomingActivities': {
+    en: 'No upcoming activities',
+    beanie: 'no upcoming activities',
+  },
+  // Travel-plan embed (a linked list rendered on the trip page)
+  'lists.embed.heading': {
+    en: '{emoji} {title} · {done}/{total} · owner {owner}',
+    beanie: '{emoji} {title} · {done}/{total} · owner {owner}',
+  },
+  'lists.embed.open': { en: 'Open list', beanie: 'open list' },
   'lists.detail.recurringHint': {
     en: 'Unchecks itself each cycle so you start fresh — no due date needed.',
     beanie: 'unchecks itself each cycle so you start fresh — no due date needed.',
@@ -4918,6 +4945,7 @@ const STRING_DEFS = {
   // 360px phone. See docs/mockups/mobile-nav-bean-jar-v3.html.
   'mobileNav.hint.activities': { en: 'calendar & plans', beanie: 'calendar & plans' },
   'mobileNav.hint.todo': { en: 'shared family tasks', beanie: 'shared family tasks' },
+  'mobileNav.hint.lists': { en: 'categorized family checklists', beanie: 'family checklists' },
   'mobileNav.hint.travel': { en: 'trips & ideas', beanie: 'trips & ideas' },
   'mobileNav.hint.overview': { en: 'your bottom line', beanie: 'your bottom line' },
   'mobileNav.hint.accounts': {

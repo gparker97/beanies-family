@@ -55,11 +55,16 @@ describe('ListTile', () => {
     expect(wrapper.emitted('open')?.[0]).toEqual(['l-1']);
   });
 
-  it('shows a recurring status pill for a recurring list', () => {
+  it('shows a recurring status pill (short frequency) for a recurring list', () => {
     const wrapper = mount(ListTile, {
       props: { list: list({ lifecycle: 'recurring', frequency: 'weekly' }) },
     });
-    expect(wrapper.text()).toContain('lists.status.repeats.weekly');
+    expect(wrapper.text()).toContain('lists.detail.freq.weekly');
+  });
+
+  it('shows a link pill when the list is attached to a trip', () => {
+    const wrapper = mount(ListTile, { props: { list: list({ linkedVacationId: 'v-1' }) } });
+    expect(wrapper.text()).toContain('lists.status.linked');
   });
 
   it('shows an overdue pill for a past-due one-off list', () => {

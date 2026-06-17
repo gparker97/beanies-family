@@ -252,6 +252,26 @@ describe('listStore', () => {
     expect(listRepo.updateList).not.toHaveBeenCalled();
   });
 
+  it('clearLinksFor clears matching trip/activity links (no orphan on delete)', async () => {
+    const store = useListStore();
+    store.lists = [
+      list({ id: 'a', linkedVacationId: 'v1' }),
+      list({ id: 'b', linkedActivityId: 'act1' }),
+      list({ id: 'c' }),
+    ];
+    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+      const cur = store.lists.find((x) => x.id === id)!;
+      return { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+    });
+
+    await store.clearLinksFor('trip', 'v1');
+    expect(store.lists.find((l) => l.id === 'a')!.linkedVacationId).toBeUndefined();
+    expect(store.lists.find((l) => l.id === 'b')!.linkedActivityId).toBe('act1'); // untouched
+
+    await store.clearLinksFor('activity', 'act1');
+    expect(store.lists.find((l) => l.id === 'b')!.linkedActivityId).toBeUndefined();
+  });
+
   it('loadLists surfaces a repo failure via wrapAsync (returns no throw, error set)', async () => {
     const store = useListStore();
     vi.mocked(listRepo.getAllLists).mockRejectedValue(new Error('boom'));

@@ -5,6 +5,13 @@ import { MOBILE_NAV_CATEGORIES } from '@/constants/navigation';
 
 const mockRoute = { path: '/nook' };
 
+// Beanie Lists is a flag-gated Planning bean; mock the flag OFF so these tests
+// keep their original 3-bean Planning intent (they predate + don't concern it).
+vi.mock('@/config/flags', async (orig) => ({
+  ...(await orig<typeof import('@/config/flags')>()),
+  isFlagEnabled: () => false,
+}));
+
 vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
 }));
