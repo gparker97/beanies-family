@@ -395,6 +395,64 @@ export type UpdateTodoInput = Partial<Omit<TodoItem, 'id' | 'createdAt' | 'updat
 /** User-selectable sort order for the Family To-Do list (page-level). */
 export type TodoSort = 'newest' | 'oldest' | 'dueDate';
 
+// Beanie Lists (#33) — categorized family checklists (named bundles of items,
+// distinct from individual To-Dos). Gated behind the `familyLists` dev flag.
+export type ListCategory =
+  | 'home'
+  | 'out'
+  | 'kids'
+  | 'health'
+  | 'celebrations'
+  | 'trips'
+  | 'projects'
+  | 'me';
+export type ListLifecycle = 'oneoff' | 'recurring';
+export type ListFrequency = 'daily' | 'weekly' | 'monthly';
+
+export interface FamilyListItem {
+  id: UUID;
+  title: string;
+  completed: boolean;
+  completedBy?: UUID; // FK to FamilyMember
+  completedAt?: ISODateString;
+}
+
+/**
+ * A named family checklist. The fields below are split by lifecycle —
+ * read them ONLY through the predicates in `@/utils/listLifecycle.ts`, never
+ * via inline `lifecycle === …` checks, so the rule lives in one place:
+ *   - one-off:   `dueDate?`, plus filing audit `completed`/`completedBy`/`completedAt`
+ *   - recurring: `frequency` (required), `lastResetDate`, `cycleCelebrated`;
+ *                `completed` stays false (recurring lists are never filed)
+ * `dueDate` and `frequency` are mutually exclusive (enforced in the modal +
+ * the store input builders).
+ */
+export interface FamilyList {
+  id: UUID;
+  title: string;
+  emoji: string;
+  category: ListCategory;
+  ownerId: UUID; // single owner (no per-item assignees)
+  items: FamilyListItem[]; // flat (no sub-sections)
+  lifecycle: ListLifecycle;
+  dueDate?: ISODateString; // one-off only
+  frequency?: ListFrequency; // recurring only
+  lastResetDate?: ISODateString; // recurring bookkeeping (last auto-reset day)
+  cycleCelebrated?: boolean; // guard: celebrate once per cycle (recurring)
+  linkedActivityId?: UUID; // optional attach to an activity
+  linkedVacationId?: UUID; // optional attach to a trip
+  templateKey?: string; // which template seeded it (audit/analytics)
+  completed: boolean; // one-off: filed when true; recurring: always false
+  completedBy?: UUID;
+  completedAt?: ISODateString;
+  createdBy: UUID; // FK to FamilyMember
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type CreateFamilyListInput = Omit<FamilyList, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdateFamilyListInput = Partial<Omit<FamilyList, 'id' | 'createdAt' | 'updatedAt'>>;
+
 // Family Activity — The Treehouse planner's central entity
 //
 // IMPORTANT: This union must stay in sync with ACTIVITY_CATEGORIES in
