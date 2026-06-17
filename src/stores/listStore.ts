@@ -6,6 +6,8 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import { useToday } from '@/composables/useToday';
 import * as listRepo from '@/services/automerge/repositories/listRepository';
 import { computeRecurringReset, isFiled, isListDue, isRecurring } from '@/utils/listLifecycle';
+import { getListTemplateByKey } from '@/constants/listTemplates';
+import { useTranslationStore } from '@/stores/translationStore';
 import { toISODateString } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
 import type {
@@ -105,6 +107,39 @@ export const useListStore = defineStore('lists', () => {
       { action: 'listStore:createList' }
     );
     return result ?? null;
+  }
+
+  /**
+   * Seed a new list from a curated template. `memberId` becomes the creator and
+   * the default owner (override `ownerId` via `overrides`). The template's name
+   * is resolved to the current language at creation (then it's editable user
+   * data); a recurring template stamps `lastResetDate` = today so its seeded
+   * items aren't immediately reset.
+   */
+  async function createFromTemplate(
+    key: string,
+    memberId: string,
+    overrides: Partial<CreateFamilyListInput> = {}
+  ): Promise<FamilyList | null> {
+    const tmpl = getListTemplateByKey(key);
+    if (!tmpl) return null;
+    const translate = useTranslationStore();
+    const seed: CreateFamilyListInput = {
+      title: translate.t(tmpl.nameKey),
+      emoji: tmpl.icon,
+      category: tmpl.category,
+      ownerId: memberId,
+      items: tmpl.starterItems.map((title) => ({ id: generateUUID(), title, completed: false })),
+      lifecycle: tmpl.lifecycle,
+      frequency: tmpl.frequency,
+      lastResetDate: tmpl.lifecycle === 'recurring' ? today.value : undefined,
+      cycleCelebrated: false,
+      templateKey: tmpl.key,
+      completed: false,
+      createdBy: memberId,
+      ...overrides,
+    };
+    return createList(seed);
   }
 
   async function updateList(id: string, input: UpdateFamilyListInput): Promise<FamilyList | null> {
@@ -281,6 +316,7 @@ export const useListStore = defineStore('lists', () => {
     // Actions
     loadLists,
     createList,
+    createFromTemplate,
     updateList,
     deleteList,
     toggleItem,

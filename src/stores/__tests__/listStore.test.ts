@@ -24,6 +24,10 @@ vi.mock('@/composables/useMemberFiltered', () => ({
     },
   }),
 }));
+// Identity translate — createFromTemplate resolves the template name via the store.
+vi.mock('@/stores/translationStore', () => ({
+  useTranslationStore: () => ({ t: (k: string) => k }),
+}));
 
 import { useListStore } from '../listStore';
 import * as listRepo from '@/services/automerge/repositories/listRepository';
@@ -104,6 +108,30 @@ describe('listStore', () => {
 
     expect(result).toEqual(created);
     expect(store.lists.map((l) => l.id)).toEqual(['new']);
+  });
+
+  it('createFromTemplate seeds correctly (grocery → 5 items recurring/weekly; honey-do → 0; unknown → null)', async () => {
+    const store = useListStore();
+    vi.mocked(listRepo.createList).mockImplementation(
+      async (input) =>
+        ({ ...(input as object), id: 'seed', createdAt: 'x', updatedAt: 'x' }) as FamilyList
+    );
+
+    const g = await store.createFromTemplate('grocery', 'm-1');
+    expect(g!.lifecycle).toBe('recurring');
+    expect(g!.frequency).toBe('weekly');
+    expect(g!.items).toHaveLength(5);
+    expect(g!.templateKey).toBe('grocery');
+    expect(g!.lastResetDate).toBe('2026-06-17'); // recurring stamps today
+    expect(g!.createdBy).toBe('m-1');
+    expect(g!.ownerId).toBe('m-1');
+
+    const h = await store.createFromTemplate('honey-do', 'm-1');
+    expect(h!.lifecycle).toBe('oneoff');
+    expect(h!.items).toHaveLength(0);
+    expect(h!.lastResetDate).toBeUndefined();
+
+    expect(await store.createFromTemplate('does-not-exist', 'm-1')).toBeNull();
   });
 
   it('deleteList removes the list', async () => {
