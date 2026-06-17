@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-06-17
 
+### Fixed
+
+- **Trusted devices no longer ask you to reconnect to Google after every sign-out.** When you mark a device as trusted, signing out now keeps your Google connection (just like it already keeps your local family-data cache), so your next sign-in reconnects to Drive silently instead of prompting you to reconnect. Shared (untrusted) devices still fully disconnect on sign-out, as before.
+
 ### Changed
 
 - **"Family To-Do" is now just "To-Dos."** The planner tab and page were renamed to sharpen the distinction between a single task and a whole checklist (the latter is coming as Beanie Lists). Nothing about your tasks changed — same page, same link.

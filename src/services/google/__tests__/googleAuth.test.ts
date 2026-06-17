@@ -1041,6 +1041,52 @@ describe('googleAuth (PKCE)', () => {
       vi.unstubAllEnvs();
     });
 
+    it('preserveRefreshToken keeps the active family token but still clears __pending__', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+
+      const { getGoogleRefreshToken, clearGoogleRefreshToken } =
+        await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
+      await googleAuth.initializeAuth('family-D');
+
+      await googleAuth.clearGoogleSessionState({ preserveRefreshToken: true });
+
+      // Active family's token is preserved (trusted-device silent reconnect)…
+      expect(clearGoogleRefreshToken).not.toHaveBeenCalledWith('family-D');
+      // …but the transient pending slot is always cleared.
+      expect(clearGoogleRefreshToken).toHaveBeenCalledWith('__pending__');
+
+      vi.unstubAllEnvs();
+    });
+
+    it('preserveRefreshToken does not fire the network revoke (grant must survive)', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ email: 'a@example.com' }) }); // userinfo
+      globalThis.fetch = fetchMock;
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'rt',
+        issuedAt: null,
+      });
+      await googleAuth.initializeAuth('family-E');
+      await googleAuth.attemptSilentRefresh();
+
+      const callsBefore = fetchMock.mock.calls.length;
+      await googleAuth.clearGoogleSessionState({ preserveRefreshToken: true });
+
+      // No additional fetch (the revoke endpoint) should have been hit.
+      expect(fetchMock.mock.calls.length).toBe(callsBefore);
+
+      vi.unstubAllEnvs();
+    });
+
     it('fires best-effort revoke fetch but does not throw on network error', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
       const fetchMock = vi
