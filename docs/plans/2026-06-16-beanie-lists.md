@@ -1,6 +1,6 @@
 # Plan: Beanie Lists — categorized family checklists
 
-> Date: 2026-06-16
+> Date: 2026-06-16 (detail-deepened 2026-06-17 — see Pass 5)
 > Related issues: Notion tracker #33 (no GitHub issue — direct implementation)
 > Plan file: `docs/plans/2026-06-16-beanie-lists.md`
 > Mockup: `docs/mockups/family-lists-2026-06-16.html` (approved v4)
@@ -157,7 +157,40 @@ Three pure, Vue-free, unit-testable helpers consumed by store computeds, `useCri
 
 - `src/constants/listCategories.ts`: ordered array of the 8 categories `{ id, labelKey, emoji, tintVar, dotColorVar }` (CIG tokens only). Add a `getListCategoryName(id)` helper mirroring `getActivityCategoryName`.
 - `src/composables/useListCategoryLabel.ts`: id→translated label, mirroring `useActivityCategoryLabel` **exactly** (beanie mode → lowercased English; English → constant name directly; other locales → `t()` with fallback to the constant). Never throws.
-- `src/constants/listTemplates.ts`: curated templates `{ key, categoryId, emoji, nameKey, lifecycle, frequency?, starterItemKeys: UIStringKey[] }`. A template only produces a `CreateFamilyListInput` seed; once created the list is a normal record.
+- `src/constants/listTemplates.ts`: curated templates, mirroring the `ActivityPreset` shape (`icon` emoji + `nameKey` + `category` discriminator) plus list fields:
+
+  ```ts
+  export interface ListTemplate {
+    key: string; // stable id, e.g. 'grocery'
+    icon: string; // emoji
+    nameKey: UIStringKey; // 'lists.template.grocery.name'
+    descriptionKey: UIStringKey; // 'lists.template.grocery.desc' (the card subtitle)
+    category: ListCategory;
+    lifecycle: ListLifecycle;
+    frequency?: ListFrequency; // recurring only
+    starterItems: string[]; // PLAIN seed text — not i18n keys
+  }
+  export const LIST_TEMPLATES: ListTemplate[] = [
+    /* below */
+  ];
+  export function getListTemplateByKey(key: string): ListTemplate | undefined;
+  export function getListTemplatesForCategory(c: ListCategory): ListTemplate[];
+  ```
+
+  **`starterItems` are plain English strings, not `UIStringKey`s** (corrected from the Pass-1 sketch): the moment a template creates a list, its item text becomes user-editable data — exactly like a to-do title, which is never translated. So they ship English-only and that is correct/consistent, not a gap.
+
+  **The 6 launch templates** (exactly the mockup's `.tmplgrid`; card descriptions verbatim):
+
+  | key                | icon | name             | card description      | category       | lifecycle | freq   | starter items                                                                     |
+  | ------------------ | ---- | ---------------- | --------------------- | -------------- | --------- | ------ | --------------------------------------------------------------------------------- |
+  | `grocery`          | 🛒   | Grocery list     | Weekly · auto-resets  | `out`          | recurring | weekly | Bananas · Spinach · Avocados · Oat milk · Pasta & passata                         |
+  | `vacation-packing` | 🧳   | Vacation packing | Link it to a trip     | `trips`        | oneoff    | —      | Passports & visas · Sunscreen & hats · Swim things · Travel adapters · Chargers   |
+  | `honey-do`         | 🍯   | Honey-do list    | For your partner      | `home`         | oneoff    | —      | (empty — owner fills in)                                                          |
+  | `kids-chores`      | 🧹   | Kids' chores     | Weekly reset          | `kids`         | recurring | weekly | Make the bed · Feed the dog · Tidy toy bins · Water the plants · Put away laundry |
+  | `before-school`    | 🎒   | Before-school    | Daily checklist       | `kids`         | recurring | daily  | Brush teeth · Pack bag · Water bottle · Homework in folder · Shoes on             |
+  | `party-prep`       | 🎉   | Party prep       | One-off · pick a date | `celebrations` | oneoff    | —      | Guest list · Send invites · Order cake · Decorations · Party bags                 |
+
+  Notes: `honey-do` ships with **0 starter items** (the new-list flow must open the detail modal straight onto an empty item list + add row). A template produces only a `CreateFamilyListInput` seed (icon→`emoji`, `category`, `lifecycle`, `frequency`, items→`FamilyListItem{ completed:false }`, `templateKey:key`); after creation the list is a normal record with no live link back. Adding/removing a template later is a one-row edit here + its two i18n keys.
 
 ### Store (`src/stores/listStore.ts`) — mirror `todoStore`
 
@@ -183,17 +216,79 @@ Three pure, Vue-free, unit-testable helpers consumed by store computeds, `useCri
 ### Pages & components (`src/pages/`, `src/components/lists/`)
 
 - `BeanieListsPage.vue` (route `/lists`): header (`PageWelcomeSubtitle` + "New list" button), filter chips, then a **flat `v-for` over a `shelves` array** (Due-soon, category shelves, Completed) rendering `ListShelf.vue` — the page template stays one level deep (see the nesting caveat). A small page composable (or inline computed) maps the filtered/categorized store getters into `{ key, titleKey, lists, collapsible }[]`.
-- `ListShelf.vue`: presentational — title + optional collapse (`useExpandableList` + `ShowMoreToggle` + `SmoothHeight`, the same trio the briefing toast uses) + `v-for` of `ListTile`. No store access; takes `titleKey` + `lists` + `collapsible` props and emits `open(listId)`. This is the one component that owns shelf chrome, so the board page and (if ever needed) the trip page can both reuse it.
+- `ListShelf.vue`: presentational — title + optional collapse + `v-for` of `ListTile`. **Collapse uses the `TodoSection` pattern (corrected from the Pass-1 sketch):** a clickable header button with a chevron and `v-model:collapsed` driven by the page — an all-or-nothing toggle (only the Completed shelf is collapsible, default collapsed). It does **not** use `useExpandableList`/`ShowMoreToggle`/`SmoothHeight` — verified that the To-Do page does not use those for its Completed section; that trio is for incremental show-more pagination, a different concern. No store access; takes `titleKey`/`title` + `emoji?` + `lists` + `collapsible?` + `collapsed?` props and emits `open(listId)`. This is the one component that owns shelf chrome, so the board page and (if ever needed) the trip page can both reuse it. Body = a responsive grid (2-col mobile / 4-col desktop) of `ListTile`.
 - `ListTile.vue`: the refined tile (category-tinted strip + emoji + owner avatar with ring via `BeanieAvatar`; title; merged meta row [category · status pill — status via the `isFiled`/`isListDue` predicates, not inline checks]; progress bar + count). Tap → emits open. Purely presentational (props in, event out) so it's trivially testable.
 - `ListDetailModal.vue`: **mirror `TodoViewEditModal.vue`** — `BeanieFormModal` shell; top **meta band** (category pill · owner via `FamilyChipPicker` single-select · prominent due-date chip via `BeanieDatePicker`); flat checkable items (add/remove/toggle); **"Repeats?"** section (`TogglePillGroup` one-off/recurring → `FrequencyChips` when recurring — both are generic `options` + `v-model:string` components, no subclassing needed); **"Due date"** section (one-off only); **"Link"** section (trip/activity picker — reuse `ActivityLinkDropdown`/`EntityLinkDropdown` if shape-compatible, else `BaseSelect`). The one-off/recurring toggle clears the now-invalid field (switching to recurring clears `dueDate`; switching to one-off clears `frequency`) so the mutually-exclusive invariant can't be violated from the UI. Delete via `confirm({ variant: 'danger', ... })` from `useConfirm` (same call `TodoViewEditModal` makes).
 - `NewListSheet.vue`: category **pills** (reuse the chip pattern) + template **cards** (distinct) + "start blank". Opens `ListDetailModal` seeded from `createFromTemplate` / a blank `CreateFamilyListInput`.
 - Embedded-on-trip rendering: extend `TravelPlansPage.vue` to render any list whose `linkedVacationId` matches, styled like `VacationIdeaCard.vue` (checkable, progress), reading/writing the same `listStore` entry — no second copy of the data. Reuse `ListTile` (or its progress/check sub-parts) rather than a parallel card so the two surfaces can't visually drift.
 - Shared `src/components/ui/PageWelcomeSubtitle.vue`: the Caveat Heritage-Orange subtitle element (DRY — used by Lists + To-Dos; takes a `t()` key prop). Confirmed not to exist today; the current To-Dos subtitle is a plain muted `<p>{{ t('todo.subtitle') }}</p>` and is retro-fit to this component.
 
+#### Concrete UI states (from the v4 mockup; CIG wins on any token conflict)
+
+- **Board (`BeanieListsPage`):** header (title + `PageWelcomeSubtitle` + "New list" pill, right-aligned; desktop also shows the member-avatar stack) → **filter chip row** (horizontal scroll: an "All" chip + one per category; active = Deep-Slate fill / white text, inactive = white bg / soft shadow / muted text; selecting a category filters the shelves, Due-soon included) → shelves in order: **Due soon** (only if non-empty, orange heading + count) → one shelf per non-empty category (heading = emoji + label + count) → **Completed** (collapsible, default collapsed). **Empty state** (no lists at all): `lists.empty.title` + `lists.empty.body` + the New-list button (reuse the To-Do empty-state illustration pattern). No FAB — the global `QuickAddFab` owns bottom-right.
+- **`ListTile`:** category-tinted strip with list emoji (drop-shadow) + owner avatar (`BeanieAvatar`, ring); title (Outfit 700); meta row (space-between) = category dot + label (`useListCategoryLabel`) | **status pill chosen by the lifecycle predicates** (never inline `lifecycle===`): one-off due → `lists.status.due` (orange) / overdue → `lists.status.overdue` (deeper orange — **never Alert Red**; due/overdue is a routine alert, Heritage-Orange family per CIG); recurring → `lists.status.resets {day}` (calm accent tint, e.g. Sky-Silk/terracotta — not red); linked → small `lists.status.linked` chip; then a thin progress bar (fill = category colour) + `done/total` via `fillTemplate`. Tap → `open(list.id)`.
+- **`ListDetailModal` section order:** (1) inline-editable title (emoji + name); (2) meta band — category pill · owner pill (`FamilyChipPicker` **single-select**) · prominent due/recurrence pill (orange gradient for a one-off due date, calm accent for "Resets {day}"); (3) flat checkable items (24px checkbox, done = strikethrough + faded) + an "Add an item…" dashed row; (4) **"Repeats?"** `TogglePillGroup` one-off/repeats → reveals `FrequencyChips` + `lists.detail.recurringHint` when recurring (switching to repeats clears `dueDate`; to one-off clears `frequency` — enforces mutual-exclusion from the UI); (5) **"Due date"** `BeanieDatePicker`, one-off only; (6) **"Link"** trip/activity picker (present/upcoming only); (7) delete via `confirm({ variant: 'danger' })`.
+- **`NewListSheet`:** `lists.new.title` + `.subtitle` → **category pills** (the 8, selecting one filters templates + seeds a blank list's category) → **template cards** (`getListTemplatesForCategory(selected)`, or all; emoji + name + description, visually distinct from pills, hover lift) → **"Start Blank List"**. Template pick → `createFromTemplate(key)` then open the detail modal; blank → minimal `CreateFamilyListInput` (selected category, owner = current member, one-off, no items) then open the modal.
+- **Page title naming:** nav + page title use **"Beanie Lists"** (`lists.title`, the intake-approved feature name); the mockup's "Family Lists" header string is treated as placeholder art, not a contradiction.
+
 ### Integrations
 
 - **Quick-Add:** add an `add-list` entry to `QUICK_ADD_ITEMS` (Everyday group, `route: '/lists'`, `action: 'add-list'`, `requiredPermission: 'activities'`). `VALID_ACTIONS`/`QuickAddAction` derive automatically. On `/lists?action=add-list`, `useQuickAddIntent` (already try/catch-guarded with toast + `console.error`) opens `NewListSheet`. Flag-gate the item in `QuickAddSheet` (see Feature gate).
-- **Daily briefing:** `useCriticalItems` — add `'list'` to `CriticalItem.type`; add one deriver block that surfaces due/coming-due whole lists (with progress in the message). It calls the shared `isListDue(list, todayStr.value)` predicate for the overdue/today/no-due gating (so the briefing rule and the store/tile rule can't diverge) and reuses the existing `buildMessage` pattern. **Visibility rule (Pass 4 — the one genuine gap):** the to-do block uses `classifyAudience` over an `assigneeIds` array; lists have a single `ownerId` instead, so do NOT copy `classifyAudience`'s array shape. Surface a due list to **its owner**, and mirror the to-do "adults also see a child's items" intent so a parent/adult sees a child-owner's due list — implement this as a tiny single-owner audience check (owner-id == current member, OR current member is an adult and owner is a child), not a re-use of the array-shaped helper. The Nook upcoming/"this week" card reads the same `criticalItems`, so it picks them up (tagged "List"). Gate the block behind `isFlagEnabled('familyLists')` (one guard at the top of the block).
+- **Daily briefing:** `useCriticalItems` — add `'list'` to `CriticalItem.type`; add one flag-gated deriver block that surfaces due/coming-due **whole lists** (never items), reusing the shared `isListDue` predicate (so the briefing date rule and the store/tile rule can't diverge) and the existing `buildMessage` placeholder pattern.
+
+  **Single-owner visibility predicate (Pass 4 gap — now written).** The to-do block uses `classifyAudience(assigneeIds[], …)` over an **array**; a `FamilyList` has a single `ownerId`, so add a single-owner sibling in `src/utils/audience.ts` that returns the **same `BriefingAudience` union** (so the existing `owner`/`forChild`/`unassigned` key selection works unchanged):
+
+  ```ts
+  // src/utils/audience.ts — next to classifyAudience; reuses isAdultMember + resolveMember verbatim
+  export function classifyOwnerAudience(
+    ownerId: string | null | undefined,
+    viewer: FamilyMember,
+    resolveMember: (id: string) => FamilyMember | undefined
+  ): BriefingAudience {
+    const owner = ownerId ? resolveMember(ownerId) : undefined;
+    if (owner && owner.id === viewer.id) return { kind: 'assignee' }; // you own it
+    if (owner && isAdultMember(owner)) return { kind: 'hidden' }; // an adult owns it → only they see it
+    if (owner && !owner.isPet) {
+      // a child owns it
+      return isAdultMember(viewer)
+        ? { kind: 'forChild', childNames: [owner.name] } // adults see it (framed by child)
+        : { kind: 'hidden' }; // siblings don't
+    }
+    return viewer.isPet ? { kind: 'hidden' } : { kind: 'unassigned' }; // unowned/pet-owned → everyone non-pet
+  }
+  ```
+
+  `isAdultMember` (`= !isPet && (role==='owner' || ageGroup==='adult')`) and `getMemberById` are reused from the to-do path — no new member/role logic.
+
+  **Deriver block** (mirrors the to-do block, swapping the audience call):
+
+  ```ts
+  // ── Beanie Lists for the current member (whole lists, never items) ──
+  if (isFlagEnabled('familyLists')) {
+    for (const list of listStore.activeLists) {
+      // activeLists = !isFiled
+      const audience = classifyOwnerAudience(list.ownerId, currentMember, getMemberById);
+      if (audience.kind === 'hidden') continue;
+      const due = isListDue(list, todayStr.value); // 'overdue' | 'today' | 'noDue' | null
+      if (due === null) continue; // future-dated or recurring-without-due → not on the plate
+      const remaining = list.items.filter((i) => !i.completed).length;
+      const dateState: DateState =
+        due === 'overdue' ? 'overdue' : due === 'today' ? 'today' : 'noDue';
+      // pick lists.briefing.{owner|forChild|unassigned}.{dateState} by audience.kind; fill {list},{children},{date},{remaining}
+      items.push({
+        id: list.id,
+        type: 'list',
+        message,
+        icon: due === 'overdue' ? '⏰' : '🧾',
+        time: '',
+        completable: false,
+      }); // tap opens /lists?view=<id>; not inline-checkable here
+    }
+  }
+  ```
+
+  **Consistency note (not a new decision):** the board shows every list (subject to the sidebar member-filter), but the briefing only surfaces lists _relevant to you_ — exactly how to-dos behave (an adult gets their kids' lists, not another adult's). The Nook upcoming/"this week" card reads the same `criticalItems`, so it picks lists up automatically (tagged "List"). One `isFlagEnabled('familyLists')` guard at the top of the block.
+
 - **Trip/activity link:** the list stores `linkedVacationId`/`linkedActivityId`; the travel-plan page renders the embedded list; the attach picker offers only present/upcoming items (reuse the existing `tripPhase`/upcoming filter). On trip/activity delete, clear the matching link on any list (`updateList(id, { linkedVacationId: undefined })`) so no orphan/crash — add this to the existing activity/vacation delete path. Because the embedded view derives purely from `linkedVacationId`, a cleared link simply stops rendering — no dangling reference, no extra cleanup state.
 - **Nav + rename:** `navigation.ts` — add a Beanie Lists item under Treehouse (with the new `requiresFlag: 'familyLists'` field, see below); rename the To-Do item's `labelKey` copy to "To-Dos" (route stays `/todo`). Update `FamilyTodoPage.vue` title + render its subtitle via `PageWelcomeSubtitle`. Update `HINT_KEY_BY_PATH` if a `/lists` mobile hint is wanted.
 - **Feature flag (single shared mechanism — DRY):**
@@ -205,7 +300,30 @@ Three pure, Vue-free, unit-testable helpers consumed by store computeds, `useCri
 
 ### i18n + theme
 
-- `uiStrings.ts`: all new keys (page title, subtitle, categories, templates + starter items, statuses, empty states, completion + notification copy, link/attach copy, the `list-completed` notification line) with en + beanie + zh; run `npm run translate`; spot-check zh per `reference_translate_mymemory_review`.
+- `uiStrings.ts`: all new keys with `{ en, beanie }` (zh auto-generated via `npm run translate`, then spot-checked per `reference_translate_mymemory_review`). `en` follows the dual-casing standard (Title Case for labels, Sentence case for sentences); `beanie` all-lowercase. Namespaced `lists.*`, mirroring the `todo.*` block. **Full inventory (~70 keys):**
+
+  **Page + header:** `lists.title` ("Beanie Lists" — nav + page title, supersedes the mockup's "Family Lists" placeholder) · `lists.welcomeSubtitle` ("What are we tackling together?" / beanie "…🌱" — the orange Caveat) · `lists.newList` · `lists.empty.title` · `lists.empty.body`.
+
+  **Shelves / board:** `lists.shelf.dueSoon` · `lists.shelf.completed` · `lists.filter.all` (category filter chips reuse the category labels — no separate keys) · `lists.progress` ("{done}/{total}", via `fillTemplate`, no beanie variant).
+
+  **Categories (8 — consumed by `useListCategoryLabel`, chips, shelves, new-list pills):** `lists.category.home` ("Home & Household") · `.out` ("Out & Errands") · `.kids` ("Kids & School") · `.health` ("Health & Safety") · `.celebrations` ("Celebrations & Traditions") · `.trips` ("Trips & Packing") · `.projects` ("Projects & Honey-dos") · `.me` ("Just for Me").
+
+  **Status pills:** `lists.status.due` ("Due {date}", `fillTemplate`) · `lists.status.overdue` (reuse global `status.overdue` if copy matches — only add if list-specific wording needed) · `lists.status.repeats.daily|weekly|monthly` · `lists.status.resets` ("Resets {day}") · `lists.status.linked`.
+
+  **Detail modal:** `lists.detail.owner` · `.addItem` ("Add an item…") · `.repeatsLabel` ("Repeats?") · `.oneoff` ("One-off") · `.recurring` ("Repeats") · `.freq.daily|weekly|monthly` · `.dueDateLabel` · `.linkLabel` · `.linkTrip` · `.linkActivity` · `.recurringHint` ("Unchecks itself each {period} so you start fresh — no due date needed.") · `.save` · `.delete` · `.deleteConfirm.title` · `.deleteConfirm.body`.
+
+  **New-list sheet:** `lists.new.title` ("Start a New List") · `.subtitle` ("Pick a category, then a template — or start blank.") · `.categoryLabel` · `.templatesLabel` ("Start from a Template") · `.blank` ("Start Blank List").
+
+  **Templates (2 × 6 = 12 — names + card descriptions, verbatim from the template table above):** `lists.template.{grocery|vacationPacking|honeydo|kidsChores|beforeSchool|partyPrep}.name` + `.desc`.
+
+  **Quick-Add:** `lists.quickAdd.label` ("New list" — the `add-list` tile).
+
+  **Completion + derived notification:** `lists.celebrate` ("List complete! 🎉") · `lists.notif.listCompleted` ("{finisher} finished your list “{list}”", `fillTemplate`).
+
+  **Briefing (mirrors the `TODO_*_KEYS` triplet — owner / forChild / unassigned × due-state):** `lists.briefing.owner.{today|overdue|noDue}` · `lists.briefing.forChild.{today|overdue|noDue}` · `lists.briefing.unassigned.{today|overdue|noDue}` — e.g. owner.today "Your list “{list}” is due today", owner.overdue "…is overdue ({date})", owner.noDue "…has {remaining} left"; forChild prefixes "{children}'s list …"; unassigned uses "Family list …". Tokens filled via the existing `buildMessage` replacer the to-do briefing already uses.
+
+  After adding: `npm run translate`, then review new `zh.json` values (categories especially — avoid MyMemory garbage like a "单兵杀敌"-class mistranslation on "Just for Me").
+
 - beanies-theme skill + `docs/brand/beanies-cig-v2.html`: document the **page welcome subtitle** convention; note `PageWelcomeSubtitle.vue` as the implementation; apply to Lists + To-Dos.
 
 ## Files Affected
@@ -270,9 +388,11 @@ Three pure, Vue-free, unit-testable helpers consumed by store computeds, `useCri
 
 ## Testing Plan
 
+**Harness (mirror `todoStore.test.ts`):** mock the repository module (`getAllLists`/`createList`/`updateList`/`deleteList`), mock `celebrate`, pass-through `createMemberFiltered`. Date-dependent tests **fake timers → `vi.resetModules()` → import** (the `useToday` module-singleton gotcha — `reference_usetoday_test_mock`). Use `vi.resetAllMocks()` in `beforeEach` wherever `mockImplementationOnce`/`mockResolvedValueOnce` is queued (`feedback_vitest_resetallmocks`).
+
 1. **Unit (Vitest):**
-   - `listLifecycle`: `isRecurring`/`isFiled`/`isListDue` across one-off (due/overdue/today/future/no-due) and recurring; `computeRecurringReset` daily/weekly/monthly boundaries, idempotency (second same-day run is a no-op), no reset mid-period, timezone via mocked `useToday` (per `reference_usetoday_test_mock`).
-   - `listStore`: create/update/delete; `createFromTemplate` seeds correctly; `toggleItem` updates progress; one-off all-checked → completed/filed + `celebrate` called; recurring all-checked → `celebrate` called once (cycle guard) + not filed; `reconcileRecurringLists` runs after load and on `today` change, no-ops on empty/same-day; failure path (mock repo throw) → action returns null/false and `wrapAsync` toast/report fired (no silent pass).
+   - `listLifecycle`: `isRecurring`/`isFiled`/`isListDue` across one-off (due/overdue/today/future→null/no-due→'noDue') and recurring (→null always); `computeRecurringReset` daily/weekly/monthly boundaries, idempotency (second same-day run is a no-op), no reset mid-period, timezone via mocked `useToday` (per `reference_usetoday_test_mock`).
+   - `listStore`: create/update/delete (immutable array updates, repo called); `createFromTemplate('grocery')` seeds emoji/category/lifecycle=recurring/frequency=weekly/owner/**5 starter items**/`templateKey:'grocery'`, and `createFromTemplate('honey-do')` seeds **0 items**; `toggleItem` updates progress; one-off all-checked → `completed`/`completedBy`/`completedAt` set (filed) + `celebrate('goal-reached',{onUndo})` called once and `onUndo` reverses+unfiles; recurring all-checked → `celebrate` once (cycle guard) + **not** filed, and re-check within the same cycle fires no second celebrate; `reconcileRecurringLists` runs after load and on `today` change, no-ops on empty/same-day; failure path (mock repo throw) → action returns null/false and `wrapAsync` toast/report fired (no silent pass).
    - `dueSoonLists` / `listsByCategory` / member-filter-by-owner computeds (all built on the predicates).
    - `useCriticalItems`: due list surfaces as a whole-list briefing item via `isListDue`; no-due-date rule; gated off when `familyLists` off.
    - `deriveNotifications`: a list completed by someone else for the creator yields one `list-completed`; self-completion yields none; missing `completedAt` / malformed list is skipped (no throw); ages out past `windowDays`.
@@ -290,6 +410,8 @@ Three pure, Vue-free, unit-testable helpers consumed by store computeds, `useCri
 - **Pass 3 (Sustainability / maintainability / reliability, verified against the codebase)**: Re-read `todoStore`, `useCriticalItems`, `utils/notifications`, `types/automerge`, `navigation`, and `router/index` to confirm the structural seams. Hardened long-term shape without weakening any Pass-2 decision: (1) Extracted **`@/utils/listLifecycle.ts`** as the single home for lifecycle semantics (`isRecurring`/`isFiled`/`isListDue` + `computeRecurringReset`), so store, page, tile, modal, briefing, and notifications all read one rule instead of scattering `lifecycle === …` and re-deriving due-date math — collapsing the dual-vocabulary `FamilyList` shape risk to one file. (2) Capped board-page nesting by splitting out a presentational **`ListShelf.vue`** and rendering `BeanieListsPage` as a flat `v-for` over a `shelves` array (mirroring `TodoSection`); kept `ListTile`/`ListShelf` props-in/event-out so they're trivially testable and reusable on the trip page (no parallel card → no visual drift). (3) Made the route guard type-safe and same-shape: `requiresFlag` is added to the **existing typed `RouteMeta` augmentation** and gated by a `beforeEach` block modelled exactly on `requiresFinance` (no novel control flow); the nav/quick-add `requiresFlag` field gets a **module-load invariant** mirroring `KNOWN_BADGE_KEYS` so a stale flag id throws in tests, and the four consumers share one `isItemFlagEnabled` helper. (4) Tightened reconcile reliability: reset runs only **after** `loadLists` populates the collection (and on `today` change), guards against an empty set, and stays idempotent — closing the watcher-race window. (5) Made the derived `list-completed` block skip records with no `completedAt` and reuse the shared `inWindow` helper so it ages out exactly like the other kinds. Added a per-lifecycle field-invariant doc-comment on `FamilyList` and a `lifecycle === …`-free acceptance criterion + tests for the new seams.
 
 - **Pass 4 (Fresh-eyes final sweep, verified against the codebase)**: Re-verified every load-bearing claim (migration backfill via `migrateDoc` on load+merge; `wrapAsync`/`celebrate`/`createMemberFiltered` shapes; derived-notification mould; typed `RouteMeta`). Plan confirmed solid. Three minimal high-value edits only: (1) specified the daily-briefing **visibility rule for single-owner lists** — the one genuine gap — so an implementer surfaces a due list to its owner (+ adults-see-a-child's, mirroring the to-do intent) with a single-owner check rather than mis-copying the array-shaped `classifyAudience`; (2) reused the already-exported `isKnownFlag` for the nav module-load invariant (DRY) and clarified that `requiresFlag: DevFlag` is already compile-checked (the runtime check is belt-and-suspenders); (3) no other changes — the four-pass plan is implementation-ready.
+
+- **Pass 5 (Detail deepening, 2026-06-17, verified via fresh exploration of the mockup + To-Do/briefing/i18n internals)**: greg flagged that the plan read short for the feature's complexity. Pushed the five under-specified areas to implementation altitude **without changing scope or any prior decision**: (1) enumerated the **6 launch templates** with starter items (and corrected `starterItemKeys: UIStringKey[]` → `starterItems: string[]` — seed item text is user-editable data, English-only like a to-do title, not translated); (2) wrote the **full ~70-key i18n inventory** (`lists.*`) instead of "all new keys"; (3) extracted concrete **board/tile/detail/new-list UI states** from the v4 mockup (filter-chip active colours, status-pill colour rules — never Alert Red, empty state, section order), and **corrected the `ListShelf` collapse mechanism** to the all-or-nothing `TodoSection` `v-model:collapsed` pattern (the Pass-1 `useExpandableList`/`SmoothHeight` trio was verified to be the wrong primitive — that's for show-more pagination, not shelf collapse); (4) wrote the **single-owner briefing visibility predicate** `classifyOwnerAudience` (the Pass-4 gap) as real code returning the existing `BriefingAudience` union, plus the deriver block; (5) expanded the **test plan** with the concrete harness (repo/`celebrate`/`createMemberFiltered` mocks, `useToday` resetModules gotcha, `resetAllMocks`) and explicit template-seed/cycle-guard cases. Data model, CRDT wiring, store action set, derived-notification mechanism, `listLifecycle` predicate home, `requiresFlag` gating, `PageWelcomeSubtitle`, the To-Do rename, and all Pass 1–4 decisions are unchanged.
 
 ## Prompt Log
 
