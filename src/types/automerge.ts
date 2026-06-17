@@ -7,6 +7,7 @@ import type {
   Budget,
   RecurringItem,
   TodoItem,
+  FamilyList,
   FamilyActivity,
   FamilyVacation,
   PhotoAttachment,
@@ -41,6 +42,7 @@ export interface FamilyDocument {
   budgets: Record<string, Budget>;
   recurringItems: Record<string, RecurringItem>;
   todos: Record<string, TodoItem>;
+  lists: Record<string, FamilyList>;
   activities: Record<string, FamilyActivity>;
   vacations: Record<string, FamilyVacation>;
   photos: Record<string, PhotoAttachment>;

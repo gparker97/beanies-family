@@ -9,5 +9,6 @@ export const COMMITTED_FLAGS: Record<DevFlag, boolean> = {
   aiPhotoExtract: true,
   aiTravelExtract: true,
   calendarClashNudge: true,
+  familyLists: false,
   googleCalendarSync: true,
 };
