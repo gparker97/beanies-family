@@ -39,6 +39,7 @@ import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import { useClash } from '@/composables/useClash';
 import { useOverlapAckStore } from '@/stores/overlapAckStore';
 import OverlapMark from '@/components/planner/OverlapMark.vue';
+import LinkedLists from '@/components/lists/LinkedLists.vue';
 import { openExternal } from '@/utils/openExternal';
 import { MARKETING_URL } from '@/utils/marketing';
 import type { FamilyActivity, DutyCompletion } from '@/types/models';
@@ -71,6 +72,12 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const { categoryLabel } = useActivityCategoryLabel();
 const router = useRouter();
+
+/** Open a linked Beanie List — close this drawer and deep-link to it. */
+function openLinkedList(id: string): void {
+  emit('close');
+  void router.push({ path: '/lists', query: { view: id } });
+}
 const { playWhoosh } = useSounds();
 const activityStore = useActivityStore();
 const photoStore = usePhotoStore();
@@ -1479,6 +1486,9 @@ async function confirmReschedule() {
             </div>
           </button>
         </div>
+
+        <!-- Beanie Lists linked to this activity (#33) -->
+        <LinkedLists :activity-id="activity.id" @open="openLinkedList" />
 
         <!-- Created by + when — shared subtle footer (standard convention) -->
         <CreatedMeta :created-by="activity.createdBy" :created-at="activity.createdAt" />
