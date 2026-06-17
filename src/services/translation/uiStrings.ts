@@ -1073,7 +1073,7 @@ const STRING_DEFS = {
   'nav.nook': { en: 'Family Dashboard', beanie: 'family nook' },
   'nav.activities': { en: 'Family Activities', beanie: 'our activities' },
   'nav.travel': { en: 'Travel Plans', beanie: 'travel plans' },
-  'nav.todo': { en: 'Family To-Do', beanie: 'to-do list' },
+  'nav.todo': { en: 'To-Dos', beanie: 'to-dos' },
   'nav.lists': { en: 'Beanie Lists', beanie: 'beanie lists' },
   'nav.overview': { en: 'Overview', beanie: 'finance corner' },
   'nav.budgets': { en: 'Budgets', beanie: 'budgets' },
