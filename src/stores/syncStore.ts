@@ -8,6 +8,7 @@ import { useFamilyStore } from './familyStore';
 import { useGoalsStore } from './goalsStore';
 import { useRecurringStore } from './recurringStore';
 import { useTodoStore } from './todoStore';
+import { useListStore } from './listStore';
 import { useActivityStore } from './activityStore';
 import { useVacationStore } from './vacationStore';
 import { useBudgetStore } from './budgetStore';
@@ -1630,6 +1631,7 @@ export const useSyncStore = defineStore('sync', () => {
       const settingsStore = useSettingsStore();
       const recurringStore = useRecurringStore();
       const todoStore = useTodoStore();
+      const listStore = useListStore();
       const activityStore = useActivityStore();
       const vacationStore = useVacationStore();
       const budgetStore = useBudgetStore();
@@ -1655,6 +1657,7 @@ export const useSyncStore = defineStore('sync', () => {
         settingsStore.loadSettings(),
         recurringStore.loadRecurringItems(),
         todoStore.loadTodos(),
+        listStore.loadLists(),
         activityStore.loadActivities(),
         vacationStore.loadVacations(),
         budgetStore.loadBudgets(),
