@@ -22,6 +22,7 @@ import {
   type QuickAddGroup,
   type QuickAddItem,
 } from '@/constants/quickAddItems';
+import { isItemFlagEnabled } from '@/constants/navigation';
 import { useQuickAdd } from '@/composables/useQuickAdd';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePermissions } from '@/composables/usePermissions';
@@ -41,6 +42,7 @@ const { isOpen, stage, allowedActions, close, triggerAction } = useQuickAdd();
  * (Family Scrapbook, Family Timeline) to keep the sheet relevant.
  */
 function itemAllowed(item: QuickAddItem): boolean {
+  if (!isItemFlagEnabled(item)) return false;
   if (item.requiredPermission === 'finance' && !canViewFinances.value) return false;
   if (item.requiredPermission === 'activities' && !canEditActivities.value) return false;
   const filter = allowedActions.value;

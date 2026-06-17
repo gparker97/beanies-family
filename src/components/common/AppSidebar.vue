@@ -17,6 +17,7 @@ import {
   TREEHOUSE_ITEMS,
   PIGGY_BANK_ITEMS,
   PINNED_ITEMS,
+  isItemFlagEnabled,
   type NavItemDef,
   type NavSubItemDef,
 } from '@/constants/navigation';
@@ -34,7 +35,7 @@ const { canViewFinances } = usePermissions();
 const { badgeFor } = useNavBadges();
 
 function mapItems(items: NavItemDef[]) {
-  return items.map((item) => ({
+  return items.filter(isItemFlagEnabled).map((item) => ({
     label: t(item.labelKey),
     path: item.path,
     emoji: item.emoji,

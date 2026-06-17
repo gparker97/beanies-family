@@ -13,6 +13,7 @@ import { MARKETING_URL } from '@/utils/marketing';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
 import { QUICK_ADD_CONTEXT_KEYS } from '@/constants/quickAddItems';
+import { isFlagEnabled, type DevFlag } from '@/config/flags';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
 import { isPodlessRecoveryQuery } from '@/components/login/resumePaths';
 
@@ -25,6 +26,8 @@ declare module 'vue-router' {
   interface RouteMeta {
     /** When true, the route renders WITHOUT the app shell (sidebar/header). */
     noChrome?: boolean;
+    /** Gate the route behind a dev feature flag — redirected to /nook when off. */
+    requiresFlag?: DevFlag;
   }
 }
 
@@ -228,6 +231,12 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: 'nav.todo', requiresAuth: true },
   },
   {
+    path: '/lists',
+    name: 'Lists',
+    component: () => import('@/pages/BeanieListsPage.vue'),
+    meta: { titleKey: 'nav.lists', requiresAuth: true, requiresFlag: 'familyLists' },
+  },
+  {
     path: '/budgets',
     name: 'Budgets',
     component: () => import('@/pages/BudgetPage.vue'),
@@ -408,6 +417,14 @@ router.beforeEach((to) => {
       // block access defensively (matches usePermissions fallback behavior)
       return { name: 'NoAccess' };
     }
+  }
+});
+
+// Feature-flag guard: a route gated behind an off dev flag is unreachable
+// (redirect home). Mirrors the finance guard's shape — no novel control flow.
+router.beforeEach((to) => {
+  if (to.meta.requiresFlag && !isFlagEnabled(to.meta.requiresFlag)) {
+    return { path: '/nook' };
   }
 });
 
