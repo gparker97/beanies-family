@@ -1074,6 +1074,7 @@ const STRING_DEFS = {
   'nav.activities': { en: 'Family Activities', beanie: 'our activities' },
   'nav.travel': { en: 'Travel Plans', beanie: 'travel plans' },
   'nav.todo': { en: 'Family To-Do', beanie: 'to-do list' },
+  'nav.lists': { en: 'Beanie Lists', beanie: 'beanie lists' },
   'nav.overview': { en: 'Overview', beanie: 'finance corner' },
   'nav.budgets': { en: 'Budgets', beanie: 'budgets' },
   'nav.comingSoon': { en: 'Soon!', beanie: 'soon!' },
@@ -4316,8 +4317,8 @@ const STRING_DEFS = {
   'lists.detail.freq.monthly': { en: 'Monthly', beanie: 'monthly' },
   'lists.detail.dueDateLabel': { en: 'Due date', beanie: 'due date' },
   'lists.detail.recurringHint': {
-    en: 'Unchecks itself each {period} so you start fresh — no due date needed.',
-    beanie: 'unchecks itself each {period} so you start fresh — no due date needed.',
+    en: 'Unchecks itself each cycle so you start fresh — no due date needed.',
+    beanie: 'unchecks itself each cycle so you start fresh — no due date needed.',
   },
   'lists.detail.titlePlaceholder': { en: 'List name', beanie: 'list name' },
   'lists.detail.delete': { en: 'Delete List', beanie: 'delete list' },
@@ -4352,9 +4353,9 @@ const STRING_DEFS = {
   'lists.template.beforeSchool.desc': { en: 'Daily checklist', beanie: 'daily checklist' },
   'lists.template.partyPrep.name': { en: 'Party prep', beanie: 'party prep' },
   'lists.template.partyPrep.desc': { en: 'One-off · pick a date', beanie: 'one-off · pick a date' },
-  // Quick-Add + celebration
-  'lists.quickAdd.label': { en: 'New list', beanie: 'new list' },
-  'lists.quickAdd.hint': {
+  // Quick-Add (under the quickAdd.* namespace, per the quick-add invariant) + celebration
+  'quickAdd.list.label': { en: 'New list', beanie: 'new list' },
+  'quickAdd.list.hint': {
     en: 'Start a categorized family checklist',
     beanie: 'start a family checklist',
   },

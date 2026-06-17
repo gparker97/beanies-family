@@ -17,6 +17,7 @@ import {
   TREEHOUSE_ITEMS,
   PIGGY_BANK_ITEMS,
   PINNED_ITEMS,
+  isItemFlagEnabled,
   type NavItemDef,
 } from '@/constants/navigation';
 import { usePermissions } from '@/composables/usePermissions';
@@ -62,7 +63,7 @@ function isParentActive(item: NavItemDef): boolean {
 }
 
 function mapItems(items: NavItemDef[]) {
-  return items.map((item) => ({
+  return items.filter(isItemFlagEnabled).map((item) => ({
     label: t(item.labelKey),
     path: item.path,
     emoji: item.emoji,
