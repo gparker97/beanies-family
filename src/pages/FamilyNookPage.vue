@@ -226,6 +226,7 @@ async function handleTransactionDelete(id: string) {
       @open-todo="selectedTodoId = $event"
       @open-activity="(id: string, date: string) => openActivity(id, date)"
       @open-medication="viewingMedicationId = $event"
+      @open-list="(id: string) => router.push({ path: '/lists', query: { view: id } })"
       @complete-duty="handleDutyComplete"
       @complete-todo="handleTodoComplete"
     />

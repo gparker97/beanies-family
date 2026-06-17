@@ -13,6 +13,7 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { useTodoStore } from '@/stores/todoStore';
+import { useListStore } from '@/stores/listStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useBeanTips } from '@/composables/useBeanTips';
@@ -55,6 +56,7 @@ function distinctMonths(start: Date, end: Date): { year: number; month: number }
 
 export const useNotificationsStore = defineStore('notifications', () => {
   const todoStore = useTodoStore();
+  const listStore = useListStore();
   const activityStore = useActivityStore();
   const familyStore = useFamilyStore();
   // Bound ONCE at store-setup scope (mirrors the other store bindings above);
@@ -97,6 +99,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
     return {
       todos: todoStore.todos,
+      lists: listStore.lists,
       members: familyStore.members,
       currentMember,
       releaseNotes: getAllReleaseNotes(),

@@ -4360,6 +4360,45 @@ const STRING_DEFS = {
     beanie: 'start a family checklist',
   },
   'lists.celebrate': { en: 'List complete! 🎉', beanie: 'all done — every bean counts! 🎉' },
+  // Daily briefing (whole lists, never items) — owner / for-child / unassigned × due-state
+  'lists.briefing.owner.today': {
+    en: 'Your list “{list}” is due today',
+    beanie: 'your list “{list}” is due today',
+  },
+  'lists.briefing.owner.overdue': {
+    en: 'Your list “{list}” is overdue ({date})',
+    beanie: 'your list “{list}” is overdue ({date})',
+  },
+  'lists.briefing.owner.noDue': {
+    en: 'Your list “{list}” has {remaining} left',
+    beanie: 'your list “{list}” has {remaining} left',
+  },
+  'lists.briefing.forChild.today': {
+    en: '{children}’s list “{list}” is due today',
+    beanie: '{children}’s list “{list}” is due today',
+  },
+  'lists.briefing.forChild.overdue': {
+    en: '{children}’s list “{list}” is overdue ({date})',
+    beanie: '{children}’s list “{list}” is overdue ({date})',
+  },
+  'lists.briefing.forChild.noDue': {
+    en: '{children}’s list “{list}” has {remaining} left',
+    beanie: '{children}’s list “{list}” has {remaining} left',
+  },
+  'lists.briefing.unassigned.today': {
+    en: 'Family list “{list}” is due today',
+    beanie: 'family list “{list}” is due today',
+  },
+  'lists.briefing.unassigned.overdue': {
+    en: 'Family list “{list}” is overdue ({date})',
+    beanie: 'family list “{list}” is overdue ({date})',
+  },
+  'lists.briefing.unassigned.noDue': {
+    en: 'Family list “{list}” has {remaining} left',
+    beanie: 'family list “{list}” has {remaining} left',
+  },
+  // Derived "list completed" notification
+  'lists.notif.finishedBy': { en: 'Finished by {finisher}', beanie: 'finished by {finisher}' },
 
   'confirm.deleteTodoTitle': { en: 'Delete Task', beanie: 'remove task' },
   'confirm.deleteLocalFamilyTitle': {
@@ -6126,6 +6165,7 @@ const STRING_DEFS = {
   'notifications.kindTodoDueOverdue': { en: 'Overdue', beanie: 'overdue' },
   'notifications.kindTodoAssigned': { en: 'Assigned to you', beanie: 'assigned to you' },
   'notifications.kindActivityReminder': { en: 'Coming up', beanie: 'coming up' },
+  'notifications.kindListCompleted': { en: 'List completed', beanie: 'list completed' },
   'notifications.kindWhatsNew': { en: "What's new", beanie: "what's new" },
   'notifications.kindAnnouncement': { en: 'Announcement', beanie: 'announcement' },
   'notifications.kindTip': { en: "Today's tip", beanie: "today's tip" },

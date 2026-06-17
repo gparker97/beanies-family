@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyAudience, isDutyDone } from '@/utils/audience';
+import { classifyAudience, classifyOwnerAudience, isDutyDone } from '@/utils/audience';
 import type { FamilyMember } from '@/types/models';
 
 function member(
@@ -65,5 +65,29 @@ describe('isDutyDone', () => {
       isDutyDone([{ date: '2026-05-26', completedBy: 'a', completedAt: '' }], '2026-05-27')
     ).toBe(false);
     expect(isDutyDone(undefined, '2026-05-27')).toBe(false);
+  });
+});
+
+describe('classifyOwnerAudience (single-owner, for Beanie Lists)', () => {
+  it('you own it → assignee', () => {
+    expect(classifyOwnerAudience('a', adult, resolve).kind).toBe('assignee');
+  });
+  it('an adult owns it → hidden for another adult', () => {
+    expect(classifyOwnerAudience('a2', adult, resolve).kind).toBe('hidden');
+  });
+  it('a child owns it → forChild for an adult viewer (framed by the child)', () => {
+    const res = classifyOwnerAudience('k', adult, resolve);
+    expect(res.kind).toBe('forChild');
+    expect(res.kind === 'forChild' && res.childNames).toEqual(['k']);
+  });
+  it('a child owns it → hidden for a different child', () => {
+    const kid2 = member('k2', 'child');
+    expect(
+      classifyOwnerAudience('k', kid2, (id) => [...all, kid2].find((m) => m.id === id)).kind
+    ).toBe('hidden');
+  });
+  it('unowned → unassigned for a non-pet; hidden for a pet', () => {
+    expect(classifyOwnerAudience(undefined, adult, resolve).kind).toBe('unassigned');
+    expect(classifyOwnerAudience(null, pet, resolve).kind).toBe('hidden');
   });
 });
