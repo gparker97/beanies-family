@@ -4,6 +4,7 @@ import { celebrate } from '@/composables/useCelebration';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { useToday } from '@/composables/useToday';
+import { isDocLoaded } from '@/services/automerge/docService';
 import * as listRepo from '@/services/automerge/repositories/listRepository';
 import { computeRecurringReset, isFiled, isListDue, isRecurring } from '@/utils/listLifecycle';
 import { getListTemplateByKey } from '@/constants/listTemplates';
@@ -82,6 +83,12 @@ export const useListStore = defineStore('lists', () => {
   // ========== ACTIONS ==========
 
   async function loadLists(): Promise<void> {
+    // No-op when the Automerge doc isn't loaded yet (e.g. a page mounts during
+    // a Drive reconnect, before the central load sequence runs). Reading the
+    // collection would throw "No Automerge document loaded" and surface a
+    // spurious red toast. The central load re-runs loadLists once the doc is
+    // ready. Matches the isDocLoaded() guard in notifications/overlap stores.
+    if (!isDocLoaded()) return;
     await wrapAsync(
       isLoading,
       error,
@@ -284,7 +291,7 @@ export const useListStore = defineStore('lists', () => {
    * `cycleCelebrated`). Idempotent and guarded against an empty set.
    */
   async function reconcileRecurringLists(): Promise<void> {
-    if (!lists.value.length) return;
+    if (!isDocLoaded() || !lists.value.length) return;
     const todayStr = today.value;
     for (const list of lists.value) {
       if (!isRecurring(list)) continue;

@@ -8,6 +8,8 @@ vi.mock('@/services/automerge/repositories/listRepository', () => ({
   updateList: vi.fn(),
   deleteList: vi.fn(),
 }));
+// Doc is "loaded" for store-logic tests — loadLists/reconcile no-op without it.
+vi.mock('@/services/automerge/docService', () => ({ isDocLoaded: () => true }));
 vi.mock('@/composables/useCelebration', () => ({ celebrate: vi.fn() }));
 // A real ref for `today` (so the store's `watch(today)` is a valid source);
 // `__setToday` lets the suite pin it deterministically per run.
