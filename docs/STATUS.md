@@ -1,6 +1,47 @@
 # Project Status
 
-> **Last updated:** 2026-06-17 (Wednesday, later — **BUILT #33 Beanie Lists in 4 committed slices behind the `familyLists` dev flag (committed `false` → flag OFF = identical to today; NOTHING deployed). Also raised Notion #40 (Helpful Hints) and deepened the #33 plan earlier the same day. Working tree clean on `main`; commits `81065720` (foundation) → `6fc532f0` (constants/i18n) → `61756998` (UI+gating) → `794c0c4a` (briefing+notification) → `99acd538` (rename+zh+theme) + this STATUS/CHANGELOG.**)
+> **Last updated:** 2026-06-17 (Wednesday, latest — **finished the #33 trip/activity LINKING that the earlier block had deferred, fixed two reported bugs, redesigned the linked-list embed, and made linked lists open in-place. Pushing the full session to `origin/main` now (18 commits). Working tree clean on `main`. NOTHING DEPLOYED (`familyLists` still committed `false`, verified). Latest commits `752d7832` (link picker + embed) → `d26f1a83` (central-load + no-doc guard) → `1e8090f7` (trusted-device Google) → `245ea5e0`/`3a518a84` (embed on the view drawer only) → `6a49a2a5` (category-tinted embed redesign) → `9d4879c8` (in-place open + stack-aware Escape).**)
+>
+> ### ⭐⭐ NEXT SESSION — RUN A CODE REVIEW ON THIS ENTIRE SESSION'S CHANGES ⭐⭐
+>
+> greg asked that the next session **run a full code review on ALL work pushed today.** Scope it to the **18 commits in `origin/main..main` as of this push — i.e. everything after `6ffc3d03`** (the prior origin HEAD), which is the complete Beanie Lists (#33) build + today's fixes/redesign. **70 files, +5615/−435.** Recommended: `/code-review ultra` against the branch (or review the range `6ffc3d03..9d4879c8`). The commits, oldest→newest:
+>
+> 1. `2e760750` docs(plan): deepen the #33 plan (templates, i18n, UI states, briefing predicate, tests)
+> 2. `81065720` feat(lists): **foundation** — `FamilyList`/`FamilyListItem` model, `lists` CRDT collection, `utils/listLifecycle.ts`, `listRepository`, `listStore`, `familyLists` flag
+> 3. `6fc532f0` feat(lists): categories, templates, label resolver, `createFromTemplate` + i18n
+> 4. `61756998` feat(lists): **UI** — page, tile, shelf, detail modal, new-list sheet + `requiresFlag` gating
+> 5. `794c0c4a` feat(lists): daily-briefing surfacing + derived `list-completed` notification
+> 6. `99acd538` feat(lists): Family To-Do → **To-Dos** rename, welcome-subtitle retro-fit, zh + theme docs
+> 7. `c8cfd80b` docs(lists): STATUS + CHANGELOG for the #33 build
+> 8. `0f419403` feat(lists): faithful mockup rework + trip/activity linking + mobile Planning nav
+> 9. `4bdfa293` feat(lists): comic-style empty-state beanie for Beanie Lists
+> 10. `183f0486` feat(ui): redraw **all** empty-state beanies as comic illustrations (`BeanieCore.vue`)
+> 11. `822b83a7` docs(changelog): note the empty-state illustration refresh
+> 12. `752d7832` feat(lists): activity-linked list embed + **searchable link picker**
+> 13. `d26f1a83` fix(lists): load Beanie Lists in the **central load sequence** + `isDocLoaded()` no-doc guard
+> 14. `1e8090f7` fix(auth): **preserve Google connection on trusted-device sign-out** (`clearGoogleSessionState({ preserveRefreshToken })`) — ⚠️ touches hardened auth; review carefully
+> 15. `245ea5e0` fix(lists): show linked lists in the activity **view drawer** (`ActivityViewEditModal`)
+> 16. `3a518a84` fix(lists): keep the embed **out of** the activity create/edit form (`ActivityModal`)
+> 17. `6a49a2a5` feat(lists): **redesign the embed** as a category-tinted card (`LinkedLists.vue`, mockup `docs/mockups/linked-list-embed.html`)
+> 18. `9d4879c8` fix(lists): **open a linked list in-place** (no navigation) + `layer` prop on `BaseSidePanel`/`BeanieFormModal` + **stack-aware `useEscapeClose`** (shared listener, closes top-most only)
+>
+> **Areas the review should weight:** (a) the trusted-device auth change (#14) — does preserving the refresh token on trusted devices while always clearing `__pending__` and skipping the revoke hold up against the account-confusion threat the original code guarded? (b) the shared `useEscapeClose` rewrite (#18) — a module-level stack now drives every modal/drawer in the app; confirm no regression for single-overlay consumers (`BaseModal`, `BaseSidePanel`, mobile menus, `NotificationsDrawer`, `TodoSortMenu`). (c) stacked-drawer z-index/`layer` correctness. (d) the whole #33 feature is gated `familyLists:false`, so prod is unaffected — but it ungates one flip away, so review as if it will ship.
+>
+> **What changed in #33 since the earlier block below:** the trip/activity **linking that block lists as DEFERRED is now BUILT** — `LinkedLists.vue` embed (renders linked lists on the trip page + the activity **view** drawer as a category-tinted card with progress + provenance + door-back), a searchable link picker in `ListDetailModal`, `clearLinksFor` on-delete cleanup, and lists opening **in-place** (no navigation) via a new modal `layer`/stacking system. Two bugs fixed: lists weren't in the central load sequence (empty activity embed); trusted-device sign-out re-prompted for Google. The Help Center `beanie-lists` article and an optional E2E remain deferred.
+>
+> **Pending / Next Session** (validated 2026-06-17: #241 OPEN, Dependabot #250/#251 open, `familyLists` still `false` — all carried items still apply):
+>
+> - **⭐⭐ Run the code review above** on the 18 pushed commits — greg's explicit ask for next session.
+> - **#33 Beanie Lists** — dogfood behind the flag (ON in dev); decide on ungating + the deferred Help Center article before going live.
+> - **#40 Helpful Hints** — raised in Notion (`Not started`); run `/beanies-pre-plan #40` when prioritized.
+> - **#39** visibility + secret notes; **#38** Qwen translation engine — Notion intake done; pre-plan/plan when prioritized.
+> - **Dependabot** #250 (dev) + #251 (prod) — run `/review-dependabot-prs`.
+> - **Google OAuth verification** — awaiting Google (unverified warning + 100-user cap; Calendar/AI gated behind The Beanie Lab).
+> - **Carried:** #241 Reports nav (OPEN); deferred deps (astro 5→6, pdfjs-dist 4→6, capacitor 8.4.0 trio); `ChoiceModal` tech-debt; app-store DUNS (~early July).
+
+---
+
+> **Last updated:** 2026-06-17 (Wednesday, earlier — **BUILT #33 Beanie Lists in 4 committed slices behind the `familyLists` dev flag (committed `false` → flag OFF = identical to today; NOTHING deployed). Also raised Notion #40 (Helpful Hints) and deepened the #33 plan earlier the same day. Working tree clean on `main`; commits `81065720` (foundation) → `6fc532f0` (constants/i18n) → `61756998` (UI+gating) → `794c0c4a` (briefing+notification) → `99acd538` (rename+zh+theme) + this STATUS/CHANGELOG.**)
 >
 > **What shipped to `main` (gated):** the full Beanie Lists feature per `docs/plans/2026-06-16-beanie-lists.md` (Pass-5 deepened) — **(1) foundation:** `FamilyList`/`FamilyListItem` model, `lists` CRDT collection (auto-migrates old pods), `utils/listLifecycle.ts` (the single home for lifecycle semantics: `isRecurring`/`isFiled`/`isListDue` + `computeRecurringReset`), `listRepository`, `listStore` (mirrors `todoStore`: `wrapAsync`/`createMemberFiltered`/`celebrate`; completion folded into `toggleItem`; idempotent `reconcileRecurringLists`), `familyLists` flag registered. **(2) UI:** `BeanieListsPage` (due-soon + category shelves + filter chips + completed + empty state) → `ListShelf` → `ListTile`; `ListDetailModal` (mirrors `TodoViewEditModal`); `NewListSheet` (category pills + 6 templates + blank); shared `PageWelcomeSubtitle` (new CIG Caveat convention). **(3) Gating:** `/lists` route + ONE shared `requiresFlag` mechanism (typed `RouteMeta` + finance-style guard; `isItemFlagEnabled` consumed by sidebar/mobile-hamburger/quick-add; module-load invariant). **(4) Integrations:** daily-briefing surfacing via `useCriticalItems` + `classifyOwnerAudience` (single-owner sibling); derived `list-completed` notification kind (pure-derived, windowed, never-throws); Nook tap → `/lists?view=`. **(5) Polish:** Family To-Do → **To-Dos** rename; `npm run translate` (74 zh keys, garbled ones hand-fixed); theme-skill doc. `npm run validate` green at every slice. Tests: `listLifecycle`, `listStore`, `useListCategoryLabel`, `ListTile`, `classifyOwnerAudience`, `deriveNotifications` list-completed, updated quick-add/nav invariants.
 >
