@@ -1293,7 +1293,18 @@ export async function revokeToken(): Promise<void> {
  * mid-flow, account B's refresh token can survive under `__pending__`
  * and silently log them in as B on the next session. Always clear it.
  */
-export async function clearGoogleSessionState(): Promise<void> {
+export async function clearGoogleSessionState(
+  options: { preserveRefreshToken?: boolean } = {}
+): Promise<void> {
+  // `preserveRefreshToken` keeps the ACTIVE family's persisted refresh token so
+  // a re-login on the same device can silently reconnect to Drive without an
+  // interactive reauth prompt. Used for trusted-device sign-out (mirrors the
+  // IndexedDB cache, which is likewise preserved on trusted devices). The
+  // pending-family slot is ALWAYS cleared and the network revoke is skipped
+  // when preserving, so the surviving grant stays valid. Default (false) is the
+  // full teardown used by shared-device sign-out and `disconnect()`.
+  const { preserveRefreshToken = false } = options;
+
   // Session teardown: bump the epoch FIRST so any acquisition in flight discards
   // its result, and clear any pending redirect-auth intent (Req 6).
   sessionEpoch++;
@@ -1306,18 +1317,23 @@ export async function clearGoogleSessionState(): Promise<void> {
   clearTokenState();
   currentFamilyId = null;
 
-  // 2. Best-effort fire-and-forget network revoke. Never await.
-  if (tokenSnapshot) {
+  // 2. Best-effort fire-and-forget network revoke. Never await. Skipped when
+  //    preserving — revoking the grant would invalidate the refresh token we
+  //    are deliberately keeping for a silent reconnect.
+  if (tokenSnapshot && !preserveRefreshToken) {
     fetch(`${GOOGLE_REVOKE_URL}?token=${tokenSnapshot}`, { method: 'POST' }).catch(() => {
       // Network errors are expected (offline, slow, etc.) — best-effort.
     });
   }
 
-  // 3. Clear persisted refresh tokens for both the active family AND the
-  //    pending-family slot. Promise.allSettled so one failure doesn't
-  //    leave the other layer dirty.
+  // 3. Clear persisted refresh tokens. The pending-family slot is ALWAYS
+  //    cleared (it can hold a wrong account mid-login — see header). The active
+  //    family's token is cleared unless we're preserving the connection.
+  //    Promise.allSettled so one failure doesn't leave the other layer dirty.
   await Promise.allSettled([
-    familyIdSnapshot ? clearGoogleRefreshToken(familyIdSnapshot) : Promise.resolve(),
+    familyIdSnapshot && !preserveRefreshToken
+      ? clearGoogleRefreshToken(familyIdSnapshot)
+      : Promise.resolve(),
     clearGoogleRefreshToken(PENDING_FAMILY_KEY),
   ]);
 }

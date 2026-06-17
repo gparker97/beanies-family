@@ -973,7 +973,17 @@ export const useAuthStore = defineStore('auth', () => {
     // with a different Google account on the next session can silently
     // re-use the previous account's refresh token via a silent token
     // refresh, leaving the app stuck on the wrong Drive.
-    await clearGoogleSessionStateWithTimeout(3000);
+    //
+    // On a TRUSTED device we preserve the active family's refresh token so the
+    // same user's next sign-in reconnects to Drive silently instead of seeing a
+    // reconnect prompt. This mirrors the IndexedDB cache below, which is also
+    // kept on trusted devices — "this is my personal device, keep my session".
+    // The pending-family slot is still cleared and the grant is not revoked, so
+    // a *different* account signing in on a shared (untrusted) device still gets
+    // the full teardown.
+    const settingsStore = useSettingsStore();
+    const trusted = settingsStore.isTrustedDevice;
+    await clearGoogleSessionStateWithTimeout(3000, { preserveRefreshToken: trusted });
 
     // Reset per-session sync state — banner flags, polling timer, encrypted
     // pending file, family key, file metadata. Without this, transient UI
@@ -990,8 +1000,7 @@ export const useAuthStore = defineStore('auth', () => {
     const familyId = currentUser.value?.familyId;
 
     // Delete the per-family IndexedDB cache unless this is a trusted device
-    const settingsStore = useSettingsStore();
-    if (familyId && !settingsStore.isTrustedDevice) {
+    if (familyId && !trusted) {
       try {
         await deleteFamilyDatabase(familyId);
       } catch (e) {
@@ -1036,10 +1045,13 @@ export const useAuthStore = defineStore('auth', () => {
    * a stale token cached is far better than trapping the user on the
    * page mid-sign-out.
    */
-  async function clearGoogleSessionStateWithTimeout(timeoutMs: number): Promise<void> {
+  async function clearGoogleSessionStateWithTimeout(
+    timeoutMs: number,
+    options: { preserveRefreshToken?: boolean } = {}
+  ): Promise<void> {
     try {
       await Promise.race([
-        Promise.all([clearGoogleSessionState(), Promise.resolve(clearFolderCache())]),
+        Promise.all([clearGoogleSessionState(options), Promise.resolve(clearFolderCache())]),
         new Promise<void>((resolve) => {
           setTimeout(() => {
             console.warn(
