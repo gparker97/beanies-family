@@ -29,33 +29,31 @@ const progressLabel = computed(() =>
   fillTemplate(t('lists.progress'), { done: String(done.value), total: String(total.value) })
 );
 
-type Pill = { text: string; kind: 'due' | 'overdue' | 'recurring' | 'linked' };
+type Pill = { glyph: string; text: string; kind: 'due' | 'overdue' | 'recurring' | 'linked' };
 const statusPill = computed<Pill | null>(() => {
   const list = props.list;
+  if (list.linkedVacationId || list.linkedActivityId) {
+    return { glyph: '🔗', text: t('lists.status.linked'), kind: 'linked' };
+  }
   if (isRecurring(list) && list.frequency) {
+    // short frequency word (mockup: "🔁 Weekly"), recurring = purple
     return {
-      text: t(`lists.status.repeats.${list.frequency}` as 'lists.status.repeats.daily'),
+      glyph: '🔁',
+      text: t(`lists.detail.freq.${list.frequency}` as 'lists.detail.freq.weekly'),
       kind: 'recurring',
     };
   }
   const due = isListDue(list, today.value);
-  if (due === 'overdue') return { text: t('lists.status.overdue'), kind: 'overdue' };
-  if (due === 'today' && list.dueDate) {
+  if (due === 'overdue') return { glyph: '📅', text: t('lists.status.overdue'), kind: 'overdue' };
+  if (list.dueDate && (due === 'today' || due === null)) {
     return {
-      text: fillTemplate(t('lists.status.due'), { date: formatDateShort(list.dueDate) }),
-      kind: 'due',
-    };
-  }
-  if (list.dueDate) {
-    return {
-      text: fillTemplate(t('lists.status.due'), { date: formatDateShort(list.dueDate) }),
+      glyph: '📅',
+      text: formatDateShort(list.dueDate),
       kind: 'due',
     };
   }
   return null;
 });
-
-const isLinked = computed(() => !!(props.list.linkedVacationId || props.list.linkedActivityId));
 </script>
 
 <template>
@@ -64,13 +62,18 @@ const isLinked = computed(() => !!(props.list.linkedVacationId || props.list.lin
     class="group flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-800"
     @click="emit('open', list.id)"
   >
-    <!-- Tinted strip: emoji + owner -->
+    <!-- Tinted strip: emoji + owner + faint watermark -->
     <div
-      class="flex items-center justify-between px-3.5 py-2.5"
+      class="relative flex items-center justify-between overflow-hidden px-3.5 py-2.5"
       :style="{ backgroundColor: `color-mix(in srgb, ${accent} 12%, transparent)` }"
     >
-      <span class="text-xl" aria-hidden="true">{{ list.emoji }}</span>
+      <span class="z-[1] text-xl drop-shadow-sm" aria-hidden="true">{{ list.emoji }}</span>
       <MemberChip :member-id="list.ownerId" size="dot" />
+      <span
+        class="pointer-events-none absolute -right-1 -bottom-3 text-4xl opacity-[0.07]"
+        aria-hidden="true"
+        >{{ list.emoji }}</span
+      >
     </div>
 
     <!-- Body -->
@@ -84,15 +87,15 @@ const isLinked = computed(() => !!(props.list.linkedVacationId || props.list.lin
         </span>
         <span
           v-if="statusPill"
-          class="rounded-full px-2 py-0.5 text-[0.625rem] font-semibold"
+          class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.625rem] font-semibold"
           :class="{
             'bg-[var(--tint-orange-15)] text-[var(--color-primary-500)]':
               statusPill.kind === 'due' || statusPill.kind === 'overdue',
-            'bg-[var(--tint-silk-20)] text-[var(--color-foundation)]':
-              statusPill.kind === 'recurring',
+            'bg-[var(--tint-purple-12)] text-purple-600': statusPill.kind === 'recurring',
+            'bg-[rgba(42,157,143,0.12)] text-[#2a9d8f]': statusPill.kind === 'linked',
           }"
         >
-          {{ statusPill.text }}
+          <span aria-hidden="true">{{ statusPill.glyph }}</span> {{ statusPill.text }}
         </span>
       </div>
 
@@ -108,10 +111,6 @@ const isLinked = computed(() => !!(props.list.linkedVacationId || props.list.lin
           progressLabel
         }}</span>
       </div>
-
-      <span v-if="isLinked" class="text-[0.625rem] text-[var(--color-text-muted)]">
-        🔗 {{ t('lists.status.linked') }}
-      </span>
     </div>
   </button>
 </template>

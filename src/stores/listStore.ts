@@ -264,6 +264,21 @@ export const useListStore = defineStore('lists', () => {
   }
 
   /**
+   * Clear any list link to a now-deleted trip/activity, so the travel-page embed
+   * simply stops rendering it (no orphan, no crash). Called from the
+   * vacation/activity delete paths.
+   */
+  async function clearLinksFor(kind: 'trip' | 'activity', id: string): Promise<void> {
+    for (const l of lists.value) {
+      if (kind === 'trip' && l.linkedVacationId === id) {
+        await updateList(l.id, { linkedVacationId: undefined });
+      } else if (kind === 'activity' && l.linkedActivityId === id) {
+        await updateList(l.id, { linkedActivityId: undefined });
+      }
+    }
+  }
+
+  /**
    * The ONE write path for "the clock advanced." Resets every recurring list
    * whose period has rolled over (uncheck all + bump `lastResetDate` + clear
    * `cycleCelebrated`). Idempotent and guarded against an empty set.
@@ -322,6 +337,7 @@ export const useListStore = defineStore('lists', () => {
     toggleItem,
     addItem,
     removeItem,
+    clearLinksFor,
     reconcileRecurringLists,
     resetState,
   };

@@ -15,7 +15,7 @@ import type { FamilyList, ListCategory } from '@/types/models';
 
 const { t } = useTranslation();
 const listStore = useListStore();
-const { categoryLabel } = useListCategoryLabel();
+const { categoryLabel, categoryShortLabel } = useListCategoryLabel();
 const route = useRoute();
 
 onMounted(() => {
@@ -133,7 +133,7 @@ function onCreated(id: string): void {
           "
           @click="selectedCategory = cat.id"
         >
-          <span aria-hidden="true">{{ cat.emoji }}</span> {{ categoryLabel(cat.id) }}
+          <span aria-hidden="true">{{ cat.emoji }}</span> {{ categoryShortLabel(cat.id) }}
         </button>
       </div>
 

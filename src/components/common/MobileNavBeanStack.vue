@@ -36,6 +36,7 @@ import { useNavBadges } from '@/composables/useNavBadges';
 import { useReducedMotion } from '@/composables/useReducedMotion';
 import { usePermissions, FINANCE_ROUTES } from '@/composables/usePermissions';
 import { isRouteActive } from '@/utils/route';
+import { isItemFlagEnabled } from '@/constants/navigation';
 import type { MobileNavCategory, MobileNavStackItem } from '@/constants/navigation';
 
 const props = defineProps<{
@@ -80,7 +81,8 @@ const isOpenRef = toRef(props, 'isOpen');
 // specific route mid-session.
 // ---------------------------------------------------------------------------
 const visibleItems = computed<MobileNavStackItem[]>(() => {
-  const items = props.category.items ?? [];
+  // Drop flag-gated items whose dev flag is off (e.g. Beanie Lists in prod).
+  const items = (props.category.items ?? []).filter(isItemFlagEnabled);
   if (canViewFinances.value) return items;
   return items.filter((i) => !FINANCE_ROUTES.includes(i.path));
 });

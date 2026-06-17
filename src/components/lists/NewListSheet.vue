@@ -16,7 +16,7 @@ const emit = defineEmits<{ close: []; created: [id: string] }>();
 const { t } = useTranslation();
 const listStore = useListStore();
 const familyStore = useFamilyStore();
-const { categoryLabel } = useListCategoryLabel();
+const { categoryShortLabel } = useListCategoryLabel();
 
 const meId = computed(() => familyStore.currentMember?.id ?? '');
 const selectedCategory = ref<ListCategory | null>(null);
@@ -81,7 +81,7 @@ const isOpen = computed(() => props.open);
             "
             @click="selectedCategory = selectedCategory === cat.id ? null : cat.id"
           >
-            <span aria-hidden="true">{{ cat.emoji }}</span> {{ categoryLabel(cat.id) }}
+            <span aria-hidden="true">{{ cat.emoji }}</span> {{ categoryShortLabel(cat.id) }}
           </button>
         </div>
       </div>
@@ -108,7 +108,7 @@ const isOpen = computed(() => props.open);
         </div>
       </div>
 
-      <BaseButton variant="secondary" class="w-full" @click="startBlank">
+      <BaseButton variant="primary" class="w-full" @click="startBlank">
         {{ t('lists.new.blank') }}
       </BaseButton>
     </div>

@@ -300,6 +300,12 @@ export const useVacationStore = defineStore('vacations', () => {
         const success = await vacationRepo.deleteVacation(id);
         if (success) {
           vacations.value = vacations.value.filter((v) => v.id !== id);
+          // Clear any Beanie List links to this trip (and its activity) so the
+          // travel-page embed stops rendering — no orphan reference.
+          const { useListStore } = await import('@/stores/listStore');
+          const listStore = useListStore();
+          await listStore.clearLinksFor('trip', id);
+          await listStore.clearLinksFor('activity', vacation.activityId);
         }
         return success;
       },

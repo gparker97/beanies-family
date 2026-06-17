@@ -3,18 +3,24 @@ import { computed, ref, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListStore } from '@/stores/listStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useVacationStore } from '@/stores/vacationStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { useToday } from '@/composables/useToday';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
-import { LIST_CATEGORIES } from '@/constants/listCategories';
+import { useMemberInfo } from '@/composables/useMemberInfo';
+import { LIST_CATEGORIES, getListCategory } from '@/constants/listCategories';
 import { isRecurring } from '@/utils/listLifecycle';
+import { fillTemplate } from '@/utils/fillTemplate';
+import { formatDateShort } from '@/utils/date';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
-import BaseSelect from '@/components/ui/BaseSelect.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
+import MemberChip from '@/components/ui/MemberChip.vue';
+import ListItemRow from './ListItemRow.vue';
 import type { ListCategory, ListFrequency } from '@/types/models';
 
 const props = defineProps<{ listId: string | null }>();
@@ -23,45 +29,43 @@ const emit = defineEmits<{ close: []; deleted: [id: string] }>();
 const { t } = useTranslation();
 const listStore = useListStore();
 const familyStore = useFamilyStore();
+const vacationStore = useVacationStore();
+const activityStore = useActivityStore();
 const { today } = useToday();
 const { categoryLabel } = useListCategoryLabel();
+const { getMemberName } = useMemberInfo();
 
-// Live lookup so the modal stays reactive as the store mutates.
 const list = computed(() =>
   props.listId ? (listStore.lists.find((l) => l.id === props.listId) ?? null) : null
 );
-
 const meId = computed(() => familyStore.currentMember?.id ?? '');
 
-// Local title draft (saved on blur) — everything else writes through immediately.
-const draftTitle = ref('');
+// Meta-band pills are display by default; tapping one reveals an inline editor.
+const editingCategory = ref(false);
+const editingOwner = ref(false);
+const editingLink = ref<'trip' | 'activity' | null>(null);
 watch(
-  list,
-  (l) => {
-    if (l) draftTitle.value = l.title;
-  },
-  { immediate: true }
+  () => props.listId,
+  () => {
+    editingCategory.value = false;
+    editingOwner.value = false;
+    editingLink.value = null;
+  }
 );
 
-function saveTitle(): void {
-  const l = list.value;
-  if (!l) return;
-  const next = draftTitle.value.trim();
-  if (next && next !== l.title) void listStore.updateList(l.id, { title: next });
-}
+const category = computed(() => (list.value ? getListCategory(list.value.category) : undefined));
 
-const categoryOptions = computed(() =>
-  LIST_CATEGORIES.map((c) => ({ value: c.id, label: categoryLabel(c.id) }))
-);
-function setCategory(value: string | number): void {
-  if (list.value) void listStore.updateList(list.value.id, { category: value as ListCategory });
+function setCategory(value: ListCategory): void {
+  if (list.value) void listStore.updateList(list.value.id, { category: value });
+  editingCategory.value = false;
 }
-
 function setOwner(value: string | string[]): void {
   const id = Array.isArray(value) ? value[0] : value;
   if (list.value && id) void listStore.updateList(list.value.id, { ownerId: id });
+  editingOwner.value = false;
 }
 
+// Repeats / frequency / due date
 const lifecycleOptions = computed(() => [
   { value: 'oneoff', label: t('lists.detail.oneoff') },
   { value: 'recurring', label: t('lists.detail.recurring') },
@@ -86,7 +90,6 @@ function setLifecycle(value: string): void {
     });
   }
 }
-
 const freqOptions = computed(() => [
   { value: 'daily', label: t('lists.detail.freq.daily') },
   { value: 'weekly', label: t('lists.detail.freq.weekly') },
@@ -95,18 +98,30 @@ const freqOptions = computed(() => [
 function setFrequency(value: string): void {
   if (list.value) void listStore.updateList(list.value.id, { frequency: value as ListFrequency });
 }
-
 function setDueDate(value: string): void {
   if (list.value) void listStore.updateList(list.value.id, { dueDate: value || undefined });
 }
 
+// Meta-band due / recurrence pill text
+const recurrenceText = computed(() => {
+  const l = list.value;
+  if (!l || !isRecurring(l)) return '';
+  const key = `lists.status.repeats.${l.frequency ?? 'weekly'}` as 'lists.status.repeats.weekly';
+  return t(key);
+});
+const dueText = computed(() => {
+  const l = list.value;
+  if (!l || isRecurring(l) || !l.dueDate) return '';
+  return fillTemplate(t('lists.status.due'), { date: formatDateShort(l.dueDate) });
+});
+
+// Items
 function toggleItem(itemId: string): void {
   if (list.value) void listStore.toggleItem(list.value.id, itemId, meId.value);
 }
 function removeItem(itemId: string): void {
   if (list.value) void listStore.removeItem(list.value.id, itemId);
 }
-
 const newItem = ref('');
 function addItem(): void {
   const title = newItem.value.trim();
@@ -114,6 +129,43 @@ function addItem(): void {
     void listStore.addItem(list.value.id, title);
     newItem.value = '';
   }
+}
+
+// ── Linking to a trip / activity ──────────────────────────────────────────
+const upcomingTrips = computed(() =>
+  vacationStore.upcomingVacations.map((v) => ({ id: v.id, name: v.name }))
+);
+const upcomingActivities = computed(() => {
+  const seen = new Set<string>();
+  const out: { id: string; title: string }[] = [];
+  for (const { activity } of activityStore.upcomingActivities) {
+    if (seen.has(activity.id)) continue;
+    seen.add(activity.id);
+    out.push({ id: activity.id, title: activity.title });
+  }
+  return out;
+});
+const linkedTripName = computed(() => {
+  const id = list.value?.linkedVacationId;
+  return id ? (upcomingTrips.value.find((v) => v.id === id)?.name ?? '') : '';
+});
+const linkedActivityName = computed(() => {
+  const id = list.value?.linkedActivityId;
+  return id ? (upcomingActivities.value.find((a) => a.id === id)?.title ?? '') : '';
+});
+function linkTrip(id: string): void {
+  if (list.value) void listStore.updateList(list.value.id, { linkedVacationId: id });
+  editingLink.value = null;
+}
+function linkActivity(id: string): void {
+  if (list.value) void listStore.updateList(list.value.id, { linkedActivityId: id });
+  editingLink.value = null;
+}
+function unlinkTrip(): void {
+  if (list.value) void listStore.updateList(list.value.id, { linkedVacationId: undefined });
+}
+function unlinkActivity(): void {
+  if (list.value) void listStore.updateList(list.value.id, { linkedActivityId: undefined });
 }
 
 async function handleDelete(): Promise<void> {
@@ -147,77 +199,62 @@ async function handleDelete(): Promise<void> {
     @save="emit('close')"
     @delete="handleDelete"
   >
-    <div class="space-y-5">
-      <!-- Name -->
-      <BaseInput
-        v-model="draftTitle"
-        :label="t('lists.detail.titlePlaceholder')"
-        :placeholder="t('lists.detail.titlePlaceholder')"
-        @blur="saveTitle"
-      />
-
-      <!-- Meta: category + owner -->
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <BaseSelect
-          :model-value="list.category"
-          :options="categoryOptions"
-          :label="t('lists.new.categoryLabel')"
-          @update:model-value="setCategory"
-        />
-        <div>
-          <p class="lists-label">{{ t('lists.detail.owner') }}</p>
-          <FamilyChipPicker
-            :model-value="list.ownerId"
-            mode="single"
-            compact
-            @update:model-value="setOwner"
-          />
-        </div>
+    <div class="space-y-4">
+      <!-- Meta band: category · owner · due/recurrence (pills, never a dropdown) -->
+      <div class="flex flex-wrap items-center gap-2 border-b border-[var(--color-border)] pb-3.5">
+        <button type="button" class="mb-pill" @click="editingCategory = !editingCategory">
+          <span class="h-2 w-2 rounded-full" :style="{ backgroundColor: category?.color }" />
+          {{ categoryLabel(list.category) }}
+        </button>
+        <button type="button" class="mb-pill" @click="editingOwner = !editingOwner">
+          <MemberChip :member-id="list.ownerId" size="dot" />
+          {{ getMemberName(list.ownerId, '') }}
+        </button>
+        <span v-if="dueText" class="mb-pill mb-due"
+          ><span aria-hidden="true">📅</span> {{ dueText }}</span
+        >
+        <span v-else-if="recurrenceText" class="mb-pill mb-recur"
+          ><span aria-hidden="true">🔁</span> {{ recurrenceText }}</span
+        >
       </div>
+
+      <!-- Inline category picker (pills) -->
+      <div v-if="editingCategory" class="flex flex-wrap gap-2">
+        <button
+          v-for="cat in LIST_CATEGORIES"
+          :key="cat.id"
+          type="button"
+          class="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"
+          :class="
+            list.category === cat.id
+              ? 'border-[var(--color-primary-500)] bg-[var(--tint-orange-12)] text-[var(--color-primary-500)]'
+              : 'border-[var(--color-border)] bg-white text-[var(--color-text-muted)] dark:bg-slate-800'
+          "
+          @click="setCategory(cat.id)"
+        >
+          <span aria-hidden="true">{{ cat.emoji }}</span> {{ categoryLabel(cat.id) }}
+        </button>
+      </div>
+      <!-- Inline owner picker -->
+      <FamilyChipPicker
+        v-if="editingOwner"
+        :model-value="list.ownerId"
+        mode="single"
+        compact
+        @update:model-value="setOwner"
+      />
 
       <!-- Items -->
       <div>
-        <p class="lists-label">{{ t('lists.title') }}</p>
-        <ul class="space-y-1.5">
-          <li
-            v-for="item in list.items"
-            :key="item.id"
-            class="flex items-center gap-2.5 rounded-xl border border-[var(--color-border)] px-3 py-2"
-          >
-            <button
-              type="button"
-              class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 text-white transition-colors"
-              :class="
-                item.completed
-                  ? 'border-[var(--color-success)] bg-[var(--color-success)]'
-                  : 'border-[var(--color-border)]'
-              "
-              :aria-label="item.title"
-              @click="toggleItem(item.id)"
-            >
-              <span v-if="item.completed" aria-hidden="true" class="text-xs">✓</span>
-            </button>
-            <span
-              class="flex-1 text-sm"
-              :class="
-                item.completed
-                  ? 'text-[var(--color-text-muted)] line-through'
-                  : 'text-[var(--color-text)]'
-              "
-            >
-              {{ item.title }}
-            </span>
-            <button
-              type="button"
-              class="text-xs text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-primary-500)]"
-              :aria-label="t('action.delete')"
-              @click="removeItem(item.id)"
-            >
-              ✕
-            </button>
-          </li>
-        </ul>
-        <div class="mt-2 flex items-center gap-2">
+        <ListItemRow
+          v-for="item in list.items"
+          :key="item.id"
+          :item="item"
+          removable
+          @toggle="toggleItem"
+          @remove="removeItem"
+        />
+        <div class="mt-2">
           <BaseInput
             v-model="newItem"
             :placeholder="t('lists.detail.addItem')"
@@ -227,8 +264,8 @@ async function handleDelete(): Promise<void> {
       </div>
 
       <!-- Repeats? -->
-      <div>
-        <p class="lists-label">{{ t('lists.detail.repeatsLabel') }}</p>
+      <div class="setsec">
+        <p class="lbl">{{ t('lists.detail.repeatsLabel') }}</p>
         <TogglePillGroup
           :model-value="isRecurring(list) ? 'recurring' : 'oneoff'"
           :options="lifecycleOptions"
@@ -249,21 +286,173 @@ async function handleDelete(): Promise<void> {
       </div>
 
       <!-- Due date (one-off only) -->
-      <div v-if="!isRecurring(list)">
-        <p class="lists-label">{{ t('lists.detail.dueDateLabel') }}</p>
+      <div v-if="!isRecurring(list)" class="setsec">
+        <p class="lbl">{{ t('lists.detail.dueDateLabel') }}</p>
         <BeanieDatePicker :model-value="list.dueDate ?? ''" @update:model-value="setDueDate" />
+      </div>
+
+      <!-- Link -->
+      <div class="setsec">
+        <p class="lbl">{{ t('lists.detail.linkLabel') }}</p>
+        <div class="flex flex-wrap gap-2">
+          <span v-if="list.linkedVacationId" class="link-chip">
+            <span aria-hidden="true">✈️</span>
+            {{ fillTemplate(t('lists.detail.linkedToTrip'), { name: linkedTripName }) }}
+            <button
+              type="button"
+              class="unlink"
+              :aria-label="t('lists.detail.unlink')"
+              @click="unlinkTrip"
+            >
+              <span aria-hidden="true">✕</span>
+            </button>
+          </span>
+          <button
+            v-else
+            type="button"
+            class="linkpill"
+            @click="editingLink = editingLink === 'trip' ? null : 'trip'"
+          >
+            <span aria-hidden="true">✈️</span> {{ t('lists.detail.linkTrip') }}
+          </button>
+
+          <span v-if="list.linkedActivityId" class="link-chip">
+            <span aria-hidden="true">📅</span>
+            {{ fillTemplate(t('lists.detail.linkedToActivity'), { name: linkedActivityName }) }}
+            <button
+              type="button"
+              class="unlink"
+              :aria-label="t('lists.detail.unlink')"
+              @click="unlinkActivity"
+            >
+              <span aria-hidden="true">✕</span>
+            </button>
+          </span>
+          <button
+            v-else
+            type="button"
+            class="linkpill"
+            @click="editingLink = editingLink === 'activity' ? null : 'activity'"
+          >
+            <span aria-hidden="true">📅</span> {{ t('lists.detail.linkActivity') }}
+          </button>
+        </div>
+
+        <div v-if="editingLink === 'trip'" class="mt-2 space-y-1">
+          <p v-if="!upcomingTrips.length" class="text-xs text-[var(--color-text-muted)]">
+            {{ t('lists.detail.noUpcomingTrips') }}
+          </p>
+          <button
+            v-for="trip in upcomingTrips"
+            :key="trip.id"
+            type="button"
+            class="picker-row"
+            @click="linkTrip(trip.id)"
+          >
+            <span aria-hidden="true">✈️</span> {{ trip.name }}
+          </button>
+        </div>
+        <div v-else-if="editingLink === 'activity'" class="mt-2 space-y-1">
+          <p v-if="!upcomingActivities.length" class="text-xs text-[var(--color-text-muted)]">
+            {{ t('lists.detail.noUpcomingActivities') }}
+          </p>
+          <button
+            v-for="act in upcomingActivities"
+            :key="act.id"
+            type="button"
+            class="picker-row"
+            @click="linkActivity(act.id)"
+          >
+            <span aria-hidden="true">📅</span> {{ act.title }}
+          </button>
+        </div>
       </div>
     </div>
   </BeanieFormModal>
 </template>
 
 <style scoped>
-.lists-label {
-  color: var(--color-text-muted);
+.mb-pill {
+  align-items: center;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: var(--card-shadow, 0 4px 20px rgb(44 62 80 / 5%));
+  color: var(--color-text);
+  display: inline-flex;
   font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.5rem;
+  gap: 0.375rem;
+  padding: 0.375rem 0.6875rem;
+}
+
+:global(.dark) .mb-pill {
+  background: var(--color-surface, #1e293b);
+}
+
+.mb-due {
+  background: linear-gradient(135deg, var(--color-primary-500), #e67e22);
+  color: #fff;
+  font-weight: 700;
+}
+
+.mb-recur {
+  background: var(--tint-purple-12, rgb(155 89 182 / 12%));
+  color: #7c3aed;
+}
+
+.setsec {
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: var(--card-shadow, 0 4px 20px rgb(44 62 80 / 5%));
+  padding: 0.75rem 0.875rem;
+}
+
+:global(.dark) .setsec {
+  background: var(--color-surface, #1e293b);
+}
+
+.lbl {
+  color: var(--color-text-muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  margin-bottom: 0.5625rem;
   text-transform: uppercase;
+}
+
+.linkpill,
+.link-chip {
+  align-items: center;
+  background: var(--tint-slate-5, rgb(44 62 80 / 5%));
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  font-size: 0.74rem;
+  font-weight: 600;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.link-chip {
+  background: rgb(42 157 143 / 12%);
+  color: #2a9d8f;
+}
+
+.unlink {
+  margin-left: 0.25rem;
+  opacity: 0.7;
+}
+
+.picker-row {
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  color: var(--color-text);
+  display: flex;
+  font-size: 0.82rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  width: 100%;
 }
 </style>

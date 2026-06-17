@@ -15,5 +15,11 @@ export function useListCategoryLabel() {
     return cat ? t(cat.labelKey) : id;
   }
 
-  return { categoryLabel };
+  /** Short label for filter chips + new-list pills (full names stay on tiles). */
+  function categoryShortLabel(id: ListCategory): string {
+    const cat = getListCategory(id);
+    return cat ? t(cat.shortLabelKey) : id;
+  }
+
+  return { categoryLabel, categoryShortLabel };
 }
