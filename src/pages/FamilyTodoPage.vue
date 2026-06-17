@@ -11,6 +11,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
+import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import QuickAddBar from '@/components/todo/QuickAddBar.vue';
 import TodoSection from '@/components/todo/TodoSection.vue';
@@ -162,9 +163,7 @@ async function handleDelete(id: string) {
   <div class="space-y-6">
     <!-- Page header with sort -->
     <div class="flex items-center justify-between">
-      <p class="text-sm text-[var(--color-text-muted)]">
-        {{ t('todo.subtitle') }}
-      </p>
+      <PageWelcomeSubtitle :text="t('todo.subtitle')" />
       <TodoSortMenu v-if="hasAnyTodos" v-model:sort-by="sortBy" />
     </div>
 

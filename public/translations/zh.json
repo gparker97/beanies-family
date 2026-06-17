@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-15",
-    "translationCount": 3523
+    "lastUpdated": "2026-06-17",
+    "translationCount": 3596
   },
   "translations": {
     "app.name": {
@@ -3072,9 +3072,9 @@
       "lastUpdated": "2026-03-03"
     },
     "nav.todo": {
-      "translation": "家庭待办事项",
-      "hash": "ssz2wx",
-      "lastUpdated": "2026-03-03"
+      "translation": "待办事项",
+      "hash": "tjgfey",
+      "lastUpdated": "2026-06-17"
     },
     "nav.overview": {
       "translation": "概述",
@@ -17620,6 +17620,371 @@
       "translation": "已安排在行程结束后（ {date} ）",
       "hash": "g6g8dy",
       "lastUpdated": "2026-06-15"
+    },
+    "nav.lists": {
+      "translation": "Beanie Lists",
+      "hash": "kyt6m7",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.title": {
+      "translation": "Beanie Lists",
+      "hash": "kyt6m7",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.welcomeSubtitle": {
+      "translation": "我们要一起解决什么问题？",
+      "hash": "lh0mpm",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.newList": {
+      "translation": "新清单",
+      "hash": "mv5y72",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.empty.title": {
+      "translation": "无列表",
+      "hash": "b85gta",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.empty.body": {
+      "translation": "启动您的第一个家庭列表，整理房源。",
+      "hash": "303vnt",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.shelf.dueSoon": {
+      "translation": "即将到期",
+      "hash": "w09mvb",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.shelf.completed": {
+      "translation": "已完成",
+      "hash": "9xualn",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.filter.all": {
+      "translation": "所有食谱",
+      "hash": "1ev5",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.progress": {
+      "translation": "{done}/{total}",
+      "hash": "4mdif9",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.category.home": {
+      "translation": "家庭和家居用品",
+      "hash": "1grrrw",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.category.out": {
+      "translation": "外出与杂事",
+      "hash": "bbbxzp",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.category.kids": {
+      "translation": "儿童/学校",
+      "hash": "55v94x",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.category.health": {
+      "translation": "健康与安全",
+      "hash": "ahppkg",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.category.celebrations": {
+      "translation": "庆祝活动和传统",
+      "hash": "c7slso",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.category.trips": {
+      "translation": "行程和行李打包",
+      "hash": "901kub",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.category.projects": {
+      "translation": "项目与家务",
+      "hash": "s0j5gq",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.category.me": {
+      "translation": "只是为我自己",
+      "hash": "mv3nr1",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.status.due": {
+      "translation": "截止到{date}",
+      "hash": "6di85c",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.status.overdue": {
+      "translation": "超期",
+      "hash": "9hd20w",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.status.resets": {
+      "translation": "{day}重置",
+      "hash": "yd7z4w",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.status.repeats.daily": {
+      "translation": "每日重复",
+      "hash": "ed1d75",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.status.repeats.weekly": {
+      "translation": "每周重复",
+      "hash": "s3hg95",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.status.repeats.monthly": {
+      "translation": "每月重复",
+      "hash": "ishmv9",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.status.linked": {
+      "translation": "已链接",
+      "hash": "xdxvbb",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.title": {
+      "translation": "家具列表",
+      "hash": "1erpa",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.owner": {
+      "translation": "所有者",
+      "hash": "19m2dv",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.addItem": {
+      "translation": "+ 新增项目",
+      "hash": "sg4ubj",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.itemPlaceholder": {
+      "translation": "需要做什么？",
+      "hash": "uhav95",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.repeatsLabel": {
+      "translation": "重复",
+      "hash": "65k6hl",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.oneoff": {
+      "translation": "一次性",
+      "hash": "5ns8ko",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.recurring": {
+      "translation": "重复",
+      "hash": "peiciw",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.freq.daily": {
+      "translation": "每天",
+      "hash": "1366m1",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.freq.weekly": {
+      "translation": "每周",
+      "hash": "s8sy1r",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.freq.monthly": {
+      "translation": "每月",
+      "hash": "n1rd3n",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.dueDateLabel": {
+      "translation": "到期日",
+      "hash": "vzzrsq",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.recurringHint": {
+      "translation": "每个周期自行取消选中，这样您就可以重新开始—不需要截止日期。",
+      "hash": "qall0d",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.titlePlaceholder": {
+      "translation": "名單名稱",
+      "hash": "bxkpt9",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.delete": {
+      "translation": "删除列表",
+      "hash": "81r377",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.deleteConfirm.title": {
+      "translation": "删除此列表",
+      "hash": "lj8wto",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.deleteConfirm.message": {
+      "translation": "这将为每个人删除列表及其所有项目。",
+      "hash": "x65n2s",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.new.title": {
+      "translation": "开始新心愿单",
+      "hash": "bd9tjv",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.new.subtitle": {
+      "translation": "选择一个类别，然后是一个模板—或者从空白开始。",
+      "hash": "5e2jkb",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.new.categoryLabel": {
+      "translation": "类型",
+      "hash": "1wk6ce",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.new.templatesLabel": {
+      "translation": "从模板开始",
+      "hash": "i7uejz",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.new.blank": {
+      "translation": "开始新建",
+      "hash": "610czs",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.new.blankTitle": {
+      "translation": "我的列表",
+      "hash": "jiwm0e",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.template.grocery.name": {
+      "translation": "生鲜杂货清单",
+      "hash": "3o25f5",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.template.grocery.desc": {
+      "translation": "每周·自动重置",
+      "hash": "cezxvq",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.template.vacationPacking.name": {
+      "translation": "度假包装",
+      "hash": "xj6o6y",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.template.vacationPacking.desc": {
+      "translation": "将其关联到行程",
+      "hash": "3triqu",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.template.honeydo.name": {
+      "translation": "家务清单",
+      "hash": "xr2lr3",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.template.honeydo.desc": {
+      "translation": "您的合作夥伴",
+      "hash": "l0z11q",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.template.kidsChores.name": {
+      "translation": "儿童杂务",
+      "hash": "xmvpzw",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.template.kidsChores.desc": {
+      "translation": "每周重置",
+      "hash": "g2q580",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.template.beforeSchool.name": {
+      "translation": "課前輔導",
+      "hash": "9annvi",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.template.beforeSchool.desc": {
+      "translation": "日常检点表",
+      "hash": "xju2m9",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.template.partyPrep.name": {
+      "translation": "派对准备",
+      "hash": "v3ic3d",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.template.partyPrep.desc": {
+      "translation": "一次性·选择日期",
+      "hash": "cxh585",
+      "lastUpdated": "2026-06-17"
+    },
+    "quickAdd.list.label": {
+      "translation": "新列表",
+      "hash": "mvqdry",
+      "lastUpdated": "2026-06-17"
+    },
+    "quickAdd.list.hint": {
+      "translation": "开始一个分类的家庭清单",
+      "hash": "jcbji4",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.celebrate": {
+      "translation": "列表已完成！ 🎉",
+      "hash": "7ezqpl",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.briefing.owner.today": {
+      "translation": "您的清单“{list}”今天到期",
+      "hash": "dgfb9p",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.briefing.owner.overdue": {
+      "translation": "您的列表“{list}”已过期（ {date} ）",
+      "hash": "ocgeol",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.briefing.owner.noDue": {
+      "translation": "您的清单“{list}”还剩{remaining}项",
+      "hash": "l8qel5",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.briefing.forChild.today": {
+      "translation": "{children}的列表“{list}”今天到期",
+      "hash": "4o0il9",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.briefing.forChild.overdue": {
+      "translation": "{children}的列表“{list}”已过期（ {date} ）",
+      "hash": "eisy9r",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.briefing.forChild.noDue": {
+      "translation": "{children}的列表“{list}”还剩{remaining}",
+      "hash": "tzhpr",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.briefing.unassigned.today": {
+      "translation": "家庭列表“{list}”今天到期",
+      "hash": "3dpkw4",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.briefing.unassigned.overdue": {
+      "translation": "家庭列表“{list}”已过期（ {date} ）",
+      "hash": "dqnwau",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.briefing.unassigned.noDue": {
+      "translation": "家庭列表“{list}”还剩{remaining}",
+      "hash": "ned7co",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.notif.finishedBy": {
+      "translation": "已由{finisher}完成",
+      "hash": "l82z3x",
+      "lastUpdated": "2026-06-17"
+    },
+    "notifications.kindListCompleted": {
+      "translation": "列表已完成",
+      "hash": "zp561",
+      "lastUpdated": "2026-06-17"
     }
   }
 }
