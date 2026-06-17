@@ -31,6 +31,11 @@ export const FLAG_REGISTRY = [
     label: 'Calendar clash nudge',
     description: 'Free/busy heads-up when an activity clashes with a connected calendar.',
   },
+  {
+    id: 'familyLists',
+    label: 'Beanie Lists',
+    description: 'Categorized family checklists (one-off & recurring) under The Treehouse.',
+  },
 ] as const;
 
 /** Union of all known flag ids — derived from the registry (single source of truth). */

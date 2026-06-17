@@ -208,6 +208,7 @@ describe('docService', () => {
         budgets: {},
         recurringItems: {},
         todos: {},
+        lists: {},
         activities: {},
         vacations: {},
         photos: {},
