@@ -7,6 +7,7 @@ import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { LIST_CATEGORIES } from '@/constants/listCategories';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
+import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import ListShelf from '@/components/lists/ListShelf.vue';
 import ListDetailModal from '@/components/lists/ListDetailModal.vue';
@@ -99,6 +100,7 @@ function onCreated(id: string): void {
 
     <!-- Empty state -->
     <div v-if="isEmpty" class="py-12 text-center">
+      <EmptyStateIllustration variant="lists" class="mb-4" />
       <p class="mb-1 text-sm font-semibold text-[var(--color-text)]">
         {{ t('lists.empty.title') }}
       </p>

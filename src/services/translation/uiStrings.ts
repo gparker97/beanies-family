@@ -7615,6 +7615,10 @@ const STRING_DEFS = {
     en: 'A beanie looking at an empty piggy bank',
     beanie: 'a beanie looking at an empty piggy bank',
   },
+  'emptyState.aria.freshChecklist': {
+    en: 'A cheerful beanie holding a fresh checklist',
+    beanie: 'a cheerful beanie holding a fresh checklist',
+  },
   'emptyState.aria.emptyPockets': {
     en: 'A beanie shrugging with empty pockets',
     beanie: 'a beanie shrugging with empty pockets',
