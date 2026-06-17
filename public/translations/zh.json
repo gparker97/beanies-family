@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-17",
-    "translationCount": 3596
+    "translationCount": 3616
   },
   "translations": {
     "app.name": {
@@ -17984,6 +17984,106 @@
     "notifications.kindListCompleted": {
       "translation": "列表已完成",
       "hash": "zp561",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.categoryShort.home": {
+      "translation": "主页",
+      "hash": "1cc1r",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.categoryShort.out": {
+      "translation": "外出",
+      "hash": "1pgu",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.categoryShort.kids": {
+      "translation": "儿童",
+      "hash": "1e4ct",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.categoryShort.health": {
+      "translation": "健康",
+      "hash": "zcjszo",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.categoryShort.celebrations": {
+      "translation": "庆生",
+      "hash": "e74di1",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.categoryShort.trips": {
+      "translation": "行程",
+      "hash": "1c9qz2",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.categoryShort.projects": {
+      "translation": "项目",
+      "hash": "fg3zom",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.categoryShort.me": {
+      "translation": "我的",
+      "hash": "mv3nr1",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.setDueDate": {
+      "translation": "设置截止日期",
+      "hash": "2wgfft",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.linkLabel": {
+      "translation": "链接",
+      "hash": "1erkq",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.linkTrip": {
+      "translation": "链接到行程",
+      "hash": "vsrj2b",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.linkActivity": {
+      "translation": "链接到活动",
+      "hash": "7vh5c3",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.linkedToTrip": {
+      "translation": "行程途中： {name}",
+      "hash": "v9t343",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.linkedToActivity": {
+      "translation": "正在进行的活动： {name}",
+      "hash": "f8iqab",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.unlink": {
+      "translation": "取消链接",
+      "hash": "t1tm19",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.noUpcomingTrips": {
+      "translation": "即将开始的行程",
+      "hash": "kk4bg7",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.noUpcomingActivities": {
+      "translation": "最新活动：",
+      "hash": "2a15ce",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.embed.heading": {
+      "translation": "{emoji} {title} · {done}/{total} ·所有者{owner}",
+      "hash": "zd2uad",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.embed.open": {
+      "translation": "打开清单",
+      "hash": "da4sj0",
+      "lastUpdated": "2026-06-17"
+    },
+    "mobileNav.hint.lists": {
+      "translation": "分类家庭核对清单",
+      "hash": "autntg",
       "lastUpdated": "2026-06-17"
     }
   }

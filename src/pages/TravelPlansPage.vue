@@ -7,6 +7,7 @@ import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import VacationSegmentCard from '@/components/vacation/VacationSegmentCard.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import VacationIdeaCard from '@/components/vacation/VacationIdeaCard.vue';
+import TripLinkedLists from '@/components/lists/TripLinkedLists.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import TripDatesHeader from '@/components/travel/TripDatesHeader.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
@@ -1742,6 +1743,12 @@ function addQuickIdea() {
               +
             </button>
           </div>
+
+          <!-- Beanie Lists linked to this trip (#33) — rendered like ideas -->
+          <TripLinkedLists
+            :vacation-id="selectedVacation.id"
+            @open="(id: string) => router.push({ path: '/lists', query: { view: id } })"
+          />
         </div>
       </div>
     </template>

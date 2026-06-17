@@ -133,9 +133,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     emoji: '🧾',
     section: 'treehouse',
     requiresFlag: 'familyLists',
-    // No mobileCategory: the mobile bottom nav is a fixed curated layout that
-    // does NOT flag-filter, so tagging it there would leak the gated item when
-    // the flag is off. Mobile access is via the (flag-filtered) hamburger menu.
+    mobileCategory: 'planning',
   },
   {
     labelKey: 'nav.pod',
@@ -354,6 +352,8 @@ export interface MobileNavStackItem {
   labelKey: UIStringKey;
   emoji: string;
   hintKey: UIStringKey;
+  /** Gate this stack item behind a dev flag (filtered at render via isItemFlagEnabled). */
+  requiresFlag?: DevFlag;
 }
 
 export interface MobileNavCategory {
@@ -375,6 +375,7 @@ export interface MobileNavCategory {
 const HINT_KEY_BY_PATH: Record<string, UIStringKey> = {
   '/activities': 'mobileNav.hint.activities',
   '/todo': 'mobileNav.hint.todo',
+  '/lists': 'mobileNav.hint.lists',
   '/travel': 'mobileNav.hint.travel',
   '/dashboard': 'mobileNav.hint.overview',
   '/accounts': 'mobileNav.hint.accounts',
@@ -411,16 +412,24 @@ function collectTaggedRoutes(): Array<{
   labelKey: UIStringKey;
   emoji: string;
   category: MobileCategoryId;
+  requiresFlag?: DevFlag;
 }> {
   const out: Array<{
     path: string;
     labelKey: UIStringKey;
     emoji: string;
     category: MobileCategoryId;
+    requiresFlag?: DevFlag;
   }> = [];
   for (const item of NAV_ITEMS) {
     for (const category of mobileCategoriesOf(item)) {
-      out.push({ path: item.path, labelKey: item.labelKey, emoji: item.emoji, category });
+      out.push({
+        path: item.path,
+        labelKey: item.labelKey,
+        emoji: item.emoji,
+        category,
+        requiresFlag: item.requiresFlag,
+      });
     }
     for (const child of item.children ?? []) {
       for (const category of mobileCategoriesOf(child)) {
@@ -475,6 +484,7 @@ function buildMobileNavCategories(): MobileNavCategory[] {
         labelKey: r.labelKey,
         emoji: r.emoji,
         hintKey,
+        requiresFlag: r.requiresFlag,
       };
     });
 
