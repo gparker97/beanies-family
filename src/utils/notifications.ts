@@ -11,7 +11,7 @@
  * Presentation (icon/accent) is intentionally absent — see
  * `types/notifications.ts` + `components/notifications/notificationKinds.ts`.
  */
-import type { TodoItem, FamilyActivity, FamilyMember } from '@/types/models';
+import type { TodoItem, FamilyActivity, FamilyList, FamilyMember } from '@/types/models';
 import type { ReleaseNote } from '@/content/release-notes';
 import type { Announcement } from '@/content/announcements';
 import type { BeanTip } from '@/content/tips';
@@ -45,6 +45,8 @@ export interface NotificationOccurrence {
 
 export interface DeriveInput {
   todos: TodoItem[];
+  /** Beanie Lists — feeds the derived `list-completed` creator notification. */
+  lists: FamilyList[];
   members: FamilyMember[];
   currentMember: FamilyMember;
   releaseNotes: readonly ReleaseNote[];
@@ -76,6 +78,9 @@ export const todoDueId = (todoId: string, dueDate: string): string =>
 export const todoAssignedId = (todoId: string): string => `todo-assigned:${todoId}`;
 export const activityReminderId = (activityId: string, occurrenceDate: string): string =>
   `activity-reminder:${activityId}:${occurrenceDate}`;
+// One per completion event (encodes completedAt so a re-completion is a new id).
+export const listCompletedId = (listId: string, completedAt: string): string =>
+  `list-completed:${listId}:${completedAt}`;
 export const whatsNewId = (version: string): string => `${WHATS_NEW_PREFIX}${version}`;
 export const announcementId = (id: string): string => `${ANNOUNCEMENT_PREFIX}${id}`;
 export const tipId = (id: string): string => `${TIP_PREFIX}${id}`;
@@ -127,6 +132,7 @@ function localTimeStr(d: Date): string {
 export function deriveNotifications(input: DeriveInput, now: Date): AppNotification[] {
   const {
     todos,
+    lists,
     members,
     currentMember,
     releaseNotes,
@@ -223,6 +229,34 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
       }
     } catch (err) {
       console.warn(`[deriveNotifications] skipped todo ${todo?.id ?? '?'}:`, err);
+    }
+  }
+
+  // ── list-completed: the creator is told when SOMEONE ELSE finishes their
+  //    list. Pure-derived from the persisted filing audit — no enqueue. Honours
+  //    the rolling window (ages out; NOT prune-exempt). Recurring lists never
+  //    file (no `completedBy`), so only one-off completions surface here.
+  for (const list of lists) {
+    try {
+      if (!list?.id || !list.completed || !list.completedAt) continue;
+      if (list.createdBy !== currentMember.id) continue; // only the creator is notified
+      if (!list.completedBy || list.completedBy === list.createdBy) continue; // not a self-finish
+      const triggerMs = new Date(list.completedAt).getTime();
+      if (Number.isNaN(triggerMs) || !inWindow(triggerMs)) continue;
+      const id = listCompletedId(list.id, list.completedAt);
+      out.push({
+        id,
+        kind: 'list-completed',
+        title: list.title,
+        subtitle: resolveMember(list.completedBy)?.name,
+        occurredAt: new Date(triggerMs).toISOString(),
+        route: '/lists',
+        query: { view: list.id },
+        sourceId: list.id,
+        read: isRead(id),
+      });
+    } catch (err) {
+      console.warn(`[deriveNotifications] skipped list ${list?.id ?? '?'}:`, err);
     }
   }
 

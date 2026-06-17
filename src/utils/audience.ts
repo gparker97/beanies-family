@@ -46,3 +46,31 @@ export function classifyAudience(
   }
   return viewer.isPet ? { kind: 'hidden' } : { kind: 'unassigned' }; // none / all-stale / pet-only
 }
+
+/**
+ * Single-owner sibling of `classifyAudience` for Beanie Lists (#33), which have
+ * one `ownerId` rather than an `assigneeIds` array. Returns the SAME
+ * `BriefingAudience` union so the briefing's message-key selection works
+ * unchanged. Same rule, single-owner shape:
+ *   • You own it                         → 'assignee'.
+ *   • An adult owns it                   → 'hidden' (only they see it).
+ *   • A child owns it                    → adults see it framed by the child
+ *     ('forChild'); siblings don't ('hidden').
+ *   • Unowned / pet-owned                → everyone non-pet sees it ('unassigned').
+ * Pets never get a briefing.
+ */
+export function classifyOwnerAudience(
+  ownerId: string | null | undefined,
+  viewer: FamilyMember,
+  resolveMember: (id: string) => FamilyMember | undefined
+): BriefingAudience {
+  const owner = ownerId ? resolveMember(ownerId) : undefined;
+  if (owner && owner.id === viewer.id) return { kind: 'assignee' };
+  if (owner && isAdultMember(owner)) return { kind: 'hidden' };
+  if (owner && !owner.isPet) {
+    return isAdultMember(viewer)
+      ? { kind: 'forChild', childNames: [owner.name] }
+      : { kind: 'hidden' };
+  }
+  return viewer.isPet ? { kind: 'hidden' } : { kind: 'unassigned' };
+}

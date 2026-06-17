@@ -13,7 +13,7 @@ import {
   tipId,
   type DeriveInput,
 } from '@/utils/notifications';
-import type { FamilyMember, TodoItem, FamilyActivity } from '@/types/models';
+import type { FamilyMember, TodoItem, FamilyActivity, FamilyList } from '@/types/models';
 import type { ReleaseNote } from '@/content/release-notes';
 import type { Announcement } from '@/content/announcements';
 import type { BeanTip } from '@/content/tips';
@@ -76,6 +76,7 @@ function activity(o: Partial<FamilyActivity>): FamilyActivity {
 function derive(overrides: Partial<DeriveInput>, now: Date = NOW) {
   const base: DeriveInput = {
     todos: [],
+    lists: [],
     members: MEMBERS,
     currentMember: viewer,
     releaseNotes: [],
@@ -494,5 +495,54 @@ describe('audience matrix (via the deriver)', () => {
         todoDueId('t1', '2026-05-27')
       )
     ).toBeDefined();
+  });
+});
+
+// ── Beanie Lists: list-completed (creator-notify) ──────────────────────────────
+function flist(overrides: Partial<FamilyList> = {}): FamilyList {
+  return {
+    id: 'l1',
+    title: 'Groceries',
+    emoji: '🛒',
+    category: 'out',
+    ownerId: 'v',
+    items: [],
+    lifecycle: 'oneoff',
+    completed: true,
+    completedBy: 'o', // finished by someone other than the creator
+    completedAt: new Date(2026, 4, 27, 8, 0, 0, 0).toISOString(), // within window of NOW
+    createdBy: 'v', // viewer is the creator
+    createdAt: '2026-05-01T00:00:00.000Z',
+    updatedAt: '2026-05-27T08:00:00.000Z',
+    ...overrides,
+  };
+}
+const listNotifs = (overrides: Partial<FamilyList>) =>
+  derive({ lists: [flist(overrides)] }).filter((n) => n.kind === 'list-completed');
+
+describe('list-completed', () => {
+  it('notifies the creator when someone else finishes their list', () => {
+    const out = listNotifs({});
+    expect(out).toHaveLength(1);
+    expect(out[0]!.title).toBe('Groceries');
+    expect(out[0]!.subtitle).toBe('O'); // finisher name (uppercased fixture)
+    expect(out[0]!.route).toBe('/lists');
+    expect(out[0]!.query).toEqual({ view: 'l1' });
+  });
+  it('a self-finish yields none', () => {
+    expect(listNotifs({ completedBy: 'v' })).toHaveLength(0);
+  });
+  it('a list created by someone else yields none for this viewer', () => {
+    expect(listNotifs({ createdBy: 'o', completedBy: 'v' })).toHaveLength(0);
+  });
+  it('a missing completedAt is skipped (no throw)', () => {
+    expect(listNotifs({ completedAt: undefined })).toHaveLength(0);
+  });
+  it('an unfiled list yields none', () => {
+    expect(listNotifs({ completed: false })).toHaveLength(0);
+  });
+  it('ages out past the rolling window', () => {
+    const old = new Date(2026, 1, 1, 8, 0, 0, 0).toISOString(); // ~3 months before NOW
+    expect(listNotifs({ completedAt: old })).toHaveLength(0);
   });
 });
