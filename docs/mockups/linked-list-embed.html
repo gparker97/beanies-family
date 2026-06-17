@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Linked Beanie List — embed redesign</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --text: #2c3e50;
+        --muted: #7a8a99;
+        --border: #eef1f4;
+        --cloud: #f8f9fa;
+        --orange: #f15d22;
+        --terra: #e67e22;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--cloud);
+        font-family: 'Inter', sans-serif;
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        padding: 40px 20px 80px;
+      }
+      .wrap {
+        max-width: 880px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 28px;
+        margin: 0 0 4px;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 14px;
+        margin: 0 0 36px;
+      }
+      .cols {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 28px;
+      }
+      @media (max-width: 760px) {
+        .cols {
+          grid-template-columns: 1fr;
+        }
+      }
+      .col-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 14px;
+      }
+
+      /* ── faux surface panels ───────────────────────────────── */
+      .panel {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        padding: 18px;
+        box-shadow: 0 6px 22px rgba(44, 62, 80, 0.05);
+        margin-bottom: 28px;
+      }
+      .panel-eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .drawer-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 19px;
+        margin: 0 0 2px;
+      }
+      .drawer-meta {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 0 0 16px;
+      }
+
+      /* ── OLD (current) sterile embed ───────────────────────── */
+      .old-head {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 16px 0 8px;
+      }
+      .old-card {
+        border-radius: 16px;
+        background: #fff;
+        border: 1px solid var(--border);
+        padding: 2px 14px;
+      }
+
+      /* ── NEW Beanie List card ──────────────────────────────── */
+      .section-eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 18px 0 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .blist {
+        border-radius: 20px;
+        overflow: hidden;
+        margin-bottom: 14px;
+        box-shadow: 0 2px 10px rgba(44, 62, 80, 0.05);
+      }
+      .blist-head {
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        gap: 12px;
+        padding: 13px 14px 14px;
+        cursor: pointer;
+        border: none;
+        width: 100%;
+        text-align: left;
+        align-items: start;
+        transition: filter 0.15s;
+      }
+      .blist-head:hover {
+        filter: brightness(0.985);
+      }
+      .tile {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        box-shadow: 0 2px 8px rgba(44, 62, 80, 0.06);
+      }
+      .topline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex: none;
+      }
+      .open {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .blist-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 15px;
+        color: var(--text);
+        margin: 2px 0 9px;
+      }
+      .progress-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .bar {
+        flex: 1;
+        height: 6px;
+        border-radius: 99px;
+        overflow: hidden;
+      }
+      .bar > span {
+        display: block;
+        height: 100%;
+        border-radius: 99px;
+      }
+      .count {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--muted);
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .owner-dot {
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        display: inline-grid;
+        place-items: center;
+        font-size: 8px;
+        font-weight: 700;
+        color: #fff;
+      }
+      .blist-body {
+        background: #fff;
+        padding: 2px 14px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 13.5px;
+      }
+      .row:last-child {
+        border-bottom: 0;
+      }
+      .check {
+        width: 22px;
+        height: 22px;
+        border-radius: 8px;
+        border: 2px solid var(--border);
+        background: #fff;
+        flex: none;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 12px;
+      }
+      .check.done {
+        border-color: transparent;
+        background: linear-gradient(135deg, var(--orange), var(--terra));
+      }
+      .row.done span {
+        color: var(--muted);
+        text-decoration: line-through;
+      }
+      .more {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 0 11px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .more b {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+      }
+
+      /* trip ideas reference header (the inspiration) */
+      .ideas-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-radius: 16px;
+        padding: 12px 14px;
+        background: linear-gradient(135deg, rgba(255, 217, 61, 0.1), rgba(0, 180, 216, 0.06));
+        border: 1px solid rgba(255, 217, 61, 0.18);
+        margin-bottom: 12px;
+      }
+      .ideas-head .t {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.75);
+        display: grid;
+        place-items: center;
+        font-size: 21px;
+        box-shadow: 0 2px 8px rgba(44, 62, 80, 0.06);
+      }
+      .ideas-head h3 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 16px;
+        margin: 0;
+      }
+      .ideas-head .c {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .note {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 6px 2px 0;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Linked Beanie List — embed redesign</h1>
+      <p class="sub">
+        Each linked list is tinted by its own category color (the same identity it has on the Lists
+        page). Provenance eyebrow + “Open ›” door-back close the two gaps. Right column shows today's
+        sterile version for contrast.
+      </p>
+
+      <div class="cols">
+        <!-- ════════════ NEW ════════════ -->
+        <div>
+          <p class="col-label">Proposed</p>
+
+          <!-- Activity drawer context -->
+          <div class="panel">
+            <p class="panel-eyebrow">📅 Activity</p>
+            <p class="drawer-title">Mia's birthday party</p>
+            <p class="drawer-meta">Sat 21 Jun · 2:00 PM · Sunshine Hall</p>
+
+            <p class="section-eyebrow">🔖 Checklists</p>
+
+            <!-- celebrations / pink #E84393 -->
+            <div class="blist">
+              <button
+                class="blist-head"
+                style="
+                  background: linear-gradient(
+                    135deg,
+                    rgba(232, 67, 147, 0.12),
+                    rgba(232, 67, 147, 0.05)
+                  );
+                "
+              >
+                <span class="tile" style="background: rgba(232, 67, 147, 0.14)">🎉</span>
+                <span>
+                  <span class="topline">
+                    <span class="eyebrow"
+                      ><span class="dot" style="background: #e84393"></span>Beanie list</span
+                    >
+                    <span class="open" style="color: #e84393">Open ›</span>
+                  </span>
+                  <span class="blist-title">Party prep</span>
+                  <span class="progress-row">
+                    <span class="bar" style="background: rgba(232, 67, 147, 0.16)"
+                      ><span style="width: 33%; background: #e84393"></span
+                    ></span>
+                    <span class="count"
+                      >3 of 9
+                      <span class="owner-dot" style="background: #9b59b6">M</span> mum</span
+                    >
+                  </span>
+                </span>
+              </button>
+              <div class="blist-body">
+                <div class="row done">
+                  <span class="check done">✓</span><span>Order the cake</span>
+                </div>
+                <div class="row done">
+                  <span class="check done">✓</span><span>Send invites</span>
+                </div>
+                <div class="row done">
+                  <span class="check done">✓</span><span>Book the hall</span>
+                </div>
+                <div class="row"><span class="check"></span><span>Buy balloons</span></div>
+                <div class="more"><span><b>+5 more</b></span><span>Open list ›</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Trip context, multiple lists -->
+          <div class="panel">
+            <p class="panel-eyebrow">✈️ Travel plan</p>
+            <p class="drawer-title">Japan — spring trip</p>
+            <p class="drawer-meta">28 Mar – 6 Apr · Tokyo &amp; Kyoto</p>
+
+            <div class="ideas-head">
+              <span class="t">🌟</span>
+              <span><h3>Trip ideas</h3><span class="c">6 ideas &amp; wishes</span></span>
+            </div>
+            <p class="note" style="margin-bottom: 18px">↑ the existing ideas banner (inspiration)</p>
+
+            <p class="section-eyebrow">🔖 Checklists</p>
+
+            <!-- trips / teal #2A9D8F -->
+            <div class="blist">
+              <button
+                class="blist-head"
+                style="
+                  background: linear-gradient(
+                    135deg,
+                    rgba(42, 157, 143, 0.12),
+                    rgba(42, 157, 143, 0.05)
+                  );
+                "
+              >
+                <span class="tile" style="background: rgba(42, 157, 143, 0.14)">🧳</span>
+                <span>
+                  <span class="topline">
+                    <span class="eyebrow"
+                      ><span class="dot" style="background: #2a9d8f"></span>Beanie list</span
+                    >
+                    <span class="open" style="color: #2a9d8f">Open ›</span>
+                  </span>
+                  <span class="blist-title">Packing — Japan</span>
+                  <span class="progress-row">
+                    <span class="bar" style="background: rgba(42, 157, 143, 0.16)"
+                      ><span style="width: 60%; background: #2a9d8f"></span
+                    ></span>
+                    <span class="count"
+                      >6 of 10 <span class="owner-dot" style="background: #2980b9">D</span> dad</span
+                    >
+                  </span>
+                </span>
+              </button>
+              <div class="blist-body">
+                <div class="row done"><span class="check done">✓</span><span>Passports</span></div>
+                <div class="row done">
+                  <span class="check done">✓</span><span>Universal adapter</span>
+                </div>
+                <div class="row"><span class="check"></span><span>Pocket wifi pickup</span></div>
+                <div class="row"><span class="check"></span><span>Kids' snacks</span></div>
+                <div class="more"><span><b>+6 more</b></span><span>Open list ›</span></div>
+              </div>
+            </div>
+
+            <!-- projects / purple #6C5CE7 -->
+            <div class="blist">
+              <button
+                class="blist-head"
+                style="
+                  background: linear-gradient(
+                    135deg,
+                    rgba(108, 92, 231, 0.12),
+                    rgba(108, 92, 231, 0.05)
+                  );
+                "
+              >
+                <span class="tile" style="background: rgba(108, 92, 231, 0.14)">🛂</span>
+                <span>
+                  <span class="topline">
+                    <span class="eyebrow"
+                      ><span class="dot" style="background: #6c5ce7"></span>Beanie list</span
+                    >
+                    <span class="open" style="color: #6c5ce7">Open ›</span>
+                  </span>
+                  <span class="blist-title">Before we fly</span>
+                  <span class="progress-row">
+                    <span class="bar" style="background: rgba(108, 92, 231, 0.16)"
+                      ><span style="width: 100%; background: #6c5ce7"></span
+                    ></span>
+                    <span class="count" style="color: #2a9d8f; font-weight: 700">✓ All done</span>
+                  </span>
+                </span>
+              </button>
+              <div class="blist-body">
+                <div class="row done">
+                  <span class="check done">✓</span><span>Travel insurance</span>
+                </div>
+                <div class="row done"><span class="check done">✓</span><span>Hold the mail</span></div>
+                <div class="row done">
+                  <span class="check done">✓</span><span>Currency ordered</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════════ OLD ════════════ -->
+        <div>
+          <p class="col-label">Today (for contrast)</p>
+          <div class="panel">
+            <p class="panel-eyebrow">📅 Activity</p>
+            <p class="drawer-title">Mia's birthday party</p>
+            <p class="drawer-meta">Sat 21 Jun · 2:00 PM · Sunshine Hall</p>
+
+            <p class="old-head">🎉 Party prep · 3/9 · owner mum</p>
+            <div class="old-card">
+              <div class="row done"><span class="check done">✓</span><span>Order the cake</span></div>
+              <div class="row done"><span class="check done">✓</span><span>Send invites</span></div>
+              <div class="row done"><span class="check done">✓</span><span>Book the hall</span></div>
+              <div class="row"><span class="check"></span><span>Buy balloons</span></div>
+              <div class="row"><span class="check"></span><span>Party bags</span></div>
+              <div class="row"><span class="check"></span><span>Pin the tail game</span></div>
+            </div>
+            <p class="note">
+              No section signal, no provenance, no door back to the list. Reads like a form label
+              with rows under it.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

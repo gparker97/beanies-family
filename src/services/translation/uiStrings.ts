@@ -4339,12 +4339,14 @@ const STRING_DEFS = {
     en: 'No upcoming activities',
     beanie: 'no upcoming activities',
   },
-  // Travel-plan embed (a linked list rendered on the trip page)
-  'lists.embed.heading': {
-    en: '{emoji} {title} · {done}/{total} · owner {owner}',
-    beanie: '{emoji} {title} · {done}/{total} · owner {owner}',
-  },
+  // Embedded linked list (rendered on a trip page or an activity drawer)
+  'lists.embed.section': { en: 'Checklists', beanie: 'checklists' },
+  'lists.embed.provenance': { en: 'Beanie list', beanie: 'beanie list' },
   'lists.embed.open': { en: 'Open list', beanie: 'open list' },
+  'lists.embed.openShort': { en: 'Open', beanie: 'open' },
+  'lists.embed.allDone': { en: 'All done', beanie: 'all done' },
+  'lists.embed.empty': { en: 'No items yet', beanie: 'no items yet' },
+  'lists.embed.more': { en: '+{count} more', beanie: '+{count} more' },
   'lists.detail.recurringHint': {
     en: 'Unchecks itself each cycle so you start fresh — no due date needed.',
     beanie: 'unchecks itself each cycle so you start fresh — no due date needed.',
