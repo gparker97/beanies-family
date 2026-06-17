@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - **"Family To-Do" is now just "To-Dos."** The planner tab and page were renamed to sharpen the distinction between a single task and a whole checklist (the latter is coming as Beanie Lists). Nothing about your tasks changed — same page, same link.
+- **The empty-state beanie illustrations got a glow-up.** Every "nothing here yet" screen (accounts, transactions, recurring, assets, goals, reports, dashboard, budgets) now shows the proper beanie mascot — a hand-drawn, shaded little bean in its knitted pom-pom hat, with arms and a cheerful face — instead of the old flat blue blob. The dashboard pair holds hands, as beanies do.
 
 ### Added
 
