@@ -1,5 +1,17 @@
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { MARKETING_URL } from '@/utils/marketing';
+import { isKnownFlag, type DevFlag } from '@/config/flagRegistry';
+import { isFlagEnabled } from '@/config/flags';
+
+/**
+ * Shared visibility test for any flag-gated config item (nav items, quick-add
+ * items): true unless the item names a dev flag that is currently off. The ONE
+ * place this logic lives — consumed by the sidebar, mobile nav, and quick-add
+ * sheet so the four surfaces can't drift.
+ */
+export function isItemFlagEnabled(item: { requiresFlag?: DevFlag }): boolean {
+  return !item.requiresFlag || isFlagEnabled(item.requiresFlag);
+}
 
 export type NavSection = 'treehouse' | 'piggyBank' | 'pinned';
 
@@ -41,6 +53,8 @@ export interface NavItemDef {
   section: NavSection;
   comingSoon?: boolean;
   badgeKey?: string;
+  /** Hide this item unless the named dev feature flag is enabled. */
+  requiresFlag?: DevFlag;
   external?: boolean;
   externalUrl?: string;
   /**
@@ -112,6 +126,16 @@ export const NAV_ITEMS: NavItemDef[] = [
     section: 'treehouse',
     badgeKey: 'overdueTodos',
     mobileCategory: 'planning',
+  },
+  {
+    labelKey: 'nav.lists',
+    path: '/lists',
+    emoji: '🧾',
+    section: 'treehouse',
+    requiresFlag: 'familyLists',
+    // No mobileCategory: the mobile bottom nav is a fixed curated layout that
+    // does NOT flag-filter, so tagging it there would leak the gated item when
+    // the flag is off. Mobile access is via the (flag-filtered) hamburger menu.
   },
   {
     labelKey: 'nav.pod',
@@ -285,6 +309,19 @@ for (const entry of NAV_ITEMS_FLAT) {
     throw new Error(
       `[navigation] NAV_ITEM "${entry.path}" has badgeKey "${entry.badgeKey}" which is not in KNOWN_BADGE_KEYS. ` +
         `Add it to KNOWN_BADGE_KEYS here AND to the badges map in useNavBadges.ts, then re-run tests.`
+    );
+  }
+}
+
+// Module-load invariant — every NAV_ITEM.requiresFlag must be a registered dev
+// flag. `requiresFlag: DevFlag` already makes a literal typo a compile error;
+// this is belt-and-suspenders for any non-typed source, mirroring the badge-key
+// check above (the navigation unit test exercises it).
+for (const item of NAV_ITEMS) {
+  if (item.requiresFlag && !isKnownFlag(item.requiresFlag)) {
+    throw new Error(
+      `[navigation] NAV_ITEM "${item.path}" has requiresFlag "${item.requiresFlag}" which is not in FLAG_REGISTRY. ` +
+        `Add it to src/config/flagRegistry.ts (+ featureFlags.committed.ts), then re-run tests.`
     );
   }
 }

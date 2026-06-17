@@ -17,6 +17,7 @@
  * Chromium / WebKit / Firefox.
  */
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import type { DevFlag } from '@/config/flagRegistry';
 
 export type QuickAddGroup = 'everyday' | 'family' | 'money' | 'care';
 
@@ -52,6 +53,8 @@ interface QuickAddItemShape {
   readonly tab?: string;
   readonly contextKey?: QuickAddContextKey;
   readonly requiredPermission: QuickAddPermission;
+  /** Hide this item unless the named dev feature flag is enabled. */
+  readonly requiresFlag?: DevFlag;
 }
 
 export const QUICK_ADD_ITEMS = [
@@ -77,6 +80,18 @@ export const QUICK_ADD_ITEMS = [
     route: '/todo',
     action: 'add-todo',
     requiredPermission: 'activities',
+  },
+  {
+    id: 'list',
+    group: 'everyday',
+    order: 7,
+    emoji: '\u{1F9FE}', // 🧾
+    labelKey: 'quickAdd.list.label',
+    hintKey: 'quickAdd.list.hint',
+    route: '/lists',
+    action: 'add-list',
+    requiredPermission: 'activities',
+    requiresFlag: 'familyLists',
   },
   {
     id: 'transaction',
@@ -309,6 +324,7 @@ export interface QuickAddItem {
   readonly tab?: string;
   readonly contextKey?: QuickAddContextKey;
   readonly requiredPermission: QuickAddPermission;
+  readonly requiresFlag?: DevFlag;
 }
 
 /**
