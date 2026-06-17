@@ -4332,6 +4332,8 @@ const STRING_DEFS = {
   'lists.detail.linkedToTrip': { en: 'On trip: {name}', beanie: 'on trip: {name}' },
   'lists.detail.linkedToActivity': { en: 'On activity: {name}', beanie: 'on activity: {name}' },
   'lists.detail.unlink': { en: 'Unlink', beanie: 'unlink' },
+  'lists.detail.linkSearch': { en: 'Search…', beanie: 'search…' },
+  'lists.detail.noMatches': { en: 'No matches', beanie: 'no matches' },
   'lists.detail.noUpcomingTrips': { en: 'No upcoming trips', beanie: 'no upcoming trips' },
   'lists.detail.noUpcomingActivities': {
     en: 'No upcoming activities',
