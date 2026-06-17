@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// Beanie Lists embedded on the travel-plan page (#33): any list linked to this
-// trip renders here like the trip's ideas — same store entry, one source of
-// truth. Flag-guarded so it is inert when `familyLists` is off.
+// Beanie Lists embedded on a trip OR an activity (#33): any list linked to the
+// given entity renders here like the trip's ideas — same store entry, one source
+// of truth. Pass exactly one of `vacationId` / `activityId`. Flag-guarded so it
+// is inert when `familyLists` is off.
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListStore } from '@/stores/listStore';
@@ -12,7 +13,7 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import ListItemRow from '@/components/lists/ListItemRow.vue';
 import type { FamilyList } from '@/types/models';
 
-const props = defineProps<{ vacationId: string }>();
+const props = defineProps<{ vacationId?: string; activityId?: string }>();
 const emit = defineEmits<{ open: [id: string] }>();
 
 const { t } = useTranslation();
@@ -20,11 +21,16 @@ const listStore = useListStore();
 const familyStore = useFamilyStore();
 const { getMemberName } = useMemberInfo();
 
-const linkedLists = computed<FamilyList[]>(() =>
-  isFlagEnabled('familyLists')
-    ? listStore.lists.filter((l) => l.linkedVacationId === props.vacationId)
-    : []
-);
+const linkedLists = computed<FamilyList[]>(() => {
+  if (!isFlagEnabled('familyLists')) return [];
+  return listStore.lists.filter((l) =>
+    props.vacationId
+      ? l.linkedVacationId === props.vacationId
+      : props.activityId
+        ? l.linkedActivityId === props.activityId
+        : false
+  );
+});
 
 function heading(list: FamilyList): string {
   return fillTemplate(t('lists.embed.heading'), {

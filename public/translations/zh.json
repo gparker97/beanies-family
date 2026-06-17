@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-17",
-    "translationCount": 3616
+    "translationCount": 3619
   },
   "translations": {
     "app.name": {
@@ -18084,6 +18084,21 @@
     "mobileNav.hint.lists": {
       "translation": "分类家庭核对清单",
       "hash": "autntg",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.linkSearch": {
+      "translation": "搜索…",
+      "hash": "ay4gwy",
+      "lastUpdated": "2026-06-17"
+    },
+    "lists.detail.noMatches": {
+      "translation": "无匹配",
+      "hash": "74k0zw",
+      "lastUpdated": "2026-06-17"
+    },
+    "emptyState.aria.freshChecklist": {
+      "translation": "一只欢快的豆豆，拿着一份新的清单",
+      "hash": "a67mdn",
       "lastUpdated": "2026-06-17"
     }
   }

@@ -132,19 +132,26 @@ function addItem(): void {
 }
 
 // ── Linking to a trip / activity ──────────────────────────────────────────
+// Both lists keep their soonest date (for the row label) and are searchable.
+const linkSearch = ref('');
 const upcomingTrips = computed(() =>
-  vacationStore.upcomingVacations.map((v) => ({ id: v.id, name: v.name }))
+  vacationStore.upcomingVacations.map((v) => ({ id: v.id, name: v.name, date: v.startDate }))
 );
 const upcomingActivities = computed(() => {
   const seen = new Set<string>();
-  const out: { id: string; title: string }[] = [];
-  for (const { activity } of activityStore.upcomingActivities) {
+  const out: { id: string; title: string; date: string }[] = [];
+  // upcomingActivities is date-sorted (soonest first) — keep the first occurrence.
+  for (const { activity, date } of activityStore.upcomingActivities) {
     if (seen.has(activity.id)) continue;
     seen.add(activity.id);
-    out.push({ id: activity.id, title: activity.title });
+    out.push({ id: activity.id, title: activity.title, date });
   }
   return out;
 });
+const matches = (text: string) =>
+  text.toLowerCase().includes(linkSearch.value.trim().toLowerCase());
+const filteredTrips = computed(() => upcomingTrips.value.filter((tr) => matches(tr.name)));
+const filteredActivities = computed(() => upcomingActivities.value.filter((a) => matches(a.title)));
 const linkedTripName = computed(() => {
   const id = list.value?.linkedVacationId;
   return id ? (upcomingTrips.value.find((v) => v.id === id)?.name ?? '') : '';
@@ -153,6 +160,10 @@ const linkedActivityName = computed(() => {
   const id = list.value?.linkedActivityId;
   return id ? (upcomingActivities.value.find((a) => a.id === id)?.title ?? '') : '';
 });
+function openLinkPicker(kind: 'trip' | 'activity'): void {
+  linkSearch.value = '';
+  editingLink.value = editingLink.value === kind ? null : kind;
+}
 function linkTrip(id: string): void {
   if (list.value) void listStore.updateList(list.value.id, { linkedVacationId: id });
   editingLink.value = null;
@@ -161,6 +172,7 @@ function linkActivity(id: string): void {
   if (list.value) void listStore.updateList(list.value.id, { linkedActivityId: id });
   editingLink.value = null;
 }
+const shortDate = (d?: string): string => (d ? formatDateShort(d) : '');
 function unlinkTrip(): void {
   if (list.value) void listStore.updateList(list.value.id, { linkedVacationId: undefined });
 }
@@ -307,12 +319,7 @@ async function handleDelete(): Promise<void> {
               <span aria-hidden="true">✕</span>
             </button>
           </span>
-          <button
-            v-else
-            type="button"
-            class="linkpill"
-            @click="editingLink = editingLink === 'trip' ? null : 'trip'"
-          >
+          <button v-else type="button" class="linkpill" @click="openLinkPicker('trip')">
             <span aria-hidden="true">✈️</span> {{ t('lists.detail.linkTrip') }}
           </button>
 
@@ -328,43 +335,68 @@ async function handleDelete(): Promise<void> {
               <span aria-hidden="true">✕</span>
             </button>
           </span>
-          <button
-            v-else
-            type="button"
-            class="linkpill"
-            @click="editingLink = editingLink === 'activity' ? null : 'activity'"
-          >
+          <button v-else type="button" class="linkpill" @click="openLinkPicker('activity')">
             <span aria-hidden="true">📅</span> {{ t('lists.detail.linkActivity') }}
           </button>
         </div>
 
-        <div v-if="editingLink === 'trip'" class="mt-2 space-y-1">
+        <!-- Trip picker: search + scrollable list with dates -->
+        <div v-if="editingLink === 'trip'" class="mt-2">
+          <BaseInput
+            v-model="linkSearch"
+            :placeholder="t('lists.detail.linkSearch')"
+            class="mb-1.5"
+          />
           <p v-if="!upcomingTrips.length" class="text-xs text-[var(--color-text-muted)]">
             {{ t('lists.detail.noUpcomingTrips') }}
           </p>
-          <button
-            v-for="trip in upcomingTrips"
-            :key="trip.id"
-            type="button"
-            class="picker-row"
-            @click="linkTrip(trip.id)"
-          >
-            <span aria-hidden="true">✈️</span> {{ trip.name }}
-          </button>
+          <p v-else-if="!filteredTrips.length" class="text-xs text-[var(--color-text-muted)]">
+            {{ t('lists.detail.noMatches') }}
+          </p>
+          <div class="max-h-44 space-y-1 overflow-y-auto">
+            <button
+              v-for="trip in filteredTrips"
+              :key="trip.id"
+              type="button"
+              class="picker-row"
+              @click="linkTrip(trip.id)"
+            >
+              <span aria-hidden="true">✈️</span>
+              <span class="flex-1 truncate">{{ trip.name }}</span>
+              <span v-if="trip.date" class="text-[0.7rem] text-[var(--color-text-muted)]">{{
+                shortDate(trip.date)
+              }}</span>
+            </button>
+          </div>
         </div>
-        <div v-else-if="editingLink === 'activity'" class="mt-2 space-y-1">
+        <!-- Activity picker: search + scrollable list with dates -->
+        <div v-else-if="editingLink === 'activity'" class="mt-2">
+          <BaseInput
+            v-model="linkSearch"
+            :placeholder="t('lists.detail.linkSearch')"
+            class="mb-1.5"
+          />
           <p v-if="!upcomingActivities.length" class="text-xs text-[var(--color-text-muted)]">
             {{ t('lists.detail.noUpcomingActivities') }}
           </p>
-          <button
-            v-for="act in upcomingActivities"
-            :key="act.id"
-            type="button"
-            class="picker-row"
-            @click="linkActivity(act.id)"
-          >
-            <span aria-hidden="true">📅</span> {{ act.title }}
-          </button>
+          <p v-else-if="!filteredActivities.length" class="text-xs text-[var(--color-text-muted)]">
+            {{ t('lists.detail.noMatches') }}
+          </p>
+          <div class="max-h-44 space-y-1 overflow-y-auto">
+            <button
+              v-for="act in filteredActivities"
+              :key="act.id"
+              type="button"
+              class="picker-row"
+              @click="linkActivity(act.id)"
+            >
+              <span aria-hidden="true">📅</span>
+              <span class="flex-1 truncate">{{ act.title }}</span>
+              <span class="text-[0.7rem] text-[var(--color-text-muted)]">{{
+                shortDate(act.date)
+              }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

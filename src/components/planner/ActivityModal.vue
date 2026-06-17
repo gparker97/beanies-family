@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
+import { useRouter } from 'vue-router';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import LinkedLists from '@/components/lists/LinkedLists.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import DayOfWeekSelector from '@/components/ui/DayOfWeekSelector.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
@@ -88,6 +90,13 @@ const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const activityStore = useActivityStore();
 const photoStore = usePhotoStore();
+const router = useRouter();
+
+/** Open a linked Beanie List — close this modal and deep-link to it. */
+function openLinkedList(id: string): void {
+  emit('close');
+  void router.push({ path: '/lists', query: { view: id } });
+}
 
 // Form state
 const icon = ref('');
@@ -1132,6 +1141,9 @@ function handleSave() {
             </span>
             <ToggleSwitch v-model="isActive" size="sm" />
           </div>
+
+          <!-- Beanie Lists linked to this activity (#33) -->
+          <LinkedLists v-if="activity?.id" :activity-id="activity.id" @open="openLinkedList" />
         </div>
       </div>
     </div>
