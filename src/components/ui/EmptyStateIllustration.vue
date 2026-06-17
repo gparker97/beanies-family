@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { useReducedMotion } from '@/composables/useReducedMotion';
 import { useTranslation } from '@/composables/useTranslation';
+import BeanieCore from '@/components/ui/BeanieCore.vue';
+
+// Shared mascot body palettes (gradient light / base / dark).
+const ORANGE = { bodyLight: '#FF7E47', bodyBase: '#F15D22', bodyDark: '#DB4D17' } as const;
+const TERRA = { bodyLight: '#F3A35C', bodyBase: '#E67E22', bodyDark: '#C9671A' } as const;
+const SLATE = { bodyLight: '#46607A', bodyBase: '#2C3E50', bodyDark: '#1E2B38' } as const;
 
 const { t } = useTranslation();
 
@@ -26,7 +32,7 @@ const prefersReducedMotion = useReducedMotion();
   <div class="relative mx-auto h-40 w-40">
     <div class="dark:bg-secondary-500 absolute inset-0 rounded-full bg-orange-50" />
 
-    <!-- Accounts: Beanie looking at empty piggy bank -->
+    <!-- Accounts: beanie reaching toward an empty piggy bank -->
     <svg
       v-if="variant === 'accounts'"
       viewBox="0 0 160 160"
@@ -35,94 +41,114 @@ const prefersReducedMotion = useReducedMotion();
       role="img"
       :aria-label="t('emptyState.aria.piggyBank')"
     >
-      <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
-      <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
-        <ellipse cx="55" cy="100" rx="22" ry="28" fill="#AED6F1" />
-        <ellipse cx="55" cy="100" rx="22" ry="28" fill="url(#emptySheen)" opacity="0.4" />
-        <ellipse cx="48" cy="92" rx="3" ry="4" fill="#2C3E50" />
-        <circle cx="47" cy="91" r="1.2" fill="white" opacity="0.7" />
-        <ellipse cx="62" cy="92" rx="3" ry="4" fill="#2C3E50" />
-        <circle cx="61" cy="91" r="1.2" fill="white" opacity="0.7" />
-        <path
-          d="M50 105 Q55 108 60 105"
-          stroke="#2C3E50"
-          stroke-width="1.5"
-          fill="none"
-          stroke-linecap="round"
-        />
-      </g>
-      <!-- Piggy bank outline -->
-      <g opacity="0.5">
+      <ellipse cx="80" cy="148" rx="50" ry="7" fill="#AED6F1" opacity="0.3" />
+      <!-- dashed empty piggy bank -->
+      <g opacity="0.65">
         <ellipse
-          cx="110"
-          cy="105"
-          rx="24"
-          ry="20"
+          cx="118"
+          cy="100"
+          rx="22"
+          ry="18"
           fill="none"
           stroke="#F15D22"
           stroke-width="2"
           stroke-dasharray="4 3"
         />
         <ellipse
-          cx="100"
-          cy="98"
+          cx="108"
+          cy="94"
           rx="3"
-          ry="2.5"
+          ry="2.4"
           fill="none"
           stroke="#F15D22"
-          stroke-width="1.5"
+          stroke-width="1.4"
           stroke-dasharray="3 2"
         />
         <rect
-          x="104"
-          y="84"
+          x="112"
+          y="81"
           width="12"
           height="3"
           rx="1.5"
           fill="none"
           stroke="#F15D22"
-          stroke-width="1.5"
+          stroke-width="1.4"
           stroke-dasharray="3 2"
         />
         <line
-          x1="102"
-          y1="125"
-          x2="100"
-          y2="130"
+          x1="110"
+          y1="117"
+          x2="108"
+          y2="123"
           stroke="#F15D22"
-          stroke-width="1.5"
+          stroke-width="1.4"
           stroke-dasharray="3 2"
           stroke-linecap="round"
         />
         <line
-          x1="118"
-          y1="125"
-          x2="120"
-          y2="130"
+          x1="126"
+          y1="117"
+          x2="128"
+          y2="123"
           stroke="#F15D22"
-          stroke-width="1.5"
+          stroke-width="1.4"
           stroke-dasharray="3 2"
           stroke-linecap="round"
         />
+        <text
+          x="116"
+          y="104"
+          font-family="Outfit, sans-serif"
+          font-weight="700"
+          font-size="12"
+          fill="#F15D22"
+          text-anchor="middle"
+        >
+          ?
+        </text>
       </g>
-      <text
-        x="107"
-        y="110"
-        font-family="Outfit, sans-serif"
-        font-weight="600"
-        font-size="12"
-        fill="#F15D22"
-        opacity="0.6"
-        text-anchor="middle"
-      >
-        ?
-      </text>
-      <defs>
-        <linearGradient id="emptySheen" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="white" stop-opacity="0.6" />
-          <stop offset="100%" stop-color="white" stop-opacity="0" />
-        </linearGradient>
-      </defs>
+      <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
+        <!-- left arm relaxed -->
+        <path
+          d="M44 98 Q34 102 31 110"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M44 98 Q34 102 31 110"
+          fill="none"
+          :stroke="ORANGE.bodyBase"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <circle
+          cx="31"
+          cy="110"
+          r="5"
+          :fill="ORANGE.bodyBase"
+          stroke="#5a3a26"
+          stroke-width="2.2"
+        />
+        <!-- right arm reaching to the piggy bank -->
+        <path
+          d="M82 98 Q92 100 99 95"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M82 98 Q92 100 99 95"
+          fill="none"
+          :stroke="ORANGE.bodyBase"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <circle cx="99" cy="95" r="5" :fill="ORANGE.bodyBase" stroke="#5a3a26" stroke-width="2.2" />
+        <BeanieCore v-bind="ORANGE" />
+      </g>
     </svg>
 
     <!-- Transactions: Beanie shrugging with empty pockets -->
@@ -134,62 +160,56 @@ const prefersReducedMotion = useReducedMotion();
       role="img"
       :aria-label="t('emptyState.aria.emptyPockets')"
     >
-      <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
+      <ellipse cx="80" cy="148" rx="50" ry="7" fill="#AED6F1" opacity="0.3" />
       <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
-        <ellipse cx="80" cy="100" rx="24" ry="30" fill="#AED6F1" />
-        <ellipse cx="80" cy="100" rx="24" ry="30" fill="url(#emptySheen2)" opacity="0.4" />
-        <ellipse cx="73" cy="91" rx="3" ry="4" fill="#2C3E50" />
-        <circle cx="72" cy="90" r="1.2" fill="white" opacity="0.7" />
-        <ellipse cx="87" cy="91" rx="3" ry="4" fill="#2C3E50" />
-        <circle cx="86" cy="90" r="1.2" fill="white" opacity="0.7" />
         <path
-          d="M75 106 Q80 103 85 106"
-          stroke="#2C3E50"
-          stroke-width="1.5"
+          d="M44 96 Q32 88 30 76"
           fill="none"
-          stroke-linecap="round"
-        />
-        <!-- Shrugging arms -->
-        <path
-          d="M56 98 Q45 85 48 78"
-          stroke="#AED6F1"
-          stroke-width="5"
-          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
           stroke-linecap="round"
         />
         <path
-          d="M104 98 Q115 85 112 78"
-          stroke="#AED6F1"
-          stroke-width="5"
+          d="M44 96 Q32 88 30 76"
           fill="none"
+          stroke="#F15D22"
+          stroke-width="5.2"
           stroke-linecap="round"
         />
-        <circle cx="48" cy="78" r="3" fill="#AED6F1" />
-        <circle cx="112" cy="78" r="3" fill="#AED6F1" />
+        <path
+          d="M82 96 Q94 88 96 76"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M82 96 Q94 88 96 76"
+          fill="none"
+          stroke="#F15D22"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <circle cx="30" cy="76" r="5" fill="#F15D22" stroke="#5a3a26" stroke-width="2.2" />
+        <circle cx="96" cy="76" r="5" fill="#F15D22" stroke="#5a3a26" stroke-width="2.2" />
+        <BeanieCore v-bind="ORANGE" uid="t" />
       </g>
-      <!-- Empty pocket outlines -->
       <path
-        d="M42 118 Q38 128 44 130"
+        d="M40 116 Q35 127 42 129"
         stroke="#E67E22"
-        stroke-width="1.5"
+        stroke-width="1.6"
         fill="none"
         stroke-dasharray="3 2"
-        opacity="0.4"
+        opacity="0.5"
       />
       <path
-        d="M118 118 Q122 128 116 130"
+        d="M84 116 Q89 127 82 129"
         stroke="#E67E22"
-        stroke-width="1.5"
+        stroke-width="1.6"
         fill="none"
         stroke-dasharray="3 2"
-        opacity="0.4"
+        opacity="0.5"
       />
-      <defs>
-        <linearGradient id="emptySheen2" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="white" stop-opacity="0.6" />
-          <stop offset="100%" stop-color="white" stop-opacity="0" />
-        </linearGradient>
-      </defs>
     </svg>
 
     <!-- Recurring: Beanie scratching head near blank calendar -->
@@ -201,90 +221,91 @@ const prefersReducedMotion = useReducedMotion();
       role="img"
       :aria-label="t('emptyState.aria.blankCalendar')"
     >
-      <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
-      <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
-        <ellipse cx="55" cy="105" rx="22" ry="28" fill="#E67E22" />
-        <ellipse cx="55" cy="105" rx="22" ry="28" fill="url(#emptySheen3)" opacity="0.3" />
-        <ellipse cx="48" cy="97" rx="3" ry="4" fill="#2C3E50" />
-        <circle cx="47" cy="96" r="1.2" fill="white" opacity="0.7" />
-        <ellipse cx="62" cy="97" rx="3" ry="4" fill="#2C3E50" />
-        <circle cx="61" cy="96" r="1.2" fill="white" opacity="0.7" />
-        <path
-          d="M50 112 Q55 109 60 112"
-          stroke="#2C3E50"
-          stroke-width="1.5"
-          fill="none"
-          stroke-linecap="round"
-        />
-        <!-- Scratching head arm -->
-        <path
-          d="M37 100 Q30 85 40 78"
-          stroke="#E67E22"
-          stroke-width="5"
-          fill="none"
-          stroke-linecap="round"
-        />
-        <circle cx="40" cy="78" r="3" fill="#E67E22" />
-      </g>
-      <!-- Blank calendar -->
-      <g opacity="0.5">
+      <ellipse cx="80" cy="148" rx="50" ry="7" fill="#AED6F1" opacity="0.3" />
+      <g opacity="0.6">
         <rect
-          x="90"
-          y="80"
-          width="40"
-          height="38"
-          rx="4"
-          fill="none"
+          x="96"
+          y="82"
+          width="42"
+          height="40"
+          rx="5"
+          fill="#fff"
           stroke="#2C3E50"
-          stroke-width="1.5"
+          stroke-width="2"
         />
-        <line x1="90" y1="92" x2="130" y2="92" stroke="#2C3E50" stroke-width="1.5" />
-        <rect x="96" y="84" width="3" height="6" rx="1" fill="#F15D22" />
-        <rect x="121" y="84" width="3" height="6" rx="1" fill="#F15D22" />
-        <!-- Empty calendar cells -->
+        <line x1="96" y1="94" x2="138" y2="94" stroke="#2C3E50" stroke-width="2" />
+        <rect x="103" y="86" width="3" height="6" rx="1" fill="#F15D22" />
+        <rect x="128" y="86" width="3" height="6" rx="1" fill="#F15D22" />
         <line
-          x1="103"
-          y1="92"
-          x2="103"
-          y2="118"
+          x1="110"
+          y1="94"
+          x2="110"
+          y2="122"
           stroke="#2C3E50"
-          stroke-width="0.5"
-          opacity="0.3"
-        />
-        <line
-          x1="117"
-          y1="92"
-          x2="117"
-          y2="118"
-          stroke="#2C3E50"
-          stroke-width="0.5"
-          opacity="0.3"
+          stroke-width="0.6"
+          opacity="0.4"
         />
         <line
-          x1="90"
-          y1="101"
-          x2="130"
-          y2="101"
+          x1="124"
+          y1="94"
+          x2="124"
+          y2="122"
           stroke="#2C3E50"
-          stroke-width="0.5"
-          opacity="0.3"
+          stroke-width="0.6"
+          opacity="0.4"
         />
         <line
-          x1="90"
-          y1="110"
-          x2="130"
-          y2="110"
+          x1="96"
+          y1="104"
+          x2="138"
+          y2="104"
           stroke="#2C3E50"
-          stroke-width="0.5"
-          opacity="0.3"
+          stroke-width="0.6"
+          opacity="0.4"
+        />
+        <line
+          x1="96"
+          y1="113"
+          x2="138"
+          y2="113"
+          stroke="#2C3E50"
+          stroke-width="0.6"
+          opacity="0.4"
         />
       </g>
-      <defs>
-        <linearGradient id="emptySheen3" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="white" stop-opacity="0.6" />
-          <stop offset="100%" stop-color="white" stop-opacity="0" />
-        </linearGradient>
-      </defs>
+      <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
+        <path
+          d="M44 98 Q34 102 31 108"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M44 98 Q34 102 31 108"
+          fill="none"
+          stroke="#E67E22"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <path
+          d="M80 96 Q84 80 72 70"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M80 96 Q84 80 72 70"
+          fill="none"
+          stroke="#E67E22"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <circle cx="31" cy="108" r="5" fill="#E67E22" stroke="#5a3a26" stroke-width="2.2" />
+        <circle cx="72" cy="70" r="5" fill="#E67E22" stroke="#5a3a26" stroke-width="2.2" />
+        <BeanieCore v-bind="TERRA" uid="r" />
+      </g>
     </svg>
 
     <!-- Assets: Beanie dreaming about treasure chest -->
@@ -296,68 +317,60 @@ const prefersReducedMotion = useReducedMotion();
       role="img"
       :aria-label="t('emptyState.aria.treasureChest')"
     >
-      <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
-      <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
-        <ellipse cx="65" cy="108" rx="22" ry="28" fill="#AED6F1" />
-        <ellipse cx="65" cy="108" rx="22" ry="28" fill="url(#emptySheen4)" opacity="0.4" />
-        <!-- Closed/dreaming eyes -->
-        <path
-          d="M55 97 Q58 94 61 97"
-          stroke="#2C3E50"
-          stroke-width="1.8"
-          fill="none"
-          stroke-linecap="round"
-        />
-        <path
-          d="M69 97 Q72 94 75 97"
-          stroke="#2C3E50"
-          stroke-width="1.8"
-          fill="none"
-          stroke-linecap="round"
-        />
-        <path
-          d="M60 114 Q65 118 70 114"
-          stroke="#2C3E50"
-          stroke-width="1.5"
-          fill="none"
-          stroke-linecap="round"
-        />
-      </g>
-      <!-- Dream bubble -->
-      <circle cx="95" cy="72" r="2.5" fill="#2C3E50" opacity="0.2" />
-      <circle cx="100" cy="62" r="3.5" fill="#2C3E50" opacity="0.2" />
-      <!-- Treasure chest in dream -->
-      <g opacity="0.5">
+      <ellipse cx="80" cy="148" rx="50" ry="7" fill="#AED6F1" opacity="0.3" />
+      <circle cx="96" cy="66" r="2.4" fill="#2C3E50" opacity="0.18" />
+      <circle cx="102" cy="56" r="3.4" fill="#2C3E50" opacity="0.18" />
+      <g opacity="0.65">
         <rect
           x="100"
-          y="42"
+          y="36"
           width="30"
           height="20"
           rx="3"
+          fill="#fff"
+          stroke="#F15D22"
+          stroke-width="1.6"
+        />
+        <line x1="100" y1="43" x2="130" y2="43" stroke="#F15D22" stroke-width="1.6" />
+        <path d="M112 36 Q115 30 118 36" stroke="#F15D22" stroke-width="1.6" fill="none" />
+        <path
+          d="M113 49 l1.2 2.6 l2.6 1.2 l-2.6 1.2 l-1.2 2.6 l-1.2 -2.6 l-2.6 -1.2 l2.6 -1.2 Z"
+          fill="#F1B24A"
+        />
+      </g>
+      <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
+        <path
+          d="M44 98 Q34 102 31 110"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M44 98 Q34 102 31 110"
           fill="none"
           stroke="#F15D22"
-          stroke-width="1.5"
+          stroke-width="5.2"
+          stroke-linecap="round"
         />
-        <path d="M100 48 L130 48" stroke="#F15D22" stroke-width="1.5" />
-        <path d="M112 42 Q115 36 118 42" stroke="#F15D22" stroke-width="1.5" fill="none" />
-        <text
-          x="115"
-          y="57"
-          font-family="Outfit, sans-serif"
-          font-weight="700"
-          font-size="10"
-          fill="#F15D22"
-          text-anchor="middle"
-        >
-          &#x2726;
-        </text>
+        <path
+          d="M82 98 Q92 102 95 110"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M82 98 Q92 102 95 110"
+          fill="none"
+          stroke="#F15D22"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <circle cx="31" cy="110" r="5" fill="#F15D22" stroke="#5a3a26" stroke-width="2.2" />
+        <circle cx="95" cy="110" r="5" fill="#F15D22" stroke="#5a3a26" stroke-width="2.2" />
+        <BeanieCore v-bind="ORANGE" eyes="happy" uid="as" />
       </g>
-      <defs>
-        <linearGradient id="emptySheen4" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="white" stop-opacity="0.6" />
-          <stop offset="100%" stop-color="white" stop-opacity="0" />
-        </linearGradient>
-      </defs>
     </svg>
 
     <!-- Goals: Beanie looking up at distant flag on hill -->
@@ -369,49 +382,47 @@ const prefersReducedMotion = useReducedMotion();
       role="img"
       :aria-label="t('emptyState.aria.flagOnHill')"
     >
-      <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
-      <!-- Hill -->
-      <path d="M70 140 Q110 70 150 140" fill="#AED6F1" opacity="0.15" />
-      <!-- Flag on top -->
-      <line x1="118" y1="90" x2="118" y2="72" stroke="#2C3E50" stroke-width="1.5" />
-      <path d="M118 72 L135 78 L118 84" fill="#F15D22" opacity="0.7" />
-      <!-- Beanie at bottom of hill -->
+      <ellipse cx="80" cy="148" rx="50" ry="7" fill="#AED6F1" opacity="0.3" />
+      <path d="M70 148 Q112 70 152 148" fill="#AED6F1" opacity="0.16" />
+      <line x1="124" y1="96" x2="124" y2="70" stroke="#2C3E50" stroke-width="1.8" />
+      <path d="M124 70 L142 76 L124 82 Z" fill="#F15D22" opacity="0.9" />
+      <path
+        d="M136 62 l1.1 2.6 l2.6 1.1 l-2.6 1.1 l-1.1 2.6 l-1.1 -2.6 l-2.6 -1.1 l2.6 -1.1 Z"
+        fill="#F1B24A"
+      />
       <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
-        <ellipse cx="50" cy="112" rx="20" ry="25" fill="#E67E22" />
-        <ellipse cx="50" cy="112" rx="20" ry="25" fill="url(#emptySheen5)" opacity="0.3" />
-        <!-- Eyes looking up -->
-        <ellipse cx="44" cy="103" rx="3" ry="4.5" fill="#2C3E50" />
-        <circle cx="43.5" cy="101.5" r="1.2" fill="white" opacity="0.7" />
-        <ellipse cx="56" cy="103" rx="3" ry="4.5" fill="#2C3E50" />
-        <circle cx="55.5" cy="101.5" r="1.2" fill="white" opacity="0.7" />
         <path
-          d="M45 120 Q50 123 55 120"
-          stroke="#2C3E50"
-          stroke-width="1.5"
+          d="M44 98 Q34 96 30 104"
           fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
           stroke-linecap="round"
         />
+        <path
+          d="M44 98 Q34 96 30 104"
+          fill="none"
+          stroke="#E67E22"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <path
+          d="M82 98 Q92 96 96 104"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M82 98 Q92 96 96 104"
+          fill="none"
+          stroke="#E67E22"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <circle cx="30" cy="104" r="5" fill="#E67E22" stroke="#5a3a26" stroke-width="2.2" />
+        <circle cx="96" cy="104" r="5" fill="#E67E22" stroke="#5a3a26" stroke-width="2.2" />
+        <BeanieCore v-bind="TERRA" uid="g" />
       </g>
-      <!-- Sparkle near flag -->
-      <text
-        x="130"
-        y="70"
-        font-family="Outfit, sans-serif"
-        font-weight="700"
-        font-size="8"
-        fill="#F15D22"
-        opacity="0.5"
-        :class="{ 'animate-beanie-float': !prefersReducedMotion }"
-        style="animation-delay: 0.5s"
-      >
-        &#x2726;
-      </text>
-      <defs>
-        <linearGradient id="emptySheen5" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="white" stop-opacity="0.6" />
-          <stop offset="100%" stop-color="white" stop-opacity="0" />
-        </linearGradient>
-      </defs>
     </svg>
 
     <!-- Reports: Beanie with magnifying glass over empty chart -->
@@ -423,71 +434,79 @@ const prefersReducedMotion = useReducedMotion();
       role="img"
       :aria-label="t('emptyState.aria.emptyChart')"
     >
-      <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
+      <ellipse cx="80" cy="148" rx="50" ry="7" fill="#AED6F1" opacity="0.3" />
       <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
-        <ellipse cx="55" cy="105" rx="22" ry="28" fill="#AED6F1" />
-        <ellipse cx="55" cy="105" rx="22" ry="28" fill="url(#emptySheen6)" opacity="0.4" />
-        <ellipse cx="48" cy="97" rx="3" ry="4" fill="#2C3E50" />
-        <circle cx="47" cy="96" r="1.2" fill="white" opacity="0.7" />
-        <ellipse cx="62" cy="97" rx="3" ry="4" fill="#2C3E50" />
-        <circle cx="61" cy="96" r="1.2" fill="white" opacity="0.7" />
         <path
-          d="M50 112 Q55 115 60 112"
-          stroke="#2C3E50"
-          stroke-width="1.5"
+          d="M44 98 Q34 102 31 110"
           fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
           stroke-linecap="round"
         />
-        <!-- Arm holding magnifying glass -->
         <path
-          d="M75 100 Q85 90 95 85"
-          stroke="#AED6F1"
-          stroke-width="5"
+          d="M44 98 Q34 102 31 110"
           fill="none"
+          stroke="#F15D22"
+          stroke-width="5.2"
           stroke-linecap="round"
         />
+        <path
+          d="M80 96 Q92 86 100 80"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M80 96 Q92 86 100 80"
+          fill="none"
+          stroke="#F15D22"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <circle cx="31" cy="110" r="5" fill="#F15D22" stroke="#5a3a26" stroke-width="2.2" />
+        <BeanieCore v-bind="ORANGE" uid="rp" />
       </g>
-      <!-- Magnifying glass -->
-      <circle cx="105" cy="75" r="14" fill="none" stroke="#2C3E50" stroke-width="2.5" />
-      <circle cx="105" cy="75" r="10" fill="#AED6F1" opacity="0.1" />
+      <circle cx="110" cy="74" r="14" fill="#AED6F1" opacity="0.16" />
+      <circle cx="110" cy="74" r="14" fill="none" stroke="#2C3E50" stroke-width="2.6" />
       <line
-        x1="95"
-        y1="85"
-        x2="88"
-        y2="92"
+        x1="100"
+        y1="84"
+        x2="93"
+        y2="91"
         stroke="#2C3E50"
-        stroke-width="3"
+        stroke-width="3.2"
         stroke-linecap="round"
       />
-      <!-- Empty chart bars behind magnifying glass -->
-      <g opacity="0.3">
+      <circle cx="100" cy="81" r="5" fill="#F15D22" stroke="#5a3a26" stroke-width="2.2" />
+      <g opacity="0.4">
         <rect
-          x="98"
-          y="78"
-          width="4"
-          height="8"
-          rx="1"
-          fill="none"
-          stroke="#F15D22"
-          stroke-width="1"
-          stroke-dasharray="2 2"
-        />
-        <rect
-          x="104"
-          y="74"
-          width="4"
-          height="12"
-          rx="1"
-          fill="none"
-          stroke="#F15D22"
-          stroke-width="1"
-          stroke-dasharray="2 2"
-        />
-        <rect
-          x="110"
+          x="103"
           y="76"
-          width="4"
-          height="10"
+          width="3.4"
+          height="7"
+          rx="1"
+          fill="none"
+          stroke="#F15D22"
+          stroke-width="1"
+          stroke-dasharray="2 2"
+        />
+        <rect
+          x="109"
+          y="72"
+          width="3.4"
+          height="11"
+          rx="1"
+          fill="none"
+          stroke="#F15D22"
+          stroke-width="1"
+          stroke-dasharray="2 2"
+        />
+        <rect
+          x="115"
+          y="74"
+          width="3.4"
+          height="9"
           rx="1"
           fill="none"
           stroke="#F15D22"
@@ -495,12 +514,6 @@ const prefersReducedMotion = useReducedMotion();
           stroke-dasharray="2 2"
         />
       </g>
-      <defs>
-        <linearGradient id="emptySheen6" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="white" stop-opacity="0.6" />
-          <stop offset="100%" stop-color="white" stop-opacity="0" />
-        </linearGradient>
-      </defs>
     </svg>
 
     <!-- Dashboard: Beanie waving "Let's get started!" -->
@@ -512,56 +525,29 @@ const prefersReducedMotion = useReducedMotion();
       role="img"
       :aria-label="t('emptyState.aria.wavingHello')"
     >
-      <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
-      <!-- Parent bean waving -->
+      <ellipse cx="80" cy="148" rx="50" ry="7" fill="#AED6F1" opacity="0.3" />
       <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
-        <ellipse cx="65" cy="105" rx="24" ry="30" fill="#AED6F1" />
-        <ellipse cx="65" cy="105" rx="24" ry="30" fill="url(#emptySheen7)" opacity="0.4" />
-        <ellipse cx="58" cy="96" rx="3.5" ry="4.5" fill="#2C3E50" />
-        <circle cx="57" cy="95" r="1.2" fill="white" opacity="0.7" />
-        <ellipse cx="72" cy="96" rx="3.5" ry="4.5" fill="#2C3E50" />
-        <circle cx="71" cy="95" r="1.2" fill="white" opacity="0.7" />
-        <path
-          d="M59 113 Q65 118 71 113"
-          stroke="#2C3E50"
-          stroke-width="1.8"
-          fill="none"
-          stroke-linecap="round"
-        />
-        <!-- Waving arm -->
-        <path
-          d="M87 98 Q100 82 95 70"
-          stroke="#AED6F1"
-          stroke-width="5"
-          fill="none"
-          stroke-linecap="round"
-        />
-        <circle cx="95" cy="70" r="3.5" fill="#AED6F1" />
+        <g transform="translate(-16,0) scale(0.95)">
+          <path
+            d="M82 98 Q98 84 94 70"
+            fill="none"
+            stroke="#5a3a26"
+            stroke-width="8.5"
+            stroke-linecap="round"
+          />
+          <path
+            d="M82 98 Q98 84 94 70"
+            fill="none"
+            stroke="#2C3E50"
+            stroke-width="5.2"
+            stroke-linecap="round"
+          />
+          <circle cx="94" cy="70" r="5" fill="#2C3E50" stroke="#5a3a26" stroke-width="2.2" />
+          <BeanieCore v-bind="SLATE" uid="dp" />
+        </g>
+        <g transform="translate(60,26) scale(0.6)"><BeanieCore v-bind="ORANGE" uid="dc" /></g>
       </g>
-      <!-- Child bean next to parent -->
-      <g :class="{ 'animate-beanie-float': !prefersReducedMotion }" style="animation-delay: 0.3s">
-        <ellipse cx="105" cy="115" rx="18" ry="22" fill="#E67E22" />
-        <ellipse cx="105" cy="115" rx="18" ry="22" fill="url(#emptySheen7)" opacity="0.3" />
-        <ellipse cx="100" cy="108" rx="2.5" ry="3.5" fill="#2C3E50" />
-        <circle cx="99.5" cy="107" r="1" fill="white" opacity="0.7" />
-        <ellipse cx="110" cy="108" rx="2.5" ry="3.5" fill="#2C3E50" />
-        <circle cx="109.5" cy="107" r="1" fill="white" opacity="0.7" />
-        <path
-          d="M101 121 Q105 124 109 121"
-          stroke="#2C3E50"
-          stroke-width="1.5"
-          fill="none"
-          stroke-linecap="round"
-        />
-      </g>
-      <!-- Joined hands -->
-      <circle cx="88" cy="112" r="3.5" fill="#F15D22" opacity="0.8" />
-      <defs>
-        <linearGradient id="emptySheen7" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="white" stop-opacity="0.6" />
-          <stop offset="100%" stop-color="white" stop-opacity="0" />
-        </linearGradient>
-      </defs>
+      <circle cx="92" cy="112" r="4.5" fill="#F15D22" stroke="#5a3a26" stroke-width="1.6" />
     </svg>
 
     <!-- Budget: Beanie with a chart/clipboard -->
@@ -573,54 +559,86 @@ const prefersReducedMotion = useReducedMotion();
       role="img"
       :aria-label="t('emptyState.aria.planningBudget')"
     >
-      <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
-      <!-- Beanie with pencil -->
-      <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
-        <ellipse cx="60" cy="102" rx="23" ry="29" fill="#AED6F1" />
-        <ellipse cx="60" cy="102" rx="23" ry="29" fill="url(#emptySheen8)" opacity="0.4" />
-        <ellipse cx="53" cy="93" rx="3" ry="4" fill="#2C3E50" />
-        <circle cx="52" cy="92" r="1.2" fill="white" opacity="0.7" />
-        <ellipse cx="67" cy="93" rx="3" ry="4" fill="#2C3E50" />
-        <circle cx="66" cy="92" r="1.2" fill="white" opacity="0.7" />
-        <path
-          d="M55 108 Q60 112 65 108"
-          stroke="#2C3E50"
-          stroke-width="1.5"
-          fill="none"
-          stroke-linecap="round"
+      <ellipse cx="80" cy="148" rx="50" ry="7" fill="#AED6F1" opacity="0.3" />
+      <g>
+        <rect
+          x="104"
+          y="98"
+          width="9"
+          height="30"
+          rx="2.5"
+          fill="#F15D22"
+          opacity="0.7"
+          stroke="#5a3a26"
+          stroke-width="1.2"
         />
-        <!-- Pencil arm -->
-        <path
-          d="M81 97 Q90 85 95 75"
-          stroke="#AED6F1"
-          stroke-width="4.5"
-          fill="none"
-          stroke-linecap="round"
+        <rect
+          x="116"
+          y="106"
+          width="9"
+          height="22"
+          rx="2.5"
+          fill="#E67E22"
+          opacity="0.7"
+          stroke="#5a3a26"
+          stroke-width="1.2"
         />
-        <path d="M95 75 L97 70" stroke="#E67E22" stroke-width="2.5" stroke-linecap="round" />
-      </g>
-      <!-- Budget chart / bars -->
-      <g opacity="0.5">
-        <rect x="100" y="100" width="8" height="28" rx="2" fill="#F15D22" opacity="0.6" />
-        <rect x="112" y="108" width="8" height="20" rx="2" fill="#E67E22" opacity="0.5" />
-        <rect x="124" y="114" width="8" height="14" rx="2" fill="#AED6F1" opacity="0.6" />
-        <!-- Baseline -->
+        <rect
+          x="128"
+          y="112"
+          width="9"
+          height="16"
+          rx="2.5"
+          fill="#AED6F1"
+          opacity="0.85"
+          stroke="#5a3a26"
+          stroke-width="1.2"
+        />
         <line
-          x1="96"
+          x1="100"
           y1="129"
-          x2="136"
+          x2="140"
           y2="129"
           stroke="#2C3E50"
           stroke-width="1.5"
-          opacity="0.3"
+          opacity="0.35"
         />
       </g>
-      <defs>
-        <linearGradient id="emptySheen8" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="white" stop-opacity="0.6" />
-          <stop offset="100%" stop-color="white" stop-opacity="0" />
-        </linearGradient>
-      </defs>
+      <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
+        <path
+          d="M44 98 Q34 102 31 110"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M44 98 Q34 102 31 110"
+          fill="none"
+          stroke="#F15D22"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <path
+          d="M80 96 Q92 88 98 80"
+          fill="none"
+          stroke="#5a3a26"
+          stroke-width="8.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M80 96 Q92 88 98 80"
+          fill="none"
+          stroke="#F15D22"
+          stroke-width="5.2"
+          stroke-linecap="round"
+        />
+        <circle cx="31" cy="110" r="5" fill="#F15D22" stroke="#5a3a26" stroke-width="2.2" />
+        <circle cx="98" cy="80" r="5" fill="#F15D22" stroke="#5a3a26" stroke-width="2.2" />
+        <path d="M98 80 l4 -6" stroke="#E67E22" stroke-width="3" stroke-linecap="round" />
+        <path d="M101 75 l3 -4" stroke="#F1B24A" stroke-width="3" stroke-linecap="round" />
+        <BeanieCore v-bind="ORANGE" uid="b" />
+      </g>
     </svg>
 
     <!-- Lists: a cheerful beanie hugging a fresh checklist (#33) -->
