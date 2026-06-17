@@ -40,6 +40,7 @@ import { useClash } from '@/composables/useClash';
 import { useOverlapAckStore } from '@/stores/overlapAckStore';
 import OverlapMark from '@/components/planner/OverlapMark.vue';
 import LinkedLists from '@/components/lists/LinkedLists.vue';
+import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import { openExternal } from '@/utils/openExternal';
 import { MARKETING_URL } from '@/utils/marketing';
 import type { FamilyActivity, DutyCompletion } from '@/types/models';
@@ -73,11 +74,10 @@ const { t } = useTranslation();
 const { categoryLabel } = useActivityCategoryLabel();
 const router = useRouter();
 
-/** Open a linked Beanie List — close this drawer and deep-link to it. */
-function openLinkedList(id: string): void {
-  emit('close');
-  void router.push({ path: '/lists', query: { view: id } });
-}
+// Open a linked Beanie List as a drawer stacked ON TOP of this one — no route
+// navigation, so closing it returns the user to this activity drawer where they
+// started. `null` = closed.
+const linkedListId = ref<string | null>(null);
 const { playWhoosh } = useSounds();
 const activityStore = useActivityStore();
 const photoStore = usePhotoStore();
@@ -1488,7 +1488,7 @@ async function confirmReschedule() {
         </div>
 
         <!-- Beanie Lists linked to this activity (#33) -->
-        <LinkedLists :activity-id="activity.id" @open="openLinkedList" />
+        <LinkedLists :activity-id="activity.id" @open="(id: string) => (linkedListId = id)" />
 
         <!-- Created by + when — shared subtle footer (standard convention) -->
         <CreatedMeta :created-by="activity.createdBy" :created-at="activity.createdAt" />
@@ -1512,4 +1512,7 @@ async function confirmReschedule() {
       </button>
     </template>
   </BeanieFormModal>
+
+  <!-- Linked list opens stacked over this drawer; closing returns here (#33) -->
+  <ListDetailModal :list-id="linkedListId" stacked @close="linkedListId = null" />
 </template>

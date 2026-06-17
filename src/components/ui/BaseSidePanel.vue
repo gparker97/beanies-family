@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { toRef } from 'vue';
+import { computed, toRef } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useFullscreenOverlay } from '@/composables/useFullscreenOverlay';
 
@@ -9,12 +9,19 @@ interface Props {
   side?: 'left' | 'right';
   size?: 'narrow' | 'medium' | 'wide' | 'full';
   closable?: boolean;
+  /**
+   * Stacking layer. 'base' (z-40) is a normal panel; 'overlay' (z-[60])
+   * sits above another open drawer/modal — use it when this panel opens on
+   * top of one (e.g. a list drawer launched from inside the activity drawer).
+   */
+  layer?: 'base' | 'overlay';
 }
 
 const props = withDefaults(defineProps<Props>(), {
   side: 'right',
   size: 'narrow',
   closable: true,
+  layer: 'base',
 });
 
 const sizeClasses: Record<string, string> = {
@@ -23,6 +30,11 @@ const sizeClasses: Record<string, string> = {
   wide: 'max-w-xl',
   full: 'max-w-3xl',
 };
+
+// Backdrop sits just under the panel; 'overlay' clears a base drawer (z-40)
+// and a base modal (z-50) beneath it.
+const backdropZ = computed(() => (props.layer === 'overlay' ? 'z-[55]' : 'z-40'));
+const panelZ = computed(() => (props.layer === 'overlay' ? 'z-[60]' : 'z-40'));
 
 const emit = defineEmits<{
   close: [];
@@ -49,7 +61,7 @@ useFullscreenOverlay(toRef(props, 'open'), close);
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="open" class="fixed inset-0 z-40 bg-black/50" @click="close" />
+      <div v-if="open" class="fixed inset-0 bg-black/50" :class="backdropZ" @click="close" />
     </Transition>
 
     <!-- Panel slide -->
@@ -66,8 +78,8 @@ useFullscreenOverlay(toRef(props, 'open'), close);
         v-if="open"
         role="dialog"
         aria-modal="true"
-        class="fixed inset-y-0 z-40 flex w-full flex-col overflow-y-auto bg-white shadow-xl dark:bg-slate-800"
-        :class="[sizeClasses[size], side === 'right' ? 'right-0' : 'left-0']"
+        class="fixed inset-y-0 flex w-full flex-col overflow-y-auto bg-white shadow-xl dark:bg-slate-800"
+        :class="[panelZ, sizeClasses[size], side === 'right' ? 'right-0' : 'left-0']"
       >
         <!-- Header -->
         <div

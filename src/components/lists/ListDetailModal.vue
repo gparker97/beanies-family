@@ -23,7 +23,14 @@ import MemberChip from '@/components/ui/MemberChip.vue';
 import ListItemRow from './ListItemRow.vue';
 import type { ListCategory, ListFrequency } from '@/types/models';
 
-const props = defineProps<{ listId: string | null }>();
+const props = withDefaults(
+  defineProps<{
+    listId: string | null;
+    /** Stack above another open drawer (e.g. when opened from the activity drawer). */
+    stacked?: boolean;
+  }>(),
+  { stacked: false }
+);
 const emit = defineEmits<{ close: []; deleted: [id: string] }>();
 
 const { t } = useTranslation();
@@ -199,6 +206,7 @@ async function handleDelete(): Promise<void> {
   <BeanieFormModal
     v-if="list"
     variant="drawer"
+    :layer="stacked ? 'overlay' : 'base'"
     :open="true"
     :title="list.title"
     :icon="list.emoji"

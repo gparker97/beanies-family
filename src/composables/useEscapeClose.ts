@@ -21,43 +21,67 @@ import { onScopeDispose, watch, type Ref } from 'vue';
  * @param onClose  — invoked with no arguments when Escape is pressed
  *                   while the overlay is open
  */
+// Module-level stack of currently-open overlays, in the order they opened.
+// Escape closes only the TOP-MOST one, so a stacked overlay (e.g. a list
+// drawer opened over the activity drawer) dismisses back to the overlay it
+// sits on rather than collapsing every layer at once. A single shared window
+// listener drives the whole stack — independent per-instance listeners would
+// each fire for the same keypress and close all open overlays together.
+type EscapeToken = { onClose: () => void };
+const escapeStack: EscapeToken[] = [];
+let sharedListening = false;
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape') return;
+  const top = escapeStack[escapeStack.length - 1];
+  if (top) top.onClose();
+}
+
+function startSharedListener() {
+  if (sharedListening || escapeStack.length === 0) return;
+  try {
+    window.addEventListener('keydown', handleKeydown);
+    sharedListening = true;
+  } catch (err) {
+    console.warn('[useEscapeClose] could not attach keydown listener:', err);
+  }
+}
+
+function stopSharedListenerIfIdle() {
+  if (!sharedListening || escapeStack.length > 0) return;
+  try {
+    window.removeEventListener('keydown', handleKeydown);
+  } catch (err) {
+    console.warn('[useEscapeClose] could not detach keydown listener:', err);
+  }
+  sharedListening = false;
+}
+
 export function useEscapeClose(isOpen: Ref<boolean>, onClose: () => void): void {
-  let attached = false;
+  // One token per consumer; its onClose is the close handler invoked when this
+  // overlay is the top of the stack. Re-opening pushes the token back on top.
+  const token: EscapeToken = { onClose };
 
-  function handler(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
-      onClose();
-    }
+  function register() {
+    if (escapeStack.includes(token)) return;
+    escapeStack.push(token);
+    startSharedListener();
   }
 
-  function attach() {
-    if (attached) return;
-    try {
-      window.addEventListener('keydown', handler);
-      attached = true;
-    } catch (err) {
-      console.warn('[useEscapeClose] could not attach keydown listener:', err);
-    }
-  }
-
-  function detach() {
-    if (!attached) return;
-    try {
-      window.removeEventListener('keydown', handler);
-    } catch (err) {
-      console.warn('[useEscapeClose] could not detach keydown listener:', err);
-    }
-    attached = false;
+  function unregister() {
+    const idx = escapeStack.indexOf(token);
+    if (idx !== -1) escapeStack.splice(idx, 1);
+    stopSharedListenerIfIdle();
   }
 
   watch(
     isOpen,
     (open) => {
-      if (open) attach();
-      else detach();
+      if (open) register();
+      else unregister();
     },
     { immediate: true }
   );
 
-  onScopeDispose(detach);
+  onScopeDispose(unregister);
 }
