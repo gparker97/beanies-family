@@ -542,9 +542,9 @@ function vacationAssignees(v: FamilyVacation) {
 }
 
 /** Count of ideas on this trip that the family hasn't decided on yet —
- *  neither marked planned nor skipped. Matches the sidebar's
- *  `openTravelIdeas` semantics so the per-trip badges add up to the
- *  sidebar total across all upcoming trips. */
+ *  neither marked planned nor skipped. A per-trip planning stat only; the nav
+ *  badge now counts unbooked bookings (`unbookedTravel`), which the per-trip
+ *  "needs booking" indicator (`vacationProgress`) sums to instead. */
 function vacationOpenIdeas(v: FamilyVacation): number {
   return v.ideas.filter((i) => !i.isPlanned && !i.isSkipped).length;
 }
