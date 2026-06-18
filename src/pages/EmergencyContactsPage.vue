@@ -8,6 +8,7 @@
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import EmergencyContactFormModal from '@/components/pod/EmergencyContactFormModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -133,14 +134,11 @@ function emailFor(c: EmergencyContact, e: Event): void {
         </p>
       </div>
       <div v-if="canEditActivities" class="flex w-full flex-shrink-0 items-center gap-2 sm:w-auto">
-        <button
-          type="button"
-          class="font-outfit from-primary-500 to-terracotta-400 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)] sm:w-auto"
+        <AddEntityButton
+          :label="t('contacts.addContact')"
+          class="w-full sm:w-auto"
           @click="openAdd"
-        >
-          <span aria-hidden="true">＋</span>
-          <span>{{ t('contacts.addContact') }}</span>
-        </button>
+        />
       </div>
     </header>
 

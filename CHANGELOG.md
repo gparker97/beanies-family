@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - **The Travel Plans menu badge now counts what still needs booking.** The little orange number next to Travel Plans used to count undecided trip "ideas" — which aren't urgent. It now counts the unbooked items (flights, stays, transport still marked _pending_) across your upcoming trips, matching the "needs booking" indicator on each trip card. It clears to zero once everything's booked, so the badge only nudges you when there's real booking work left.
+- **Consistent "add" buttons across the app.** The various "＋ Add" buttons (new activity, add contact, add recipe, add bean, new list) now share one component, so they all look and behave the same — including showing the ＋ on the planner's "Add activity" button on desktop.
 
 ## 2026-06-17
 
