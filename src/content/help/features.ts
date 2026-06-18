@@ -1104,6 +1104,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Shared, categorized checklists for the stuff family life runs on — groceries, packing, chores, before-school routines. One-off or auto-repeating.',
     icon: '\u{1F9FE}',
     readTime: 6,
+    popular: true,
     updatedDate: '2026-06-18',
     sections: [
       { type: 'heading', content: 'Why Beanie Lists?', level: 2, id: 'why' },
