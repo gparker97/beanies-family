@@ -6,7 +6,7 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import { useToday } from '@/composables/useToday';
 import { isDocLoaded } from '@/services/automerge/docService';
 import * as listRepo from '@/services/automerge/repositories/listRepository';
-import { computeRecurringReset, isFiled, isListDue, isRecurring } from '@/utils/listLifecycle';
+import { computeRecurringReset, isDueSoon, isFiled, isRecurring } from '@/utils/listLifecycle';
 import { getListTemplateByKey } from '@/constants/listTemplates';
 import { useTranslationStore } from '@/stores/translationStore';
 import { toISODateString } from '@/utils/date';
@@ -110,11 +110,16 @@ export const useListStore = defineStore('lists', () => {
   );
 
   /** Active lists that are due today or overdue (built on the shared predicate). */
-  const dueSoonLists = computed(() =>
-    activeLists.value.filter((l) => {
-      const due = isListDue(l, today.value);
-      return due === 'overdue' || due === 'today';
-    })
+  const dueSoonLists = computed(() => activeLists.value.filter((l) => isDueSoon(l, today.value)));
+
+  /**
+   * Count of lists overdue or due today, across ALL members — drives the nav
+   * attention badge. Unfiltered (like the todo/goal/travel badges, which show
+   * the whole family); recurring + future-dated lists are excluded by
+   * `isDueSoon`, filed lists by `isFiled`. Reaches 0 when nothing's due.
+   */
+  const dueListsCount = computed(
+    () => lists.value.filter((l) => !isFiled(l) && isDueSoon(l, today.value)).length
   );
 
   /** Active lists grouped by category (insertion order = active sort order). */
@@ -399,10 +404,11 @@ export const useListStore = defineStore('lists', () => {
     lists,
     isLoading,
     error,
-    // Getters (all member-filtered)
+    // Getters (member-filtered, except dueListsCount which is whole-family)
     activeLists,
     completedLists,
     dueSoonLists,
+    dueListsCount,
     listsByCategory,
     // Actions
     loadLists,
