@@ -3,11 +3,11 @@ import { computed, ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListStore } from '@/stores/listStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
-import { LIST_CATEGORIES, getListCategory } from '@/constants/listCategories';
+import { getListCategory } from '@/constants/listCategories';
 import { LIST_TEMPLATES, getListTemplatesForCategory } from '@/constants/listTemplates';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import ListCategoryPills from './ListCategoryPills.vue';
 import type { ListCategory } from '@/types/models';
 
 const props = defineProps<{ open: boolean }>();
@@ -16,7 +16,6 @@ const emit = defineEmits<{ close: []; created: [id: string] }>();
 const { t } = useTranslation();
 const listStore = useListStore();
 const familyStore = useFamilyStore();
-const { categoryShortLabel } = useListCategoryLabel();
 
 const meId = computed(() => familyStore.currentMember?.id ?? '');
 const selectedCategory = ref<ListCategory | null>(null);
@@ -68,22 +67,7 @@ const isOpen = computed(() => props.open);
       <!-- Category pills -->
       <div>
         <p class="lists-label">{{ t('lists.new.categoryLabel') }}</p>
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="cat in LIST_CATEGORIES"
-            :key="cat.id"
-            type="button"
-            class="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"
-            :class="
-              selectedCategory === cat.id
-                ? 'border-[var(--color-primary-500)] bg-[var(--tint-orange-12)] text-[var(--color-primary-500)]'
-                : 'border-[var(--color-border)] bg-white text-[var(--color-text-muted)] dark:bg-slate-800'
-            "
-            @click="selectedCategory = selectedCategory === cat.id ? null : cat.id"
-          >
-            <span aria-hidden="true">{{ cat.emoji }}</span> {{ categoryShortLabel(cat.id) }}
-          </button>
-        </div>
+        <ListCategoryPills v-model="selectedCategory" clearable short />
       </div>
 
       <!-- Templates -->
@@ -101,9 +85,7 @@ const isOpen = computed(() => props.open);
             <span class="font-outfit text-sm font-bold text-[var(--color-text)]">{{
               t(tmpl.nameKey)
             }}</span>
-            <span class="text-[0.6875rem] text-[var(--color-text-muted)]">{{
-              t(tmpl.descriptionKey)
-            }}</span>
+            <span class="text-xs text-[var(--color-text-muted)]">{{ t(tmpl.descriptionKey) }}</span>
           </button>
         </div>
       </div>

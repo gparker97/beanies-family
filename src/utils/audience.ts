@@ -64,13 +64,8 @@ export function classifyOwnerAudience(
   viewer: FamilyMember,
   resolveMember: (id: string) => FamilyMember | undefined
 ): BriefingAudience {
-  const owner = ownerId ? resolveMember(ownerId) : undefined;
-  if (owner && owner.id === viewer.id) return { kind: 'assignee' };
-  if (owner && isAdultMember(owner)) return { kind: 'hidden' };
-  if (owner && !owner.isPet) {
-    return isAdultMember(viewer)
-      ? { kind: 'forChild', childNames: [owner.name] }
-      : { kind: 'hidden' };
-  }
-  return viewer.isPet ? { kind: 'hidden' } : { kind: 'unassigned' };
+  // A single owner is just an assignee list of length 0 or 1 — delegate to the
+  // one classifier so the rule can't diverge (this file's own header forbids
+  // duplicating it). An unresolved/empty owner → empty array → unassigned/hidden.
+  return classifyAudience(ownerId ? [ownerId] : [], viewer, resolveMember);
 }

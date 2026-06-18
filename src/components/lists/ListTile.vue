@@ -4,7 +4,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useToday } from '@/composables/useToday';
 import { getListCategory } from '@/constants/listCategories';
-import { isListDue, isRecurring } from '@/utils/listLifecycle';
+import { isListDue, isRecurring, listProgress } from '@/utils/listLifecycle';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatDateShort } from '@/utils/date';
 import MemberChip from '@/components/ui/MemberChip.vue';
@@ -20,13 +20,12 @@ const { today } = useToday();
 const category = computed(() => getListCategory(props.list.category));
 const accent = computed(() => category.value?.color ?? 'var(--color-primary-500)');
 
-const total = computed(() => props.list.items.length);
-const done = computed(() => props.list.items.filter((i) => i.completed).length);
-const progressPct = computed(() =>
-  total.value ? Math.round((done.value / total.value) * 100) : 0
-);
+const progress = computed(() => listProgress(props.list));
 const progressLabel = computed(() =>
-  fillTemplate(t('lists.progress'), { done: String(done.value), total: String(total.value) })
+  fillTemplate(t('lists.progress'), {
+    done: String(progress.value.done),
+    total: String(progress.value.total),
+  })
 );
 
 type Pill = { glyph: string; text: string; kind: 'due' | 'overdue' | 'recurring' | 'linked' };
@@ -87,7 +86,7 @@ const statusPill = computed<Pill | null>(() => {
         </span>
         <span
           v-if="statusPill"
-          class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.625rem] font-semibold"
+          class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
           :class="{
             'bg-[var(--tint-orange-15)] text-[var(--color-primary-500)]':
               statusPill.kind === 'due' || statusPill.kind === 'overdue',
@@ -104,12 +103,10 @@ const statusPill = computed<Pill | null>(() => {
         <span class="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--tint-slate-5)]">
           <span
             class="block h-full rounded-full transition-all"
-            :style="{ width: `${progressPct}%`, backgroundColor: accent }"
+            :style="{ width: `${progress.pct}%`, backgroundColor: accent }"
           />
         </span>
-        <span class="text-[0.625rem] font-medium text-[var(--color-text-muted)]">{{
-          progressLabel
-        }}</span>
+        <span class="text-xs font-medium text-[var(--color-text-muted)]">{{ progressLabel }}</span>
       </div>
     </div>
   </button>

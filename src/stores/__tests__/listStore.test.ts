@@ -283,4 +283,127 @@ describe('listStore', () => {
     expect(store.error).toBe('boom');
     expect(store.lists).toEqual([]);
   });
+
+  // ── deriveCompletion shared by toggle/add/remove (F5/F10) ──────────────────
+
+  it('removeItem files a one-off when the last open item is deleted — no celebrate, no completedBy', async () => {
+    const store = useListStore();
+    store.lists = [
+      list({ id: 'l', items: [item({ id: 'i1', completed: true }), item({ id: 'i2' })] }),
+    ];
+    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+      const cur = store.lists.find((x) => x.id === id)!;
+      return { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+    });
+
+    await store.removeItem('l', 'i2'); // delete the only open item → 100% done
+
+    const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+    expect(patch.completed).toBe(true);
+    expect(patch.completedBy).toBeUndefined(); // no acting member on a remove
+    expect(patch.completedAt).toBeDefined();
+    expect(celebrate).not.toHaveBeenCalled(); // filing via remove never throws confetti
+    expect(store.completedLists.map((l) => l.id)).toEqual(['l']);
+  });
+
+  it('addItem clears cycleCelebrated on a completed recurring list (re-completion can celebrate again)', async () => {
+    const store = useListStore();
+    store.lists = [
+      list({
+        id: 'r',
+        lifecycle: 'recurring',
+        frequency: 'daily',
+        cycleCelebrated: true,
+        items: [item({ id: 'i1', completed: true })],
+      }),
+    ];
+    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+      const cur = store.lists.find((x) => x.id === id)!;
+      return { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+    });
+
+    await store.addItem('r', 'Grab lunchbox');
+
+    const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+    expect(patch.cycleCelebrated).toBe(false);
+  });
+
+  it('removeItem on an already-celebrated recurring list leaves completion fields untouched (no-op patch)', async () => {
+    const store = useListStore();
+    store.lists = [
+      list({
+        id: 'r',
+        lifecycle: 'recurring',
+        frequency: 'daily',
+        cycleCelebrated: true,
+        items: [item({ id: 'i1', completed: true }), item({ id: 'i2', completed: true })],
+      }),
+    ];
+    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+      const cur = store.lists.find((x) => x.id === id)!;
+      return { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+    });
+
+    await store.removeItem('r', 'i1'); // still all-done, already celebrated
+
+    const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+    expect(patch).not.toHaveProperty('cycleCelebrated');
+    expect(patch).not.toHaveProperty('completed');
+  });
+
+  // ── setLifecycle clears the completion triple both directions (F3) ─────────
+
+  it('setLifecycle one-off → recurring clears completion stamps and sets recurrence', async () => {
+    const store = useListStore();
+    store.lists = [
+      list({
+        id: 'l',
+        completed: true,
+        completedBy: 'm-1',
+        completedAt: '2026-06-16T00:00:00.000Z',
+        items: [item({ id: 'i1', completed: true })],
+      }),
+    ];
+    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+      const cur = store.lists.find((x) => x.id === id)!;
+      return { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+    });
+
+    await store.setLifecycle('l', 'recurring');
+
+    const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+    expect(patch.lifecycle).toBe('recurring');
+    expect(patch.completed).toBeUndefined();
+    expect(patch.completedBy).toBeUndefined();
+    expect(patch.completedAt).toBeUndefined();
+    expect(patch.cycleCelebrated).toBe(false);
+    expect(patch.lastResetDate).toBe('2026-06-17');
+    expect(store.completedLists).toEqual([]); // no longer filed
+  });
+
+  it('setLifecycle recurring → one-off clears stale stamps so it does not auto-file', async () => {
+    const store = useListStore();
+    store.lists = [
+      list({
+        id: 'r',
+        lifecycle: 'recurring',
+        frequency: 'daily',
+        completed: true, // stale (recurring lists should never carry this)
+        completedAt: '2026-06-16T00:00:00.000Z',
+        items: [item({ id: 'i1', completed: true })],
+      }),
+    ];
+    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+      const cur = store.lists.find((x) => x.id === id)!;
+      return { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+    });
+
+    await store.setLifecycle('r', 'oneoff');
+
+    const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+    expect(patch.lifecycle).toBe('oneoff');
+    expect(patch.completed).toBeUndefined();
+    expect(patch.completedAt).toBeUndefined();
+    expect(store.completedLists).toEqual([]); // not filed despite the stale flag
+  });
 });

@@ -16,6 +16,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { getListCategory } from '@/constants/listCategories';
 import { isFlagEnabled } from '@/config/flags';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { listProgress } from '@/utils/listLifecycle';
 import ListItemRow from '@/components/lists/ListItemRow.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import type { FamilyList, FamilyListItem } from '@/types/models';
@@ -60,8 +61,7 @@ interface ListCard {
 
 const cards = computed<ListCard[]>(() =>
   linkedLists.value.map((list) => {
-    const total = list.items.length;
-    const done = list.items.filter((i) => i.completed).length;
+    const { total, done, pct } = listProgress(list);
     return {
       id: list.id,
       ownerId: list.ownerId,
@@ -70,7 +70,7 @@ const cards = computed<ListCard[]>(() =>
       accent: getListCategory(list.category)?.color ?? 'var(--color-primary-500)',
       done,
       total,
-      pct: total ? Math.round((done / total) * 100) : 0,
+      pct,
       isComplete: total > 0 && done === total,
       isEmpty: total === 0,
       visibleItems: list.items.slice(0, PREVIEW_LIMIT),
@@ -107,7 +107,7 @@ function toggle(listId: string, itemId: string): void {
   <section v-if="cards.length" class="mt-5">
     <!-- Section eyebrow — announces that linked checklists live here. -->
     <p
-      class="font-outfit mb-2.5 flex items-center gap-1.5 text-[0.625rem] font-bold tracking-[0.09em] text-[var(--color-text-muted)] uppercase"
+      class="font-outfit mb-2.5 flex items-center gap-1.5 text-xs font-bold tracking-[0.09em] text-[var(--color-text-muted)] uppercase"
     >
       <span aria-hidden="true">📋</span>{{ t('lists.embed.section') }}
     </p>
@@ -136,7 +136,7 @@ function toggle(listId: string, itemId: string): void {
             <!-- Provenance eyebrow + door-back -->
             <span class="flex items-center justify-between gap-2">
               <span
-                class="font-outfit flex items-center gap-1.5 text-[0.625rem] font-bold tracking-[0.09em] text-[var(--color-text-muted)] uppercase"
+                class="font-outfit flex items-center gap-1.5 text-xs font-bold tracking-[0.09em] text-[var(--color-text-muted)] uppercase"
               >
                 <span
                   class="h-[7px] w-[7px] flex-none rounded-full"
@@ -145,7 +145,7 @@ function toggle(listId: string, itemId: string): void {
                 {{ t('lists.embed.provenance') }}
               </span>
               <span
-                class="font-outfit inline-flex flex-none items-center gap-0.5 text-[0.6875rem] font-bold"
+                class="font-outfit inline-flex flex-none items-center gap-0.5 text-xs font-bold"
                 :style="{ color: card.accent }"
                 >{{ t('lists.embed.openShort')
                 }}<span aria-hidden="true" class="text-xs leading-none">›</span></span
@@ -173,19 +173,17 @@ function toggle(listId: string, itemId: string): void {
                   }"
                 />
               </span>
-              <span
-                v-if="card.isEmpty"
-                class="flex-1 text-[0.6875rem] text-[var(--color-text-muted)]"
-                >{{ t('lists.embed.empty') }}</span
-              >
+              <span v-if="card.isEmpty" class="flex-1 text-xs text-[var(--color-text-muted)]">{{
+                t('lists.embed.empty')
+              }}</span>
               <span
                 v-else-if="card.isComplete"
-                class="flex items-center gap-1 text-[0.6875rem] font-bold whitespace-nowrap text-[#27AE60]"
+                class="flex items-center gap-1 text-xs font-bold whitespace-nowrap text-[#27AE60]"
                 ><span aria-hidden="true">✓</span>{{ t('lists.embed.allDone') }}</span
               >
               <span
                 v-else
-                class="text-[0.6875rem] font-semibold whitespace-nowrap text-[var(--color-text-muted)]"
+                class="text-xs font-semibold whitespace-nowrap text-[var(--color-text-muted)]"
                 >{{ card.progressLabel }}</span
               >
               <MemberChip :member-id="card.ownerId" size="dot" />
