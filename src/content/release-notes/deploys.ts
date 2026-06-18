@@ -17,6 +17,41 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.06.18.2',
+    date: '2026-06-18',
+    month: '18 june 2026',
+    spotlight: true,
+    summary: {
+      en: 'Introducing - Beanie Lists!',
+      beanie: 'introducing - beanie lists!',
+    },
+    features: [
+      {
+        icon: '🧾',
+        title: { en: 'Beanie Lists', beanie: 'beanie lists' },
+        description: {
+          en: 'Shared checklists for the little things that make up life - groceries, before school, packing, chores, and more. Set a list with a due date, or assign a repeating list to yourself or your partner that automatically resets itself each cycle. Sort by category, assign an owner, and link lists directly to your travel plans or activities.',
+          beanie:
+            'shared checklists for the little things that make up life - groceries, before school, packing, chores, and more. set a list with a due date, or assign a repeating list to yourself or your partner that automatically resets itself each cycle. sort by category, assign an owner, and link lists directly to your travel plans or activities.',
+        },
+        tryItRoute: '/lists',
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.06.18',
     date: '2026-06-18',
     month: '18 june 2026',
