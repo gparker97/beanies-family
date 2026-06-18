@@ -101,6 +101,19 @@ describe('listStore', () => {
     expect(store.listsByCategory.get('kids')!.map((l) => l.id)).toEqual(['b']);
   });
 
+  it('dueListsCount counts overdue + due-today lists, excluding recurring / future / undated / filed', () => {
+    const store = useListStore();
+    store.lists = [
+      list({ id: 'o', dueDate: '2026-06-10' }), // overdue
+      list({ id: 't', dueDate: '2026-06-17' }), // today (mockToday)
+      list({ id: 'fut', dueDate: '2026-06-30' }), // future → excluded
+      list({ id: 'nd' }), // undated → excluded
+      list({ id: 'rec', lifecycle: 'recurring', frequency: 'daily' }), // recurring → excluded
+      list({ id: 'filed', dueDate: '2026-06-10', completed: true }), // overdue but filed → excluded
+    ];
+    expect(store.dueListsCount).toBe(2);
+  });
+
   it('createList appends and returns the created list', async () => {
     const store = useListStore();
     const created = list({ id: 'new' });

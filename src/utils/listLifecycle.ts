@@ -56,6 +56,16 @@ export function isListDue(list: FamilyList, todayStr: string): ListDueState | nu
   return null; // future-dated
 }
 
+/**
+ * "On the plate now" — overdue or due today. False for recurring, undated, and
+ * future-dated lists (`isListDue` returns `null`/`'noDue'`), so it cleanly drives
+ * both the due-soon shelf and the nav attention badge from one rule.
+ */
+export function isDueSoon(list: FamilyList, todayStr: string): boolean {
+  const due = isListDue(list, todayStr);
+  return due === 'overdue' || due === 'today';
+}
+
 /** The Monday (ISO week start) of the week containing `ymd`, as `YYYY-MM-DD`. */
 function mondayOf(ymd: string): string {
   const d = parseLocalDate(ymd.slice(0, 10));
