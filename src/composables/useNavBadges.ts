@@ -24,6 +24,7 @@ import { useBudgetStore } from '@/stores/budgetStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useListStore } from '@/stores/listStore';
 import { isFlagEnabled } from '@/config/flags';
+import { bookingProgress } from '@/utils/vacation';
 import {
   getBadgeKeyForPath,
   MOBILE_TAGGED_NAV_ITEMS,
@@ -42,25 +43,23 @@ export type NavBadge =
 export const ATTENTION_DOT: NavBadge = { kind: 'dot', severity: 'attention', active: true };
 
 /**
- * Sum of open ideas across every upcoming-or-active trip — i.e. every
- * vacation that hasn't ended yet. "Open" = an idea that's neither marked
- * planned nor skipped. Caller should pass `vacationStore.upcomingVacations`
- * (already filtered to not-ended) so this just unfolds the ideas.
+ * Total UNBOOKED travel items — segments + accommodations + transportation whose
+ * `status` is still 'pending' — across every upcoming-or-active trip. This is the
+ * real, non-optional work left to do before each trip, and it equals the sum of
+ * the per-trip "N items need booking" indicators on the travel cards. Caller
+ * passes `vacationStore.upcomingVacations` (already filtered to not-ended).
  *
- * Returns 0 when there are no upcoming trips (badge hides naturally) and
- * 0 when every idea on every upcoming trip is decided (the satisfying
- * "all planned" state).
- *
- * Note: no time-window filter. A trip 6 months out with 8 open ideas
- * still contributes 8 — the user is actively planning it, and clamping
- * the badge to a 30-day horizon would silently hide that work.
+ * Reaches 0 when every upcoming trip is fully booked (the satisfying done state)
+ * and when there are no upcoming trips (badge hides naturally). No time-window
+ * clamp: a trip months out with pending bookings still counts — those bookings
+ * are real work, and prices/availability only get worse with time. (Open *ideas*
+ * are deliberately NOT counted — they're optional/aspirational, not urgent.)
  */
-export function openIdeasOnUpcomingTrips(vacations: FamilyVacation[]): number {
+export function unbookedOnUpcomingTrips(vacations: FamilyVacation[]): number {
   let total = 0;
   for (const v of vacations) {
-    for (const i of v.ideas) {
-      if (!i.isPlanned && !i.isSkipped) total += 1;
-    }
+    const { booked, total: items } = bookingProgress(v);
+    total += items - booked;
   }
   return total;
 }
@@ -82,9 +81,9 @@ export function useNavBadges() {
       count: budgetStore.categoryBudgetStatus.filter((c) => c.status === 'over').length,
     },
     overdueGoals: { kind: 'count', count: goalsStore.overdueGoals.length },
-    openTravelIdeas: {
+    unbookedTravel: {
       kind: 'count',
-      count: openIdeasOnUpcomingTrips(vacationStore.upcomingVacations),
+      count: unbookedOnUpcomingTrips(vacationStore.upcomingVacations),
     },
     // Lists overdue or due today (whole family, like the siblings). Flag-gated:
     // the mobile-tab aggregator walks the registry without checking requiresFlag,
