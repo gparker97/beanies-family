@@ -17,6 +17,15 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.06.18',
+    date: '2026-06-18',
+    month: '18 june 2026',
+    summary: {
+      en: 'The Travel Plans badge now flags what still needs booking.',
+      beanie: 'the travel plans badge now flags what still needs booking.',
+    },
+  },
+  {
     version: '2026.06.15',
     date: '2026-06-15',
     month: '15 june 2026',
