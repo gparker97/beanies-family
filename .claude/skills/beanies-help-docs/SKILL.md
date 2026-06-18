@@ -275,12 +275,13 @@ For reference, the current help center contains these articles:
 - Moving your pod between local file and Google Drive
 - Installing beanies.family as an app
 
-**Features (15):**
+**Features (16):**
 - Managing Accounts
 - Recording Transactions
 - Setting & Tracking Goals
 - Budgets & Category Limits
 - Family To-Do Lists *(includes the "Someday · Maybe" section)*
+- Beanie Lists *(categorized family checklists — one-off & recurring; `popular`)*
 - Travel Plans & Vacations
 - The Family Nook — Your Home Base
 - Family Planner & Activities
