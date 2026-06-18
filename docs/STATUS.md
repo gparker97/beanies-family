@@ -1,6 +1,30 @@
 # Project Status
 
-> **Last updated:** 2026-06-18 (Thursday — **re-ran the requested MAX-EFFORT `/code-review` over yesterday's #33 batch (`6ffc3d03..HEAD`), then fixed ALL 15 confirmed findings via a 4-pass `/beanies-plan` and committed to `main`. `familyLists` still committed `false` — NOTHING deployed, NOTHING user-visible. `npm run validate` green (0 lint errors, 3326 unit tests pass).**)
+> **Last updated:** 2026-06-18 (Thursday, evening — **a build-AND-SHIP session: re-ran `/code-review` on the #33 batch and fixed all 15 findings, redesigned the Lists + Travel nav badges, fixed an E2E selector, extracted a shared add-button — then LAUNCHED Beanie Lists to production (flipped `familyLists` → `true`) with a Help Center article, across several deploys. ⭐ Beanie Lists is now LIVE for all users. Working tree clean on `main`, in sync with `origin/main`. Latest commit `ce2f7e76`.**)
+>
+> **(1) Code-review re-run → all 15 findings fixed + SHIPPED** (`daab74d7`, plan `docs/plans/2026-06-18-beanie-lists-review-fixes.md`). 10 finder angles → 15 verifiers → gap sweep confirmed the must-fix set + 3 new bugs (listStore not reset on sign-out; no-due lists flooding the briefing; `addItem` not re-arming a recurring celebration); the two risky rewrites (trusted-device auth, `useEscapeClose` stack) re-cleared as safe. Fixes: F1 gate `list-completed` at the `notificationsStore` boundary (deriver stays pure); F2 reset listStore on sign-out; F3 store `setLifecycle` clears the completion triple both ways; F4 member-filter the Lists getters; F5/F10 shared `deriveCompletion`; F6 hide empty/0-left lists from the briefing; F7 resolve linked names from full stores; F8 clear `?view=` on close; F9 `fillTemplate` + "someone" fallback; F11 sub-12px fonts; F12 `buildMessage`→`fillTemplate`; F13 `listProgress` + `<ListCategoryPills>`; F14 `classifyOwnerAudience` delegates; F15 `useEscapeClose` test isolation.
+>
+> **(2) Nav badges.** **Lists badge** (`08305702`): new `dueLists` badge counts lists overdue or due today (whole-family, via shared `isDueSoon`), flag-gated at the count so it can't light the mobile Planning tab when `familyLists` is off. **Travel badge** (`fb83066a`, user-visible): swapped from counting open _ideas_ to counting **unbooked items** (`unbookedOnUpcomingTrips` via `bookingProgress`) — matches the per-trip "needs booking" chips, self-clears.
+>
+> **(3) E2E fix** (`59670522`): `invite-join.spec.ts` "Drive Picker fallback" was red across several pushes — a stale copy-dependent selector (the CTA was renamed to "Open Your Family File" on 2026-06-14). Updated the regex; logged in `docs/E2E_HEALTH.md` (category b). E2E now green on both browsers.
+>
+> **(4) Shared add-button** (`e98b4395`): extracted `src/components/ui/AddEntityButton.vue` (`tone` orange/ocean, `compact` for tight toolbars; ＋ always shown) and migrated all five add CTAs (new list, new activity, add contact, add recipe, add bean). Fixes the "new list" button that was missing its ＋.
+>
+> **(5) ⭐ LAUNCHED Beanie Lists to prod** (`51280453`): flipped `familyLists` committed `false`→`true`, wrote + shipped the **Beanie Lists Help Center article** (`src/content/help/features.ts`, marked `popular`), CHANGELOG `### Added`. Release notes: **`2026.06.18`** (travel badge, minor) and **`2026.06.18.2`** ("Introducing - Beanie Lists!", spotlight + Discord CTA, copy from greg). **Multiple prod deploys** this session: the gated batch test (Vue, flag still off → verified Lists stays hidden), then the launch (Vue + Astro, flag on), then two Astro-only deploys for the Help Center. Help Center "Popular Reads" bumped 3→6 (`ce2f7e76`) so the new article surfaces. Verified live: `app.beanies.family` 200, `beanies.family/help` shows Beanie Lists in Popular Reads. **Note: the Help Center is the Astro site (`web/`), not the Vue app — help-content changes deploy via `deploy-web.yml`.**
+>
+> **Pending / Next Session** (validated 2026-06-18 evening: **removed 2 stale items now shipped** — the deferred `beanie-lists` Help Center article (written + LIVE) and the `familyLists` flip (now `true` + deployed; Beanie Lists is live). Dependabot #250/#251 + #241 re-checked, still OPEN.):
+>
+> - **⭐ Beanie Lists is LIVE** — watch `#beanies-errors` for any real-world issues now it's ungated; dogfood the full flow (FAB → new list, recurring resets, trip linking).
+> - **Help Center "Popular Reads" is order-dependent** — Beanie Lists is currently the 6th of 6 shown; a future popular Features article ordered above it could drop it off. If that recurs, switch to recency-ordering. Also the `beanies-help-docs` skill inventory is missing the existing **Notifications** article (pre-existing drift) — tidy next inventory edit.
+> - **#40 Helpful Hints** — Notion `Not started`; `/beanies-pre-plan #40` when prioritized.
+> - **#39** visibility + secret notes; **#38** Qwen translation engine — Notion intake done; pre-plan/plan when prioritized.
+> - **Dependabot** #250 (dev) + #251 (prod) — `/review-dependabot-prs`.
+> - **Google OAuth verification** — awaiting Google (unverified warning + 100-user cap; Calendar/AI gated behind The Beanie Lab).
+> - **Carried:** #241 Reports nav (OPEN); deferred deps (astro 5→6, pdfjs-dist 4→6, capacitor 8.4.0 trio); `ChoiceModal` tech-debt; app-store DUNS (~early July).
+
+---
+
+> **Last updated:** 2026-06-18 (Thursday, earlier — **re-ran the requested MAX-EFFORT `/code-review` over yesterday's #33 batch (`6ffc3d03..HEAD`), then fixed ALL 15 confirmed findings via a 4-pass `/beanies-plan` and committed to `main`. `familyLists` still committed `false` — NOTHING deployed, NOTHING user-visible. `npm run validate` green (0 lint errors, 3326 unit tests pass).**)
 >
 > **(1) Code-review re-run.** 10 finder angles → 15 verifiers → gap sweep. Confirmed the prior baseline's must-fix set AND added **3 new confirmed bugs** the first pass missed (listStore not reset on sign-out; no-due lists flooding the briefing; `addItem` not re-arming a recurring celebration). Re-cleared the two risky rewrites (trusted-device auth, `useEscapeClose` stack) as structurally safe. Net: 10 correctness + 5 quality.
 >
