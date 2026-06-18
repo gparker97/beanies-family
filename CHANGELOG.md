@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-06-18
 
+### Added
+
+- **Beanie Lists are here.** A new Treehouse page for shared family checklists, sorted into categories (Home & Household, Out & Errands, Kids & School, and more). Start a list from a template — groceries, before-school, vacation packing, kids' chores, honey-do, party prep — or from blank, then tick items off together. Each list is either **one-off** (give it a due date; it moves to a Completed area when everything's checked) or **repeating** (daily / weekly / monthly), which auto-unchecks itself each cycle so you start fresh. Lists have a single owner, surface in your Daily Briefing when they're due, show an at-a-glance count on the menu, and can be linked to a trip or activity so the checklist appears right there. A full guide is in the Help Center.
+
 ### Changed
 
 - **The Travel Plans menu badge now counts what still needs booking.** The little orange number next to Travel Plans used to count undecided trip "ideas" — which aren't urgent. It now counts the unbooked items (flights, stays, transport still marked _pending_) across your upcoming trips, matching the "needs booking" indicator on each trip card. It clears to zero once everything's booked, so the badge only nudges you when there's real booking work left.
