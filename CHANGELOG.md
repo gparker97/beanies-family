@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-18
+
+### Changed
+
+- **The Travel Plans menu badge now counts what still needs booking.** The little orange number next to Travel Plans used to count undecided trip "ideas" — which aren't urgent. It now counts the unbooked items (flights, stays, transport still marked _pending_) across your upcoming trips, matching the "needs booking" indicator on each trip card. It clears to zero once everything's booked, so the badge only nudges you when there's real booking work left.
+
 ## 2026-06-17
 
 ### Fixed
