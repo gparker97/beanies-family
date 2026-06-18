@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { effectScope, ref } from 'vue';
-import { useEscapeClose } from '../useEscapeClose';
+import { useEscapeClose, __resetEscapeCloseForTests } from '../useEscapeClose';
 
 function pressKey(key: string) {
   window.dispatchEvent(new KeyboardEvent('keydown', { key }));
@@ -10,6 +10,10 @@ describe('useEscapeClose', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    // The escape stack is module-global and persists across tests by design; a
+    // test that throws before its scope.stop() would otherwise leak a token into
+    // the next test and target the wrong onClose. Reset it before each test.
+    __resetEscapeCloseForTests();
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 

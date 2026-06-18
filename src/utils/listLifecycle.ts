@@ -23,6 +23,23 @@ export function isFiled(list: FamilyList): boolean {
   return !isRecurring(list) && list.completed;
 }
 
+export interface ListProgress {
+  total: number;
+  done: number;
+  /** Completed percentage 0–100, `0` for an empty list (never `NaN`). */
+  pct: number;
+}
+
+/**
+ * Item progress for a list — the single source for the tile + linked-list embed
+ * bars (both render it on lists mid-edit, so the empty case must be 0, not NaN).
+ */
+export function listProgress(list: FamilyList): ListProgress {
+  const total = list.items.length;
+  const done = list.items.filter((i) => i.completed).length;
+  return { total, done, pct: total ? Math.round((done / total) * 100) : 0 };
+}
+
 export type ListDueState = 'overdue' | 'today' | 'noDue';
 
 /**

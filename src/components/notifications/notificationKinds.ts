@@ -8,6 +8,7 @@
 import type { AppNotification, NotificationKind, KindPresentation } from '@/types/notifications';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { formatTime12, relativeDayLabel, timeAgo } from '@/utils/date';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { getReleaseNote, isSpotlightRelease } from '@/content/release-notes';
 import { getAnnouncement } from '@/content/announcements';
 import WhatsNewBody from '@/components/notifications/WhatsNewBody.vue';
@@ -84,12 +85,16 @@ export function notificationSummary(n: AppNotification, t: T): string {
       return n.subtitle ?? '';
     case 'todo-assigned':
       return n.assignedByName
-        ? t('notifications.assignedByYou').replace('{name}', n.assignedByName)
+        ? fillTemplate(t('notifications.assignedByYou'), { name: n.assignedByName })
         : t('notifications.yourTask');
     case 'todo-due':
       return n.subtitle ?? t('notifications.yourTask');
     case 'list-completed':
-      return t('lists.notif.finishedBy').replace('{finisher}', n.subtitle ?? '');
+      // Fall back to a generic "someone" when the finisher member was deleted
+      // (n.subtitle is then empty) — never render a dangling "Finished by ".
+      return fillTemplate(t('lists.notif.finishedBy'), {
+        finisher: n.subtitle || t('medicationLog.someone'),
+      });
     case 'whats-new':
       return n.title; // the release month (e.g. "may 2026")
     case 'announcement':

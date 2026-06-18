@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { isRecurring, isFiled, isListDue, computeRecurringReset } from './listLifecycle';
+import {
+  isRecurring,
+  isFiled,
+  isListDue,
+  computeRecurringReset,
+  listProgress,
+} from './listLifecycle';
 import type { FamilyList } from '@/types/models';
 
 function list(overrides: Partial<FamilyList> = {}): FamilyList {
@@ -30,6 +36,22 @@ describe('listLifecycle predicates', () => {
     expect(isFiled(list({ lifecycle: 'oneoff', completed: false }))).toBe(false);
     // A recurring list with completed:true (shouldn't happen) is still never filed.
     expect(isFiled(list({ lifecycle: 'recurring', completed: true }))).toBe(false);
+  });
+
+  it('listProgress counts done/total/pct and never returns NaN for an empty list', () => {
+    expect(listProgress(list({ items: [] }))).toEqual({ total: 0, done: 0, pct: 0 });
+    expect(
+      listProgress(
+        list({
+          items: [
+            { id: 'a', title: 'a', completed: true },
+            { id: 'b', title: 'b', completed: false },
+            { id: 'c', title: 'c', completed: true },
+            { id: 'd', title: 'd', completed: false },
+          ],
+        })
+      )
+    ).toEqual({ total: 4, done: 2, pct: 50 });
   });
 
   describe('isListDue', () => {

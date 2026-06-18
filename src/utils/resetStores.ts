@@ -8,6 +8,7 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { useListStore } from '@/stores/listStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
@@ -31,6 +32,7 @@ export function resetAllAppStores(): void {
   useSettingsStore().resetState();
   useMemberFilterStore().resetState();
   useTodoStore().resetState();
+  useListStore().resetState();
   useActivityStore().resetState();
   useHolidayStore().resetState();
   // Tear down the calendar sync engine (pollers + watchers + module state) so it

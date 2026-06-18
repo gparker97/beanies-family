@@ -85,3 +85,14 @@ export function useEscapeClose(isOpen: Ref<boolean>, onClose: () => void): void 
 
   onScopeDispose(unregister);
 }
+
+/**
+ * Test-only: clear the module-global stack + detach the shared listener between
+ * tests. The stack intentionally persists across consumers (that's the whole
+ * point of the shared listener), so a test that leaves an overlay registered
+ * would leak into the next; call this in a `beforeEach`. Not for production use.
+ */
+export function __resetEscapeCloseForTests(): void {
+  escapeStack.length = 0;
+  stopSharedListenerIfIdle(); // stack is now empty → detaches the shared listener
+}
