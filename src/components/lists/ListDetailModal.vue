@@ -5,11 +5,10 @@ import { useListStore } from '@/stores/listStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useActivityStore } from '@/stores/activityStore';
-import { useToday } from '@/composables/useToday';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useMemberInfo } from '@/composables/useMemberInfo';
-import { LIST_CATEGORIES, getListCategory } from '@/constants/listCategories';
+import { getListCategory } from '@/constants/listCategories';
 import { isRecurring } from '@/utils/listLifecycle';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatDateShort } from '@/utils/date';
@@ -21,7 +20,8 @@ import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import ListItemRow from './ListItemRow.vue';
-import type { ListCategory, ListFrequency } from '@/types/models';
+import ListCategoryPills from './ListCategoryPills.vue';
+import type { ListCategory, ListFrequency, ListLifecycle } from '@/types/models';
 
 const props = withDefaults(
   defineProps<{
@@ -38,7 +38,6 @@ const listStore = useListStore();
 const familyStore = useFamilyStore();
 const vacationStore = useVacationStore();
 const activityStore = useActivityStore();
-const { today } = useToday();
 const { categoryLabel } = useListCategoryLabel();
 const { getMemberName } = useMemberInfo();
 
@@ -78,24 +77,9 @@ const lifecycleOptions = computed(() => [
   { value: 'recurring', label: t('lists.detail.recurring') },
 ]);
 function setLifecycle(value: string): void {
-  const l = list.value;
-  if (!l) return;
-  if (value === 'recurring') {
-    void listStore.updateList(l.id, {
-      lifecycle: 'recurring',
-      frequency: l.frequency ?? 'weekly',
-      dueDate: undefined,
-      lastResetDate: today.value,
-      cycleCelebrated: false,
-    });
-  } else {
-    void listStore.updateList(l.id, {
-      lifecycle: 'oneoff',
-      frequency: undefined,
-      lastResetDate: undefined,
-      cycleCelebrated: undefined,
-    });
-  }
+  // The store owns the full lifecycle patch (clears the completion triple +
+  // sets/clears recurrence fields) — see listStore.setLifecycle.
+  if (list.value) void listStore.setLifecycle(list.value.id, value as ListLifecycle);
 }
 const freqOptions = computed(() => [
   { value: 'daily', label: t('lists.detail.freq.daily') },
@@ -159,13 +143,16 @@ const matches = (text: string) =>
   text.toLowerCase().includes(linkSearch.value.trim().toLowerCase());
 const filteredTrips = computed(() => upcomingTrips.value.filter((tr) => matches(tr.name)));
 const filteredActivities = computed(() => upcomingActivities.value.filter((a) => matches(a.title)));
+// Resolve the linked entity's name from the FULL store collections (not the
+// windowed `upcoming*` pickers), so a link to a past / far-future / filtered
+// trip or activity still shows its name instead of a blank chip.
 const linkedTripName = computed(() => {
   const id = list.value?.linkedVacationId;
-  return id ? (upcomingTrips.value.find((v) => v.id === id)?.name ?? '') : '';
+  return id ? (vacationStore.vacations.find((v) => v.id === id)?.name ?? '') : '';
 });
 const linkedActivityName = computed(() => {
   const id = list.value?.linkedActivityId;
-  return id ? (upcomingActivities.value.find((a) => a.id === id)?.title ?? '') : '';
+  return id ? (activityStore.activities.find((a) => a.id === id)?.title ?? '') : '';
 });
 function openLinkPicker(kind: 'trip' | 'activity'): void {
   linkSearch.value = '';
@@ -239,22 +226,11 @@ async function handleDelete(): Promise<void> {
       </div>
 
       <!-- Inline category picker (pills) -->
-      <div v-if="editingCategory" class="flex flex-wrap gap-2">
-        <button
-          v-for="cat in LIST_CATEGORIES"
-          :key="cat.id"
-          type="button"
-          class="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"
-          :class="
-            list.category === cat.id
-              ? 'border-[var(--color-primary-500)] bg-[var(--tint-orange-12)] text-[var(--color-primary-500)]'
-              : 'border-[var(--color-border)] bg-white text-[var(--color-text-muted)] dark:bg-slate-800'
-          "
-          @click="setCategory(cat.id)"
-        >
-          <span aria-hidden="true">{{ cat.emoji }}</span> {{ categoryLabel(cat.id) }}
-        </button>
-      </div>
+      <ListCategoryPills
+        v-if="editingCategory"
+        :model-value="list.category"
+        @update:model-value="(id) => id && setCategory(id)"
+      />
       <!-- Inline owner picker -->
       <FamilyChipPicker
         v-if="editingOwner"
@@ -371,7 +347,7 @@ async function handleDelete(): Promise<void> {
             >
               <span aria-hidden="true">✈️</span>
               <span class="flex-1 truncate">{{ trip.name }}</span>
-              <span v-if="trip.date" class="text-[0.7rem] text-[var(--color-text-muted)]">{{
+              <span v-if="trip.date" class="text-xs text-[var(--color-text-muted)]">{{
                 shortDate(trip.date)
               }}</span>
             </button>
@@ -400,9 +376,7 @@ async function handleDelete(): Promise<void> {
             >
               <span aria-hidden="true">📅</span>
               <span class="flex-1 truncate">{{ act.title }}</span>
-              <span class="text-[0.7rem] text-[var(--color-text-muted)]">{{
-                shortDate(act.date)
-              }}</span>
+              <span class="text-xs text-[var(--color-text-muted)]">{{ shortDate(act.date) }}</span>
             </button>
           </div>
         </div>
@@ -453,7 +427,7 @@ async function handleDelete(): Promise<void> {
 
 .lbl {
   color: var(--color-text-muted);
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.07em;
   margin-bottom: 0.5625rem;
@@ -467,7 +441,7 @@ async function handleDelete(): Promise<void> {
   border-radius: 999px;
   color: var(--color-text-muted);
   display: inline-flex;
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   font-weight: 600;
   gap: 0.375rem;
   padding: 0.5rem 0.75rem;

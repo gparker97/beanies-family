@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListStore } from '@/stores/listStore';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
@@ -10,14 +10,16 @@ import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import ListShelf from '@/components/lists/ListShelf.vue';
+import ListCategoryPills from '@/components/lists/ListCategoryPills.vue';
 import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import NewListSheet from '@/components/lists/NewListSheet.vue';
 import type { FamilyList, ListCategory } from '@/types/models';
 
 const { t } = useTranslation();
 const listStore = useListStore();
-const { categoryLabel, categoryShortLabel } = useListCategoryLabel();
+const { categoryLabel } = useListCategoryLabel();
 const route = useRoute();
+const router = useRouter();
 
 onMounted(() => {
   void listStore.loadLists();
@@ -86,6 +88,17 @@ function openList(id: string): void {
 function onCreated(id: string): void {
   selectedListId.value = id;
 }
+/**
+ * Close the detail drawer AND strip the `?view=` query. Without clearing it, the
+ * URL stays `/lists?view=<id>`, so re-tapping the same notification is a
+ * no-op navigation and the modal never reopens (the watch only fires on change).
+ */
+function closeDetail(): void {
+  selectedListId.value = null;
+  if (route.query.view !== undefined) {
+    void router.replace({ query: { ...route.query, view: undefined } });
+  }
+}
 </script>
 
 <template>
@@ -110,34 +123,7 @@ function onCreated(id: string): void {
 
     <template v-else>
       <!-- Filter chips -->
-      <div class="flex flex-wrap gap-2">
-        <button
-          type="button"
-          class="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"
-          :class="
-            selectedCategory === null
-              ? 'border-transparent bg-[var(--color-foundation)] text-white'
-              : 'border-[var(--color-border)] bg-white text-[var(--color-text-muted)] dark:bg-slate-800'
-          "
-          @click="selectedCategory = null"
-        >
-          {{ t('lists.filter.all') }}
-        </button>
-        <button
-          v-for="cat in LIST_CATEGORIES"
-          :key="cat.id"
-          type="button"
-          class="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"
-          :class="
-            selectedCategory === cat.id
-              ? 'border-transparent bg-[var(--color-foundation)] text-white'
-              : 'border-[var(--color-border)] bg-white text-[var(--color-text-muted)] dark:bg-slate-800'
-          "
-          @click="selectedCategory = cat.id"
-        >
-          <span aria-hidden="true">{{ cat.emoji }}</span> {{ categoryShortLabel(cat.id) }}
-        </button>
-      </div>
+      <ListCategoryPills v-model="selectedCategory" tone="filter" show-all short />
 
       <!-- Shelves -->
       <ListShelf
@@ -164,6 +150,6 @@ function onCreated(id: string): void {
 
     <!-- Modals -->
     <NewListSheet :open="showNew" @close="showNew = false" @created="onCreated" />
-    <ListDetailModal :list-id="selectedListId" @close="selectedListId = null" />
+    <ListDetailModal :list-id="selectedListId" @close="closeDetail" />
   </div>
 </template>

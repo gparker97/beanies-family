@@ -27,6 +27,7 @@ import {
   isAutoOpenAnnouncement,
 } from '@/content/announcements';
 import { TIPS_BY_ID } from '@/content/tips';
+import { isFlagEnabled } from '@/config/flags';
 import { reportError } from '@/utils/errorReporter';
 import {
   deriveNotifications,
@@ -99,7 +100,11 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
     return {
       todos: todoStore.todos,
-      lists: listStore.lists,
+      // Gate the list-completed notification on the same flag as the rest of
+      // Beanie Lists. `loadLists()` runs ungated in the central load, so a
+      // flag-OFF device can hold synced lists; feeding [] keeps the pure deriver
+      // from emitting a bell that would dead-end at the flag-blocked /lists route.
+      lists: isFlagEnabled('familyLists') ? listStore.lists : [],
       members: familyStore.members,
       currentMember,
       releaseNotes: getAllReleaseNotes(),

@@ -17,6 +17,7 @@ import type {
   CreateFamilyListInput,
   UpdateFamilyListInput,
   ListCategory,
+  ListLifecycle,
 } from '@/types/models';
 
 // Sort comparators — newest-created first / most-recently-completed first
@@ -26,15 +27,63 @@ const byCompletedDesc = (a: FamilyList, b: FamilyList) =>
   (b.completedAt ?? b.updatedAt).localeCompare(a.completedAt ?? a.updatedAt);
 
 /**
+ * Derive the list-level completion/filing keys that must change so a list's
+ * completion state stays consistent with `items`. The single source of truth
+ * for "did this list newly complete / un-complete", shared by
+ * `toggleItem`/`addItem`/`removeItem`.
+ *
+ *  - one-off: file on the transition into all-done (guard: `!list.completed`),
+ *    un-file when no longer all-done. `byMemberId` stamps `completedBy`; omit it
+ *    on actor-less paths (item removal) — the list still files (leaves the active
+ *    shelf) but with no `completedBy`, so no "finished by" notification fires.
+ *  - recurring: mark `cycleCelebrated` on the transition into all-done (once).
+ *    NEVER cleared here — clearing `cycleCelebrated` is a per-caller concern (a
+ *    new cycle in `reconcileRecurringLists`, or new work added in `addItem`),
+ *    so toggling an item off does NOT re-arm the celebration (once per cycle).
+ *
+ * Returns the patch (EMPTY when nothing changed — callers merge `items`
+ * themselves) plus whether this was a real completion transition worth a
+ * celebration (only `toggleItem` reads `shouldCelebrate`).
+ */
+function deriveCompletion(
+  list: FamilyList,
+  items: FamilyListItem[],
+  byMemberId?: string
+): { patch: UpdateFamilyListInput; shouldCelebrate: boolean } {
+  const allDone = items.length > 0 && items.every((i) => i.completed);
+  const patch: UpdateFamilyListInput = {};
+  let shouldCelebrate = false;
+
+  if (isRecurring(list)) {
+    if (allDone && !list.cycleCelebrated) {
+      patch.cycleCelebrated = true;
+      shouldCelebrate = true;
+    }
+  } else if (allDone && !list.completed) {
+    patch.completed = true;
+    patch.completedBy = byMemberId;
+    patch.completedAt = toISODateString(new Date());
+    shouldCelebrate = true;
+  } else if (!allDone && list.completed) {
+    patch.completed = false;
+    patch.completedBy = undefined;
+    patch.completedAt = undefined;
+  }
+  return { patch, shouldCelebrate };
+}
+
+/**
  * Beanie Lists store (#33) — mirrors `todoStore`: same state triple, the same
  * `wrapAsync` error discipline (toast + `reportError`, returns result-or-null),
  * `createMemberFiltered` for the global member filter, and the shared
  * `celebrate('goal-reached')` on completion. All lifecycle-conditional reads go
  * through `@/utils/listLifecycle` predicates — never inline `lifecycle === …`.
  *
- * Two write invariants (Pass 3): completion/filing lives ONLY in `toggleItem`;
- * recurrence reset lives ONLY in `reconcileRecurringLists`. No other action
- * mutates `completed`/`lastResetDate`/`cycleCelebrated`.
+ * Write invariants: list-level completion/filing is derived ONLY via
+ * `deriveCompletion` (from `toggleItem`/`addItem`/`removeItem`); recurrence reset
+ * lives ONLY in `reconcileRecurringLists`; the lifecycle flip (which clears the
+ * completion triple) lives ONLY in `setLifecycle`. No other action mutates
+ * `completed`/`completedBy`/`completedAt`/`lastResetDate`/`cycleCelebrated`.
  */
 export const useListStore = defineStore('lists', () => {
   // State
@@ -46,9 +95,18 @@ export const useListStore = defineStore('lists', () => {
 
   // ========== GETTERS ==========
 
-  const activeLists = computed(() => lists.value.filter((l) => !isFiled(l)).sort(byCreatedDesc));
+  // Every display getter honors the global member filter (single owner → scalar
+  // id; `createMemberFiltered` treats a no-id as always-included and returns the
+  // full set when the filter is 'all', so default behavior is unchanged). The
+  // Lists page reads these the same way To-Dos/Activities read their filtered
+  // getters, so selecting a member narrows /lists identically.
+  const filteredLists = createMemberFiltered(lists, (l) => l.ownerId);
+
+  const activeLists = computed(() =>
+    filteredLists.value.filter((l) => !isFiled(l)).sort(byCreatedDesc)
+  );
   const completedLists = computed(() =>
-    lists.value.filter((l) => isFiled(l)).sort(byCompletedDesc)
+    filteredLists.value.filter((l) => isFiled(l)).sort(byCompletedDesc)
   );
 
   /** Active lists that are due today or overdue (built on the shared predicate). */
@@ -69,16 +127,6 @@ export const useListStore = defineStore('lists', () => {
     }
     return map;
   });
-
-  // Filtered by the global member filter (single owner → scalar id;
-  // createMemberFiltered already treats a no-id as always-included).
-  const filteredLists = createMemberFiltered(lists, (l) => l.ownerId);
-  const filteredActiveLists = computed(() =>
-    filteredLists.value.filter((l) => !isFiled(l)).sort(byCreatedDesc)
-  );
-  const filteredCompletedLists = computed(() =>
-    filteredLists.value.filter((l) => isFiled(l)).sort(byCompletedDesc)
-  );
 
   // ========== ACTIONS ==========
 
@@ -207,30 +255,9 @@ export const useListStore = defineStore('lists', () => {
       };
     });
 
-    const allDone = items.length > 0 && items.every((i) => i.completed);
-    const patch: UpdateFamilyListInput = { items };
-
-    // Celebrate only on the transition INTO all-done, and (recurring) only once
-    // per cycle. Capture the decision before persisting.
-    let shouldCelebrate = false;
-    if (allDone) {
-      if (!isRecurring(list)) {
-        patch.completed = true;
-        patch.completedBy = byMemberId;
-        patch.completedAt = now;
-        shouldCelebrate = true;
-      } else if (!list.cycleCelebrated) {
-        patch.cycleCelebrated = true;
-        shouldCelebrate = true;
-      }
-    } else if (!isRecurring(list) && list.completed) {
-      // A filed one-off had an item re-opened → un-file it.
-      patch.completed = false;
-      patch.completedBy = undefined;
-      patch.completedAt = undefined;
-    }
-
-    const updated = await updateList(listId, patch);
+    // Completion/filing is derived in one place (shared with add/remove).
+    const { patch: completion, shouldCelebrate } = deriveCompletion(list, items, byMemberId);
+    const updated = await updateList(listId, { items, ...completion });
     if (updated && shouldCelebrate) {
       const originalItems = list.items;
       const wasRecurring = isRecurring(list);
@@ -249,25 +276,70 @@ export const useListStore = defineStore('lists', () => {
     return updated;
   }
 
-  /** Add an open item. Adding an open item un-files a filed one-off list. */
+  /**
+   * Add an open item. Adding new work re-opens the list: a filed one-off is
+   * un-filed (via `deriveCompletion`), and a recurring list that was marked
+   * done this cycle has `cycleCelebrated` cleared so finishing the new item
+   * celebrates again (unlike toggling an existing item off, which is a
+   * correction and keeps the once-per-cycle guard).
+   */
   async function addItem(listId: string, title: string): Promise<FamilyList | null> {
     const list = lists.value.find((l) => l.id === listId);
     if (!list) return null;
     const item: FamilyListItem = { id: generateUUID(), title, completed: false };
-    const patch: UpdateFamilyListInput = { items: [...list.items, item] };
-    if (!isRecurring(list) && list.completed) {
-      patch.completed = false;
-      patch.completedBy = undefined;
-      patch.completedAt = undefined;
-    }
-    return updateList(listId, patch);
+    const items = [...list.items, item];
+    const { patch } = deriveCompletion(list, items);
+    if (isRecurring(list) && list.cycleCelebrated) patch.cycleCelebrated = false;
+    return updateList(listId, { items, ...patch });
   }
 
-  /** Remove an item. Completion is never derived here (lives only in toggleItem). */
+  /**
+   * Remove an item, re-deriving completion (shared with toggle/add). Deleting the
+   * last open item makes a one-off all-done, so it files (moves to Completed) —
+   * but with NO `completedBy` (no acting member on a remove), so no "finished by"
+   * notification fires and no celebration plays. `shouldCelebrate` is ignored.
+   */
   async function removeItem(listId: string, itemId: string): Promise<FamilyList | null> {
     const list = lists.value.find((l) => l.id === listId);
     if (!list) return null;
-    return updateList(listId, { items: list.items.filter((i) => i.id !== itemId) });
+    const items = list.items.filter((i) => i.id !== itemId);
+    const { patch } = deriveCompletion(list, items);
+    return updateList(listId, { items, ...patch });
+  }
+
+  /**
+   * Switch a list between one-off and recurring — the ONE place the lifecycle
+   * flip lives. Always clears the completion triple (`completed`/`completedBy`/
+   * `completedAt`) via explicit `undefined` so a stale completion can't leak
+   * across the flip (a recurring list must never be filed; a one-off must
+   * re-derive filing from its items), and sets/clears the recurrence fields.
+   * Delegates to `updateList`, inheriting its `wrapAsync` toast + `reportError`.
+   */
+  async function setLifecycle(
+    listId: string,
+    lifecycle: ListLifecycle
+  ): Promise<FamilyList | null> {
+    const list = lists.value.find((l) => l.id === listId);
+    if (!list) return null;
+    const cleared = { completed: undefined, completedBy: undefined, completedAt: undefined };
+    const patch: UpdateFamilyListInput =
+      lifecycle === 'recurring'
+        ? {
+            ...cleared,
+            lifecycle: 'recurring',
+            frequency: list.frequency ?? 'weekly',
+            dueDate: undefined,
+            lastResetDate: today.value,
+            cycleCelebrated: false,
+          }
+        : {
+            ...cleared,
+            lifecycle: 'oneoff',
+            frequency: undefined,
+            lastResetDate: undefined,
+            cycleCelebrated: undefined,
+          };
+    return updateList(listId, patch);
   }
 
   /**
@@ -327,14 +399,11 @@ export const useListStore = defineStore('lists', () => {
     lists,
     isLoading,
     error,
-    // Getters
+    // Getters (all member-filtered)
     activeLists,
     completedLists,
     dueSoonLists,
     listsByCategory,
-    filteredLists,
-    filteredActiveLists,
-    filteredCompletedLists,
     // Actions
     loadLists,
     createList,
@@ -344,6 +413,7 @@ export const useListStore = defineStore('lists', () => {
     toggleItem,
     addItem,
     removeItem,
+    setLifecycle,
     clearLinksFor,
     reconcileRecurringLists,
     resetState,

@@ -11,6 +11,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { formatTime12, formatDateShort, addDays, toISODateString } from '@/utils/date';
 import { useToday } from '@/composables/useToday';
 import { normalizeAssignees, formatNameList } from '@/utils/assignees';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { isTodoOverdue } from '@/utils/todo';
 import { classifyAudience, classifyOwnerAudience, isDutyDone } from '@/utils/audience';
 import { isListDue } from '@/utils/listLifecycle';
@@ -310,6 +311,9 @@ export function useCriticalItems() {
         if (due === null) continue; // future-dated or recurring → not on the plate
 
         const remaining = list.items.filter((i) => !i.completed).length;
+        // Don't surface empty / fully-checked lists ("0 left"): an undated list
+        // only belongs on the plate while it still has open items.
+        if (remaining === 0) continue;
         const dateLabel = due === 'overdue' && list.dueDate ? formatDateShort(list.dueDate) : '';
 
         let message: string;
@@ -376,13 +380,13 @@ export function useCriticalItems() {
     return items;
   });
 
-  /** Replace {placeholders} in a translated string. Unknown placeholders no-op. */
+  /**
+   * Resolve a briefing key and fill its `{placeholders}`. Delegates to the shared
+   * `fillTemplate` (replaceAll + `$`-safe function replacer) — never a bare
+   * `String.replace`, which is first-occurrence-only and mangles `$` sequences.
+   */
   function buildMessage(key: UIStringKey, replacements: Record<string, string>): string {
-    let msg = t(key);
-    for (const [k, v] of Object.entries(replacements)) {
-      msg = msg.replace(`{${k}}`, v);
-    }
-    return msg;
+    return fillTemplate(t(key), replacements);
   }
 
   /** Lowercase the first character for mid-sentence use. */
