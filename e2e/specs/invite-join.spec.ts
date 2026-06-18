@@ -157,7 +157,10 @@ test.describe('Magic Link Invite System', () => {
     // recovery path for Drive-backed joiners; the rev-3 plan deliberately
     // removed the local-file fallback for cloud joiners (it would have
     // created an orphaned standalone copy of the data).
-    const pickerButton = page.getByRole('button', { name: /select file from drive/i });
+    // Copy: `join.pickerPrompt.button` ("Open Your Family File") — the awaiting-auth
+    // Picker CTA. (The Drive step was reframed as "open your family file" in the
+    // 2026-06-14 join-flow copy pass; keep this regex in sync with that key.)
+    const pickerButton = page.getByRole('button', { name: /open your family file/i });
     await expect(pickerButton).toBeVisible({ timeout: 15000 });
 
     // The local-file drop zone is NOT shown for google_drive invites —
