@@ -1096,4 +1096,198 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'beanie-lists',
+    category: 'features',
+    title: 'Beanie Lists',
+    excerpt:
+      'Shared, categorized checklists for the stuff family life runs on — groceries, packing, chores, before-school routines. One-off or auto-repeating.',
+    icon: '\u{1F9FE}',
+    readTime: 6,
+    updatedDate: '2026-06-18',
+    sections: [
+      { type: 'heading', content: 'Why Beanie Lists?', level: 2, id: 'why' },
+      {
+        type: 'paragraph',
+        content:
+          'So much of family life is a checklist — the weekly grocery run, the before-school scramble, what to pack for a trip, the jobs to do before a party. <strong>Beanie Lists</strong> give your family one shared home for all of them, sorted by what they’re for, so nothing gets forgotten and everyone can see what’s left to do. You’ll find them under <strong>Beanie Lists</strong> in the Treehouse section of the sidebar.',
+      },
+
+      {
+        type: 'heading',
+        content: 'Lists or to-dos — which do I use?',
+        level: 2,
+        id: 'lists-vs-todos',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A <strong>to-do</strong> is a single task (“call the dentist”). A <strong>list</strong> is a checklist of many items that belong together (“Groceries”, “Before-school”, “Italy packing”) — especially the routines that come back week after week.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Rule of thumb: if it’s one thing, make it a to-do. If it’s a bundle of things you tick off together — or a routine that repeats — make it a list.',
+        title: 'Which is which?',
+        icon: '\u{1F9ED}',
+      },
+
+      { type: 'heading', content: 'Creating a list', level: 2, id: 'creating' },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Go to <strong>Beanie Lists</strong> in the Treehouse section of the sidebar',
+          'Tap the <strong>New List</strong> button (the orange <strong>+</strong>)',
+          'In <strong>Start a New List</strong>, pick a <strong>Category</strong> (Home, Kids, Trips…)',
+          'Choose a ready-made option under <strong>Start from a Template</strong> — or tap <strong>Start Blank List</strong> to begin from scratch',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Templates are just a head start — they drop in a name and a few starter items (a grocery list arrives with “Bananas, Spinach, Oat milk…”). Once created, the list is yours to rename, add to, and edit however you like.',
+        title: 'Templates give you a running start',
+        icon: '\u{1F4A1}',
+      },
+
+      { type: 'heading', content: 'One-off or repeating?', level: 2, id: 'one-off-or-repeating' },
+      {
+        type: 'paragraph',
+        content:
+          'Every list is one of two kinds. You set this when editing a list, under <strong>Repeats?</strong>:',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>One-off</strong> — a list you finish once, like packing for a trip or party prep. Give it a <strong>Due date</strong> if timing matters. When every item is ticked, it moves to the <strong>Completed</strong> area.',
+          '<strong>Repeats</strong> — a routine that comes back: <strong>Daily</strong>, <strong>Weekly</strong>, or <strong>Monthly</strong>. A repeating list never “finishes” — instead it unchecks itself at the start of each new period so you start fresh (your grocery list clears every week; before-school clears every morning).',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'A repeating list clearing its checkmarks isn’t a glitch — it’s the point: it “unchecks itself each cycle so you start fresh, no due date needed.” Your items stay put; only the ticks reset.',
+        title: 'Repeating lists reset themselves',
+        icon: '\u{1F504}',
+      },
+
+      { type: 'heading', content: 'Working with a list', level: 2, id: 'working' },
+      { type: 'paragraph', content: 'Tap any list to open it. From there you can:' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Tick items off</strong> as you go — a little progress bar fills up',
+          '<strong>Add an item</strong> with the “Add an item…” field',
+          '<strong>Rename</strong> the list, or change its <strong>Category</strong>',
+          'Set the <strong>Owner</strong> — who the list belongs to (see below)',
+          'Set a <strong>Due date</strong>, or switch <strong>Repeats?</strong> on and pick a frequency',
+          '<strong>Link</strong> it to a trip or activity (see below)',
+          '<strong>Delete List</strong> when you’re finished with it for good',
+        ],
+      },
+
+      { type: 'heading', content: 'Who a list belongs to', level: 2, id: 'owner' },
+      {
+        type: 'paragraph',
+        content:
+          'Each list has one <strong>Owner</strong>. Unlike a to-do (which can be shared among several people), a list belongs to a single person — the one looking after it. The owner’s due lists turn up in their <strong>Daily Briefing</strong>. If a list belongs to a child, grown-ups see it in their briefing too, framed by the child’s name, so the parent who actually makes it happen doesn’t miss it.',
+      },
+
+      { type: 'heading', content: 'Linking a list to a trip or activity', level: 2, id: 'linking' },
+      {
+        type: 'paragraph',
+        content:
+          'A packing list really belongs <em>with</em> your trip. Link them and the list appears right on that trip (or activity) under <strong>Checklists</strong> — so you can tick items off without leaving the page.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open the list and find the <strong>Link</strong> row',
+          'Tap <strong>Link to a trip</strong> or <strong>Link to an activity</strong>',
+          'Search for the trip or activity and pick it — that’s it',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'You can link to your upcoming trips and activities. To remove a link later, open the list and tap <strong>Unlink</strong>.',
+        title: 'Good to know',
+        icon: '\u{1F517}',
+      },
+
+      { type: 'heading', content: 'Where your lists show up', level: 2, id: 'where' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>The Beanie Lists page</strong> — a <strong>Due soon</strong> shelf at the top, your lists grouped by category below, and a <strong>Completed</strong> area at the bottom. The filter chips (<strong>All</strong>, Home, Kids…) narrow the view.',
+          '<strong>Your Daily Briefing</strong> — a one-off list that’s due today, overdue, or simply still has items to do gets a gentle nudge. Repeating lists don’t nag; they just reset.',
+          '<strong>The menu badge</strong> — the little orange number beside Beanie Lists counts lists that are overdue or due today, so you know at a glance when something needs you.',
+          '<strong>A linked trip or activity</strong> — any list you’ve linked appears there under Checklists.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Finish a one-off list and you’ll get a little <strong>List complete! \u{1F389}</strong> celebration — because every bean counts.',
+      },
+
+      { type: 'heading', content: 'List categories', level: 2, id: 'categories' },
+      {
+        type: 'paragraph',
+        content: 'Every list lives in one of eight categories, so the page stays tidy:',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '\u{1F3E0} <strong>Home & Household</strong> — chores, repairs, household routines',
+          '\u{1F6D2} <strong>Out & Errands</strong> — groceries, shopping, errands around town',
+          '\u{1F9D2} <strong>Kids & School</strong> — before-school, homework, kids’ chores',
+          '\u{1FA7A} <strong>Health & Safety</strong> — appointments, medicines, safety checks',
+          '\u{1F389} <strong>Celebrations & Traditions</strong> — parties, holidays, gatherings',
+          '\u{1F9F3} <strong>Trips & Packing</strong> — what to pack and prep for travel',
+          '✅ <strong>Projects & Honey-dos</strong> — bigger job bundles and partner lists',
+          '✨ <strong>Just for Me</strong> — your own personal lists',
+        ],
+      },
+
+      { type: 'heading', content: 'Ready-made templates', level: 2, id: 'templates' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Grocery list</strong> — weekly, auto-resets',
+          '<strong>Kids’ chores</strong> — weekly reset',
+          '<strong>Before-school</strong> — daily checklist',
+          '<strong>Vacation packing</strong> — one-off; link it to a trip',
+          '<strong>Honey-do list</strong> — a one-off list for your partner',
+          '<strong>Party prep</strong> — one-off; pick a date',
+        ],
+      },
+
+      {
+        type: 'callout',
+        content:
+          'Deleting a list removes it and all of its items for everyone in the family, and there’s no undo. Deleting is for lists you’re truly done with — for a routine that comes around again, just leave it to reset.',
+        title: 'Deleting a list can’t be undone',
+        icon: '⚠️',
+      },
+
+      { type: 'heading', content: 'What’s next?', level: 2, id: 'whats-next' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Family To-Do Lists</strong> — for single, shareable tasks',
+          '<strong>Travel Plans & Vacations</strong> — link a packing list to your next trip',
+          '<strong>Your Daily Briefing</strong> — where your due lists come to find you',
+        ],
+      },
+    ],
+  },
 ];
