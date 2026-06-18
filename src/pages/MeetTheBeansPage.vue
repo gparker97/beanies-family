@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import BeanCard from '@/components/family/BeanCard.vue';
 import FamilyMemberModal from '@/components/family/FamilyMemberModal.vue';
 import InviteWizardModal from '@/components/family/InviteWizardModal.vue';
@@ -440,14 +441,11 @@ function cancelEditFamilyName() {
           </span>
           <span class="relative z-10">{{ t('family.hub.inviteBean') }}</span>
         </button>
-        <button
-          type="button"
-          class="font-outfit from-primary-500 to-terracotta-400 inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)] sm:flex-initial"
+        <AddEntityButton
+          :label="t('family.hub.addBean')"
+          class="flex-1 sm:flex-initial"
           @click="openAddModal"
-        >
-          <span aria-hidden="true">＋</span>
-          <span>{{ t('family.hub.addBean') }}</span>
-        </button>
+        />
       </div>
     </header>
 

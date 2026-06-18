@@ -8,7 +8,7 @@ import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { LIST_CATEGORIES } from '@/constants/listCategories';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
-import BaseButton from '@/components/ui/BaseButton.vue';
+import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import ListShelf from '@/components/lists/ListShelf.vue';
 import ListCategoryPills from '@/components/lists/ListCategoryPills.vue';
 import ListDetailModal from '@/components/lists/ListDetailModal.vue';
@@ -106,9 +106,7 @@ function closeDetail(): void {
     <!-- Header -->
     <div class="flex items-start justify-between gap-3">
       <PageWelcomeSubtitle :text="t('lists.welcomeSubtitle')" />
-      <BaseButton variant="primary" size="sm" @click="showNew = true">
-        ＋ {{ t('lists.newList') }}
-      </BaseButton>
+      <AddEntityButton :label="t('lists.newList')" @click="showNew = true" />
     </div>
 
     <!-- Empty state -->
@@ -118,7 +116,7 @@ function closeDetail(): void {
         {{ t('lists.empty.title') }}
       </p>
       <p class="mb-4 text-sm text-[var(--color-text-muted)]">{{ t('lists.empty.body') }}</p>
-      <BaseButton variant="primary" @click="showNew = true">＋ {{ t('lists.newList') }}</BaseButton>
+      <AddEntityButton :label="t('lists.newList')" @click="showNew = true" />
     </div>
 
     <template v-else>
