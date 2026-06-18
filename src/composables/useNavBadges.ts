@@ -22,6 +22,8 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useVacationStore } from '@/stores/vacationStore';
+import { useListStore } from '@/stores/listStore';
+import { isFlagEnabled } from '@/config/flags';
 import {
   getBadgeKeyForPath,
   MOBILE_TAGGED_NAV_ITEMS,
@@ -68,6 +70,7 @@ export function useNavBadges() {
   const goalsStore = useGoalsStore();
   const budgetStore = useBudgetStore();
   const vacationStore = useVacationStore();
+  const listStore = useListStore();
 
   const badges = computed<Record<KnownBadgeKey, NavBadge>>(() => ({
     overdueTodos: {
@@ -82,6 +85,14 @@ export function useNavBadges() {
     openTravelIdeas: {
       kind: 'count',
       count: openIdeasOnUpcomingTrips(vacationStore.upcomingVacations),
+    },
+    // Lists overdue or due today (whole family, like the siblings). Flag-gated:
+    // the mobile-tab aggregator walks the registry without checking requiresFlag,
+    // so a flag-OFF device with synced due lists would otherwise light up the
+    // Planning tab for a hidden page.
+    dueLists: {
+      kind: 'count',
+      count: isFlagEnabled('familyLists') ? listStore.dueListsCount : 0,
     },
   }));
 

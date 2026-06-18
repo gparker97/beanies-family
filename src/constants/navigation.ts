@@ -133,6 +133,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     emoji: '🧾',
     section: 'treehouse',
     requiresFlag: 'familyLists',
+    badgeKey: 'dueLists',
     mobileCategory: 'planning',
   },
   {
@@ -266,6 +267,7 @@ export const KNOWN_BADGE_KEYS = [
   'overBudgets',
   'overdueGoals',
   'openTravelIdeas',
+  'dueLists',
 ] as const;
 export type KnownBadgeKey = (typeof KNOWN_BADGE_KEYS)[number];
 const KNOWN_BADGE_KEY_SET: ReadonlySet<string> = new Set(KNOWN_BADGE_KEYS);
