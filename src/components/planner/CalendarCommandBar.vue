@@ -18,6 +18,7 @@ import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
 import MemberFilterMobileMenu from '@/components/planner/MemberFilterMobileMenu.vue';
 import CalendarTripRibbon from '@/components/planner/CalendarTripRibbon.vue';
 import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
+import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import HamburgerButton from '@/components/common/HamburgerButton.vue';
 import SearchButton from '@/components/common/SearchButton.vue';
 import NotificationsBell from '@/components/notifications/NotificationsBell.vue';
@@ -233,16 +234,12 @@ onBeforeUnmount(() => {
             @click="emit('add-from-photo')"
           />
 
-          <button
+          <AddEntityButton
             v-if="canAdd"
-            type="button"
-            class="font-outfit from-primary-500 to-terracotta-400 inline-flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full bg-gradient-to-r text-xl font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)] sm:h-auto sm:w-auto sm:rounded-2xl sm:px-5 sm:py-2.5 sm:text-sm"
-            :aria-label="t('planner.addActivity')"
+            :label="t('planner.addActivity')"
+            compact
             @click="emit('add')"
-          >
-            <span aria-hidden="true" class="sm:hidden">＋</span>
-            <span class="hidden sm:inline">{{ t('planner.addActivity') }}</span>
-          </button>
+          />
         </div>
       </div>
     </div>
