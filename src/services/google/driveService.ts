@@ -318,6 +318,21 @@ export async function listFilePermissions(
 }
 
 /**
+ * A `.beanpod` file as surfaced by the listing/search helpers.
+ *
+ * `ownedByMe` is the discriminator the adopt-existing recovery relies on
+ * (2026-06-19): a same-name collision the authenticating account OWNS can be
+ * adopted; one owned by another account never is. Drive returns it on the
+ * `ownedByMe` field; we thread it through `mapFileResults` so it isn't dropped.
+ */
+export interface BeanpodFileEntry {
+  fileId: string;
+  name: string;
+  modifiedTime: string;
+  ownedByMe: boolean;
+}
+
+/**
  * List .beanpod files in the app folder.
  * If folder-based search returns empty, falls back to a Drive-wide search
  * for .beanpod files (handles broken folder associations).
@@ -325,9 +340,9 @@ export async function listFilePermissions(
 export async function listBeanpodFiles(
   token: string,
   folderId: string
-): Promise<Array<{ fileId: string; name: string; modifiedTime: string }>> {
+): Promise<BeanpodFileEntry[]> {
   const query = `'${folderId}' in parents and trashed=false`;
-  const url = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`;
+  const url = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime,ownedByMe)&orderBy=modifiedTime desc`;
 
   const res = await driveRequest(token, url);
   const data = await res.json();
@@ -348,11 +363,9 @@ export async function listBeanpodFiles(
  * If files are found outside the app folder, updates the cached folder ID to the
  * file's actual parent so subsequent operations use the correct folder.
  */
-export async function searchBeanpodFilesGlobal(
-  token: string
-): Promise<Array<{ fileId: string; name: string; modifiedTime: string }>> {
+export async function searchBeanpodFilesGlobal(token: string): Promise<BeanpodFileEntry[]> {
   const query = `name contains '.beanpod' and trashed=false`;
-  const url = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime,parents)&orderBy=modifiedTime desc`;
+  const url = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime,parents,ownedByMe)&orderBy=modifiedTime desc`;
 
   const res = await driveRequest(token, url);
   const data = await res.json();
@@ -370,11 +383,14 @@ export async function searchBeanpodFilesGlobal(
     }
   }
 
-  return rawFiles.map((f: { id: string; name: string; modifiedTime: string }) => ({
-    fileId: f.id,
-    name: f.name,
-    modifiedTime: f.modifiedTime,
-  }));
+  return rawFiles.map(
+    (f: { id: string; name: string; modifiedTime: string; ownedByMe?: boolean }) => ({
+      fileId: f.id,
+      name: f.name,
+      modifiedTime: f.modifiedTime,
+      ownedByMe: f.ownedByMe ?? false,
+    })
+  );
 }
 
 /**
@@ -549,12 +565,13 @@ async function pickFolderWithFiles(
 
 /** Map raw Drive API file results to our shape. */
 function mapFileResults(
-  files: Array<{ id: string; name: string; modifiedTime: string }> | undefined
-): Array<{ fileId: string; name: string; modifiedTime: string }> {
+  files: Array<{ id: string; name: string; modifiedTime: string; ownedByMe?: boolean }> | undefined
+): BeanpodFileEntry[] {
   return (files ?? []).map((f) => ({
     fileId: f.id,
     name: f.name,
     modifiedTime: f.modifiedTime,
+    ownedByMe: f.ownedByMe ?? false,
   }));
 }
 

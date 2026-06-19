@@ -450,8 +450,13 @@ describe('driveService', () => {
   describe('listBeanpodFiles', () => {
     it('returns file list sorted by modifiedTime', async () => {
       const files = [
-        { id: 'f1', name: 'family.beanpod', modifiedTime: '2026-02-26T12:00:00Z' },
-        { id: 'f2', name: 'backup.beanpod', modifiedTime: '2026-02-25T12:00:00Z' },
+        { id: 'f1', name: 'family.beanpod', modifiedTime: '2026-02-26T12:00:00Z', ownedByMe: true },
+        {
+          id: 'f2',
+          name: 'backup.beanpod',
+          modifiedTime: '2026-02-25T12:00:00Z',
+          ownedByMe: false,
+        },
       ];
       globalThis.fetch = mockFetch({ files });
 
@@ -461,6 +466,7 @@ describe('driveService', () => {
         fileId: 'f1',
         name: 'family.beanpod',
         modifiedTime: '2026-02-26T12:00:00Z',
+        ownedByMe: true,
       });
     });
 

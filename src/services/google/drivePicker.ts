@@ -20,6 +20,15 @@ function loadPickerScript(): Promise<void> {
     }
 
     const script = document.createElement('script');
+    // `crossorigin="anonymous"` is REQUIRED for error observability. Without it,
+    // any exception thrown inside this cross-origin Google script (gapi / GSI /
+    // picker) is redacted by the browser — most aggressively by iOS WebKit — to
+    // an opaque `window.onerror` "Script error." with no message or stack
+    // (prod #4, 2026-06-19, the failing iPhone onboarding session). Google's
+    // `apis.google.com` serves `Access-Control-Allow-Origin: *`, so requesting
+    // CORS here does not break loading and lets the real error + stack surface
+    // to `#beanies-errors` instead of an un-actionable blank.
+    script.crossOrigin = 'anonymous';
     script.src = PICKER_SCRIPT_URL;
     script.async = true;
     script.onload = () => resolve();

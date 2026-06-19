@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-17",
-    "translationCount": 3624
+    "lastUpdated": "2026-06-19",
+    "translationCount": 3630
   },
   "translations": {
     "app.name": {
@@ -16212,19 +16212,19 @@
       "lastUpdated": "2026-06-15"
     },
     "resumeSetup.startNewConfirmTitle": {
-      "translation": "启动一个新的pod ？",
-      "hash": "abfdef",
-      "lastUpdated": "2026-06-15"
+      "translation": "组建您的家庭？",
+      "hash": "jtqj1x",
+      "lastUpdated": "2026-06-19"
     },
     "resumeSetup.startNewConfirmMessage": {
-      "translation": "您的家人已经有一个我们无法到达的吊舱。启动新Pod意味着您现有的Pod将不会在此处加载。只有当您确定要重新开始时，才执行此操作。",
-      "hash": "q60sbz",
-      "lastUpdated": "2026-06-15"
+      "translation": "我们现在将为您安排家庭成员。如果您已拥有同名家庭文件，我们会查找并打开该文件，这样您的数据就安全了。",
+      "hash": "v6uzm5",
+      "lastUpdated": "2026-06-19"
     },
     "resumeSetup.startNewConfirmCta": {
-      "translation": "启动新Pod",
-      "hash": "8tyv6g",
-      "lastUpdated": "2026-06-15"
+      "translation": "设置我的家庭",
+      "hash": "y5mucx",
+      "lastUpdated": "2026-06-19"
     },
     "selfHost.localUnsupported": {
       "translation": "此浏览器无法存储本地文件。在电脑上的Chrome或Edge中打开beanies.family以设置您的Pod。",
@@ -18125,6 +18125,36 @@
       "translation": "还有 {count} 项",
       "hash": "xdbj93",
       "lastUpdated": "2026-06-17"
+    },
+    "createPod.adoptExistingTitle": {
+      "translation": "打开您现有的家庭文件？",
+      "hash": "ag3et7",
+      "lastUpdated": "2026-06-19"
+    },
+    "createPod.adoptExistingMessage": {
+      "translation": "我们在您的Google云端硬盘中找到了一个同名的家庭文件。您想打开它而不是重新开始吗？",
+      "hash": "5bxqm",
+      "lastUpdated": "2026-06-19"
+    },
+    "createPod.adoptExistingConfirm": {
+      "translation": "打开",
+      "hash": "6mzd0h",
+      "lastUpdated": "2026-06-19"
+    },
+    "createPod.adoptExistingCancel": {
+      "translation": "以新名字重新开始",
+      "hash": "q3bzuc",
+      "lastUpdated": "2026-06-19"
+    },
+    "createPod.driveCheckUnavailable": {
+      "translation": "我们刚刚无法检查您的Google云端硬盘，因此我们没有创建文件（以避免重复）。请检查您的网络连接，然后重试。",
+      "hash": "9at75z",
+      "lastUpdated": "2026-06-19"
+    },
+    "resumeSetup.driveConsentDenied": {
+      "translation": "Google需要访问您的家庭文件的权限。请重新连接Google云端硬盘，并在出现提示时允许文件访问。",
+      "hash": "nez4ve",
+      "lastUpdated": "2026-06-19"
     }
   }
 }

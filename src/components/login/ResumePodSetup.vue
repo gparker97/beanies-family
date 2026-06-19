@@ -44,10 +44,12 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
+import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
 import { confirm } from '@/composables/useConfirm';
+import { consumeResumeReason } from '@/components/login/resumePaths';
 
 const { t } = useTranslation();
 const authStore = useAuthStore();
@@ -123,6 +125,14 @@ onMounted(async () => {
   ownerName.value = authStore.displayName;
 
   await runProbe();
+
+  // Surface a specific hint if we arrived here because Google file access was
+  // denied on the consent screen (2026-06-19, finding 3). Set after runProbe so
+  // it isn't cleared by the probe's `formError = null`. The reconnect CTA is the
+  // storage step's "Connect Google Drive" button.
+  if (consumeResumeReason() === 'drive-consent') {
+    formError.value = t('resumeSetup.driveConsentDenied');
+  }
 });
 
 /**
@@ -149,6 +159,11 @@ async function runProbe() {
     case 'no-registry-entry':
       // Scenario (a) — genuinely new family; fall through to the create flow.
       phase.value = 'identity';
+      return;
+    case 'redirecting':
+      // The probe kicked off a full-page OAuth redirect (iOS/PWA, no valid
+      // token) — the page is navigating to Google. Do nothing; we resume on
+      // return (2026-06-19, finding 2). Leave the spinner up.
       return;
     case 'registry-error':
       reportError({
@@ -183,15 +198,20 @@ async function handleRetry() {
 }
 
 /**
- * "Start a new pod instead" on the retry screen — the rare genuine give-up
- * (the real pod is unreachable AND the user accepts starting fresh). Gated
- * behind an explicit destructive confirm so it's opt-in, never the default.
+ * "Set up my family" on the retry screen — a non-destructive escape when the
+ * registry is persistently unreachable (2026-06-19, finding 4). Previously this
+ * was a danger-gated "start a new pod" trap: a genuinely-new user (no pod) could
+ * only proceed through a scary destructive confirm. It is now SAFE because the
+ * adopt-existing recovery protects the create path — if a real same-name pod
+ * exists on Drive, `finishOnDrive` adopts/opens it instead of overwriting. So
+ * this routes to the identity/create flow behind a reassuring INFO confirm
+ * rather than a destructive one.
  */
 async function handleStartNewPodFromRetry() {
   const ok = await confirm({
     title: 'resumeSetup.startNewConfirmTitle',
     message: 'resumeSetup.startNewConfirmMessage',
-    variant: 'danger',
+    variant: 'info',
     confirmLabel: 'resumeSetup.startNewConfirmCta',
   });
   if (!ok) return;
@@ -394,6 +414,51 @@ async function finishOnDrive() {
   });
   if (r.status === 'redirecting') return; // page navigating to Google — nothing more to do
   if (r.status === 'failed') {
+    // Adopt-existing recovery — the fix for the iOS dead-end loop (2026-06-19).
+    // This is exactly where the orphaned-pod collision lands on iPhone.
+    if (r.errorKind === 'name-collision' && r.collision) {
+      const action = await resolveDriveCollision(r.collision, {
+        familyName: familyContextStore.activeFamilyName || 'my-family',
+        activeFamilyId: familyContextStore.activeFamilyId,
+      });
+      switch (action.kind) {
+        case 'adopted-stub':
+          await finalizePod(); // write the real pod into the adopted orphan
+          return;
+        case 'open-existing':
+          await openExistingOnDrive(action.fileId);
+          return;
+        case 'declined':
+          formError.value = t('createPod.duplicateFile');
+          phase.value = 'storage';
+          return;
+        case 'reject-different-account':
+          formError.value = t('createPod.duplicateFile');
+          reportError({
+            surface: 'resumeSetup.nameCollision',
+            message: r.error,
+            severity: 'warning',
+            context: { provider_type: 'google_drive', collision_file_id: r.collision.fileId },
+          });
+          phase.value = 'storage';
+          return;
+        case 'failed':
+          formError.value = action.error || t('googleDrive.authFailed');
+          reportError({
+            surface: 'resumeSetup.adoptExisting',
+            message: action.error || 'adopt-existing recovery failed during resume',
+            severity: 'critical',
+            context: { provider_type: 'google_drive' },
+          });
+          phase.value = 'storage';
+          return;
+      }
+    }
+    if (r.errorKind === 'collision-check-unavailable') {
+      formError.value = t('createPod.driveCheckUnavailable');
+      phase.value = 'storage';
+      return;
+    }
     const cancelled = r.cancelled || isUserCancellation(r.error);
     if (cancelled) console.warn('[ResumePodSetup] Drive connect cancelled:', r.error);
     else console.error('[ResumePodSetup] Drive connect failed:', r.error);
@@ -403,11 +468,37 @@ async function finishOnDrive() {
       severity: cancelled ? 'warning' : 'error',
       context: { provider_type: 'google_drive' },
     });
-    formError.value = r.error || t('googleDrive.authFailed');
+    // Translated copy only (finding 13): never assign the raw Drive message —
+    // it's English-only and a name-collision message leaks an internal fileId.
+    formError.value = t('googleDrive.authFailed');
     phase.value = 'storage';
     return;
   }
   await finalizePod();
+}
+
+/**
+ * Open the account's own existing populated pod (the adopt-confirm "Open it"
+ * path). Loads the file and routes to the password (`auto-load`) phase, reusing
+ * the same machinery as the registry auto-load — never creates over the file.
+ */
+async function openExistingOnDrive(fileId: string): Promise<void> {
+  const podFileName = `${familyContextStore.activeFamilyName || 'my-family'}.beanpod`;
+  const result = await syncStore.loadFromGoogleDrive(fileId, podFileName);
+  if (result.needsPassword) {
+    autoLoadFamilyName.value = familyContextStore.activeFamilyName || familyName.value;
+    phase.value = 'auto-load';
+    return;
+  }
+  console.error('[ResumePodSetup] open-existing load did not reach password step:', result);
+  reportError({
+    surface: 'resumeSetup.openExisting',
+    message: `open-existing load failed: ${result.reason ?? syncStore.error ?? 'unknown'}`,
+    severity: 'error',
+    context: { provider_type: 'google_drive' },
+  });
+  formError.value = t('setup.fileCreateFailed');
+  phase.value = 'storage';
 }
 
 async function handleConnectDrive() {
