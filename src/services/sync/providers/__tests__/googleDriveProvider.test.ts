@@ -196,6 +196,14 @@ describe('GoogleDriveProvider', () => {
       expect(p.getFileId()).toBe('existing-id');
       expect(p.getDisplayName()).toBe('existing.beanpod');
     });
+
+    it('does NOT register a flush target — read-only builds must not write (finding 11)', async () => {
+      const { setFlushProvider } = await import('../../offlineQueue');
+      vi.mocked(setFlushProvider).mockClear();
+      GoogleDriveProvider.fromExisting('existing-id', 'existing.beanpod');
+      // Flush registration is owned by syncService.setProvider, not the build.
+      expect(setFlushProvider).not.toHaveBeenCalled();
+    });
   });
 
   describe('createNew', () => {
@@ -286,6 +294,42 @@ describe('GoogleDriveProvider', () => {
       expect(enqueueOfflineSave).not.toHaveBeenCalled();
       expect(mockUpdateFile).toHaveBeenCalledTimes(2);
     }, 20_000);
+
+    it("queues offline on Safari/iOS 'Load failed' network error (2026-06-19 finding 6)", async () => {
+      const { enqueueOfflineSave } = await import('../../offlineQueue');
+      vi.mocked(enqueueOfflineSave).mockClear();
+      mockUpdateFile.mockReset();
+      // WebKit throws `TypeError: Load failed` (no "fetch" substring) — the old
+      // `.includes('fetch')` guard missed it and the save was LOST.
+      mockUpdateFile.mockRejectedValue(new TypeError('Load failed'));
+
+      await provider.write('{"data":"ios"}');
+
+      expect(enqueueOfflineSave).toHaveBeenCalledWith('{"data":"ios"}');
+    }, 20_000);
+  });
+
+  describe('bound-account guard (account drift — 2026-06-19 finding 9)', () => {
+    it('read() throws TokenExpiredError when the session drifted to another account', async () => {
+      const { getGoogleAccountEmail, TokenExpiredError } =
+        await import('@/services/google/googleAuth');
+      // Provider bound to account A; live session is account B.
+      const bound = GoogleDriveProvider.fromExisting('file-A', 'a.beanpod', 'a@example.com');
+      (getGoogleAccountEmail as ReturnType<typeof vi.fn>).mockReturnValue('b@example.com');
+
+      await expect(bound.read()).rejects.toBeInstanceOf(TokenExpiredError);
+      // Never read with the wrong account's token.
+      expect(mockReadFile).not.toHaveBeenCalled();
+    });
+
+    it('allows read() when the bound account is not yet known (null → learn)', async () => {
+      const { getGoogleAccountEmail } = await import('@/services/google/googleAuth');
+      const unbound = GoogleDriveProvider.fromExisting('file-A', 'a.beanpod', null);
+      (getGoogleAccountEmail as ReturnType<typeof vi.fn>).mockReturnValue('b@example.com');
+      mockReadFile.mockResolvedValueOnce('{"version":"4.0"}');
+
+      await expect(unbound.read()).resolves.toBe('{"version":"4.0"}');
+    });
   });
 
   describe('read — 401 recovery (silent-only, no popups)', () => {
@@ -432,14 +476,16 @@ describe('GoogleDriveProvider', () => {
       expect(mockCreateFile).toHaveBeenCalled();
     });
 
-    it('continues to create when the collision check itself fails (best-effort, never blocks)', async () => {
+    it('throws CollisionCheckUnavailableError and does NOT create when the collision check fails', async () => {
+      // 2026-06-19, finding 5: a list failure means we can't tell whether a
+      // same-name file exists. Creating blindly risks a SECOND orphan .beanpod,
+      // so we surface a retryable error instead of swallowing + creating.
+      const { CollisionCheckUnavailableError } = await import('@/types/sync');
       mockListBeanpodFiles.mockRejectedValueOnce(new Error('Drive listing failed'));
-      mockCreateFile.mockResolvedValueOnce({ fileId: 'new-id', name: 'LaFleur.beanpod' });
-      const created = await GoogleDriveProvider.createNew('LaFleur.beanpod', {
-        forceConsent: false,
-      });
-      expect(created.getFileId()).toBe('new-id');
-      expect(mockCreateFile).toHaveBeenCalled();
+      await expect(
+        GoogleDriveProvider.createNew('LaFleur.beanpod', { forceConsent: false })
+      ).rejects.toBeInstanceOf(CollisionCheckUnavailableError);
+      expect(mockCreateFile).not.toHaveBeenCalled();
     });
   });
 });

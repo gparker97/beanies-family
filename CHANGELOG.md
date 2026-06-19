@@ -8,6 +8,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-19
+
+### Fixed
+
+- **Onboarding no longer gets stuck in a loop on iPhone.** If a first sign-up attempt was interrupted (a flaky network, an app glitch), it could leave a half-created family file behind in your Google Drive — and every retry then failed with "a file with this name already exists," with no way forward. Setup now recognizes your own leftover file and picks up where it left off: an empty leftover is reused automatically, and if you genuinely already have a family file with that name, it offers to open it instead. (A file owned by someone else still asks you to pick a different name.)
+- **Clearer message when Google file access is declined.** If you uncheck the file-access box on Google's permission screen, onboarding now explains that beanies needs that permission and prompts you to reconnect — instead of silently bouncing you back with no explanation.
+- **iPhone saves are no longer lost on a flaky connection.** A Safari-specific network error wasn't being recognized, so a failed save to Google Drive could be dropped instead of queued. Those saves now retry when you're back online, matching every other browser.
+- **Joining a family is more reliable for non-English users.** The "grant access to this file" recovery step keyed off English error text, so it could fail to offer the file picker in other languages. It now uses the actual response code, so it works regardless of app language.
+- **Steadier Google reconnection.** Hardened a few edge cases in how Drive access is re-established (signing out on another tab mid-reconnect; the app and the signed-in Google account briefly disagreeing) so they resolve cleanly instead of surfacing a spurious "reconnect" prompt.
+
+### Changed
+
+- **Better error visibility on iPhone (internal).** Errors thrown inside Google's sign-in/file-picker scripts were being reported as an opaque "Script error." with no detail; they now surface the real cause, so genuine iPhone onboarding issues can be diagnosed and fixed faster.
+
 ## 2026-06-18
 
 ### Added

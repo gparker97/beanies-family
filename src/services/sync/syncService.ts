@@ -30,6 +30,7 @@ import { CapacitorFileProvider } from './providers/capacitorFileProvider';
 import { DriveApiError } from '@/services/google/driveService';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import { preserveLocalKeyDicts } from './envelopeMerge';
+import { setFlushProvider } from './offlineQueue';
 import {
   usePollWhileVisible,
   type PollWhileVisibleHandle,
@@ -318,6 +319,12 @@ export function getProvider(): StorageProvider | null {
 export function setProvider(provider: StorageProvider): void {
   currentProvider = provider;
   currentProviderFamilyId = getActiveFamilyId();
+  // This is the single write-intent install seam, so it OWNS offline-queue
+  // flush registration (2026-06-19, finding 11). Provider builds (createNew /
+  // fromExisting) no longer self-register, so read-only resume/recovery paths
+  // that build a provider WITHOUT calling setProvider never become a flush
+  // target and can't write stale queued bytes into a file they only inspected.
+  setFlushProvider(provider);
   startPollingIfApplicable(provider);
   updateState({
     isConfigured: true,
@@ -447,6 +454,12 @@ export async function initialize(): Promise<boolean> {
           config.driveAccountEmail
         );
         currentProviderFamilyId = familyId;
+        // Cold-boot restore of the configured Drive provider is write-intent
+        // (the app saves to it), so register it as the offline-queue flush
+        // target. `fromExisting` no longer self-registers (finding 11); this
+        // init path sets currentProvider directly instead of via setProvider,
+        // so it must register explicitly.
+        setFlushProvider(currentProvider);
         startPollingIfApplicable(currentProvider);
         updateState({
           isInitialized: true,

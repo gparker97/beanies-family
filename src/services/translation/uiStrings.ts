@@ -2951,6 +2951,28 @@ const STRING_DEFS = {
     beanie:
       "a pod file with this family name already exists in your google drive. please pick a different family name and try again — we won't touch the existing file.",
   },
+  'createPod.adoptExistingTitle': {
+    en: 'Open your existing family file?',
+    beanie: 'open your existing family file?',
+  },
+  'createPod.adoptExistingMessage': {
+    en: 'We found a family file with this name already in your Google Drive. Would you like to open it instead of starting fresh?',
+    beanie:
+      'we found a family file with this name already in your google drive. would you like to open it instead of starting fresh?',
+  },
+  'createPod.adoptExistingConfirm': {
+    en: 'Open it',
+    beanie: 'open it',
+  },
+  'createPod.adoptExistingCancel': {
+    en: 'Start fresh with a new name',
+    beanie: 'start fresh with a new name',
+  },
+  'createPod.driveCheckUnavailable': {
+    en: "We couldn't check your Google Drive just now, so we didn't create a file (to avoid duplicates). Please check your connection and try again.",
+    beanie:
+      "we couldn't check your google drive just now, so we didn't create a file (to avoid duplicates). please check your connection and try again.",
+  },
 
   // Auth
   'auth.signingIn': { en: 'Signing in...', beanie: 'signing in...' },
@@ -3484,17 +3506,22 @@ const STRING_DEFS = {
     beanie: 'start a new pod instead',
   },
   'resumeSetup.startNewConfirmTitle': {
-    en: 'Start a new pod?',
-    beanie: 'start a new pod?',
+    en: 'Set up your family?',
+    beanie: 'set up your family?',
   },
   'resumeSetup.startNewConfirmMessage': {
-    en: "Your family already has a pod we just couldn't reach. Starting a new one means your existing pod won't be loaded here. Only do this if you're sure you want to start fresh.",
+    en: "We'll set up your family now. If you already have a family file with this name, we'll find and open it instead — your data is safe.",
     beanie:
-      "your family already has a pod we just couldn't reach. starting a new one means your existing pod won't be loaded here. only do this if you're sure you want to start fresh.",
+      "we'll set up your family now. if you already have a family file with this name, we'll find and open it instead — your data is safe.",
   },
   'resumeSetup.startNewConfirmCta': {
-    en: 'Start a new pod',
-    beanie: 'start a new pod',
+    en: 'Set up my family',
+    beanie: 'set up my family',
+  },
+  'resumeSetup.driveConsentDenied': {
+    en: 'Google needs permission to access your family file. Please reconnect Google Drive and allow file access when prompted.',
+    beanie:
+      'google needs permission to access your family file. please reconnect google drive and allow file access when prompted.',
   },
   'resumeSetup.podCorrupted': {
     en: "Your pod file appears damaged and can't be opened. Please contact support@beanies.family with the diagnostic details below — we may be able to help.",

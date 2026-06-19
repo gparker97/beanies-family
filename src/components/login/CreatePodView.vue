@@ -16,6 +16,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
+import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isUserCancellation } from '@/services/google/googleAuth';
 import { slackNotify } from '@/utils/slackNotify';
@@ -308,23 +309,58 @@ async function handleChooseGoogleDriveStorage() {
       storageSaved.value = true;
       storageType.value = 'google_drive';
       showDriveResultModal.value = true; // success state
-    } else if (r.errorKind === 'name-collision') {
-      // A `.beanpod` with this family-name already exists in the user's
-      // Drive folder. Surface a focused message + a hint to pick a different
-      // family name — rather than the generic "auth failed" copy. The
-      // existing file is NOT touched (vs. the pre-fix behaviour of silently
-      // creating a duplicate and orphaning the original).
-      driveResultError.value = t('createPod.duplicateFile');
-      console.error('[CreatePodView] Drive name collision:', r.error);
-      reportError({
-        surface: 'createPod.nameCollision',
-        message: r.error,
-        severity: 'warning',
-        context: {
-          provider_type: 'google_drive',
-          collision_file_id: r.collisionFileId ?? null,
-        },
+    } else if (r.errorKind === 'name-collision' && r.collision) {
+      // A `.beanpod` with this family-name already exists in the user's Drive
+      // folder. Resolve it via the adopt-existing recovery (2026-06-19):
+      //  - own orphan STUB → adopt it as the create target, continue as success;
+      //  - own POPULATED pod → (after confirm) send the user to the load flow;
+      //  - DIFFERENT account → the focused "pick a different name" hint.
+      // The existing file is never silently overwritten or duplicated.
+      const action = await resolveDriveCollision(r.collision, {
+        familyName: familyName.value || 'my-family',
+        activeFamilyId: familyContextStore.activeFamilyId,
       });
+      switch (action.kind) {
+        case 'adopted-stub':
+          storageSaved.value = true;
+          storageType.value = 'google_drive';
+          showDriveResultModal.value = true; // success state — write into the adopted file
+          break;
+        case 'open-existing':
+          // They already have a real family file with this name — open it.
+          emit('navigate', 'load-pod');
+          break;
+        case 'reject-different-account':
+        case 'declined':
+          driveResultError.value = t('createPod.duplicateFile');
+          if (action.kind === 'reject-different-account') {
+            console.error('[CreatePodView] Drive name collision (different account):', r.error);
+            reportError({
+              surface: 'createPod.nameCollision',
+              message: r.error,
+              severity: 'warning',
+              context: { provider_type: 'google_drive', collision_file_id: r.collision.fileId },
+            });
+          }
+          showDriveResultModal.value = true;
+          break;
+        case 'failed':
+          driveResultError.value = action.error || t('googleDrive.authFailed');
+          console.error('[CreatePodView] adopt-existing recovery failed:', action.error);
+          reportError({
+            surface: 'createPod.adoptExisting',
+            message: action.error || 'adopt-existing recovery failed',
+            severity: 'critical',
+            context: { provider_type: 'google_drive' },
+          });
+          showDriveResultModal.value = true;
+          break;
+      }
+    } else if (r.errorKind === 'collision-check-unavailable') {
+      // Couldn't verify the user's Drive for existing files — we refused to
+      // create blindly (avoids a second orphan). Retryable.
+      driveResultError.value = t('createPod.driveCheckUnavailable');
+      console.warn('[CreatePodView] Drive collision check unavailable:', r.error);
       showDriveResultModal.value = true;
     } else {
       driveResultError.value = r.error || t('googleDrive.authFailed');

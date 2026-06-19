@@ -84,7 +84,11 @@ export type ResumeFromRegistryResult =
     }
   | { kind: 'no-registry-entry' }
   | { kind: 'registry-error'; error: Error }
-  | { kind: 'load-failed'; error: Error };
+  | { kind: 'load-failed'; error: Error }
+  // The probe kicked off a full-page OAuth redirect (iOS/PWA, no valid token) —
+  // the page is navigating to Google; the caller does nothing and we resume on
+  // return (2026-06-19, finding 2: never open a gesture-less popup on iOS).
+  | { kind: 'redirecting' };
 
 /**
  * `completeAutoLoad` result — what happened when the user submitted their
@@ -138,14 +142,57 @@ export class CorruptPayloadError extends Error {
  * Thrown by `GoogleDriveProvider.createNew` when a file with the same name
  * already exists in the beanies.family folder. Drive doesn't dedupe by
  * filename — without this check, a second create silently orphans the first.
+ *
+ * `ownedByCurrentAccount` drives the adopt-existing recovery (2026-06-19): a
+ * same-name file the authenticating account OWNS is almost always its own
+ * orphan from a prior aborted attempt and can be adopted/loaded instead of
+ * dead-ending; a file owned by a DIFFERENT account must never be adopted and
+ * keeps the "pick a different name" guidance.
  */
 export class FileNameCollisionError extends Error {
   readonly existingFileId: string;
   readonly fileName: string;
-  constructor(message: string, existingFileId: string, fileName: string) {
+  readonly ownedByCurrentAccount: boolean;
+  constructor(
+    message: string,
+    existingFileId: string,
+    fileName: string,
+    ownedByCurrentAccount: boolean
+  ) {
     super(message);
     this.name = 'FileNameCollisionError';
     this.existingFileId = existingFileId;
     this.fileName = fileName;
+    this.ownedByCurrentAccount = ownedByCurrentAccount;
+  }
+}
+
+/**
+ * Thrown by `GoogleDriveProvider.createNew` when the pre-create collision
+ * check (a Drive file list) could not be completed — e.g. a transient Drive
+ * list-API failure. Distinct from "no collision found": we genuinely do NOT
+ * know whether a same-name file exists, so creating blindly risks a SECOND
+ * orphan `.beanpod` (2026-06-19, finding 5). Callers surface a retryable
+ * "couldn't verify your Drive — try again" message rather than creating.
+ */
+export class CollisionCheckUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CollisionCheckUnavailableError';
+  }
+}
+
+/**
+ * Thrown when a Google OAuth token comes back WITHOUT the `drive.file` scope —
+ * the user deselected the file-access checkbox on Google's granular consent
+ * screen (2026-06-19, finding 3). A typed error (vs. a bare message) lets the
+ * App.vue boot path and the redirect-completion path branch on `instanceof`
+ * and route the user to a clear, translated "you must allow file access"
+ * reconnect prompt instead of a silent dead-end.
+ */
+export class DriveConsentDeniedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DriveConsentDeniedError';
   }
 }
