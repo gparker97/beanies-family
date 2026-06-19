@@ -26,7 +26,7 @@
  * here, mirror it there.
  */
 
-import { tail } from '@/utils/diagnostics';
+import { getDeviceInfo, tail } from '@/utils/diagnostics';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -88,6 +88,15 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   // a failure in telemetry to a specific entry in the corrupted envelope
   // without leaking the full id. Family scoping comes from `family_id`.
   'member_id_tail',
+  // Web Storage availability (added 2026-06-20 for the iPhone onboarding
+  // blocker). A flat `ls=<bool>,ss=<bool>` scalar from the diagnostics probe —
+  // distinguishes "storage throws/blocked" from "storage wiped". No user content.
+  'web_storage',
+  // Init breadcrumb trail on init-failure surfaces (app.initFailed /
+  // app.chunkRecoveryFailed / app.postInitNoData). Email-redacted and
+  // tail-trimmed by `breadcrumbsForReport` before it reaches here, so it
+  // honours the firehose's PII-free contract. Developer-authored step labels.
+  'breadcrumbs',
 ]);
 
 export const MAX_STRING_LEN = 200;
@@ -147,6 +156,35 @@ export function normalizeMessage(message: string): string {
     .replace(/\b[a-f0-9]{8,}\b/gi, '<hex>');
 }
 /* eslint-enable security/detect-unsafe-regex */
+
+/**
+ * Build a firehose-safe `breadcrumbs` context value from an init breadcrumb
+ * trail. Two guarantees, both load-bearing:
+ *
+ *   1. PII-free. The `auth:` breadcrumb embeds `user=<email>`, but the telemetry
+ *      firehose is PII-free by contract (the Lambda allowlist omits
+ *      `family_email`). Every email-shaped token is replaced with `<email>`. The
+ *      pattern mirrors the repo's own email shape (`src/utils/email.ts`:
+ *      `[^\s@]+@[^\s@]+\.[^\s@]+`); the extra `|` exclusion stops a match from
+ *      spanning the ` | ` crumb separator, and the `@` exclusion stops it
+ *      spanning two addresses. Linear-time, no nested quantifiers.
+ *   2. Tail-preserving. `redactContext` truncates strings >MAX_STRING_LEN keeping
+ *      the FIRST 200 chars — which would drop the failure point (always the last
+ *      crumb). So we keep the TAIL here, sized to exactly MAX_STRING_LEN so the
+ *      downstream `> MAX_STRING_LEN` guard stays false and won't re-truncate.
+ *
+ * Pure, synchronous, never throws. The on-device error modal still renders the
+ * FULL (un-redacted) trail — this redaction applies only to the telemetry-bound
+ * context value.
+ */
+export function breadcrumbsForReport(crumbs: string[]): string {
+  if (!crumbs || crumbs.length === 0) return '';
+  const redacted = crumbs.join(' | ').replace(/[^\s|@]+@[^\s|@]+\.[^\s|@]+/g, '<email>');
+  if (redacted.length > MAX_STRING_LEN) {
+    return '…' + redacted.slice(-(MAX_STRING_LEN - 1));
+  }
+  return redacted;
+}
 
 // ─── Environment / build ─────────────────────────────────────────────────────
 
@@ -264,6 +302,17 @@ export function enrichAndRedact(
     const conn = (navigator as { connection?: { effectiveType?: string } }).connection;
     if (conn?.effectiveType) raw.connection_type = conn.effectiveType;
     raw.browser = navigator.userAgent.slice(0, MAX_STRING_LEN);
+  }
+
+  // Web Storage availability — the iPhone onboarding blocker (2026-06-20) is a
+  // storage *access* failure the old diagnostics couldn't see. Flat scalar from
+  // the single diagnostics probe; independently guarded so a probe fault never
+  // drops the rest of the context.
+  try {
+    const dev = getDeviceInfo();
+    raw.web_storage = `ls=${dev.localStorage},ss=${dev.sessionStorage}`;
+  } catch (e) {
+    console.warn('[diagnosticContext] web_storage enrich failed', e);
   }
 
   return redactContext(raw);

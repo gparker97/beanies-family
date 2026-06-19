@@ -73,6 +73,11 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'visibility_state',
   'refresh_token_age_ms',
   'member_id_tail',
+  // Web Storage availability + email-redacted init breadcrumbs (added
+  // 2026-06-20 for the iPhone onboarding blocker). Mirror of the client
+  // allowlist; both are PII-free (breadcrumbs redacted client-side).
+  'web_storage',
+  'breadcrumbs',
 ]);
 
 function getHeaders(event) {

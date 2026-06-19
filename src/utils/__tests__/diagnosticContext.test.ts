@@ -22,6 +22,7 @@ import {
   normalizeMessage,
   enrichAndRedact,
   getBuildVersionLabel,
+  breadcrumbsForReport,
 } from '../diagnosticContext';
 
 describe('diagnosticContext', () => {
@@ -162,6 +163,43 @@ describe('diagnosticContext', () => {
         throw new Error('pinia not ready');
       });
       expect(() => enrichAndRedact({ surface: 's' })).not.toThrow();
+    });
+
+    it('attaches a flat web_storage signal that survives redaction', () => {
+      const out = enrichAndRedact({ surface: 's' });
+      expect(typeof out.web_storage).toBe('string');
+      expect(out.web_storage).toMatch(/^ls=(true|false),ss=(true|false)$/);
+    });
+  });
+
+  describe('breadcrumbsForReport — PII-safe, tail-preserving', () => {
+    it('redacts email-shaped tokens (no raw address survives)', () => {
+      const out = breadcrumbsForReport([
+        'route: OAuthCallback',
+        'auth: needsAuth=false, user=cssoff@test.com',
+      ]);
+      expect(out).not.toContain('cssoff@test.com');
+      expect(out).toContain('<email>');
+    });
+
+    it('keeps the TAIL when the trail exceeds MAX_STRING_LEN (failure point survives)', () => {
+      const crumbs = Array.from({ length: 60 }, (_, i) => `step-${i}-padding-padding`);
+      crumbs.push('THE-FAILURE-POINT');
+      const out = breadcrumbsForReport(crumbs);
+      expect(out.length).toBeLessThanOrEqual(200);
+      expect(out.startsWith('…')).toBe(true);
+      expect(out).toContain('THE-FAILURE-POINT'); // last crumb retained, head dropped
+    });
+
+    it('returns an empty string for an empty trail', () => {
+      expect(breadcrumbsForReport([])).toBe('');
+    });
+
+    it('output survives redactContext (allowlisted, not re-truncated at exactly 200)', () => {
+      const crumbs = Array.from({ length: 60 }, (_, i) => `step-${i}-padding-padding`);
+      const value = breadcrumbsForReport(crumbs);
+      const redacted = redactContext({ breadcrumbs: value });
+      expect(redacted.breadcrumbs).toBe(value);
     });
   });
 });

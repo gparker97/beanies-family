@@ -203,6 +203,7 @@ describe('Telemetry Lambda handler', () => {
     it('matches the expected key set exactly', () => {
       const expected = [
         'action',
+        'breadcrumbs',
         'browser',
         'build_sha',
         'component',
@@ -230,6 +231,7 @@ describe('Telemetry Lambda handler', () => {
         'silent_refresh_had_refresh_token',
         'visibility_state',
         'vue_info',
+        'web_storage',
       ];
       assert.deepEqual([...ALLOWED_CONTEXT_KEYS].sort(), expected);
       assert.equal(ALLOWED_CONTEXT_KEYS.has('family_email'), false);
