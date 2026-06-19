@@ -36,7 +36,14 @@ import {
 } from '@/utils/appChrome';
 import { isPodlessRecoveryQuery, RESUME_SETUP_PATH } from '@/components/login/resumePaths';
 import { withTimeout } from '@/utils/timing';
-import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
+import {
+  hardReload,
+  isChunkLoadError,
+  readChunkAttempts,
+  writeChunkAttempts,
+  resetChunkAttempts,
+} from '@/utils/hardReload';
+import { breadcrumbsForReport } from '@/utils/diagnosticContext';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
 import ContentSkeleton from '@/components/ui/ContentSkeleton.vue';
 import BackgroundSyncBar from '@/components/common/BackgroundSyncBar.vue';
@@ -663,6 +670,19 @@ onMounted(async () => {
 
     initBreadcrumbs.push(`route: ${String(route.name ?? route.path)}`);
 
+    // OAuth callback is a pure BOUNCE route: OAuthCallbackPage.vue reads the
+    // auth code and immediately `window.location`-redirects to the returnPath,
+    // where App.vue init re-runs and `completeRedirectAuth()` consumes the code.
+    // Running heavy init here (settings → auth → dynamic imports) is not just
+    // wasted work — the page is unloading, so an in-flight `await import()` can
+    // resolve to `null` and throw (the registerGoogleAccountAssertion
+    // destructure crash seen on iPhone, 2026-06-20). Skip everything; the
+    // `finally` dismisses the spinner until the redirect lands.
+    if (route.name === 'OAuthCallback') {
+      initBreadcrumbs.push('oauth-callback: bounce route — skipping heavy init');
+      return;
+    }
+
     // Fast path: skip heavy initialization for public-only pages
     const publicOnlyPages = [
       'BeanstalkBlog',
@@ -974,11 +994,10 @@ onMounted(async () => {
       // counter — the initial nav resolves before App.vue's onMounted
       // error throws, so every load got a fresh "first attempt" budget
       // and the loop never escalated. Gated on actual boot success now.)
-      try {
-        sessionStorage.removeItem(CHUNK_RELOAD_FLAG);
-      } catch {
-        // sessionStorage unavailable — counter dies with the tab anyway.
-      }
+      // Clears both the persisted flag AND the in-memory mirror — on a device
+      // where storage throws, the mirror would otherwise strand a stale count
+      // that the next unrelated chunk error inherits.
+      resetChunkAttempts();
     } catch {
       // Doc not loaded — initialization completed but data is missing.
       // Two reasons this can happen: (a) genuine init failure (network, file
@@ -1004,7 +1023,10 @@ onMounted(async () => {
           // Recovery overlay shown to a podCreated user = data unreachable. The
           // onLoginFlowRoute guard above filters the historical false-fires.
           severity: 'critical',
-          context: { route_path: route.path },
+          context: {
+            route_path: route.path,
+            breadcrumbs: breadcrumbsForReport(initBreadcrumbs),
+          },
         });
       } else {
         console.warn(
@@ -1058,52 +1080,60 @@ onMounted(async () => {
     // Suppresses the "modal flashed several times during PWA update"
     // experience reported by greg on 2026-05-10 (iPhone, mid-update).
     if (isChunkLoadError(err)) {
-      try {
-        // Bounded retries — the previous "once-guard" version was defeated
-        // by `router.afterEach` clearing the flag on every successful
-        // navigation (which includes the initial nav that fires BEFORE
-        // App.vue's onMounted error). Result: every load was the "first
-        // attempt" → infinite silent hardReloads → page reloads faster
-        // than the user can tap the overlay → no `app.chunkRecoveryFailed`
-        // Slack alert ever fires. Caught 2026-05-13 by greg on iPhone 14
-        // Safari from a freshly-cleared baseline.
-        //
-        // Now: counter persisted in sessionStorage across the location.replace
-        // chain (same tab = same sessionStorage). Up to 3 silent hardReloads
-        // — iOS Safari's SW lifecycle quirks legitimately need 2 sometimes —
-        // then on the 4th we stop, page the Slack alert with the route +
-        // error + attempt count, and show the overlay so the user can tap
-        // "Sign out & clear data" (no longer racing the reload). Cleared
-        // by a successful boot (post-init health check passes).
-        const attempts = parseInt(sessionStorage.getItem(CHUNK_RELOAD_FLAG) ?? '0', 10) || 0;
-        const MAX_ATTEMPTS = 3;
-        if (attempts < MAX_ATTEMPTS) {
-          sessionStorage.setItem(CHUNK_RELOAD_FLAG, String(attempts + 1));
-          console.warn(
-            `[App] chunk-load symptom — hardReload attempt ${attempts + 1}/${MAX_ATTEMPTS}:`,
-            err
-          );
-          chunkReloadInProgress = true;
-          void hardReload();
-          return;
-        }
-        console.error(
-          `[App] chunk-load recovery exhausted after ${attempts} attempts — surfacing overlay:`,
+      // Bounded retries via the throw-safe counter (hardReload.ts). It used to
+      // read sessionStorage inline inside a try/catch whose empty `catch`
+      // SWALLOWED a storage throw — silently skipping both `hardReload()` and
+      // the Slack page (the iPhone onboarding blocker, 2026-06-20). The
+      // accessors now fall back to an in-memory mirror, so a throwing
+      // `sessionStorage` no longer abandons recovery, and the `critical` report
+      // below is always reached when exhausted. Up to 3 silent hardReloads —
+      // iOS Safari's SW lifecycle legitimately needs 2 sometimes — then we stop,
+      // page Slack, and show the overlay. Counter cleared by a successful boot.
+      const attempts = readChunkAttempts();
+      const MAX_ATTEMPTS = 3;
+      if (attempts < MAX_ATTEMPTS) {
+        writeChunkAttempts(attempts + 1);
+        console.warn(
+          `[App] chunk-load symptom — hardReload attempt ${attempts + 1}/${MAX_ATTEMPTS}:`,
           err
         );
-        reportError({
-          surface: 'app.chunkRecoveryFailed',
-          message: `Chunk-load recovery exhausted after ${attempts} attempts: ${err instanceof Error ? err.message : String(err)}`,
-          error: err,
-          // Recovery exhausted (overlay shown, user stuck on a broken bundle) —
-          // the comment above says to page; under the gate that means critical.
-          severity: 'critical',
-          context: { route_path: route.fullPath },
-        });
-      } catch {
-        // sessionStorage unavailable (Safari private mode etc.) — fall
-        // through to the overlay so the user has at least a Reload button.
+        chunkReloadInProgress = true;
+        void hardReload();
+        return;
       }
+      console.error(
+        `[App] chunk-load recovery exhausted after ${attempts} attempts — surfacing overlay:`,
+        err
+      );
+      reportError({
+        surface: 'app.chunkRecoveryFailed',
+        message: `Chunk-load recovery exhausted after ${attempts} attempts: ${err instanceof Error ? err.message : String(err)}`,
+        error: err,
+        // Recovery exhausted (overlay shown, user stuck on a broken bundle) —
+        // the comment above says to page; under the gate that means critical.
+        severity: 'critical',
+        context: {
+          route_path: route.fullPath,
+          breadcrumbs: breadcrumbsForReport(initBreadcrumbs),
+        },
+      });
+    } else {
+      // Non-chunk init failure — previously emitted NO telemetry, so onboarding
+      // crashes for OTHER users were invisible server-side. Capture it in the
+      // firehose (90-day retention, queryable) at `error` severity (no Slack
+      // page — init failures vary; we want the record, not a pager storm). The
+      // breadcrumb trail is email-redacted + tail-trimmed for the PII-free
+      // firehose; the full trail still renders in the on-device overlay below.
+      reportError({
+        surface: 'app.initFailed',
+        message: `App init failed: ${err instanceof Error ? err.message : String(err)}`,
+        error: err,
+        severity: 'error',
+        context: {
+          route_path: route.fullPath,
+          breadcrumbs: breadcrumbsForReport(initBreadcrumbs),
+        },
+      });
     }
     const message = err instanceof Error ? err.message : String(err);
     initError.value = message;
@@ -1133,15 +1163,13 @@ function handleReload() {
   // cached `index.html` that referenced the dead chunk in the first place,
   // putting the user right back on the error overlay.
   //
-  // Also clear the once-guard: the auto-recovery sets it to prevent an
+  // Also clear the retry counter: the auto-recovery increments it to prevent an
   // infinite reload loop, but a user-driven click is an explicit "try the
   // recovery path again" signal — it shouldn't fall through to the overlay
-  // a second time because the gentle attempt was already counted.
-  try {
-    sessionStorage.removeItem(CHUNK_RELOAD_FLAG);
-  } catch {
-    // sessionStorage unavailable (Safari private mode etc.) — proceed anyway.
-  }
+  // a second time because the gentle attempts were already counted.
+  // `resetChunkAttempts()` clears both the persisted flag and the in-memory
+  // mirror, and is itself throw-safe.
+  resetChunkAttempts();
   void hardReload();
 }
 

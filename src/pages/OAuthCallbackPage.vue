@@ -64,7 +64,11 @@ onMounted(() => {
       surface: 'oauth.redirectStateLost',
       message:
         'OAuth redirect returned with a code but no sessionStorage state — likely Private Browsing blocked storage during the redirect',
-      severity: 'warning',
+      // Critical, not warning: a code-in-hand-but-state-lost HARD-BLOCKS
+      // onboarding for a real (even non-private) user — it must page Slack, not
+      // die in telemetry. The device's `web_storage` context distinguishes
+      // throwing/blocked storage from a wipe (2026-06-20).
+      severity: 'critical',
     });
     window.location.href = '/welcome?authError=storage';
     return;

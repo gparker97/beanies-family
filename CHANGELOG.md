@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-20
+
+### Fixed
+
+- **Stopped a crash that could hit the screen right after the Google sign-in step.** The page you bounce through on the way back from Google was doing far more work than it needed to — and on some phones (notably iPhone) that work could fail mid-redirect and throw up the "oh no, the beans spilled" error. That bounce page now does only its one job (hand you back to the app), so the crash can't happen there.
+
+### Changed
+
+- **Better behind-the-scenes diagnostics for sign-in and onboarding problems.** When something goes wrong setting up or signing in, the app now records whether your browser's local storage is actually working (a common, hard-to-see cause of iPhone onboarding failures) and includes a short trail of what it was doing — so genuine blockers get flagged to the team instead of failing silently. No change to anything you see or do; this only improves how we catch and fix real issues.
+
 ## 2026-06-19
 
 ### Fixed
