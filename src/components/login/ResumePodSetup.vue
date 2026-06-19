@@ -49,7 +49,13 @@ import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
 import { confirm } from '@/composables/useConfirm';
-import { consumeResumeReason } from '@/components/login/resumePaths';
+import {
+  consumeResumeReason,
+  hasPendingCreate,
+  loadPendingCreate,
+  consumePendingCreatePassword,
+  clearPendingCreate,
+} from '@/components/login/resumePaths';
 
 const { t } = useTranslation();
 const authStore = useAuthStore();
@@ -123,6 +129,40 @@ onMounted(async () => {
   // Pre-fill the name field. `authStore.displayName` resolves to the cached
   // `currentUser.displayName` (set by signUp) when the doc isn't loaded yet.
   ownerName.value = authStore.displayName;
+
+  // ── Create-resume fast-path (2026-06-19) ──────────────────────────────────
+  // If we just returned from the iOS/native Drive redirect MID-create-wizard,
+  // finish the create directly instead of dropping into the generic recovery
+  // flow (which would re-ask for the password). Only when we hold a fresh token
+  // (a successful consent return). Restore the owner name + the atomically-
+  // consumed password (and mirror confirmPassword so the existing
+  // `validateIdentity()` inside handleIdentityNext passes), then reuse the
+  // EXISTING handleIdentityNext() chain (rehydrateOwnerDoc → finishOnDrive →
+  // finalizePod → createNewFile, incl. adopt-existing collision recovery). A
+  // single try/finally clears the pending blob on EVERY resolution so no
+  // password is ever left at rest.
+  if (hasPendingCreate()) {
+    if (isTokenValid()) {
+      const pending = loadPendingCreate();
+      const pw = consumePendingCreatePassword(); // atomic read-and-delete
+      if (pw) {
+        if (pending?.ownerName) ownerName.value = pending.ownerName;
+        password.value = pw;
+        confirmPassword.value = pw;
+        try {
+          await handleIdentityNext();
+        } finally {
+          clearPendingCreate();
+        }
+        return; // create-resume handled — skip the generic probe
+      }
+    }
+    // No valid token (consent denied / token lapsed) or no stored password:
+    // abandon the silent resume and fall through to the generic flow (which
+    // surfaces any consent hint + lets the user reconnect). Never leave the
+    // password at rest.
+    clearPendingCreate();
+  }
 
   await runProbe();
 

@@ -22,6 +22,7 @@ import { useToday } from '@/composables/useToday';
 import { isDocLoaded } from '@/services/automerge/docService';
 import { getAllReleaseNotes } from '@/content/release-notes';
 import { whatsNewId } from '@/utils/notifications';
+import { consumeFamilyJustCreated } from '@/utils/newFamilyFlag';
 
 const LAST_SEEN_WHATS_NEW_KEY = 'beanies-lastSeenWhatsNew';
 
@@ -106,6 +107,16 @@ export function useNotifications(): void {
       if (!isReady) return;
       if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('e2e_auto_auth')) return;
       runWhatsNewMigrationOnce();
+      // Brand-new family (just created this session): seed ALL existing releases
+      // as read so the what's-new drawer does NOT auto-open for a user who never
+      // not-had those features (2026-06-19). MUST run before openToLatestAutoOpen
+      // below. Consumed once; returning users (any of the 4 load paths) never set
+      // the flag, so their genuine-update auto-open is unaffected.
+      if (consumeFamilyJustCreated()) {
+        for (const release of getAllReleaseNotes()) {
+          store.markRead(whatsNewId(release.version));
+        }
+      }
       // Issue tip + nudge BEFORE auto-open so a freshly-due community nudge is in
       // the derived list when openToLatestAutoOpen() reads it (tips don't auto-open).
       beanTips.ensureTodayTipIssued();

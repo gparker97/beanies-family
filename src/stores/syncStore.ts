@@ -28,6 +28,7 @@ import { useSyncHighlightStore } from './syncHighlightStore';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
 import { beginDriveAuthRedirectIfNeeded, RESUME_SETUP_PATH } from '@/services/sync/connectStorage';
+import { markFamilyJustCreated } from '@/utils/newFamilyFlag';
 import { features } from '@/config/features';
 import { downloadAsFile } from '@/services/sync/fileSync';
 import * as registry from '@/services/registry/registryService';
@@ -1287,6 +1288,11 @@ export const useSyncStore = defineStore('sync', () => {
       //    pod exists and the app is safe to enter".
       lastSync.value = toISODateString(new Date());
       useAuthStore().markPodCreated();
+      // Brand-new family: flag it so the notifications watcher seeds the
+      // what's-new read-state and DOESN'T pop a spotlight drawer for a user
+      // who never not-had those features (2026-06-19). Decoupled one-shot flag
+      // (no notificationsStore import here); consumed once in useNotifications.
+      markFamilyJustCreated();
       const providerType = syncService.getProviderType();
       const storageLabel =
         providerType === 'google_drive'
