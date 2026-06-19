@@ -24,6 +24,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
+import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 import {
   RESUME_LOAD_DRIVE,
   isPodlessRecoveryQuery,
@@ -481,12 +482,30 @@ async function handleFamilySelected(payload: {
         // cards, no file picker); otherwise the generic provider+file picker.
         const cfg = payload.providerConfig;
         if (loadResult.reason === 'auth' && cfg?.type === 'google_drive' && cfg.driveFileId) {
-          reconnectDriveFile.value = {
-            fileId: cfg.driveFileId,
-            fileName: cfg.driveFileName ?? `${payload.name}.beanpod`,
-            familyName: payload.name,
-          };
-          activeView.value = 'load-pod';
+          // Silent reconnect BEFORE prompting (2026-06-19, cluster 2):
+          // syncStore.initialize() already restored the refresh token, but the
+          // cold-start silent refresh can fail/time out on the first try and
+          // surface a needless reconnect prompt even though data wasn't cleared.
+          // Retry silently; on success route into the normal auto-load path
+          // (which reads the file + prompts for password/biometric as usual).
+          const recovered = await tryReconnectSilently(syncStore.providerAccountEmail ?? undefined);
+          if (recovered) {
+            autoLoadPod.value = true;
+            needsPermissionGrant.value = false;
+            biometricDeclined.value = false;
+            loadErrorProviderHint.value = toProviderHint(cfg);
+            activeView.value = 'load-pod';
+          } else {
+            console.warn(
+              '[LoginPage] welcome-back: silent reconnect failed — showing focused reconnect'
+            );
+            reconnectDriveFile.value = {
+              fileId: cfg.driveFileId,
+              fileName: cfg.driveFileName ?? `${payload.name}.beanpod`,
+              familyName: payload.name,
+            };
+            activeView.value = 'load-pod';
+          }
         } else {
           enterGenericLoadFallback(toProviderHint(cfg));
         }

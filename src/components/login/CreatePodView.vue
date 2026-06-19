@@ -17,8 +17,9 @@ import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
 import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
+import { savePendingCreate, clearPendingCreate } from '@/components/login/resumePaths';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
-import { isUserCancellation } from '@/services/google/googleAuth';
+import { isUserCancellation, shouldUseRedirectAuth } from '@/services/google/googleAuth';
 import { slackNotify } from '@/utils/slackNotify';
 import { reportError } from '@/utils/errorReporter';
 import { formatBirthdayShort } from '@/utils/date';
@@ -295,15 +296,29 @@ async function handleChooseGoogleDriveStorage() {
   formError.value = null;
   driveResultError.value = null;
 
+  // On a redirect surface (iOS / PWA / native) connecting Drive does a full-page
+  // redirect that destroys this component's state. Persist the in-progress
+  // create-wizard state (incl. password) FIRST so ResumePodSetup can resume the
+  // create cleanly on return instead of re-asking for the password (2026-06-19).
+  // The `redirecting` flag keeps the pending state ONLY when we actually navigate
+  // away; any inline outcome (silent reconnect succeeded, connected, failed,
+  // throw) clears it in the finally so nothing is left at rest.
+  let redirecting = false;
   try {
+    if (shouldUseRedirectAuth()) {
+      savePendingCreate({ ownerName: name.value }, password.value);
+    }
     const r = await connectDriveStorage(familyName.value || 'my-family', {
       googleEmail: email.value || undefined,
       activeFamilyId: familyContextStore.activeFamilyId,
     });
     // On iOS / installed PWAs this kicks off a full-page redirect to Google —
     // the page is navigating away; there's nothing more to do here. We resume
-    // on return via `/welcome?resume=setup` → ResumePodSetup.
-    if (r.status === 'redirecting') return;
+    // on return via `/welcome?resume=setup` → ResumePodSetup (create fast-path).
+    if (r.status === 'redirecting') {
+      redirecting = true;
+      return;
+    }
 
     if (r.status === 'connected') {
       storageSaved.value = true;
@@ -378,6 +393,9 @@ async function handleChooseGoogleDriveStorage() {
       showDriveResultModal.value = true; // failure state — Try again / Use a local file
     }
   } finally {
+    // Keep the pending create state ONLY when we actually redirected (the resume
+    // needs it); clear it on every inline outcome so no password is left at rest.
+    if (!redirecting) clearPendingCreate();
     isSavingStorage.value = false;
   }
 }

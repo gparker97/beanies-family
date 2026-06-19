@@ -18,6 +18,7 @@ import {
   shouldUseRedirectAuth,
   isTokenValid,
 } from '@/services/google/googleAuth';
+import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 import { supportsFileSystemAccess } from '@/services/sync/capabilities';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -585,11 +586,21 @@ async function openDrivePicker(opts: { forceNewAccount?: boolean; isResume?: boo
 
   // Resume after the deep link: a failed exchange still routes to LOAD_DRIVE_PATH
   // (handleNativeAuthRedirect always onComplete()s), so we can land here with no
-  // token. Surface it directly — do NOT fall through to beginDriveAuthRedirect,
-  // which would see `!isTokenValid()` and redirect again (consent loop).
+  // IN-MEMORY token. Before surfacing the error + looping, try a silent reconnect
+  // with the preserved refresh token — on the first post-consent return the token
+  // may be committed in IndexedDB but not yet in memory (the bounce greg hit,
+  // 2026-06-19, cluster 2). `tryReconnectSilently` checks isTokenValid first and
+  // recovers the local/doc refresh token; it never redirects, so no consent loop.
   if (opts.isResume && !isTokenValid()) {
-    formError.value = t('googleDrive.authFailed');
-    return;
+    const recovered = await tryReconnectSilently(syncStore.providerAccountEmail ?? undefined);
+    if (!recovered || !isTokenValid()) {
+      console.warn(
+        '[LoadPodView] resume: no in-memory token and silent reconnect failed — surfacing reconnect'
+      );
+      formError.value = t('googleDrive.authFailed');
+      return;
+    }
+    // Recovered silently — fall through to list files with the now-valid token.
   }
 
   // Redirect surface + (no token OR switch-account) → bounce out; the resume
