@@ -20,6 +20,8 @@ interface ImportMetaEnv {
   readonly VITE_AI_EXTRACT_API_KEY: string | undefined;
   /** Set automatically by Vite at build time (CI). Not user-configurable. */
   readonly VITE_BUILD_SHA: string | undefined;
+  /** ISO build timestamp, set by Vite at build time. Not user-configurable. */
+  readonly VITE_BUILD_TIME: string | undefined;
 }
 
 interface ImportMeta {

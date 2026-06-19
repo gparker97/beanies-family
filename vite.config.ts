@@ -231,5 +231,12 @@ export default defineConfig({
     // `import.meta.env.VITE_BUILD_SHA` (the errorReporter ships this in
     // every Slack message so we can correlate bugs to specific deploys).
     'import.meta.env.VITE_BUILD_SHA': JSON.stringify(process.env.VITE_BUILD_SHA || 'dev'),
+    // Build timestamp — evaluated when Vite builds. In CI that is the deploy
+    // time; locally it's the local build time. Paired with the SHA to show a
+    // human-readable "which version am I on?" marker on the welcome gate. No
+    // CI wiring needed: `new Date()` runs at build time on the runner.
+    'import.meta.env.VITE_BUILD_TIME': JSON.stringify(
+      process.env.VITE_BUILD_TIME || new Date().toISOString()
+    ),
   },
 });

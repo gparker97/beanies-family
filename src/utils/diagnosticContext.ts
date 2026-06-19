@@ -155,6 +155,39 @@ export function getBuildSha(): string {
   return (import.meta.env?.VITE_BUILD_SHA as string | undefined) ?? 'dev';
 }
 
+/** ISO build timestamp injected at build time, or null if unavailable. */
+export function getBuildTime(): string | null {
+  if (typeof import.meta === 'undefined') return null;
+  return (import.meta.env?.VITE_BUILD_TIME as string | undefined) ?? null;
+}
+
+/**
+ * A subtle, human-readable "which version am I on?" marker for the welcome gate
+ * (2026-06-19). Format: `<short-sha> · <DD Mon YYYY>` (e.g. `41f5353 · 19 Jun 2026`).
+ * The short SHA is the first 7 chars of `VITE_BUILD_SHA` — the SAME value the
+ * error reporter ships in the `Build:` field of #beanies-errors, so a Slack
+ * alert can be matched directly against the running build. A local/dev build
+ * (no injected SHA) returns `dev`. Increments on every deploy (new commit +
+ * new build time).
+ */
+export function getBuildVersionLabel(): string {
+  const sha = getBuildSha();
+  const shortSha = sha === 'dev' ? 'dev' : sha.slice(0, 7);
+  const iso = getBuildTime();
+  if (iso) {
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) {
+      const date = d.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+      return `${shortSha} · ${date}`;
+    }
+  }
+  return shortSha;
+}
+
 // ─── Stack extraction ────────────────────────────────────────────────────────
 
 export function extractStack(err: unknown): string | null {

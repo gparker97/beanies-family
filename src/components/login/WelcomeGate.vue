@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
 import { splitAroundAccent } from '@/utils/splitAroundAccent';
+import { getBuildVersionLabel } from '@/utils/diagnosticContext';
 import LoginChoiceCard from './LoginChoiceCard.vue';
 
 const { t } = useTranslation();
+
+// Subtle build marker so we can tell which deployed bundle is running (matches
+// the `Build:` SHA in #beanies-errors). Computed once — the build is static.
+const buildVersion = getBuildVersionLabel();
 
 // Marketing homepage lives on the Astro site at the apex (post-Phase-C).
 // DEV points at the local Astro dev server (4321) for parity; in prod
@@ -258,5 +263,14 @@ function promptParts() {
         {{ t('homepage.learnMore') }}
       </a>
     </div>
+
+    <!-- Subtle build/version marker. Lets us confirm which deployed bundle is
+         running on a device (e.g. an iPhone PWA that may be serving a stale
+         cached version). The short SHA matches the `Build:` field in the error
+         reporter, so a Slack alert can be cross-referenced against the running
+         build. Decorative/diagnostic value — not translated. -->
+    <p class="mt-1 text-center text-xs tracking-wide text-gray-400 select-all dark:text-gray-600">
+      {{ buildVersion }}
+    </p>
   </div>
 </template>

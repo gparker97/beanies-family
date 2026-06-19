@@ -17,7 +17,12 @@ vi.mock('@/stores/syncStore', () => ({
   })),
 }));
 
-import { redactContext, normalizeMessage, enrichAndRedact } from '../diagnosticContext';
+import {
+  redactContext,
+  normalizeMessage,
+  enrichAndRedact,
+  getBuildVersionLabel,
+} from '../diagnosticContext';
 
 describe('diagnosticContext', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
@@ -30,6 +35,31 @@ describe('diagnosticContext', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+  });
+
+  describe('getBuildVersionLabel — welcome-gate build marker', () => {
+    it('formats short SHA + date and matches the error-reporter Build prefix', () => {
+      vi.stubEnv('VITE_BUILD_SHA', '41f5353fdeadbeef');
+      vi.stubEnv('VITE_BUILD_TIME', '2026-06-19T09:33:00Z');
+      const label = getBuildVersionLabel();
+      expect(label).toMatch(/^41f5353 · /); // short SHA = first 7, matches Slack Build prefix
+      expect(label).toContain('Jun 2026');
+    });
+
+    it('falls back to the short SHA alone when the build time is missing', () => {
+      vi.stubEnv('VITE_BUILD_SHA', '41f5353fdeadbeef');
+      vi.stubEnv('VITE_BUILD_TIME', '');
+      expect(getBuildVersionLabel()).toBe('41f5353');
+    });
+
+    it('shows "dev" for a local build (Vite define yields "dev")', () => {
+      // The vite.config define resolves `VITE_BUILD_SHA` to the literal 'dev'
+      // for local builds (`process.env.VITE_BUILD_SHA || 'dev'`), so that's the
+      // realistic local value — not an empty string.
+      vi.stubEnv('VITE_BUILD_SHA', 'dev');
+      vi.stubEnv('VITE_BUILD_TIME', '');
+      expect(getBuildVersionLabel()).toBe('dev');
+    });
   });
 
   describe('redactContext — privacy contract', () => {
