@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { isChunkLoadError } from './hardReload';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import {
+  isChunkLoadError,
+  readChunkAttempts,
+  writeChunkAttempts,
+  resetChunkAttempts,
+  CHUNK_RELOAD_FLAG,
+} from './hardReload';
 
 describe('isChunkLoadError', () => {
   it('matches Chrome/Edge dynamic import failure', () => {
@@ -100,5 +106,61 @@ describe('isChunkLoadError', () => {
     expect(isChunkLoadError(null)).toBe(false);
     expect(isChunkLoadError(undefined)).toBe(false);
     expect(isChunkLoadError('Failed to fetch dynamically imported module')).toBe(true);
+  });
+});
+
+describe('chunk-reload counter (throw-safe accessors)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetChunkAttempts();
+  });
+
+  it('round-trips through sessionStorage when storage works', () => {
+    resetChunkAttempts();
+    expect(readChunkAttempts()).toBe(0);
+    writeChunkAttempts(1);
+    expect(window.sessionStorage.getItem(CHUNK_RELOAD_FLAG)).toBe('1');
+    expect(readChunkAttempts()).toBe(1);
+    writeChunkAttempts(2);
+    expect(readChunkAttempts()).toBe(2);
+  });
+
+  it('resetChunkAttempts clears both stores', () => {
+    writeChunkAttempts(3);
+    resetChunkAttempts();
+    expect(window.sessionStorage.getItem(CHUNK_RELOAD_FLAG)).toBeNull();
+    expect(readChunkAttempts()).toBe(0);
+  });
+
+  it('falls back to the in-memory mirror when sessionStorage throws', () => {
+    resetChunkAttempts();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // A storage area whose every access throws — the iOS blocked-storage case.
+    const throwingStorage = {
+      getItem: () => {
+        throw new DOMException('SecurityError');
+      },
+      setItem: () => {
+        throw new DOMException('SecurityError');
+      },
+      removeItem: () => {
+        throw new DOMException('SecurityError');
+      },
+    } as unknown as Storage;
+    vi.spyOn(window, 'sessionStorage', 'get').mockReturnValue(throwingStorage);
+    expect(readChunkAttempts()).toBe(0); // nothing written yet → memory 0
+    writeChunkAttempts(1);
+    expect(readChunkAttempts()).toBe(1); // read falls back to memory
+    writeChunkAttempts(2);
+    expect(readChunkAttempts()).toBe(2);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('readChunkAttempts returns max(persisted, memory)', () => {
+    resetChunkAttempts();
+    writeChunkAttempts(2); // memory=2, storage='2'
+    // Simulate a stale-but-lower persisted value; memory should win.
+    window.sessionStorage.setItem(CHUNK_RELOAD_FLAG, '1');
+    expect(readChunkAttempts()).toBe(2);
   });
 });

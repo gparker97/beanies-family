@@ -138,3 +138,53 @@ export function isChunkLoadError(err: unknown): boolean {
  * a tab carrying the old value just starts at attempt 1 of N — graceful.
  */
 export const CHUNK_RELOAD_FLAG = 'chunkReloadAttempted';
+
+/**
+ * In-memory mirror of the chunk-reload attempt counter.
+ *
+ * `sessionStorage` is the primary store (survives the `location.replace` chain
+ * in the same tab). But on devices where Web Storage THROWS on access — the
+ * iPhone onboarding blocker, 2026-06-20 — a bare `sessionStorage.getItem` in the
+ * recovery branch threw and was swallowed, silently skipping BOTH `hardReload()`
+ * AND the `app.chunkRecoveryFailed` Slack page. This module-level mirror keeps
+ * the counter usable when storage throws, so recovery still escalates and still
+ * pages. Reset by a full document load (same lifetime as the persisted value).
+ *
+ * Shape mirrors `errorReporter`'s `getStoredFiredAt`/`setStoredFiredAt`: prefer
+ * storage, fall back to memory, never throw, warn on degrade.
+ */
+let chunkAttemptsMemory = 0;
+
+/** Current attempt count — `max(persisted, in-memory)`, never throws. */
+export function readChunkAttempts(): number {
+  try {
+    const raw = sessionStorage.getItem(CHUNK_RELOAD_FLAG);
+    if (raw != null) {
+      const parsed = parseInt(raw, 10) || 0;
+      return Math.max(parsed, chunkAttemptsMemory);
+    }
+  } catch (e) {
+    console.warn('[hardReload] chunk counter read failed — using memory fallback', e);
+  }
+  return chunkAttemptsMemory;
+}
+
+/** Persist the attempt count (memory always; storage best-effort). */
+export function writeChunkAttempts(n: number): void {
+  chunkAttemptsMemory = n;
+  try {
+    sessionStorage.setItem(CHUNK_RELOAD_FLAG, String(n));
+  } catch (e) {
+    console.warn('[hardReload] chunk counter persist failed — memory fallback only', e);
+  }
+}
+
+/** Clear the attempt counter on both stores (called on successful boot). */
+export function resetChunkAttempts(): void {
+  chunkAttemptsMemory = 0;
+  try {
+    sessionStorage.removeItem(CHUNK_RELOAD_FLAG);
+  } catch (e) {
+    console.warn('[hardReload] chunk counter reset failed', e);
+  }
+}
