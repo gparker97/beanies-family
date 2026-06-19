@@ -785,12 +785,23 @@ onMounted(async () => {
         const msg = (e as Error).message;
         console.warn('[App] completeRedirectAuth failed during init:', msg);
         initBreadcrumbs.push(`auth: redirect-auth completion failed: ${msg}`);
+        // Granular-consent denial (drive.file unchecked) is a SPECIFIC,
+        // user-fixable failure (2026-06-19, finding 3) — stash a reason so the
+        // resume-setup screen explains "you must allow file access" instead of
+        // a silent route the user retries blindly. Reported at warning (not
+        // critical): it's user action, not a code fault.
+        const { DriveConsentDeniedError } = await import('@/types/sync');
+        const isConsentDenied = e instanceof DriveConsentDeniedError;
+        if (isConsentDenied) {
+          const { setResumeReason } = await import('@/components/login/resumePaths');
+          setResumeReason('drive-consent');
+        }
         reportError({
           surface: 'app.redirectAuthCompletion',
           message: `Redirect-auth code exchange failed during app init: ${msg}`,
           error: e,
-          severity: 'critical',
-          context: { route_path: route.path },
+          severity: isConsentDenied ? 'warning' : 'critical',
+          context: { route_path: route.path, consent_denied: isConsentDenied },
         });
       }
 

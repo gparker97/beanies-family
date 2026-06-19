@@ -50,3 +50,38 @@ export const RESUME_SETUP_PATH = `/welcome?resume=${RESUME_SETUP}`;
 export function isPodlessRecoveryQuery(resume: unknown): boolean {
   return resume === RESUME_SETUP || resume === RESUME_LOAD_DRIVE;
 }
+
+/**
+ * Why the resume-setup screen was reached, surfaced as an actionable hint
+ * (2026-06-19, finding 3). Set just before App.vue routes a podless session to
+ * resume-setup; read+cleared once by the screen on mount.
+ *
+ * - `drive-consent` — the granular consent screen came back WITHOUT `drive.file`
+ *   (the user unchecked file access). Without this, the user was silently routed
+ *   with no explanation and retried blindly.
+ *
+ * sessionStorage-backed (survives the full-page OAuth redirect) rather than a
+ * URL param, so it doesn't have to thread through the shared `RESUME_SETUP_PATH`
+ * redirect. Best-effort: a storage failure just means no hint is shown.
+ */
+export type ResumeSetupReason = 'drive-consent';
+const RESUME_REASON_KEY = 'beanies:resume-reason';
+
+export function setResumeReason(reason: ResumeSetupReason): void {
+  try {
+    sessionStorage.setItem(RESUME_REASON_KEY, reason);
+  } catch {
+    // sessionStorage unavailable (private mode / disabled) — the hint is
+    // best-effort; the recovery screen still works without it.
+  }
+}
+
+export function consumeResumeReason(): ResumeSetupReason | null {
+  try {
+    const v = sessionStorage.getItem(RESUME_REASON_KEY);
+    if (v) sessionStorage.removeItem(RESUME_REASON_KEY);
+    return v === 'drive-consent' ? 'drive-consent' : null;
+  } catch {
+    return null;
+  }
+}

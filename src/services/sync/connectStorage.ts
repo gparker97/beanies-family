@@ -22,7 +22,8 @@ import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvid
 import * as syncService from '@/services/sync/syncService';
 import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
 import { withTimeout } from '@/utils/timing';
-import { FileNameCollisionError } from '@/types/sync';
+import { detectFileVersion } from '@/services/sync/fileSync';
+import { FileNameCollisionError, CollisionCheckUnavailableError } from '@/types/sync';
 
 // `RESUME_SETUP_PATH` now lives in the lightweight `resumePaths.ts` (so it can
 // be imported without this module's heavy Drive/sync graph). Imported for this
@@ -89,6 +90,9 @@ export interface StorageConnectFailed {
    * Discriminator for failure classes the caller may want to surface with
    * a focused message:
    * - `name-collision` — Drive folder already has a `.beanpod` with this name.
+   * - `collision-check-unavailable` — could NOT verify whether a same-name file
+   *   exists (transient Drive list failure). Distinct from "no collision": we
+   *   refused to create blindly to avoid a second orphan. Retryable.
    * - `unsupported-browser` — local files need the File System Access API
    *   (Chromium-only); this browser (e.g. Firefox/Safari) can't do it, so a
    *   retry is futile. Steer the user to Google Drive (works everywhere) or
@@ -96,9 +100,17 @@ export interface StorageConnectFailed {
    * Other failures pass through with no `errorKind` set and the caller shows
    * the generic error.
    */
-  errorKind?: 'name-collision' | 'unsupported-browser';
-  /** Set when `errorKind === 'name-collision'`. */
-  collisionFileId?: string;
+  errorKind?: 'name-collision' | 'collision-check-unavailable' | 'unsupported-browser';
+  /**
+   * Present iff `errorKind === 'name-collision'`. Grouped into one object
+   * (rather than loose `collision*` siblings) so the failure shape stays
+   * legible as the adopt-existing recovery reads it. `ownedByCurrentAccount`
+   * comes from the cheap `ownedByMe` file metadata — NO decrypt here (that
+   * lives in `resolveExistingBeanpod`, the single decrypt-to-classify site).
+   */
+  collision?: { fileId: string; ownedByCurrentAccount: boolean };
+  /** Set on transient/verify failures the caller may retry (e.g. collision-check-unavailable). */
+  retryable?: boolean;
 }
 /** A full-page redirect to Google is in flight; nothing after this runs. */
 export interface StorageRedirecting {
@@ -151,15 +163,102 @@ export async function connectDriveStorage(
     return { status: 'connected', type: 'google_drive' };
   } catch (e) {
     if (e instanceof FileNameCollisionError) {
+      // Hand the caller the grouped collision metadata (no decrypt here — that
+      // lives in `resolveExistingBeanpod`). The adopt-existing recovery reads
+      // `collision.ownedByCurrentAccount` to decide adopt vs. reject.
       return {
         status: 'failed',
         error: e.message,
         errorKind: 'name-collision',
-        collisionFileId: e.existingFileId,
+        collision: { fileId: e.existingFileId, ownedByCurrentAccount: e.ownedByCurrentAccount },
+      };
+    }
+    if (e instanceof CollisionCheckUnavailableError) {
+      // We could not verify the user's Drive for existing files, so we refused
+      // to create blindly (avoiding a second orphan). Retryable, not fatal.
+      return {
+        status: 'failed',
+        error: e.message,
+        errorKind: 'collision-check-unavailable',
+        retryable: true,
       };
     }
     return { status: 'failed', error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/**
+ * Outcome of classifying a same-name `.beanpod` collision during onboarding —
+ * the single decrypt/inspect site for the adopt-existing recovery (2026-06-19).
+ *
+ * - `adopt-stub` — the file is the authenticating account's OWN empty `{}`
+ *   placeholder from a prior aborted attempt. Safe to reuse as the create
+ *   target; the caller installs it via `adoptDriveStub` and continues creating.
+ * - `adopt-existing` — the file is owned but holds a REAL `.beanpod` envelope.
+ *   The caller confirms with the user, then loads it (never creates over it).
+ * - `reject-different-account` — not owned by the current account. Never adopt;
+ *   the caller shows the "pick a different name" guidance.
+ */
+export type ExistingBeanpodResolution =
+  | { kind: 'adopt-stub'; fileId: string }
+  | { kind: 'adopt-existing'; fileId: string }
+  | { kind: 'reject-different-account' };
+
+/**
+ * Classify an owned-vs-not / stub-vs-populated `.beanpod` collision.
+ *
+ * Distinguishes the empty `{}` placeholder `createNew` writes (an orphan from
+ * an aborted attempt) from a real V4 envelope WITHOUT decrypting — `'{}'` vs a
+ * V4 envelope is structural, so this sidesteps the "orphan encrypted with a
+ * different key" risk entirely. ANY failure to read/inspect falls SAFE to
+ * `adopt-existing` (confirm-before-open) and is never re-thrown — a throw
+ * escaping here would re-trap the user in the collision loop this fix removes.
+ */
+export async function resolveExistingBeanpod(collision: {
+  fileId: string;
+  ownedByCurrentAccount: boolean;
+}): Promise<ExistingBeanpodResolution> {
+  if (!collision.ownedByCurrentAccount) return { kind: 'reject-different-account' };
+  try {
+    // Read-only probe. `fromExisting` does NOT register a flush target
+    // (finding 11), so inspecting here can't write anything back.
+    const probe = GoogleDriveProvider.fromExisting(collision.fileId, '(collision-probe).beanpod');
+    const text = await probe.read();
+    return isStubBeanpod(text)
+      ? { kind: 'adopt-stub', fileId: collision.fileId }
+      : { kind: 'adopt-existing', fileId: collision.fileId };
+  } catch (e) {
+    // Fail safe: ask the user rather than silently adopting, and never re-throw.
+    console.warn('[connectStorage] stub probe inconclusive — treating as populated:', e);
+    return { kind: 'adopt-existing', fileId: collision.fileId };
+  }
+}
+
+/** True when the file is the empty placeholder `createNew` wrote (never populated). */
+function isStubBeanpod(text: string | null): boolean {
+  if (!text) return true; // empty / zero-byte
+  const trimmed = text.trim();
+  if (trimmed === '' || trimmed === '{}') return true; // the createNew placeholder
+  // Anything that isn't a real V4 envelope is treated as a non-pod stub.
+  return detectFileVersion(text) !== '4.0';
+}
+
+/**
+ * Adopt the current account's own orphan stub `.beanpod` as the create target:
+ * install a provider on the existing fileId so the in-flight create writes the
+ * real pod INTO it (no duplicate, no dead-end). Mirrors `connectDriveStorage`'s
+ * success tail. The caller proceeds exactly as for a fresh connect.
+ */
+export async function adoptDriveStub(
+  fileId: string,
+  podFileBaseName: string,
+  opts: { activeFamilyId?: string | null } = {}
+): Promise<StorageConnected> {
+  const fileName = `${podFileBaseName || 'my-family'}.beanpod`;
+  const provider = GoogleDriveProvider.fromExisting(fileId, fileName);
+  syncService.setProvider(provider);
+  if (opts.activeFamilyId) await provider.persist(opts.activeFamilyId);
+  return { status: 'connected', type: 'google_drive' };
 }
 
 /**

@@ -21,6 +21,7 @@ import {
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
+import { DriveConsentDeniedError } from '@/types/sync';
 import { Browser } from '@capacitor/browser';
 import { App as CapacitorApp, type URLOpenListenerEvent } from '@capacitor/app';
 import { isNative, isIosOrIpadOs, isStandalone } from '@/services/sync/capabilities';
@@ -839,7 +840,10 @@ async function performPopupAuth(
   // Validate that Drive file scope was granted (Google granular consent lets users deselect it)
   if (tokens.scope && !tokens.scope.includes('drive.file')) {
     clearTokenState();
-    throw new Error(
+    // Typed so callers branch on `instanceof` and route the user to a clear
+    // "allow file access" reconnect prompt rather than a silent dead-end
+    // (2026-06-19, finding 3).
+    throw new DriveConsentDeniedError(
       'Google Drive file access was not granted. Please allow file access when prompted.'
     );
   }
@@ -1045,10 +1049,19 @@ async function performSilentRefresh(): Promise<string | null> {
       console.warn(
         `[googleAuth] Attempting silent token refresh (attempt ${attempt}/${MAX_ATTEMPTS})...`
       );
-      // Capture into a const so the await below can't lose TypeScript's
-      // narrowing on the module-level `let currentRefreshToken`. The guard
-      // above (line ~810) ensures we never enter the loop with null.
-      const tokenAtAttempt = currentRefreshToken!.token;
+      // Re-check per attempt: a concurrent sign-out / clearTokenState() can null
+      // `currentRefreshToken` DURING a backoff sleep between attempts (2026-06-19,
+      // finding 10). The pre-loop guard only covers attempt 1; without this, a
+      // later iteration would dereference null via the `!` below, throw a
+      // TypeError, and get MISCLASSIFIED as a transient failure — inflating the
+      // consecutive-failure counter toward a false reconnect-banner escalation
+      // for a session that no longer exists. A torn-down session is not a
+      // refresh failure: bail cleanly.
+      if (!currentRefreshToken) {
+        console.warn('[googleAuth] Silent refresh aborted: session torn down mid-retry');
+        return null;
+      }
+      const tokenAtAttempt = currentRefreshToken.token;
       const tokens = await refreshAccessToken({
         refreshToken: tokenAtAttempt,
         clientId,
@@ -1320,6 +1333,14 @@ export async function clearGoogleSessionState(
   // 2. Best-effort fire-and-forget network revoke. Never await. Skipped when
   //    preserving — revoking the grant would invalidate the refresh token we
   //    are deliberately keeping for a silent reconnect.
+  //
+  //    SECURITY NOTE (2026-06-19, finding 8 — reviewed, intended): on a trusted
+  //    device this leaves the OAuth grant LIVE at Google after sign-out. That is
+  //    deliberate — it's the whole point of trusted-device preservation (commit
+  //    1e8090f7) and mirrors the preserved IndexedDB cache. The user-facing
+  //    "revoke everything" escape hatch is `authStore.signOutAndClearData()`,
+  //    which calls this WITHOUT preserveRefreshToken (full network revoke) AND
+  //    deletes the local cache + resets the trust flag. See ADR-031.
   if (tokenSnapshot && !preserveRefreshToken) {
     fetch(`${GOOGLE_REVOKE_URL}?token=${tokenSnapshot}`, { method: 'POST' }).catch(() => {
       // Network errors are expected (offline, slow, etc.) — best-effort.
@@ -1766,7 +1787,10 @@ export async function completeRedirectAuth(): Promise<string | null> {
   });
 
   if (tokens.scope && !tokens.scope.includes('drive.file')) {
-    throw new Error('Google Drive file access was not granted.');
+    // Typed so the App.vue boot redirect-completion path can branch on
+    // `instanceof` and route to the consent-denied reconnect screen
+    // (2026-06-19, finding 3) instead of a silent dead-end.
+    throw new DriveConsentDeniedError('Google Drive file access was not granted.');
   }
 
   // Commit via the shared chokepoint. interactive=true: a persist failure throws and

@@ -429,16 +429,15 @@ export function useJoinFlow() {
       return 'loaded';
     }
 
-    const storeError = (syncStore.error as string | null) ?? '';
-    const looksLikeMissingAccess =
-      storeError.includes('File not found') ||
-      storeError.includes('not found') ||
-      storeError.includes('404') ||
-      storeError.includes('403');
-
-    if (looksLikeMissingAccess) return 'needs-pick';
+    // Branch on the STRUCTURED HTTP status, not a localized message substring
+    // (2026-06-19, finding 7). A 404 (file not visible) or 403 (no permission)
+    // means the `drive.file` scope hasn't granted API-level access yet → the
+    // Picker is the recovery path. Locale-independent: the old substring match
+    // silently failed for non-English Drive messages, dead-ending the iOS join.
+    if (result.status === 404 || result.status === 403) return 'needs-pick';
 
     // Some other error — surface it.
+    const storeError = (syncStore.error as string | null) ?? '';
     recordError('FILE_READ_FAILED', {
       error: storeError || 'Unknown file-load error',
       hintEmail: inviteEmailHint.value,

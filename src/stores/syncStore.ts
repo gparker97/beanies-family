@@ -27,7 +27,7 @@ import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
-import { beginDriveAuthRedirectIfNeeded } from '@/services/sync/connectStorage';
+import { beginDriveAuthRedirectIfNeeded, RESUME_SETUP_PATH } from '@/services/sync/connectStorage';
 import { features } from '@/config/features';
 import { downloadAsFile } from '@/services/sync/fileSync';
 import * as registry from '@/services/registry/registryService';
@@ -2201,6 +2201,10 @@ export const useSyncStore = defineStore('sync', () => {
     success: boolean;
     needsPassword?: boolean;
     reason?: 'auth' | 'not-found' | 'error';
+    /** Structured HTTP status when the failure was a DriveApiError. Lets callers
+     *  branch on 404/403 without substring-matching a localized message
+     *  (2026-06-19, finding 7). */
+    status?: number;
   }> {
     // Defensive: clear any banner state left over from a prior session.
     // Sign-out should have done this via resetState(), but if we're here we
@@ -2276,9 +2280,9 @@ export const useSyncStore = defineStore('sync', () => {
       // syncService.load() would add. Mirrors the idiom used in the
       // reload-if-changed catch above. The reconnect flow branches on this
       // `reason` to fall back to the file picker when the known file is gone.
-      const reason: 'not-found' | 'error' =
-        e instanceof DriveApiError && e.status === 404 ? 'not-found' : 'error';
-      return { success: false, reason };
+      const status = e instanceof DriveApiError ? e.status : undefined;
+      const reason: 'not-found' | 'error' = status === 404 ? 'not-found' : 'error';
+      return { success: false, reason, status };
     } finally {
       // Only restore to idle if WE set it — otherwise a caller that wrapped
       // us in their own critical section (e.g. a future orchestrator) keeps
@@ -2334,6 +2338,16 @@ export const useSyncStore = defineStore('sync', () => {
       // pod (which we can't auto-load — the file picker is user-driven).
       // Either way the user picks storage manually in the fallback flow.
       return { kind: 'no-registry-entry' };
+    }
+
+    // iOS/PWA gesture-less popup guard (2026-06-19, finding 2): this probe runs
+    // from ResumePodSetup.onMounted with NO user gesture. If the token has
+    // lapsed, the inner loadFromGoogleDrive → requestAccessToken would open a
+    // popup that iOS Safari blocks, dead-ending the resume. On a redirect
+    // surface with no valid token, silently reconnect or kick off a full-page
+    // redirect (page navigates away; we resume on return) instead.
+    if (await beginDriveAuthRedirectIfNeeded(RESUME_SETUP_PATH, authStoreInst.currentUser?.email)) {
+      return { kind: 'redirecting' };
     }
 
     // Fetch the encrypted envelope into `pendingEncryptedFile`. The inner

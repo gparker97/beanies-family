@@ -22,11 +22,25 @@ vi.mock('@/services/google/googleAuth', () => ({
 vi.mock('@/services/google/driveTokenRecovery', () => ({
   tryReconnectSilently: vi.fn(() => Promise.resolve(false)),
 }));
+const mockProbeRead = vi.fn();
+const mockFromExisting = vi.fn(() => ({ read: mockProbeRead, persist: vi.fn(async () => {}) }));
 vi.mock('@/services/sync/providers/googleDriveProvider', () => ({
-  GoogleDriveProvider: { createNew: vi.fn() },
+  GoogleDriveProvider: {
+    createNew: vi.fn(),
+    fromExisting: (...args: unknown[]) => mockFromExisting(...(args as [])),
+  },
+}));
+const mockDetectFileVersion = vi.fn();
+vi.mock('@/services/sync/fileSync', () => ({
+  detectFileVersion: (...args: unknown[]) => mockDetectFileVersion(...(args as [])),
 }));
 
-import { connectLocalStorage, beginDriveAuthRedirectIfNeeded } from '../connectStorage';
+import {
+  connectLocalStorage,
+  beginDriveAuthRedirectIfNeeded,
+  resolveExistingBeanpod,
+  adoptDriveStub,
+} from '../connectStorage';
 import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
 import {
   shouldUseRedirectAuth,
@@ -157,5 +171,60 @@ describe('beginDriveAuthRedirectIfNeeded', () => {
     mockStartRedirect.mockRejectedValue(new Error('Browser.open rejected'));
 
     await expect(beginDriveAuthRedirectIfNeeded('/p')).rejects.toThrow('Browser.open rejected');
+  });
+});
+
+describe('resolveExistingBeanpod — adopt-existing classification (2026-06-19)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockFromExisting.mockReturnValue({ read: mockProbeRead, persist: vi.fn(async () => {}) });
+  });
+
+  it('rejects a collision owned by a DIFFERENT account — never adopts, never even reads', async () => {
+    const r = await resolveExistingBeanpod({ fileId: 'f1', ownedByCurrentAccount: false });
+    expect(r).toEqual({ kind: 'reject-different-account' });
+    expect(mockProbeRead).not.toHaveBeenCalled();
+  });
+
+  it('adopts silently when the owned file is the empty {} placeholder (orphan stub)', async () => {
+    mockProbeRead.mockResolvedValue('{}');
+    const r = await resolveExistingBeanpod({ fileId: 'f1', ownedByCurrentAccount: true });
+    expect(r).toEqual({ kind: 'adopt-stub', fileId: 'f1' });
+  });
+
+  it('adopts silently when the owned file is empty/zero-byte', async () => {
+    mockProbeRead.mockResolvedValue('');
+    const r = await resolveExistingBeanpod({ fileId: 'f1', ownedByCurrentAccount: true });
+    expect(r).toEqual({ kind: 'adopt-stub', fileId: 'f1' });
+  });
+
+  it('confirms (adopt-existing) when the owned file is a real V4 envelope', async () => {
+    mockProbeRead.mockResolvedValue('{"version":"4.0","familyId":"fam"}');
+    mockDetectFileVersion.mockReturnValue('4.0');
+    const r = await resolveExistingBeanpod({ fileId: 'f1', ownedByCurrentAccount: true });
+    expect(r).toEqual({ kind: 'adopt-existing', fileId: 'f1' });
+  });
+
+  it('fails SAFE to adopt-existing (confirm) when the probe read throws — never re-throws', async () => {
+    mockProbeRead.mockRejectedValue(new Error('network blip'));
+    const r = await resolveExistingBeanpod({ fileId: 'f1', ownedByCurrentAccount: true });
+    expect(r).toEqual({ kind: 'adopt-existing', fileId: 'f1' });
+  });
+});
+
+describe('adoptDriveStub', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockFromExisting.mockReturnValue({ read: mockProbeRead, persist: vi.fn() });
+  });
+
+  it('installs a provider on the orphan fileId and returns connected', async () => {
+    const persist = vi.fn(async () => {});
+    mockFromExisting.mockReturnValue({ read: mockProbeRead, persist });
+    const r = await adoptDriveStub('orphan-1', 'the-smiths', { activeFamilyId: 'fam-1' });
+    expect(r).toEqual({ status: 'connected', type: 'google_drive' });
+    expect(mockFromExisting).toHaveBeenCalledWith('orphan-1', 'the-smiths.beanpod');
+    expect(syncService.setProvider).toHaveBeenCalled();
+    expect(persist).toHaveBeenCalledWith('fam-1');
   });
 });

@@ -35,8 +35,9 @@ import {
   clearFolderCache,
   DriveApiError,
 } from '@/services/google/driveService';
-import { enqueueOfflineSave, setFlushProvider } from '../offlineQueue';
-import { FileNameCollisionError } from '@/types/sync';
+import { enqueueOfflineSave } from '../offlineQueue';
+import { FileNameCollisionError, CollisionCheckUnavailableError } from '@/types/sync';
+import { isNetworkError } from '@/utils/isNetworkError';
 import { logEvent } from '@/services/telemetry';
 
 /**
@@ -60,7 +61,7 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
       lastError = e;
       const isRetryable =
         (e instanceof DriveApiError && (e.status >= 500 || e.status === 408)) ||
-        (e instanceof TypeError && /fetch|network/i.test(e.message));
+        (e instanceof TypeError && isNetworkError(e));
       if (!isRetryable || attempt === maxRetries) throw e;
       // Exponential backoff: 1s, 2s, 4s
       await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
@@ -121,8 +122,31 @@ export class GoogleDriveProvider implements StorageProvider {
    * On 5xx: retry up to 3 times with exponential backoff.
    * On network error: queue for offline flush.
    */
+  /**
+   * Guard against account drift (2026-06-19, finding 9). This provider is bound
+   * to ONE Drive account (`this.accountEmail`) that owns `this.fileId`. If the
+   * live session has silently drifted to a different account, using that
+   * account's token to operate on this file yields spurious 404/403s and a
+   * reconnect loop. Throw `TokenExpiredError` so the reconnect banner appears
+   * for the bound account instead of operating with the wrong identity.
+   *
+   * Only enforced when BOTH are known: a null bound email means "not yet
+   * learned" (allow — the provider learns it via `updateAccountEmailIfAvailable`);
+   * a null session email means we can't tell (allow — the token path handles it).
+   */
+  private ensureBoundAccount(): void {
+    if (!this.accountEmail) return;
+    const active = getGoogleAccountEmail();
+    if (active && active !== this.accountEmail) {
+      throw new TokenExpiredError(
+        `Drive session account (${active}) does not match this file's bound account (${this.accountEmail}) — reconnect required`
+      );
+    }
+  }
+
   async write(content: string): Promise<void> {
     try {
+      this.ensureBoundAccount();
       const token = await getValidTokenSilent();
       await withRetry(() => updateFile(token, this.fileId, content));
     } catch (e) {
@@ -173,8 +197,11 @@ export class GoogleDriveProvider implements StorageProvider {
         return;
       }
 
-      // Network error — queue for offline flush
-      if (e instanceof TypeError && e.message.includes('fetch')) {
+      // Network error — queue for offline flush. Uses the shared classifier so
+      // Safari/iOS `TypeError: Load failed` (no "fetch" substring) is caught
+      // too; the old `.includes('fetch')` missed it and the save was LOST
+      // instead of queued (2026-06-19, finding 6).
+      if (isNetworkError(e)) {
         enqueueOfflineSave(content);
         return;
       }
@@ -191,6 +218,7 @@ export class GoogleDriveProvider implements StorageProvider {
   async read(): Promise<string | null> {
     try {
       /* eslint-disable no-console -- init diagnostics */
+      this.ensureBoundAccount();
       console.log('[GoogleDrive.read] getting token...');
       const token = await getValidTokenSilent();
       console.log('[GoogleDrive.read] token obtained, reading file...');
@@ -326,7 +354,12 @@ export class GoogleDriveProvider implements StorageProvider {
    */
   updateAccountEmailIfAvailable(): boolean {
     const email = getGoogleAccountEmail();
-    if (email && email !== this.accountEmail) {
+    // Only LEARN an account when we don't have one yet (null → learn). Do NOT
+    // rebind A→B: a provider bound to account A must never silently adopt a
+    // drifted session account B (2026-06-19, finding 9) — that is exactly the
+    // account-drift `ensureBoundAccount()` guards against on read/write. A
+    // genuine account switch installs a fresh provider, it doesn't rebind here.
+    if (email && !this.accountEmail) {
       this.accountEmail = email;
       return true;
     }
@@ -362,37 +395,39 @@ export class GoogleDriveProvider implements StorageProvider {
     // with the same name in the same folder (different fileIds), which is
     // how the 2026-05-15 incident orphaned a real pod with an empty
     // duplicate. If a file with this name already exists, throw a typed
-    // error so the caller (`connectStorage.connectDriveStorage`) can surface
-    // a focused "duplicate name" message and let the user pick a different
-    // family name. List failure is non-fatal — fall through to create as
-    // before; the worst case is we re-introduce the original behaviour for
-    // this user, not data loss.
+    // error carrying `ownedByMe` so the caller's adopt-existing recovery can
+    // load the user's own orphan (2026-06-19, finding 1) or, for a different
+    // account, surface the focused "duplicate name" message.
+    //
+    // A list FAILURE is NOT swallowed (2026-06-19, finding 5): we genuinely
+    // don't know whether a same-name file exists, and creating blindly risks a
+    // SECOND orphan `.beanpod`. Throw a typed `CollisionCheckUnavailableError`
+    // so the caller surfaces a retryable "couldn't verify your Drive" message.
+    let existing;
     try {
-      const existing = await listBeanpodFiles(token, folderId);
-      const collision = existing.find((f) => f.name === fileName);
-      if (collision) {
-        throw new FileNameCollisionError(
-          `A .beanpod file named "${fileName}" already exists in this Google Drive folder (fileId: ${collision.fileId})`,
-          collision.fileId,
-          fileName
-        );
-      }
+      existing = await listBeanpodFiles(token, folderId);
     } catch (e) {
-      // Re-throw the typed collision — only swallow listing failures.
-      if (e instanceof FileNameCollisionError) throw e;
-      console.warn(
-        '[GoogleDriveProvider.createNew] pre-create collision check failed (continuing):',
-        e
+      console.warn('[GoogleDriveProvider.createNew] pre-create collision check failed:', e);
+      throw new CollisionCheckUnavailableError(
+        'Could not verify your Google Drive for existing family files. Please try again.'
+      );
+    }
+    const collision = existing.find((f) => f.name === fileName);
+    if (collision) {
+      throw new FileNameCollisionError(
+        `A .beanpod file named "${fileName}" already exists in this Google Drive folder (fileId: ${collision.fileId})`,
+        collision.fileId,
+        fileName,
+        collision.ownedByMe
       );
     }
 
     const { fileId, name } = await createFile(token, folderId, fileName, '{}');
-    const provider = new GoogleDriveProvider(fileId, name, email);
-
-    // Register as flush target for offline queue
-    setFlushProvider(provider);
-
-    return provider;
+    // Flush-provider registration is owned by `syncService.setProvider` (the
+    // single write-intent install seam, 2026-06-19 finding 11) — NOT here, so
+    // a read-only build can never auto-flush stale bytes into a file it only
+    // meant to inspect. Every createNew caller calls setProvider immediately.
+    return new GoogleDriveProvider(fileId, name, email);
   }
 
   /**
@@ -407,8 +442,11 @@ export class GoogleDriveProvider implements StorageProvider {
     // Use persisted email, or fall back to in-memory cache from current session
     const email = accountEmail ?? getGoogleAccountEmail();
     if (email) setGoogleAccountEmail(email);
-    const provider = new GoogleDriveProvider(fileId, fileName, email);
-    setFlushProvider(provider);
-    return provider;
+    // No `setFlushProvider` here (2026-06-19, finding 11): `fromExisting` is used
+    // by READ-only resume/recovery paths (loadFromGoogleDrive, recoverFromMissingFile)
+    // that must NOT register a flush target — otherwise inspecting a file could
+    // auto-flush stale queued bytes INTO it. Write-intent callers go through
+    // `syncService.setProvider`, which owns flush registration.
+    return new GoogleDriveProvider(fileId, fileName, email);
   }
 }

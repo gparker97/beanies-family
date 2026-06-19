@@ -123,6 +123,8 @@ vi.mock('@/services/google/googleAuth', () => ({
   onTokenPermanentlyExpired: vi.fn(() => () => {}),
   fetchGoogleUserEmail: vi.fn(async () => 'owner@example.com'),
   isTokenValid: vi.fn(() => true),
+  shouldUseRedirectAuth: vi.fn(() => false),
+  startRedirectAuth: vi.fn(async () => {}),
   isSilentRefreshPending: vi.fn(() => false),
   isUserCancellation: vi.fn(() => false),
   migratePendingRefreshToken: vi.fn(async () => {}),

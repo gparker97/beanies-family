@@ -160,6 +160,35 @@ function getPendingFamilyInfo(): { familyId?: string; familyName?: string } {
   return { familyId: raw?.familyId, familyName: raw?.familyName };
 }
 
+/**
+ * Shared "the file is encrypted — now what?" handoff (2026-06-19, finding 14).
+ * Previously copy-pasted across all six load entry points (auto-load, grant-
+ * permission, manual load, drop, Drive pick), each with a slightly different
+ * `loadedFileName` source and drifting subtly. One helper:
+ *   auto-decrypt (when applicable) → biometric → password modal.
+ *
+ * `opts.tryAuto` preserves the per-site variance Pass 4 flagged: the manual-load
+ * and drop paths historically did NOT attempt a cached-key auto-decrypt, so they
+ * pass `tryAuto: false`; the rest default to `true` (and emit `file-loaded` if
+ * the cached key opens it).
+ */
+async function handlePendingPassword(
+  fileName: string | null,
+  opts: { tryAuto?: boolean } = {}
+): Promise<void> {
+  if ((opts.tryAuto ?? true) && (await tryAutoDecrypt())) {
+    emit('file-loaded');
+    return;
+  }
+  const { familyId, familyName } = getPendingFamilyInfo();
+  if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
+    // Biometric flow will handle decryption — don't show the password modal.
+    return;
+  }
+  loadedFileName.value = fileName;
+  showDecryptModal.value = true;
+}
+
 onMounted(async () => {
   if (props.loadError) {
     formError.value = props.loadError;
@@ -181,35 +210,14 @@ async function autoLoadFile() {
     // a biometric fallback), go straight to decrypt flow instead of re-reading from
     // the configured handle — which may still point to the previous family's file.
     if (syncStore.hasPendingEncryptedFile) {
-      if (!(await tryAutoDecrypt())) {
-        const { familyId, familyName } = getPendingFamilyInfo();
-        if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
-          // Biometric flow will handle decryption — don't show password modal
-        } else {
-          loadedFileName.value = syncStore.fileName;
-          showDecryptModal.value = true;
-        }
-      } else {
-        emit('file-loaded');
-      }
+      await handlePendingPassword(syncStore.fileName);
       isLoadingFile.value = false;
       return;
     }
 
     const loadResult = await syncStore.loadFromFile();
     if (!loadResult.success && loadResult.needsPassword) {
-      // File is encrypted — try cached password before showing modal
-      if (!(await tryAutoDecrypt())) {
-        const { familyId, familyName } = getPendingFamilyInfo();
-        if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
-          // Biometric flow will handle decryption — don't show password modal
-        } else {
-          loadedFileName.value = syncStore.fileName;
-          showDecryptModal.value = true;
-        }
-      } else {
-        emit('file-loaded');
-      }
+      await handlePendingPassword(syncStore.fileName);
     } else if (loadResult.success) {
       emit('file-loaded');
     }
@@ -230,17 +238,7 @@ async function handleGrantPermission() {
     const granted = await syncStore.requestPermission();
     if (granted) {
       if (syncStore.hasPendingEncryptedFile) {
-        if (!(await tryAutoDecrypt())) {
-          const { familyId, familyName } = getPendingFamilyInfo();
-          if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
-            // Biometric flow will handle decryption
-          } else {
-            loadedFileName.value = syncStore.fileName;
-            showDecryptModal.value = true;
-          }
-        } else {
-          emit('file-loaded');
-        }
+        await handlePendingPassword(syncStore.fileName);
       } else {
         emit('file-loaded');
       }
@@ -275,13 +273,7 @@ async function handleLoadFile() {
     if (result.success) {
       emit('file-loaded');
     } else if (result.needsPassword) {
-      const { familyId, familyName } = getPendingFamilyInfo();
-      if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
-        // Biometric flow will handle decryption
-      } else {
-        loadedFileName.value = syncStore.fileName;
-        showDecryptModal.value = true;
-      }
+      await handlePendingPassword(syncStore.fileName, { tryAuto: false });
     } else if (syncStore.error) {
       formError.value = syncStore.error;
     } else {
@@ -441,13 +433,7 @@ async function handleDrop(e: DragEvent) {
     if (result.success) {
       emit('file-loaded');
     } else if (result.needsPassword) {
-      const { familyId, familyName } = getPendingFamilyInfo();
-      if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
-        // Biometric flow will handle decryption
-      } else {
-        loadedFileName.value = file.name;
-        showDecryptModal.value = true;
-      }
+      await handlePendingPassword(file.name, { tryAuto: false });
     } else if (syncStore.error) {
       formError.value = syncStore.error;
     } else {
@@ -697,18 +683,7 @@ async function handleDriveFileSelected(payload: { fileId: string; fileName: stri
     if (result.success) {
       emit('file-loaded');
     } else if (result.needsPassword) {
-      // Try auto-decrypt first
-      if (!(await tryAutoDecrypt())) {
-        const { familyId, familyName } = getPendingFamilyInfo();
-        if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
-          // Biometric flow will handle decryption
-        } else {
-          loadedFileName.value = payload.fileName;
-          showDecryptModal.value = true;
-        }
-      } else {
-        emit('file-loaded');
-      }
+      await handlePendingPassword(payload.fileName);
     } else if (syncStore.error) {
       formError.value = syncStore.error;
     }

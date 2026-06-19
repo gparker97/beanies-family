@@ -303,7 +303,7 @@ describe('useJoinFlow', () => {
         }).replace('http://localhost:3000', '')
       );
       mockGoogleAuth.silent = vi.fn(async () => 'silent-token');
-      mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({ success: false }));
+      mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({ success: false, status: 404 }));
       mockSyncStore.error = 'File not found: drive-1';
 
       const { useJoinFlow } = await import('../useJoinFlow');
@@ -545,7 +545,7 @@ describe('useJoinFlow', () => {
       // Silent token present → tryAutoLoadByFileId runs
       mockGoogleAuth.silent = vi.fn(async () => 'wrong-account-token');
       // Drive returns 404-ish → 'needs-pick'
-      mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({ success: false }));
+      mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({ success: false, status: 404 }));
       mockSyncStore.error = 'File not found';
       mockPick.mockResolvedValueOnce({ kind: 'cancelled' });
 

@@ -888,6 +888,48 @@ describe('googleAuth (PKCE)', () => {
       vi.useRealTimers();
       vi.unstubAllEnvs();
     });
+
+    it('bails cleanly when a concurrent sign-out nulls the refresh token mid-retry (finding 10)', async () => {
+      // The pre-fix loop dereferenced the module-level refresh token via `!` on
+      // each attempt; a sign-out that nulled it during a backoff sleep made the
+      // next attempt throw a TypeError, misclassified as a transient failure
+      // (inflating the consecutive-failure counter toward a false escalation).
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
+      await googleAuth.initializeAuth('family-123');
+
+      const permanentSpy = vi.fn();
+      googleAuth.onTokenPermanentlyExpired(permanentSpy);
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+      const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
+      refreshFn.mockReset();
+      // Attempt 1 fails transiently AND a concurrent sign-out clears the
+      // refresh token during the attempt.
+      refreshFn.mockImplementationOnce(async () => {
+        await googleAuth.clearGoogleSessionState();
+        throw new Error('Token refresh failed: network error');
+      });
+
+      vi.useFakeTimers();
+      const p = googleAuth.attemptSilentRefresh();
+      await vi.advanceTimersByTimeAsync(22_500);
+      const result = await p;
+
+      expect(result).toBeNull();
+      // Attempt 2 bailed at the null guard — refresh was only called once, and
+      // the torn-down session did NOT escalate to a permanent-expiry signal.
+      expect(refreshFn).toHaveBeenCalledTimes(1);
+      expect(permanentSpy).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    });
   });
 
   describe('getValidTokenSilent (banner-firing contract)', () => {
