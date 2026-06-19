@@ -17,6 +17,25 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.06.19',
+    date: '2026-06-19',
+    month: '19 june 2026',
+    summary: {
+      en: 'Smoother sign-up, especially on iPhone.',
+      beanie: 'smoother sign-up, especially on iphone.',
+    },
+    features: [
+      {
+        title: { en: 'A more reliable sign-up', beanie: 'a more reliable sign-up' },
+        description: {
+          en: "Setting up your family is now more dependable. If a first attempt gets interrupted, beanies picks up where it left off instead of getting stuck, and it's clearer when Google needs permission to save your family file. Mostly felt on iPhone.",
+          beanie:
+            "setting up your family is now more dependable. if a first attempt gets interrupted, beanies picks up where it left off instead of getting stuck, and it's clearer when google needs permission to save your family file. mostly felt on iphone.",
+        },
+      },
+    ],
+  },
+  {
     version: '2026.06.18.2',
     date: '2026-06-18',
     month: '18 june 2026',
