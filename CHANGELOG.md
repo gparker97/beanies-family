@@ -22,6 +22,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Better error visibility on iPhone (internal).** Errors thrown inside Google's sign-in/file-picker scripts were being reported as an opaque "Script error." with no detail; they now surface the real cause, so genuine iPhone onboarding issues can be diagnosed and fixed faster.
 
+### Added
+
+- **Build version on the welcome screen.** A small version marker now appears at the bottom of the welcome screen (the deployed revision + date). It's mainly a support aid — it confirms which version your device is actually running, which helps when an old copy is cached (especially on iPhone after an update).
+
 ## 2026-06-18
 
 ### Added
