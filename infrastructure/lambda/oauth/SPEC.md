@@ -17,16 +17,22 @@ Called by the SPA after Google's OAuth redirect returns an authorization code.
 ```json
 {
   "code": "<authorization code from Google>",
-  "code_verifier": "<PKCE verifier the SPA generated>",
+  "code_verifier": "<PKCE verifier the SPA generated — OPTIONAL>",
   "redirect_uri": "<must match the SPA's /oauth/callback URL>",
   "client_id": "<the SPA's VITE_GOOGLE_CLIENT_ID>"
 }
 ```
 
-All four fields are required. The proxy MUST:
+`code`, `redirect_uri`, and `client_id` are required. `code_verifier` is **optional**:
+because this proxy is a **confidential client** (it holds `client_secret`), an intercepted
+code cannot be redeemed without the secret, so PKCE is defense-in-depth, not load-bearing.
+The iOS web redirect omits the verifier (it can't survive WebKit bounce-tracking storage
+clearing across the cross-site redirect — see ADR-026 amendment, 2026-06-20); native and
+legacy clients still send it. **If a public-client path is ever added, PKCE MUST be
+required on that path.** The proxy MUST:
 
 1. Validate `redirect_uri` against an allowlist before forwarding (open-redirect prevention).
-2. Add `client_secret` and `grant_type=authorization_code` server-side.
+2. Add `client_secret` and `grant_type=authorization_code` server-side (`client_secret` is ALWAYS attached, regardless of whether `code_verifier` is present). Forward `code_verifier` to Google only when the client supplied it.
 3. POST to Google's token endpoint at `https://oauth2.googleapis.com/token` with `Content-Type: application/x-www-form-urlencoded`.
 4. Return Google's response body as-is, preserving the HTTP status code on errors.
 

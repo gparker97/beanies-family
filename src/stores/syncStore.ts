@@ -28,6 +28,7 @@ import { useSyncHighlightStore } from './syncHighlightStore';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
 import { beginDriveAuthRedirectIfNeeded, RESUME_SETUP_PATH } from '@/services/sync/connectStorage';
+import type { RedirectMode } from '@/services/google/redirectState';
 import { markFamilyJustCreated } from '@/utils/newFamilyFlag';
 import { features } from '@/config/features';
 import { downloadAsFile } from '@/services/sync/fileSync';
@@ -2352,7 +2353,13 @@ export const useSyncStore = defineStore('sync', () => {
     // popup that iOS Safari blocks, dead-ending the resume. On a redirect
     // surface with no valid token, silently reconnect or kick off a full-page
     // redirect (page navigates away; we resume on return) instead.
-    if (await beginDriveAuthRedirectIfNeeded(RESUME_SETUP_PATH, authStoreInst.currentUser?.email)) {
+    if (
+      await beginDriveAuthRedirectIfNeeded(
+        RESUME_SETUP_PATH,
+        authStoreInst.currentUser?.email,
+        'create'
+      )
+    ) {
       return { kind: 'redirecting' };
     }
 
@@ -2556,10 +2563,11 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function beginDriveAuthRedirect(
     returnPath: string,
-    loginHint?: string,
+    loginHint: string | undefined,
+    mode: RedirectMode,
     opts?: { forceReauth?: boolean }
   ): Promise<boolean> {
-    return beginDriveAuthRedirectIfNeeded(returnPath, loginHint, opts);
+    return beginDriveAuthRedirectIfNeeded(returnPath, loginHint, mode, opts);
   }
 
   let tokenExpiryUnsub: (() => void) | null = null;

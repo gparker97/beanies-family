@@ -86,87 +86,10 @@ export function consumeResumeReason(): ResumeSetupReason | null {
   }
 }
 
-/**
- * In-progress create-wizard state persisted across the iOS/native Google
- * redirect so the create flow can RESUME after returning (2026-06-19) instead
- * of falling into the generic recovery screen and re-asking for the password.
- *
- * On iOS/PWA/native, connecting Drive needs a full-page redirect (no popups),
- * which reloads the page and destroys CreatePodView's in-memory state. The
- * owner name is recoverable on return (authStore.displayName / activeFamilyName),
- * so the only genuinely-lost piece is the PASSWORD — kept in a SEPARATE sub-key
- * that is consumed (read-and-deleted) atomically the instant it's used, so the
- * secret's at-rest lifetime is the redirect round-trip only. Same idiom as
- * `RESUME_REASON_KEY` above; sessionStorage is tab-session scoped and cleared
- * on tab close regardless.
- *
- * SECURITY: the password is at rest in sessionStorage only between the redirect
- * and the resume's `consumePendingCreatePassword()`. It is never logged, never
- * sent anywhere, and the create flow already holds the password in page memory
- * during normal (non-redirect) create — so the marginal exposure is the
- * transient sessionStorage copy. greg accepted this tradeoff (2026-06-19) for
- * the smoother no-re-enter UX.
- */
-export interface PendingCreate {
-  /** Owner display name captured in step 1 (fallback; also recoverable from authStore). */
-  ownerName: string;
-}
-const PENDING_CREATE_KEY = 'beanies:pending-create';
-const PENDING_CREATE_PW_KEY = 'beanies:pending-create-pw';
-
-/** Persist the create-wizard marker + password just before the Drive redirect. */
-export function savePendingCreate(state: PendingCreate, password: string): void {
-  try {
-    sessionStorage.setItem(PENDING_CREATE_KEY, JSON.stringify(state));
-    sessionStorage.setItem(PENDING_CREATE_PW_KEY, password);
-  } catch {
-    // sessionStorage unavailable — the resume simply won't fire and the user
-    // re-enters their password on the recovery screen (lossless fallback).
-  }
-}
-
-/** True when a create-wizard resume is pending (marker present). */
-export function hasPendingCreate(): boolean {
-  try {
-    return sessionStorage.getItem(PENDING_CREATE_KEY) !== null;
-  } catch {
-    return false;
-  }
-}
-
-/** Read the non-secret create-wizard marker (null if absent/malformed). */
-export function loadPendingCreate(): PendingCreate | null {
-  try {
-    const raw = sessionStorage.getItem(PENDING_CREATE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as PendingCreate;
-    return typeof parsed?.ownerName === 'string' ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Read-AND-DELETE the pending password in one call — the single consume site.
- * Atomic by construction so the at-rest copy is gone before the caller proceeds
- * (no two-step the caller can get wrong). Returns null if absent.
- */
-export function consumePendingCreatePassword(): string | null {
-  try {
-    const pw = sessionStorage.getItem(PENDING_CREATE_PW_KEY);
-    if (pw !== null) sessionStorage.removeItem(PENDING_CREATE_PW_KEY);
-    return pw;
-  } catch {
-    return null;
-  }
-}
-
-/** Wipe ALL pending create state (marker + password). Idempotent. */
-export function clearPendingCreate(): void {
-  try {
-    sessionStorage.removeItem(PENDING_CREATE_KEY);
-    sessionStorage.removeItem(PENDING_CREATE_PW_KEY);
-  } catch {
-    // best-effort
-  }
-}
+// NOTE: the `PendingCreate` password-stash (2026-06-19, round 2) was REMOVED on
+// 2026-06-20. It persisted the create password in sessionStorage across the iOS
+// Drive redirect — but WebKit bounce-tracking clears pre-redirect storage, so it
+// never worked on the affected devices AND it stored a secret unnecessarily. The
+// create flow now resumes purely via the OAuth `state` param (redirectState.ts)
+// and the user re-enters the password ONCE on the resume screen (ADR-026's
+// original, honest design). See docs/plans/2026-06-20-ios-oauth-bounce-state-param.md.

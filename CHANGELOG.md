@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Fixed creating or joining a family on iPhone (Safari and the installed app).** Signing in with Google could bounce you to a recovery screen, ask for your password twice, pop the "what's new" panel mid-setup, and then freeze on "counting beans…". The cause was Safari's privacy protection wiping the page's temporary data during the trip to Google and back, so the app lost track of where it was. Sign-in now carries what it needs through the sign-in link itself instead of relying on that temporary storage, so onboarding completes cleanly with a single password entry. If setup ever does stall, you now get a clear "reload to try again" instead of an endless spinner.
 - **Stopped a crash that could hit the screen right after the Google sign-in step.** The page you bounce through on the way back from Google was doing far more work than it needed to — and on some phones (notably iPhone) that work could fail mid-redirect and throw up the "oh no, the beans spilled" error. That bounce page now does only its one job (hand you back to the app), so the crash can't happen there.
 
 ### Changed

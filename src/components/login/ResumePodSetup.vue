@@ -49,13 +49,7 @@ import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
 import { confirm } from '@/composables/useConfirm';
-import {
-  consumeResumeReason,
-  hasPendingCreate,
-  loadPendingCreate,
-  consumePendingCreatePassword,
-  clearPendingCreate,
-} from '@/components/login/resumePaths';
+import { consumeResumeReason } from '@/components/login/resumePaths';
 
 const { t } = useTranslation();
 const authStore = useAuthStore();
@@ -130,40 +124,13 @@ onMounted(async () => {
   // `currentUser.displayName` (set by signUp) when the doc isn't loaded yet.
   ownerName.value = authStore.displayName;
 
-  // ── Create-resume fast-path (2026-06-19) ──────────────────────────────────
-  // If we just returned from the iOS/native Drive redirect MID-create-wizard,
-  // finish the create directly instead of dropping into the generic recovery
-  // flow (which would re-ask for the password). Only when we hold a fresh token
-  // (a successful consent return). Restore the owner name + the atomically-
-  // consumed password (and mirror confirmPassword so the existing
-  // `validateIdentity()` inside handleIdentityNext passes), then reuse the
-  // EXISTING handleIdentityNext() chain (rehydrateOwnerDoc → finishOnDrive →
-  // finalizePod → createNewFile, incl. adopt-existing collision recovery). A
-  // single try/finally clears the pending blob on EVERY resolution so no
-  // password is ever left at rest.
-  if (hasPendingCreate()) {
-    if (isTokenValid()) {
-      const pending = loadPendingCreate();
-      const pw = consumePendingCreatePassword(); // atomic read-and-delete
-      if (pw) {
-        if (pending?.ownerName) ownerName.value = pending.ownerName;
-        password.value = pw;
-        confirmPassword.value = pw;
-        try {
-          await handleIdentityNext();
-        } finally {
-          clearPendingCreate();
-        }
-        return; // create-resume handled — skip the generic probe
-      }
-    }
-    // No valid token (consent denied / token lapsed) or no stored password:
-    // abandon the silent resume and fall through to the generic flow (which
-    // surfaces any consent hint + lets the user reconnect). Never leave the
-    // password at rest.
-    clearPendingCreate();
-  }
-
+  // No secret is stashed across the iOS Drive redirect (the round-2 stash was
+  // removed 2026-06-20 — WebKit bounce-tracking cleared it anyway). The generic
+  // `runProbe()` flow IS the clean single-password resume: on a fresh-token
+  // return for a genuinely-new family, the registry probe yields
+  // `no-registry-entry` → the `identity` phase asks for the password ONCE →
+  // `handleIdentityNext` finishes on Drive. See
+  // docs/plans/2026-06-20-ios-oauth-bounce-state-param.md.
   await runProbe();
 
   // Surface a specific hint if we arrived here because Google file access was

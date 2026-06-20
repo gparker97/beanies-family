@@ -235,10 +235,14 @@ describe('googleAuth (PKCE)', () => {
       const hrefSpy = vi.spyOn(window.location, 'href', 'set').mockImplementation((v: string) => {
         capturedHref = v;
       });
-      await googleAuth.startRedirectAuth('/welcome?resume=setup', 'a@b.com');
+      await googleAuth.startRedirectAuth('/welcome?resume=setup', 'a@b.com', 'create');
       expect(capturedHref).toContain('prompt=consent');
       expect(capturedHref).toContain('access_type=offline');
       expect(capturedHref).not.toContain('prompt=select_account');
+      // Web redirect carries routing in `state` and drops PKCE (confidential
+      // proxy) — see ADR-026 amendment (2026-06-20).
+      expect(capturedHref).toContain('state=');
+      expect(capturedHref).not.toContain('code_challenge');
       hrefSpy.mockRestore();
       vi.unstubAllEnvs();
     });

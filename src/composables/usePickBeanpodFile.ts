@@ -84,7 +84,7 @@ export function usePickBeanpodFile() {
         if (!token) {
           if (shouldUseRedirectAuth()) {
             const returnPath = `${window.location.pathname}${window.location.search}`;
-            await startRedirectAuth(returnPath, loginHint);
+            await startRedirectAuth(returnPath, loginHint, 'join');
             // Page navigates; the next session completes redirect auth
             // and the user re-triggers. Treat as a cancellation from
             // the current call's perspective.

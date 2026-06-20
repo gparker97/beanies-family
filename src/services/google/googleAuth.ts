@@ -12,6 +12,7 @@
 
 import { generateCodeVerifier, generateCodeChallenge } from './pkce';
 import { exchangeCodeForTokens, refreshAccessToken } from './oauthProxy';
+import { encodeRedirectState, type RedirectMode } from './redirectState';
 import {
   storeGoogleRefreshToken,
   getGoogleRefreshToken,
@@ -1493,7 +1494,7 @@ function clearTokenState(): void {
 
 function buildAuthUrl(
   clientId: string,
-  codeChallenge: string,
+  codeChallenge: string | undefined,
   prompt: string,
   loginHint?: string,
   state?: string
@@ -1503,14 +1504,23 @@ function buildAuthUrl(
     redirect_uri: getRedirectUri(),
     response_type: 'code',
     scope: `${DRIVE_FILE_SCOPE} ${USERINFO_EMAIL_SCOPE}`,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
     access_type: 'offline',
     prompt,
   });
+  // PKCE challenge — set for popup / silent / native (they always pass one).
+  // The iOS web redirect passes NONE: the confidential OAuth proxy adds
+  // `client_secret` server-side, so PKCE is not load-bearing there, and the
+  // verifier can't survive WebKit bounce-tracking storage clearing anyway.
+  // See ADR-026 amendment (2026-06-20).
+  if (codeChallenge) {
+    params.set('code_challenge', codeChallenge);
+    params.set('code_challenge_method', 'S256');
+  }
   if (loginHint) params.set('login_hint', loginHint);
-  // CSRF state — set only for the native deep-link transport (web callers pass
-  // none and are unaffected). Validated by the appUrlOpen handler.
+  // `state` — carries the NATIVE CSRF token, OR the WEB routing payload
+  // (returnPath+mode, encoded via redirectState.ts). The two transports never
+  // collide: native sets a CSRF nonce + writes its own sessionStorage stash;
+  // web sets the routing payload + writes NO stash.
   if (state) params.set('state', state);
   return `${GOOGLE_AUTH_URL}?${params.toString()}`;
 }
@@ -1709,48 +1719,60 @@ interface RedirectAuthState {
 
 /**
  * Start a redirect-based OAuth flow (for mobile where popups are blocked).
- * Saves PKCE state to sessionStorage and redirects the full page to Google.
  * After auth, OAuthCallbackPage redirects back to `returnPath`.
  *
- * @param loginHint Optional email to pre-fill Google's chooser with.
+ * INVARIANT: redirect auth ALWAYS forces `prompt=consent`. Every caller
+ * establishes offline Drive access (reconnect, connect-pod, switch-account,
+ * re-pick a .beanpod), and Google only returns a refresh_token with
+ * prompt=consent + access_type=offline. Do not change to 'select_account'
+ * without an explicit non-offline caller.
+ * See docs/plans/2026-05-20-google-refresh-token-persistence-fix.md.
+ *
+ * @param returnPath Same-origin relative path to land on after the redirect.
+ * @param loginHint  Optional email to pre-fill Google's chooser with.
+ * @param mode       Which onboarding flow this is (create/join/reconnect).
+ *                   REQUIRED so the compiler flags every call site; carried in
+ *                   the web `state` payload (ignored for native routing).
  */
-export async function startRedirectAuth(returnPath: string, loginHint?: string): Promise<void> {
+export async function startRedirectAuth(
+  returnPath: string,
+  loginHint: string | undefined,
+  mode: RedirectMode
+): Promise<void> {
   const clientId = getClientId();
   if (!clientId) throw new Error('Google Client ID not configured');
 
-  const codeVerifier = generateCodeVerifier();
-  const codeChallenge = await generateCodeChallenge(codeVerifier);
-
-  // Native opens the system browser and returns via a verified App Link deep
-  // link, so it carries a CSRF `state` (defense-in-depth atop the verified
-  // link; ADR-029). Web returns via a same-origin top-level navigation and
-  // needs none. `generateCodeVerifier()` is a CSPRNG high-entropy string.
-  const state = isNative() ? generateCodeVerifier() : undefined;
-
-  // Save state for when we come back
-  sessionStorage.setItem(
-    REDIRECT_AUTH_KEY,
-    JSON.stringify({ codeVerifier, returnPath, state } satisfies RedirectAuthState)
-  );
-
-  // INVARIANT: redirect auth ALWAYS forces `prompt=consent`. Every caller of
-  // startRedirectAuth establishes offline Drive access (reconnect, connect-pod,
-  // switch-account, re-pick a .beanpod), and Google only returns a refresh_token
-  // with prompt=consent + access_type=offline. Using 'select_account' here
-  // silently yields an access-token-only grant → no refresh token persisted →
-  // the "disconnected" toast on every PWA restart. Do not change to a
-  // conditional/'select_account' without an explicit non-offline caller.
-  // See docs/plans/2026-05-20-google-refresh-token-persistence-fix.md.
-  const authUrl = buildAuthUrl(clientId, codeChallenge, 'consent', loginHint, state);
-
   if (isNative()) {
-    // Open the system browser (Custom Tabs / ASWebAuthenticationSession). The
-    // redirect returns via the appUrlOpen listener (installNativeAuthListener),
-    // NOT by navigating this WebView — so this resolves immediately and the
-    // caller treats it as "redirecting", same as web.
+    // NATIVE: opens the system browser and returns via a verified App Link deep
+    // link. Native storage is NOT bounce-cleared (the OS routes the deep-link
+    // back into this WebView), so it keeps PKCE + a CSRF `state` nonce
+    // (defense-in-depth atop the verified link; ADR-029) + the sessionStorage
+    // stash. `mode` is not used for native routing — `returnPath` rides in the
+    // stash. `generateCodeVerifier()` is a CSPRNG high-entropy string.
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+    const state = generateCodeVerifier();
+    sessionStorage.setItem(
+      REDIRECT_AUTH_KEY,
+      JSON.stringify({ codeVerifier, returnPath, state } satisfies RedirectAuthState)
+    );
+    const authUrl = buildAuthUrl(clientId, codeChallenge, 'consent', loginHint, state);
+    // Resolves immediately; the redirect returns via the appUrlOpen listener.
     await Browser.open({ url: authUrl });
     return;
   }
+
+  // WEB (iOS Safari / installed PWA): carry the routing through the OAuth
+  // `state` param so it survives WebKit bounce-tracking storage clearing across
+  // the cross-site redirect (app → accounts.google.com → app). Write NO
+  // sessionStorage stash and use NO PKCE verifier.
+  //
+  // INVARIANT (do not break): no `code_verifier` on this path is safe ONLY
+  // because the confidential OAuth proxy adds `client_secret` server-side, so an
+  // intercepted code can't be redeemed. If any token exchange ever bypasses that
+  // proxy, PKCE MUST return here. See ADR-026 amendment (2026-06-20).
+  const stateParam = encodeRedirectState({ returnPath, mode });
+  const authUrl = buildAuthUrl(clientId, undefined, 'consent', loginHint, stateParam);
   window.location.href = authUrl;
 }
 
@@ -1768,7 +1790,11 @@ export async function completeRedirectAuth(): Promise<string | null> {
   const code = sessionStorage.getItem(REDIRECT_AUTH_CODE_KEY);
   const stateJson = sessionStorage.getItem(REDIRECT_AUTH_KEY);
 
-  if (!code || !stateJson) return null;
+  // The new web transport carries routing in the OAuth `state` param (consumed
+  // by OAuthCallbackPage) and leaves NO sessionStorage stash, so a present
+  // `code` with no stash is the happy path — not a no-op. Only a missing `code`
+  // means "nothing to complete."
+  if (!code) return null;
 
   // Clean up immediately to prevent re-processing
   sessionStorage.removeItem(REDIRECT_AUTH_CODE_KEY);
@@ -1777,11 +1803,30 @@ export async function completeRedirectAuth(): Promise<string | null> {
   const clientId = getClientId();
   if (!clientId) throw new Error('Google Client ID not configured');
 
-  const state: RedirectAuthState = JSON.parse(stateJson);
+  // Two arms (there is no third):
+  //  - LEGACY web (pre-bounce-fix, one release) OR NATIVE hand-off — a stash
+  //    with a `codeVerifier` is present → exchange WITH the verifier (PKCE).
+  //  - NEW web — no stash → exchange WITHOUT a verifier (the confidential proxy
+  //    secures the code via client_secret).
+  // LEGACY (remove after 2026-09-30): the `stateJson`/`codeVerifier` arm exists
+  // only to complete in-flight redirects started by the pre-bounce-fix build.
+  // The NATIVE hand-off ALSO uses this stash, so removing it must keep the
+  // native arm — see redirectState tripwire test.
+  let codeVerifier: string | undefined;
+  if (stateJson) {
+    try {
+      const state: RedirectAuthState = JSON.parse(stateJson);
+      codeVerifier = state.codeVerifier;
+    } catch (e) {
+      // A corrupt stash must not strand the user — fall through to the
+      // no-verifier exchange (the confidential proxy still secures the code).
+      console.warn('[googleAuth] redirect-auth stash unparseable; exchanging without verifier', e);
+    }
+  }
 
   const tokens = await exchangeCodeForTokens({
     code,
-    codeVerifier: state.codeVerifier,
+    codeVerifier,
     redirectUri: getRedirectUri(),
     clientId,
   });
