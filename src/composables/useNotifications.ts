@@ -10,6 +10,8 @@
  *   5. Daily tip issuance — one bell entry per local day from `useBeanTips`.
  */
 import { watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { isPodlessExpectedRoute } from '@/utils/appChrome';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -33,6 +35,7 @@ type BadgingNavigator = Navigator & {
 };
 
 export function useNotifications(): void {
+  const router = useRouter();
   const store = useNotificationsStore();
   const authStore = useAuthStore();
   const settingsStore = useSettingsStore();
@@ -122,7 +125,15 @@ export function useNotifications(): void {
       beanTips.ensureTodayTipIssued();
       communityNudge.ensureNudgeIssued();
       installNudge.ensureNudgeIssued();
-      store.openToLatestAutoOpen();
+      // Never auto-open mid-onboarding. On the iOS create/resume flow the family
+      // can be created on a podless route (e.g. resume-setup), and the ready()
+      // watcher could fire before navigation to /nook — auto-opening the drawer
+      // over the setup screen (the 2026-06-20 report). The seed-as-read above
+      // still runs, so nothing pops once the user lands in /nook. Uses the SAME
+      // predicate App.vue uses for podless routing (no duplicated route logic).
+      if (!isPodlessExpectedRoute(router.currentRoute.value)) {
+        store.openToLatestAutoOpen();
+      }
     },
     { immediate: true }
   );

@@ -127,9 +127,13 @@ async function handleTokenExchange(body, event) {
   const { code, code_verifier, redirect_uri, client_id } = body;
 
   if (!code) return response(400, { error: 'Missing required field: code' }, event);
-  if (!code_verifier) {
-    return response(400, { error: 'Missing required field: code_verifier' }, event);
-  }
+  // `code_verifier` is OPTIONAL because THIS proxy is a confidential client
+  // (adds `client_secret` below) — an intercepted code is useless without the
+  // secret, so PKCE is defense-in-depth, not load-bearing, here. The iOS web
+  // redirect omits it (its verifier can't survive WebKit bounce-tracking
+  // storage clearing); native + legacy still send it. Do NOT relax any other
+  // field — and if a public-client path is ever added, it MUST send + we MUST
+  // require PKCE on that path. See ADR-026 amendment (2026-06-20).
   if (!redirect_uri) {
     return response(400, { error: 'Missing required field: redirect_uri' }, event);
   }
@@ -141,12 +145,14 @@ async function handleTokenExchange(body, event) {
 
   const params = new URLSearchParams({
     code,
-    code_verifier,
     redirect_uri,
     client_id,
+    // ALWAYS attached — "optional verifier" must never be misread as "optional secret".
     client_secret: GOOGLE_CLIENT_SECRET,
     grant_type: 'authorization_code',
   });
+  // Forward the PKCE verifier only when the client sent one.
+  if (code_verifier) params.set('code_verifier', code_verifier);
 
   const googleRes = await fetch(GOOGLE_TOKEN_ENDPOINT, {
     method: 'POST',

@@ -82,7 +82,7 @@ describe('googleAuth — native (Capacitor) OAuth deep-link (ADR-029 A2)', () =>
     // The load-picker path now sets `beanies_redirect_auth` (it didn't before —
     // it used the popup, so the returning deep link was "ignored"). Pin the
     // round-trip: the picker's returnPath survives and the listener navigates to it.
-    await googleAuth.startRedirectAuth('/welcome?resume=load-drive', 'a@b.com');
+    await googleAuth.startRedirectAuth('/welcome?resume=load-drive', 'a@b.com', 'join');
     expect(browserOpen).toHaveBeenCalledOnce();
     const stored = JSON.parse(sessionStorage.getItem(STATE_KEY)!);
     expect(stored.returnPath).toBe('/welcome?resume=load-drive');
@@ -96,7 +96,7 @@ describe('googleAuth — native (Capacitor) OAuth deep-link (ADR-029 A2)', () =>
   });
 
   it('startRedirectAuth (native) opens the system browser with the App Link redirect_uri + a state param', async () => {
-    await googleAuth.startRedirectAuth('/welcome?resume=setup', 'a@b.com');
+    await googleAuth.startRedirectAuth('/welcome?resume=setup', 'a@b.com', 'create');
 
     expect(browserOpen).toHaveBeenCalledOnce();
     const url = new URL((browserOpen.mock.calls[0][0] as { url: string }).url);

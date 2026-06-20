@@ -125,17 +125,21 @@ describe('beginDriveAuthRedirectIfNeeded', () => {
     mockShouldRedirect.mockReturnValue(true);
     mockIsTokenValid.mockReturnValue(false);
 
-    const result = await beginDriveAuthRedirectIfNeeded('/welcome?resume=load-drive', 'a@b.com');
+    const result = await beginDriveAuthRedirectIfNeeded(
+      '/welcome?resume=load-drive',
+      'a@b.com',
+      'join'
+    );
 
     expect(result).toBe(true);
-    expect(mockStartRedirect).toHaveBeenCalledWith('/welcome?resume=load-drive', 'a@b.com');
+    expect(mockStartRedirect).toHaveBeenCalledWith('/welcome?resume=load-drive', 'a@b.com', 'join');
   });
 
   it('does NOT redirect (false) when a valid token is already held — caller proceeds inline', async () => {
     mockShouldRedirect.mockReturnValue(true);
     mockIsTokenValid.mockReturnValue(true);
 
-    expect(await beginDriveAuthRedirectIfNeeded('/p')).toBe(false);
+    expect(await beginDriveAuthRedirectIfNeeded('/p', undefined, 'create')).toBe(false);
     expect(mockStartRedirect).not.toHaveBeenCalled();
   });
 
@@ -143,7 +147,7 @@ describe('beginDriveAuthRedirectIfNeeded', () => {
     mockShouldRedirect.mockReturnValue(false);
     mockIsTokenValid.mockReturnValue(false);
 
-    expect(await beginDriveAuthRedirectIfNeeded('/p')).toBe(false);
+    expect(await beginDriveAuthRedirectIfNeeded('/p', undefined, 'create')).toBe(false);
     expect(mockStartRedirect).not.toHaveBeenCalled();
   });
 
@@ -151,17 +155,19 @@ describe('beginDriveAuthRedirectIfNeeded', () => {
     mockShouldRedirect.mockReturnValue(true);
     mockIsTokenValid.mockReturnValue(true);
 
-    expect(await beginDriveAuthRedirectIfNeeded('/p', undefined, { forceReauth: true })).toBe(true);
-    expect(mockStartRedirect).toHaveBeenCalledWith('/p', undefined);
+    expect(
+      await beginDriveAuthRedirectIfNeeded('/p', undefined, 'reconnect', { forceReauth: true })
+    ).toBe(true);
+    expect(mockStartRedirect).toHaveBeenCalledWith('/p', undefined, 'reconnect');
   });
 
   it('forceReauth on a popup surface still does NOT redirect (transport decision wins)', async () => {
     mockShouldRedirect.mockReturnValue(false);
     mockIsTokenValid.mockReturnValue(true);
 
-    expect(await beginDriveAuthRedirectIfNeeded('/p', undefined, { forceReauth: true })).toBe(
-      false
-    );
+    expect(
+      await beginDriveAuthRedirectIfNeeded('/p', undefined, 'reconnect', { forceReauth: true })
+    ).toBe(false);
     expect(mockStartRedirect).not.toHaveBeenCalled();
   });
 
@@ -170,7 +176,9 @@ describe('beginDriveAuthRedirectIfNeeded', () => {
     mockIsTokenValid.mockReturnValue(false);
     mockStartRedirect.mockRejectedValue(new Error('Browser.open rejected'));
 
-    await expect(beginDriveAuthRedirectIfNeeded('/p')).rejects.toThrow('Browser.open rejected');
+    await expect(beginDriveAuthRedirectIfNeeded('/p', undefined, 'create')).rejects.toThrow(
+      'Browser.open rejected'
+    );
   });
 });
 

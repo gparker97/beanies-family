@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-19",
-    "translationCount": 3630
+    "lastUpdated": "2026-06-20",
+    "translationCount": 3631
   },
   "translations": {
     "app.name": {
@@ -16242,9 +16242,9 @@
       "lastUpdated": "2026-06-15"
     },
     "oauth.storageErrorBody": {
-      "translation": "您的浏览器在登录期间阻止存储（这通常发生在隐私浏览中）。请在正常窗口中重试。",
-      "hash": "iuxwue",
-      "lastUpdated": "2026-06-15"
+      "translation": "我们无法完成与Google的连接。请尝试重新登录。",
+      "hash": "if43t8",
+      "lastUpdated": "2026-06-20"
     },
     "plausibleExclude.title.justDone": {
       "translation": "完成—您已被排除在外",
@@ -18155,6 +18155,11 @@
       "translation": "Google需要访问您的家庭文件的权限。请重新连接Google云端硬盘，并在出现提示时允许文件访问。",
       "hash": "nez4ve",
       "lastUpdated": "2026-06-19"
+    },
+    "app.initError.stalled": {
+      "translation": "安装花费的时间比预期长。重新加载以重试。",
+      "hash": "q6vbn8",
+      "lastUpdated": "2026-06-20"
     }
   }
 }

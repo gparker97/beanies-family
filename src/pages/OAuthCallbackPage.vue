@@ -10,15 +10,30 @@
  */
 import { onMounted } from 'vue';
 import { REDIRECT_AUTH_CODE_KEY } from '@/services/google/googleAuth';
+import { decodeRedirectState } from '@/services/google/redirectState';
 import { reportError } from '@/utils/errorReporter';
 import { useTranslation } from '@/composables/useTranslation';
 
 const { t } = useTranslation();
 
+/** Stash the auth code for `completeRedirectAuth()` on the returnPath load.
+ *  This post-bounce, same-origin write reliably survives (it's not a tracking
+ *  bounce). Returns false if storage throws — caller treats that as "lost". */
+function stashCode(code: string): boolean {
+  try {
+    sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY, code);
+    return true;
+  } catch (e) {
+    console.warn('[OAuthCallback] failed to stash auth code', e);
+    return false;
+  }
+}
+
 onMounted(() => {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   const error = params.get('error');
+  const stateParam = params.get('state');
 
   if (window.opener) {
     // Popup mode — send code to parent and close
@@ -33,21 +48,35 @@ onMounted(() => {
     return;
   }
 
-  // Redirect mode — save code and redirect back to the original page. The
-  // sessionStorage read itself can THROW in iOS Safari Private Browsing (the
-  // same context that loses the state across the Google round-trip), so guard
-  // it — a throw is treated identically to "state missing".
-  let stateJson: string | null = null;
-  try {
-    stateJson = sessionStorage.getItem('beanies_redirect_auth');
-  } catch (e) {
-    console.warn('[OAuthCallback] sessionStorage read failed (private browsing?):', e);
+  // Redirect mode — flat precedence ladder. Each transport forwards-and-returns
+  // or falls through to the next.
+
+  // NEW PATH: routing rides in the OAuth `state` param (survives WebKit
+  // bounce-tracking storage clearing — the iOS failure mode). No dependency on
+  // pre-bounce sessionStorage. `decodeRedirectState` validates the same-origin
+  // returnPath (open-redirect guard) and returns null on anything malformed.
+  const decoded = decodeRedirectState(stateParam);
+  if (decoded && code) {
+    if (stashCode(code)) {
+      window.location.href = decoded.returnPath;
+      return;
+    }
+    // Couldn't forward the code — fall through to the reported "lost" surface.
   }
 
-  if (stateJson && code) {
+  // LEGACY (remove after 2026-09-30): completes in-flight redirects started by
+  // the pre-bounce-fix build, which wrote `beanies_redirect_auth` before the
+  // redirect. The getItem can throw on blocked storage — guarded.
+  let legacyState: string | null = null;
+  try {
+    legacyState = sessionStorage.getItem('beanies_redirect_auth');
+  } catch (e) {
+    console.warn('[OAuthCallback] legacy state read failed', e);
+  }
+  if (legacyState && code) {
     try {
       sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY, code);
-      const state = JSON.parse(stateJson);
+      const state = JSON.parse(legacyState);
       window.location.href = state.returnPath || '/';
     } catch {
       window.location.href = '/';
@@ -55,19 +84,16 @@ onMounted(() => {
     return;
   }
 
-  // We have an auth `code` but couldn't recover the redirect state — the
-  // sessionStorage write from `startRedirectAuth` didn't survive (or threw),
-  // which is the iOS-Private-Browsing failure mode. Don't silently drop the
-  // code at `/`; send the user to an actionable error surface + report it.
+  // GENUINELY LOST: a code in hand we can't forward (no valid `state`, no legacy
+  // stash, or the code stash threw). A hard onboarding block — report it.
   if (code) {
     reportError({
       surface: 'oauth.redirectStateLost',
       message:
-        'OAuth redirect returned with a code but no sessionStorage state — likely Private Browsing blocked storage during the redirect',
-      // Critical, not warning: a code-in-hand-but-state-lost HARD-BLOCKS
-      // onboarding for a real (even non-private) user — it must page Slack, not
-      // die in telemetry. The device's `web_storage` context distinguishes
-      // throwing/blocked storage from a wipe (2026-06-20).
+        'OAuth redirect returned with a code but no usable routing state (malformed/absent `state` param and no legacy stash, or storage write failed)',
+      // Critical: a code-in-hand-but-routing-lost HARD-BLOCKS onboarding — it
+      // must page Slack. The device's `web_storage` context distinguishes a
+      // genuine storage fault from this (now-rare) malformed-callback case.
       severity: 'critical',
     });
     window.location.href = '/welcome?authError=storage';
