@@ -17,6 +17,16 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.06.20',
+    date: '2026-06-20',
+    month: '20 june 2026',
+    summary: {
+      en: 'Creating or joining a family on iPhone now works smoothly - no more getting stuck partway through Google sign-in.',
+      beanie:
+        'creating or joining a family on iphone now works smoothly - no more getting stuck partway through google sign-in.',
+    },
+  },
+  {
     version: '2026.06.19',
     date: '2026-06-19',
     month: '19 june 2026',
