@@ -61,7 +61,7 @@ function ingestApiKey(): string {
  * Buffer a finished log record. No-ops (with a single warn) when no ingest URL
  * is configured, so `logEvent` is a cheap no-op in dev/preview without the env.
  */
-export function enqueueLogEvent(record: LogRecord): void {
+export function enqueueLogEvent(record: LogRecord, flush = false): void {
   if (!ingestUrl()) {
     if (!warnedNoUrl) {
       console.warn('[telemetry] VITE_BEANIES_LOG_INGEST_URL not set — diagnostic logging disabled');
@@ -81,7 +81,13 @@ export function enqueueLogEvent(record: LogRecord): void {
 
   startListening();
 
-  if (buffer.length >= BATCH_THRESHOLD) {
+  // `flush` forces an immediate send (bypassing the batch threshold) so a
+  // critical event survives a hang-then-force-quit — the buffered batch/
+  // interval/pagehide path can lose the buffer if the page dies before the next
+  // trigger. Used for `severity:'critical'` reports (e.g. the onboarding-stall
+  // watchdog), which are exactly the failures we can't afford to lose. The fetch
+  // uses keepalive, so it can outlive the page.
+  if (flush || buffer.length >= BATCH_THRESHOLD) {
     void tryFlush();
   }
 }

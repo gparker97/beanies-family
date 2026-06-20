@@ -36,6 +36,12 @@ export interface LogEventInput {
   context?: Record<string, unknown>;
   /** Error object — stack extracted; the object itself is not sent. */
   error?: unknown;
+  /**
+   * Force an immediate flush (bypass the batch threshold) so the event survives
+   * a hang-then-force-quit. Set for critical reports. Fire-and-forget; the queue
+   * coalesces concurrent flushes.
+   */
+  flush?: boolean;
 }
 
 /** A finished, redacted, ship-ready record. System fields + allowlisted context. */
@@ -115,7 +121,7 @@ export function logEvent(input: LogEventInput): void {
       ...(stack ? { stack } : {}),
     };
 
-    enqueueLogEvent(record);
+    enqueueLogEvent(record, input.flush);
   } catch (e) {
     console.warn('[telemetry] logEvent failed', e);
   } finally {
