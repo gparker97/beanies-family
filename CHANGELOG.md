@@ -23,6 +23,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - **Better behind-the-scenes diagnostics for sign-in and onboarding problems.** When something goes wrong setting up or signing in, the app now records whether your browser's local storage is actually working (a common, hard-to-see cause of iPhone onboarding failures) and includes a short trail of what it was doing — so genuine blockers get flagged to the team instead of failing silently. No change to anything you see or do; this only improves how we catch and fix real issues.
+- **Travel plans header restyled to match the rest of the app.** The travel page now uses the same warm handwritten welcome line as Beanie Lists and To-Dos, instead of the older bold title bar.
 
 ## 2026-06-19
 
