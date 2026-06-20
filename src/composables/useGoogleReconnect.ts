@@ -39,7 +39,7 @@ export function useGoogleReconnect() {
       // pending OAuth code via completeRedirectAuth().
       if (shouldUseRedirectAuth()) {
         const returnPath = `${window.location.pathname}${window.location.search}`;
-        await startRedirectAuth(returnPath, loginHint);
+        await startRedirectAuth(returnPath, loginHint, 'reconnect');
         // Page is navigating away. The promise will not resolve in any
         // useful way. Return true so callers don't think they failed.
         return true;

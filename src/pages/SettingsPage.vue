@@ -324,7 +324,11 @@ async function handleSwitchGoogleAccount() {
     armAccountSwitch();
 
     if (shouldUseRedirectAuth()) {
-      await startRedirectAuth(`${window.location.pathname}${window.location.search}`);
+      await startRedirectAuth(
+        `${window.location.pathname}${window.location.search}`,
+        undefined,
+        'reconnect'
+      );
       return; // page navigates away
     }
     await requestAccessToken({ forceConsent: true });

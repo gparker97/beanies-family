@@ -17,6 +17,7 @@ import {
   startRedirectAuth,
   isTokenValid,
 } from '@/services/google/googleAuth';
+import type { RedirectMode } from '@/services/google/redirectState';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import * as syncService from '@/services/sync/syncService';
@@ -55,7 +56,8 @@ export { RESUME_SETUP_PATH };
  */
 export async function beginDriveAuthRedirectIfNeeded(
   returnPath: string,
-  loginHint?: string,
+  loginHint: string | undefined,
+  mode: RedirectMode,
   opts: { forceReauth?: boolean } = {}
 ): Promise<boolean> {
   if (shouldUseRedirectAuth() && (opts.forceReauth || !isTokenValid())) {
@@ -70,7 +72,7 @@ export async function beginDriveAuthRedirectIfNeeded(
     if (!opts.forceReauth && (await tryReconnectSilently(expectedEmail))) {
       return false; // connection restored silently; caller proceeds with the token
     }
-    await startRedirectAuth(returnPath, loginHint);
+    await startRedirectAuth(returnPath, loginHint, mode);
     return true;
   }
   return false;
@@ -144,7 +146,7 @@ export async function connectDriveStorage(
   // listener (native) or OAuthCallbackPage (web) drives the resume-setup
   // continuation on return. `shouldUseRedirectAuth()` already covers native
   // (ADR-029), so no separate `isNative()` check is needed here.
-  if (await beginDriveAuthRedirectIfNeeded(RESUME_SETUP_PATH, opts.googleEmail)) {
+  if (await beginDriveAuthRedirectIfNeeded(RESUME_SETUP_PATH, opts.googleEmail, 'create')) {
     return { status: 'redirecting' };
   }
 

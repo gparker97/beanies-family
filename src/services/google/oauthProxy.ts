@@ -92,7 +92,14 @@ async function safeJsonParse(res: Response): Promise<unknown> {
  */
 export async function exchangeCodeForTokens(params: {
   code: string;
-  codeVerifier: string;
+  /**
+   * PKCE verifier. OPTIONAL because the confidential OAuth proxy adds
+   * `client_secret` server-side, so the code can't be redeemed without it.
+   * The web redirect flow omits this (its verifier can't survive iOS
+   * bounce-tracking storage clearing); native + legacy still send it.
+   * See ADR-026 amendment (2026-06-20).
+   */
+  codeVerifier?: string;
   redirectUri: string;
   clientId: string;
 }): Promise<TokenResponse> {
@@ -103,7 +110,8 @@ export async function exchangeCodeForTokens(params: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       code: params.code,
-      code_verifier: params.codeVerifier,
+      // Only send the verifier when present — no empty-string sends.
+      ...(params.codeVerifier ? { code_verifier: params.codeVerifier } : {}),
       redirect_uri: params.redirectUri,
       client_id: params.clientId,
     }),

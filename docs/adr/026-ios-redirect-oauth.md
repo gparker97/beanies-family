@@ -48,3 +48,41 @@ Three faults compounded:
 - `src/router/index.ts`, `src/App.vue` — the `podCreated` routing guard.
 - `src/utils/timing.ts` — `withTimeout()`.
 - `src/config/features.ts` — the loud warn for a missing error webhook.
+
+---
+
+## Amendment (2026-06-20): carry redirect routing through the OAuth `state` param; drop the web PKCE verifier
+
+> Status: Accepted. Supersedes Decision §2's reliance on `sessionStorage` for the web redirect, and the 2026-06-19 "round 2" create-resume password stash.
+
+### Context
+
+The full-page redirect flow above stored the redirect state — `{ codeVerifier, returnPath }` — in `sessionStorage['beanies_redirect_auth']` **before** navigating to Google, and the 2026-06-19 "round 2" change additionally stashed the create-wizard password there to avoid the re-enter. On iOS Safari this never worked: **WebKit's bounce-tracking protection clears the initiating site's script-writable storage across the cross-site OAuth redirect** (`app.beanies.family → accounts.google.com → app.beanies.family`), _independently of the "Prevent Cross-Site Tracking" toggle_ — it reproduces with that toggle OFF, in a plain Safari tab.
+
+Telemetry confirmed it three ways (a `#beanies-errors` Slack alert + two CloudWatch runs): at the exact instant of failure the device reports `web_storage: ls=true,ss=true` — **storage works**; only the _pre-bounce_ values vanish. The user saw: redirect-state-lost → recovery screen → second password → what's-new drawer → a silent "counting beans…" hang → a misleading "Private Browsing" toast.
+
+### Decision
+
+1. **Web redirect carries routing through the OAuth `state` parameter** (`src/services/google/redirectState.ts` — `encode/decodeRedirectState`), not pre-bounce `sessionStorage`. `state` round-trips through Google in the URL, immune to storage clearing. It carries ONLY non-secret routing: `returnPath`, a `mode` (`create`/`join`/`reconnect`), and a version `v`.
+2. **The web redirect drops the client-stored PKCE verifier.** The auth URL omits `code_challenge`; the exchange sends no `code_verifier`. The OAuth proxy Lambda's `code_verifier` is now optional.
+3. **The password is re-entered ONCE** on the resume screen (ADR-026 §2's original, honest design). The round-2 sessionStorage password stash is removed entirely.
+4. **The native path is unchanged.** Native storage is not bounce-cleared; it keeps PKCE + its CSRF `state` + the `sessionStorage` stash, and rides the legacy arm of `completeRedirectAuth`.
+5. **A one-release legacy fallback** (`beanies_redirect_auth` read) completes in-flight pre-fix redirects, guarded by a dated CI tripwire test (remove after 2026-09-30).
+6. **An onboarding init watchdog** (App.vue `INIT_TIMEOUTS.watchdog`, 35s) converts a silent "counting beans" hang into the existing recovery overlay + `app.onboardingStallTimeout` telemetry.
+
+### Invariants (do not break)
+
+- **PKCE may be dropped on the web redirect ONLY because the OAuth proxy is a confidential client** (it adds `client_secret` server-side, so an intercepted code can't be redeemed). If any token exchange is ever added that does NOT go through that confidential proxy, **PKCE MUST be restored on that path**. Recorded at: the web branch of `startRedirectAuth` (in-code comment), `infrastructure/lambda/oauth/index.mjs handleTokenExchange` (comment + a "client_secret always attached" test), and here.
+- **`returnPath` in `state` MUST be validated as a same-origin relative path** (a single leading `/`, never `//`) on decode — it now travels in a URL an attacker could craft, so this is the open-redirect guard. Recorded in `redirectState.decodeRedirectState` + its unit tests.
+- **`state` version `v` is an EXACT-MATCH gate** — an old client must never best-effort-parse a newer shape. Additive changes bump `v` and accept both versions for one release.
+- **`state` carries NO secrets** — never a password, token, family key, email, or name.
+
+### Key files
+
+- `src/services/google/redirectState.ts` — the `state` codec + same-origin/version validation.
+- `src/services/google/googleAuth.ts` — `startRedirectAuth(mode)` web vs native branches; `completeRedirectAuth` two-arm verifier sourcing; optional `code_challenge` in `buildAuthUrl`.
+- `src/services/google/oauthProxy.ts` + `infrastructure/lambda/oauth/index.mjs` — optional `code_verifier`.
+- `src/pages/OAuthCallbackPage.vue` — reads `state` from the URL; new/legacy/lost precedence.
+- `src/components/login/resumePaths.ts`, `CreatePodView.vue`, `ResumePodSetup.vue` — round-2 password stash removed; single clean re-entry via the generic `identity` phase.
+- `src/App.vue` — `INIT_TIMEOUTS` + init watchdog; `src/composables/useNotifications.ts` — no auto-open mid-onboarding.
+- Full plan: `docs/plans/2026-06-20-ios-oauth-bounce-state-param.md`. Cross-refs: ADR-020 (PKCE migration), ADR-029 (native).

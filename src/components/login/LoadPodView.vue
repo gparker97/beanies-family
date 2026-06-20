@@ -611,6 +611,7 @@ async function openDrivePicker(opts: { forceNewAccount?: boolean; isResume?: boo
       await syncStore.beginDriveAuthRedirect(
         LOAD_DRIVE_PATH,
         syncStore.providerAccountEmail ?? undefined,
+        'join',
         { forceReauth: opts.forceNewAccount }
       )
     ) {

@@ -97,7 +97,15 @@ describe('OAuth Lambda handler', () => {
       assert.match(res.parsedBody.error, /code/);
     });
 
-    it('returns 400 when code_verifier is missing', async () => {
+    it('exchanges WITHOUT code_verifier (confidential client) — and still sends client_secret', async () => {
+      // The iOS web redirect omits the PKCE verifier (it can't survive
+      // bounce-tracking storage clearing); the confidential proxy secures the
+      // code via client_secret. See ADR-026 amendment (2026-06-20).
+      globalThis.fetch = mock.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'ya29.access', token_type: 'Bearer', expires_in: 3600 }),
+      }));
       const event = makeEvent({
         body: {
           code: 'c',
@@ -106,8 +114,13 @@ describe('OAuth Lambda handler', () => {
         },
       });
       const res = parseResponse(await handler(event));
-      assert.equal(res.statusCode, 400);
-      assert.match(res.parsedBody.error, /code_verifier/);
+      assert.equal(res.statusCode, 200);
+      const fetchBody = globalThis.fetch.mock.calls[0].arguments[1].body;
+      assert.ok(
+        fetchBody.includes('client_secret=test-secret'),
+        'client_secret must always be attached'
+      );
+      assert.ok(!fetchBody.includes('code_verifier='), 'no verifier forwarded when none was sent');
     });
 
     it('returns 400 when redirect_uri is missing', async () => {

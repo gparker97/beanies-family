@@ -646,7 +646,38 @@ async function loadFamilyData() {
 // next thing `hardReload()` does.
 let chunkReloadInProgress = false;
 
+// Init timeouts — STRICTLY INCREASING; each layer is the safety net for the one
+// above it. Do NOT reorder or collapse (a unit test pins the ordering). The
+// innermost bound is the 15s OAuth-proxy fetch abort in `oauthProxy.ts`; these
+// are the App.vue init layers above it. The watchdog is the last resort against
+// a silent "counting beans" wedge (init stuck with `isInitializing` true and no
+// inner timeout to escape it) — the iOS onboarding freeze, 2026-06-20.
+const INIT_TIMEOUTS = {
+  completeRedirectAuth: 20_000, // the whole code↔token exchange (one fetch + commit)
+  dataLoad: 30_000, // dismiss the data skeleton; loading continues in the background
+  watchdog: 35_000, // last resort: flip isInitializing false + show the recovery overlay
+} as const;
+
 onMounted(async () => {
+  // Watchdog: if init never settles (a downstream await hangs before the
+  // data-load timeout can fire), flip out of "counting beans" into the EXISTING
+  // recovery overlay rather than freezing forever. Cleared in the finally on any
+  // resolution; only fires when the body genuinely never completes.
+  const initWatchdog = setTimeout(() => {
+    if (chunkReloadInProgress) return; // a hardReload is already swapping the page
+    if (!isInitializing.value && !isLoadingData.value) return; // already settled
+    console.error('[App] init watchdog fired — setup stalled; surfacing recovery overlay');
+    initError.value = t('app.initError.stalled');
+    initErrorDetail.value = initBreadcrumbs.join('\n');
+    isInitializing.value = false;
+    isLoadingData.value = false;
+    reportError({
+      surface: 'app.onboardingStallTimeout',
+      message: `App init stalled — watchdog fired after ${INIT_TIMEOUTS.watchdog}ms`,
+      severity: 'critical',
+      context: { route_path: route.path },
+    });
+  }, INIT_TIMEOUTS.watchdog);
   try {
     // Ensure initial route is resolved before checking route names
     await router.isReady();
@@ -782,8 +813,8 @@ onMounted(async () => {
         // (the inner fetch already times out at 15s).
         const redirectToken = await withTimeout(
           completeRedirectAuth(),
-          20_000,
-          'completeRedirectAuth() timed out after 20000ms — silent refresh failed'
+          INIT_TIMEOUTS.completeRedirectAuth,
+          'completeRedirectAuth() timed out — silent refresh failed'
         );
         if (redirectToken) {
           initBreadcrumbs.push('auth: consumed pending redirect-auth token');
@@ -958,7 +989,7 @@ onMounted(async () => {
 
     // Timeout guard: if loading takes too long (Google Drive 5xx, network issues),
     // dismiss the skeleton so the app is usable. Data continues loading in background.
-    const INIT_TIMEOUT_MS = 30_000;
+    const INIT_TIMEOUT_MS = INIT_TIMEOUTS.dataLoad;
     let initTimedOut = false;
     const timeoutId = setTimeout(() => {
       initTimedOut = true;
@@ -1142,6 +1173,10 @@ onMounted(async () => {
     initErrorDetail.value = `${stack}\n\n--- Breadcrumbs ---\n${breadcrumbLog}`;
     console.error('[App] Initialization failed:', err, '\nBreadcrumbs:', breadcrumbLog);
   } finally {
+    // Init resolved (success, early return, or error) — the watchdog is no
+    // longer needed. (If the body instead WEDGED forever, this finally never
+    // runs and the watchdog fires — exactly the freeze it exists to break.)
+    clearTimeout(initWatchdog);
     // Always dismiss loading states, even on early return or error —
     // EXCEPT when a chunk-load `hardReload()` is in flight. Keep the
     // initial spinner visible until `location.replace()` swaps the page,

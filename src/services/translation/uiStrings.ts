@@ -2987,9 +2987,8 @@ const STRING_DEFS = {
     beanie: "sign-in couldn't finish",
   },
   'oauth.storageErrorBody': {
-    en: 'Your browser blocked storage during sign-in (this usually happens in Private Browsing). Please try again in a normal window.',
-    beanie:
-      'your browser blocked storage during sign-in (this usually happens in private browsing). please try again in a normal window.',
+    en: "We couldn't finish connecting to Google. Please try signing in again.",
+    beanie: "we couldn't finish connecting to google. please try signing in again.",
   },
   'auth.signOut': { en: 'Sign Out', beanie: 'sign out' },
   'auth.signOutConfirmTitle': { en: 'Sign Out', beanie: 'sign out' },
@@ -5806,6 +5805,10 @@ const STRING_DEFS = {
     en: 'The app failed to start properly. You can try reloading, or clear your data and start fresh.',
     beanie:
       'the app failed to start properly. you can try reloading, or clear your data and start fresh.',
+  },
+  'app.initError.stalled': {
+    en: 'Setup is taking longer than expected. Reload to try again.',
+    beanie: 'setup is taking longer than expected. reload to try again.',
   },
   'app.initError.reload': { en: 'Reload', beanie: 'reload' },
   'app.initError.clearData': { en: 'Sign Out & Clear Data', beanie: 'sign out & clear data' },
