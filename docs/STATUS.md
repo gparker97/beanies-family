@@ -1,90 +1,119 @@
 # Project Status
 
-> **Last updated:** 2026-06-20 (Saturday — **ROOT-CAUSED and FIXED + DEPLOYED the iPhone onboarding failure (the ITP hypothesis was WRONG). The comprehensive ADR-026 bounce-tracking fix is LIVE in prod: oauth Lambda (`code_verifier`-optional) deployed first via Terraform, THEN the Vue app (`deploy.yml`). Prod serves build `b3fb8744` (200 OK). Working tree clean, in sync with `origin/main`. ⏳ AWAITING greg's iPhone device test to confirm the fix end-to-end — then pull CloudWatch to verify. Earlier today, the observability batch `9ab3d971` was also deployed.**)
+> **Last updated:** 2026-06-20 (Saturday, later — **TWO threads. (1) ⛔ iPhone onboarding STILL BROKEN: greg tested the deployed bounce-tracking fix on a BRAND-NEW iPhone and hit the FREEZING "counting beans" page DIRECTLY AFTER the Google Drive consent screen. The fix is NOT confirmed working — it failed on this device. greg will retest on ANOTHER iPhone next session. (2) Planned the Beanie Lists edit/reorder feature — a 4-pass plan is SAVED (`docs/plans/2026-06-20-beanie-lists-edit-and-reorder.md`, commit `01de8172`) but NOT implemented; greg implements in another session. Working tree clean, in sync with `origin/main`.**)
 >
-> ## ⭐⭐ NEXT SESSION — START HERE: onboarding fix is DEPLOYED; verify on device + pull telemetry ⭐⭐
+> ## ⛔⛔ NEXT SESSION — START HERE: iPhone onboarding STILL freezes on "counting beans" ⛔⛔
 >
-> **The state in one paragraph:** the iPhone onboarding bounce-tracking fix is fully implemented, committed, pushed, and **DEPLOYED to prod** (Vue build `b3fb8744`; oauth Lambda `beanies-family-oauth-prod` updated `2026-06-20T02:29Z` to the `code_verifier`-optional version, deployed BEFORE the Vue app per the hard ordering). `npm run validate` was green (3378 unit tests) + the oauth Lambda suite green (33 tests). **The deploy is DONE. The remaining work is verification.**
+> **The new finding (2026-06-20 device test):** greg ran create-a-family on a **brand-new iPhone** (so almost certainly the new build — a fresh device has no stale PWA cache; confirm the welcome-gate marker reads `b3fb874` to be certain). The flow **froze on the "counting beans" loading screen immediately after the Google Drive consent screen.** This is the post-redirect init hang — it wedges AFTER returning from Google, during the OAuth-callback → pod-load sequence. **The deployed `state`-param fix did NOT resolve it on this device.** greg will **retest on a second, different iPhone next session** to see if it's device-specific or universal.
 >
-> ### ⭐ THE REMAINING STEP — verify on device, then confirm via telemetry
+> ### ⭐ THE DIAGNOSTIC PATH (do this first next session — telemetry will say exactly where it wedged)
 >
-> 1. **greg re-runs create-a-family on his iPhone** on the NEW build. He must FULLY update first: swipe-close Safari/the PWA and reopen; the welcome-gate marker should read `b3fb874`. Test BOTH a **Safari tab** (the primary path) and ideally the **installed PWA**. Expected: Google sign-in → ONE password step → `/nook`, with **no** recovery screen, **no** second password, **no** what's-new pop, **no** "counting beans" freeze.
-> 2. **Then pull CloudWatch to confirm.** Query the telemetry firehose (`/aws/lambda/beanies-family-telemetry-prod`, Logs Insights, `filter ispresent(surface)`, last ~20 min). Success looks like: the `auth-init` path completes and **NO `oauth.redirectStateLost`** fires for the `b3fb8744` build. (`web_storage` + breadcrumbs now ride along on any failure surface if something's still off.) AWS access works from this environment (the `greg` IAM user); the query helper pattern is in this session's history — `aws logs start-query … --query-string 'fields @message | filter ispresent(surface) | sort @timestamp asc'` then `get-query-results`, parse the `@message` JSON after the `tab`-delimited Lambda prefix.
-> 3. **If it WORKS** → close out the onboarding saga (mark the deferred `app.onboardingStallTimeout` watchdog + the legacy tripwire as the only follow-ups). **If anything is STILL off** → the breadcrumbs + `web_storage` are now captured server-side, so read them to see exactly where it wedges; the most likely residual is the installed-PWA ↔ Safari storage isolation (the `state`-param fix is storage-independent so it SHOULD be fine, but confirm).
+> The whole point of the observability batch (`9ab3d971`) was this moment: a freeze now captures breadcrumbs + `web_storage` server-side. **Pull CloudWatch for the failing build before changing any code.**
 >
-> ### Follow-ups created this session (not blocking)
+> 1. **Query the telemetry firehose** `/aws/lambda/beanies-family-telemetry-prod` (Logs Insights), last ~24h, for the `b3fb8744`/`b3fb874` build. Pattern (AWS works from this env via the `greg` IAM user): `aws logs start-query --log-group-name /aws/lambda/beanies-family-telemetry-prod --start-time <epoch> --end-time <epoch> --query-string 'fields @message | filter ispresent(surface) | sort @timestamp asc'` then `aws logs get-query-results --query-id <id>`; parse the `@message` JSON after the tab-delimited Lambda prefix.
+> 2. **The key question the telemetry answers:** did **`oauth.redirectStateLost`** still fire?
+>    - **If YES** → the `state` param did NOT survive the bounce even via the URL on this device (unexpected — it rides in the redirect URL, not storage). Re-examine `OAuthCallbackPage.vue`'s state-read ladder (new → legacy → lost) and whether the redirect actually round-tripped the `state` query param.
+>    - **If NO `redirectStateLost`** → state recovery SUCCEEDED and the wedge is LATER: the freeze is in the **create-resume / pod-setup / Drive-load** path (`ResumePodSetup.vue`, `LoadPodView.openDrivePicker`, central load / `syncStore`), NOT the OAuth state handling. That narrows it sharply — "counting beans" right after consent = the pod/Drive load never resolves or never advances the wizard. Read the `breadcrumbs` + `web_storage` on whatever surface DID fire (or check whether the 35s `app.onboardingStallTimeout` watchdog fired → if it did, its surface + breadcrumbs pinpoint the stall; if it did NOT fire after a long freeze, the watchdog itself isn't arming on this path — a bug in the `INIT_TIMEOUTS` wiring in `App.vue`).
+> 3. **Only after reading telemetry**, form the next hypothesis. We've been wrong twice by guessing (ITP, then round-2 storage) — let the server-side breadcrumbs lead this time. Do NOT ship another speculative fix without telemetry pointing at the wedge.
 >
-> - **Dated CI tripwire** (`src/services/google/legacyRedirectTransport.tripwire.test.ts`) FAILS after **2026-09-30** to force removal of the one-release legacy `beanies_redirect_auth` web transport (in `OAuthCallbackPage.vue` + `completeRedirectAuth`). When it fails: delete those two legacy branches (NOT the native hand-off, which also reads `REDIRECT_AUTH_KEY`) + the test. A tracked issue for this was planned (`/beanies-new-issue` "Remove legacy `beanies_redirect_auth` web transport") — **NOT yet filed**; file it if desired.
-> - **`INIT_TIMEOUTS` ordering test deliberately skipped** — the constants are local to `App.vue`'s `onMounted` (not exported); exporting internals just to assert a 3-literal strictly-increasing block (already commented "do not reorder") was judged over-exposure. Revisit only if the watchdog misbehaves.
->
-> ### What was root-caused (the ITP hypothesis below was WRONG)
->
-> Three independent telemetry captures (a `#beanies-errors` Slack alert + two CloudWatch runs after the telemetry Lambda was updated) proved: at the exact instant of failure the device reports **`web_storage: ls=true,ss=true`** — storage WORKS; only the values written BEFORE the redirect vanish. greg confirmed it reproduces in a **plain Safari tab** with **"Prevent Cross-Site Tracking" OFF**. Root cause: **WebKit bounce-tracking protection clears the initiating site's script-writable storage across the cross-site OAuth bounce** (`app → accounts.google.com → app`), independently of the ITP toggle. So `sessionStorage['beanies_redirect_auth']` (codeVerifier + returnPath) and the round-2 create-resume password — all written pre-bounce — were gone on return, cascading into: recovery screen → second password → what's-new pop → silent "counting beans" hang → misleading "Private Browsing" toast.
->
-> ### What the fix does (committed in `04f18785`; plan `docs/plans/2026-06-20-ios-oauth-bounce-state-param.md`; ADR-026 amendment)
->
-> Enabled by two facts: the OAuth proxy is a **confidential client** (holds `client_secret`, so PKCE is defense-in-depth, not load-bearing) and ADR-026 already deems the web redirect CSRF-safe (same-origin top-level nav).
->
-> - **Carry routing through the OAuth `state` param** (new `src/services/google/redirectState.ts` — `encode/decodeRedirectState`, validates same-origin `returnPath` + exact-match version). Survives the bounce because it rides in the URL, not storage.
-> - **Drop the web PKCE verifier**; the Lambda's `code_verifier` is now optional (`infrastructure/lambda/oauth/index.mjs` + SPEC + tests — ALWAYS still attaches `client_secret`).
-> - **Thread a REQUIRED `mode` (`create`/`join`/`reconnect`) through all FIVE `startRedirectAuth` call sites** (`connectStorage`, `syncStore`, `useGoogleReconnect`, `usePickBeanpodFile`, `SettingsPage` → `LoadPodView`) — compiler-enforced coverage.
-> - **Remove the round-2 password stash; single clean password re-entry** via the existing `identity` phase (`resumePaths.ts`/`CreatePodView.vue`/`ResumePodSetup.vue`).
-> - **`OAuthCallbackPage.vue`** reads `state` from the URL (new → legacy → lost ladder); accurate copy (no "Private Browsing").
-> - **Init watchdog** (`App.vue` `INIT_TIMEOUTS`, 35s → existing recovery overlay + `app.onboardingStallTimeout`); **no what's-new auto-open mid-onboarding** (`useNotifications.ts`).
-> - **Native path UNCHANGED.** One-release legacy `beanies_redirect_auth` fallback guarded by a **dated CI tripwire** (`legacyRedirectTransport.tripwire.test.ts`, fails after **2026-09-30** to force cleanup).
->
-> ### Earlier today (2026-06-20, ALREADY DEPLOYED to prod as `9ab3d971`)
->
-> The observability-first batch: OAuthCallback skip guard (killed the `registerGoogleAccountAssertion` null-import crash), a real-round-trip `localStorage`/`sessionStorage` probe in device diagnostics (`web_storage=ls=…,ss=…`), throw-safe chunk-recovery counter, `oauth.redirectStateLost` → `critical`, and email-redacted breadcrumbs on init-failure reports. The telemetry Lambda was also deployed (Terraform) so `web_storage`/`breadcrumbs` survive ingest. Plan `docs/plans/2026-06-20-iphone-onboarding-observability.md`. This is what let us capture the `ls=true,ss=true` evidence that disproved ITP.
->
-> ### ⚠️ Working tree / repo state for the next session
->
-> `main` tip is `04f18785` (pushed; CI running). Earlier in the same push history: `9ab3d971` (observability, deployed). The oauth Lambda (`beanies-family-oauth-prod`) is STILL the old version (requires `code_verifier`) until greg's separate-session Terraform apply. Do NOT run `deploy.yml` until that Lambda apply is confirmed live.
+> **Key file/line anchors for the post-consent freeze:** `src/pages/OAuthCallbackPage.vue` (state-read ladder, redirect target); `src/services/google/redirectState.ts` (encode/decode the `state` param — verify the new iPhone's redirect carried it); `src/pages/ResumePodSetup.vue` (`onMounted` create-resume fast-path); `LoadPodView.vue` (`openDrivePicker`, post-consent token-recoverable check); `src/App.vue` `INIT_TIMEOUTS` (35s watchdog → `app.onboardingStallTimeout` + recovery overlay — confirm it arms on the onboarding path).
 >
 > ---
 >
-> <details>
-> <summary>Superseded 2026-06-19 block (the ITP hypothesis — now DISPROVEN; kept for history)</summary>
+> ## ⭐ SECOND THREAD — Beanie Lists edit/reorder: plan SAVED, ready to implement
 >
-> **Last updated:** 2026-06-19 (Friday — **iPhone onboarding deep-dive: triaged 4 prod errors, shipped TWO rounds of onboarding fixes + a welcome-gate version marker (3 prod deploys), but the iPhone create + re-login bugs PERSIST. Root cause now strongly suspected: iOS "Prevent Cross-Site Tracking" wipes script-writable storage across the OAuth redirect, so the PKCE state (and our fixes) don't survive. ⏳ AWAITING greg's 1-minute iPhone test to confirm before the real fix. Working tree clean on `main`, in sync with `origin/main`. Latest commit `963c0197`.**)
+> A 4-pass `/beanies-plan` is committed at **`docs/plans/2026-06-20-beanie-lists-edit-and-reorder.md`** (`01de8172`). **NOT implemented — greg implements in another session.** Everything needed for a clean pickup is in that plan; the essentials:
 >
-> ## ⭐⭐ NEXT SESSION — START HERE: iPhone onboarding still broken; one test pending ⭐⭐
+> - **Scope (one combined PR):** (1) inline-edit a list **title**, (2) inline-edit an **item's text**, (3) **reorder items** by drag-and-drop. greg's decisions (do NOT re-litigate): one combined plan; **SortableJS via `vuedraggable@4`** (NOT interact.js — different problem shape; the calendar DnD plan stays separate/unimplemented); **reuse the existing `useInlineEdit` composable** (don't rebuild edit infra).
+> - **Three new `listStore` actions** (all route through existing `updateList` → Automerge → sync; NONE touch completion/filing): `renameList`, `updateItemText` (preserves the item's `completed`/`completedBy`/`completedAt`), `reorderItems(from, to)` (bounds-guarded array move). Unit-test all three.
+> - **`vuedraggable@4` is a NET-NEW dependency** — `npm install` it first (resolve exact version, document the ~12–16 KB gzipped bundle delta via `npm run build`).
+> - **Two judgment calls baked into the plan** (Passes 3-4 resolved real bugs — read the `## Review Passes` section): (a) **save-on-blur is KEPT** (greg's quick-edit UX) but guarded so **Esc never commits** — title blur guarded by `isEditing`, item row by a local `cancelled` flag; (b) **keyboard reorder is DEFERRED** to a coherent a11y fast-follow (handle is focusable/labeled now, pointer-only this pass). If greg wants Enter-only (no blur-save) or keyboard reorder in v1, that's a plan tweak.
+> - **Key files to touch:** `src/stores/listStore.ts`, `src/components/lists/ListDetailModal.vue`, `src/components/lists/ListItemRow.vue` (additive `editable`/`editing`/`draggable` props — defaults preserve the read-only `LinkedLists` embed), `src/components/ui/BeanieFormModal.vue` (additive `#title-content` slot), `uiStrings.ts` (3 new aria-label keys — `dragHandle`/`editTitle`/`editItem`; REUSE existing `itemPlaceholder`/`titlePlaceholder`), Help Center Beanie Lists article. No E2E (drag is Playwright-flaky — documented choice; store unit tests + manual touch cover it).
 >
-> **The story so far (2026-06-19):** greg's friend (and greg) cannot complete onboarding on iPhone (iOS 18.7 Safari, normal window). We shipped two rounds of fixes; greg confirmed he's on the new build (welcome-gate marker reads the commit SHA) but the bugs PERSIST:
+> ---
 >
-> - After Google consent → lands on the **recovery screen** (not a clean create continuation).
-> - Recovery screen **asks for the password a 2nd time** (already set in step 1).
-> - **What's-new drawer auto-opens** after the 2nd password.
-> - Family creation then **fails** with toast: _"Sign-in couldn't finish / Your browser blocked storage during sign-in (this usually happens in Private Browsing). Please try again in a normal window."_ — **in a NORMAL (non-private) Safari window.**
-> - Re-login after trusted "log out (save data)" is **inconsistent** (reconnect prompt despite valid token; post-consent bounces back to reconnect; only `back → sign-in again` works).
+> ### ⭐ Onboarding fix that IS deployed (background for the diagnostic above)
 >
-> **⭐ ROOT-CAUSE HYPOTHESIS (high confidence, NOT yet confirmed on device):** iOS **"Prevent Cross-Site Tracking" is ON** (greg confirmed). The whole iOS redirect-auth flow stores PKCE state in **sessionStorage** (`startRedirectAuth` writes `beanies_redirect_auth` at `src/services/google/googleAuth.ts:1731`; `OAuthCallbackPage.vue` reads it at `:42`; `completeRedirectAuth` reads it at `googleAuth.ts:1768-1769`). The "storage blocked" toast is shown ONLY by `LoginPage.vue:186-187` when `?authError=storage` is set, which is set ONLY by `OAuthCallbackPage.vue:69` when Google returns an auth `code` but `beanies_redirect_auth` is **MISSING** (`oauth.redirectStateLost`). So **sessionStorage written before the redirect is GONE on return** — consistent with ITP **bounce-tracking protection** wiping the initiating site's script-writable storage after the cross-site OAuth bounce (app → accounts.google.com → app). This also nukes BOTH rounds of fixes below (they store the create-resume blob in the same sessionStorage). **NOTE: this likely wipes localStorage too** (ITP bounce mitigation clears script-writable storage broadly) — so simply switching tiers may not be enough; verify.
->
-> **Why "no Slack errors" is EXPECTED (not contradictory):** the error→Slack reporter is gated **critical-only** (commit `e03acbd8`, "quiet by default"). `oauth.redirectStateLost` reports at **`warning`** → suppressed from Slack. So a storage failure that HARD-BLOCKS onboarding is currently invisible in `#beanies-errors`. **FIX THIS TOO: bump `oauth.redirectStateLost` (and the storage-blocked signUp/createNewFile paths) to a Slack-visible severity** — a hard onboarding blocker must page.
->
-> **⏳ THE PENDING TEST greg will run (do NOT plan the fix until this is answered):** On iPhone, Settings → Apps → Safari → turn **Prevent Cross-Site Tracking OFF**, fully close Safari, reopen `app.beanies.family`, retry create-a-family.
->
-> - **If it WORKS with ITP off** → root cause CONFIRMED (ITP storage-wipe). Build the fix below.
-> - **If it STILL FAILS with ITP off** → sessionStorage loss is NOT the cause; STOP patching and do a from-scratch investigation of the iOS flow (we've been wrong twice; don't guess a 3rd time).
->
-> **⭐ THE LIKELY REAL FIX (if ITP confirmed) — an ADR-026 auth-layer change, needs `/beanies-plan` + greg sign-off:** stop relying on client storage surviving the redirect. (a) Carry the non-secret routing (`returnPath`, a state nonce) through the **OAuth `state` parameter** — it round-trips through Google in the URL, immune to local-storage wipes. (b) Hold the **PKCE code-verifier server-side in the OAuth proxy (Lambda)** keyed by that state nonce, so nothing sensitive depends on iOS keeping local storage across the bounce. (c) The create-resume password problem: re-evaluate — if ALL client storage is wiped on the bounce, greg's "persist password in sessionStorage" decision (round 2) cannot work on his device; the create-resume may need the server-held-state approach too, or fall back to the (secure) re-enter. **Re-open the create-resume decision with greg in light of the ITP finding.** Touches `googleAuth.ts` (startRedirectAuth/completeRedirectAuth), `oauthProxy.ts`, `OAuthCallbackPage.vue`, the Lambda proxy (infra), ADR-026/029.
->
-> **What shipped this session (3 prod deploys — all LIVE but did NOT fix the iPhone bugs):**
->
-> 1. **Round 1 — onboarding hardening** (`af5e1173` + release note `41f5353f`, deploy of `41f5353f`): fixed all 15 findings from a workflow-backed `/code-review max` (plan `docs/plans/2026-06-19-onboarding-hardening.md`, ADR-031). Adopt-existing recovery (`resolveExistingBeanpod`/`resolveDriveCollision`/`adoptDriveStub` in `connectStorage.ts` + `useDriveCollisionRecovery.ts`), `crossorigin` on the Google API script (`drivePicker.ts` — iOS errors no longer opaque "Script error."), Safari `Load failed`→offline-queue (`isNetworkError.ts`), bound-account guard, null-safe silent refresh, `setProvider` owns flush, typed `DriveConsentDeniedError`/`CollisionCheckUnavailableError`, etc. **3349 unit tests green.** These are real improvements but orthogonal to the ITP storage-wipe.
-> 2. **Welcome-gate version marker** (`8656c29f` + CHANGELOG `b353807b`, deploy of `b353807b`): subtle `<short-sha> · <date>` at the bottom of the welcome screen (`WelcomeGate.vue` + `getBuildVersionLabel()` in `diagnosticContext.ts`; `VITE_BUILD_TIME` added to `vite.config.ts`). Short SHA matches the `Build:` field in `#beanies-errors`. **This is how greg confirms which bundle his device is running** — critical for diagnosing stale-PWA-cache. (greg confirmed `963...` live.)
-> 3. **Round 2 — iOS create-resume + re-login reconnect** (`89906171` + CHANGELOG `963c0197`, deploy of `963c0197` with `skip_gate=true` because the CHANGELOG-only tip commit is path-ignored by `main-ci.yml`; code was CI-green at `89906171`). Plan `docs/plans/2026-06-19-ios-onboarding-round2.md` (4-pass). Persist create-wizard state in sessionStorage (`pendingCreate` contract in `resumePaths.ts`) + `ResumePodSetup.onMounted` fast-path reusing `handleIdentityNext()`; what's-new seed-for-new-family (`newFamilyFlag.ts` + `useNotifications` + `createNewFile`); silent-reconnect-before-prompt (`LoginPage.handleFamilySelected`) + post-consent token-recoverable check (`LoadPodView.openDrivePicker`). **⚠️ This round CANNOT work on greg's device — it stores the create-resume blob in the same sessionStorage that ITP wipes.** Re-evaluate after the ITP test.
->
-> **Key file/line anchors for next session:**
->
-> - `src/services/google/googleAuth.ts:1712-1775` — `startRedirectAuth` (writes `beanies_redirect_auth` sessionStorage) + `completeRedirectAuth` (reads it). The sessionStorage dependency to remove.
-> - `src/pages/OAuthCallbackPage.vue:40-71` — reads state, redirects to `?authError=storage` on loss (`oauth.redirectStateLost`, warning).
-> - `src/pages/LoginPage.vue:186-187` — shows the `oauth.storageError*` toast on `?authError=storage`.
-> - `src/services/google/oauthProxy.ts` — the Lambda proxy client; server-side-state fix lands here + the Lambda.
-> - `src/stores/authStore.ts:585-600` — `signUp` storage-blocked handling (`isStorageBlockedError`, `auth.storageBlocked`).
-> - Round-2 fix surfaces (may need rework): `resumePaths.ts` (pendingCreate), `ResumePodSetup.vue` onMounted fast-path, `CreatePodView.vue` `handleChooseGoogleDriveStorage` (savePendingCreate before redirect), `newFamilyFlag.ts`.
->
-> </details>
+> The bounce-tracking fix is LIVE in prod (Vue build `b3fb8744`; oauth Lambda `beanies-family-oauth-prod` updated `2026-06-20T02:29Z` to `code_verifier`-optional, `CodeSha256` verified, deployed BEFORE the Vue app per the hard ordering — that gate is fully cleared). `npm run validate` was green (3378 unit tests) + oauth Lambda suite green (33 tests). **It is deployed but NOT confirmed working** (see the device-test failure above).
+
+### Carried (unchanged this session)
+
+- **Dependabot:** astro 5→6 now surfaced as PR (`origin/dependabot/npm_and_yarn/astro-6.4.6`); plus prior #250/#251 — run `/review-dependabot-prs`.
+- **Onboarding follow-ups** (non-blocking, from the deploy session): the dated CI tripwire `legacyRedirectTransport.tripwire.test.ts` (fails after 2026-09-30 → remove legacy `beanies_redirect_auth` web transport) — tracked-issue not yet filed; the `INIT_TIMEOUTS` ordering test was deliberately skipped.
+- **#40 Helpful Hints; #39/#38** (Notion intake done); **Google OAuth verification** (awaiting Google); **#241 Reports nav**; deferred deps (pdfjs-dist 4→6, capacitor trio); app-store DUNS (~early July).
+  > ### Follow-ups created this session (not blocking)
+  >
+  > - **Dated CI tripwire** (`src/services/google/legacyRedirectTransport.tripwire.test.ts`) FAILS after **2026-09-30** to force removal of the one-release legacy `beanies_redirect_auth` web transport (in `OAuthCallbackPage.vue` + `completeRedirectAuth`). When it fails: delete those two legacy branches (NOT the native hand-off, which also reads `REDIRECT_AUTH_KEY`) + the test. A tracked issue for this was planned (`/beanies-new-issue` "Remove legacy `beanies_redirect_auth` web transport") — **NOT yet filed**; file it if desired.
+  > - **`INIT_TIMEOUTS` ordering test deliberately skipped** — the constants are local to `App.vue`'s `onMounted` (not exported); exporting internals just to assert a 3-literal strictly-increasing block (already commented "do not reorder") was judged over-exposure. Revisit only if the watchdog misbehaves.
+  >
+  > ### What was root-caused (the ITP hypothesis below was WRONG)
+  >
+  > Three independent telemetry captures (a `#beanies-errors` Slack alert + two CloudWatch runs after the telemetry Lambda was updated) proved: at the exact instant of failure the device reports **`web_storage: ls=true,ss=true`** — storage WORKS; only the values written BEFORE the redirect vanish. greg confirmed it reproduces in a **plain Safari tab** with **"Prevent Cross-Site Tracking" OFF**. Root cause: **WebKit bounce-tracking protection clears the initiating site's script-writable storage across the cross-site OAuth bounce** (`app → accounts.google.com → app`), independently of the ITP toggle. So `sessionStorage['beanies_redirect_auth']` (codeVerifier + returnPath) and the round-2 create-resume password — all written pre-bounce — were gone on return, cascading into: recovery screen → second password → what's-new pop → silent "counting beans" hang → misleading "Private Browsing" toast.
+  >
+  > ### What the fix does (committed in `04f18785`; plan `docs/plans/2026-06-20-ios-oauth-bounce-state-param.md`; ADR-026 amendment)
+  >
+  > Enabled by two facts: the OAuth proxy is a **confidential client** (holds `client_secret`, so PKCE is defense-in-depth, not load-bearing) and ADR-026 already deems the web redirect CSRF-safe (same-origin top-level nav).
+  >
+  > - **Carry routing through the OAuth `state` param** (new `src/services/google/redirectState.ts` — `encode/decodeRedirectState`, validates same-origin `returnPath` + exact-match version). Survives the bounce because it rides in the URL, not storage.
+  > - **Drop the web PKCE verifier**; the Lambda's `code_verifier` is now optional (`infrastructure/lambda/oauth/index.mjs` + SPEC + tests — ALWAYS still attaches `client_secret`).
+  > - **Thread a REQUIRED `mode` (`create`/`join`/`reconnect`) through all FIVE `startRedirectAuth` call sites** (`connectStorage`, `syncStore`, `useGoogleReconnect`, `usePickBeanpodFile`, `SettingsPage` → `LoadPodView`) — compiler-enforced coverage.
+  > - **Remove the round-2 password stash; single clean password re-entry** via the existing `identity` phase (`resumePaths.ts`/`CreatePodView.vue`/`ResumePodSetup.vue`).
+  > - **`OAuthCallbackPage.vue`** reads `state` from the URL (new → legacy → lost ladder); accurate copy (no "Private Browsing").
+  > - **Init watchdog** (`App.vue` `INIT_TIMEOUTS`, 35s → existing recovery overlay + `app.onboardingStallTimeout`); **no what's-new auto-open mid-onboarding** (`useNotifications.ts`).
+  > - **Native path UNCHANGED.** One-release legacy `beanies_redirect_auth` fallback guarded by a **dated CI tripwire** (`legacyRedirectTransport.tripwire.test.ts`, fails after **2026-09-30** to force cleanup).
+  >
+  > ### Earlier today (2026-06-20, ALREADY DEPLOYED to prod as `9ab3d971`)
+  >
+  > The observability-first batch: OAuthCallback skip guard (killed the `registerGoogleAccountAssertion` null-import crash), a real-round-trip `localStorage`/`sessionStorage` probe in device diagnostics (`web_storage=ls=…,ss=…`), throw-safe chunk-recovery counter, `oauth.redirectStateLost` → `critical`, and email-redacted breadcrumbs on init-failure reports. The telemetry Lambda was also deployed (Terraform) so `web_storage`/`breadcrumbs` survive ingest. Plan `docs/plans/2026-06-20-iphone-onboarding-observability.md`. This is what let us capture the `ls=true,ss=true` evidence that disproved ITP.
+  >
+  > ### ⚠️ Working tree / repo state for the next session
+  >
+  > `main` tip is `04f18785` (pushed; CI running). Earlier in the same push history: `9ab3d971` (observability, deployed). The oauth Lambda (`beanies-family-oauth-prod`) is STILL the old version (requires `code_verifier`) until greg's separate-session Terraform apply. Do NOT run `deploy.yml` until that Lambda apply is confirmed live.
+  >
+  > ***
+  >
+  > <details>
+  > <summary>Superseded 2026-06-19 block (the ITP hypothesis — now DISPROVEN; kept for history)</summary>
+  >
+  > **Last updated:** 2026-06-19 (Friday — **iPhone onboarding deep-dive: triaged 4 prod errors, shipped TWO rounds of onboarding fixes + a welcome-gate version marker (3 prod deploys), but the iPhone create + re-login bugs PERSIST. Root cause now strongly suspected: iOS "Prevent Cross-Site Tracking" wipes script-writable storage across the OAuth redirect, so the PKCE state (and our fixes) don't survive. ⏳ AWAITING greg's 1-minute iPhone test to confirm before the real fix. Working tree clean on `main`, in sync with `origin/main`. Latest commit `963c0197`.**)
+  >
+  > ## ⭐⭐ NEXT SESSION — START HERE: iPhone onboarding still broken; one test pending ⭐⭐
+  >
+  > **The story so far (2026-06-19):** greg's friend (and greg) cannot complete onboarding on iPhone (iOS 18.7 Safari, normal window). We shipped two rounds of fixes; greg confirmed he's on the new build (welcome-gate marker reads the commit SHA) but the bugs PERSIST:
+  >
+  > - After Google consent → lands on the **recovery screen** (not a clean create continuation).
+  > - Recovery screen **asks for the password a 2nd time** (already set in step 1).
+  > - **What's-new drawer auto-opens** after the 2nd password.
+  > - Family creation then **fails** with toast: _"Sign-in couldn't finish / Your browser blocked storage during sign-in (this usually happens in Private Browsing). Please try again in a normal window."_ — **in a NORMAL (non-private) Safari window.**
+  > - Re-login after trusted "log out (save data)" is **inconsistent** (reconnect prompt despite valid token; post-consent bounces back to reconnect; only `back → sign-in again` works).
+  >
+  > **⭐ ROOT-CAUSE HYPOTHESIS (high confidence, NOT yet confirmed on device):** iOS **"Prevent Cross-Site Tracking" is ON** (greg confirmed). The whole iOS redirect-auth flow stores PKCE state in **sessionStorage** (`startRedirectAuth` writes `beanies_redirect_auth` at `src/services/google/googleAuth.ts:1731`; `OAuthCallbackPage.vue` reads it at `:42`; `completeRedirectAuth` reads it at `googleAuth.ts:1768-1769`). The "storage blocked" toast is shown ONLY by `LoginPage.vue:186-187` when `?authError=storage` is set, which is set ONLY by `OAuthCallbackPage.vue:69` when Google returns an auth `code` but `beanies_redirect_auth` is **MISSING** (`oauth.redirectStateLost`). So **sessionStorage written before the redirect is GONE on return** — consistent with ITP **bounce-tracking protection** wiping the initiating site's script-writable storage after the cross-site OAuth bounce (app → accounts.google.com → app). This also nukes BOTH rounds of fixes below (they store the create-resume blob in the same sessionStorage). **NOTE: this likely wipes localStorage too** (ITP bounce mitigation clears script-writable storage broadly) — so simply switching tiers may not be enough; verify.
+  >
+  > **Why "no Slack errors" is EXPECTED (not contradictory):** the error→Slack reporter is gated **critical-only** (commit `e03acbd8`, "quiet by default"). `oauth.redirectStateLost` reports at **`warning`** → suppressed from Slack. So a storage failure that HARD-BLOCKS onboarding is currently invisible in `#beanies-errors`. **FIX THIS TOO: bump `oauth.redirectStateLost` (and the storage-blocked signUp/createNewFile paths) to a Slack-visible severity** — a hard onboarding blocker must page.
+  >
+  > **⏳ THE PENDING TEST greg will run (do NOT plan the fix until this is answered):** On iPhone, Settings → Apps → Safari → turn **Prevent Cross-Site Tracking OFF**, fully close Safari, reopen `app.beanies.family`, retry create-a-family.
+  >
+  > - **If it WORKS with ITP off** → root cause CONFIRMED (ITP storage-wipe). Build the fix below.
+  > - **If it STILL FAILS with ITP off** → sessionStorage loss is NOT the cause; STOP patching and do a from-scratch investigation of the iOS flow (we've been wrong twice; don't guess a 3rd time).
+  >
+  > **⭐ THE LIKELY REAL FIX (if ITP confirmed) — an ADR-026 auth-layer change, needs `/beanies-plan` + greg sign-off:** stop relying on client storage surviving the redirect. (a) Carry the non-secret routing (`returnPath`, a state nonce) through the **OAuth `state` parameter** — it round-trips through Google in the URL, immune to local-storage wipes. (b) Hold the **PKCE code-verifier server-side in the OAuth proxy (Lambda)** keyed by that state nonce, so nothing sensitive depends on iOS keeping local storage across the bounce. (c) The create-resume password problem: re-evaluate — if ALL client storage is wiped on the bounce, greg's "persist password in sessionStorage" decision (round 2) cannot work on his device; the create-resume may need the server-held-state approach too, or fall back to the (secure) re-enter. **Re-open the create-resume decision with greg in light of the ITP finding.** Touches `googleAuth.ts` (startRedirectAuth/completeRedirectAuth), `oauthProxy.ts`, `OAuthCallbackPage.vue`, the Lambda proxy (infra), ADR-026/029.
+  >
+  > **What shipped this session (3 prod deploys — all LIVE but did NOT fix the iPhone bugs):**
+  >
+  > 1. **Round 1 — onboarding hardening** (`af5e1173` + release note `41f5353f`, deploy of `41f5353f`): fixed all 15 findings from a workflow-backed `/code-review max` (plan `docs/plans/2026-06-19-onboarding-hardening.md`, ADR-031). Adopt-existing recovery (`resolveExistingBeanpod`/`resolveDriveCollision`/`adoptDriveStub` in `connectStorage.ts` + `useDriveCollisionRecovery.ts`), `crossorigin` on the Google API script (`drivePicker.ts` — iOS errors no longer opaque "Script error."), Safari `Load failed`→offline-queue (`isNetworkError.ts`), bound-account guard, null-safe silent refresh, `setProvider` owns flush, typed `DriveConsentDeniedError`/`CollisionCheckUnavailableError`, etc. **3349 unit tests green.** These are real improvements but orthogonal to the ITP storage-wipe.
+  > 2. **Welcome-gate version marker** (`8656c29f` + CHANGELOG `b353807b`, deploy of `b353807b`): subtle `<short-sha> · <date>` at the bottom of the welcome screen (`WelcomeGate.vue` + `getBuildVersionLabel()` in `diagnosticContext.ts`; `VITE_BUILD_TIME` added to `vite.config.ts`). Short SHA matches the `Build:` field in `#beanies-errors`. **This is how greg confirms which bundle his device is running** — critical for diagnosing stale-PWA-cache. (greg confirmed `963...` live.)
+  > 3. **Round 2 — iOS create-resume + re-login reconnect** (`89906171` + CHANGELOG `963c0197`, deploy of `963c0197` with `skip_gate=true` because the CHANGELOG-only tip commit is path-ignored by `main-ci.yml`; code was CI-green at `89906171`). Plan `docs/plans/2026-06-19-ios-onboarding-round2.md` (4-pass). Persist create-wizard state in sessionStorage (`pendingCreate` contract in `resumePaths.ts`) + `ResumePodSetup.onMounted` fast-path reusing `handleIdentityNext()`; what's-new seed-for-new-family (`newFamilyFlag.ts` + `useNotifications` + `createNewFile`); silent-reconnect-before-prompt (`LoginPage.handleFamilySelected`) + post-consent token-recoverable check (`LoadPodView.openDrivePicker`). **⚠️ This round CANNOT work on greg's device — it stores the create-resume blob in the same sessionStorage that ITP wipes.** Re-evaluate after the ITP test.
+  >
+  > **Key file/line anchors for next session:**
+  >
+  > - `src/services/google/googleAuth.ts:1712-1775` — `startRedirectAuth` (writes `beanies_redirect_auth` sessionStorage) + `completeRedirectAuth` (reads it). The sessionStorage dependency to remove.
+  > - `src/pages/OAuthCallbackPage.vue:40-71` — reads state, redirects to `?authError=storage` on loss (`oauth.redirectStateLost`, warning).
+  > - `src/pages/LoginPage.vue:186-187` — shows the `oauth.storageError*` toast on `?authError=storage`.
+  > - `src/services/google/oauthProxy.ts` — the Lambda proxy client; server-side-state fix lands here + the Lambda.
+  > - `src/stores/authStore.ts:585-600` — `signUp` storage-blocked handling (`isStorageBlockedError`, `auth.storageBlocked`).
+  > - Round-2 fix surfaces (may need rework): `resumePaths.ts` (pendingCreate), `ResumePodSetup.vue` onMounted fast-path, `CreatePodView.vue` `handleChooseGoogleDriveStorage` (savePendingCreate before redirect), `newFamilyFlag.ts`.
+  >
+  > </details>
 
 > **(Prior 2026-06-18 evening session below — Beanie Lists launch.)**
 
