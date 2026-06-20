@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **New beanstalk post: "getting your beans in a row."** A walkthrough of beanie lists — dedicated trip checklists, self-resetting recurring grocery lists, and Fair Play-inspired categories — sparked by an early adopter's feature request, now live on the blog.
 - **Beanie Lists: rename a list, edit items, and drag to reorder.** Open any list and tap its name to rename it, or tap an item's text to fix it — Enter or tap-away saves, Esc cancels. Drag the new grip handle (⠿) on a row to reorder items into the sequence your family actually works through them. Editing an item never unticks it, and emptying an item's text keeps the previous wording (use ✕ to delete). Order syncs to the whole family.
 
 ### Fixed

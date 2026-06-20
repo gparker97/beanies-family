@@ -4,13 +4,14 @@ slug: family-organization
 excerpt: 'a practical guide to organizing your family life - calendars, chores, and mental load. systems that actually work.'
 heroEmoji: 🏠
 publishedDate: 2026-04-22
-lastUpdated: 2026-05-22
+lastUpdated: 2026-06-20
 relatedPosts:
   - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
   - buy-fruit
   - best-cozi-maple-alternatives-in-2026
   - japan-trip-with-my-son
+  - getting-your-beans-in-a-row
 tags:
   - family-organization
   - routines
