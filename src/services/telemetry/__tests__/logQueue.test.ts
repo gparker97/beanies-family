@@ -59,6 +59,24 @@ describe('logQueue', () => {
     });
   });
 
+  describe('forced flush', () => {
+    it('flushes a SINGLE event immediately when flush=true (below the batch threshold)', async () => {
+      enqueueLogEvent(rec('critical'), true);
+      await tick();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const body = JSON.parse((fetchSpy.mock.calls[0] as [string, RequestInit])[1].body as string);
+      expect(body.events.length).toBe(1);
+      expect(__getLogQueueLengthForTesting()).toBe(0);
+    });
+
+    it('does NOT flush a single event when flush is omitted (waits for the threshold)', async () => {
+      enqueueLogEvent(rec('quiet'));
+      await tick();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(__getLogQueueLengthForTesting()).toBe(1);
+    });
+  });
+
   describe('batch flush', () => {
     it('flushes at the batch threshold with the right URL, headers, and body', async () => {
       enqueueN(25);

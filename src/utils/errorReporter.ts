@@ -257,6 +257,10 @@ function handleReport(input: ErrorReportInput): void {
       message: input.message,
       error: input.error,
       context: { ...input.context, severity: input.severity ?? 'error' },
+      // Critical reports flush immediately so a hang-then-force-quit (the
+      // onboarding-stall case) still lands the breadcrumbs in CloudWatch,
+      // instead of dying in the buffer with the page (2026-06-20).
+      flush: input.severity === 'critical',
     });
   } catch (e) {
     console.warn('[errorReporter] telemetry mirror failed', e);
