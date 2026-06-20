@@ -1,5 +1,55 @@
 # Project Status
 
+> **Last updated:** 2026-06-20 (Saturday — **ROOT-CAUSED and FIXED the iPhone onboarding failure (the ITP hypothesis was WRONG). Implemented the comprehensive ADR-026 fix, committed + pushed to `main` (`04f18785`), all green — but it is NOT DEPLOYED. ⛔ The prod deploy is PAUSED on a hard ordering constraint: the `code_verifier`-optional oauth Lambda MUST be deployed (Terraform) BEFORE the Vue app, or iPhone web onboarding breaks. greg is deploying the Lambda in a SEPARATE session. Earlier today, the observability batch `9ab3d971` WAS deployed to prod.**)
+>
+> ## ⛔⛔ NEXT SESSION — START HERE: deploy is PAUSED, Lambda-first ordering ⛔⛔
+>
+> **The state in one paragraph:** the iPhone onboarding fix is fully implemented, committed, and pushed to `main` (tip `04f18785`), with `npm run validate` green (3378 unit tests) + the oauth Lambda's own suite green (33 tests). It is **NOT live** — `deploy.yml` (Vue PROD) has NOT been run for it. The deploy is deliberately paused because the change makes the iOS web client STOP sending the PKCE `code_verifier`, and the **currently-live oauth Lambda still REQUIRES it** — so the Vue app must NOT go to prod until the `code_verifier`-optional Lambda is deployed.
+>
+> ### ⭐ THE TWO REMAINING STEPS (in this exact order)
+>
+> 1. **Deploy the oauth Lambda FIRST (Terraform) — greg is doing this in a separate session.** It is backward-compatible (accepts requests WITH or WITHOUT `code_verifier`), so deploying it early does NOT affect the current live app (which still sends a verifier). Steps (same careful flow as the 2026-06-20 telemetry Lambda deploy):
+>    ```bash
+>    cd infrastructure
+>    # with TF_VAR_* secrets exported (TINFOIL_API_KEY, AI_EXTRACT_API_KEY, etc.):
+>    terraform plan -var-file=environments/prod.tfvars \
+>      -target=module.oauth.aws_lambda_function.oauth -out=tfplan-oauth.out
+>    # REVIEW: must be `Plan: 0 to add, 1 to change, 0 to destroy`, the only
+>    # resource being module.oauth.aws_lambda_function.oauth (source_code_hash change).
+>    terraform apply tfplan-oauth.out
+>    ```
+>    Verify after: `aws lambda get-function-configuration --function-name beanies-family-oauth-prod --query '{LastModified:LastModified}'` shows today's date.
+> 2. **THEN deploy the Vue app** via `/deploy-prod-auto` (or `deploy.yml`). Step 4b of that skill will author the release note — the DRAFTED, greg-not-yet-approved note is: **version `2026.06.20`**, summary `en`: _"Creating or joining a family on iPhone now works smoothly — no more getting stuck partway through Google sign-in."_ (beanie = lowercase). Summary-only, NO spotlight, NO Discord CTA (it's a fix). The release note has NOT been committed yet — it rides the eventual Vue deploy. After deploy: have greg re-run the iPhone create-a-family test on the new build; CloudWatch should show the success path and NO `oauth.redirectStateLost`.
+>
+> ### What was root-caused (the ITP hypothesis below was WRONG)
+>
+> Three independent telemetry captures (a `#beanies-errors` Slack alert + two CloudWatch runs after the telemetry Lambda was updated) proved: at the exact instant of failure the device reports **`web_storage: ls=true,ss=true`** — storage WORKS; only the values written BEFORE the redirect vanish. greg confirmed it reproduces in a **plain Safari tab** with **"Prevent Cross-Site Tracking" OFF**. Root cause: **WebKit bounce-tracking protection clears the initiating site's script-writable storage across the cross-site OAuth bounce** (`app → accounts.google.com → app`), independently of the ITP toggle. So `sessionStorage['beanies_redirect_auth']` (codeVerifier + returnPath) and the round-2 create-resume password — all written pre-bounce — were gone on return, cascading into: recovery screen → second password → what's-new pop → silent "counting beans" hang → misleading "Private Browsing" toast.
+>
+> ### What the fix does (committed in `04f18785`; plan `docs/plans/2026-06-20-ios-oauth-bounce-state-param.md`; ADR-026 amendment)
+>
+> Enabled by two facts: the OAuth proxy is a **confidential client** (holds `client_secret`, so PKCE is defense-in-depth, not load-bearing) and ADR-026 already deems the web redirect CSRF-safe (same-origin top-level nav).
+>
+> - **Carry routing through the OAuth `state` param** (new `src/services/google/redirectState.ts` — `encode/decodeRedirectState`, validates same-origin `returnPath` + exact-match version). Survives the bounce because it rides in the URL, not storage.
+> - **Drop the web PKCE verifier**; the Lambda's `code_verifier` is now optional (`infrastructure/lambda/oauth/index.mjs` + SPEC + tests — ALWAYS still attaches `client_secret`).
+> - **Thread a REQUIRED `mode` (`create`/`join`/`reconnect`) through all FIVE `startRedirectAuth` call sites** (`connectStorage`, `syncStore`, `useGoogleReconnect`, `usePickBeanpodFile`, `SettingsPage` → `LoadPodView`) — compiler-enforced coverage.
+> - **Remove the round-2 password stash; single clean password re-entry** via the existing `identity` phase (`resumePaths.ts`/`CreatePodView.vue`/`ResumePodSetup.vue`).
+> - **`OAuthCallbackPage.vue`** reads `state` from the URL (new → legacy → lost ladder); accurate copy (no "Private Browsing").
+> - **Init watchdog** (`App.vue` `INIT_TIMEOUTS`, 35s → existing recovery overlay + `app.onboardingStallTimeout`); **no what's-new auto-open mid-onboarding** (`useNotifications.ts`).
+> - **Native path UNCHANGED.** One-release legacy `beanies_redirect_auth` fallback guarded by a **dated CI tripwire** (`legacyRedirectTransport.tripwire.test.ts`, fails after **2026-09-30** to force cleanup).
+>
+> ### Earlier today (2026-06-20, ALREADY DEPLOYED to prod as `9ab3d971`)
+>
+> The observability-first batch: OAuthCallback skip guard (killed the `registerGoogleAccountAssertion` null-import crash), a real-round-trip `localStorage`/`sessionStorage` probe in device diagnostics (`web_storage=ls=…,ss=…`), throw-safe chunk-recovery counter, `oauth.redirectStateLost` → `critical`, and email-redacted breadcrumbs on init-failure reports. The telemetry Lambda was also deployed (Terraform) so `web_storage`/`breadcrumbs` survive ingest. Plan `docs/plans/2026-06-20-iphone-onboarding-observability.md`. This is what let us capture the `ls=true,ss=true` evidence that disproved ITP.
+>
+> ### ⚠️ Working tree / repo state for the next session
+>
+> `main` tip is `04f18785` (pushed; CI running). Earlier in the same push history: `9ab3d971` (observability, deployed). The oauth Lambda (`beanies-family-oauth-prod`) is STILL the old version (requires `code_verifier`) until greg's separate-session Terraform apply. Do NOT run `deploy.yml` until that Lambda apply is confirmed live.
+>
+> ---
+>
+> <details>
+> <summary>Superseded 2026-06-19 block (the ITP hypothesis — now DISPROVEN; kept for history)</summary>
+>
 > **Last updated:** 2026-06-19 (Friday — **iPhone onboarding deep-dive: triaged 4 prod errors, shipped TWO rounds of onboarding fixes + a welcome-gate version marker (3 prod deploys), but the iPhone create + re-login bugs PERSIST. Root cause now strongly suspected: iOS "Prevent Cross-Site Tracking" wipes script-writable storage across the OAuth redirect, so the PKCE state (and our fixes) don't survive. ⏳ AWAITING greg's 1-minute iPhone test to confirm before the real fix. Working tree clean on `main`, in sync with `origin/main`. Latest commit `963c0197`.**)
 >
 > ## ⭐⭐ NEXT SESSION — START HERE: iPhone onboarding still broken; one test pending ⭐⭐
@@ -38,10 +88,12 @@
 > - `src/stores/authStore.ts:585-600` — `signUp` storage-blocked handling (`isStorageBlockedError`, `auth.storageBlocked`).
 > - Round-2 fix surfaces (may need rework): `resumePaths.ts` (pendingCreate), `ResumePodSetup.vue` onMounted fast-path, `CreatePodView.vue` `handleChooseGoogleDriveStorage` (savePendingCreate before redirect), `newFamilyFlag.ts`.
 >
+> </details>
+
 > **(Prior 2026-06-18 evening session below — Beanie Lists launch.)**
->
-> ---
->
+
+---
+
 > **Last updated:** 2026-06-18 (Thursday, evening — **a build-AND-SHIP session: re-ran `/code-review` on the #33 batch and fixed all 15 findings, redesigned the Lists + Travel nav badges, fixed an E2E selector, extracted a shared add-button — then LAUNCHED Beanie Lists to production (flipped `familyLists` → `true`) with a Help Center article, across several deploys. ⭐ Beanie Lists is now LIVE for all users. Working tree clean on `main`, in sync with `origin/main`. Latest commit `ce2f7e76`.**)
 >
 > **(1) Code-review re-run → all 15 findings fixed + SHIPPED** (`daab74d7`, plan `docs/plans/2026-06-18-beanie-lists-review-fixes.md`). 10 finder angles → 15 verifiers → gap sweep confirmed the must-fix set + 3 new bugs (listStore not reset on sign-out; no-due lists flooding the briefing; `addItem` not re-arming a recurring celebration); the two risky rewrites (trusted-device auth, `useEscapeClose` stack) re-cleared as safe. Fixes: F1 gate `list-completed` at the `notificationsStore` boundary (deriver stays pure); F2 reset listStore on sign-out; F3 store `setLifecycle` clears the completion triple both ways; F4 member-filter the Lists getters; F5/F10 shared `deriveCompletion`; F6 hide empty/0-left lists from the briefing; F7 resolve linked names from full stores; F8 clear `?view=` on close; F9 `fillTemplate` + "someone" fallback; F11 sub-12px fonts; F12 `buildMessage`→`fillTemplate`; F13 `listProgress` + `<ListCategoryPills>`; F14 `classifyOwnerAudience` delegates; F15 `useEscapeClose` test isolation.
