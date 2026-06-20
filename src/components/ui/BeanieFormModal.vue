@@ -102,11 +102,13 @@ const containerProps = computed(() => {
         >
           {{ icon }}
         </div>
-        <!-- Title -->
+        <!-- Title. Additive `title-content` slot lets a caller supply an
+             inline-editable title (e.g. ListDetailModal); fallback renders the
+             identical static text so every other caller is unchanged. -->
         <h2
           class="font-outfit flex-1 text-lg font-bold text-[var(--color-text)] dark:text-gray-100"
         >
-          {{ title }}
+          <slot name="title-content">{{ title }}</slot>
         </h2>
       </div>
     </template>

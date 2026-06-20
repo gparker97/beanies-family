@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-20",
-    "translationCount": 3631
+    "translationCount": 3634
   },
   "translations": {
     "app.name": {
@@ -8278,8 +8278,8 @@
     },
     "travel.subtitle": {
       "translation": "豆子接下来要去哪里？",
-      "hash": "iwpyv8",
-      "lastUpdated": "2026-03-21"
+      "hash": "kkyqw4",
+      "lastUpdated": "2026-06-20"
     },
     "travel.planATrip": {
       "translation": "规划行程",
@@ -18159,6 +18159,21 @@
     "app.initError.stalled": {
       "translation": "安装花费的时间比预期长。重新加载以重试。",
       "hash": "q6vbn8",
+      "lastUpdated": "2026-06-20"
+    },
+    "lists.detail.dragHandle": {
+      "translation": "拖动重新排序",
+      "hash": "hqtjdq",
+      "lastUpdated": "2026-06-20"
+    },
+    "lists.detail.editTitle": {
+      "translation": "编辑列表名称",
+      "hash": "6lt1gp",
+      "lastUpdated": "2026-06-20"
+    },
+    "lists.detail.editItem": {
+      "translation": "编辑项目",
+      "hash": "1bawqx",
       "lastUpdated": "2026-06-20"
     }
   }

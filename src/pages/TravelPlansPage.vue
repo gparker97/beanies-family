@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import PageHeader from '@/components/common/PageHeader.vue';
+import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import VacationSegmentCard from '@/components/vacation/VacationSegmentCard.vue';
@@ -818,7 +818,10 @@ function addQuickIdea() {
          LIST VIEW — when no trip is selected
          ═══════════════════════════════════════════════════════════════════════ -->
     <template v-if="!selectedVacationId">
-      <PageHeader icon="airplane" :title="t('travel.title')" :subtitle="t('travel.subtitle')">
+      <!-- Page welcome subtitle convention (#33): handwritten orange Caveat line,
+           matching Beanie Lists / To-Dos (no bold title bar). -->
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <PageWelcomeSubtitle :text="t('travel.subtitle')" />
         <div class="flex flex-wrap items-center gap-2">
           <MagicReaderPill
             v-if="canReadDocument"
@@ -834,7 +837,7 @@ function addQuickIdea() {
             {{ t('travel.planATrip') }} 🌴
           </button>
         </div>
-      </PageHeader>
+      </div>
 
       <!-- Upcoming trip cards -->
       <div
