@@ -63,7 +63,8 @@
     "qrcode": "^1.5.4",
     "vue": "^3.5.34",
     "vue-chartjs": "^5.3.3",
-    "vue-router": "^4.6.4"
+    "vue-router": "^4.6.4",
+    "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1063.0",

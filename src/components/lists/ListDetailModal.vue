@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
+import draggable from 'vuedraggable';
 import { useTranslation } from '@/composables/useTranslation';
+import { useInlineEdit } from '@/composables/useInlineEdit';
+import { useReducedMotion } from '@/composables/useReducedMotion';
 import { useListStore } from '@/stores/listStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useVacationStore } from '@/stores/vacationStore';
@@ -21,7 +24,7 @@ import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import ListItemRow from './ListItemRow.vue';
 import ListCategoryPills from './ListCategoryPills.vue';
-import type { ListCategory, ListFrequency, ListLifecycle } from '@/types/models';
+import type { FamilyListItem, ListCategory, ListFrequency, ListLifecycle } from '@/types/models';
 
 const props = withDefaults(
   defineProps<{
@@ -45,6 +48,67 @@ const list = computed(() =>
   props.listId ? (listStore.lists.find((l) => l.id === props.listId) ?? null) : null
 );
 const meId = computed(() => familyStore.currentMember?.id ?? '');
+const { prefersReducedMotion } = useReducedMotion();
+
+// ── Inline edit: list title + item text ───────────────────────────────────
+// One useInlineEdit instance drives both (single-active-field + auto-save-
+// previous). The TITLE draft lives here; ITEM drafts live in each ListItemRow
+// (the row owns the <input>), so saveDraft only persists the title — item saves
+// dispatch from onItemEditSave. `editingListId` is captured at edit-start so a
+// save lands on the list that WAS being edited even if `list` (a computed off
+// props.listId) has re-projected.
+const editingListId = ref<string | null>(null);
+const draftTitle = ref('');
+const titleInputRef = ref<HTMLInputElement | null>(null);
+
+const inline = useInlineEdit<'title' | `item:${string}`>({
+  populateDraft: (field) => {
+    if (!list.value) return;
+    editingListId.value = list.value.id;
+    if (field === 'title') draftTitle.value = list.value.title;
+    // item drafts are seeded inside the row from `item.title`.
+  },
+  saveDraft: (field) => {
+    const id = editingListId.value;
+    if (id && field === 'title') void listStore.renameList(id, draftTitle.value);
+    // item saves are dispatched from onItemEditSave, not here.
+  },
+});
+
+function startTitleEdit(): void {
+  inline.startEdit('title');
+  void nextTick(() => titleInputRef.value?.focus());
+}
+// Guarded so the blur fired by an Esc/Enter-driven unmount can't re-commit
+// (after either, isEditing('title') is already false).
+function onTitleBlur(): void {
+  if (inline.isEditing('title')) void inline.saveField('title');
+}
+function onItemEditSave(itemId: string, text: string): void {
+  const id = editingListId.value ?? list.value?.id;
+  if (id) void listStore.updateItemText(id, itemId, text);
+  inline.cancelEdit();
+}
+// vuedraggable mutates its bound array IN PLACE — so bind a LOCAL clone (not the
+// Automerge projection `list.items`, which a direct bind would double-mutate →
+// the off-by-one). The clone is the optimistic visual order; the authoritative
+// move is persisted via `reorderItems`, which flows back through this watcher.
+const itemsDraft = ref<FamilyListItem[]>([]);
+watch(
+  () => list.value?.items,
+  (items) => {
+    itemsDraft.value = items ? [...items] : [];
+  },
+  { immediate: true }
+);
+function onItemMove(evt: { moved?: { oldIndex: number; newIndex: number } }): void {
+  if (!list.value || !evt.moved) return;
+  void listStore.reorderItems(list.value.id, evt.moved.oldIndex, evt.moved.newIndex);
+}
+function onClose(): void {
+  void inline.saveAndClose(); // commit an in-flight TITLE edit (items self-commit on unmount)
+  emit('close');
+}
 
 // Meta-band pills are display by default; tapping one reveals an inline editor.
 const editingCategory = ref(false);
@@ -56,6 +120,11 @@ watch(
     editingCategory.value = false;
     editingOwner.value = false;
     editingLink.value = null;
+    // Commit an in-flight title edit to the OLD list (via editingListId) before
+    // it re-projects; item rows self-commit on unmount. Don't clear
+    // editingListId here — it's re-set on the next edit and read by the row's
+    // unmount-commit, which runs AFTER this pre-flush watcher.
+    void inline.saveAndClose();
   }
 );
 
@@ -202,10 +271,56 @@ async function handleDelete(): Promise<void> {
     :save-label="t('action.close')"
     save-gradient="orange"
     :show-delete="true"
-    @close="emit('close')"
-    @save="emit('close')"
+    @close="onClose"
+    @save="onClose"
     @delete="handleDelete"
   >
+    <!-- Inline-editable list title (additive slot; fallback is the static title). -->
+    <template #title-content>
+      <!-- EDITING: input + explicit save/cancel (pointerdown.prevent so a ✕
+           cancel isn't pre-empted by the input's blur-to-save). -->
+      <div v-if="inline.isEditing('title')" class="flex items-center gap-2">
+        <input
+          ref="titleInputRef"
+          v-model="draftTitle"
+          type="text"
+          class="font-outfit min-w-0 flex-1 border-b border-[var(--color-primary-500)] bg-transparent text-lg font-bold text-[var(--color-text)] outline-none dark:text-gray-100"
+          :placeholder="t('lists.detail.titlePlaceholder')"
+          :aria-label="t('lists.detail.editTitle')"
+          @keyup.enter="inline.saveField('title')"
+          @keyup.esc="inline.cancelEdit"
+          @blur="onTitleBlur"
+        />
+        <!-- Save only (✓). No ✕ here — it would sit right beside the drawer's
+             close ✕ and read as two cancels. Cancel a title edit with Esc (or
+             tap away, which saves, consistent with the item rows). -->
+        <button
+          type="button"
+          class="flex-shrink-0 text-base text-[var(--color-primary-500)] transition-opacity hover:opacity-80"
+          :aria-label="t('action.save')"
+          @pointerdown.prevent
+          @click="inline.saveField('title')"
+        >
+          <span aria-hidden="true">✓</span>
+        </button>
+      </div>
+      <!-- DISPLAY: tappable title + a faint pencil hint that it can be edited. -->
+      <button
+        v-else
+        type="button"
+        class="group/title flex w-full items-center gap-2 text-left"
+        :aria-label="t('lists.detail.editTitle')"
+        @click="startTitleEdit"
+      >
+        <span class="min-w-0 truncate">{{ list.title }}</span>
+        <span
+          class="flex-shrink-0 text-sm font-normal text-[var(--color-text-muted)] opacity-40 transition-opacity group-hover/title:opacity-100"
+          aria-hidden="true"
+          >✎</span
+        >
+      </button>
+    </template>
+
     <div class="space-y-4">
       <!-- Meta band: category · owner · due/recurrence (pills, never a dropdown) -->
       <div class="flex flex-wrap items-center gap-2 border-b border-[var(--color-border)] pb-3.5">
@@ -240,16 +355,34 @@ async function handleDelete(): Promise<void> {
         @update:model-value="setOwner"
       />
 
-      <!-- Items -->
+      <!-- Items — draggable to reorder. One-way bound (`:list` + `@change`):
+           vuedraggable does the visual drag; the move routes through the store
+           (`reorderItems`) which re-renders authoritatively. NEVER mutate
+           `list.items` in place (it's the Automerge projection). -->
       <div>
-        <ListItemRow
-          v-for="item in list.items"
-          :key="item.id"
-          :item="item"
-          removable
-          @toggle="toggleItem"
-          @remove="removeItem"
-        />
+        <draggable
+          v-model="itemsDraft"
+          item-key="id"
+          handle=".drag-handle"
+          :animation="prefersReducedMotion ? 0 : 160"
+          ghost-class="list-row-ghost"
+          @change="onItemMove"
+        >
+          <template #item="{ element: item }">
+            <ListItemRow
+              :item="item"
+              removable
+              editable
+              draggable
+              :editing="inline.isEditing(`item:${item.id}`)"
+              @toggle="toggleItem"
+              @remove="removeItem"
+              @edit-start="inline.startEdit(`item:${item.id}`)"
+              @edit-save="(text: string) => onItemEditSave(item.id, text)"
+              @edit-cancel="inline.cancelEdit"
+            />
+          </template>
+        </draggable>
         <div class="mt-2">
           <BaseInput
             v-model="newItem"
@@ -468,5 +601,13 @@ async function handleDelete(): Promise<void> {
   padding: 0.5rem 0.75rem;
   text-align: left;
   width: 100%;
+}
+
+/* Drag placeholder while reordering an item (heritage-orange ring + lift). */
+.list-row-ghost {
+  background: var(--tint-orange-12);
+  border-radius: 0.5rem;
+  box-shadow: 0 0 0 2px var(--color-primary-500);
+  opacity: 0.9;
 }
 </style>

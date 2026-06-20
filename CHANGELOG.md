@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-06-20
 
+### Added
+
+- **Beanie Lists: rename a list, edit items, and drag to reorder.** Open any list and tap its name to rename it, or tap an item's text to fix it — Enter or tap-away saves, Esc cancels. Drag the new grip handle (⠿) on a row to reorder items into the sequence your family actually works through them. Editing an item never unticks it, and emptying an item's text keeps the previous wording (use ✕ to delete). Order syncs to the whole family.
+
 ### Fixed
 
 - **Fixed creating or joining a family on iPhone (Safari and the installed app).** Signing in with Google could bounce you to a recovery screen, ask for your password twice, pop the "what's new" panel mid-setup, and then freeze on "counting beans…". The cause was Safari's privacy protection wiping the page's temporary data during the trip to Google and back, so the app lost track of where it was. Sign-in now carries what it needs through the sign-in link itself instead of relying on that temporary storage, so onboarding completes cleanly with a single password entry. If setup ever does stall, you now get a clear "reload to try again" instead of an endless spinner.

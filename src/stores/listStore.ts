@@ -84,6 +84,9 @@ function deriveCompletion(
  * lives ONLY in `reconcileRecurringLists`; the lifecycle flip (which clears the
  * completion triple) lives ONLY in `setLifecycle`. No other action mutates
  * `completed`/`completedBy`/`completedAt`/`lastResetDate`/`cycleCelebrated`.
+ * In particular `renameList`/`updateItemText`/`reorderItems` deliberately do NOT
+ * derive completion — they change the title/text/order, never which items exist
+ * or their done-state.
  */
 export const useListStore = defineStore('lists', () => {
   // State
@@ -313,6 +316,62 @@ export const useListStore = defineStore('lists', () => {
   }
 
   /**
+   * Rename a list. Trims; an empty/whitespace or unchanged title is a no-op
+   * (returns the list unchanged) — a list must always have a title. Deliberately
+   * does NOT derive completion: renaming changes neither which items exist nor
+   * their done-state, so it must never touch the completion/filing triple.
+   */
+  async function renameList(listId: string, title: string): Promise<FamilyList | null> {
+    const list = lists.value.find((l) => l.id === listId);
+    if (!list) return null;
+    const next = title.trim();
+    if (!next || next === list.title) return list; // no-op revert / unchanged
+    return updateList(listId, { title: next });
+  }
+
+  /**
+   * Edit one item's text. Preserves the item's completion triple (spread). Trims;
+   * an empty/whitespace or unchanged value is a no-op (returns the list unchanged)
+   * — deletion is the remove button's job, never an emptied edit. Deliberately
+   * does NOT derive completion (the set of items and their done-state is unchanged).
+   */
+  async function updateItemText(
+    listId: string,
+    itemId: string,
+    title: string
+  ): Promise<FamilyList | null> {
+    const list = lists.value.find((l) => l.id === listId);
+    if (!list) return null;
+    const next = title.trim();
+    const current = list.items.find((i) => i.id === itemId);
+    if (!current || !next || next === current.title) return list; // no-op
+    const items = list.items.map((it) => (it.id === itemId ? { ...it, title: next } : it));
+    return updateList(listId, { items });
+  }
+
+  /**
+   * Reorder items by moving the item at `fromIndex` to `toIndex`. Pure array
+   * move; bounds-guarded (out-of-range or equal indices no-op). Deliberately does
+   * NOT derive completion: same items, same done-state, just a different order.
+   */
+  async function reorderItems(
+    listId: string,
+    fromIndex: number,
+    toIndex: number
+  ): Promise<FamilyList | null> {
+    const list = lists.value.find((l) => l.id === listId);
+    if (!list) return null;
+    const n = list.items.length;
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= n || toIndex >= n) {
+      return list; // no-op on a degenerate move
+    }
+    const items = [...list.items];
+    const [moved] = items.splice(fromIndex, 1);
+    items.splice(toIndex, 0, moved!);
+    return updateList(listId, { items });
+  }
+
+  /**
    * Switch a list between one-off and recurring — the ONE place the lifecycle
    * flip lives. Always clears the completion triple (`completed`/`completedBy`/
    * `completedAt`) via explicit `undefined` so a stale completion can't leak
@@ -419,6 +478,9 @@ export const useListStore = defineStore('lists', () => {
     toggleItem,
     addItem,
     removeItem,
+    renameList,
+    updateItemText,
+    reorderItems,
     setLifecycle,
     clearLinksFor,
     reconcileRecurringLists,

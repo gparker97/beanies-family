@@ -1105,7 +1105,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     icon: '\u{1F9FE}',
     readTime: 6,
     popular: true,
-    updatedDate: '2026-06-18',
+    updatedDate: '2026-06-20',
     sections: [
       { type: 'heading', content: 'Why Beanie Lists?', level: 2, id: 'why' },
       {
@@ -1188,6 +1188,24 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           '<strong>Link</strong> it to a trip or activity (see below)',
           '<strong>Delete List</strong> when you’re finished with it for good',
         ],
+      },
+
+      { type: 'heading', content: 'Editing and reordering items', level: 2, id: 'editing' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Rename the list</strong> — tap the list’s name at the top of the drawer, type the new name, and press Enter (or tap away) to save. Press Esc to cancel.',
+          '<strong>Fix an item’s text</strong> — tap the item’s words to turn them into an editable field; Enter or tap-away saves, Esc cancels.',
+          '<strong>Reorder items</strong> — drag the grip handle (<strong>⠿</strong>) on the left of a row up or down to put items in the order your family works through them.',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Emptying an item’s text doesn’t delete it — it just keeps the previous text. To remove an item, use its <strong>✕</strong> button instead. Reordering is saved per list and syncs to the whole family.',
+        title: 'Good to know',
+        icon: '\u{1F4A1}',
       },
 
       { type: 'heading', content: 'Who a list belongs to', level: 2, id: 'owner' },
