@@ -1,25 +1,21 @@
 # Project Status
 
-> **Last updated:** 2026-06-20 (Saturday — **ROOT-CAUSED and FIXED the iPhone onboarding failure (the ITP hypothesis was WRONG). Implemented the comprehensive ADR-026 fix, committed + pushed to `main` (`04f18785`), all green — but it is NOT DEPLOYED. ⛔ The prod deploy is PAUSED on a hard ordering constraint: the `code_verifier`-optional oauth Lambda MUST be deployed (Terraform) BEFORE the Vue app, or iPhone web onboarding breaks. greg is deploying the Lambda in a SEPARATE session. Earlier today, the observability batch `9ab3d971` WAS deployed to prod.**)
+> **Last updated:** 2026-06-20 (Saturday — **ROOT-CAUSED and FIXED + DEPLOYED the iPhone onboarding failure (the ITP hypothesis was WRONG). The comprehensive ADR-026 bounce-tracking fix is LIVE in prod: oauth Lambda (`code_verifier`-optional) deployed first via Terraform, THEN the Vue app (`deploy.yml`). Prod serves build `b3fb8744` (200 OK). Working tree clean, in sync with `origin/main`. ⏳ AWAITING greg's iPhone device test to confirm the fix end-to-end — then pull CloudWatch to verify. Earlier today, the observability batch `9ab3d971` was also deployed.**)
 >
-> ## ⛔⛔ NEXT SESSION — START HERE: deploy is PAUSED, Lambda-first ordering ⛔⛔
+> ## ⭐⭐ NEXT SESSION — START HERE: onboarding fix is DEPLOYED; verify on device + pull telemetry ⭐⭐
 >
-> **The state in one paragraph:** the iPhone onboarding fix is fully implemented, committed, and pushed to `main` (tip `04f18785`), with `npm run validate` green (3378 unit tests) + the oauth Lambda's own suite green (33 tests). It is **NOT live** — `deploy.yml` (Vue PROD) has NOT been run for it. The deploy is deliberately paused because the change makes the iOS web client STOP sending the PKCE `code_verifier`, and the **currently-live oauth Lambda still REQUIRES it** — so the Vue app must NOT go to prod until the `code_verifier`-optional Lambda is deployed.
+> **The state in one paragraph:** the iPhone onboarding bounce-tracking fix is fully implemented, committed, pushed, and **DEPLOYED to prod** (Vue build `b3fb8744`; oauth Lambda `beanies-family-oauth-prod` updated `2026-06-20T02:29Z` to the `code_verifier`-optional version, deployed BEFORE the Vue app per the hard ordering). `npm run validate` was green (3378 unit tests) + the oauth Lambda suite green (33 tests). **The deploy is DONE. The remaining work is verification.**
 >
-> ### ⭐ THE TWO REMAINING STEPS (in this exact order)
+> ### ⭐ THE REMAINING STEP — verify on device, then confirm via telemetry
 >
-> 1. **Deploy the oauth Lambda FIRST (Terraform) — greg is doing this in a separate session.** It is backward-compatible (accepts requests WITH or WITHOUT `code_verifier`), so deploying it early does NOT affect the current live app (which still sends a verifier). Steps (same careful flow as the 2026-06-20 telemetry Lambda deploy):
->    ```bash
->    cd infrastructure
->    # with TF_VAR_* secrets exported (TINFOIL_API_KEY, AI_EXTRACT_API_KEY, etc.):
->    terraform plan -var-file=environments/prod.tfvars \
->      -target=module.oauth.aws_lambda_function.oauth -out=tfplan-oauth.out
->    # REVIEW: must be `Plan: 0 to add, 1 to change, 0 to destroy`, the only
->    # resource being module.oauth.aws_lambda_function.oauth (source_code_hash change).
->    terraform apply tfplan-oauth.out
->    ```
->    Verify after: `aws lambda get-function-configuration --function-name beanies-family-oauth-prod --query '{LastModified:LastModified}'` shows today's date.
-> 2. **THEN deploy the Vue app** via `/deploy-prod-auto` (or `deploy.yml`). Step 4b of that skill will author the release note — the DRAFTED, greg-not-yet-approved note is: **version `2026.06.20`**, summary `en`: _"Creating or joining a family on iPhone now works smoothly — no more getting stuck partway through Google sign-in."_ (beanie = lowercase). Summary-only, NO spotlight, NO Discord CTA (it's a fix). The release note has NOT been committed yet — it rides the eventual Vue deploy. After deploy: have greg re-run the iPhone create-a-family test on the new build; CloudWatch should show the success path and NO `oauth.redirectStateLost`.
+> 1. **greg re-runs create-a-family on his iPhone** on the NEW build. He must FULLY update first: swipe-close Safari/the PWA and reopen; the welcome-gate marker should read `b3fb874`. Test BOTH a **Safari tab** (the primary path) and ideally the **installed PWA**. Expected: Google sign-in → ONE password step → `/nook`, with **no** recovery screen, **no** second password, **no** what's-new pop, **no** "counting beans" freeze.
+> 2. **Then pull CloudWatch to confirm.** Query the telemetry firehose (`/aws/lambda/beanies-family-telemetry-prod`, Logs Insights, `filter ispresent(surface)`, last ~20 min). Success looks like: the `auth-init` path completes and **NO `oauth.redirectStateLost`** fires for the `b3fb8744` build. (`web_storage` + breadcrumbs now ride along on any failure surface if something's still off.) AWS access works from this environment (the `greg` IAM user); the query helper pattern is in this session's history — `aws logs start-query … --query-string 'fields @message | filter ispresent(surface) | sort @timestamp asc'` then `get-query-results`, parse the `@message` JSON after the `tab`-delimited Lambda prefix.
+> 3. **If it WORKS** → close out the onboarding saga (mark the deferred `app.onboardingStallTimeout` watchdog + the legacy tripwire as the only follow-ups). **If anything is STILL off** → the breadcrumbs + `web_storage` are now captured server-side, so read them to see exactly where it wedges; the most likely residual is the installed-PWA ↔ Safari storage isolation (the `state`-param fix is storage-independent so it SHOULD be fine, but confirm).
+>
+> ### Follow-ups created this session (not blocking)
+>
+> - **Dated CI tripwire** (`src/services/google/legacyRedirectTransport.tripwire.test.ts`) FAILS after **2026-09-30** to force removal of the one-release legacy `beanies_redirect_auth` web transport (in `OAuthCallbackPage.vue` + `completeRedirectAuth`). When it fails: delete those two legacy branches (NOT the native hand-off, which also reads `REDIRECT_AUTH_KEY`) + the test. A tracked issue for this was planned (`/beanies-new-issue` "Remove legacy `beanies_redirect_auth` web transport") — **NOT yet filed**; file it if desired.
+> - **`INIT_TIMEOUTS` ordering test deliberately skipped** — the constants are local to `App.vue`'s `onMounted` (not exported); exporting internals just to assert a 3-literal strictly-increasing block (already commented "do not reorder") was judged over-exposure. Revisit only if the watchdog misbehaves.
 >
 > ### What was root-caused (the ITP hypothesis below was WRONG)
 >
