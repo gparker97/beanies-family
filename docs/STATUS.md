@@ -20,15 +20,20 @@
 >
 > ---
 >
-> ## ⭐ SECOND THREAD — Beanie Lists edit/reorder: plan SAVED, ready to implement
+> ## ⭐ SECOND THREAD — Beanie Lists edit/reorder: IMPLEMENTED (committed, NOT deployed)
 >
-> A 4-pass `/beanies-plan` is committed at **`docs/plans/2026-06-20-beanie-lists-edit-and-reorder.md`** (`01de8172`). **NOT implemented — greg implements in another session.** Everything needed for a clean pickup is in that plan; the essentials:
+> Built per the 4-pass plan `docs/plans/2026-06-20-beanie-lists-edit-and-reorder.md` (`01de8172`); `npm run validate` green (3388 unit tests, +14 listStore cases). **Committed, NOT deployed** (prod still serves the onboarding-fix build `b3fb8744`). Ships as its own deploy when greg's ready. What landed:
 >
-> - **Scope (one combined PR):** (1) inline-edit a list **title**, (2) inline-edit an **item's text**, (3) **reorder items** by drag-and-drop. greg's decisions (do NOT re-litigate): one combined plan; **SortableJS via `vuedraggable@4`** (NOT interact.js — different problem shape; the calendar DnD plan stays separate/unimplemented); **reuse the existing `useInlineEdit` composable** (don't rebuild edit infra).
-> - **Three new `listStore` actions** (all route through existing `updateList` → Automerge → sync; NONE touch completion/filing): `renameList`, `updateItemText` (preserves the item's `completed`/`completedBy`/`completedAt`), `reorderItems(from, to)` (bounds-guarded array move). Unit-test all three.
-> - **`vuedraggable@4` is a NET-NEW dependency** — `npm install` it first (resolve exact version, document the ~12–16 KB gzipped bundle delta via `npm run build`).
-> - **Two judgment calls baked into the plan** (Passes 3-4 resolved real bugs — read the `## Review Passes` section): (a) **save-on-blur is KEPT** (greg's quick-edit UX) but guarded so **Esc never commits** — title blur guarded by `isEditing`, item row by a local `cancelled` flag; (b) **keyboard reorder is DEFERRED** to a coherent a11y fast-follow (handle is focusable/labeled now, pointer-only this pass). If greg wants Enter-only (no blur-save) or keyboard reorder in v1, that's a plan tweak.
-> - **Key files to touch:** `src/stores/listStore.ts`, `src/components/lists/ListDetailModal.vue`, `src/components/lists/ListItemRow.vue` (additive `editable`/`editing`/`draggable` props — defaults preserve the read-only `LinkedLists` embed), `src/components/ui/BeanieFormModal.vue` (additive `#title-content` slot), `uiStrings.ts` (3 new aria-label keys — `dragHandle`/`editTitle`/`editItem`; REUSE existing `itemPlaceholder`/`titlePlaceholder`), Help Center Beanie Lists article. No E2E (drag is Playwright-flaky — documented choice; store unit tests + manual touch cover it).
+> - **Three `listStore` actions** — `renameList`, `updateItemText` (preserves the completion triple), `reorderItems` (bounds-guarded); none derive completion (write-invariants doc updated).
+> - **Inline edit** in `ListDetailModal` via the reused `useInlineEdit`; raw autofocused `<input>`; `editingListId` captured at edit-start; rows own their draft + self-commit on unmount.
+> - **Drag reorder** via `vuedraggable@4.1.0` (+ sortablejs 1.14.0, ~+20 KB gzipped). **Bound to a LOCAL clone (`v-model="itemsDraft"`), NOT `list.items`** — vuedraggable mutates its bound array in place, so a direct bind double-applied with `reorderItems` (the off-by-one greg hit on first test). Clone fix + splice indices matching sortablejs `moved` semantics.
+> - **Post-test refinements (greg's device feedback):** off-by-one fixed (above); a faint pencil (`✎`) edit-hint on editable rows/title; `✓`/`✕` save-cancel controls while editing (items), with `@pointerdown.prevent` so a ✕ cancel isn't pre-empted by blur-to-save. The **title shows `✓` only** (a `✕` there collides with the drawer's close `✕` → looked like two cancels).
+> - Additive `#title-content` slot on `BeanieFormModal`; `LinkedLists` embed unchanged (row edit/drag props default off). 3 new aria keys; `⠿`/`✎` allowlisted; Help Center + CHANGELOG updated.
+> - **Deferred (tracked):** keyboard reorder (a11y fast-follow with focus-follow + `aria-live`).
+>
+> ## ⭐ Also done this session — travel-plans subtitle convention
+>
+> `TravelPlansPage` was the last page on the old `PageHeader` (bold title + airplane icon + plain subtitle). Migrated to the `PageWelcomeSubtitle` script-Caveat convention (matching Beanie Lists / To-Dos); "Plan a Trip" + Magic Reader actions preserved; `travel.subtitle` `en` fixed to proper case. Committed, not deployed.
 >
 > ---
 >

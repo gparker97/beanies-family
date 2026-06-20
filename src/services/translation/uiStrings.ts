@@ -4344,6 +4344,9 @@ const STRING_DEFS = {
   'lists.detail.owner': { en: 'Owner', beanie: 'owner' },
   'lists.detail.addItem': { en: 'Add an item…', beanie: 'add an item…' },
   'lists.detail.itemPlaceholder': { en: 'What needs doing?', beanie: 'what needs doing?' },
+  'lists.detail.dragHandle': { en: 'Drag to reorder', beanie: 'drag to reorder' },
+  'lists.detail.editTitle': { en: 'Edit list name', beanie: 'edit list name' },
+  'lists.detail.editItem': { en: 'Edit item', beanie: 'edit item' },
   'lists.detail.repeatsLabel': { en: 'Repeats?', beanie: 'repeats?' },
   'lists.detail.oneoff': { en: 'One-off', beanie: 'one-off' },
   'lists.detail.recurring': { en: 'Repeats', beanie: 'repeats' },
@@ -6620,7 +6623,7 @@ const STRING_DEFS = {
   // Travel Plans page
   'travel.title': { en: 'Travel Plans', beanie: 'travel plans' },
   'travel.subtitle': {
-    en: 'where are the beans headed next?',
+    en: 'Where are the beans headed next?',
     beanie: 'where are the beans headed next?',
   },
   'travel.planATrip': { en: '+ Plan a Trip', beanie: '+ plan a trip' },

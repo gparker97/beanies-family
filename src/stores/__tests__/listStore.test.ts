@@ -419,4 +419,132 @@ describe('listStore', () => {
     expect(patch.completedAt).toBeUndefined();
     expect(store.completedLists).toEqual([]); // not filed despite the stale flag
   });
+
+  // ── edit + reorder (2026-06-20) ──────────────────────────────────────────
+  const mergeUpdate = (store: ReturnType<typeof useListStore>): void => {
+    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+      const cur = store.lists.find((x) => x.id === id)!;
+      return { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+    });
+  };
+
+  describe('renameList', () => {
+    it('trims and updates ONLY the title (never completion/filing)', async () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'l', title: 'Old', completed: true, completedAt: 'x' })];
+      mergeUpdate(store);
+      await store.renameList('l', '  New name  ');
+      const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+      expect(patch).toEqual({ title: 'New name' });
+      expect('completed' in patch).toBe(false);
+    });
+
+    it('no-ops on empty/whitespace or unchanged title (no write)', async () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'l', title: 'Same' })];
+      mergeUpdate(store);
+      await store.renameList('l', '   ');
+      await store.renameList('l', 'Same');
+      expect(listRepo.updateList).not.toHaveBeenCalled();
+    });
+
+    it('returns null for an unknown list id', async () => {
+      const store = useListStore();
+      store.lists = [];
+      expect(await store.renameList('nope', 'x')).toBeNull();
+    });
+  });
+
+  describe('updateItemText', () => {
+    it('edits the target item and preserves its completion triple', async () => {
+      const store = useListStore();
+      store.lists = [
+        list({
+          id: 'l',
+          items: [
+            item({
+              id: 'i1',
+              title: 'old',
+              completed: true,
+              completedBy: 'm-2',
+              completedAt: 'ts',
+            }),
+            item({ id: 'i2', title: 'keep' }),
+          ],
+        }),
+      ];
+      mergeUpdate(store);
+      await store.updateItemText('l', 'i1', 'new text');
+      const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+      expect(patch.items).toEqual([
+        { id: 'i1', title: 'new text', completed: true, completedBy: 'm-2', completedAt: 'ts' },
+        { id: 'i2', title: 'keep', completed: false },
+      ]);
+      // never re-derives list completion
+      expect('completed' in patch).toBe(false);
+    });
+
+    it('no-ops on empty text, unchanged text, or a missing item', async () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'l', items: [item({ id: 'i1', title: 'thing' })] })];
+      mergeUpdate(store);
+      await store.updateItemText('l', 'i1', '  ');
+      await store.updateItemText('l', 'i1', 'thing');
+      await store.updateItemText('l', 'missing', 'x');
+      expect(listRepo.updateList).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reorderItems', () => {
+    const seed = () => {
+      const store = useListStore();
+      store.lists = [
+        list({
+          id: 'l',
+          items: [item({ id: 'a' }), item({ id: 'b' }), item({ id: 'c' })],
+          completed: false,
+        }),
+      ];
+      mergeUpdate(store);
+      return store;
+    };
+    const orderOf = (): string[] =>
+      ((vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>).items ?? []).map(
+        (i) => i.id
+      );
+
+    it('moves first→last', async () => {
+      const store = seed();
+      await store.reorderItems('l', 0, 2);
+      expect(orderOf()).toEqual(['b', 'c', 'a']);
+    });
+
+    it('moves last→first', async () => {
+      const store = seed();
+      await store.reorderItems('l', 2, 0);
+      expect(orderOf()).toEqual(['c', 'a', 'b']);
+    });
+
+    it('moves an adjacent pair', async () => {
+      const store = seed();
+      await store.reorderItems('l', 1, 2);
+      expect(orderOf()).toEqual(['a', 'c', 'b']);
+    });
+
+    it('no-ops on equal / negative / out-of-range indices', async () => {
+      const store = seed();
+      await store.reorderItems('l', 1, 1);
+      await store.reorderItems('l', -1, 2);
+      await store.reorderItems('l', 0, 9);
+      expect(listRepo.updateList).not.toHaveBeenCalled();
+    });
+
+    it('never changes completion/filing state', async () => {
+      const store = seed();
+      await store.reorderItems('l', 0, 2);
+      const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+      expect('completed' in patch).toBe(false);
+      expect('completedAt' in patch).toBe(false);
+    });
+  });
 });
