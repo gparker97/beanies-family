@@ -1,28 +1,39 @@
 # Project Status
 
-> **Last updated:** 2026-06-20 (Saturday, later — **TWO threads. (1) ⛔ iPhone onboarding STILL BROKEN: greg tested the deployed bounce-tracking fix on a BRAND-NEW iPhone and hit the FREEZING "counting beans" page DIRECTLY AFTER the Google Drive consent screen. The fix is NOT confirmed working — it failed on this device. greg will retest on ANOTHER iPhone next session. (2) Planned the Beanie Lists edit/reorder feature — a 4-pass plan is SAVED (`docs/plans/2026-06-20-beanie-lists-edit-and-reorder.md`, commit `01de8172`) but NOT implemented; greg implements in another session. Working tree clean, in sync with `origin/main`.**)
+> **Last updated:** 2026-06-20 (Saturday, evening — **iPhone onboarding FREEZE is RESOLVED. greg retested create-a-family TWICE on a CONFIRMED-latest-build iPhone: no freeze, onboarding succeeds, no what's-new pop. The earlier "freeze" was a STALE-BUILD device (CloudWatch showed ZERO telemetry from build `b3fb8744` — the fix never ran on it). The bounce-tracking `state`-param fix WORKS. Two UX wrinkles remain (double-password + iPhone users skip the add-members step) → fixed by the 4-pass plan `docs/plans/2026-06-20-unified-create-flow-defer-password.md` (committed `73d1901d`, NOT yet implemented — NEXT SESSION implements it). DEPLOYED to prod this session: Beanie Lists edit/reorder + travel subtitle + a critical-report telemetry force-flush (deploy `73d1901d`). Working tree clean, in sync with `origin/main`.**)
 >
-> ## ⛔⛔ NEXT SESSION — START HERE: iPhone onboarding STILL freezes on "counting beans" ⛔⛔
+> ## ⭐⭐ NEXT SESSION — START HERE: implement the unified create-a-family flow ⭐⭐
 >
-> **The new finding (2026-06-20 device test):** greg ran create-a-family on a **brand-new iPhone** (so almost certainly the new build — a fresh device has no stale PWA cache; confirm the welcome-gate marker reads `b3fb874` to be certain). The flow **froze on the "counting beans" loading screen immediately after the Google Drive consent screen.** This is the post-redirect init hang — it wedges AFTER returning from Google, during the OAuth-callback → pod-load sequence. **The deployed `state`-param fix did NOT resolve it on this device.** greg will **retest on a second, different iPhone next session** to see if it's device-specific or universal.
+> **The freeze is solved.** greg ran create-a-family TWICE on a confirmed-latest-build iPhone → **no freeze, onboarding succeeds, no what's-new pop.** The earlier "counting beans" freeze was a **stale-build device** (the CloudWatch query this session returned ZERO events from build `b3fb8744` — that device never ran the fix). The bounce-tracking `state`-param fix (live as `b3fb8744`) is confirmed working. **Do NOT keep chasing the freeze.**
 >
-> ### ⭐ THE DIAGNOSTIC PATH (do this first next session — telemetry will say exactly where it wedged)
+> **Two UX wrinkles remain on the confirmed-build device, ONE root cause:**
 >
-> The whole point of the observability batch (`9ab3d971`) was this moment: a freeze now captures breadcrumbs + `web_storage` server-side. **Pull CloudWatch for the failing build before changing any code.**
+> 1. **Double-password** — the step-1 password isn't carried across the Drive redirect, so the resume screen re-asks for it.
+> 2. **iPhone users skip the add-members step** — they land in the onboarding wizard with NO family members, so the account/activity steps have nobody to assign.
 >
-> 1. **Query the telemetry firehose** `/aws/lambda/beanies-family-telemetry-prod` (Logs Insights), last ~24h, for the `b3fb8744`/`b3fb874` build. Pattern (AWS works from this env via the `greg` IAM user): `aws logs start-query --log-group-name /aws/lambda/beanies-family-telemetry-prod --start-time <epoch> --end-time <epoch> --query-string 'fields @message | filter ispresent(surface) | sort @timestamp asc'` then `aws logs get-query-results --query-id <id>`; parse the `@message` JSON after the tab-delimited Lambda prefix.
-> 2. **The key question the telemetry answers:** did **`oauth.redirectStateLost`** still fire?
->    - **If YES** → the `state` param did NOT survive the bounce even via the URL on this device (unexpected — it rides in the redirect URL, not storage). Re-examine `OAuthCallbackPage.vue`'s state-read ladder (new → legacy → lost) and whether the redirect actually round-tripped the `state` query param.
->    - **If NO `redirectStateLost`** → state recovery SUCCEEDED and the wedge is LATER: the freeze is in the **create-resume / pod-setup / Drive-load** path (`ResumePodSetup.vue`, `LoadPodView.openDrivePicker`, central load / `syncStore`), NOT the OAuth state handling. That narrows it sharply — "counting beans" right after consent = the pod/Drive load never resolves or never advances the wizard. Read the `breadcrumbs` + `web_storage` on whatever surface DID fire (or check whether the 35s `app.onboardingStallTimeout` watchdog fired → if it did, its surface + breadcrumbs pinpoint the stall; if it did NOT fire after a long freeze, the watchdog itself isn't arming on this path — a bug in the `INIT_TIMEOUTS` wiring in `App.vue`).
-> 3. **Only after reading telemetry**, form the next hypothesis. We've been wrong twice by guessing (ITP, then round-2 storage) — let the server-side breadcrumbs lead this time. Do NOT ship another speculative fix without telemetry pointing at the wedge.
+> **Root cause (same for both):** the iOS Drive connect is a full-page redirect that **reloads the app mid-wizard**, so the app falls into the minimal `ResumePodSetup` _recovery_ screen (re-asks password, writes pod, jumps to `/nook`) — bypassing the post-storage steps (password confirmation AND step-3 members). Desktop avoids it (popup, no reload).
 >
-> **Key file/line anchors for the post-consent freeze:** `src/pages/OAuthCallbackPage.vue` (state-read ladder, redirect target); `src/services/google/redirectState.ts` (encode/decode the `state` param — verify the new iPhone's redirect carried it); `src/pages/ResumePodSetup.vue` (`onMounted` create-resume fast-path); `LoadPodView.vue` (`openDrivePicker`, post-consent token-recoverable check); `src/App.vue` `INIT_TIMEOUTS` (35s watchdog → `app.onboardingStallTimeout` + recovery overlay — confirm it arms on the onboarding path).
+> ### ⭐ THE WORK: implement `docs/plans/2026-06-20-unified-create-flow-defer-password.md` (committed `73d1901d`)
+>
+> A full **4-pass `/beanies-plan`** is saved + committed. Read it in full — it has line-level anchors, verified-safe analysis, and the Review-Passes record. The shape (greg-approved via ExitPlanMode):
+>
+> - **Apply to ALL users** (not just iPhone) — one unified flow + lower step-1 friction.
+> - **Step 1 → identity only** (family name, owner, email; NO password). **KEEP the "🫘 New family pod started!" Slack ping on step-1 completion** (greg's hard requirement — `CreatePodView.vue:169-171`). The **"🎉 created" ping stays in `createNewFile`** (`syncStore.ts:1305`), unchanged.
+> - **Shape B:** `ResumePodSetup` becomes the SINGLE post-connect finish surface (it already owns password form → `rehydrateOwnerDoc` → `finishOnDrive`/collision recovery → `finalizePod`/`createNewFile`); add a new terminal **`members` phase** rendering a NEW self-contained `<CreateMembersStep>` (extracted from `CreatePodView` step 3). `finalizePod` advances to `members` instead of emitting `signed-in`.
+> - **Password collected ONCE, after storage connect.** `signUp` gains a **type-enforced discriminated-union `deferPassword` mode** (skips `hashPassword`, passes a named `DEFERRED_PASSWORD_HASH=''` constant); the real hash is applied by the EXISTING `rehydrateOwnerDoc`. Add a **fail-closed precondition in `createNewFile`** that refuses to write if the owner still carries `DEFERRED_PASSWORD_HASH`.
+> - **Desktop seam (Pass-4 correction):** needs a NEW `CreatePodView` emit + a NEW `LoginPage` handler that sets `activeView='resume-setup'` directly (no existing emit does this; no `router.replace` so the live `syncStore` provider survives). iOS reuses the existing reactive flip (`LoginPage.vue:114-136`, `:133`).
+> - **`<CreateMembersStep>` closes a silent gap:** it must `reportError` on `createMember` failure (today CreatePodView only toasts).
+> - Verified safe: no `passwordHash` reader runs pre-pod; `requiresPassword:true` self-corrects; no double-create (registry-`fileId` + `criticalWriteState`); no secret crosses the redirect.
+>
+> **After implementing: real-iPhone verification is REQUIRED** (Safari tab + installed PWA): create → password once → members → `/nook` with members. The **critical-report telemetry force-flush** is now deployed (`6188564f`/`73d1901d`) — so if anything stalls on iPhone, the watchdog/`redirectStateLost` reports flush immediately and land in CloudWatch `/aws/lambda/beanies-family-telemetry-prod`.
+>
+> **Key files:** `CreatePodView.vue` (identity-only step 1, new hand-off emit), `ResumePodSetup.vue` (members phase), new `CreateMembersStep.vue`, `authStore.ts` (deferred `signUp` + `DEFERRED_PASSWORD_HASH`), `syncStore.ts` (fail-closed guard), `LoginPage.vue` (desktop hand-off), `uiStrings.ts` (copy), `docs/adr/026-ios-redirect-oauth.md` (amend), Help Center getting-started article.
 >
 > ---
 >
-> ## ⭐ SECOND THREAD — Beanie Lists edit/reorder: IMPLEMENTED (committed, NOT deployed)
+> ## ✅ DEPLOYED this session — Beanie Lists edit/reorder (live in prod, deploy `73d1901d`)
 >
-> Built per the 4-pass plan `docs/plans/2026-06-20-beanie-lists-edit-and-reorder.md` (`01de8172`); `npm run validate` green (3388 unit tests, +14 listStore cases). **Committed, NOT deployed** (prod still serves the onboarding-fix build `b3fb8744`). Ships as its own deploy when greg's ready. What landed:
+> Built per the 4-pass plan `docs/plans/2026-06-20-beanie-lists-edit-and-reorder.md` (`01de8172`); `npm run validate` green (3388 unit tests, +14 listStore cases). **DEPLOYED to prod 2026-06-20 evening** (no release note, per greg). What landed:
 >
 > - **Three `listStore` actions** — `renameList`, `updateItemText` (preserves the completion triple), `reorderItems` (bounds-guarded); none derive completion (write-invariants doc updated).
 > - **Inline edit** in `ListDetailModal` via the reused `useInlineEdit`; raw autofocused `<input>`; `editingListId` captured at edit-start; rows own their draft + self-commit on unmount.
@@ -31,15 +42,16 @@
 > - Additive `#title-content` slot on `BeanieFormModal`; `LinkedLists` embed unchanged (row edit/drag props default off). 3 new aria keys; `⠿`/`✎` allowlisted; Help Center + CHANGELOG updated.
 > - **Deferred (tracked):** keyboard reorder (a11y fast-follow with focus-follow + `aria-live`).
 >
-> ## ⭐ Also done this session — travel-plans subtitle convention
+> ## ✅ DEPLOYED this session — travel-plans subtitle convention + telemetry force-flush
 >
-> `TravelPlansPage` was the last page on the old `PageHeader` (bold title + airplane icon + plain subtitle). Migrated to the `PageWelcomeSubtitle` script-Caveat convention (matching Beanie Lists / To-Dos); "Plan a Trip" + Magic Reader actions preserved; `travel.subtitle` `en` fixed to proper case. Committed, not deployed.
+> - **Travel subtitle:** `TravelPlansPage` was the last page on the old `PageHeader`; migrated to the `PageWelcomeSubtitle` script-Caveat convention (matching Beanie Lists / To-Dos); "Plan a Trip" + Magic Reader actions preserved; `travel.subtitle` `en` fixed to proper case. **Live.**
+> - **Telemetry force-flush** (`6188564f`): critical error reports (`severity:'critical'` — the onboarding-stall watchdog, `oauth.redirectStateLost`) now flush an immediate keepalive beacon instead of buffering, so a hang-then-force-quit still lands breadcrumbs + `web_storage` in CloudWatch. Threaded a `flush` flag through `logEvent`→`logQueue`; +2 logQueue tests. **Live.** This is the observability that makes the next iPhone test conclusive.
 >
 > ---
 >
-> ### ⭐ Onboarding fix that IS deployed (background for the diagnostic above)
+> ### ⭐ Onboarding bounce-tracking fix — DEPLOYED + CONFIRMED WORKING
 >
-> The bounce-tracking fix is LIVE in prod (Vue build `b3fb8744`; oauth Lambda `beanies-family-oauth-prod` updated `2026-06-20T02:29Z` to `code_verifier`-optional, `CodeSha256` verified, deployed BEFORE the Vue app per the hard ordering — that gate is fully cleared). `npm run validate` was green (3378 unit tests) + oauth Lambda suite green (33 tests). **It is deployed but NOT confirmed working** (see the device-test failure above).
+> The bounce-tracking fix is LIVE (Vue build `b3fb8744`; oauth Lambda `beanies-family-oauth-prod` updated `2026-06-20T02:29Z` to `code_verifier`-optional). **CONFIRMED WORKING on a latest-build iPhone (no freeze).** Remaining double-password + missing-members wrinkles are addressed by the unified-create-flow plan (START HERE above), not this fix.
 
 ### Carried (unchanged this session)
 
