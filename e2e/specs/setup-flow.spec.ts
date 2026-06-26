@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
-import { navigateToSetupStep3 } from '../helpers/auth';
+import { navigateToAddMembers } from '../helpers/auth';
 import { gotoRoot } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
 
@@ -12,8 +12,9 @@ test.describe('Setup Flow', () => {
     await dbHelper.clearAllData();
     await gotoRoot(page);
 
-    // Walk through the full setup wizard: homepage → welcome → create pod steps 1-3
-    await navigateToSetupStep3(page);
+    // Walk through the create flow: homepage → welcome → identity → injected
+    // storage → password → the add-members step on the finish surface.
+    await navigateToAddMembers(page);
 
     // Open the add-member form by clicking the "Add an adult" chip. The
     // form is no longer pre-opened — per the 2026-05-14 step-3 simplification,

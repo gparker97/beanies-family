@@ -120,14 +120,16 @@ function enterErrorPhase(stepIdx: number, msg: string, err?: unknown): void {
   });
 }
 
-/** Run real async work (sync + auto-sync) without UI delays. */
+/** Run real async work (sync) without UI delays. */
 async function runRealWork() {
   if (syncStore.isConfigured) {
     let saved = await syncStore.syncNow(true);
     if (!saved) saved = await syncStore.syncNow(true);
   }
-  syncStore.setupAutoSync();
-  syncStore.ensureRegistered();
+  // setupAutoSync + ensureRegistered run ONCE, canonically, in
+  // LoginPage.handleSignedIn (the single arm-and-register point for every entry
+  // path — create/load/join/reconnect), reached a tick after 'complete'.
+  // Removed here to avoid a duplicate registry network write on every create.
 }
 
 async function runFromStep(startIdx: number) {
@@ -180,24 +182,12 @@ async function runFromStep(startIdx: number) {
           await delay(500); // No sync configured — brief pause
         }
       } else if (i === 4) {
-        // Real: setupAutoSync + ensureRegistered. The pod is already
-        // created and saved by now — if arming auto-sync throws, it
-        // re-arms on next launch, so report it but don't trap the user.
-        const start = Date.now();
-        try {
-          syncStore.setupAutoSync();
-          syncStore.ensureRegistered();
-        } catch (e) {
-          reportError({
-            surface: 'setupProgress.finalize',
-            message: (e as Error)?.message || 'setupAutoSync/ensureRegistered threw',
-            error: e,
-            severity: 'critical',
-            context: { provider_type: syncStore.storageProviderType ?? null },
-          });
-        }
-        const elapsed = Date.now() - start;
-        if (elapsed < 500) await delay(500 - elapsed); // minimum visibility
+        // Perceived "finishing touches" beat. The real arm-and-register
+        // (setupAutoSync + ensureRegistered) runs ONCE in
+        // LoginPage.handleSignedIn — the single canonical point for every entry
+        // path — a tick after this modal emits 'complete'. Kept as a timer for
+        // visual continuity; no duplicate registry write here.
+        await delay(500);
       }
 
       setStep(i, 'done');

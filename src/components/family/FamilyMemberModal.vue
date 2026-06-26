@@ -13,6 +13,8 @@ import { useFormModal } from '@/composables/useFormModal';
 import { confirm } from '@/composables/useConfirm';
 import { isTemporaryEmail } from '@/utils/email';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
+import { useCalendarSelectOptions } from '@/composables/useCalendarSelectOptions';
+import { MEMBER_COLORS } from '@/constants/memberColors';
 import { usePhotoStore } from '@/stores/photoStore';
 import type {
   FamilyMember,
@@ -38,16 +40,6 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const photoStore = usePhotoStore();
 
-// Color options with gradients
-const MEMBER_COLORS = [
-  { value: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #60a5fa)' },
-  { value: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444, #f87171)' },
-  { value: '#22c55e', gradient: 'linear-gradient(135deg, #22c55e, #4ade80)' },
-  { value: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b, #fbbf24)' },
-  { value: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6, #a78bfa)' },
-  { value: '#ec4899', gradient: 'linear-gradient(135deg, #ec4899, #f472b6)' },
-];
-
 // Role chips — parent / child / pet. Pets are part of the pod but never
 // invited, signed in, or granted permissions (see handleSave).
 const roleOptions = computed(() => [
@@ -62,32 +54,7 @@ const genderChipOptions = computed(() => [
   { value: 'other', label: t('family.gender.other'), icon: '⚧️' },
 ]);
 
-const MONTH_KEYS = [
-  'month.january',
-  'month.february',
-  'month.march',
-  'month.april',
-  'month.may',
-  'month.june',
-  'month.july',
-  'month.august',
-  'month.september',
-  'month.october',
-  'month.november',
-  'month.december',
-] as const;
-
-const monthOptions = computed(() =>
-  MONTH_KEYS.map((key, i) => ({
-    value: String(i + 1),
-    label: t(key),
-  }))
-);
-
-const dayOptions = Array.from({ length: 31 }, (_, i) => ({
-  value: String(i + 1),
-  label: String(i + 1),
-}));
+const { monthOptions, dayOptions } = useCalendarSelectOptions(31);
 
 // Form state
 const name = ref('');

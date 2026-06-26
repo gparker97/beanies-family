@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-06-26",
-    "translationCount": 3634
+    "translationCount": 3636
   },
   "translations": {
     "app.name": {
@@ -18175,6 +18175,16 @@
       "translation": "编辑项目",
       "hash": "1bawqx",
       "lastUpdated": "2026-06-20"
+    },
+    "resumeSetup.subtitleRecovery": {
+      "translation": "您上次的设置没有完全完成。请重新输入密码，我们绝不会存储密码，因此您的数据将始终保持端到端加密状态。",
+      "hash": "o55a9m",
+      "lastUpdated": "2026-06-26"
+    },
+    "loginV6.removeMemberFailed": {
+      "translation": "删除成员失败。请重试。",
+      "hash": "3cy9od",
+      "lastUpdated": "2026-06-26"
     }
   }
 }

@@ -337,6 +337,13 @@ router.beforeEach((to) => {
   if (!ALREADY_AUTH_REDIRECT_FROM.has(to.path)) return;
   const authStore = useAuthStore();
   if (!authStore.isAuthenticated) return;
+  // Mid-create: the add-members step renders at /welcome?resume=setup AFTER
+  // createNewFile flips podCreated=true (so needsPodSetup is already false).
+  // Without this, the redirect below would bounce the user to /nook and skip
+  // add-members on iOS. The flag is set only during the members phase and
+  // cleared on completion/unmount (see ResumePodSetup).
+  const syncStore = useSyncStore();
+  if (syncStore.membersStepActive) return;
   if (authStore.needsPodSetup) {
     // Already on a resume screen — let them stay. `setup` is the create/recovery
     // continuation; `load-drive` is the Drive-load OAuth return that re-opens the

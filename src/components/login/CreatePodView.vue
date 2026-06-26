@@ -71,13 +71,23 @@ const driveCardState = computed<'idle' | 'connecting' | 'connected'>(() =>
 // docs/plans/2026-06-20-unified-create-flow-defer-password.md.
 const totalSteps = 2;
 
-// Expose step navigation for E2E tests (dev mode only). The pod is no longer
-// written inside this component (it's created on the finish surface), so this
-// just drives the visible step; tests assert the hand-off separately.
+// E2E seam (dev mode only). Pod creation moved OFF this component to the
+// ResumePodSetup finish surface, which requires a real StorageProvider — and
+// the storage connect (OS file picker / Drive OAuth) is the ONE step Playwright
+// can't drive headless. So the hook injects ONLY that piece: a DEV in-memory
+// provider via the same `syncService.setProvider` seam the real connect uses
+// (which also flips `isConfigured`), and marks the storage step done. The test
+// then drives the REAL UI — the step-2 Continue hand-off, the finish surface's
+// single password entry, and the members step — so the harness exercises the
+// genuine create path and can't drift from production.
 if (import.meta.env.DEV) {
   (window as unknown as Record<string, unknown>).__e2eCreatePod = {
-    setStep: (s: number) => {
-      currentStep.value = s;
+    installMemoryProvider: async () => {
+      const { createMemoryProvider } = await import('@/services/sync/providers/memoryProvider');
+      const { setProvider } = await import('@/services/sync/syncService');
+      setProvider(createMemoryProvider(`${familyName.value || 'my-family'}.beanpod`));
+      storageSaved.value = true;
+      storageType.value = 'local';
     },
   };
 }
@@ -374,6 +384,25 @@ function handleStorageConnected() {
     reportError({
       surface: 'createPod.handOff',
       message: 'storage hand-off reached with no authenticated owner',
+      severity: 'critical',
+      context: { provider_type: storageType.value },
+    });
+    return;
+  }
+  if (!syncStore.isConfigured) {
+    // `storageSaved` is true but no provider is actually wired (a torn-down or
+    // half-installed provider). `setProvider` flips `isConfigured`, so this is
+    // false only when the install genuinely didn't take — refuse the hand-off
+    // rather than landing on a finish surface whose createNewFile will fail at
+    // the write step with no provider. (Restores the guard the old
+    // handleStep2Next had before the unified-flow refactor.)
+    formError.value = t('setup.fileCreateFailed');
+    console.error(
+      '[CreatePodView] storageSaved=true but syncStore.isConfigured=false — refusing the hand-off'
+    );
+    reportError({
+      surface: 'createPod.handOff',
+      message: 'storage hand-off refused: storageSaved=true but syncStore is not configured',
       severity: 'critical',
       context: { provider_type: storageType.value },
     });

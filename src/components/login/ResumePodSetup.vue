@@ -57,7 +57,7 @@
  * branch — never from any existing-pod load (`handleAutoLoadSubmit`,
  * `openExistingOnDrive`, `retry`), which emit `signed-in '/nook'` directly.
  */
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -72,6 +72,7 @@ import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
 import { getProvider } from '@/services/sync/syncService';
+import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
@@ -174,6 +175,14 @@ onMounted(async () => {
   if (consumeResumeReason() === 'drive-consent') {
     formError.value = t('resumeSetup.driveConsentDenied');
   }
+});
+
+onBeforeUnmount(() => {
+  // Safety: never leave the members-step guard flag stranded if this surface is
+  // torn down by any path other than handleSetupComplete (start-over, an error
+  // route, a hard navigation). A stuck flag would suppress the ALREADY_AUTH
+  // redirect for the rest of the session.
+  syncStore.membersStepActive = false;
 });
 
 /**
@@ -384,7 +393,30 @@ async function handleIdentityNext() {
       phase.value = 'finishing';
       await finishOnDrive();
     } else {
-      phase.value = 'storage';
+      // iOS edge: no live provider AND no valid token at the finish surface
+      // (e.g. the token lapsed while the user was on the password form). Before
+      // forcing a SECOND full-page Drive redirect — which reloads the app and
+      // makes the user re-enter the password — try a silent reconnect via the
+      // beanpod-mirrored refresh token. If it restores a token, finish on Drive
+      // with no redirect; only fall back to the storage step when it genuinely
+      // can't recover.
+      phase.value = 'finishing';
+      let recovered = false;
+      try {
+        recovered = await tryReconnectSilently(authStore.currentUser?.email);
+      } catch (e) {
+        reportError({
+          surface: 'resumeSetup.silentReconnect',
+          message: `silent reconnect threw at finish: ${e instanceof Error ? e.message : String(e)}`,
+          error: e,
+          severity: 'warning',
+        });
+      }
+      if (recovered && isTokenValid()) {
+        await finishOnDrive();
+      } else {
+        phase.value = 'storage';
+      }
     }
   } catch (e) {
     console.error('[ResumePodSetup] unexpected error resuming setup', e);
@@ -440,7 +472,20 @@ async function finalizePod(): Promise<boolean> {
       phase.value = 'retry';
       return false;
     }
-    formError.value = t('setup.fileCreateFailed');
+    // Map each failure reason to its specific, recovery-oriented message
+    // (restored from the old CreatePodView.handleStep2Next, which created pods
+    // before the unified-flow refactor). `existing-pod` is handled above;
+    // unmapped reasons fall back to the generic message defensively.
+    // `existing-pod` is handled in the branch above, so it's narrowed out here.
+    const reasonKey: Record<typeof result.reason, Parameters<typeof t>[0]> = {
+      write: 'createPod.failedReasonWrite',
+      verify: 'createPod.failedReasonVerify',
+      persist: 'createPod.failedReasonPersist',
+      register: 'createPod.failedReasonRegister',
+      precondition: 'createPod.failedReasonPrecondition',
+      'concurrent-write': 'createPod.failedReasonConcurrent',
+    };
+    formError.value = t(reasonKey[result.reason] ?? 'setup.fileCreateFailed');
     console.error(`[ResumePodSetup] createNewFile failed (reason=${result.reason}):`, result.error);
     reportError({
       surface: `resumeSetup.${result.reason}`,
@@ -455,6 +500,9 @@ async function finalizePod(): Promise<boolean> {
   // advance to the terminal `members` phase so every user (iPhone included)
   // gets the add-family-members step before entering the app. `/nook` is
   // emitted later, after SetupProgressModal completes (handleSetupComplete).
+  // Flag the members step so the router's ALREADY_AUTH guard does not bounce
+  // /welcome?resume=setup → /nook now that podCreated is true (iOS skip guard).
+  syncStore.membersStepActive = true;
   phase.value = 'members';
   return true;
 }
@@ -484,6 +532,11 @@ async function handleSetupComplete() {
     // the next navigation (the prior behaviour). Don't block entry to the app.
     console.warn('[ResumePodSetup] settings refresh before /nook failed', e);
   }
+  // Members step is finished and we're leaving for /nook — release the guard
+  // flag. NOT cleared in handleSetupBack: that only closes SetupProgressModal
+  // and returns to the still-active members phase (CreateMembersStep re-renders),
+  // so clearing there would reopen the /welcome → /nook skip window.
+  syncStore.membersStepActive = false;
   navigatedAway.value = true;
   emit('signed-in', '/nook');
 }
@@ -673,7 +726,7 @@ async function handleConnectLocal() {
       {{ t('resumeSetup.title') }}
     </h2>
     <p class="mb-6 text-center text-sm text-gray-500 dark:text-gray-400">
-      {{ t('resumeSetup.subtitle') }}
+      {{ phase === 'auto-load' ? t('resumeSetup.subtitleRecovery') : t('resumeSetup.subtitle') }}
     </p>
 
     <div

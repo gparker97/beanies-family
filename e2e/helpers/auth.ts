@@ -2,55 +2,86 @@ import { type Page } from '@playwright/test';
 import { ui } from './ui-strings';
 
 const E2E_PASSWORD = 'test1234';
+// Distinctive name so any future registry-table scrub can grep for it. The E2E
+// suite also calls deleteFamilyFromRegistry() in afterEach to clean up; this
+// name is the safety net for failed tests that crash before teardown.
+const E2E_FAMILY_NAME = 'E2E Test Family';
 
 /**
- * Navigates through the setup wizard to step 3 (Add Family Members).
- * Useful for tests that need to interact with step 3 directly.
+ * Drive the create-a-family flow from WelcomeGate up to the add-members step,
+ * leaving the Finish button visible (NOT yet clicked).
+ *
+ * The unified flow finishes on the `ResumePodSetup` surface, which calls
+ * `createNewFile` and so needs a real `StorageProvider`. The storage connect
+ * (OS save-file picker / Drive OAuth) is the ONE step Playwright can't drive
+ * headless, so we inject a DEV in-memory provider via
+ * `__e2eCreatePod.installMemoryProvider` and drive everything else through the
+ * REAL UI: step-1 identity, the step-2 Continue hand-off, then the finish
+ * surface's single password entry. The password is collected ONCE here — not at
+ * step 1 (those fields no longer exist).
  */
-export async function navigateToSetupStep3(page: Page): Promise<void> {
+async function createUpToMembers(page: Page): Promise<void> {
+  // Step 1 — identity only (no password; it moved to the finish surface).
+  await page.getByLabel(ui('auth.familyName')).fill(E2E_FAMILY_NAME);
+  await page.getByLabel(ui('setup.yourName')).fill('John Doe');
+  await page.getByLabel(ui('form.email')).fill('john@example.com');
+  await page.getByRole('button', { name: ui('loginV6.createNext') }).click();
+
+  // Step 2 — inject the headless provider (the only un-automatable piece), then
+  // drive the real Continue hand-off to the finish surface.
+  await page
+    .getByText(ui('loginV6.storageSectionLabel'))
+    .waitFor({ state: 'visible', timeout: 10000 });
+  await page.evaluate(async () => {
+    await (
+      window as unknown as { __e2eCreatePod?: { installMemoryProvider: () => Promise<void> } }
+    ).__e2eCreatePod?.installMemoryProvider();
+  });
+  // The step-2 CTA enables once storage is marked connected.
+  await page.getByRole('button', { name: ui('loginV6.createNext') }).click();
+
+  // Finish surface (ResumePodSetup) — identity phase: set the password ONCE.
+  const passwordField = page.getByLabel(ui('loginV6.signInPasswordLabel'));
+  await passwordField.waitFor({ state: 'visible', timeout: 10000 });
+  await passwordField.fill(E2E_PASSWORD);
+  await page.getByLabel(ui('auth.confirmPassword')).fill(E2E_PASSWORD);
+  await page.getByRole('button', { name: ui('action.continue') }).click();
+
+  // Members phase — the Finish button is the marker we leave visible.
+  await page
+    .getByRole('button', { name: ui('loginV6.finish') })
+    .waitFor({ state: 'visible', timeout: 10000 });
+}
+
+/**
+ * Navigates through the create flow to the Add Family Members step.
+ * Useful for tests that need to interact with the members step directly.
+ * (Replaces the old `navigateToSetupStep3` — there is no "step 3" anymore;
+ * members live on the finish surface.)
+ */
+export async function navigateToAddMembers(page: Page): Promise<void> {
   const createPodButton = page.getByTestId('create-pod-button');
   await createPodButton.waitFor({ state: 'visible', timeout: 5000 });
 
-  // Set auto-auth flag before clicking create
+  // Set auto-auth flag before clicking create so InviteGateOverlay and
+  // TrustDeviceModal are both suppressed in E2E.
   await page.evaluate(() => {
     sessionStorage.setItem('e2e_auto_auth', 'true');
   });
   await createPodButton.click();
 
-  // Step 1: Name & Password
-  // Distinctive name so any future registry-table scrub can grep for it.
-  // The E2E suite also calls deleteFamilyFromRegistry() in afterEach to
-  // clean up properly; this name is the safety net for failed tests that
-  // crash before teardown.
-  await page.getByLabel('Family Name').fill('E2E Test Family');
-  await page.getByLabel('Your Name').fill('John Doe');
-  await page.getByLabel('Email').fill('john@example.com');
-  await page.getByLabel('Password').first().fill(E2E_PASSWORD);
-  await page.getByLabel('Confirm password').fill(E2E_PASSWORD);
-  await page.getByRole('button', { name: ui('action.next') }).click();
-
-  // Step 2: Skip to step 3 via dev hook (storage picker can't be automated)
-  await page
-    .getByText(ui('loginV6.storageSectionLabel'))
-    .waitFor({ state: 'visible', timeout: 10000 });
-  await page.evaluate(() => {
-    (window as any).__e2eCreatePod?.setStep(3);
-  });
-
-  // Wait for step 3 to render
-  await page
-    .getByRole('button', { name: ui('loginV6.finish') })
-    .waitFor({ state: 'visible', timeout: 5000 });
+  await createUpToMembers(page);
 }
 
 /**
  * Bypasses the login page for E2E tests.
  *
- * On first call (fresh browser context after clearAllData): walks through
- * the WelcomeGate → Create Pod wizard then navigates to /dashboard.
+ * On first call (fresh browser context after clearAllData): walks through the
+ * WelcomeGate → create flow (identity → injected storage → password → members),
+ * clicks Finish, then waits for /nook.
  *
- * On subsequent calls within the same test: the auto-auth flag is
- * already set, so the app skips login automatically.
+ * On subsequent calls within the same test: the auto-auth flag is already set,
+ * so the app skips login automatically.
  */
 export async function bypassLoginIfNeeded(page: Page): Promise<void> {
   const createPodButton = page.getByTestId('create-pod-button');
@@ -61,46 +92,16 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
     .catch(() => false);
 
   if (isOnWelcome) {
-    // Set auto-auth flag BEFORE clicking create so InviteGateOverlay
-    // and TrustDeviceModal are both suppressed in E2E.
+    // Set auto-auth flag BEFORE clicking create so InviteGateOverlay and
+    // TrustDeviceModal are both suppressed in E2E.
     await page.evaluate(() => {
       sessionStorage.setItem('e2e_auto_auth', 'true');
     });
 
     await createPodButton.click();
+    await createUpToMembers(page);
 
-    // Step 1: Name & Password
-    // Distinctive name so any future registry-table scrub can grep for it.
-    // The E2E suite also calls deleteFamilyFromRegistry() in afterEach to
-    // clean up properly; this name is the safety net for failed tests that
-    // crash before teardown.
-    await page.getByLabel('Family Name').fill('E2E Test Family');
-    await page.getByLabel('Your Name').fill('John Doe');
-    await page.getByLabel('Email').fill('john@example.com');
-    await page.getByLabel('Password').first().fill(E2E_PASSWORD);
-    await page.getByLabel('Confirm password').fill(E2E_PASSWORD);
-    await page.getByRole('button', { name: ui('action.next') }).click();
-
-    // Step 2: Storage & pod password
-    // Wait for step 2 to fully render (signUp is async, so step 1's Next
-    // triggers an async flow that sets currentStep = 2 on completion).
-    await page
-      .getByText(ui('loginV6.storageSectionLabel'))
-      .waitFor({ state: 'visible', timeout: 10000 });
-
-    // The Local button triggers showSaveFilePicker (native OS dialog) which
-    // cannot be automated in headless browsers. Skip to step 3 using the
-    // dev-mode E2E hook exposed by CreatePodView.
-    await page.evaluate(() => {
-      (window as any).__e2eCreatePod?.setStep(3);
-    });
-
-    // Wait for step 3 to render
-    await page
-      .getByRole('button', { name: ui('loginV6.finish') })
-      .waitFor({ state: 'visible', timeout: 5000 });
-
-    // Step 3: Add family members — finish (goes to /nook)
+    // Members step → finish (goes to /nook).
     await page.getByRole('button', { name: ui('loginV6.finish') }).click();
   }
 
