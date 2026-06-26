@@ -572,6 +572,19 @@ function handleRequestCreate() {
   activeView.value = 'create';
 }
 
+/**
+ * Desktop create hand-off: CreatePodView connected storage (popup / local file)
+ * and is done. Flip to the shared finish surface (ResumePodSetup) where the
+ * password is entered once and members are added. A direct `activeView` flip —
+ * NOT a `router.replace` — so the freshly-installed `syncStore` provider/token
+ * stay live in the store and the finish surface writes straight into them
+ * without re-connecting. (iOS reaches the same surface via the Drive redirect
+ * return + the `?resume=setup` watchEffect, not this handler.)
+ */
+function handleFinishStorage() {
+  activeView.value = 'resume-setup';
+}
+
 function handleFileLoaded() {
   activeView.value = 'pick-bean';
 }
@@ -680,6 +693,7 @@ async function handleStartOver() {
             @back="activeView = 'welcome'"
             @signed-in="handleSignedIn"
             @navigate="handleNavigate"
+            @finish-storage="handleFinishStorage"
           />
         </div>
         <InviteGateOverlay

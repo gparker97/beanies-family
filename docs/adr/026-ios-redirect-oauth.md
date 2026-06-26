@@ -86,3 +86,18 @@ Telemetry confirmed it three ways (a `#beanies-errors` Slack alert + two CloudWa
 - `src/components/login/resumePaths.ts`, `CreatePodView.vue`, `ResumePodSetup.vue` — round-2 password stash removed; single clean re-entry via the generic `identity` phase.
 - `src/App.vue` — `INIT_TIMEOUTS` + init watchdog; `src/composables/useNotifications.ts` — no auto-open mid-onboarding.
 - Full plan: `docs/plans/2026-06-20-ios-oauth-bounce-state-param.md`. Cross-refs: ADR-020 (PKCE migration), ADR-029 (native).
+
+### Amendment (2026-06-26): the create flow defers the password to a shared post-connect finish surface
+
+The `state`-param fix above made iOS create-a-family complete without a freeze, but two UX wrinkles remained on a confirmed-latest-build device — both from the same root cause: the iOS Drive connect is a **full-page redirect that reloads the app mid-wizard**, so on return the app fell into the minimal `ResumePodSetup` _recovery_ screen, which re-asked for the password (the in-memory step-1 password died in the reload) and routed straight to `/nook` — bypassing the add-members step. Desktop (popup, no reload) didn't hit either.
+
+The unified create flow removes the divergence for **all** users (plan: `docs/plans/2026-06-20-unified-create-flow-defer-password.md`):
+
+- **Step 1 is identity only** (family name, owner, email — no password). `authStore.signUp` gains a type-enforced `deferPassword` mode that builds the owner with an empty `DEFERRED_PASSWORD_HASH` sentinel; no key/hash work happens until the password is collected.
+- **The password is collected ONCE, on the post-connect finish surface** (`ResumePodSetup`, now a first-class create step, not only a recovery fallback). The existing `rehydrateOwnerDoc` applies the real hash. `createNewFile` gains a **fail-closed precondition** that refuses to write a pod whose owner still carries the sentinel — a password-less pod is structurally unwritable.
+- **Every user gets the add-members step**: `ResumePodSetup` adds a terminal `members` phase (`CreateMembersStep`) reached ONLY from a successful pod write, never from any existing-pod load.
+- **Desktop and iOS share the one finish surface.** Desktop hands off via a direct `LoginPage` `activeView` flip (no route change → the live `syncStore` provider survives); when a provider is already installed on the page, the finish surface skips `connectDriveStorage` and writes straight into it (avoids a second `createNew` colliding with the step-2 stub). iOS resumes via the existing `?resume=setup` watchEffect after the redirect.
+
+**Invariant added:** `rehydrateOwnerDoc` must NOT early-return when the owner exists with the `DEFERRED_PASSWORD_HASH` sentinel — on the desktop no-reload hand-off the owner is still in memory, so it must rebuild with the real hash or the fail-closed `createNewFile` guard blocks the create. Recorded in-code at `authStore.rehydrateOwnerDoc` + a unit test in `createNewFile.test.ts`.
+
+Key files: `src/stores/authStore.ts` (deferred `signUp` + `DEFERRED_PASSWORD_HASH` + the rehydrate guard), `src/stores/syncStore.ts` (fail-closed `createNewFile` precondition), `src/components/login/CreatePodView.vue` (identity-only step 1 + `finish-storage` hand-off), `src/components/login/CreateMembersStep.vue` (new), `src/components/login/ResumePodSetup.vue` (`members` phase + already-connected short-circuit), `src/pages/LoginPage.vue` (desktop hand-off handler).
