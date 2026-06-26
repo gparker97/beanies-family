@@ -487,13 +487,27 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Rebuild the owner member after a full-page redirect during onboarding
-   * (the iOS Drive flow) destroyed the in-memory Automerge doc, so the
-   * resume-setup screen can go on to call `syncStore.createNewFile`. Re-uses
-   * the persisted session for the immutable bits (memberId/email) and the
-   * caller-supplied name + password for the rest. No-op if the doc already
-   * has the owner (re-entered on the same session without an intervening
-   * reload). Requires an active session.
+   * Apply the real password to the owner on the create-finish surface (and
+   * rebuild the owner after a full-page redirect destroyed the in-memory doc).
+   * Re-uses the persisted session for the immutable bits (memberId/email) and
+   * the caller-supplied name + password for the rest. Requires an active session.
+   *
+   * Two paths:
+   * - **Owner still in the doc** (desktop deferred-password hand-off — no reload
+   *   between step-1 `signUp` and this call): stamp the real hash IN PLACE via
+   *   `updateMember`. Do NOT rebuild the doc — `buildOwnerDoc` would `initDoc()`
+   *   (a whole-doc reset), recreate the member, and redo step-1's onboarding
+   *   settings write. That churn is wasted AND swaps the doc identity mid-create,
+   *   which widened the `/nook` stale-`onboardingCompleted` projection window.
+   *   The step-1 doc already holds name + `onboardingCompleted:false`; only the
+   *   `passwordHash` (and possibly an edited name) changed.
+   * - **Owner gone** (iOS Drive redirect reloaded the app → in-memory doc wiped):
+   *   rebuild it from the persisted session via `buildOwnerDoc`.
+   *
+   * No-op short-circuit when the owner already holds a REAL hash (a genuine
+   * recovery re-entry on the same session) — never when it still carries the
+   * `DEFERRED_PASSWORD_HASH` sentinel, or the fail-closed `createNewFile` guard
+   * would block the create.
    */
   async function rehydrateOwnerDoc(
     name: string,
@@ -501,21 +515,23 @@ export const useAuthStore = defineStore('auth', () => {
   ): Promise<{ success: boolean; error?: string }> {
     if (!currentUser.value) return { success: false, error: 'No active session to resume' };
     const familyStore = useFamilyStore();
-    // No-op when the owner is already in the doc — BUT only if it already holds
-    // a real password hash. In the unified create flow the owner exists with
-    // the empty `DEFERRED_PASSWORD_HASH` sentinel (desktop hands off WITHOUT a
-    // reload between step-1 `signUp` and this call, so the in-memory owner
-    // survives). We MUST fall through to rebuild it with the real hash, or the
-    // owner ships with an empty hash and `createNewFile`'s fail-closed guard
-    // refuses the write. iOS reloads on the redirect, so `owner` is null there
-    // and this branch is moot. `buildOwnerDoc` re-`initDoc()`s (a full doc
-    // reset) then recreates the owner on the same memberId — safe here because
-    // no members have been added yet at this point in the flow.
-    if (familyStore.owner && familyStore.owner.passwordHash !== DEFERRED_PASSWORD_HASH) {
+    const existingOwner = familyStore.owner;
+    if (existingOwner && existingOwner.passwordHash !== DEFERRED_PASSWORD_HASH) {
       return { success: true };
     }
     try {
       const passwordHashValue = await hashPassword(password);
+      if (existingOwner) {
+        // Desktop: owner present with the deferred sentinel — set the hash (and
+        // any edited name) in place, preserving the rest of the step-1 doc.
+        const updated = await familyStore.updateMember(existingOwner.id, {
+          name,
+          passwordHash: passwordHashValue,
+        });
+        if (!updated) return { success: false, error: 'Failed to set owner password' };
+        return { success: true };
+      }
+      // iOS: the redirect reloaded the app — rebuild the owner from scratch.
       const member = await buildOwnerDoc(
         { name, email: currentUser.value.email, passwordHash: passwordHashValue },
         currentUser.value.memberId
