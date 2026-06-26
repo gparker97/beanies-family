@@ -14,6 +14,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Creating a family now asks for your password once — after you connect storage — and always lets you add your family members.** Setup is now: your details → connect Google Drive (or a local file) → set your password → add your family. Previously, on iPhone the password step could repeat itself and the add-members step was skipped entirely (you'd land in the app with nobody to assign to accounts and activities). Now everyone — iPhone, Android, and desktop — gets the same clean flow with a single password and the add-members step. Your password is still never stored, and it's the key that encrypts your family's data.
 
+### Fixed
+
+- **The welcome guide now appears right after you create your family.** Previously, on a brand-new family the home page (the Nook) could load without the money/savings onboarding guide, which only showed up once you navigated to another page and back. It now appears immediately.
+- **Family member colors picked during setup now match the palette you edit later.** A member added during setup could be given a color that wasn't in the member-edit color picker — so opening that member later showed "no color selected" and a single tap could overwrite it. Setup now uses the same palette throughout.
+- **Clearer, more specific messages if family-file setup ever fails**, and a failed member-removal during setup no longer silently leaves the person on screen. Internal hardening of the new create flow (sign-in token recovery, guarding the add-members step) so it stays smooth on iPhone too.
+
 ## 2026-06-20
 
 ### Added
