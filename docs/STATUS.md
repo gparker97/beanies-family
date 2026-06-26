@@ -18,7 +18,7 @@
 > ## ⭐⭐ NEXT SESSION — START HERE ⭐⭐
 >
 > 1. **⏳ iPhone DEVICE verification of the new create flow (Safari tab + installed PWA).** greg tested **desktop Chrome only** this session. Verify on a real iPhone: create → **password once** → **members step** → `/nook` with the members present AND the welcome guide showing immediately. The critical-report telemetry force-flush is live, so any stall lands in CloudWatch `/aws/lambda/beanies-family-telemetry-prod`. The two iOS-defensive guards (findings 10/11) were reasoned-from-code only — confirm they behave on device.
-> 2. **Dependabot triage** — 5 PRs open (#251, #252 astro 5→6, #254 tar, #255 actions/checkout 6→7, #256 dev-deps). Run `/review-dependabot-prs`.
+> 2. **Dependabot triage — DONE 2026-06-27** (merged #254 tar + #256 dev-deps group; closed #252 astro 5→6 as the recurring security-bypass of the existing semver-major ignore). **Two held, awaiting greg's decision:** **#255** actions/checkout 6→7 — vetted safe (we use no `pull_request_target`/`workflow_run`, so the v7 fork-PR-checkout block is inert), **recommend merge**; **#251** prod-deps group — Dependency Review red because `astro 5.18.1→5.18.2` carries the unfixed-in-5.x high-sev SSRF advisory (GHSA-8hv8-536x-4wqp), stranding 5 safe patches (vue/tailwind/sitemap/passkey). Recommended fix: **exclude `astro` from the `production-dependencies` group** in `.github/dependabot.yml` so patches flow without the inert astro bump.
 > 3. **Finding 15 FUTURE** (optional, low priority): the create-owner-late refactor that removes the `DEFERRED_PASSWORD_HASH` sentinel + fail-closed guard + rehydrate special-case. Documented in the `authStore.ts` doc-comment. Revisit only after iOS is device-verified.
 >
 > ---
@@ -31,7 +31,7 @@
 
 ### Carried (unchanged this session)
 
-- **Dependabot:** 5 PRs open as of 2026-06-26 — #251 (prod-deps), #252 (astro 5→6), #254 (tar), #255 (actions/checkout 6→7), #256 (dev-deps). Run `/review-dependabot-prs`. (Also in NEXT SESSION item 2.)
+- **Dependabot (triaged 2026-06-27):** #254 + #256 merged; #252 (astro 6) closed. **2 held for greg:** #255 (checkout v7 — recommend merge, vetted safe) and #251 (prod-deps group — blocked by the inert astro-5.18.2 SSRF advisory; recommend excluding `astro` from the group in `dependabot.yml`). See NEXT SESSION item 2.
 - **Onboarding follow-ups** (non-blocking, from the deploy session): the dated CI tripwire `legacyRedirectTransport.tripwire.test.ts` (fails after 2026-09-30 → remove legacy `beanies_redirect_auth` web transport) — tracked-issue not yet filed; the `INIT_TIMEOUTS` ordering test was deliberately skipped.
 - **#40 Helpful Hints; #39/#38** (Notion intake done); **Google OAuth verification** (awaiting Google); **#241 Reports nav**; deferred deps (pdfjs-dist 4→6, capacitor trio); app-store DUNS (~early July).
   > ### Follow-ups created this session (not blocking)
