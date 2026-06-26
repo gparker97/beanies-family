@@ -3449,6 +3449,11 @@ const STRING_DEFS = {
     beanie:
       'one last step: set your password to finish. we never store it, so your beans stay encrypted end-to-end.',
   },
+  'resumeSetup.subtitleRecovery': {
+    en: "Your last setup didn't quite finish. Re-enter your password to wrap things up — we never store it, so your data stays encrypted end-to-end.",
+    beanie:
+      "your last setup didn't quite finish. re-enter your password to wrap things up — we never store it, so your beans stay encrypted end-to-end.",
+  },
   'resumeSetup.storagePrompt': {
     en: 'Where should your pod live?',
     beanie: 'where should your pod live?',
@@ -3634,6 +3639,10 @@ const STRING_DEFS = {
   'loginV6.addMemberFailed': {
     en: 'Failed to add member. Please try again.',
     beanie: 'failed to add member. please try again.',
+  },
+  'loginV6.removeMemberFailed': {
+    en: 'Failed to remove member. Please try again.',
+    beanie: 'failed to remove member. please try again.',
   },
   'loginV6.removeMember': { en: 'Remove', beanie: 'remove' },
   'loginV6.you': { en: 'You', beanie: 'you' },

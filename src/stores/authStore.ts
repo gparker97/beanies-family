@@ -39,6 +39,26 @@ import { useTranslationStore } from './translationStore';
  * which point every read flips it back to `false` automatically. Verified
  * safe pre-pod: the only consumer, `familyStore.normalizeRoles`, only elects
  * an owner when `owners.length === 0`, and our owner keeps `role: 'owner'`.
+ *
+ * ⚠️ THREE LOCKSTEP INVARIANTS — keep all three in sync or a pod can ship with
+ * an owner who can never authenticate (empty hash → `signIn` rejects it → the
+ * encrypted pod is unrecoverable):
+ *   1. `signUp({ deferPassword: true })` builds the owner with this sentinel
+ *      and does NO hashing/key derivation.
+ *   2. `rehydrateOwnerDoc` MUST NOT early-return when the owner still holds
+ *      this sentinel — it applies the real hash (in place on desktop, via a
+ *      rebuild on iOS). Early-returning only on a REAL hash is the guard.
+ *   3. `syncStore.createNewFile`'s fail-closed precondition refuses to write a
+ *      pod whose resolved owner still carries this sentinel.
+ *
+ * FUTURE: the cleaner design is to not create the owner member at all until the
+ * password is known — pre-generate `memberId` in `signUp`, create the owner via
+ * `createMemberWithId` on the finish surface — which removes this sentinel, the
+ * fail-closed guard, and the rehydrate special-case together. Deferred (2026-06-26):
+ * it's an auth-layer refactor touching `signUp`'s contract, the registry
+ * mapping, the iOS rehydrate path, and the "🫘 started" ping ordering — too
+ * high-blast-radius for a flow that can't yet be iOS device-tested. Revisit once
+ * iOS is verified on a real device.
  */
 export const DEFERRED_PASSWORD_HASH = '';
 

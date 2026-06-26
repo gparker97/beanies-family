@@ -15,21 +15,19 @@
  * (the pod already exists at this point), and persisted by the host's
  * `SetupProgressModal` sync after `finish`.
  */
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useCalendarSelectOptions } from '@/composables/useCalendarSelectOptions';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFamilyStore } from '@/stores/familyStore';
+import { MEMBER_COLOR_VALUES } from '@/constants/memberColors';
 import { reportError } from '@/utils/errorReporter';
 import { formatBirthdayShort } from '@/utils/date';
 import type { FamilyMember, Gender, AgeGroup, DateOfBirth } from '@/types/models';
-
-const props = withDefaults(defineProps<{ ownerRole?: 'parent' | 'child' }>(), {
-  ownerRole: 'parent',
-});
 
 const emit = defineEmits<{ finish: [] }>();
 
@@ -46,32 +44,7 @@ const dobYear = ref('');
 const showMemberForm = ref(false);
 const formError = ref<string | null>(null);
 
-const MONTH_KEYS = [
-  'month.january',
-  'month.february',
-  'month.march',
-  'month.april',
-  'month.may',
-  'month.june',
-  'month.july',
-  'month.august',
-  'month.september',
-  'month.october',
-  'month.november',
-  'month.december',
-] as const;
-
-const monthOptions = computed(() =>
-  MONTH_KEYS.map((key, i) => ({
-    value: String(i + 1),
-    label: t(key),
-  }))
-);
-
-const dayOptions = Array.from({ length: 31 }, (_, i) => ({
-  value: String(i + 1),
-  label: String(i + 1),
-}));
+const { monthOptions, dayOptions } = useCalendarSelectOptions(31);
 
 async function handleAddMember() {
   formError.value = null;
@@ -127,7 +100,19 @@ async function handleAddMember() {
 }
 
 async function handleRemoveMember(memberId: string) {
-  await familyStore.deleteMember(memberId);
+  formError.value = null;
+  const ok = await familyStore.deleteMember(memberId);
+  if (!ok) {
+    // No-silent-failures: deleteMember returns false on failure. Keep the row so
+    // the UI matches the pod, and report it (same discipline as the add path).
+    formError.value = t('loginV6.removeMemberFailed');
+    reportError({
+      surface: 'createMembers.removeMember',
+      message: `deleteMember returned false for member ${memberId} on the create-finish surface`,
+      severity: 'warning',
+    });
+    return;
+  }
   addedMembers.value = addedMembers.value.filter((m) => m.id !== memberId);
   // If all members removed, re-show the form
   if (addedMembers.value.length === 0) showMemberForm.value = true;
@@ -142,11 +127,9 @@ function openAddMemberForm(role: 'parent' | 'child') {
   showMemberForm.value = true;
 }
 
-const memberColors = ['#ef4444', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4'];
-
 function getNextColor(): string {
   const usedCount = addedMembers.value.length;
-  return memberColors[usedCount % memberColors.length] ?? '#3b82f6';
+  return MEMBER_COLOR_VALUES[usedCount % MEMBER_COLOR_VALUES.length] ?? MEMBER_COLOR_VALUES[0]!;
 }
 </script>
 
@@ -171,12 +154,7 @@ function getNextColor(): string {
         class="flex items-center gap-3 rounded-xl bg-gray-50 p-3 dark:bg-slate-700/50"
       >
         <BeanieAvatar
-          :variant="
-            getMemberAvatarVariant({
-              gender: familyStore.owner.gender,
-              ageGroup: props.ownerRole === 'child' ? 'child' : 'adult',
-            })
-          "
+          :variant="getMemberAvatarVariant(familyStore.owner)"
           :color="familyStore.owner.color"
           size="sm"
         />
@@ -190,7 +168,7 @@ function getNextColor(): string {
           </p>
           <p class="text-xs text-gray-500 dark:text-gray-400">
             {{
-              props.ownerRole === 'child'
+              familyStore.owner.ageGroup === 'child'
                 ? '🌱 ' + t('loginV6.littleBean')
                 : '🫘 ' + t('loginV6.parentBean')
             }}
