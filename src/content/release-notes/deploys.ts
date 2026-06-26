@@ -17,6 +17,16 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.06.26',
+    date: '2026-06-26',
+    month: '26 june 2026',
+    summary: {
+      en: 'Setting up a new family is simpler now - one password, and add your family right in setup.',
+      beanie:
+        'setting up a new family is simpler now - one password, and add your family right in setup.',
+    },
+  },
+  {
     version: '2026.06.20',
     date: '2026-06-20',
     month: '20 june 2026',
