@@ -32,18 +32,45 @@
  * UI is a flat `switch` on the orchestrator's discriminated result kinds —
  * see `src/types/sync.ts`. The store layer owns all the recovery logic so
  * each branch in this file is one render path with one action.
+ *
+ * ── Dual role (2026-06-26): recovery surface AND first-class create-finish ──
+ *
+ * Since the unified create flow, this is ALSO the single post-connect finish
+ * surface for a brand-new family (desktop hands off here after the step-2
+ * popup; iPhone resumes here after the Drive redirect). The password is
+ * collected ONCE in the `identity` phase, then the pod is written and the new
+ * terminal `members` phase runs for every user before `/nook`.
+ *
+ * Phase reachability — the create and load sub-flows are disjoint:
+ *
+ *   create (genuinely-new family):
+ *     no-registry-entry → identity → (storage |        ) → finishing
+ *                                     (already-connected) → finalizePod
+ *       → finalizePod SUCCESS → members → SetupProgressModal → signed-in /nook
+ *
+ *   load (existing pod — NEVER reaches `members`):
+ *     auto-loadable → auto-load → completeAutoLoad success → signed-in /nook
+ *     open-existing (adopt-confirm) → auto-load → … → signed-in /nook
+ *     registry-error | load-failed → retry → (re-probe | start-new → identity)
+ *
+ * The `members` phase is entered ONLY from `finalizePod`'s create-success
+ * branch — never from any existing-pod load (`handleAutoLoadSubmit`,
+ * `openExistingOnDrive`, `retry`), which emit `signed-in '/nook'` directly.
  */
 import { ref, computed, onMounted } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
+import CreateMembersStep from '@/components/login/CreateMembersStep.vue';
+import SetupProgressModal from '@/components/login/SetupProgressModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
+import { getProvider } from '@/services/sync/syncService';
 import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
@@ -66,11 +93,12 @@ const emit = defineEmits<{
 /**
  * Discriminated UI phases. `probing` is the initial registry-check;
  * `auto-load` is the non-destructive happy path; `identity` + `storage` are
- * the original destructive-recreate flow we fall back to when there is no
- * registered pod (genuinely-new families). `finishing` is the spinner shown
+ * the create flow (genuinely-new families). `finishing` is the spinner shown
  * during a critical write — both auto-load decrypt and create-pod write.
+ * `members` is the terminal create-only add-family-members step, reached ONLY
+ * after a successful pod write (see the phase-reachability table above).
  */
-type Phase = 'probing' | 'auto-load' | 'identity' | 'storage' | 'finishing' | 'retry';
+type Phase = 'probing' | 'auto-load' | 'identity' | 'storage' | 'finishing' | 'members' | 'retry';
 const phase = ref<Phase>('probing');
 
 const ownerName = ref('');
@@ -79,6 +107,10 @@ const confirmPassword = ref('');
 const formError = ref<string | null>(null);
 const busy = ref(false);
 const showLocalFileWarning = ref(false);
+// Drives the SetupProgressModal opened from the terminal `members` phase
+// (sync the just-added members + register), mirroring CreatePodView's old
+// handleFinish → SetupProgressModal → /nook tail.
+const showSetupModal = ref(false);
 // Set once we've kicked off navigation to /nook — keeps the `finally` blocks
 // from flashing the storage picker back on during the route transition.
 const navigatedAway = ref(false);
@@ -334,9 +366,19 @@ async function handleIdentityNext() {
       });
       return;
     }
-    // If we already hold a fresh Google token (just returned from a Drive
-    // redirect), finish on Drive without bothering the user with a chooser.
-    if (isTokenValid()) {
+    // Desktop create hand-off: storage was ALREADY connected on this same page
+    // (CreatePodView's step-2 popup / local picker installed the provider and,
+    // for Drive, wrote the stub `.beanpod`). Write straight into it — do NOT
+    // re-run `connectDriveStorage`, which would call `createNew` a second time
+    // and collide with that stub (and re-prompt for a local file). iOS never
+    // takes this branch: its full-page Drive redirect reloads the app, so the
+    // in-memory provider is gone (`getProvider()` is null) on return.
+    if (getProvider()) {
+      phase.value = 'finishing';
+      await finalizePod();
+    } else if (isTokenValid()) {
+      // iOS returned from the Drive redirect with a fresh token but no live
+      // provider yet — connect Drive here, exactly once.
       phase.value = 'finishing';
       await finishOnDrive();
     } else {
@@ -407,10 +449,32 @@ async function finalizePod(): Promise<boolean> {
     });
     return false;
   }
-  // setupAutoSync + ensureRegistered happen in LoginPage.handleSignedIn.
+  // Pod written. Unlike the load paths, a create does NOT route to /nook yet:
+  // advance to the terminal `members` phase so every user (iPhone included)
+  // gets the add-family-members step before entering the app. `/nook` is
+  // emitted later, after SetupProgressModal completes (handleSetupComplete).
+  phase.value = 'members';
+  return true;
+}
+
+/**
+ * `members` phase: the user is done adding family — open SetupProgressModal,
+ * which syncs the just-added members + registers the pod, then routes to /nook.
+ */
+function handleMembersFinish() {
+  showSetupModal.value = true;
+}
+
+function handleSetupComplete() {
+  // The "🎉 pod created" Slack ping already fired inside createNewFile when the
+  // pod was written; this just closes the wizard and enters the app.
+  showSetupModal.value = false;
   navigatedAway.value = true;
   emit('signed-in', '/nook');
-  return true;
+}
+
+function handleSetupBack() {
+  showSetupModal.value = false;
 }
 
 async function finishOnDrive() {
@@ -734,14 +798,18 @@ async function handleConnectLocal() {
       </p>
     </div>
 
+    <!-- Members (create-finish only): add family members after the pod write. -->
+    <CreateMembersStep v-else-if="phase === 'members'" @finish="handleMembersFinish" />
+
     <!-- Finishing (in-flight critical write — auto-load decrypt or create-pod) -->
     <div v-else class="py-6 text-center">
       <BeanieSpinner size="md" class="mx-auto mb-3" />
       <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('resumeSetup.finishing') }}</p>
     </div>
 
-    <!-- Start over (always available except during a critical write) -->
-    <div v-if="phase !== 'finishing'" class="mt-6 text-center">
+    <!-- Start over — hidden during a critical write AND on the members step
+         (the pod already exists; the user should finish, not sign back out). -->
+    <div v-if="phase !== 'finishing' && phase !== 'members'" class="mt-6 text-center">
       <button
         type="button"
         class="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -758,6 +826,14 @@ async function handleConnectLocal() {
       @close="showLocalFileWarning = false"
       @proceed="handleConnectLocal"
       @use-google-drive="handleConnectDrive"
+    />
+
+    <!-- Setup progress modal — opened from the members step; syncs the added
+         members + registers the pod, then routes into the app. -->
+    <SetupProgressModal
+      :open="showSetupModal"
+      @complete="handleSetupComplete"
+      @back="handleSetupBack"
     />
   </div>
 </template>

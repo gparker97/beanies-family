@@ -4,15 +4,11 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
-import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
-import SetupProgressModal from '@/components/login/SetupProgressModal.vue';
 import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAuthStore } from '@/stores/authStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
@@ -21,12 +17,9 @@ import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isUserCancellation } from '@/services/google/googleAuth';
 import { slackNotify } from '@/utils/slackNotify';
 import { reportError } from '@/utils/errorReporter';
-import { formatBirthdayShort } from '@/utils/date';
-import type { FamilyMember, Gender, AgeGroup, DateOfBirth } from '@/types/models';
 
 const { t } = useTranslation();
 const authStore = useAuthStore();
-const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
 
@@ -36,6 +29,13 @@ const emit = defineEmits<{
   back: [];
   'signed-in': [destination: string];
   navigate: [view: LoginView];
+  /**
+   * Storage connected (desktop popup / local file) — hand off to the shared
+   * post-connect finish surface (ResumePodSetup) where the password is entered
+   * once and family members are added. iOS reaches the same surface via the
+   * Drive redirect return, not this emit.
+   */
+  'finish-storage': [];
 }>();
 
 const currentStep = ref(1);
@@ -50,8 +50,6 @@ const ownerRoleOptions = computed(() => [
   { value: 'parent', label: t('loginV6.parentBean') },
   { value: 'child', label: t('loginV6.littleBean') },
 ]);
-const password = ref('');
-const confirmPassword = ref('');
 const subscribeNewsletter = ref(true);
 
 // Step 2 state
@@ -67,67 +65,24 @@ const driveCardState = computed<'idle' | 'connecting' | 'connected'>(() =>
   storageType.value === 'google_drive' ? 'connected' : isSavingStorage.value ? 'connecting' : 'idle'
 );
 
-// Step 3 state
-const addedMembers = ref<FamilyMember[]>([]);
-const isAddingMember = ref(false);
-const showSetupModal = ref(false);
-const newMemberName = ref('');
-const newMemberRole = ref<'parent' | 'child'>('parent');
-const dobMonth = ref('');
-const dobDay = ref('');
-const dobYear = ref('');
-const showMemberForm = ref(false);
+// Two steps now: identity → connect storage. The password is collected ONCE on
+// the shared finish surface (ResumePodSetup) AFTER storage connects, and the
+// add-members step runs there too — for every user, iPhone included. See
+// docs/plans/2026-06-20-unified-create-flow-defer-password.md.
+const totalSteps = 2;
 
-const MONTH_KEYS = [
-  'month.january',
-  'month.february',
-  'month.march',
-  'month.april',
-  'month.may',
-  'month.june',
-  'month.july',
-  'month.august',
-  'month.september',
-  'month.october',
-  'month.november',
-  'month.december',
-] as const;
-
-const monthOptions = computed(() =>
-  MONTH_KEYS.map((key, i) => ({
-    value: String(i + 1),
-    label: t(key),
-  }))
-);
-
-const dayOptions = Array.from({ length: 31 }, (_, i) => ({
-  value: String(i + 1),
-  label: String(i + 1),
-}));
-
-const totalSteps = 3;
-
-// Expose step navigation for E2E tests (dev mode only).
-//
-// `setStep(3)` is the E2E suite's way of saying "pretend the storage step
-// (step 2) completed and a pod file was written" — `showSaveFilePicker` is a
-// native OS dialog that can't be automated in headless browsers. Mark the
-// `authStore.podCreated` invariant accordingly so the router guard doesn't
-// bounce the test back to the resume-setup recovery screen.
+// Expose step navigation for E2E tests (dev mode only). The pod is no longer
+// written inside this component (it's created on the finish surface), so this
+// just drives the visible step; tests assert the hand-off separately.
 if (import.meta.env.DEV) {
   (window as unknown as Record<string, unknown>).__e2eCreatePod = {
     setStep: (s: number) => {
-      if (s >= 3) authStore.markPodCreated();
       currentStep.value = s;
     },
   };
 }
 
-const stepLabels = [
-  () => t('loginV6.createStep1'),
-  () => t('loginV6.createStep2'),
-  () => t('loginV6.createStep3'),
-];
+const stepLabels = [() => t('loginV6.createStep1'), () => t('loginV6.createStep2')];
 
 async function handleStep1Next() {
   formError.value = null;
@@ -142,24 +97,17 @@ async function handleStep1Next() {
     return;
   }
 
-  if (!familyName.value || !name.value || !email.value || !password.value) {
+  if (!familyName.value || !name.value || !email.value) {
     formError.value = t('auth.fillAllFields');
     return;
   }
 
-  if (password.value.length < 8) {
-    formError.value = t('auth.passwordMinLength');
-    return;
-  }
-
-  if (password.value !== confirmPassword.value) {
-    formError.value = t('auth.passwordsDoNotMatch');
-    return;
-  }
-
+  // Identity only — no password here. `deferPassword` builds the owner with an
+  // empty sentinel hash; the real password is collected once on the finish
+  // surface (after storage connect) and applied via `rehydrateOwnerDoc`.
   const result = await authStore.signUp({
+    deferPassword: true,
     email: email.value,
-    password: password.value,
     familyName: familyName.value,
     memberName: name.value,
     subscribeNewsletter: subscribeNewsletter.value,
@@ -393,7 +341,7 @@ async function handleChooseGoogleDriveStorage() {
 /** Drive-result-modal actions (success: Continue; failure: Try again / Use a local file). */
 function handleDriveModalContinue() {
   showDriveResultModal.value = false;
-  void handleStep2Next();
+  handleStorageConnected();
 }
 function handleDriveModalRetry() {
   showDriveResultModal.value = false;
@@ -404,179 +352,34 @@ function handleDriveModalUseLocal() {
   handleLocalFileClick();
 }
 
-async function handleStep2Next() {
+/**
+ * Storage connected (desktop popup or local file). Step 2's job ends here —
+ * the pod is NOT written in this component anymore. Hand off to the shared
+ * finish surface (ResumePodSetup), which collects the password ONCE and runs
+ * the add-members step. The freshly-installed `syncService` provider stays
+ * live in the store across the in-component view switch (no route change), so
+ * the finish surface writes straight into it without re-connecting.
+ */
+function handleStorageConnected() {
   formError.value = null;
-
-  // Storage location is required.
   if (!storageSaved.value) {
     formError.value = t('setup.fileCreateFailed');
     return;
   }
-
   if (!authStore.currentUser) {
-    // Impossible after step 1's signUp — but never fall through to step 3
-    // (and an empty /nook) if it somehow happens.
+    // Impossible after step 1's signUp — but never hand off into a finish
+    // surface with no authenticated owner.
     formError.value = t('setup.fileCreateFailed');
-    console.error('[CreatePodView] handleStep2Next: no authenticated owner');
+    console.error('[CreatePodView] handleStorageConnected: no authenticated owner');
     reportError({
-      surface: 'createPod.createNewFile',
-      message: 'handleStep2Next reached with no authenticated owner',
+      surface: 'createPod.handOff',
+      message: 'storage hand-off reached with no authenticated owner',
       severity: 'critical',
       context: { provider_type: storageType.value },
     });
     return;
   }
-
-  if (!syncStore.isConfigured) {
-    // storageSaved is true (guarded above) but no provider is wired. Without
-    // a provider createNewFile() can't write the pod file — block here and
-    // surface the regression rather than advancing to step 3 (then a
-    // pod-less /nook).
-    formError.value = t('setup.fileCreateFailed');
-    console.error(
-      '[CreatePodView] storageSaved=true but syncStore.isConfigured=false — refusing to advance'
-    );
-    reportError({
-      surface: 'createPod.createNewFile',
-      message: 'storageSaved=true but syncStore is not configured — refusing to advance to step 3',
-      severity: 'critical',
-      context: { provider_type: storageType.value },
-    });
-    return;
-  }
-
-  // Already created (e.g. the user navigated back to step 2 and clicked Next
-  // again) — re-running createNewFile would mint a fresh family key and
-  // orphan the first. Just advance.
-  if (syncStore.hasSessionPassword) {
-    currentStep.value = 3;
-    return;
-  }
-
-  // Initialize the Automerge doc, generate + wrap the family key, write the
-  // V4 envelope. createNewFile() also fires the "🎉 pod created" Slack ping
-  // and sets authStore.podCreated on success.
-  const podFileName = `${familyName.value || 'my-family'}.beanpod`;
-  const result = await syncStore.createNewFile(
-    podFileName,
-    password.value,
-    authStore.currentUser.memberId,
-    familyContextStore.activeFamilyId ?? '',
-    familyName.value
-  );
-
-  if (result.ok) {
-    currentStep.value = 3;
-    return;
-  }
-
-  // Failure — branch on reason to show the user something concrete. The
-  // store layer already (a) renamed any partial Drive file to .corrupt-<ts>
-  // and (b) cleared in-memory key/envelope state, so a retry starts clean.
-  // Each branch reports to Slack with a focused surface so we can see the
-  // failure distribution in prod.
-  const reasonKey: Record<typeof result.reason, string> = {
-    verify: 'createPod.failedReasonVerify',
-    persist: 'createPod.failedReasonPersist',
-    register: 'createPod.failedReasonRegister',
-    write: 'createPod.failedReasonWrite',
-    precondition: 'createPod.failedReasonPrecondition',
-    'concurrent-write': 'createPod.failedReasonConcurrent',
-    'existing-pod': 'createPod.failedReasonExistingPod',
-  };
-  formError.value = t(reasonKey[result.reason] as Parameters<typeof t>[0]);
-  console.error(`[CreatePodView] createNewFile failed (reason=${result.reason}):`, result.error);
-  reportError({
-    surface: `createPod.${result.reason}`,
-    message: `createNewFile failed at step '${result.reason}': ${result.error.message}`,
-    error: result.error,
-    severity: 'critical',
-    context: { provider_type: storageType.value },
-  });
-}
-
-async function handleAddMember() {
-  formError.value = null;
-
-  if (!newMemberName.value) {
-    formError.value = t('auth.fillAllFields');
-    return;
-  }
-
-  isAddingMember.value = true;
-
-  const dateOfBirth: DateOfBirth | undefined =
-    dobMonth.value && dobDay.value
-      ? {
-          month: parseInt(dobMonth.value, 10),
-          day: parseInt(dobDay.value, 10),
-          ...(dobYear.value ? { year: parseInt(dobYear.value, 10) } : {}),
-        }
-      : undefined;
-
-  const memberInput = {
-    name: newMemberName.value,
-    email: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@setup.local`,
-    gender: 'other' as Gender,
-    ageGroup: (newMemberRole.value === 'child' ? 'child' : 'adult') as AgeGroup,
-    role: 'member' as const,
-    color: getNextColor(),
-    requiresPassword: true,
-    ...(dateOfBirth ? { dateOfBirth } : {}),
-  };
-
-  const member = await familyStore.createMember(memberInput);
-  if (member) {
-    addedMembers.value.push(member);
-    newMemberName.value = '';
-    newMemberRole.value = 'parent';
-    dobMonth.value = '';
-    dobDay.value = '';
-    dobYear.value = '';
-    showMemberForm.value = false; // Collapse after adding — user must explicitly add another
-  } else {
-    formError.value = t('loginV6.addMemberFailed');
-  }
-  isAddingMember.value = false;
-}
-
-async function handleRemoveMember(memberId: string) {
-  await familyStore.deleteMember(memberId);
-  addedMembers.value = addedMembers.value.filter((m) => m.id !== memberId);
-  // If all members removed, re-show the form
-  if (addedMembers.value.length === 0) showMemberForm.value = true;
-}
-
-function openAddMemberForm(role: 'parent' | 'child') {
-  newMemberRole.value = role;
-  newMemberName.value = '';
-  dobMonth.value = '';
-  dobDay.value = '';
-  dobYear.value = '';
-  showMemberForm.value = true;
-}
-
-const memberColors = ['#ef4444', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4'];
-
-function getNextColor(): string {
-  const usedCount = addedMembers.value.length;
-  return memberColors[usedCount % memberColors.length] ?? '#3b82f6';
-}
-
-function handleFinish() {
-  showSetupModal.value = true;
-}
-
-function handleSetupComplete() {
-  // The "pod created" Slack ping already fired in handleStep2Next, the moment
-  // the pod was actually written. This handler just closes the wizard and
-  // routes into the app.
-  showSetupModal.value = false;
-  emit('signed-in', '/nook');
-}
-
-function handleSetupBack() {
-  showSetupModal.value = false;
+  emit('finish-storage');
 }
 
 function handleBack() {
@@ -724,27 +527,6 @@ function handleBack() {
             type="email"
             placeholder="you@example.com"
             required
-          />
-          <div>
-            <BaseInput
-              v-model="password"
-              :label="t('loginV6.signInPasswordLabel')"
-              type="password"
-              :placeholder="t('auth.passwordPlaceholder')"
-              required
-              @input="formError = null"
-            />
-            <p class="mt-1 text-xs text-gray-400">
-              {{ t('loginV6.signInPasswordHint') }}
-            </p>
-          </div>
-          <BaseInput
-            v-model="confirmPassword"
-            :label="t('auth.confirmPassword')"
-            type="password"
-            :placeholder="t('auth.confirmPasswordPlaceholder')"
-            required
-            @input="formError = null"
           />
         </div>
 
@@ -1045,209 +827,8 @@ function handleBack() {
         </details>
       </div>
 
-      <BaseButton class="mt-6 w-full" :disabled="!storageSaved" @click="handleStep2Next">
+      <BaseButton class="mt-6 w-full" :disabled="!storageSaved" @click="handleStorageConnected">
         {{ storageSaved ? t('loginV6.createNext') : t('loginV6.pickStorageToContinue') }}
-      </BaseButton>
-    </div>
-
-    <!-- Step 3: Add Family Members -->
-    <div v-else-if="currentStep === 3">
-      <h2 class="font-outfit mb-6 text-center text-xl font-bold text-gray-900 dark:text-gray-100">
-        {{ t('loginV6.addBeansTitle') }}
-      </h2>
-
-      <!-- Owner + added members list -->
-      <div class="mb-4 space-y-2">
-        <!-- Owner (always shown, non-removable) -->
-        <div
-          v-if="familyStore.owner"
-          class="flex items-center gap-3 rounded-xl bg-gray-50 p-3 dark:bg-slate-700/50"
-        >
-          <BeanieAvatar
-            :variant="
-              getMemberAvatarVariant({
-                gender: familyStore.owner.gender,
-                ageGroup: ownerRole === 'child' ? 'child' : 'adult',
-              })
-            "
-            :color="familyStore.owner.color"
-            size="sm"
-          />
-          <div class="flex-1">
-            <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {{ familyStore.owner.name }}
-              <span
-                class="bg-primary-500/15 text-primary-500 ml-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-semibold"
-                >{{ t('loginV6.you') }}</span
-              >
-            </p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">
-              {{
-                ownerRole === 'child'
-                  ? '🌱 ' + t('loginV6.littleBean')
-                  : '🫘 ' + t('loginV6.parentBean')
-              }}
-            </p>
-          </div>
-        </div>
-
-        <!-- Additional members -->
-        <div
-          v-for="member in addedMembers"
-          :key="member.id"
-          class="flex items-center gap-3 rounded-xl bg-gray-50 p-3 dark:bg-slate-700/50"
-        >
-          <BeanieAvatar :variant="getMemberAvatarVariant(member)" :color="member.color" size="sm" />
-          <div class="flex-1">
-            <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ member.name }}</p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">
-              {{
-                member.ageGroup === 'child'
-                  ? '🌱 ' + t('loginV6.littleBean')
-                  : '🫘 ' + t('loginV6.parentBean')
-              }}<template v-if="formatBirthdayShort(member.dateOfBirth)">
-                · {{ formatBirthdayShort(member.dateOfBirth) }}</template
-              >
-            </p>
-          </div>
-          <button
-            type="button"
-            class="ml-1 rounded-lg p-1 text-red-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
-            :title="t('loginV6.removeMember')"
-            @click="handleRemoveMember(member.id)"
-          >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Add-a-beanie prompt — the single source for opening the member form.
-           Shown whenever the form is closed (empty state OR after at least
-           one member has been added and the form collapsed). The heading is
-           omitted on the empty state — the chips ("Add an adult" / "Add a
-           little bean") carry the verb themselves, and the screen state
-           (owner card + chips + Finish CTA) is self-evident. -->
-      <div
-        v-if="!showMemberForm"
-        class="rounded-2xl border-2 border-dashed border-gray-200 p-4 text-center dark:border-slate-600"
-      >
-        <p
-          v-if="addedMembers.length > 0"
-          class="font-outfit mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400"
-        >
-          {{ t('loginV6.addAnotherBeanie') }}
-        </p>
-        <div class="flex justify-center gap-2">
-          <button
-            type="button"
-            class="font-outfit flex items-center gap-1.5 rounded-full border-2 border-transparent bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:border-[var(--color-secondary-500)] hover:bg-gray-50 dark:bg-slate-700 dark:text-gray-300 dark:hover:border-slate-400 dark:hover:bg-slate-600"
-            @click="openAddMemberForm('parent')"
-          >
-            🫘 {{ t('loginV6.addAnAdult') }}
-          </button>
-          <button
-            type="button"
-            class="font-outfit flex items-center gap-1.5 rounded-full border-2 border-transparent bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:border-[var(--color-secondary-500)] hover:bg-gray-50 dark:bg-slate-700 dark:text-gray-300 dark:hover:border-slate-400 dark:hover:bg-slate-600"
-            @click="openAddMemberForm('child')"
-          >
-            🌱 {{ t('loginV6.addALittleBean') }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Add member form. Field order: Role → Name → Birthday. Role is
-           pre-selected from the chip click that opened the form; the chips at
-           the top act as a confirm/override affordance. Name and birthday
-           follow in committal order. -->
-      <div
-        v-if="showMemberForm"
-        class="space-y-3 rounded-2xl border border-gray-200 p-4 dark:border-slate-600"
-      >
-        <!-- Role chips — pre-selected from the opening chip click; user can flip. -->
-        <div class="flex gap-2">
-          <button
-            type="button"
-            class="rounded-full px-3 py-1 text-sm transition-colors"
-            :class="
-              newMemberRole === 'parent'
-                ? 'bg-secondary-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400'
-            "
-            @click="newMemberRole = 'parent'"
-          >
-            🫘 {{ t('loginV6.parentBean') }}
-          </button>
-          <button
-            type="button"
-            class="rounded-full px-3 py-1 text-sm transition-colors"
-            :class="
-              newMemberRole === 'child'
-                ? 'bg-secondary-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400'
-            "
-            @click="newMemberRole = 'child'"
-          >
-            🌱 {{ t('loginV6.littleBean') }}
-          </button>
-        </div>
-
-        <BaseInput
-          v-model="newMemberName"
-          :label="'👤 ' + t('form.name')"
-          :placeholder="t('family.enterName')"
-        />
-
-        <!-- Birthday (month & day required, year optional) -->
-        <div>
-          <span
-            class="font-outfit text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
-            >🎂 {{ t('modal.birthday') }}</span
-          >
-          <div class="mt-1 grid grid-cols-[1fr_0.6fr_0.7fr] gap-1.5">
-            <BaseSelect
-              v-model="dobMonth"
-              :options="monthOptions"
-              :placeholder="t('family.dateOfBirth.month')"
-            />
-            <BaseSelect
-              v-model="dobDay"
-              :options="dayOptions"
-              :placeholder="t('family.dateOfBirth.day')"
-            />
-            <BaseInput v-model="dobYear" type="number" placeholder="Year" />
-          </div>
-        </div>
-
-        <div class="flex gap-2">
-          <BaseButton class="flex-1" variant="outline" @click="showMemberForm = false">
-            {{ t('action.cancel') }}
-          </BaseButton>
-          <BaseButton
-            class="flex-1"
-            variant="secondary"
-            :disabled="!newMemberName || !dobMonth || !dobDay || isAddingMember"
-            :loading="isAddingMember"
-            @click="handleAddMember"
-          >
-            🫘 {{ t('loginV6.addMember') }}
-          </BaseButton>
-        </div>
-      </div>
-
-      <!-- Finish CTA — only visible while the form is closed. When the form
-           is open the form's own Cancel / Add member row drives the next
-           action, so a competing orange CTA at the bottom would be visual
-           noise. With no separate "Skip" link: Finish IS the skip path when
-           no members have been added. -->
-      <BaseButton v-if="!showMemberForm" class="mt-6 w-full" @click="handleFinish">
-        {{ t('loginV6.finish') }}
       </BaseButton>
     </div>
 
@@ -1387,12 +968,5 @@ function handleBack() {
         </BaseButton>
       </template>
     </BaseModal>
-
-    <!-- Setup progress modal -->
-    <SetupProgressModal
-      :open="showSetupModal"
-      @complete="handleSetupComplete"
-      @back="handleSetupBack"
-    />
   </div>
 </template>
