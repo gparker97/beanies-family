@@ -69,6 +69,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
 import { getProvider } from '@/services/sync/syncService';
 import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
@@ -83,6 +84,7 @@ const authStore = useAuthStore();
 const syncStore = useSyncStore();
 const familyContextStore = useFamilyContextStore();
 const fatalErrorStore = useFatalErrorStore();
+const settingsStore = useSettingsStore();
 
 const emit = defineEmits<{
   'signed-in': [destination: string];
@@ -465,10 +467,23 @@ function handleMembersFinish() {
   showSetupModal.value = true;
 }
 
-function handleSetupComplete() {
+async function handleSetupComplete() {
   // The "🎉 pod created" Slack ping already fired inside createNewFile when the
   // pod was written; this just closes the wizard and enters the app.
   showSetupModal.value = false;
+  // Refresh the reactive settings projection from the just-written doc BEFORE
+  // routing. `buildOwnerDoc` set `onboardingCompleted:false`, but the snapshot
+  // in `settingsStore.settings` can lag the doc — and `/nook`'s onboarding
+  // wizard reads `onboardingCompleted ?? true`, so a stale snapshot hides the
+  // wizard until the user navigates (which triggers a later loadSettings). One
+  // explicit load here closes that window for every create transport.
+  try {
+    await settingsStore.loadSettings();
+  } catch (e) {
+    // Non-fatal: the doc still has the flag; worst case the wizard appears on
+    // the next navigation (the prior behaviour). Don't block entry to the app.
+    console.warn('[ResumePodSetup] settings refresh before /nook failed', e);
+  }
   navigatedAway.value = true;
   emit('signed-in', '/nook');
 }
