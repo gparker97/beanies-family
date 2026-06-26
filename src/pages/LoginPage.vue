@@ -603,6 +603,11 @@ function handleBiometricFallback(context?: {
 }
 
 function handleSignedIn(destination: string) {
+  // Single canonical arm-and-register point for EVERY entry path — create,
+  // load, join, reconnect. SetupProgressModal no longer calls these (it used to,
+  // causing a duplicate registry write on every create); they live here so the
+  // de-dup holds for all flows. `setupAutoSync` is idempotent; `ensureRegistered`
+  // is a no-op when the pod is already registered (createNewFile registers it).
   syncStore.setupAutoSync();
   syncStore.ensureRegistered();
   router.replace(destination);

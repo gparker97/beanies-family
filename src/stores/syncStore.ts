@@ -174,6 +174,15 @@ export const useSyncStore = defineStore('sync', () => {
   // SetupProgressModal visibility gate. See `src/types/sync.ts` for shape.
   const criticalWriteState = ref<CriticalWriteState>({ kind: 'idle' });
 
+  // True while the create flow's terminal add-members step is on screen. The
+  // pod is already written (podCreated=true) at this point, so the router's
+  // ALREADY_AUTH guard would otherwise redirect /welcome?resume=setup → /nook
+  // and skip add-members on iOS. A dedicated flag (NOT a criticalWriteState
+  // variant — that would block ALL navigation) checked only in that guard. Set
+  // when finalizePod advances to the members phase; cleared on completion and
+  // on unmount. See ResumePodSetup + router/index.ts.
+  const membersStepActive = ref(false);
+
   // Google Drive state
   const storageProviderType = ref<StorageProviderType | null>(null);
   const providerAccountEmail = ref<string | null>(null);
@@ -2812,6 +2821,7 @@ export const useSyncStore = defineStore('sync', () => {
     showGoogleReconnect,
     driveFileNotFound,
     criticalWriteState,
+    membersStepActive,
     saveFailureLevel,
     lastSaveError,
     showSaveFailureBanner,

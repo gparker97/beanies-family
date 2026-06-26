@@ -23,6 +23,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useCalendarSelectOptions } from '@/composables/useCalendarSelectOptions';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useFormModal } from '@/composables/useFormModal';
 import { useAttentionPulse } from '@/composables/useAttentionPulse';
@@ -284,25 +285,9 @@ const frequencyOptions = computed(() => [
   { value: 'yearly', label: t('form.frequency.yearly') },
 ]);
 
-const dayOfMonthOptions = Array.from({ length: 28 }, (_, i) => ({
-  value: String(i + 1),
-  label: String(i + 1),
-}));
-
-const monthOptions = computed(() => [
-  { value: '1', label: t('month.january') },
-  { value: '2', label: t('month.february') },
-  { value: '3', label: t('month.march') },
-  { value: '4', label: t('month.april') },
-  { value: '5', label: t('month.may') },
-  { value: '6', label: t('month.june') },
-  { value: '7', label: t('month.july') },
-  { value: '8', label: t('month.august') },
-  { value: '9', label: t('month.september') },
-  { value: '10', label: t('month.october') },
-  { value: '11', label: t('month.november') },
-  { value: '12', label: t('month.december') },
-]);
+// Recurrence scheduling: month-of-year + day-of-month (28 to stay valid in
+// every month). Shares the option builder with the DOB pickers (31-day).
+const { monthOptions, dayOptions: dayOfMonthOptions } = useCalendarSelectOptions(28);
 
 const canSave = computed(
   () => description.value.trim().length > 0 && amount.value !== undefined && amount.value > 0
