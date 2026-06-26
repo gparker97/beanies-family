@@ -2,7 +2,7 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-20",
+    "lastUpdated": "2026-06-26",
     "translationCount": 3634
   },
   "translations": {
@@ -14042,9 +14042,9 @@
       "lastUpdated": "2026-05-13"
     },
     "resumeSetup.subtitle": {
-      "translation": "您上次的设置没有完全完成。请重新输入密码，我们绝不会存储密码，因此您的数据将始终保持端到端加密状态。",
-      "hash": "o55a9m",
-      "lastUpdated": "2026-05-14"
+      "translation": "最后一步：设置您的密码以完成设置。我们从不存储密码，因此您的数据始终保持端到端加密。",
+      "hash": "5f6gqe",
+      "lastUpdated": "2026-06-26"
     },
     "resumeSetup.storagePrompt": {
       "translation": "您的Pod应该住在哪里？",

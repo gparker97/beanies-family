@@ -318,8 +318,9 @@ vi.mock('@/stores/syncHighlightStore', () => ({
 // ---------------------------------------------------------------------------
 // Import REAL stores and services AFTER mocks are set up
 // ---------------------------------------------------------------------------
-import { useAuthStore } from '@/stores/authStore';
+import { useAuthStore, DEFERRED_PASSWORD_HASH } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { resetDoc } from '@/services/automerge/docService';
 
 // ---------------------------------------------------------------------------
@@ -683,6 +684,140 @@ describe('pod creation: full end-to-end flow', () => {
     });
     expect(newMember).not.toBeNull();
     expect(newMember!.name).toBe('Child Bean');
+  });
+});
+
+describe('unified create flow: deferred password (signUp → rehydrateOwnerDoc → createNewFile)', () => {
+  let pinia: Pinia;
+
+  beforeEach(() => {
+    pinia = createPinia();
+    setActivePinia(pinia);
+    vi.clearAllMocks();
+    resetDoc();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('beanies_pod_created', '0');
+    }
+  });
+
+  afterEach(() => {
+    resetDoc();
+  });
+
+  it('deferred signUp builds the owner with the empty sentinel hash and never hashes a password', async () => {
+    const authStore = useAuthStore();
+    const familyStore = useFamilyStore();
+    const pwSvc = await import('@/services/auth/passwordService');
+
+    const result = await authStore.signUp({
+      deferPassword: true,
+      email: 'owner@example.com',
+      familyName: 'Test Family',
+      memberName: 'Owner',
+    });
+
+    expect(result.success).toBe(true);
+    // No key/hash work at step 1 — the password isn't collected yet.
+    expect(pwSvc.hashPassword).not.toHaveBeenCalled();
+    expect(familyStore.owner).not.toBeNull();
+    expect(familyStore.owner!.passwordHash).toBe(DEFERRED_PASSWORD_HASH);
+    // `applyDefaults` derives requiresPassword from the empty hash on read.
+    expect(familyStore.owner!.requiresPassword).toBe(true);
+    // Still keeps the owner role (never demoted) and no pod yet.
+    expect(familyStore.owner!.role).toBe('owner');
+    expect(authStore.podCreated).toBe(false);
+  });
+
+  it('rehydrateOwnerDoc applies the real hash to a deferred owner EVEN when it already exists (desktop, no reload)', async () => {
+    const authStore = useAuthStore();
+    const familyStore = useFamilyStore();
+
+    await authStore.signUp({
+      deferPassword: true,
+      email: 'owner@example.com',
+      familyName: 'Test Family',
+      memberName: 'Owner',
+    });
+    const ownerIdBefore = familyStore.owner!.id;
+    expect(familyStore.owner!.passwordHash).toBe(DEFERRED_PASSWORD_HASH);
+
+    // Desktop hand-off: the owner is STILL in the in-memory doc (no redirect
+    // reload). rehydrateOwnerDoc must NOT early-return — it must rebuild the
+    // owner with the real hash, or createNewFile's fail-closed guard blocks.
+    const r = await authStore.rehydrateOwnerDoc('Owner', 'realpw123');
+    expect(r.success).toBe(true);
+    expect(familyStore.owner!.id).toBe(ownerIdBefore); // same memberId preserved
+    expect(familyStore.owner!.passwordHash).toBe('hashed-realpw123');
+    // Derived from the now-non-empty hash → flips back to false.
+    expect(familyStore.owner!.requiresPassword).toBe(false);
+  });
+
+  it('createNewFile refuses (precondition, no write) when the owner still carries the deferred sentinel', async () => {
+    const authStore = useAuthStore();
+    const syncStore = useSyncStore();
+
+    await authStore.signUp({
+      deferPassword: true,
+      email: 'owner@example.com',
+      familyName: 'Test Family',
+      memberName: 'Owner',
+    });
+    stateChangeCallbackHolder.callback?.({
+      isInitialized: true,
+      isConfigured: true,
+      fileName: 'test.beanpod',
+      isSyncing: false,
+      lastError: null,
+    });
+    mockProvider.write.mockClear();
+
+    // Password step was skipped — the fail-closed guard must refuse the write.
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      'pod-password',
+      authStore.currentUser!.memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('precondition');
+    expect(mockProvider.write).not.toHaveBeenCalled();
+    expect(syncStore.criticalWriteState.kind).toBe('idle');
+    expect(authStore.podCreated).toBe(false);
+  });
+
+  it('full deferred happy path: signUp(defer) → rehydrateOwnerDoc → createNewFile succeeds', async () => {
+    const authStore = useAuthStore();
+    const syncStore = useSyncStore();
+
+    await authStore.signUp({
+      deferPassword: true,
+      email: 'owner@example.com',
+      familyName: 'Test Family',
+      memberName: 'Owner',
+    });
+    const rehydrate = await authStore.rehydrateOwnerDoc('Owner', 'realpw123');
+    expect(rehydrate.success).toBe(true);
+
+    stateChangeCallbackHolder.callback?.({
+      isInitialized: true,
+      isConfigured: true,
+      fileName: 'test.beanpod',
+      isSyncing: false,
+      lastError: null,
+    });
+
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      'realpw123',
+      authStore.currentUser!.memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+    expect(result.ok).toBe(true);
+    expect(authStore.podCreated).toBe(true);
   });
 });
 

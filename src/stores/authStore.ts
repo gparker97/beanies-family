@@ -23,6 +23,25 @@ import { reportError } from '@/utils/errorReporter';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from './translationStore';
 
+/**
+ * Sentinel `passwordHash` for an owner created in deferred-password mode
+ * (`signUp({ deferPassword: true })`). The unified create-a-family flow
+ * collects the password ONCE on the post-connect finish surface (after
+ * storage is connected), not at step 1 — so step-1 `signUp` builds the owner
+ * with this empty sentinel and the real hash is applied later by
+ * `rehydrateOwnerDoc`. Exported so `syncStore.createNewFile`'s fail-closed
+ * precondition references the SAME constant (single source of truth): a pod
+ * whose owner still carries this sentinel must never be written.
+ *
+ * NOTE: `familyMemberRepository.applyDefaults` DERIVES `requiresPassword`
+ * from `!passwordHash` on every read, so an owner with this sentinel reads as
+ * `requiresPassword: true` until `rehydrateOwnerDoc` sets a real hash — at
+ * which point every read flips it back to `false` automatically. Verified
+ * safe pre-pod: the only consumer, `familyStore.normalizeRoles`, only elects
+ * an owner when `owners.length === 0`, and our owner keeps `role: 'owner'`.
+ */
+export const DEFERRED_PASSWORD_HASH = '';
+
 // ─── Password-rotation shared helper ─────────────────────────────────────
 // `rotateMemberPassword` is the single source of truth for the four-step
 // "re-wrap envelope, hash, updateMember, sync" sequence. All three flows
@@ -482,7 +501,19 @@ export const useAuthStore = defineStore('auth', () => {
   ): Promise<{ success: boolean; error?: string }> {
     if (!currentUser.value) return { success: false, error: 'No active session to resume' };
     const familyStore = useFamilyStore();
-    if (familyStore.owner) return { success: true };
+    // No-op when the owner is already in the doc — BUT only if it already holds
+    // a real password hash. In the unified create flow the owner exists with
+    // the empty `DEFERRED_PASSWORD_HASH` sentinel (desktop hands off WITHOUT a
+    // reload between step-1 `signUp` and this call, so the in-memory owner
+    // survives). We MUST fall through to rebuild it with the real hash, or the
+    // owner ships with an empty hash and `createNewFile`'s fail-closed guard
+    // refuses the write. iOS reloads on the redirect, so `owner` is null there
+    // and this branch is moot. `buildOwnerDoc` re-`initDoc()`s (a full doc
+    // reset) then recreates the owner on the same memberId — safe here because
+    // no members have been added yet at this point in the flow.
+    if (familyStore.owner && familyStore.owner.passwordHash !== DEFERRED_PASSWORD_HASH) {
+      return { success: true };
+    }
     try {
       const passwordHashValue = await hashPassword(password);
       const member = await buildOwnerDoc(
@@ -497,16 +528,29 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Sign up: create a new family + owner member with password.
+   * Sign up: create a new family + owner member.
    * This is the owner-only "Create Pod" flow.
+   *
+   * Two modes, enforced by a discriminated union so they can never be mixed:
+   * - **`deferPassword: true`** (the unified create flow): build the owner with
+   *   the empty `DEFERRED_PASSWORD_HASH` sentinel; the real password is hashed
+   *   later by `rehydrateOwnerDoc` on the post-connect finish surface. No
+   *   `password` field is accepted in this mode.
+   * - **`password` given** (legacy / non-deferred callers): hash it now, as
+   *   before.
+   *
+   * Either way nothing here derives a key or writes the `.beanpod` — that's
+   * `syncStore.createNewFile`, which always receives the real plaintext
+   * password on the finish surface.
    */
-  async function signUp(params: {
-    email: string;
-    password: string;
-    familyName: string;
-    memberName: string;
-    subscribeNewsletter?: boolean;
-  }): Promise<{ success: boolean; error?: string }> {
+  async function signUp(
+    params: {
+      email: string;
+      familyName: string;
+      memberName: string;
+      subscribeNewsletter?: boolean;
+    } & ({ deferPassword: true; password?: never } | { deferPassword?: false; password: string })
+  ): Promise<{ success: boolean; error?: string }> {
     // Idempotency guard: a session already exists (the user re-entered the
     // create flow — WelcomeGate→Create again, browser-back to /create, or any
     // future re-call). Re-running would mint a SECOND family via createFamily()
@@ -530,8 +574,12 @@ export const useAuthStore = defineStore('auth', () => {
         return { success: false, error: 'Failed to create family' };
       }
 
-      // Hash the password + build the owner doc.
-      const passwordHashValue = await hashPassword(params.password);
+      // Hash the password + build the owner doc. In deferred mode the owner
+      // carries the empty sentinel; `rehydrateOwnerDoc` applies the real hash
+      // on the finish surface (after storage connect).
+      const passwordHashValue = params.deferPassword
+        ? DEFERRED_PASSWORD_HASH
+        : await hashPassword(params.password);
       const member = await buildOwnerDoc({
         name: params.memberName,
         email: params.email,

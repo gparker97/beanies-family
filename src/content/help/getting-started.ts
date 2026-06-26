@@ -10,7 +10,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
     icon: '\u{1F331}',
     readTime: 3,
     popular: true,
-    updatedDate: '2026-04-20',
+    updatedDate: '2026-06-26',
     sections: [
       {
         type: 'heading',
@@ -35,8 +35,9 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         items: [
           'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> and click <strong>Create a New Family</strong>',
           'Enter your family name, your name, and your email address',
-          'Choose a strong password \u2014 this encrypts your pod file',
-          'Pick your base currency and preferred language',
+          'Connect where your pod lives \u2014 Google Drive (recommended) or a local file',
+          'Set a strong password to finish \u2014 this encrypts your pod file (entered once, after connecting)',
+          'Add your family members so they\u2019re ready to assign to accounts and activities',
           "Your pod is created! You'll land in the Family Nook",
         ],
       },

@@ -22,7 +22,7 @@ import { useRecipesStore } from './recipesStore';
 import { useEmergencyContactsStore } from './emergencyContactsStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
-import { useAuthStore } from './authStore';
+import { useAuthStore, DEFERRED_PASSWORD_HASH } from './authStore';
 import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
@@ -1167,6 +1167,26 @@ export const useSyncStore = defineStore('sync', () => {
           `createNewFile precondition failed: owner member ${memberId} not in family store`
         ),
       };
+    }
+
+    // Fail-closed: the unified create flow builds the owner with the empty
+    // `DEFERRED_PASSWORD_HASH` sentinel at step 1 and applies the real hash via
+    // `rehydrateOwnerDoc` on the finish surface BEFORE this runs. If the owner
+    // still carries the sentinel, the password step was skipped — writing the
+    // pod would mint an envelope whose owner can never authenticate. Refuse the
+    // write (structurally impossible to ship a deferred-hash pod) and report it
+    // loudly. References the SAME constant as `signUp`'s deferred branch.
+    if (ownerMember.passwordHash === DEFERRED_PASSWORD_HASH) {
+      const err = new Error(
+        `createNewFile refused: owner member ${memberId} still carries the deferred-password sentinel (rehydrateOwnerDoc was not called before the write)`
+      );
+      reportError({
+        surface: 'syncStore.deferredHashLeak',
+        message: err.message,
+        error: err,
+        severity: 'critical',
+      });
+      return { ok: false, reason: 'precondition', error: err };
     }
 
     // Existing-pod guard (belt-and-braces above the Drive-only name-collision

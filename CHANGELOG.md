@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-26
+
+### Changed
+
+- **Creating a family now asks for your password once — after you connect storage — and always lets you add your family members.** Setup is now: your details → connect Google Drive (or a local file) → set your password → add your family. Previously, on iPhone the password step could repeat itself and the add-members step was skipped entirely (you'd land in the app with nobody to assign to accounts and activities). Now everyone — iPhone, Android, and desktop — gets the same clean flow with a single password and the add-members step. Your password is still never stored, and it's the key that encrypts your family's data.
+
 ## 2026-06-20
 
 ### Added
