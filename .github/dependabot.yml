@@ -26,6 +26,12 @@ updates:
         dependency-type: 'production'
         update-types:
           - 'patch'
+        # astro patches (5.18.x) don't clear the high-sev SSRF advisory (fix is in
+        # astro 6, a deferred migration) → they keep Dependency Review red and would
+        # block the whole group. Keep astro out so routine prod patches still flow;
+        # astro then bumps solo and gets closed like #252 until v6 is scheduled.
+        exclude-patterns:
+          - 'astro'
     # Ignore specific dependencies if needed
     ignore:
       # Major bumps blocked indefinitely on peer-dep ERESOLVE — re-enable when ecosystem catches up
