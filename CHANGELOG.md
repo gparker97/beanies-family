@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-28
+
+### Fixed
+
+- **Links from your synced Google Calendar now open the specific item, not just the page.** Tapping a beanies.family event in Google Calendar opens the app straight to that activity. Previously it landed on the calendar/planner page but didn't open the item, because the app read the link before your family's data had finished loading and then gave up. The same fix applies to every deep link in the app — opening a specific account, transaction, goal, asset, to-do, trip, or family member from a link now waits for your data to load and opens reliably, even on a cold start.
+
 ## 2026-06-26
 
 ### Changed

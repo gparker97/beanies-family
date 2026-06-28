@@ -32,6 +32,7 @@ import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { usePhotoStore } from '@/stores/photoStore';
 import { getActivityCategoryColor } from '@/constants/activityCategories';
+import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
 import type {
   ActivityCategory,
   CreateFamilyMemberInput,
@@ -235,25 +236,36 @@ function closeEditModal() {
   editingMember.value = null;
 }
 
-// Open modals from query params (e.g. navigated from Family Nook or global search)
-function handleFamilyQueryParam() {
+// Open the add-member modal from ?add=true (no data dependency, so handled inline).
+function handleAddMemberQueryParam() {
   if (route.query.add === 'true') {
     openAddModal();
-    router.replace({ query: {} });
-  } else if (route.query.edit) {
-    const memberId = route.query.edit as string;
-    const member = familyStore.members.find((m) => m.id === memberId);
-    if (member) openEditModal(member);
-    router.replace({ query: {} });
+    const next = { ...route.query };
+    delete next.add;
+    router.replace({ query: next });
   }
 }
+onMounted(handleAddMemberQueryParam);
 watch(
-  () => route.query.edit,
+  () => route.query.add,
   (val) => {
-    if (val) handleFamilyQueryParam();
+    if (val) handleAddMemberQueryParam();
   }
 );
-onMounted(handleFamilyQueryParam);
+
+// Open a member's edit modal from a deep link (?edit=<id> — from Family Nook or
+// global search). Robust to cold-start: only clears the param once the member is
+// found, and retries when the family store hydrates.
+useDeepLinkParam({
+  param: 'edit',
+  open: (id) => {
+    const member = familyStore.members.find((m) => m.id === id);
+    if (!member) return false;
+    openEditModal(member);
+    return true;
+  },
+  ready: () => familyStore.members.length,
+});
 
 // Run the one-time folder-share migration once the .beanpod file ID is
 // available (i.e. sync has settled). Defers until after the initial load
