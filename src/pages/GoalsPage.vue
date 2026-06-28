@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useCountUp } from '@/composables/useCountUp';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 
@@ -27,6 +26,7 @@ import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useGoalsStore } from '@/stores/goalsStore';
+import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
 import { getPriorityConfig, PRIORITY_ORDER, PRIORITY_RANK } from '@/constants/goalDisplay';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -45,36 +45,29 @@ const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
 
-const route = useRoute();
-const router = useRouter();
-
 const progressMounted = ref(false);
 onMounted(() => {
   nextTick(() => {
     progressMounted.value = true;
   });
-  handleGoalQueryParam();
 });
-
-// Open goal from query param (e.g. from global search)
-function handleGoalQueryParam() {
-  const viewId = route.query.view as string | undefined;
-  if (viewId) {
-    const goal = goalsStore.goals.find((g) => g.id === viewId);
-    if (goal) openEditModal(goal);
-    router.replace({ query: {} });
-  }
-}
-watch(
-  () => route.query.view,
-  (val) => {
-    if (val) handleGoalQueryParam();
-  }
-);
 
 const goalsStore = useGoalsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
+
+// Open goal from a deep link (?view=<id> — e.g. from global search). Robust to
+// cold-start: only clears the param once the goal is found, retries on hydrate.
+useDeepLinkParam({
+  param: 'view',
+  open: (id) => {
+    const goal = goalsStore.goals.find((g) => g.id === id);
+    if (!goal) return false;
+    openEditModal(goal);
+    return true;
+  },
+  ready: () => goalsStore.goals.length,
+});
 const { getMemberName, getMemberColor } = useMemberInfo();
 
 // Animated stat card counts

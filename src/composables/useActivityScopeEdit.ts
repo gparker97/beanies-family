@@ -19,12 +19,14 @@ export function useActivityScopeEdit() {
   const viewingActivity = ref<FamilyActivity | null>(null);
   const viewingOccurrenceDate = ref<string | undefined>();
 
-  function openViewModal(id: string, date?: string) {
+  function openViewModal(id: string, date?: string): boolean {
     const activity = activityStore.activities.find((a) => a.id === id);
     if (activity) {
       viewingActivity.value = activity;
       viewingOccurrenceDate.value = date;
+      return true;
     }
+    return false;
   }
 
   /**
