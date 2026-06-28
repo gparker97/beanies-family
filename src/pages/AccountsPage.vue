@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
@@ -23,6 +23,7 @@ import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
+import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
 import { showToast } from '@/composables/useToast';
 import { convertToBaseCurrency } from '@/utils/currency';
 import { isLiabilityType } from '@/utils/finance';
@@ -61,22 +62,19 @@ const groupBy = ref<'member' | 'category'>(
 );
 const addModalDefaults = ref<{ memberId?: string; type?: AccountType } | undefined>();
 
-// Open edit modal from query param (e.g. navigated from Dashboard or global search)
-function handleAccountQueryParam() {
-  const viewId = route.query.view as string | undefined;
-  if (viewId) {
-    const account = accountsStore.accounts.find((a) => a.id === viewId);
-    if (account) openEditModal(account);
-    router.replace({ query: { ...route.query, view: undefined } });
-  }
-}
-watch(
-  () => route.query.view,
-  (val) => {
-    if (val) handleAccountQueryParam();
-  }
-);
-onMounted(handleAccountQueryParam);
+// Open edit modal from a deep link (?view=<id> — from Dashboard or global search).
+// Robust to cold-start: only clears the param once the account is found, and
+// retries when the store hydrates.
+useDeepLinkParam({
+  param: 'view',
+  open: (id) => {
+    const account = accountsStore.accounts.find((a) => a.id === id);
+    if (!account) return false;
+    openEditModal(account);
+    return true;
+  },
+  ready: () => accountsStore.accounts.length,
+});
 
 const groupByOptions = computed(() => [
   { value: 'member', label: t('accounts.groupByMember') },

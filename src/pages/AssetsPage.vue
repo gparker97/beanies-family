@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 
@@ -14,6 +14,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useMemberInfo } from '@/composables/useMemberInfo';
+import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
 import { getAssetTypeIcon } from '@/constants/icons';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
@@ -23,7 +24,6 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { formatDate } from '@/utils/date';
 import type { Asset, AssetType, CreateAssetInput, UpdateAssetInput } from '@/types/models';
 
-const route = useRoute();
 const router = useRouter();
 const assetsStore = useAssetsStore();
 const recurringStore = useRecurringStore();
@@ -48,22 +48,19 @@ const showEditModal = ref(false);
 const editingAsset = ref<Asset | null>(null);
 const addModalDefaults = ref<{ memberId?: string; type?: AssetType } | undefined>();
 
-// Open edit modal from query param (e.g. navigated from Dashboard or global search)
-function handleAssetQueryParam() {
-  const viewId = route.query.view as string | undefined;
-  if (viewId) {
-    const asset = assetsStore.assets.find((a) => a.id === viewId);
-    if (asset) openEditModal(asset);
-    router.replace({ query: {} });
-  }
-}
-watch(
-  () => route.query.view,
-  (val) => {
-    if (val) handleAssetQueryParam();
-  }
-);
-onMounted(handleAssetQueryParam);
+// Open edit modal from a deep link (?view=<id> — from Dashboard or global search).
+// Robust to cold-start: only clears the param once the asset is found, and
+// retries when the store hydrates.
+useDeepLinkParam({
+  param: 'view',
+  open: (id) => {
+    const asset = assetsStore.assets.find((a) => a.id === id);
+    if (!asset) return false;
+    openEditModal(asset);
+    return true;
+  },
+  ready: () => assetsStore.assets.length,
+});
 
 // Asset type options
 const assetTypes = computed(() => [

@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, computed, nextTick } from 'vue';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
@@ -28,6 +27,7 @@ import { useClipboard } from '@/composables/useClipboard';
 import { confirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { usePermissions } from '@/composables/usePermissions';
+import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
 import { showToast } from '@/composables/useToast';
 import { useDocumentToTravel, type TravelReady } from '@/composables/useDocumentToTravel';
 import { useDocumentConsent } from '@/composables/useDocumentConsent';
@@ -63,8 +63,6 @@ import type { FamilyVacation, VacationIdea } from '@/types/models';
 
 const { t } = useTranslation();
 const { canEditActivities } = usePermissions();
-const route = useRoute();
-const router = useRouter();
 const vacationStore = useVacationStore();
 const familyStore = useFamilyStore();
 const { getMemberName } = useMemberInfo();
@@ -359,20 +357,17 @@ function scrollToIdeas() {
 
 // ── Query param: auto-select vacation from ?vacation=ID ──────────────────────
 
-function handleVacationQueryParam() {
-  const vacationId = route.query.vacation as string | undefined;
-  if (vacationId) {
-    selectedVacationId.value = vacationId;
-    router.replace({ query: {} });
-  }
-}
-watch(
-  () => route.query.vacation,
-  (val) => {
-    if (val) handleVacationQueryParam();
-  }
-);
-onMounted(handleVacationQueryParam);
+// Auto-select a trip from a deep link (?vacation=<id>). Robust to cold-start:
+// only clears the param once the trip exists, and retries when trips hydrate.
+useDeepLinkParam({
+  param: 'vacation',
+  open: (id) => {
+    if (!vacationStore.getVacationById(id)) return false;
+    selectedVacationId.value = id;
+    return true;
+  },
+  ready: () => vacationStore.vacations.length,
+});
 
 // ── Computed ─────────────────────────────────────────────────────────────────
 

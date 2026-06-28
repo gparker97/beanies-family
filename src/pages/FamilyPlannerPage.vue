@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, computed, nextTick, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import CalendarCommandBar from '@/components/planner/CalendarCommandBar.vue';
 import { useMemberFilterChips } from '@/composables/useMemberFilterChips';
 import { usePlannerNavigation, type PlannerView } from '@/composables/usePlannerNavigation';
@@ -21,6 +21,7 @@ import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePermissions } from '@/composables/usePermissions';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
+import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { confirm } from '@/composables/useConfirm';
 import { useAccountsStore } from '@/stores/accountsStore';
@@ -63,7 +64,6 @@ import type {
 
 const { t } = useTranslation();
 const { categoryLabel } = useActivityCategoryLabel();
-const route = useRoute();
 const router = useRouter();
 const { canEditActivities } = usePermissions();
 // Gating + cross-surface dispatch for the photo→activity reader (#133) live in
@@ -88,21 +88,14 @@ const {
   handleScopedSave,
 } = useActivityScopeEdit();
 
-// Open activity view modal from query param (e.g. /activities?activity=abc)
-function handleActivityQueryParam() {
-  const activityId = route.query.activity as string | undefined;
-  if (activityId) {
-    openViewModal(activityId);
-    router.replace({ query: {} });
-  }
-}
-onMounted(handleActivityQueryParam);
-watch(
-  () => route.query.activity,
-  (val) => {
-    if (val) handleActivityQueryParam();
-  }
-);
+// Open activity view modal from query param (e.g. /activities?activity=abc).
+// Robust to cold-start: only clears the param once the activity is found, and
+// retries when the store hydrates (e.g. opening the link from Google Calendar).
+useDeepLinkParam({
+  param: 'activity',
+  open: (id) => openViewModal(id),
+  ready: () => activityStore.activities.length,
+});
 
 const activeView = ref<PlannerView>('month');
 // Single source of truth for the calendar's period — the views are controlled

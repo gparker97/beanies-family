@@ -106,24 +106,41 @@ const createdConfirm = ref<{
   details: ConfirmDetail[];
 }>({ open: false, title: '', message: '', details: [] });
 
-// Open view modal from query param (e.g. navigated from Dashboard or global search)
+// Open modals / apply filters from deep-link query params (from Dashboard,
+// Reports, global search). Robust to cold-start: each param is only cleared once
+// it's been resolved, and the handler retries when the backing stores hydrate —
+// so a link opened on a cold boot (empty stores) still resolves once data loads.
+// A store that hasn't loaded yet (`length === 0`) is left untouched for the retry
+// rather than mis-reported as "not found".
 function handleTransactionQueryParam() {
+  const next = { ...route.query };
+  let changed = false;
+
   const viewId = route.query.view as string | undefined;
-  if (viewId) {
+  if (viewId && transactionsStore.transactions.length > 0) {
     const tx = transactionsStore.transactions.find((t) => t.id === viewId);
     if (tx) viewingTransaction.value = tx;
+    delete next.view;
+    changed = true;
   }
+
   const riId = route.query.recurringItem as string | undefined;
-  if (riId) {
+  if (riId && recurringStore.recurringItems.length > 0) {
     const ri = recurringStore.getRecurringItemById(riId);
     if (ri) openEditRecurringModal(ri);
+    delete next.recurringItem;
+    changed = true;
   }
+
   const direction = route.query.direction as string | undefined;
   if (direction === 'income' || direction === 'expense') {
     directionFilter.value = direction;
+    delete next.direction;
+    changed = true;
   }
+
   const accountId = route.query.account as string | undefined;
-  if (accountId) {
+  if (accountId && accountsStore.accounts.length > 0) {
     const account = accountsStore.accounts.find((a) => a.id === accountId);
     if (account) {
       accountFilter.value = accountId;
@@ -131,9 +148,12 @@ function handleTransactionQueryParam() {
       console.warn('[TransactionsPage] unknown account filter id:', accountId);
       showToast('error', t('txn.filter.accountNotFound'), undefined, { silent: true });
     }
+    delete next.account;
+    changed = true;
   }
+
   const goalId = route.query.goal as string | undefined;
-  if (goalId) {
+  if (goalId && goalsStore.goals.length > 0) {
     const g = goalsStore.goals.find((gg) => gg.id === goalId);
     if (g) {
       goalFilter.value = goalId;
@@ -141,20 +161,30 @@ function handleTransactionQueryParam() {
       console.warn('[TransactionsPage] unknown goal filter id:', goalId);
       showToast('error', t('txn.filter.goalNotFound'), undefined, { silent: true });
     }
+    delete next.goal;
+    changed = true;
   }
-  if (viewId || riId || direction || accountId || goalId) {
-    router.replace({ query: {} });
-  }
+
+  if (changed) router.replace({ query: next });
 }
 
 function toggleDirection(direction: 'income' | 'expense') {
   directionFilter.value = directionFilter.value === direction ? 'all' : direction;
 }
 watch(
-  () => route.query.view,
-  (val) => {
-    if (val) handleTransactionQueryParam();
+  () => [route.query.view, route.query.recurringItem],
+  ([view, ri]) => {
+    if (view || ri) handleTransactionQueryParam();
   }
+);
+// Retry when any backing store hydrates (cold-start fix).
+watch(
+  () =>
+    transactionsStore.transactions.length +
+    recurringStore.recurringItems.length +
+    accountsStore.accounts.length +
+    goalsStore.goals.length,
+  () => handleTransactionQueryParam()
 );
 onMounted(() => {
   handleTransactionQueryParam();

@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
@@ -19,10 +18,9 @@ import TodoSortMenu from '@/components/todo/TodoSortMenu.vue';
 import type { TodoItem } from '@/types/models';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useTodoSort } from '@/composables/useTodoSort';
+import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
 import { sortTodos } from '@/utils/todo';
 
-const route = useRoute();
-const router = useRouter();
 const { t } = useTranslation();
 const { canEditActivities } = usePermissions();
 const { playWhoosh } = useSounds();
@@ -111,21 +109,19 @@ function openModal(todo: { id: string }) {
   selectedTodoId.value = todo.id;
 }
 
-// Open view modal from query param (e.g. navigated from Family Nook or global search)
-function handleTodoQueryParam() {
-  const viewId = route.query.view as string | undefined;
-  if (viewId) {
-    const todo = todoStore.todos.find((t) => t.id === viewId);
-    if (todo) openModal(todo);
-    router.replace({ query: {} });
-  }
-}
-watch(
-  () => route.query.view,
-  (val) => {
-    if (val) handleTodoQueryParam();
-  }
-);
+// Open view modal from a deep link (?view=<id> — from Family Nook, global search,
+// or an external link). Robust to cold-start: only clears the param once the todo
+// is found, and retries when the store hydrates.
+useDeepLinkParam({
+  param: 'view',
+  open: (id) => {
+    const todo = todoStore.todos.find((t) => t.id === id);
+    if (!todo) return false;
+    openModal(todo);
+    return true;
+  },
+  ready: () => todoStore.todos.length,
+});
 // Quick-add FAB → focus the QuickAddBar so the user can type a todo.
 // There is no separate "add" modal for todos — adds happen inline.
 useQuickAddIntent(async (action) => {
@@ -136,8 +132,6 @@ useQuickAddIntent(async (action) => {
 });
 
 onMounted(async () => {
-  handleTodoQueryParam();
-
   // Auto-focus the quick add bar (skip on mobile/tablet to avoid keyboard popup)
   if (isDesktop.value && canEditActivities.value) {
     await nextTick();
