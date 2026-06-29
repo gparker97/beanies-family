@@ -298,3 +298,17 @@ if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
 3. Good: "add a beanie" (for "Add Member"), "counting beans..." (for "Loading...")
 4. Bad: "counted a bean" (for "completed a task") — what bean? what count?
 5. When in doubt, keep the beanie text close to the English meaning with lowercase styling only
+
+## 15. E2E: a stale warm dev server gives false-green — repro against a fresh server
+
+**Date:** 2026-06-29
+**Context:** E2E was red on CI since the 2026-06-26 create-flow rework (`b1a842fe`). Locally the tests "passed" with `--workers=1`, which led to a wrong contention diagnosis and a first fix (`workers=1`) that didn't fix CI at all.
+
+**Pattern:** `playwright.config.ts` has `reuseExistingServer: !process.env.CI`. A dev server left running from an earlier session (`npm run dev`, port 5173) is reused by local Playwright — and it can be serving **stale code** (old modules HMR never picked up, or started before the change under test). The local suite passed against old code while CI (fresh server, current code) failed. This sent the whole diagnosis down a false "concurrency contention" path. The real cause only surfaced after killing the stale server and forcing Playwright to start a fresh one — then the on-screen error ("We saved your pod, but couldn't reach our family registry") revealed the actual root cause: the rework promoted `createNewFile`'s registry write to a critical throwing step, and E2E points the registry at `e2e.registry.invalid`.
+
+**Rule:**
+
+1. **When local E2E disagrees with CI, suspect the dev server first.** Kill any process on :5173 and re-run so Playwright boots a fresh server (`reuseExistingServer` only applies when CI is unset).
+2. **Read the failure screenshot/`error-context.md` before theorizing.** The page snapshot showed the exact blocking error message — it would have pointed straight at the registry on the first look, before the contention rabbit-hole.
+3. **A fix that's green locally but still red on CI means the local repro was invalid** — don't push-and-pray; reproduce the CI failure locally first (fresh server, CI-parity worker count).
+4. **When the app gates a flow on an external service (registry/Drive/API), the E2E harness must mock that service** — don't rely on "the wizard exits before it's reached"; that assumption rots when flows change. See `e2e/helpers/registry-mock.ts`.
