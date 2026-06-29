@@ -53,13 +53,13 @@ test.describe('Google Drive Sync', () => {
     // Wait for step 1 to render before filling — the WelcomeGate → CreatePodView
     // transition has raced clicks in CI, leaving us on WelcomeGate.
     await page.getByLabel('Family Name').waitFor({ state: 'visible', timeout: 10000 });
+    // Step 1 is identity-only now — password moved to the post-connect finish
+    // surface (unified create flow, 2026-06-26). Fill identity, then advance.
     await page.getByLabel('Family Name').fill('E2E Drive Family');
     await page.getByLabel('Your Name').fill('Drive Test');
     await page.getByLabel('Email').fill('drive@test.com');
-    await page.getByLabel('Password').first().fill('test12345');
-    await page.getByLabel('Confirm password').fill('test12345');
 
-    await page.getByRole('button', { name: ui('action.next') }).click();
+    await page.getByRole('button', { name: ui('loginV6.createNext') }).click();
 
     await page
       .getByText(ui('loginV6.storageSectionLabel'))
