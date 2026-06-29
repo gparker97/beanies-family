@@ -4,8 +4,18 @@ export default defineConfig({
   testDir: './e2e/specs',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
+  // CI runs single-worker. Each spec's beforeEach drives the REAL create-a-family
+  // flow (key derivation → encrypt → write → verify → members), which is CPU-bound.
+  // Two concurrent create flows on a slow shared CI runner + one Vite dev server
+  // starve each other and blow the per-step waitFor budgets, bouncing the app back
+  // to WelcomeGate. Serializing removes the contention (the tests pass reliably
+  // sequentially). Local runs stay fully parallel for speed.
+  workers: process.env.CI ? 1 : undefined,
   retries: process.env.CI ? 1 : 0,
-  timeout: 20000,
+  // 45s (was 20s): the auth bypass waits up to 30s for `app-content` to appear
+  // after /nook — a 20s test timeout undercut that inner wait. 45s also gives the
+  // heavy create-flow beforeEach headroom on slower single-worker CI.
+  timeout: 45000,
   reporter: [['html'], ['junit', { outputFile: 'test-results/junit.xml' }]],
   use: {
     baseURL: 'http://localhost:5173',
