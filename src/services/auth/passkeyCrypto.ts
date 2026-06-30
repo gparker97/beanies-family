@@ -20,8 +20,7 @@ export function isPRFSupported(
 ): boolean {
   if (!extensionResults) return false;
   const prf = (extensionResults as Record<string, unknown>).prf as
-    | { results?: { first?: ArrayBuffer } }
-    | undefined;
+    { results?: { first?: ArrayBuffer } } | undefined;
   return !!(prf?.results?.first && prf.results.first.byteLength > 0);
 }
 
@@ -32,8 +31,7 @@ export function getPRFOutput(
   extensionResults: AuthenticationExtensionsClientOutputs
 ): ArrayBuffer | null {
   const prf = (extensionResults as Record<string, unknown>).prf as
-    | { results?: { first?: ArrayBuffer } }
-    | undefined;
+    { results?: { first?: ArrayBuffer } } | undefined;
   return prf?.results?.first ?? null;
 }
 

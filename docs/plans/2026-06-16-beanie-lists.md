@@ -84,14 +84,7 @@ These exist to stop the feature ossifying into a hard-to-maintain corner. They c
 
 ```ts
 export type ListCategory =
-  | 'home'
-  | 'out'
-  | 'kids'
-  | 'health'
-  | 'celebrations'
-  | 'trips'
-  | 'projects'
-  | 'me';
+  'home' | 'out' | 'kids' | 'health' | 'celebrations' | 'trips' | 'projects' | 'me';
 export type ListLifecycle = 'oneoff' | 'recurring';
 export type ListFrequency = 'daily' | 'weekly' | 'monthly';
 
@@ -170,9 +163,7 @@ Three pure, Vue-free, unit-testable helpers consumed by store computeds, `useCri
     frequency?: ListFrequency; // recurring only
     starterItems: string[]; // PLAIN seed text — not i18n keys
   }
-  export const LIST_TEMPLATES: ListTemplate[] = [
-    /* below */
-  ];
+  export const LIST_TEMPLATES: ListTemplate[] = [/* below */];
   export function getListTemplateByKey(key: string): ListTemplate | undefined;
   export function getListTemplatesForCategory(c: ListCategory): ListTemplate[];
   ```

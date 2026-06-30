@@ -43,19 +43,19 @@ Grounded in `.claude/skills/beanies-theme/SKILL.md` (authoritative brand system)
 
 ## Reuse matrix — what I'm NOT building
 
-| Need                                           | Existing solution                                     | Location                               |
+| Need | Existing solution | Location |
 | ---------------------------------------------- | ----------------------------------------------------- | -------------------------------------- | ------------------------------- |
-| Relative time ("3h ago", "today", "yesterday") | `timeAgo()`                                           | `src/utils/date.ts:173`                |
-| Short dates / times                            | `formatNookDate()`, `formatTime12()`                  | `src/utils/date.ts`                    |
-| Local today (timezone-safe)                    | `toDateInputValue()`                                  | `src/utils/date.ts`                    |
-| Confirm dialogs                                | `useConfirm({ variant: 'info'                         | 'danger' })`                           | `src/composables/useConfirm.ts` |
-| Store-action error handling + auto-toast       | `wrapAsync()`                                         | `src/composables/useStoreActions.ts`   |
-| Photo lightbox                                 | `PhotoViewer.vue` (flushBody, readOnly)               | existing                               |
-| Member avatars with photos                     | `BeanieAvatar` + `useMemberInfo.getMemberAvatarUrl()` | existing                               |
-| Current signed-in member                       | `familyStore.currentMember`                           | `src/stores/familyStore.ts`            |
-| Automerge doc init + older-file migration      | `initDoc()` + `ALL_COLLECTIONS` auto-migrate          | `src/services/automerge/docService.ts` |
-| Attention pulse                                | `useAttentionPulse()`                                 | `src/composables/useAttentionPulse.ts` |
-| Medication-active check                        | `isMedicationActive()`                                | existing helper                        |
+| Relative time ("3h ago", "today", "yesterday") | `timeAgo()` | `src/utils/date.ts:173` |
+| Short dates / times | `formatNookDate()`, `formatTime12()` | `src/utils/date.ts` |
+| Local today (timezone-safe) | `toDateInputValue()` | `src/utils/date.ts` |
+| Confirm dialogs | `useConfirm({ variant: 'info'                         | 'danger' })` | `src/composables/useConfirm.ts` |
+| Store-action error handling + auto-toast | `wrapAsync()` | `src/composables/useStoreActions.ts` |
+| Photo lightbox | `PhotoViewer.vue` (flushBody, readOnly) | existing |
+| Member avatars with photos | `BeanieAvatar` + `useMemberInfo.getMemberAvatarUrl()` | existing |
+| Current signed-in member | `familyStore.currentMember` | `src/stores/familyStore.ts` |
+| Automerge doc init + older-file migration | `initDoc()` + `ALL_COLLECTIONS` auto-migrate | `src/services/automerge/docService.ts` |
+| Attention pulse | `useAttentionPulse()` | `src/composables/useAttentionPulse.ts` |
+| Medication-active check | `isMedicationActive()` | existing helper |
 
 ## Reliability additions — from sustainability review
 
