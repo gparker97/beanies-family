@@ -75,7 +75,7 @@
     "@microsoft/eslint-plugin-sdl": "^1.1.0",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.3.2",
-    "@types/node": "^25.9.2",
+    "@types/node": "^26.0.1",
     "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/test-utils": "^2.4.11",
