@@ -1,18 +1,8 @@
 export type HelpCategory =
-  | 'whats-new'
-  | 'getting-started'
-  | 'features'
-  | 'security'
-  | 'how-it-works';
+  'whats-new' | 'getting-started' | 'features' | 'security' | 'how-it-works';
 
 export type SectionType =
-  | 'heading'
-  | 'paragraph'
-  | 'callout'
-  | 'infoBox'
-  | 'codeBlock'
-  | 'list'
-  | 'steps';
+  'heading' | 'paragraph' | 'callout' | 'infoBox' | 'codeBlock' | 'list' | 'steps';
 
 export interface ArticleSection {
   type: SectionType;

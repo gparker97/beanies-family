@@ -5,14 +5,7 @@
  * `?edit=`). Adding a new linkable entity is a single switch case here.
  */
 export type DeepLinkType =
-  | 'activity'
-  | 'vacation'
-  | 'todo'
-  | 'account'
-  | 'transaction'
-  | 'goal'
-  | 'asset'
-  | 'member';
+  'activity' | 'vacation' | 'todo' | 'account' | 'transaction' | 'goal' | 'asset' | 'member';
 
 export interface DeepLink {
   path: string;

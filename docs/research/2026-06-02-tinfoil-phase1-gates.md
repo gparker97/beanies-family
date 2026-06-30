@@ -105,7 +105,7 @@ The public pricing page labels the **Private Inference** (API) tier `"Usage-base
 
 > `qwen3-vl-30b` — 12 requests · 22,349 input · 1,628 output tokens · **total $0.03**
 
-That is **~$1.25/M blended** (23,977 tokens × $1.25/M = $0.030, exact to the reported cent) and **~$0.0025/doc** (avg ~2.0k tokens/doc, image-token-dominated). This **confirms the Gate 1 estimate empirically** against real billing. Projected scale: 5k families × 4 docs/mo ≈ 20k docs → **~$50/mo**. Per-token input/output split isn't separately displayed, but the blended rate is what matters for the $/doc model. **Residual #4 closed.**
+That is **~$1.25/M blended** (23,977 tokens × $1.25/M = $0.030, exact to the reported cent) and **~$0.0025/doc** (avg ~~2.0k tokens/doc, image-token-dominated). This **confirms the Gate 1 estimate empirically** against real billing. Projected scale: 5k families × 4 docs/mo ≈ 20k docs → **~~$50/mo**. Per-token input/output split isn't separately displayed, but the blended rate is what matters for the $/doc model. **Residual #4 closed.**
 
 ---
 

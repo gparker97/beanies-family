@@ -21,11 +21,7 @@ import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import type { VacationAccommodation, VacationSegmentStatus } from '@/types/models';
 
 type AccommodationField =
-  | 'name'
-  | 'address'
-  | 'checkInDate'
-  | 'checkOutDate'
-  | 'confirmationNumber';
+  'name' | 'address' | 'checkInDate' | 'checkOutDate' | 'confirmationNumber';
 
 interface Props {
   open: boolean;

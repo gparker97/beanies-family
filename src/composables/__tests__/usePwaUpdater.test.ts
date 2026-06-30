@@ -13,8 +13,7 @@ vi.mock('virtual:pwa-register/vue', () => ({
 }));
 
 let capturedGuard:
-  | ((to: { fullPath: string }, from: unknown, next: (v?: unknown) => void) => void)
-  | undefined;
+  ((to: { fullPath: string }, from: unknown, next: (v?: unknown) => void) => void) | undefined;
 const beforeEach_ = vi.fn((fn: typeof capturedGuard) => {
   capturedGuard = fn;
   return () => {}; // remove handle
