@@ -52,6 +52,8 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: 'astro-og-canvas'
         update-types: ['version-update:semver-major']
+      - dependency-name: 'pdfjs-dist'
+        update-types: ['version-update:semver-major']
       - dependency-name: 'canvaskit-wasm'
         update-types: ['version-update:semver-major']
 
