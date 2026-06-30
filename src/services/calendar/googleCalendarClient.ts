@@ -270,13 +270,11 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
       const data = (await res.json()) as {
         items?: Array<{ id: string; summary?: string; primary?: boolean }>;
       };
-      return (data.items ?? []).map(
-        (c): CalendarSummary => ({
-          id: c.id,
-          summary: c.summary ?? c.id,
-          primary: c.primary === true,
-        })
-      );
+      return (data.items ?? []).map((c): CalendarSummary => ({
+        id: c.id,
+        summary: c.summary ?? c.id,
+        primary: c.primary === true,
+      }));
     },
 
     async listEventTimes(connectionId, calendarId, timeMinIso, timeMaxIso) {

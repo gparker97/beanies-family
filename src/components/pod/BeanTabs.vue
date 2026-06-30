@@ -11,13 +11,7 @@ import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 
 export type BeanTabId =
-  | 'overview'
-  | 'favorites'
-  | 'sayings'
-  | 'allergies'
-  | 'medications'
-  | 'notes'
-  | 'milestones';
+  'overview' | 'favorites' | 'sayings' | 'allergies' | 'medications' | 'notes' | 'milestones';
 
 const props = defineProps<{
   active: BeanTabId;

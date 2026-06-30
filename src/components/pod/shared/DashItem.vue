@@ -7,15 +7,7 @@
  * medications, notes, allergies).
  */
 export type DashItemTone =
-  | 'fav'
-  | 'place'
-  | 'book'
-  | 'toy'
-  | 'med'
-  | 'note'
-  | 'allergy'
-  | 'allergy-mild'
-  | 'milestone';
+  'fav' | 'place' | 'book' | 'toy' | 'med' | 'note' | 'allergy' | 'allergy-mild' | 'milestone';
 
 const props = defineProps<{
   emoji: string;

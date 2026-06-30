@@ -21,195 +21,219 @@ The budget system also needs updating: currently allocations are per-category, b
 ### Transaction Categories — Money In (12 categories, 4 groups)
 
 **Employment:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `freelance` | Freelance | 💻 | `code` | `#10b981` |
-| `salary` | Salary | 💼 | `briefcase` | `#22c55e` |
-| `consultancy` | Consultancy | 🤝 | `handshake` | `#059669` |
-| `other_employment` | Other Employment Income | 💼 | `briefcase` | `#16a34a` |
+
+| ID                 | Name                    | Emoji | Icon        | Color     |
+| ------------------ | ----------------------- | ----- | ----------- | --------- |
+| `freelance`        | Freelance               | 💻    | `code`      | `#10b981` |
+| `salary`           | Salary                  | 💼    | `briefcase` | `#22c55e` |
+| `consultancy`      | Consultancy             | 🤝    | `handshake` | `#059669` |
+| `other_employment` | Other Employment Income | 💼    | `briefcase` | `#16a34a` |
 
 **Investments:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `dividends` | Dividends | 💰 | `dollar-sign` | `#0891b2` |
-| `investments` | Investment Returns | 📈 | `trending-up` | `#14b8a6` |
-| `other_investment` | Other Investment Income | 📊 | `bar-chart` | `#0d9488` |
+
+| ID                 | Name                    | Emoji | Icon          | Color     |
+| ------------------ | ----------------------- | ----- | ------------- | --------- |
+| `dividends`        | Dividends               | 💰    | `dollar-sign` | `#0891b2` |
+| `investments`      | Investment Returns      | 📈    | `trending-up` | `#14b8a6` |
+| `other_investment` | Other Investment Income | 📊    | `bar-chart`   | `#0d9488` |
 
 **Property:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `rental` | Rental Income | 🏠 | `home` | `#06b6d4` |
-| `other_property` | Other Property Income | 🏡 | `home` | `#0284c7` |
+
+| ID               | Name                  | Emoji | Icon   | Color     |
+| ---------------- | --------------------- | ----- | ------ | --------- |
+| `rental`         | Rental Income         | 🏠    | `home` | `#06b6d4` |
+| `other_property` | Other Property Income | 🏡    | `home` | `#0284c7` |
 
 **Other:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `gifts` | Gifts Received | 🎁 | `gift` | `#0284c7` |
-| `refunds` | Refunds | 🔄 | `refresh` | `#0369a1` |
-| `other_income` | Other Income | 📦 | `plus-circle` | `#059669` |
+
+| ID             | Name           | Emoji | Icon          | Color     |
+| -------------- | -------------- | ----- | ------------- | --------- |
+| `gifts`        | Gifts Received | 🎁    | `gift`        | `#0284c7` |
+| `refunds`      | Refunds        | 🔄    | `refresh`     | `#0369a1` |
+| `other_income` | Other Income   | 📦    | `plus-circle` | `#059669` |
 
 ### Transaction Categories — Money Out (46 categories, 13 groups)
 
 **Entertainment:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `entertainment` | Entertainment | 🎬 | `film` | `#4f46e5` |
-| `hobbies` | Hobbies | 🎨 | `palette` | `#9333ea` |
-| `other_entertainment` | Other Entertainment | 🎭 | `theater` | `#6d28d9` |
+
+| ID                    | Name                | Emoji | Icon      | Color     |
+| --------------------- | ------------------- | ----- | --------- | --------- |
+| `entertainment`       | Entertainment       | 🎬    | `film`    | `#4f46e5` |
+| `hobbies`             | Hobbies             | 🎨    | `palette` | `#9333ea` |
+| `other_entertainment` | Other Entertainment | 🎭    | `theater` | `#6d28d9` |
 
 **Subscriptions:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `software` | Software | 💻 | `monitor` | `#7c3aed` |
-| `streaming` | Streaming | 📺 | `tv` | `#8b5cf6` |
-| `other_subscriptions` | Other Subscriptions | 📱 | `repeat` | `#6366f1` |
+
+| ID                    | Name                | Emoji | Icon      | Color     |
+| --------------------- | ------------------- | ----- | --------- | --------- |
+| `software`            | Software            | 💻    | `monitor` | `#7c3aed` |
+| `streaming`           | Streaming           | 📺    | `tv`      | `#8b5cf6` |
+| `other_subscriptions` | Other Subscriptions | 📱    | `repeat`  | `#6366f1` |
 
 **Family:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `childcare` | Childcare | 👶 | `users` | `#be123c` |
-| `pets` | Pets | 🐾 | `paw` | `#881337` |
-| `other_family` | Other Family | 👨‍👩‍👧 | `users` | `#9f1239` |
+
+| ID             | Name         | Emoji | Icon    | Color     |
+| -------------- | ------------ | ----- | ------- | --------- |
+| `childcare`    | Childcare    | 👶    | `users` | `#be123c` |
+| `pets`         | Pets         | 🐾    | `paw`   | `#881337` |
+| `other_family` | Other Family | 👨‍👩‍👧    | `users` | `#9f1239` |
 
 **Education / Lessons:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `tuition` | Tutor / Tuition | 📚 | `book-open` | `#7e22ce` |
-| `school_fees` | School Fees | 🏫 | `school` | `#6b21a8` |
-| `other_lessons` | Other Lessons | 🎓 | `graduation-cap` | `#581c87` |
+
+| ID              | Name            | Emoji | Icon             | Color     |
+| --------------- | --------------- | ----- | ---------------- | --------- |
+| `tuition`       | Tutor / Tuition | 📚    | `book-open`      | `#7e22ce` |
+| `school_fees`   | School Fees     | 🏫    | `school`         | `#6b21a8` |
+| `other_lessons` | Other Lessons   | 🎓    | `graduation-cap` | `#581c87` |
 
 **Sports:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `sports_equipment` | Sports Equipment | 🏅 | `dumbbell` | `#15803d` |
-| `sports_team` | Sports Team / Practice | ⚽ | `users` | `#166534` |
-| `golf` | Golf | ⛳ | `flag` | `#14532d` |
-| `gym` | Gym / Fitness | 🏋️ | `dumbbell` | `#22c55e` |
-| `yoga` | Yoga / Pilates | 🧘 | `heart` | `#16a34a` |
-| `other_sports` | Other Sports | 🏃 | `activity` | `#059669` |
+
+| ID                 | Name                   | Emoji | Icon       | Color     |
+| ------------------ | ---------------------- | ----- | ---------- | --------- |
+| `sports_equipment` | Sports Equipment       | 🏅    | `dumbbell` | `#15803d` |
+| `sports_team`      | Sports Team / Practice | ⚽    | `users`    | `#166534` |
+| `golf`             | Golf                   | ⛳    | `flag`     | `#14532d` |
+| `gym`              | Gym / Fitness          | 🏋️    | `dumbbell` | `#22c55e` |
+| `yoga`             | Yoga / Pilates         | 🧘    | `heart`    | `#16a34a` |
+| `other_sports`     | Other Sports           | 🏃    | `activity` | `#059669` |
 
 **Food:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `coffee` | Coffee / Snacks | ☕ | `coffee` | `#0891b2` |
-| `dining_out` | Dining Out | 🍽️ | `utensils` | `#06b6d4` |
-| `groceries` | Groceries | 🛒 | `shopping-cart` | `#14b8a6` |
-| `other_food` | Other Food | 🍴 | `utensils` | `#0d9488` |
+
+| ID           | Name            | Emoji | Icon            | Color     |
+| ------------ | --------------- | ----- | --------------- | --------- |
+| `coffee`     | Coffee / Snacks | ☕    | `coffee`        | `#0891b2` |
+| `dining_out` | Dining Out      | 🍽️    | `utensils`      | `#06b6d4` |
+| `groceries`  | Groceries       | 🛒    | `shopping-cart` | `#14b8a6` |
+| `other_food` | Other Food      | 🍴    | `utensils`      | `#0d9488` |
 
 **Housing:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `home_maintenance` | Home Maintenance | 🔨 | `tool` | `#f59e0b` |
-| `rent` | Rent / Mortgage | 🏠 | `home` | `#ef4444` |
-| `utilities` | Utilities | ⚡ | `zap` | `#f97316` |
-| `other_housing` | Other Housing | 🏗️ | `building` | `#d97706` |
+
+| ID                 | Name             | Emoji | Icon       | Color     |
+| ------------------ | ---------------- | ----- | ---------- | --------- |
+| `home_maintenance` | Home Maintenance | 🔨    | `tool`     | `#f59e0b` |
+| `rent`             | Rent / Mortgage  | 🏠    | `home`     | `#ef4444` |
+| `utilities`        | Utilities        | ⚡    | `zap`      | `#f97316` |
+| `other_housing`    | Other Housing    | 🏗️    | `building` | `#d97706` |
 
 **Financial:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `debt_payment` | Debt Payment | 💳 | `credit-card` | `#e11d48` |
-| `insurance` | Insurance | 🔒 | `shield` | `#c026d3` |
-| `taxes` | Taxes | 📄 | `file-text` | `#db2777` |
+
+| ID             | Name         | Emoji | Icon          | Color     |
+| -------------- | ------------ | ----- | ------------- | --------- |
+| `debt_payment` | Debt Payment | 💳    | `credit-card` | `#e11d48` |
+| `insurance`    | Insurance    | 🔒    | `shield`      | `#c026d3` |
+| `taxes`        | Taxes        | 📄    | `file-text`   | `#db2777` |
 
 **Other:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `other_expense` | Other Expense | 📦 | `more-horizontal` | `#334155` |
+
+| ID              | Name          | Emoji | Icon              | Color     |
+| --------------- | ------------- | ----- | ----------------- | --------- |
+| `other_expense` | Other Expense | 📦    | `more-horizontal` | `#334155` |
 
 **Charity:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `donations` | Donations | 💝 | `heart-handshake` | `#475569` |
-| `gifts_given` | Gifts Given | 🎁 | `gift` | `#64748b` |
-| `other_charity` | Other Charity | 🤲 | `hand-heart` | `#374151` |
+
+| ID              | Name          | Emoji | Icon              | Color     |
+| --------------- | ------------- | ----- | ----------------- | --------- |
+| `donations`     | Donations     | 💝    | `heart-handshake` | `#475569` |
+| `gifts_given`   | Gifts Given   | 🎁    | `gift`            | `#64748b` |
+| `other_charity` | Other Charity | 🤲    | `hand-heart`      | `#374151` |
 
 **Personal:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `clothing` | Clothing / Shopping | 👕 | `shirt` | `#0284c7` |
-| `personal_care` | Personal Care | 💅 | `heart` | `#0369a1` |
-| `other_personal` | Other Personal | 🛍️ | `shopping-bag` | `#1d4ed8` |
+
+| ID               | Name                | Emoji | Icon           | Color     |
+| ---------------- | ------------------- | ----- | -------------- | --------- |
+| `clothing`       | Clothing / Shopping | 👕    | `shirt`        | `#0284c7` |
+| `personal_care`  | Personal Care       | 💅    | `heart`        | `#0369a1` |
+| `other_personal` | Other Personal      | 🛍️    | `shopping-bag` | `#1d4ed8` |
 
 **Medical:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `healthcare` | Healthcare | 🏥 | `activity` | `#dc2626` |
-| `dental` | Dental | 🦷 | `smile` | `#b91c1c` |
-| `other_medical` | Other Medical Expense | ⚕️ | `stethoscope` | `#991b1b` |
+
+| ID              | Name                  | Emoji | Icon          | Color     |
+| --------------- | --------------------- | ----- | ------------- | --------- |
+| `healthcare`    | Healthcare            | 🏥    | `activity`    | `#dc2626` |
+| `dental`        | Dental                | 🦷    | `smile`       | `#b91c1c` |
+| `other_medical` | Other Medical Expense | ⚕️    | `stethoscope` | `#991b1b` |
 
 **Transportation:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `car_maintenance` | Car / Bike Maintenance | 🔧 | `settings` | `#10b981` |
-| `car_payment` | Car Payment | 🚗 | `car` | `#eab308` |
-| `gas` | Gas / Fuel | ⛽ | `fuel` | `#84cc16` |
-| `public_transit` | Public Transit | 🚌 | `train` | `#22c55e` |
-| `taxi` | Taxi / Ride Hailing | 🚕 | `navigation` | `#a3e635` |
-| `other_transportation` | Other Transportation | 🚙 | `car` | `#65a30d` |
+
+| ID                     | Name                   | Emoji | Icon         | Color     |
+| ---------------------- | ---------------------- | ----- | ------------ | --------- |
+| `car_maintenance`      | Car / Bike Maintenance | 🔧    | `settings`   | `#10b981` |
+| `car_payment`          | Car Payment            | 🚗    | `car`        | `#eab308` |
+| `gas`                  | Gas / Fuel             | ⛽    | `fuel`       | `#84cc16` |
+| `public_transit`       | Public Transit         | 🚌    | `train`      | `#22c55e` |
+| `taxi`                 | Taxi / Ride Hailing    | 🚕    | `navigation` | `#a3e635` |
+| `other_transportation` | Other Transportation   | 🚙    | `car`        | `#65a30d` |
 
 **Travel:**
-| ID | Name | Emoji | Icon | Color |
-|---|---|---|---|---|
-| `flights` | Flight | ✈️ | `airplane` | `#be123c` |
-| `hotel` | Hotel | 🏨 | `hotel` | `#a21caf` |
-| `other_travel` | Other Travel | 🧳 | `luggage` | `#86198f` |
+
+| ID             | Name         | Emoji | Icon       | Color     |
+| -------------- | ------------ | ----- | ---------- | --------- |
+| `flights`      | Flight       | ✈️    | `airplane` | `#be123c` |
+| `hotel`        | Hotel        | 🏨    | `hotel`    | `#a21caf` |
+| `other_travel` | Other Travel | 🧳    | `luggage`  | `#86198f` |
 
 ### Activity Categories (6 groups, 30 categories)
 
 **School:**
-| ID | Name | Emoji | Color |
-|---|---|---|---|
-| `after_school` | After School Activity | 🏫 | `#3B82F6` |
-| `school_recital` | School Recital / Presentation | 🎭 | `#2563EB` |
-| `other_school` | Other School Activity | 📋 | `#1D4ED8` |
+
+| ID               | Name                          | Emoji | Color     |
+| ---------------- | ----------------------------- | ----- | --------- |
+| `after_school`   | After School Activity         | 🏫    | `#3B82F6` |
+| `school_recital` | School Recital / Presentation | 🎭    | `#2563EB` |
+| `other_school`   | Other School Activity         | 📋    | `#1D4ED8` |
 
 **Educational:**
-| ID | Name | Emoji | Color |
-|---|---|---|---|
-| `tutoring` | Tutoring | 📚 | `#8B5CF6` |
-| `math` | Math | 🧮 | `#7C3AED` |
-| `language` | Language | 🌐 | `#6D28D9` |
-| `science` | Science | 🔬 | `#5B21B6` |
-| `other_educational` | Other Educational | 📖 | `#4C1D95` |
+
+| ID                  | Name              | Emoji | Color     |
+| ------------------- | ----------------- | ----- | --------- |
+| `tutoring`          | Tutoring          | 📚    | `#8B5CF6` |
+| `math`              | Math              | 🧮    | `#7C3AED` |
+| `language`          | Language          | 🌐    | `#6D28D9` |
+| `science`           | Science           | 🔬    | `#5B21B6` |
+| `other_educational` | Other Educational | 📖    | `#4C1D95` |
 
 **Sports:**
-| ID | Name | Emoji | Color |
-|---|---|---|---|
-| `tennis` | Tennis | 🎾 | `#22C55E` |
-| `badminton` | Badminton | 🏸 | `#16A34A` |
-| `golf_activity` | Golf | ⛳ | `#15803D` |
-| `baseball` | Baseball / Softball | ⚾ | `#166534` |
-| `gym_activity` | Gym / Fitness | 🏋️ | `#059669` |
-| `yoga_activity` | Yoga / Pilates | 🧘 | `#0D9488` |
-| `other_sports_activity` | Other Sports | 🏃 | `#14B8A6` |
+
+| ID                      | Name                | Emoji | Color     |
+| ----------------------- | ------------------- | ----- | --------- |
+| `tennis`                | Tennis              | 🎾    | `#22C55E` |
+| `badminton`             | Badminton           | 🏸    | `#16A34A` |
+| `golf_activity`         | Golf                | ⛳    | `#15803D` |
+| `baseball`              | Baseball / Softball | ⚾    | `#166534` |
+| `gym_activity`          | Gym / Fitness       | 🏋️    | `#059669` |
+| `yoga_activity`         | Yoga / Pilates      | 🧘    | `#0D9488` |
+| `other_sports_activity` | Other Sports        | 🏃    | `#14B8A6` |
 
 **Competitions:**
-| ID | Name | Emoji | Color |
-|---|---|---|---|
-| `spelling_bee` | Spelling Bee | 🐝 | `#F59E0B` |
-| `math_competition` | Math Competition | 🔢 | `#D97706` |
-| `cubing` | Cubing Competition | 🧩 | `#B45309` |
-| `other_competition` | Other Competition | 🏆 | `#92400E` |
+
+| ID                  | Name               | Emoji | Color     |
+| ------------------- | ------------------ | ----- | --------- |
+| `spelling_bee`      | Spelling Bee       | 🐝    | `#F59E0B` |
+| `math_competition`  | Math Competition   | 🔢    | `#D97706` |
+| `cubing`            | Cubing Competition | 🧩    | `#B45309` |
+| `other_competition` | Other Competition  | 🏆    | `#92400E` |
 
 **Lessons:**
-| ID | Name | Emoji | Color |
-|---|---|---|---|
-| `piano` | Piano | 🎹 | `#AED6F1` |
-| `guitar` | Guitar | 🎸 | `#93C5FD` |
-| `trumpet` | Trumpet | 🎺 | `#60A5FA` |
-| `drum` | Drum | 🥁 | `#3B82F6` |
-| `music` | Music | 🎵 | `#2563EB` |
-| `art` | Art | 🎨 | `#818CF8` |
-| `dance` | Dance / Ballet | 💃 | `#A78BFA` |
-| `other_lesson` | Other Lesson | 📓 | `#7C3AED` |
+
+| ID             | Name           | Emoji | Color     |
+| -------------- | -------------- | ----- | --------- |
+| `piano`        | Piano          | 🎹    | `#AED6F1` |
+| `guitar`       | Guitar         | 🎸    | `#93C5FD` |
+| `trumpet`      | Trumpet        | 🎺    | `#60A5FA` |
+| `drum`         | Drum           | 🥁    | `#3B82F6` |
+| `music`        | Music          | 🎵    | `#2563EB` |
+| `art`          | Art            | 🎨    | `#818CF8` |
+| `dance`        | Dance / Ballet | 💃    | `#A78BFA` |
+| `other_lesson` | Other Lesson   | 📓    | `#7C3AED` |
 
 **Fun:**
-| ID | Name | Emoji | Color |
-|---|---|---|---|
-| `birthday` | Birthday Party | 🎂 | `#F15D22` |
-| `wedding` | Wedding | 💒 | `#E67E22` |
-| `bar_mitzvah` | Bar Mitzvah | ✡️ | `#D97706` |
-| `other_celebration` | Other Celebration | 🎉 | `#F59E0B` |
+
+| ID                  | Name              | Emoji | Color     |
+| ------------------- | ----------------- | ----- | --------- |
+| `birthday`          | Birthday Party    | 🎂    | `#F15D22` |
+| `wedding`           | Wedding           | 💒    | `#E67E22` |
+| `bar_mitzvah`       | Bar Mitzvah       | ✡️    | `#D97706` |
+| `other_celebration` | Other Celebration | 🎉    | `#F59E0B` |
 
 ### Budget: Group-Level Allocation with Optional Category Drill-Down
 

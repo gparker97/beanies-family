@@ -22,12 +22,7 @@ import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import type { VacationTransportation, VacationSegmentStatus } from '@/types/models';
 
 type TransportationField =
-  | 'agencyName'
-  | 'pickupDate'
-  | 'pickupTime'
-  | 'returnDate'
-  | 'departureDate'
-  | 'departureTime';
+  'agencyName' | 'pickupDate' | 'pickupTime' | 'returnDate' | 'departureDate' | 'departureTime';
 
 interface Props {
   open: boolean;

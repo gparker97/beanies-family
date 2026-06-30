@@ -116,7 +116,7 @@ The Settings page footer shows which build you're on:
 | Badge                            | Meaning                                                                                                               |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | ☁️ Cloud-hosted version          | You're on `app.beanies.family` (the official cloud build).                                                            |
-| 🛠 Self-hosted · Developer build | Both Drive (`VITE_GOOGLE_CLIENT_ID`) and registry (`VITE_REGISTRY_API_URL` + `VITE_REGISTRY_API_KEY`) are configured. |
+| 🛠 Self-hosted · Developer build  | Both Drive (`VITE_GOOGLE_CLIENT_ID`) and registry (`VITE_REGISTRY_API_URL` + `VITE_REGISTRY_API_KEY`) are configured. |
 | 🏠 Self-hosted · Community build | One or both essentials are missing. The corresponding UI surfaces are disabled with a tooltip explaining why.         |
 
 ---

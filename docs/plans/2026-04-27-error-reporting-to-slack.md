@@ -42,14 +42,15 @@ export function reportError(input: ErrorReportInput): void;
 - Context build wrapped in try/catch. Failure to gather context → send a degraded report carrying `{ contextBuildError: '<message>' }` rather than dropping the whole report.
 
 **Failure logging — every path is named, none silent:**
-| Failure mode | Action |
-|---|---|
-| Webhook URL env unset | `console.warn('[errorReporter] webhook not configured — set PUBLIC_BEANIES_ERROR_WEBHOOK_URL')`, return |
-| Disallowed context key | `console.warn('[errorReporter] dropped non-allowlisted key:', key)`, drop only that key |
-| Dedup count-only (subsequent occurrence) | `console.warn('[errorReporter] dedup-counted', surface, message, count)`, return |
-| Context-build throws | `console.warn('[errorReporter] context build failed', e)`, send degraded report |
-| Re-entry detected | `console.warn('[errorReporter] re-entry blocked', input.surface)`, return |
-| `fetch` throws (offline, DNS, etc.) | `console.warn('[errorReporter] webhook POST failed', e)`, return |
+
+| Failure mode                             | Action                                                                                                  |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Webhook URL env unset                    | `console.warn('[errorReporter] webhook not configured — set PUBLIC_BEANIES_ERROR_WEBHOOK_URL')`, return |
+| Disallowed context key                   | `console.warn('[errorReporter] dropped non-allowlisted key:', key)`, drop only that key                 |
+| Dedup count-only (subsequent occurrence) | `console.warn('[errorReporter] dedup-counted', surface, message, count)`, return                        |
+| Context-build throws                     | `console.warn('[errorReporter] context build failed', e)`, send degraded report                         |
+| Re-entry detected                        | `console.warn('[errorReporter] re-entry blocked', input.surface)`, return                               |
+| `fetch` throws (offline, DNS, etc.)      | `console.warn('[errorReporter] webhook POST failed', e)`, return                                        |
 
 ### 2.2 — Dedup design (the spam-prevention contract)
 

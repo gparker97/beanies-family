@@ -72,8 +72,7 @@ export const DEFERRED_PASSWORD_HASH = '';
 
 export type RotateError = 'familyKeyMissing' | 'wrapFailed' | 'updateFailed';
 export type RotateResult =
-  | { success: true; syncDeferred: boolean }
-  | { success: false; error: RotateError };
+  { success: true; syncDeferred: boolean } | { success: false; error: RotateError };
 
 export type RotateSurface = 'change-password' | 'reset-member-password' | 'signin-heal';
 

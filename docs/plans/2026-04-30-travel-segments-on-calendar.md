@@ -24,11 +24,7 @@ Confirmed scope (greg, 2026-04-30):
 
 ```ts
 export type SupportedTravelType =
-  | 'flight_outbound'
-  | 'flight_return'
-  | 'train'
-  | 'ferry'
-  | 'cruise';
+  'flight_outbound' | 'flight_return' | 'train' | 'ferry' | 'cruise';
 
 export interface TravelSegmentOccurrence {
   vacationId: string;

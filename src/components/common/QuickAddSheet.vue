@@ -112,9 +112,7 @@ function pickerAfter(group: QuickAddGroup): boolean {
 const SECONDARY_GROUPS: readonly {
   id: QuickAddGroup;
   titleKey:
-    | 'quickAdd.groups.family.title'
-    | 'quickAdd.groups.money.title'
-    | 'quickAdd.groups.care.title';
+    'quickAdd.groups.family.title' | 'quickAdd.groups.money.title' | 'quickAdd.groups.care.title';
   suffixKey?: 'quickAdd.groups.money.setup';
 }[] = [
   { id: 'family', titleKey: 'quickAdd.groups.family.title' },

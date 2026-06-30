@@ -64,10 +64,7 @@ export type JoinErrorCode =
   | 'NO_UNCLAIMED_MEMBERS';
 
 export type RecoveryAction =
-  | 'retry'
-  | 'signInDifferentAccount'
-  | 'tryAnotherDevice'
-  | 'pickDifferentBean';
+  'retry' | 'signInDifferentAccount' | 'tryAnotherDevice' | 'pickDifferentBean';
 
 export interface JoinErrorEntry {
   messageKey: string;

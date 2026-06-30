@@ -1496,16 +1496,14 @@ watch(
           <pre
             v-if="initErrorDetail"
             class="mt-2 max-h-32 overflow-auto rounded-lg bg-gray-100 p-2 text-xs text-gray-700 dark:bg-slate-900 dark:text-gray-300"
-            >{{ initErrorDetail }}</pre
-          >
+            >{{ initErrorDetail }}</pre>
           <div class="mt-2">
             <p class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
               {{ t('app.initError.diagnostics') }}
             </p>
             <pre
               class="max-h-24 overflow-auto rounded-lg bg-gray-100 p-2 text-xs text-gray-700 dark:bg-slate-900 dark:text-gray-300"
-              >{{ getDeviceDiagnostics() }}</pre
-            >
+              >{{ getDeviceDiagnostics() }}</pre>
           </div>
         </details>
       </div>

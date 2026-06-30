@@ -18,14 +18,7 @@ import { getTransactionVisual } from '@/utils/transactionLabel';
 import { entityDeepLink } from '@/utils/entityDeepLink';
 
 type ResultType =
-  | 'activity'
-  | 'vacation'
-  | 'todo'
-  | 'account'
-  | 'transaction'
-  | 'goal'
-  | 'asset'
-  | 'member';
+  'activity' | 'vacation' | 'todo' | 'account' | 'transaction' | 'goal' | 'asset' | 'member';
 
 interface Props {
   open: boolean;

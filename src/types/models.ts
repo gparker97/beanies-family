@@ -398,14 +398,7 @@ export type TodoSort = 'newest' | 'oldest' | 'dueDate';
 // Beanie Lists (#33) — categorized family checklists (named bundles of items,
 // distinct from individual To-Dos). Gated behind the `familyLists` dev flag.
 export type ListCategory =
-  | 'home'
-  | 'out'
-  | 'kids'
-  | 'health'
-  | 'celebrations'
-  | 'trips'
-  | 'projects'
-  | 'me';
+  'home' | 'out' | 'kids' | 'health' | 'celebrations' | 'trips' | 'projects' | 'me';
 export type ListLifecycle = 'oneoff' | 'recurring';
 export type ListFrequency = 'daily' | 'weekly' | 'monthly';
 
@@ -593,13 +586,7 @@ export type ActivityCategory =
  * — `daysOfWeek` is ignored for this kind.
  */
 export type ActivityRecurrence =
-  | 'none'
-  | 'daily'
-  | 'weekly'
-  | 'biweekly'
-  | 'monthly'
-  | 'monthly-by-day'
-  | 'yearly';
+  'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'monthly-by-day' | 'yearly';
 export type FeeSchedule =
   | 'none'
   | 'per_session'
@@ -829,23 +816,12 @@ export interface OverlapAck {
 // ---------------------------------------------------------------------------
 
 export type VacationTripType =
-  | 'fly_and_stay'
-  | 'cruise'
-  | 'road_trip'
-  | 'combo'
-  | 'camping'
-  | 'adventure';
+  'fly_and_stay' | 'cruise' | 'road_trip' | 'combo' | 'camping' | 'adventure';
 
 export type VacationSegmentStatus = 'booked' | 'pending';
 
 export type VacationIdeaCategory =
-  | 'beach'
-  | 'activity'
-  | 'food'
-  | 'sightseeing'
-  | 'shopping'
-  | 'nightlife'
-  | 'other';
+  'beach' | 'activity' | 'food' | 'sightseeing' | 'shopping' | 'nightlife' | 'other';
 
 export type VacationTravelType =
   | 'flight_outbound'
@@ -858,20 +834,12 @@ export type VacationTravelType =
   | 'activity';
 
 export type VacationActivityCategory =
-  | 'show_musical'
-  | 'theme_park'
-  | 'sporting_event'
-  | 'concert'
-  | 'excursion'
-  | 'other';
+  'show_musical' | 'theme_park' | 'sporting_event' | 'concert' | 'excursion' | 'other';
 
 export type VacationAccommodationType = 'hotel' | 'airbnb' | 'campground' | 'family_friends';
 
 export type VacationTransportationType =
-  | 'airport_shuttle'
-  | 'rental_car'
-  | 'taxi_rideshare'
-  | 'bus';
+  'airport_shuttle' | 'rental_car' | 'taxi_rideshare' | 'bus';
 
 export interface VacationTravelSegment {
   id: UUID;
@@ -1323,12 +1291,7 @@ export interface CookLogEntry {
 }
 
 export type EmergencyContactCategory =
-  | 'doctor'
-  | 'dentist'
-  | 'nurse'
-  | 'teacher'
-  | 'school'
-  | 'other';
+  'doctor' | 'dentist' | 'nurse' | 'teacher' | 'school' | 'other';
 
 /**
  * An emergency / key contact — pediatrician, school, poison control,

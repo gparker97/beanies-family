@@ -32,8 +32,7 @@ export function generateCommittedSource(state: Record<DevFlag, boolean>): string
 }
 
 export type FlagWriteResult =
-  | { ok: true; source: string; nextState: Record<DevFlag, boolean> }
-  | { ok: false; error: string };
+  { ok: true; source: string; nextState: Record<DevFlag, boolean> } | { ok: false; error: string };
 
 /**
  * Validate a single flag change and produce the new committed-file source. Pure:

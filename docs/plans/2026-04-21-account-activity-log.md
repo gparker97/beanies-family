@@ -428,7 +428,7 @@ No changes to `UpcomingActivities.vue`, `DayAgendaSidebar.vue`, `ScheduleCards.v
     - Sign in as member A → Main Checking $1000 → $1200. Activity log shows `+$200 · Adjusted by A`. Transactions page shows row with account pill, no Edit/Delete in the view modal.
     - Switch to member B → $1200 → $1150. `−$50 · Adjusted by B`.
     - Create recurring Netflix $15/mo → materialize → shows `−$15 · Recurring: Netflix` in activity log.
-    - Create transfer Main → Savings $500 → shows `−$500 · Transfer → Savings` in Main's log, `+$500 · Transfer ← Main Checking` in Savings' log.
+    - Create transfer Main → Savings $500 → shows `−$500 · Transfer → Savings`in Main's log,`+$500 · Transfer ← Main Checking` in Savings' log.
     - Click a row in Account activity log → navigates to `/transactions?view=<id>` with modal open; close modal → stays on TransactionsPage.
     - Resize viewport mobile → sm → md → confirm account column appears/disappears cleanly.
     - Dashboard net worth + monthly summaries unaffected by adjustments.

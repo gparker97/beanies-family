@@ -43,8 +43,7 @@ export type CreatePodFailureReason =
   | 'existing-pod';
 
 export type CreatePodResult =
-  | { ok: true }
-  | { ok: false; reason: CreatePodFailureReason; error: Error };
+  { ok: true } | { ok: false; reason: CreatePodFailureReason; error: Error };
 
 // ─── In-flight critical writes ────────────────────────────────────────────
 
