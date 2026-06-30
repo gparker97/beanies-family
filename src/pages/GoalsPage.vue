@@ -125,8 +125,7 @@ interface GoalSection {
   goals: Goal[];
   addDefaults: { memberId?: string; priority?: GoalPriority };
   header:
-    | { kind: 'member'; memberId: string | null }
-    | { kind: 'priority'; priority: GoalPriority };
+    { kind: 'member'; memberId: string | null } | { kind: 'priority'; priority: GoalPriority };
 }
 
 const sections = computed<GoalSection[]>(() => {

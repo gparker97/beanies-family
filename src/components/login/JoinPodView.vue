@@ -694,8 +694,7 @@ onMounted(() => {
 
       <pre
         class="mt-4 max-h-64 overflow-auto rounded-lg bg-gray-100 p-3 text-xs text-gray-700 dark:bg-slate-900 dark:text-gray-300"
-        >{{ diagnosticReport }}</pre
-      >
+        >{{ diagnosticReport }}</pre>
 
       <div class="mt-4 flex justify-end">
         <BaseButton size="sm" @click="copyDiagnostic">

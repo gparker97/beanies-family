@@ -1017,11 +1017,7 @@ export function buildCruisePortOptions(): ComboOption[] {
 
 /** Travel-segment types that have a meaningful departure/arrival pair. */
 export type SupportedTravelType =
-  | 'flight_outbound'
-  | 'flight_return'
-  | 'train'
-  | 'ferry'
-  | 'cruise';
+  'flight_outbound' | 'flight_return' | 'train' | 'ferry' | 'cruise';
 
 /** A single calendar occurrence — one side of a travel segment. */
 export interface TravelSegmentOccurrence {

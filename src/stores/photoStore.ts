@@ -109,9 +109,7 @@ function isTransientUploadError(e: unknown): boolean {
 export type PhotoSize = 'thumb' | 'full';
 
 export type PhotoResolution =
-  | { status: 'ok'; url: string }
-  | { status: 'pending' }
-  | { status: 'missing' };
+  { status: 'ok'; url: string } | { status: 'pending' } | { status: 'missing' };
 
 /**
  * How a collection references photos. Two functions cover the two
