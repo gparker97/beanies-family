@@ -58,7 +58,7 @@
     "@capgo/capacitor-passkey": "^8.3.9",
     "chart.js": "^4.5.1",
     "idb": "^8.0.3",
-    "pdfjs-dist": "^4.10.38",
+    "pdfjs-dist": "^6.1.200",
     "pinia": "^3.0.4",
     "qrcode": "^1.5.4",
     "vue": "^3.5.39",
