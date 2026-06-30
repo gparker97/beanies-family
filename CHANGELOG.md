@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-06-30
+
+### Changed
+
+- **Routine dependency maintenance.** Updated Vue, Tailwind, and several build/test tooling packages to their latest patch releases. No change to how the app looks or works — these are behind-the-scenes upkeep to stay current and secure.
+
 ## 2026-06-28
 
 ### Fixed
