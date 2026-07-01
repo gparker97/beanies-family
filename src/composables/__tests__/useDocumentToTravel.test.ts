@@ -26,14 +26,10 @@ vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({ sortedHumans: sortedHumans.value }),
 }));
 
+// The service now owns document preparation (PDF rasterization + compression); the composable
+// just hands it the original File and attaches that original as the trip source.
 vi.mock('@/services/ai/documentExtractionService', () => ({
   extractTravelFromDocument: vi.fn(),
-}));
-
-const pdfFirstPageToImage = vi.fn();
-vi.mock('@/utils/pdfFirstPageToImage', () => ({
-  isPdfFile: (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name),
-  pdfFirstPageToImage: (f: File) => pdfFirstPageToImage(f),
 }));
 
 import { useDocumentToTravel } from '../useDocumentToTravel';
@@ -113,29 +109,31 @@ describe('useDocumentToTravel', () => {
     expect(showToast).not.toHaveBeenCalled();
   });
 
-  it('rasterizes a PDF before extracting, attaching the ORIGINAL pdf as the source', async () => {
-    pdfFirstPageToImage.mockResolvedValue(new File(['img'], 'ticket.jpg', { type: 'image/jpeg' }));
+  it('PDF: hands the ORIGINAL pdf to the service and attaches it as the trip source', async () => {
     mockExtract.mockResolvedValue({ success: true, data: TRAVEL });
     const { processFile, onTravelReady } = setup();
 
     await processFile(pdfFile());
 
-    expect(pdfFirstPageToImage).toHaveBeenCalled();
-    // Extraction runs on the rasterized JPEG, not the PDF.
-    expect(mockExtract.mock.calls[0][0]).toBeInstanceOf(File);
-    expect((mockExtract.mock.calls[0][0] as File).type).toBe('image/jpeg');
-    // But the source attached is the original PDF.
+    // The service (mocked) receives the original PDF — rasterization is its concern now.
+    expect((mockExtract.mock.calls[0][0] as File).type).toBe('application/pdf');
+    // And the source attached to the trip is that same original PDF.
     const arg = onTravelReady.mock.calls[0][0] as { sourceFile: File };
     expect(arg.sourceFile.type).toBe('application/pdf');
   });
 
-  it('PDF rasterization failure → compression toast, no extraction', async () => {
-    pdfFirstPageToImage.mockRejectedValue(new Error('bad pdf'));
+  it('truncated PDF: info toast that only the first pages were read, still emits the trip', async () => {
+    mockExtract.mockResolvedValue({ success: true, data: TRAVEL, truncated: true });
     const { processFile, onTravelReady } = setup();
+
     await processFile(pdfFile());
-    expect(showToast).toHaveBeenCalledWith('warning', 'ai.error.title', 'photos.invalidType');
-    expect(mockExtract).not.toHaveBeenCalled();
-    expect(onTravelReady).not.toHaveBeenCalled();
+
+    expect(showToast).toHaveBeenCalledWith(
+      'info',
+      'ai.pdfTruncated.title',
+      'ai.pdfTruncated.message'
+    );
+    expect(onTravelReady).toHaveBeenCalled();
   });
 
   it('not a travel document → friendly info toast, nothing emitted', async () => {

@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-06-26",
-    "translationCount": 3636
+    "lastUpdated": "2026-07-01",
+    "translationCount": 3638
   },
   "translations": {
     "app.name": {
@@ -18185,6 +18185,16 @@
       "translation": "删除成员失败。请重试。",
       "hash": "3cy9od",
       "lastUpdated": "2026-06-26"
+    },
+    "ai.pdfTruncated.title": {
+      "translation": "长文档",
+      "hash": "b8ntq7",
+      "lastUpdated": "2026-07-01"
+    },
+    "ai.pdfTruncated.message": {
+      "translation": "我们阅读了本PDF的前几页。完整文件仍在附件中。",
+      "hash": "vrmea9",
+      "lastUpdated": "2026-07-01"
     }
   }
 }

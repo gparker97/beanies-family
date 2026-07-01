@@ -23,7 +23,6 @@ import {
 } from '@/utils/travelExtractionToSegments';
 import { resolveTripTarget, segmentDateRange, tripsOverlappingRange } from '@/utils/vacation';
 import type { TripTarget } from '@/utils/vacation';
-import { isPdfFile, pdfFirstPageToImage } from '@/utils/pdfFirstPageToImage';
 import { toDateInputValue } from '@/utils/date';
 import type { VacationTripType } from '@/types/models';
 
@@ -73,21 +72,11 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
 
     isProcessing.value = true;
     try {
-      // PDFs must be rasterized (page 1) to an image for the image-only extraction proxy.
-      // A rasterization failure is surfaced through the shared reporter (compression bucket),
-      // never silently swallowed.
-      let extractFile = file;
-      if (isPdfFile(file)) {
-        try {
-          extractFile = await pdfFirstPageToImage(file);
-        } catch (err) {
-          console.error('[travel-extract] PDF rasterization failed:', err);
-          reportExtractionFailure('compression');
-          return;
-        }
-      }
-
-      const result = await extractTravelFromDocument(extractFile, {
+      // The service owns document preparation: a PDF is rasterized to its first pages (up
+      // to MAX_EXTRACT_PAGES) and a photo is used as-is, then each page is compressed. The
+      // ORIGINAL file is still attached below, so the full PDF is never lost. Preparation
+      // failures come back classified as `compression`, never silent.
+      const result = await extractTravelFromDocument(file, {
         tier: tier.value,
         // Local YYYY-MM-DD so the model resolves relative dates against the user's calendar
         // date and the proxy's date validation passes.
@@ -96,6 +85,11 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
       });
 
       if (result.success && result.data) {
+        // Loud-but-non-blocking notice FIRST — before the not-travel early return — so a
+        // >cap PDF whose bookings sat on a dropped page still tells the user (never silent).
+        if (result.truncated) {
+          showToast('info', t('ai.pdfTruncated.title'), t('ai.pdfTruncated.message'));
+        }
         if (!result.data.isTravel || result.data.segments.length === 0) {
           // Not recognised as a travel document — friendly info toast, nothing created.
           showToast('info', t('ai.notTravel.title'), t('ai.notTravel.message'));
