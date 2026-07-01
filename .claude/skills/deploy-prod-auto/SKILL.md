@@ -86,26 +86,31 @@ Record `VUE`, `WEB`, and `MOBILE` flags.
 - **If `VUE: no` and `WEB: no` and `MOBILE: no`** — report "no runtime changes since last deploy — nothing to ship" and stop.
 - **If `VUE: no` and `WEB: no` but `MOBILE: yes`** — there is nothing for this skill to deploy (it's native-only). Report that the change ships via the mobile lane (per the note above), confirm the auto-triggered APK build, and stop — do NOT run `deploy.yml` or `deploy-web.yml` (they would be no-ops that mislead).
 
-## Step 4b: Author the release note (only if `VUE: yes`)
+## Step 4b: Author the release note + bump the product version (only if `VUE: yes`)
 
 Every Vue-app deploy ships a brief, user-facing release note — it becomes the
-in-app `whats-new` notification (the bell) when clients update. **Follow
+in-app `whats-new` notification (the bell) when clients update — **and** bumps
+the in-app product version (`APP_VERSION`). **Follow
 `scripts/deploy/release-note-guide.md` in full**: judge significance, draft the
 message in greg's voice (no em-dashes; en + lowercase beanie), compute the
-`YYYY.MM.DD[.N]` version, and **propose it to greg for approval**.
+`YYYY.MM.DD[.N]` note version, propose the next `APP_VERSION` (§3b — patch by
+default, `R<n>` for a same-release hotfix), and **propose all of it to greg for
+approval**.
 
 > **The one allowed pause.** This skill is otherwise no-pause, but greg has
 > explicitly asked to approve the wording before it ships. Present the drafted
 > note (✨, version, month, en + beanie lines, spotlight?, one-line rationale)
-> and wait for approval / edits before continuing.
+> **and the proposed `APP_VERSION` bump** (current → next, with the
+> patch-vs-revision reason) and wait for approval / edits before continuing.
 
-On approval, prepend the entry to `src/content/release-notes/deploys.ts` (Edit
-tool), then commit it on its own and push so it rides this deploy:
+On approval, prepend the entry to `src/content/release-notes/deploys.ts` AND edit
+`src/constants/appVersion.ts` to the approved `APP_VERSION` (Edit tool for both),
+then commit them together and push so both ride this deploy:
 ```
-git add src/content/release-notes/deploys.ts
+git add src/content/release-notes/deploys.ts src/constants/appVersion.ts
 ```
 ```
-git commit -m "docs(release): note <version> for prod deploy" -m "<the en summary>" -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+git commit -m "docs(release): note <version> (app v<APP_VERSION>) for prod deploy" -m "<the en summary>" -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ```
 ```
 git push
@@ -207,7 +212,7 @@ Summarise:
 - **Never skip or silence CI failures** — always fix the root cause.
 - **Never amend published commits** — always create new fix commits.
 - **Never inline `$(...)` / `$?` / `;` / `&&` / heredocs** in Bash commands run through the tool — they trigger permission prompts. If you need compound logic, add a script under `scripts/deploy/` and invoke it.
-- **Stop and ask the user only** if there is an unrecoverable failure after 3 fix attempts, or something truly unexpected (merge conflicts, unknown infrastructure failures) — **plus the one deliberate pause in Step 4b** to get greg's approval of the release-note wording before it ships.
-- **Release note on every Vue deploy.** When `VUE: yes`, author + ship a release note per `scripts/deploy/release-note-guide.md` (Step 4b). The deploy emoji is always ✨.
+- **Stop and ask the user only** if there is an unrecoverable failure after 3 fix attempts, or something truly unexpected (merge conflicts, unknown infrastructure failures) — **plus the one deliberate pause in Step 4b** to get greg's approval of the release-note wording + the `APP_VERSION` bump before they ship.
+- **Release note + version bump on every Vue deploy.** When `VUE: yes`, author + ship a release note AND bump `APP_VERSION` per `scripts/deploy/release-note-guide.md` (Step 4b). The deploy emoji is always ✨.
 - The Vue deploy workflow name is exactly `deploy.yml` (display name: "Deploy beanies PROD").
 - The Astro deploy workflow name is exactly `deploy-web.yml`.

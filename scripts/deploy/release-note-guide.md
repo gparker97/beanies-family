@@ -115,14 +115,41 @@ static note. No em-dashes — hyphens only.)
 - `month` = friendly lowercase date, e.g. `27 may 2026` (shown as the detail's
   label).
 
+## 3b. Bump the product version (`APP_VERSION`)
+
+Separate from the dated release-note `version` above, every prod deploy also
+bumps the **product version** shown inside the app (sidebar + Settings footer).
+It is the single constant `APP_VERSION` in `src/constants/appVersion.ts`.
+
+Read the current value:
+`grep "APP_VERSION =" src/constants/appVersion.ts`
+
+Propose the next value by the convention documented in that file:
+
+- **Normal release (default)** — increment the patch: `0.9` → `0.9.1`,
+  `0.9.1` → `0.9.2`.
+- **Revision / hotfix of the release just shipped** (a re-deploy that fixes the
+  same logical release rather than net-new work) — append/increment `R<n>`:
+  `0.9.1` → `0.9.1R1`, `0.9.1R1` → `0.9.1R2`.
+- **Minor / major** (`0.9` → `0.10`, or `1.0` for the full public launch) —
+  ONLY when greg explicitly says so; never bump the minor/major automatically.
+
+Judge patch-vs-revision from what is shipping (the `git log <last-deploy>..HEAD`
+you already reviewed in §1): net-new work = patch bump; a same-release fix =
+`R<n>`. **Propose** the value — greg confirms or overrides it at the same
+approval pause as the note (§4). This is what keeps the shown version meaningful
+instead of rotting like the old hardcoded `v1.0.0 - MVP`.
+
 ## 4. Propose to greg, then add the entry
 
 1. **Present the drafted note for approval** — this is the ONE allowed pause in
-   the auto skill. Show: emoji ✨, version, `month`, the `summary` line, each
-   feature's `title` + `description` (both `en` and `beanie`), whether it is
-   `spotlight`, and a one-line significance rationale. Wait for greg's approval or
-   edits. (The deploy emoji is always ✨ — set on the `whats-new` notification
-   kind, not per entry, so it is not a field here.)
+   the auto skill. Show: emoji ✨, release-note `version`, `month`, the `summary`
+   line, each feature's `title` + `description` (both `en` and `beanie`), whether
+   it is `spotlight`, a one-line significance rationale, **and the proposed
+   `APP_VERSION` bump** (current → next, with the patch-vs-revision reason from
+   §3b). Wait for greg's approval or edits. (The deploy emoji is always ✨ — set
+   on the `whats-new` notification kind, not per entry, so it is not a field
+   here.)
 2. On approval, **prepend** the entry to the `DEPLOY_NOTES` array in
    `src/content/release-notes/deploys.ts` (use the Edit tool; do not hand-munge
    via shell). A minor entry (summary only):
@@ -167,14 +194,19 @@ static note. No em-dashes — hyphens only.)
    (The bigger curated monthly releases live in their own `YYYY-MM.ts` file and
    also add a `fixes` list — the per-deploy stream rarely needs that.)
 
-3. **Commit the note on its own** (it must be in the deployed commit):
+3. **Bump `APP_VERSION`** (per §3b) — Edit `src/constants/appVersion.ts` to the
+   approved value (e.g. `0.9` → `0.9.1`). Both this and the note ride the same
+   deploy commit below, so the shown product version moves with the release.
+
+4. **Commit the note + version bump together** (they must be in the deployed
+   commit):
 
    ```
-   git add src/content/release-notes/deploys.ts
+   git add src/content/release-notes/deploys.ts src/constants/appVersion.ts
    ```
 
    ```
-   git commit -m "docs(release): note <version> for prod deploy" -m "<the en summary>" -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+   git commit -m "docs(release): note <version> (app v<APP_VERSION>) for prod deploy" -m "<the en summary>" -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
    ```
 
    ```
