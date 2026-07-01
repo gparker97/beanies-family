@@ -42,9 +42,12 @@ variable "tinfoil_api_base" {
 }
 
 variable "tinfoil_model" {
-  description = "Tinfoil vision model id"
+  description = "Tinfoil vision model id (must be multimodal + served on /v1/chat/completions)"
   type        = string
-  default     = "qwen3-vl-30b"
+  # 2026-07-01: Tinfoil retired qwen3-vl-30b (removed from catalog → 503s). Switched to
+  # gemma4-31b, their current multimodal chat model. Applied to prod via Lambda env hotfix
+  # the same day; this default keeps Terraform in sync so the next apply doesn't revert it.
+  default = "gemma4-31b"
 }
 
 variable "log_retention_days" {
