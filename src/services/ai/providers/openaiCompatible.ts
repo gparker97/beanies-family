@@ -121,7 +121,7 @@ export function callOpenAiCompatibleVision(
   return callOpenAiCompatible(
     config,
     request,
-    buildExtractionMessages(request.imageDataUrl, request.todayIso),
+    buildExtractionMessages(request.imageDataUrls, request.todayIso),
     parseExtractionResult
   );
 }
@@ -133,7 +133,7 @@ export function callOpenAiCompatibleTravel(
   return callOpenAiCompatible(
     config,
     request,
-    buildTravelExtractionMessages(request.imageDataUrl, request.todayIso),
+    buildTravelExtractionMessages(request.imageDataUrls, request.todayIso),
     parseTravelExtractionResult
   );
 }

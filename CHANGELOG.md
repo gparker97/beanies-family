@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-07-01
 
+### Added
+
+- **The AI reader now reads multi-page PDFs, not just the first page.** When you scan a PDF invitation or travel itinerary with "magic beans", beanies now reads its first few pages — so a return flight on page two, or a second day's schedule, gets picked up too. Very long PDFs read the first several pages, and the full original document stays attached to whatever it creates, so nothing is lost. Photos are still read as a single image.
+
 ### Fixed
 
 - **Reading a photo or document with AI works again.** The "magic beans" reader (scan a flyer, invitation, or itinerary to fill in an activity or trip) had started failing because our privacy-preserving AI provider retired the vision model it was using. Switched to their current model, so photo and document reading is back to normal — nothing changes about how you use it.

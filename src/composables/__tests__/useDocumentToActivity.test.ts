@@ -17,24 +17,17 @@ vi.mock('../useToast', () => ({ useToast: () => ({ showToast }) }));
 // t() echoes the key so assertions can match on keys.
 vi.mock('../useTranslation', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
 
+// The service now owns document preparation (PDF rasterization + compression), so the
+// composable just hands it the original File. We mock the service and assert what's passed.
 vi.mock('@/services/ai/documentExtractionService', () => ({
   extractEventFromDocument: vi.fn(),
 }));
 
-// PDF rasterization util — mocked so we can drive the PDF path deterministically.
-const rasterized = new File(['img'], 'invite.jpg', { type: 'image/jpeg' });
-vi.mock('@/utils/pdfFirstPageToImage', () => ({
-  isPdfFile: (f: File) => f.type === 'application/pdf',
-  pdfFirstPageToImage: vi.fn(() => Promise.resolve(rasterized)),
-}));
-
 import { useDocumentToActivity } from '../useDocumentToActivity';
 import { extractEventFromDocument } from '@/services/ai/documentExtractionService';
-import { pdfFirstPageToImage } from '@/utils/pdfFirstPageToImage';
 import type { ExtractionResult } from '@/services/ai/types';
 
 const mockExtract = vi.mocked(extractEventFromDocument);
-const mockRasterize = vi.mocked(pdfFirstPageToImage);
 
 function pdf(): File {
   return new File(['%PDF-1.4'], 'invite.pdf', { type: 'application/pdf' });
@@ -200,37 +193,29 @@ describe('useDocumentToActivity', () => {
     });
   });
 
-  it('PDF: rasterizes page 1 to an image, then extracts THAT image (not the raw PDF)', async () => {
-    mockRasterize.mockResolvedValue(rasterized); // resetAllMocks wiped the factory default
+  it('PDF input: hands the ORIGINAL pdf to the service (service owns rasterization now)', async () => {
     mockExtract.mockResolvedValue({ success: true, data: SAMPLE });
     const { processFile, onActivityReady } = setup();
 
     await processFile(pdf());
 
-    expect(mockRasterize).toHaveBeenCalledOnce();
-    expect(mockExtract).toHaveBeenCalledWith(rasterized, expect.any(Object));
+    const passed = mockExtract.mock.calls[0][0] as File;
+    expect(passed.type).toBe('application/pdf'); // not a client-rasterized image
     expect(onActivityReady).toHaveBeenCalled();
   });
 
-  it('PDF rasterization failure: compression toast, no extraction, nothing opened', async () => {
-    mockRasterize.mockRejectedValue(new Error('bad pdf'));
+  it('truncated PDF: info toast that only the first pages were read, still opens the activity', async () => {
+    mockExtract.mockResolvedValue({ success: true, data: SAMPLE, truncated: true });
     const { processFile, onActivityReady } = setup();
 
     await processFile(pdf());
 
-    expect(mockExtract).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith('warning', 'ai.error.title', 'photos.invalidType');
-    expect(onActivityReady).not.toHaveBeenCalled();
-  });
-
-  it('image input: skips rasterization and extracts the file directly', async () => {
-    mockExtract.mockResolvedValue({ success: true, data: SAMPLE });
-    const { processFile } = setup();
-
-    await processFile(file()); // image/jpeg
-
-    expect(mockRasterize).not.toHaveBeenCalled();
-    expect(mockExtract).toHaveBeenCalledWith(expect.any(File), expect.any(Object));
+    expect(showToast).toHaveBeenCalledWith(
+      'info',
+      'ai.pdfTruncated.title',
+      'ai.pdfTruncated.message'
+    );
+    expect(onActivityReady).toHaveBeenCalled();
   });
 
   it('toggles isProcessing around the extraction', async () => {

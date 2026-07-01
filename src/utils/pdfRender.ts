@@ -1,6 +1,6 @@
-// Shared pdf.js plumbing. Two callers:
-//   • pdfFirstPageToImage (AI extraction) — page 1 → JPEG File for the proxy.
-//   • pdfToPageImages (in-app viewing) — all pages → object URLs the PhotoViewer
+// Shared pdf.js plumbing. `renderPdfPages` owns the page loop; two callers build on it:
+//   • pdfToExtractionImages (AI extraction) — first N pages → JPEG Files for the proxy.
+//   • pdfToPageImages (in-app viewing) — pages → object URLs the PhotoViewer
 //     renders inline, because mobile/PWA webviews frequently refuse to inline an
 //     <iframe> PDF (they show a dead native fallback instead).
 //
@@ -59,6 +59,43 @@ const VIEW_LONG_EDGE = 1600;
 /** Safety cap so a pathologically long PDF can't render hundreds of canvases. */
 const MAX_VIEW_PAGES = 20;
 
+export interface RenderedPdfPages {
+  /** One JPEG blob per rendered page, in page order. */
+  blobs: Blob[];
+  /** True when the document had more pages than were rendered (cap hit). */
+  truncated: boolean;
+}
+
+/**
+ * Render the first `maxPages` pages of a PDF to JPEG blobs (long edge ~`longEdge`px).
+ * The single owner of the pdf.js page loop — shared by the in-app viewer
+ * (`pdfToPageImages`) and the AI extraction util (`pdfToExtractionImages`). Loads the
+ * doc once, cleans up each page, and destroys the doc in `finally` so the worker can
+ * be reclaimed.
+ */
+export async function renderPdfPages(
+  data: ArrayBuffer,
+  opts: { longEdge: number; maxPages: number }
+): Promise<RenderedPdfPages> {
+  const pdfjs = await loadPdfjs();
+  const doc = await pdfjs.getDocument({ data }).promise;
+  const blobs: Blob[] = [];
+  try {
+    const count = Math.min(doc.numPages, opts.maxPages);
+    for (let i = 1; i <= count; i++) {
+      const page = await doc.getPage(i);
+      try {
+        blobs.push(await renderPdfPageToBlob(page, opts.longEdge));
+      } finally {
+        page.cleanup();
+      }
+    }
+    return { blobs, truncated: doc.numPages > count };
+  } finally {
+    void doc.destroy();
+  }
+}
+
 export interface PdfViewPages {
   /** One JPEG object URL per rendered page, in order. Caller MUST revoke them. */
   urls: string[];
@@ -72,22 +109,9 @@ export interface PdfViewPages {
  * when done (the PhotoViewer revokes on close / navigation / unmount).
  */
 export async function pdfToPageImages(data: ArrayBuffer): Promise<PdfViewPages> {
-  const pdfjs = await loadPdfjs();
-  const doc = await pdfjs.getDocument({ data }).promise;
-  const urls: string[] = [];
-  try {
-    const count = Math.min(doc.numPages, MAX_VIEW_PAGES);
-    for (let i = 1; i <= count; i++) {
-      const page = await doc.getPage(i);
-      try {
-        const blob = await renderPdfPageToBlob(page, VIEW_LONG_EDGE);
-        urls.push(URL.createObjectURL(blob));
-      } finally {
-        page.cleanup();
-      }
-    }
-    return { urls, truncated: doc.numPages > count };
-  } finally {
-    void doc.destroy();
-  }
+  const { blobs, truncated } = await renderPdfPages(data, {
+    longEdge: VIEW_LONG_EDGE,
+    maxPages: MAX_VIEW_PAGES,
+  });
+  return { urls: blobs.map((b) => URL.createObjectURL(b)), truncated };
 }

@@ -480,6 +480,12 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
           "Tap <strong>✨ Perform magic</strong> (or the <strong>Invite</strong> and <strong>Travel booking</strong> buttons) and beanies reads a single photo or document you choose — a party invitation, a flight itinerary, a hotel confirmation — and magically pulls out the key details, then opens a pre-filled activity or trip for you to check and save. As you probably guessed, it's not actually magic: it's secure, private AI. It only ever runs on the one document you pick, and only when you ask.",
       },
       {
+        type: 'callout',
+        content:
+          "Picked a PDF? beanies reads its first few pages — not just the first — so a return flight on page two or a second day's plan gets picked up too. Very long PDFs read the first several pages, and either way the full original document stays attached to whatever it creates, so nothing is lost. A photo is read as a single image.",
+        title: 'Multi-page PDFs',
+      },
+      {
         type: 'heading',
         content: 'What we send',
         level: 2,

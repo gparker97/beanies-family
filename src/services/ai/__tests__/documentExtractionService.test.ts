@@ -16,6 +16,14 @@ vi.mock('../providers/onDeviceProvider', () => ({
   onDeviceProvider: { id: 'on-device', extract: vi.fn(), extractTravel: vi.fn() },
 }));
 
+// Mock the PDF rasterizer (real one loads pdf.js + canvas, unavailable in happy-dom). isPdfFile
+// stays real-ish so the non-PDF tests take the single-image path without any rasterization.
+const mockPdfToExtractionImages = vi.fn();
+vi.mock('@/utils/pdfExtractionImages', () => ({
+  isPdfFile: (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name),
+  pdfToExtractionImages: (f: File) => mockPdfToExtractionImages(f),
+}));
+
 import { extractEventFromDocument } from '../documentExtractionService';
 import { compress, CompressionError } from '@/services/photos/photoCompression';
 import { managedProvider } from '../providers/managedProvider';
@@ -42,6 +50,14 @@ const SAMPLE: ExtractionResult = {
 
 function file(): File {
   return new File(['x'], 'invite.jpg', { type: 'image/jpeg' });
+}
+
+function pdfFile(): File {
+  return new File(['%PDF-1.4'], 'invite.pdf', { type: 'application/pdf' });
+}
+
+function imgFile(name: string): File {
+  return new File([name], name, { type: 'image/jpeg' });
 }
 
 function compressedOk() {
@@ -80,10 +96,58 @@ describe('extractEventFromDocument — tier dispatch', () => {
     await extractEventFromDocument(file(), { tier: 'managed', todayIso: '2026-06-03' });
 
     const request = mockManagedExtract.mock.calls[0][0];
-    expect(request.imageDataUrl).toMatch(/^data:image\/jpeg;base64,/);
+    // A photo is the single-element case of the images array.
+    expect(request.imageDataUrls).toHaveLength(1);
+    expect(request.imageDataUrls[0]).toMatch(/^data:image\/jpeg;base64,/);
     expect(request.todayIso).toBe('2026-06-03');
     // No family-data fields are present on the request — only the document + date + signal + task.
-    expect(Object.keys(request).sort()).toEqual(['imageDataUrl', 'signal', 'task', 'todayIso']);
+    expect(Object.keys(request).sort()).toEqual(['imageDataUrls', 'signal', 'task', 'todayIso']);
+  });
+
+  it('multi-page PDF: sends one compressed data URL per page and threads truncated', async () => {
+    mockPdfToExtractionImages.mockResolvedValue({
+      files: [imgFile('doc-p1'), imgFile('doc-p2'), imgFile('doc-p3')],
+      truncated: true,
+    });
+    mockManagedExtract.mockResolvedValue(SAMPLE);
+
+    const res = await extractEventFromDocument(pdfFile(), {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+    });
+
+    const request = mockManagedExtract.mock.calls[0][0];
+    expect(request.imageDataUrls).toHaveLength(3);
+    expect(request.imageDataUrls.every((u) => u.startsWith('data:image/jpeg;base64,'))).toBe(true);
+    // Page 1's compressed blob is handed back as the representative source thumbnail.
+    expect(res.compressedBlob).toBeInstanceOf(Blob);
+    // Truncation flag rides the envelope so the caller can notify the user.
+    expect(res.truncated).toBe(true);
+  });
+
+  it('a PDF that produces no readable pages → compression error, provider never called', async () => {
+    mockPdfToExtractionImages.mockResolvedValue({ files: [], truncated: false });
+
+    const res = await extractEventFromDocument(pdfFile(), {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+    });
+
+    expect(res.errorCode).toBe('compression');
+    expect(mockManagedExtract).not.toHaveBeenCalled();
+  });
+
+  it('PDF rasterization failure → compression error (never leaks a raw throw)', async () => {
+    mockPdfToExtractionImages.mockRejectedValue(new Error('corrupt or password-protected'));
+
+    const res = await extractEventFromDocument(pdfFile(), {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.errorCode).toBe('compression');
+    expect(mockManagedExtract).not.toHaveBeenCalled();
   });
 
   it('byok tier: constructs the BYOK provider from the supplied config', async () => {

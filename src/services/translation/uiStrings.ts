@@ -6941,6 +6941,13 @@ const STRING_DEFS = {
     en: "We couldn't spot any travel details in that document. You can add the trip manually.",
     beanie: "we couldn't spot any travel details in that document. you can add the trip manually.",
   },
+  // Shown when a long PDF is read: only its first pages are sent to the reader. Number-free
+  // on purpose (so the copy never drifts from MAX_EXTRACT_PAGES).
+  'ai.pdfTruncated.title': { en: 'Long Document', beanie: 'long document' },
+  'ai.pdfTruncated.message': {
+    en: 'We read the first few pages of this PDF. The full document is still attached.',
+    beanie: 'we read the first few pages of this pdf. the full document is still attached.',
+  },
   // ── "beanies can do magic" AI entry points — shared magic-reader language ──
   'ai.magic.title': { en: 'Magic beans', beanie: 'magic beans' },
   'ai.magic.subtitle': {

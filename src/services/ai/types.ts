@@ -22,13 +22,17 @@ export type { AiTier } from '@/types/models';
 export type AiProviderId = 'tinfoil' | 'openai' | 'claude' | 'gemini' | 'on-device';
 
 /**
- * A single document to extract from. Data-minimization: this is ONE already-
- * compressed document image — never the family dataset. The image is a base64
- * `data:` URL so it travels as a self-contained payload.
+ * A single document to extract from. Data-minimization: this is one document's
+ * already-compressed page image(s) — never the family dataset. Each image is a
+ * base64 `data:` URL so the request travels as a self-contained payload.
  */
 export interface ExtractionRequest {
-  /** `data:image/jpeg;base64,…` of the single, client-compressed document. */
-  imageDataUrl: string;
+  /**
+   * `data:image/jpeg;base64,…` for each client-compressed page of ONE document, in
+   * page order. Always ≥1 (a photo is the single-element case; a PDF contributes up
+   * to `MAX_EXTRACT_PAGES`). The model reads them as one document → one merged result.
+   */
+  imageDataUrls: string[];
   /** Current date `YYYY-MM-DD`, so the model can resolve relative/partial dates. */
   todayIso: string;
   /** Optional cancel signal so the UI can abort a slow extraction. */
@@ -162,11 +166,18 @@ export interface DocumentExtractionResult<T = ExtractionResult> {
   error?: string;
   /**
    * The client-compressed document image (#133) — present on success so the caller can
-   * attach the source photo to the created activity without re-compressing. Envelope-level
-   * metadata ONLY; never folded into `data` (the model output stays pure text — interface
-   * purity invariant above). Always a JPEG, so its mime is on `Blob.type`.
+   * attach the source photo to the created activity without re-compressing. For a
+   * multi-page PDF this is PAGE 1's compressed image (the representative thumbnail).
+   * Envelope-level metadata ONLY; never folded into `data` (the model output stays pure
+   * text — interface purity invariant above). Always a JPEG, so its mime is on `Blob.type`.
    */
   compressedBlob?: Blob;
+  /**
+   * True when the source PDF had more pages than `MAX_EXTRACT_PAGES` and only the first
+   * pages were read. Envelope metadata so the caller can surface a "read the first pages"
+   * notice; the full original file is still attached to the item.
+   */
+  truncated?: boolean;
 }
 
 /**
