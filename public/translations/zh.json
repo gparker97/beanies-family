@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-07-01",
-    "translationCount": 3638
+    "translationCount": 3636
   },
   "translations": {
     "app.name": {
@@ -15,11 +15,6 @@
       "translation": "每一颗豆子都很重要",
       "hash": "13n1gv",
       "lastUpdated": "2026-02-24"
-    },
-    "app.version": {
-      "translation": "v1.0.0 - MVP",
-      "hash": "w23ll9",
-      "lastUpdated": "2026-02-10"
     },
     "common.totalAssets": {
       "translation": "资产总计",
@@ -1150,11 +1145,6 @@
       "translation": "beanies.family",
       "hash": "1i3nyj",
       "lastUpdated": "2026-02-24"
-    },
-    "settings.version": {
-      "translation": "1.0.0版（ MVP ）",
-      "hash": "9fpvx3",
-      "lastUpdated": "2026-03-03"
     },
     "settings.appDescription": {
       "translation": "一个安全、注重隐私的家庭财务和规划应用程序。",
