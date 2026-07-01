@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-01
+
+### Fixed
+
+- **Reading a photo or document with AI works again.** The "magic beans" reader (scan a flyer, invitation, or itinerary to fill in an activity or trip) had started failing because our privacy-preserving AI provider retired the vision model it was using. Switched to their current model, so photo and document reading is back to normal — nothing changes about how you use it.
+
 ## 2026-06-30
 
 ### Changed
