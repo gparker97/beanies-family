@@ -21,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - **beanstalk (the blog) intro tightened.** The hero line now reads "not written by AI." — dropped the trailing "usually" and gave the "not" a bit more emphasis.
+- **The app now shows its real version and build.** The sidebar shows a proper product version (v0.9.0) and the Settings screen shows the version plus the exact build and date, instead of the old fixed "v1.0.0 MVP" that never changed. Handy if you ever need to tell us which build you're on.
 
 ## 2026-06-30
 
