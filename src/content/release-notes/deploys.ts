@@ -17,6 +17,40 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.01',
+    date: '2026-07-01',
+    month: '1 july 2026',
+    spotlight: true,
+    summary: {
+      en: 'Scanning a PDF invite or itinerary now reads past the first page.',
+      beanie: 'scanning a pdf invite or itinerary now reads past the first page.',
+    },
+    features: [
+      {
+        icon: '📄',
+        title: { en: 'Multi-page PDFs', beanie: 'multi-page pdfs' },
+        description: {
+          en: "When you scan a PDF invitation or travel itinerary with magic beans, beanies now reads its first several pages instead of just page one - so a return flight, a second day's schedule, or the RSVP on the back gets picked up too. The full document is still saved alongside whatever it creates.",
+          beanie:
+            "when you scan a pdf invitation or travel itinerary with magic beans, beanies now reads its first several pages instead of just page one - so a return flight, a second day's schedule, or the rsvp on the back gets picked up too. the full document is still saved alongside whatever it creates.",
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.06.28',
     date: '2026-06-28',
     month: '28 june 2026',
