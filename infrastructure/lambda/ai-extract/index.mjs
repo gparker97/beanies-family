@@ -25,16 +25,25 @@ const API_KEY = process.env.AI_EXTRACT_API_KEY;
 const TINFOIL_API_BASE = (
   process.env.TINFOIL_API_BASE || 'https://inference.tinfoil.sh/v1'
 ).replace(/\/+$/, '');
-const TINFOIL_MODEL = process.env.TINFOIL_MODEL || 'qwen3-vl-30b';
+// Prod sets TINFOIL_MODEL via Terraform (default gemma4-31b). This fallback must stay a
+// CURRENT multimodal model — the old qwen3-vl-30b was retired by Tinfoil (every call 503'd).
+const TINFOIL_MODEL = process.env.TINFOIL_MODEL || 'gemma4-31b';
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'https://beanies.family')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
 
-// Base64 image data-URL: ~1.33× the compressed bytes. A 2048px/q0.85 JPEG is routinely
-// 270 KB–1.3 MB → cap at ~2 MB, comfortably under the API GW 10 MB / Lambda 6 MB ceilings.
-const MAX_BODY_BYTES = 2 * 1024 * 1024;
-// Allowed document mime prefixes (single image only — data-minimization).
+// Body cap. A multi-page PDF sends up to `MAX_EXTRACT_PAGES` (client) images; base64 is
+// ~1.33× the compressed bytes, so a realistic request is ~1.5–2.5 MB. Set to 5 MB — this is a
+// classified-413 BACKSTOP that must sit BELOW the ~6 MB Lambda synchronous-invocation ceiling:
+// at exactly 6 MB the platform rejects the invoke before this handler runs and the client gets
+// an opaque error instead of our clean 413. Do NOT raise to 6 MB or above.
+const MAX_BODY_BYTES = 5 * 1024 * 1024;
+// Server-side page-count backstop. Intentionally LOOSER than the client's MAX_EXTRACT_PAGES (5):
+// this only guards against a malformed/hostile request, it is not the product cap. Do not
+// "reconcile" the two to match.
+const MAX_IMAGES = 8;
+// Allowed document mime prefixes (JPEG/PNG only — data-minimization).
 const ALLOWED_DATA_URL = /^data:image\/(jpeg|png);base64,/;
 // Upstream call deadline (Lambda timeout is 29s; leave headroom to return a clean error).
 const UPSTREAM_TIMEOUT_MS = 25_000;
@@ -95,7 +104,7 @@ export async function handler(event) {
     return response(400, { error: 'Malformed JSON body' }, event);
   }
 
-  const { imageDataUrl, todayIso, task: rawTask } = parsed || {};
+  const { imageDataUrls, imageDataUrl, todayIso, task: rawTask } = parsed || {};
   // Task selects the prompt + required-keys. Default to 'event' so older clients (which
   // send no task) keep the original #133 behavior byte-for-byte. Reject an unknown task.
   const task = rawTask === undefined ? 'event' : rawTask;
@@ -103,10 +112,22 @@ export async function handler(event) {
   if (!taskConfig) {
     return response(400, { error: `Unknown task: ${String(task)}` }, event);
   }
-  // Validate exactly one image of an allowed type within the cap BEFORE the billable upstream
-  // call (cheap belt-and-braces against a malformed/oversized request burning a request).
-  if (typeof imageDataUrl !== 'string' || !ALLOWED_DATA_URL.test(imageDataUrl)) {
-    return response(400, { error: 'Expected a single JPEG/PNG image data URL' }, event);
+  // Dual-accept: new clients send `imageDataUrls` (array, one per page); older cached clients
+  // send a single `imageDataUrl` string — normalize both to an array so one code path handles
+  // it. Validate BEFORE the billable upstream call (cheap belt-and-braces vs a malformed request).
+  const images = Array.isArray(imageDataUrls)
+    ? imageDataUrls
+    : typeof imageDataUrl === 'string'
+      ? [imageDataUrl]
+      : null;
+  if (!images || images.length === 0) {
+    return response(400, { error: 'Expected one or more JPEG/PNG image data URLs' }, event);
+  }
+  if (images.length > MAX_IMAGES) {
+    return response(400, { error: `Too many images (max ${MAX_IMAGES})` }, event);
+  }
+  if (!images.every((u) => typeof u === 'string' && ALLOWED_DATA_URL.test(u))) {
+    return response(400, { error: 'Expected JPEG/PNG image data URL(s)' }, event);
   }
   // Accept a date-only string (YYYY-MM-DD) or a full ISO timestamp; normalize to the
   // date part for the prompt so either client format works.
@@ -126,7 +147,7 @@ export async function handler(event) {
         },
         body: JSON.stringify({
           model: TINFOIL_MODEL,
-          messages: taskConfig.buildMessages(imageDataUrl, todayDate),
+          messages: taskConfig.buildMessages(images, todayDate),
           temperature: 0,
         }),
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),

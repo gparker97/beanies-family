@@ -60,7 +60,7 @@ function fakeUpstream({
   ok = true,
   status = 200,
   content = JSON.stringify(VALID_EXTRACTION),
-  enclave = 'qwen3-vl-30b.inf10.tinfoil.sh',
+  enclave = 'gemma4-31b.inf10.tinfoil.sh',
   json = true,
 } = {}) {
   return {
@@ -165,12 +165,61 @@ describe('ai-extract Lambda handler', () => {
       assert.equal(res.statusCode, 200);
     });
 
-    it('returns 413 on an oversized body', async () => {
-      const huge = 'data:image/jpeg;base64,' + 'A'.repeat(2 * 1024 * 1024 + 10);
+    it('returns our clean 413 on a body over the 5 MB guard (below the 6 MB platform ceiling)', async () => {
+      const huge = 'data:image/jpeg;base64,' + 'A'.repeat(5 * 1024 * 1024 + 10);
       const res = await handler(
         makeEvent({ headers: keyHeader, body: { imageDataUrl: huge, todayIso: '2026-06-03' } })
       );
       assert.equal(res.statusCode, 413);
+    });
+  });
+
+  describe('multi-image (multi-page PDF) requests', () => {
+    it('accepts an imageDataUrls array and returns 200', async () => {
+      const res = parseResponse(
+        await handler(
+          makeEvent({
+            headers: keyHeader,
+            body: { imageDataUrls: [IMAGE, IMAGE, IMAGE], todayIso: '2026-06-03' },
+          })
+        )
+      );
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.parsedBody.result.title, "Mia's Party");
+    });
+
+    it('still accepts a legacy single imageDataUrl (old cached clients)', async () => {
+      const res = await handler(
+        makeEvent({ headers: keyHeader, body: { imageDataUrl: IMAGE, todayIso: '2026-06-03' } })
+      );
+      assert.equal(res.statusCode, 200);
+    });
+
+    it('returns 400 on an empty imageDataUrls array', async () => {
+      const res = await handler(
+        makeEvent({ headers: keyHeader, body: { imageDataUrls: [], todayIso: '2026-06-03' } })
+      );
+      assert.equal(res.statusCode, 400);
+    });
+
+    it('returns 400 when the array exceeds the server MAX_IMAGES backstop (8)', async () => {
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: { imageDataUrls: Array(9).fill(IMAGE), todayIso: '2026-06-03' },
+        })
+      );
+      assert.equal(res.statusCode, 400);
+    });
+
+    it('returns 400 when any array element is not an allowed image data URL', async () => {
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: { imageDataUrls: [IMAGE, 'https://x/y.gif'], todayIso: '2026-06-03' },
+        })
+      );
+      assert.equal(res.statusCode, 400);
     });
   });
 
@@ -179,7 +228,7 @@ describe('ai-extract Lambda handler', () => {
       const res = parseResponse(await handler(makeEvent({ headers: keyHeader, body: goodBody })));
       assert.equal(res.statusCode, 200);
       assert.equal(res.parsedBody.result.title, "Mia's Party");
-      assert.equal(res.parsedBody.attestation.enclave, 'qwen3-vl-30b.inf10.tinfoil.sh');
+      assert.equal(res.parsedBody.attestation.enclave, 'gemma4-31b.inf10.tinfoil.sh');
     });
 
     it('strips markdown fences around the model JSON', async () => {

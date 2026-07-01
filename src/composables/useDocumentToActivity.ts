@@ -15,7 +15,6 @@ import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
 import { useExtractionErrorToast } from './useExtractionErrorToast';
 import { extractEventFromDocument } from '@/services/ai/documentExtractionService';
-import { isPdfFile, pdfFirstPageToImage } from '@/utils/pdfFirstPageToImage';
 import type { FieldConfidence } from '@/services/ai/types';
 import { extractionToActivityPrefill } from '@/utils/extractionToActivity';
 import { toDateInputValue } from '@/utils/date';
@@ -55,23 +54,10 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
 
     isProcessing.value = true;
     try {
-      // PDFs are rasterized (page 1) to an image for the image-only extraction
-      // proxy — the same client-side step the travel reader uses, so the prompt
-      // and Lambda are unchanged (they always receive an image). A rasterization
-      // failure surfaces via the shared reporter (compression bucket), never
-      // silently swallowed.
-      let extractFile = file;
-      if (isPdfFile(file)) {
-        try {
-          extractFile = await pdfFirstPageToImage(file);
-        } catch (err) {
-          console.error('[photo-extract] PDF rasterization failed:', err);
-          reportExtractionFailure('compression');
-          return;
-        }
-      }
-
-      const result = await extractEventFromDocument(extractFile, {
+      // The service owns document preparation: a PDF is rasterized to its first pages
+      // (up to MAX_EXTRACT_PAGES) and a photo is used as-is, then each page is compressed.
+      // Preparation failures come back classified as `compression`, never silent.
+      const result = await extractEventFromDocument(file, {
         // Local YYYY-MM-DD (not a full ISO timestamp) so the model resolves relative dates
         // against the user's calendar date, and the proxy's date validation passes.
         tier: tier.value,
@@ -80,6 +66,11 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
       });
 
       if (result.success && result.data) {
+        // Loud-but-non-blocking notice FIRST, so a >cap PDF whose recognisable content sat
+        // on a dropped page still tells the user pages weren't read (never silent).
+        if (result.truncated) {
+          showToast('info', t('ai.pdfTruncated.title'), t('ai.pdfTruncated.message'));
+        }
         if (!result.data.isEvent) {
           // Not recognised as an event — still open the form so nothing is silently dropped.
           showToast('info', t('ai.notEvent.title'), t('ai.notEvent.message'));

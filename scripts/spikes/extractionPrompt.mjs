@@ -6,7 +6,7 @@
 // extractionPrompt.mjs` (server/managed), keep the two copies drift-pinned by a unit test that asserts
 // PROMPT_VERSION + the schema shape match. Bump PROMPT_VERSION on any change so drift is detectable.
 
-export const PROMPT_VERSION = '2026-06-14.1';
+export const PROMPT_VERSION = '2026-07-01.1';
 
 // The activity-category taxonomy rendered for the model to pick `category` from.
 // HARDCODED and byte-identical across all three prompt copies (drift guard) — the .mjs copies
@@ -55,16 +55,17 @@ export const EXTRACTION_JSON_SHAPE = {
 
 /**
  * Build the system+user message array for an OpenAI-compatible vision chat call.
- * @param {string} imageDataUrl  data: URL of the (already compressed) image.
+ * @param {string[]} imageDataUrls  data: URL(s) of the (already compressed) page image(s),
+ *   in page order — one for a photo, up to MAX_EXTRACT_PAGES for a PDF (all of one document).
  * @param {string} todayIso      current date YYYY-MM-DD, for resolving relative dates.
  */
-export function buildExtractionMessages(imageDataUrl, todayIso) {
+export function buildExtractionMessages(imageDataUrls, todayIso) {
   const system = [
-    'You extract structured calendar-event details from a single image of an invitation, school notice, or activity flyer.',
+    'You extract structured calendar-event details from one or more images — the pages of a single invitation, school notice, or activity flyer, in page order.',
     'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
     `Today's date is ${todayIso}. Resolve any relative or partial dates against it. Output dates as YYYY-MM-DD and times as 24-hour HH:mm.`,
-    'If a field is not present in the image, return an empty string for it (do not invent values). Set isEvent=false if the image is not an event/invitation.',
-    'Never output any value that is not actually supported by the image. It is better to leave a field empty than to hallucinate.',
+    'If a field is not present in the images, return an empty string for it (do not invent values). Set isEvent=false if the images are not an event/invitation.',
+    'Never output any value that is not actually supported by the images. It is better to leave a field empty than to hallucinate.',
     'For "description", write each distinct fact on its own line (one per line), never a single run-on paragraph.',
     'For "category", choose the single best-matching id from this list (one line per group, shown as id (Name)); use "" if none fits well, and prefer an "other_*" id in the right group over a wrong specific id:\n' +
       CATEGORY_OPTIONS_TEXT,
@@ -81,9 +82,9 @@ export function buildExtractionMessages(imageDataUrl, todayIso) {
       content: [
         {
           type: 'text',
-          text: 'Extract the event details from this image as the specified JSON object.',
+          text: 'Extract the event details from these page image(s) as the specified JSON object.',
         },
-        { type: 'image_url', image_url: { url: imageDataUrl } },
+        ...imageDataUrls.map((url) => ({ type: 'image_url', image_url: { url } })),
       ],
     },
   ];
@@ -137,12 +138,13 @@ export const TRAVEL_JSON_SHAPE = {
 
 /**
  * Build the system+user message array for the TRAVEL extraction task.
- * @param {string} imageDataUrl  data: URL of the (already compressed/rasterized) image.
+ * @param {string[]} imageDataUrls  data: URL(s) of the (already compressed/rasterized) page
+ *   image(s), in page order — one for a photo, up to MAX_EXTRACT_PAGES for a PDF (one document).
  * @param {string} todayIso      current date YYYY-MM-DD, for resolving relative dates.
  */
-export function buildTravelExtractionMessages(imageDataUrl, todayIso) {
+export function buildTravelExtractionMessages(imageDataUrls, todayIso) {
   const system = [
-    'You extract structured travel-booking details from a single image of a flight, hotel, cruise, train, ferry, or car-rental booking, ticket, or itinerary.',
+    'You extract structured travel-booking details from one or more images — the pages of a single flight, hotel, cruise, train, ferry, or car-rental booking, ticket, or itinerary, in page order.',
     'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
     `Today's date is ${todayIso}. Resolve any relative or partial dates against it. Output dates as YYYY-MM-DD and times as 24-hour HH:mm.`,
     'A single document may contain SEVERAL bookings (e.g. an outbound and a return flight, or a flight plus a hotel). Return one object in "segments" for each distinct booking. A round-trip flight is two segments.',
@@ -164,9 +166,9 @@ export function buildTravelExtractionMessages(imageDataUrl, todayIso) {
       content: [
         {
           type: 'text',
-          text: 'Extract the travel booking(s) from this document as the specified JSON object.',
+          text: 'Extract the travel booking(s) from these page image(s) as the specified JSON object.',
         },
-        { type: 'image_url', image_url: { url: imageDataUrl } },
+        ...imageDataUrls.map((url) => ({ type: 'image_url', image_url: { url } })),
       ],
     },
   ];

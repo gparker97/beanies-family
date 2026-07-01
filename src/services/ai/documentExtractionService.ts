@@ -17,6 +17,7 @@ import {
   type CompressOptions,
 } from '@/services/photos/photoCompression';
 import { assertNever } from '@/utils/assertNever';
+import { isPdfFile, pdfToExtractionImages } from '@/utils/pdfExtractionImages';
 import { createByokProvider, type ByokConfig } from './providers/byokProvider';
 import { managedProvider } from './providers/managedProvider';
 import { onDeviceProvider } from './providers/onDeviceProvider';
@@ -32,9 +33,10 @@ import {
 } from './types';
 
 /**
- * Compression defaults sized for the managed proxy body cap. The base64 data-URL is
- * ~1.33× the compressed bytes; 2048px / q0.85 keeps a typical document comfortably
- * under the ~2 MB proxy limit while staying readable for OCR.
+ * Per-page compression defaults. The base64 data-URL is ~1.33× the compressed bytes;
+ * 2048px / q0.85 keeps each page small while staying readable for OCR. PDF pages are
+ * already rendered at 1600px (≤ this cap, so no upscale), and the page count is bounded
+ * by `MAX_EXTRACT_PAGES`, keeping the whole request under the Lambda body cap.
  */
 const DEFAULT_COMPRESSION: CompressOptions = { maxDimension: 2048, quality: 0.85 };
 
@@ -82,6 +84,55 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+interface PreparedImages {
+  /** One compressed `data:` URL per page, in page order (always ≥1). */
+  imageDataUrls: string[];
+  /** Page 1's compressed blob — the representative source thumbnail for the caller. */
+  compressedBlob: Blob;
+  /** True when a PDF had more pages than `MAX_EXTRACT_PAGES` (extra pages dropped). */
+  truncated: boolean;
+}
+
+/**
+ * Resolve the input `File` into one-or-more client-compressed page images.
+ * - PDF → rasterize up to `MAX_EXTRACT_PAGES` pages (`pdfToExtractionImages`), then compress each.
+ * - Any other image → the single-image case (`truncated: false`).
+ *
+ * Compresses sequentially: canvas work is main-thread, so sequential bounds peak memory
+ * and is simpler than `Promise.all`. Throws `CompressionError` on any failure so the single
+ * catch in `runExtraction` classifies it as `'compression'`. Returns page 1's compressed blob
+ * as the representative thumbnail.
+ */
+async function prepareImageDataUrls(
+  file: File,
+  compression: CompressOptions
+): Promise<PreparedImages> {
+  let sourceFiles: File[];
+  let truncated: boolean;
+  if (isPdfFile(file)) {
+    const rasterized = await pdfToExtractionImages(file);
+    sourceFiles = rasterized.files;
+    truncated = rasterized.truncated;
+  } else {
+    sourceFiles = [file];
+    truncated = false;
+  }
+  // Defensive: an empty / unrenderable PDF would otherwise leave nothing to send.
+  if (sourceFiles.length === 0) {
+    throw new CompressionError('Document produced no readable pages');
+  }
+
+  const imageDataUrls: string[] = [];
+  let compressedBlob: Blob | undefined;
+  for (const src of sourceFiles) {
+    const compressed = await compress(src, compression);
+    compressedBlob ??= compressed.blob; // page 1 → source thumbnail
+    imageDataUrls.push(await blobToDataUrl(compressed.blob));
+  }
+  // compressedBlob is defined: the length guard above guarantees ≥1 iteration.
+  return { imageDataUrls, compressedBlob: compressedBlob as Blob, truncated };
+}
+
 /**
  * Shared funnel for every extraction task (DRY): client-side compression → tier dispatch →
  * the task-specific provider call → typed result. Always resolves (never rejects) with a
@@ -93,20 +144,25 @@ async function runExtraction<T>(
   task: ExtractionTask,
   run: (provider: ExtractionProvider, request: ExtractionRequest) => Promise<T>
 ): Promise<DocumentExtractionResult<T>> {
-  // 1) Compress client-side (also down-scales for the proxy cap + faster upload).
-  // Keep the compressed blob in function scope so a successful result can hand it back
-  // for attaching to the created entity — avoids a second compression pass.
-  let imageDataUrl: string;
-  let compressedBlob: Blob;
+  // 1) Resolve the document into its page image(s) and compress each client-side (a PDF
+  //    rasterizes up to MAX_EXTRACT_PAGES pages; a photo is the single-image case). Keep
+  //    page 1's compressed blob so a successful result can hand it back as the source
+  //    thumbnail without a second compression pass, and carry `truncated` through.
+  let prepared: PreparedImages;
   try {
-    const compressed = await compress(file, opts.compression ?? DEFAULT_COMPRESSION);
-    compressedBlob = compressed.blob;
-    imageDataUrl = await blobToDataUrl(compressed.blob);
+    prepared = await prepareImageDataUrls(file, opts.compression ?? DEFAULT_COMPRESSION);
   } catch (err) {
-    if (err instanceof CompressionError) {
-      return { success: false, errorCode: 'compression', error: err.message };
-    }
-    return { success: false, errorCode: 'compression', error: 'Failed to prepare image' };
+    // Rasterize + compress live here now, so their dev-guidance log lives here too.
+    console.error(
+      '[ai-extract] failed to prepare document "%s" for extraction — a corrupt or ' +
+        'password-protected PDF, a browser-undecodable image (e.g. HEIC on Chromium), or ' +
+        'an out-of-memory canvas render can cause this. Reported to the user as a ' +
+        'compression error.',
+      file.name,
+      err
+    );
+    const detail = err instanceof CompressionError ? err.message : 'Failed to prepare image';
+    return { success: false, errorCode: 'compression', error: detail };
   }
 
   // 2) Dispatch to the selected tier's provider.
@@ -122,14 +178,19 @@ async function runExtraction<T>(
 
   // 3) Run extraction; classify any failure.
   const request: ExtractionRequest = {
-    imageDataUrl,
+    imageDataUrls: prepared.imageDataUrls,
     todayIso: opts.todayIso,
     signal: opts.signal,
     task,
   };
   try {
     const data = await run(provider, request);
-    return { success: true, data, compressedBlob };
+    return {
+      success: true,
+      data,
+      compressedBlob: prepared.compressedBlob,
+      truncated: prepared.truncated,
+    };
   } catch (err) {
     if (err instanceof ExtractionProviderError) {
       return { success: false, errorCode: err.code, error: err.message };

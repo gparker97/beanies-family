@@ -55,9 +55,9 @@ async function postToProxy(
     );
   }
 
-  // GATE 3 TODO: replace this plaintext-body POST with EHBP — encrypt `imageDataUrl`
+  // GATE 3 TODO: replace this plaintext-body POST with EHBP — encrypt `imageDataUrls`
   // to the attested enclave's HPKE key (via the Tinfoil verification SDK) so the proxy
-  // forwards ciphertext only. The proxy contract (single document → typed JSON) is unchanged.
+  // forwards ciphertext only. The proxy contract (one document → typed JSON) is unchanged.
   let res: Response;
   try {
     res = await fetch(PROXY_URL, {
@@ -67,7 +67,7 @@ async function postToProxy(
         ...(PROXY_API_KEY ? { 'x-api-key': PROXY_API_KEY } : {}),
       },
       body: JSON.stringify({
-        imageDataUrl: request.imageDataUrl,
+        imageDataUrls: request.imageDataUrls,
         todayIso: request.todayIso,
         task,
       }),

@@ -12,7 +12,8 @@ import * as spike from '../../../../scripts/spikes/extractionPrompt.mjs';
 // @ts-expect-error — Lambda source is plain JS with no .d.ts; imported for runtime comparison only.
 import * as server from '../../../../infrastructure/lambda/ai-extract/extractionPrompt.mjs';
 
-const imageDataUrl = 'data:image/jpeg;base64,AAAA';
+// Two pages so the drift guard also covers the multi-image spread (one image_url part per url).
+const imageDataUrls = ['data:image/jpeg;base64,AAAA', 'data:image/jpeg;base64,BBBB'];
 const todayIso = '2026-06-03';
 
 describe('extraction prompt drift guard (client vs spike vs server)', () => {
@@ -35,7 +36,7 @@ describe('extraction prompt drift guard (client vs spike vs server)', () => {
   // for every task in the registry. Adding a task automatically extends this guard.
   type TaskEntry = {
     requiredKeys: readonly string[];
-    buildMessages: (imageDataUrl: string, todayIso: string) => unknown;
+    buildMessages: (imageDataUrls: string[], todayIso: string) => unknown;
   };
   const tasks = (registry: Record<string, unknown>, task: string) => registry[task] as TaskEntry;
 
@@ -47,9 +48,9 @@ describe('extraction prompt drift guard (client vs spike vs server)', () => {
       expect([...c.requiredKeys]).toEqual([...s.requiredKeys]);
       expect([...v.requiredKeys]).toEqual([...s.requiredKeys]);
 
-      const expected = s.buildMessages(imageDataUrl, todayIso);
-      expect(c.buildMessages(imageDataUrl, todayIso)).toEqual(expected);
-      expect(v.buildMessages(imageDataUrl, todayIso)).toEqual(expected);
+      const expected = s.buildMessages(imageDataUrls, todayIso);
+      expect(c.buildMessages(imageDataUrls, todayIso)).toEqual(expected);
+      expect(v.buildMessages(imageDataUrls, todayIso)).toEqual(expected);
     });
   }
 });
