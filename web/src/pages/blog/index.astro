@@ -82,7 +82,7 @@ const latestDate = byDateDesc[0]?.data.date;
         <p class="masthead-pitch">
           a newsletter about <span class="masthead-pitch-brand">beanies.family</span>,
           vibe coding, or just life in general. published every friday, or roughly whenever
-          I feel like it. not written by AI. usually.
+          I feel like it. <span class="masthead-pitch-em">not</span> written by AI.
         </p>
         <p class="masthead-issue">
           <span class="masthead-issue-chip">VOL. 01</span>
@@ -432,6 +432,10 @@ const latestDate = byDateDesc[0]?.data.date;
   }
   .masthead-pitch-brand {
     color: var(--heritage-orange);
+  }
+  .masthead-pitch-em {
+    color: rgb(44 62 80);
+    font-weight: 700;
   }
   .masthead-issue {
     align-items: center;
