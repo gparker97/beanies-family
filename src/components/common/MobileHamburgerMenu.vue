@@ -10,6 +10,7 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
+import { getProductVersionLabel } from '@/utils/diagnosticContext';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES } from '@/constants/languages';
 import {
@@ -37,6 +38,8 @@ const emit = defineEmits<{ close: [] }>();
 const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
+/** Friendly product version (e.g. "v0.9"); bumped per release in constants/appVersion.ts. */
+const productVersionLabel = getProductVersionLabel();
 const authStore = useAuthStore();
 const familyStore = useFamilyStore();
 const goalsStore = useGoalsStore();
@@ -523,7 +526,7 @@ const encryptionLabel = computed(() => {
               </div>
 
               <!-- Version -->
-              <p class="text-xs text-white/20">{{ t('app.version') }}</p>
+              <p class="text-xs text-white/20">{{ productVersionLabel }}</p>
             </div>
           </div>
         </Transition>

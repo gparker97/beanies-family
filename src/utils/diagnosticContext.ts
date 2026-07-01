@@ -9,6 +9,7 @@
  *
  * Dependency direction is one-way: errorReporter and telemetry import FROM
  * here; this module imports nothing from either, so there is no import cycle.
+ * (The `APP_VERSION` constant it reads imports nothing, so no cycle there either.)
  *
  * Privacy contract:
  *   - Strict allowlist for context fields (NOT a blocklist). Email is the only
@@ -26,6 +27,7 @@
  * here, mirror it there.
  */
 
+import { APP_VERSION } from '@/constants/appVersion';
 import { getDeviceInfo, tail } from '@/utils/diagnostics';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
@@ -224,6 +226,20 @@ export function getBuildVersionLabel(): string {
     }
   }
   return shortSha;
+}
+
+/** The human-facing product version, e.g. `v0.9`. Sidebar / menu label. */
+export function getProductVersionLabel(): string {
+  return `v${APP_VERSION}`;
+}
+
+/**
+ * Product version + build marker, e.g. `v0.9 · 41f5353 · 19 Jun 2026`. Shown in the
+ * Settings "about" footer so a running, signed-in build is fully identifiable (the
+ * WelcomeGate is only visible pre-login).
+ */
+export function getFullVersionLabel(): string {
+  return `${getProductVersionLabel()} · ${getBuildVersionLabel()}`;
 }
 
 // ─── Stack extraction ────────────────────────────────────────────────────────
