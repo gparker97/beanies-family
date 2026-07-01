@@ -35,7 +35,6 @@ const STRING_DEFS = {
   // The single word in `app.tagline` rendered with the brand gradient on the
   // welcome page. Kept separate so the i18n value stays plain text.
   'app.taglineAccent': { en: 'bean' },
-  'app.version': { en: 'v1.0.0 - MVP' },
 
   // Global search
   // Blog
@@ -2200,7 +2199,6 @@ const STRING_DEFS = {
   },
   'settings.about': { en: 'About', beanie: 'about' },
   'settings.appName': { en: 'beanies.family', beanie: 'beanies.family' },
-  'settings.version': { en: 'Version 1.0.0 (MVP)', beanie: 'version 1.0.0 (mvp)' },
   'settings.noRatesWarning': {
     en: 'Exchange rates have not been loaded yet. Currency conversions will not work correctly without them.',
     beanie:

@@ -22,8 +22,11 @@ import {
   normalizeMessage,
   enrichAndRedact,
   getBuildVersionLabel,
+  getProductVersionLabel,
+  getFullVersionLabel,
   breadcrumbsForReport,
 } from '../diagnosticContext';
+import { APP_VERSION } from '@/constants/appVersion';
 
 describe('diagnosticContext', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
@@ -60,6 +63,21 @@ describe('diagnosticContext', () => {
       vi.stubEnv('VITE_BUILD_SHA', 'dev');
       vi.stubEnv('VITE_BUILD_TIME', '');
       expect(getBuildVersionLabel()).toBe('dev');
+    });
+  });
+
+  describe('product version labels (sidebar + settings)', () => {
+    it('getProductVersionLabel is the friendly "v<APP_VERSION>" (sidebar)', () => {
+      expect(getProductVersionLabel()).toBe(`v${APP_VERSION}`);
+    });
+
+    it('getFullVersionLabel combines product version + build marker (settings)', () => {
+      vi.stubEnv('VITE_BUILD_SHA', '41f5353fdeadbeef');
+      vi.stubEnv('VITE_BUILD_TIME', '2026-06-19T09:33:00Z');
+      const label = getFullVersionLabel();
+      expect(label).toBe(`v${APP_VERSION} · 41f5353 · 19 Jun 2026`);
+      // product version leads, build marker follows — the two answer different questions.
+      expect(label.startsWith(`v${APP_VERSION} · `)).toBe(true);
     });
   });
 

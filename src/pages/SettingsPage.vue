@@ -24,6 +24,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 
 import { useRoute, useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
+import { getFullVersionLabel } from '@/utils/diagnosticContext';
 import { alert as showAlert, confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
 import type { StorageProviderType } from '@/services/sync/storageProvider';
@@ -65,6 +66,8 @@ const beanTips = useBeanTips();
 const familyStore = useFamilyStore();
 const holidayStore = useHolidayStore();
 const { t } = useTranslation();
+/** Product version + build marker (e.g. "v0.9 · 41f5353 · 19 Jun 2026") for the about footer. */
+const fullVersionLabel = getFullVersionLabel();
 const deploymentBadge = computed(() => getDeploymentBadge());
 const { canInstall, isInstalled, installApp } = usePWA();
 const { canManagePod, isOwner } = usePermissions();
@@ -802,7 +805,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       <p>
         <span class="opacity-60">🫘</span>
         <strong class="text-slate-500 dark:text-slate-400">{{ t('settings.appName') }}</strong>
-        · {{ t('settings.version') }}
+        · {{ fullVersionLabel }}
       </p>
       <p class="mt-1"><span class="opacity-60">🔒</span> {{ t('settings.privacyNote') }}</p>
       <p class="mt-1">

@@ -10,6 +10,7 @@ import { useMemberAvatar } from '@/composables/useMemberAvatar';
 import { useNavBadges, type NavBadge as NavBadgeType } from '@/composables/useNavBadges';
 import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useTranslation } from '@/composables/useTranslation';
+import { getProductVersionLabel } from '@/utils/diagnosticContext';
 import { isRouteActive } from '@/utils/route';
 import { openExternal } from '@/utils/openExternal';
 import {
@@ -28,6 +29,8 @@ import { useSyncStore } from '@/stores/syncStore';
 const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
+/** Friendly product version (e.g. "v0.9"); bumped per release in constants/appVersion.ts. */
+const productVersionLabel = getProductVersionLabel();
 const familyStore = useFamilyStore();
 const syncStore = useSyncStore();
 const { isOpen, toggle, isItemExpanded, toggleItem } = useSidebarAccordion();
@@ -326,7 +329,7 @@ function subItemsOf(item: MappedNavItem): NavSubItemDef[] {
       </div>
 
       <!-- Version -->
-      <p class="text-xs text-white/20">{{ t('app.version') }}</p>
+      <p class="text-xs text-white/20">{{ productVersionLabel }}</p>
     </div>
   </aside>
 </template>
