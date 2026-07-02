@@ -9,3 +9,6 @@ node_modules/
 .env
 .env.local
 .env.*.local
+
+# Lighthouse CI local runs
+.lighthouseci/

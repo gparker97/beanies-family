@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-02
+
+### Changed
+
+- **Newsletter sign-up on the blog is now a simple, private form.** The "follow me on substack" box on the blog used to embed Substack's own widget, which set third-party tracking cookies and slowed the page down. It's now a plain email box that sends your address straight to Substack when you subscribe — same result, but nothing loads (and no cookie is set) unless you actually sign up.
+- **Routine dependency maintenance.** Updated the blog/marketing-site build tooling (Astro, the OG share-image generator, Tailwind) to their latest releases. No change to how the app looks or works.
+
 ## 2026-07-01
 
 ### Added

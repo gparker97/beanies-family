@@ -1,7 +1,15 @@
 ---
 /**
- * Substack newsletter subscribe strip. Embeds the everybeancounts.substack.com
- * subscribe iframe inside a gradient card matching the Vue blog version 1:1.
+ * Substack newsletter subscribe strip. Renders a cookieless native form that
+ * posts the email straight to Substack's free-subscribe endpoint — no embedded
+ * iframe at page load, so no third-party cookies and no render-blocking
+ * cross-origin frame (keeps Lighthouse's third-party-cookies + performance
+ * budgets green). Mirrors the app's proven pattern in CreatePodView.vue.
+ *
+ * Progressive enhancement: with JS the submit posts into a transient hidden
+ * iframe (created on submit, removed after) and swaps in an inline "check your
+ * inbox" confirmation without leaving the page. Without JS the form falls back
+ * to a normal new-tab submit to Substack.
  *
  * Used on /blog (index) and /blog/[slug] (post pages) as a primary inbound
  * channel — subscribers are future users, so we want this visible wherever
@@ -14,17 +22,60 @@
     follow me on substack for a new beanstalk post every friday (well, usually)
   </p>
   <div class="substack-strip-embed-wrap">
-    <iframe
-      src="https://everybeancounts.substack.com/embed"
-      width="100%"
-      height="120"
-      style="background: transparent; border: none"
-      frameborder="0"
-      scrolling="no"
-      title="Subscribe to the beanstalk on Substack"
-      loading="lazy"></iframe>
+    <form
+      class="substack-strip-form"
+      action="https://everybeancounts.substack.com/api/v1/free"
+      method="post"
+      target="_blank"
+      data-substack-form
+    >
+      <input
+        type="email"
+        name="email"
+        class="substack-strip-input"
+        placeholder="you@email.com"
+        aria-label="Email address"
+        autocomplete="email"
+        required
+      />
+      <input type="hidden" name="first_url" value="https://beanies.family/blog" />
+      <button type="submit" class="substack-strip-button">subscribe</button>
+    </form>
+    <p class="substack-strip-done" data-substack-done hidden>
+      thanks — check your inbox to confirm 🌱
+    </p>
   </div>
 </section>
+
+<script>
+  // Progressive enhancement: intercept submit, post into a transient hidden
+  // iframe so the reader stays on the page, then reveal the confirmation. The
+  // iframe is created on submit and removed after — nothing loads (and no
+  // third-party cookie is set) until the reader actively subscribes.
+  document.querySelectorAll<HTMLFormElement>('[data-substack-form]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      const email = form.querySelector<HTMLInputElement>('input[name="email"]');
+      if (!email || !email.checkValidity()) return; // let the browser show its native error
+
+      event.preventDefault();
+
+      const frameName = `substack-frame-${Math.random().toString(36).slice(2)}`;
+      const iframe = document.createElement('iframe');
+      iframe.name = frameName;
+      iframe.style.display = 'none';
+      iframe.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(iframe);
+
+      form.target = frameName;
+      form.submit();
+      setTimeout(() => iframe.remove(), 5000);
+
+      const done = form.parentElement?.querySelector<HTMLElement>('[data-substack-done]');
+      form.hidden = true;
+      if (done) done.hidden = false;
+    });
+  });
+</script>
 
 <style>
   .substack-strip {
@@ -52,12 +103,56 @@
     background: rgb(255 255 255 / 15%);
     border-radius: 14px;
     margin-top: 4px;
-    padding: 4px;
+    padding: 8px;
   }
 
-  .substack-strip-embed-wrap iframe {
+  .substack-strip-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .substack-strip-input {
+    flex: 1 1 220px;
+    min-width: 0;
+    border: none;
     border-radius: 10px;
-    display: block;
-    width: 100%;
+    padding: 10px 14px;
+    font-family: 'Inter Variable', Inter, sans-serif;
+    font-size: 0.9375rem;
+    color: var(--deep-slate);
+    background: #fff;
+  }
+
+  .substack-strip-input::placeholder {
+    color: rgb(44 62 80 / 55%);
+  }
+
+  .substack-strip-button {
+    flex: 0 0 auto;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-family: 'Outfit Variable', Outfit, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--heritage-orange);
+    background: #fff;
+    cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+
+  .substack-strip-button:hover {
+    transform: translateY(-1px);
+  }
+
+  .substack-strip-done {
+    color: rgb(255 255 255 / 95%);
+    font-family: 'Outfit Variable', Outfit, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.3;
+    margin: 6px 0;
   }
 </style>
