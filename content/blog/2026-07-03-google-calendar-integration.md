@@ -34,7 +34,7 @@ I'm paraphrasing. My claude-bot didn't actually call me a knucklehead. He used t
 
 In all seriousness though, the answer was really that simple.
 
-So, here we are. I'm happy to present, to my lovely beanie users: the beanies.family Google calendar integration!
+So, here we are. I'm happy to present, to my lovely beanie users: **_the [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=google-calendar-integration) Google calendar integration_**!
 
 If you're attached at the hip to your calendars like me, I understand and agree with you. beanies.family now pushes your events to your precious calendars - whether it's your personal calendar, your partner's calendar, your shared family calendar, or anything else, you're covered. I know - you're so happy right now you could cry. Or maybe that's just me.
 
