@@ -12,16 +12,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
-- **New beanstalk blog post announcing the Google Calendar integration.** "keeping everything in sync" walks through why beanies pushes (rather than two-way syncs) your family activities to your calendars, how the privacy scopes work, and what happens when there's a conflict. Staged as a draft — publishes alongside the Calendar release.
+- **New beanstalk blog post announcing the Google Calendar integration.** "keeping your calendars in sync" walks through why beanies pushes (rather than two-way syncs) your family activities to your calendars, how the privacy scopes work, and what happens when there's a conflict. Now published.
+- **A nudge to connect Google Calendar.** On the activities page (month view), members who haven't linked a calendar yet see a quiet, dismissible banner below the calendar inviting them to connect — it disappears once a calendar is connected or you dismiss it.
 - **A clearer privacy promise — on the homepage and when you add your first account.** The homepage hero now says plainly that your data never leaves your hands: _privacy, guaranteed_ — tap it to jump straight to the data-security section. And right when you're first asked to add an account, a calm "Your data stays with you. Privacy, guaranteed." line sits above the form with a one-tap **How?** explainer — your data lives in a file only you hold, it's locked to your key even in the cloud, and we can't read it, ever — linking to the full zero-knowledge explainer in the help center.
 
 ### Changed
 
 - **Google Calendar sync is now an official feature.** With Google's verification approved, syncing your family's activities to Google Calendar has graduated out of The Beanie Lab — it now has its own **Calendar** card in Settings (right after Country & Holidays), so you can connect it without turning on experimental features. The connected-calendar view (and its clash-warnings toggle) is unchanged; only its home has moved. The help-center article on how it works is now published.
+- **Clearer permission wording.** When editing a family member, the permissions now read "Can edit family activities and plans" (which covers activities, travel plans, and to-dos) and "Can view and edit finances" — the labels now match what each permission actually grants.
+- **A tidier add button.** The global quick-add button no longer appears for members who can't add anything (previously it opened an empty menu). Members who can add activities or finances still see it.
 
 ### Fixed
 
 - **Calendar "Sync now" and "Disconnect" now report what actually happened.** Previously these always showed a success message even if the sync or disconnect ran into trouble; they now show a clear error (or a "reconnect needed" / "partly disconnected" note) so you're never told something worked when it didn't.
+- **The "Add Activity" button showed two plus signs.** Fixed — it now reads a single "＋ Add Activity".
 
 ## 2026-07-02
 
