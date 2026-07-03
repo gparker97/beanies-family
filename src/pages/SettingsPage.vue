@@ -14,6 +14,7 @@ import CalendarSyncSettings from '@/components/settings/CalendarSyncSettings.vue
 import BeanieLabSection from '@/components/settings/BeanieLabSection.vue';
 import { useBeanieLab } from '@/composables/useBeanieLab';
 import { isFlagEnabled } from '@/config/flags';
+import { CALENDAR_SYNC_OPEN } from '@/constants/settingsDeepLinks';
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
 import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
 import BaseModal from '@/components/ui/BaseModal.vue';
@@ -126,7 +127,7 @@ const cardOpenMap: Record<string, () => void> = {
     // flag (aiPhotoExtract / aiTravelExtract) is alive.
     if (aiVisible.value) showAi.value = true;
   },
-  'calendar-sync': () => {
+  [CALENDAR_SYNC_OPEN]: () => {
     // Official feature — gated on the googleCalendarSync flag (kill-switch), not the Lab.
     if (calendarAvailable) showCalendarSync.value = true;
   },
