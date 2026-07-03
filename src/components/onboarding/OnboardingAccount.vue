@@ -7,6 +7,8 @@ import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import { BaseCombobox } from '@/components/ui';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import { MARKETING_URL } from '@/utils/marketing';
 import { showToast } from '@/composables/useToast';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -27,6 +29,10 @@ const settingsStore = useSettingsStore();
 const familyStore = useFamilyStore();
 const accountsStore = useAccountsStore();
 const { options: institutionOptions } = useInstitutionOptions();
+
+// Zero-knowledge help article lives on the marketing apex (origin-isolated from
+// the app), so the link must be absolute — a relative /help/... would 404 here.
+const zkHelpUrl = `${MARKETING_URL}/help/security/zero-knowledge-architecture`;
 
 const accountTypeOptions = computed(() => [
   { value: 'checking', label: t('onboarding.accountType.checking'), icon: '\u{1F3E6}' },
@@ -154,6 +160,24 @@ function formatBalanceMeta(currency: string, balance: number): string {
       :total-steps="6"
     />
 
+    <!-- Privacy reassurance — shown before the first financial data entry, in
+         both the entry and after-add states (sits outside the v-if below). -->
+    <div class="ob-privacy">
+      <p class="ob-privacy-line">
+        {{ t('onboarding.privacy.reassure') }}
+        <strong class="ob-privacy-em">{{ t('onboarding.privacy.guaranteed') }}</strong>
+      </p>
+      <InfoHintBadge
+        :trigger-label="t('onboarding.privacy.how')"
+        :items="[
+          t('onboarding.privacy.proof1'),
+          t('onboarding.privacy.proof2'),
+          t('onboarding.privacy.proof3'),
+        ]"
+        :link="{ text: t('onboarding.privacy.learnMore'), href: zkHelpUrl }"
+      />
+    </div>
+
     <div class="ob-section">
       <!-- Already-added rows — always visible above the entry form so the
            user can remove a mistake without leaving the step. -->
@@ -245,6 +269,33 @@ function formatBalanceMeta(currency: string, balance: number): string {
 </template>
 
 <style scoped>
+/* Privacy reassurance block — centered line + "How?" hint, sits under the
+ * step header before the account form. Solid Heritage Orange emphasis (the
+ * gradient treatment is a marketing-hero device, not an in-app pattern). */
+.ob-privacy {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.ob-privacy-line {
+  color: rgb(44 62 80 / 70%);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+:global(.dark) .ob-privacy-line {
+  color: rgb(255 255 255 / 70%);
+}
+
+.ob-privacy-em {
+  color: var(--heritage-orange, #f15d22);
+  font-weight: 600;
+}
+
 /* BaseCombobox trigger background overrides — moved here from
  * onboarding-shared.css (global) so Vue's scoped-style [data-v]
  * specificity boost retires the previous !important workaround.

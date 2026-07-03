@@ -1,0 +1,410 @@
+<title>privacy, guaranteed — mockup</title>
+<style>
+  :root {
+    --deep-slate: #2c3e50;
+    --heritage-orange: #f15d22;
+    --terracotta: #e67e22;
+    --sky-silk: #aed6f1;
+    --cloud-white: #f8f9fa;
+    --soft-green: #27ae60;
+    --body-text: #2c3e50;
+    --font-display: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --ink-55: rgb(44 62 80 / 55%);
+    --ink-70: rgb(44 62 80 / 70%);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: linear-gradient(180deg, var(--cloud-white) 0%, #edf6fc 50%, var(--cloud-white) 100%);
+    color: var(--deep-slate);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { margin: 0 auto; max-width: 1180px; padding: 40px 24px 72px; }
+
+  .page-head { margin-bottom: 8px; }
+  .page-eyebrow {
+    color: var(--heritage-orange);
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .page-title {
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 3vw, 2.1rem);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 6px 0 4px;
+    text-wrap: balance;
+  }
+  .page-sub { color: var(--ink-55); font-size: 0.95rem; max-width: 56ch; }
+
+  .grid {
+    display: grid;
+    gap: 28px;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    margin-top: 36px;
+  }
+
+  .panel {
+    background: #fff;
+    border: 1px solid rgb(44 62 80 / 8%);
+    border-radius: 20px;
+    box-shadow: 0 8px 30px rgb(44 62 80 / 6%);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel__label {
+    align-items: center;
+    background: var(--cloud-white);
+    border-bottom: 1px solid rgb(44 62 80 / 8%);
+    color: var(--ink-70);
+    display: flex;
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 700;
+    gap: 8px;
+    letter-spacing: 0.1em;
+    padding: 12px 18px;
+    text-transform: uppercase;
+  }
+  .panel__label .dot { background: var(--heritage-orange); border-radius: 50%; height: 7px; width: 7px; }
+  .panel__body { flex: 1; padding: 30px 28px 26px; }
+
+  /* ---------- HERO surface ---------- */
+  .hero {
+    background: radial-gradient(120% 90% at 80% 0%, rgb(174 214 241 / 18%), transparent 60%);
+    border-radius: 16px;
+    padding: 6px 4px 4px;
+    position: relative;
+    text-align: center;
+  }
+  .hero__mascot { filter: drop-shadow(0 10px 24px rgb(44 62 80 / 12%)); font-size: 3.4rem; line-height: 1; margin-bottom: 10px; }
+  .hero__headline {
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4.4vw, 2.9rem);
+    font-weight: 800;
+    line-height: 1.06;
+    margin: 0 0 14px;
+  }
+  .grad {
+    background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: var(--heritage-orange);
+  }
+  .hero__sub {
+    color: var(--body-text);
+    font-size: 0.98rem;
+    line-height: 1.7;
+    margin: 0 auto 14px;
+    max-width: 42ch;
+    opacity: 0.55;
+  }
+  .hero__privacy {
+    align-items: center;
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin: 2px auto 22px;
+  }
+  .hero__privacy .lockchip {
+    align-items: center;
+    background: rgb(39 174 96 / 10%);
+    border-radius: 999px;
+    color: var(--soft-green);
+    display: inline-flex;
+    font-size: 0.82rem;
+    gap: 6px;
+    padding: 4px 11px;
+    font-weight: 600;
+  }
+  .hero__privacy .line {
+    font-family: var(--font-display);
+    font-size: 1.06rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .hero__privacy .line .muted { color: var(--ink-70); font-weight: 600; }
+  .hero__cta {
+    background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgb(241 93 34 / 28%);
+    color: #fff;
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    padding: 12px 26px;
+  }
+
+  /* ---------- ONBOARDING surface ---------- */
+  .ob { margin: 0 auto; max-width: 380px; }
+  .ob__pips { display: flex; gap: 7px; justify-content: center; margin-bottom: 16px; }
+  .ob__pip { background: rgb(44 62 80 / 15%); border-radius: 999px; height: 6px; width: 22px; }
+  .ob__pip.active { background: var(--heritage-orange); width: 30px; }
+  .ob__pip.done { background: var(--terracotta); }
+  .ob__emoji { font-size: 2.2rem; text-align: center; }
+  .ob__title {
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin: 8px 0 4px;
+    text-align: center;
+  }
+  .ob__reassure {
+    color: var(--ink-70);
+    font-size: 0.9rem;
+    margin: 4px 0 4px;
+    text-align: center;
+  }
+  .ob__reassure strong { color: var(--deep-slate); font-weight: 700; }
+  .ob__how { display: flex; justify-content: center; margin-bottom: 4px; }
+  .hint-trigger {
+    align-items: center;
+    background: rgb(241 93 34 / 8%);
+    border: none;
+    border-radius: 999px;
+    color: var(--heritage-orange);
+    cursor: pointer;
+    display: inline-flex;
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    font-weight: 600;
+    gap: 6px;
+    padding: 4px 10px 4px 12px;
+  }
+  .hint-trigger:hover { background: rgb(241 93 34 / 14%); }
+  .hintbadge {
+    align-items: center;
+    background: rgb(241 93 34 / 18%);
+    border-radius: 50%;
+    color: var(--heritage-orange);
+    display: inline-flex;
+    font-size: 0.62rem;
+    font-weight: 700;
+    height: 15px;
+    justify-content: center;
+    width: 15px;
+  }
+
+  /* rendered-open popover (InfoHintBadge, items mode + new link) */
+  .popover-anchor { display: flex; justify-content: center; margin: 2px 0 18px; position: relative; }
+  .popover {
+    background: #fff;
+    border: 1px solid rgb(44 62 80 / 12%);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgb(44 62 80 / 14%);
+    color: var(--ink-70);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    max-width: 288px;
+    padding: 13px 14px;
+    position: relative;
+    text-align: left;
+  }
+  .popover::before {
+    background: #fff;
+    border-left: 1px solid rgb(44 62 80 / 12%);
+    border-top: 1px solid rgb(44 62 80 / 12%);
+    content: '';
+    height: 12px;
+    left: calc(50% - 6px);
+    position: absolute;
+    top: -7px;
+    transform: rotate(45deg);
+    width: 12px;
+  }
+  .popover ul { list-style: none; margin: 0; padding: 0; }
+  .popover li { display: flex; gap: 8px; margin-bottom: 7px; }
+  .popover li span.b { color: rgb(44 62 80 / 45%); flex-shrink: 0; margin-top: 1px; }
+  .popover__link {
+    border-top: 1px solid rgb(44 62 80 / 10%);
+    color: var(--heritage-orange);
+    display: inline-block;
+    font-weight: 600;
+    margin-top: 4px;
+    padding-top: 9px;
+    text-decoration: none;
+  }
+  .popover__link:hover { text-decoration: underline; }
+
+  /* dimmed form context */
+  .ob__form { opacity: 0.42; pointer-events: none; }
+  .ob__chips { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; }
+  .ob__chip {
+    background: #fff;
+    border: 1.5px solid rgb(44 62 80 / 14%);
+    border-radius: 10px;
+    font-size: 0.8rem;
+    padding: 7px 12px;
+  }
+  .ob__chip.sel { background: rgb(241 93 34 / 8%); border-color: var(--heritage-orange); color: var(--heritage-orange); font-weight: 600; }
+  .ob__field {
+    background: #fff;
+    border: 1.5px solid rgb(44 62 80 / 14%);
+    border-radius: 12px;
+    color: var(--ink-55);
+    font-size: 0.92rem;
+    padding: 12px 14px;
+  }
+  .ob__field .lbl { color: var(--ink-55); display: block; font-size: 0.7rem; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* annotation callouts */
+  .notes { margin-top: 40px; }
+  .notes h2 {
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin: 0 0 14px;
+  }
+  .note {
+    align-items: flex-start;
+    background: #fff;
+    border: 1px solid rgb(44 62 80 / 8%);
+    border-left: 3px solid var(--heritage-orange);
+    border-radius: 12px;
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 14px 16px;
+  }
+  .note .num {
+    background: rgb(241 93 34 / 10%);
+    border-radius: 8px;
+    color: var(--heritage-orange);
+    flex-shrink: 0;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-weight: 800;
+    padding: 3px 9px;
+  }
+  .note p { margin: 0; font-size: 0.88rem; color: var(--ink-70); }
+  .note code {
+    background: rgb(44 62 80 / 6%);
+    border-radius: 5px;
+    font-size: 0.82em;
+    padding: 1px 5px;
+  }
+  .note strong { color: var(--deep-slate); }
+</style>
+
+<div class="wrap">
+  <div class="page-head">
+    <div class="page-eyebrow">beanies.family · mockup · 2026-07-03</div>
+    <h1 class="page-title">privacy, guaranteed</h1>
+    <p class="page-sub">Surfacing the one thing no mainstream family-finance app can claim — on the homepage hero, and at the exact moment a user hesitates to type in a bank balance.</p>
+  </div>
+
+  <div class="grid">
+    <!-- ===================== HERO ===================== -->
+    <section class="panel">
+      <div class="panel__label"><span class="dot"></span> homepage hero · beanies.family</div>
+      <div class="panel__body">
+        <div class="hero">
+          <div class="hero__mascot">🫘</div>
+          <h1 class="hero__headline">every. bean.<br /><span class="grad">counts.</span></h1>
+          <p class="hero__sub">one app to manage your family's money, activities, and all the little beans. open source and fully encrypted. no ads, no tracking, no nonsense.</p>
+
+          <div class="hero__privacy">
+            <span class="lockchip">🔒 local-first</span>
+            <span class="line"><span class="muted">your data never leaves your hands.</span> <span class="grad">privacy, guaranteed.</span></span>
+          </div>
+
+          <button class="hero__cta">start counting beans</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== ONBOARDING ===================== -->
+    <section class="panel">
+      <div class="panel__label"><span class="dot"></span> onboarding · add your first account</div>
+      <div class="panel__body">
+        <div class="ob">
+          <div class="ob__pips">
+            <span class="ob__pip done"></span>
+            <span class="ob__pip done"></span>
+            <span class="ob__pip active"></span>
+            <span class="ob__pip"></span>
+            <span class="ob__pip"></span>
+            <span class="ob__pip"></span>
+          </div>
+          <div class="ob__emoji">🐷</div>
+          <h2 class="ob__title">let's add your first account</h2>
+
+          <div class="ob__reassure">
+            your data stays with you. <strong>privacy, guaranteed.</strong>
+          </div>
+          <div class="ob__how">
+            <button class="hint-trigger" aria-label="how your data is kept private">
+              how <span class="hintbadge">?</span>
+            </button>
+          </div>
+
+          <div class="popover-anchor">
+            <div class="popover" role="dialog" aria-label="how your data is kept private">
+              <ul>
+                <li><span class="b">•</span><span>your data lives in a file only you hold</span></li>
+                <li><span class="b">•</span><span>even in the cloud, it's locked to your key alone</span></li>
+                <li><span class="b">•</span><span>we can't read it, ever</span></li>
+              </ul>
+              <a class="popover__link" href="/help/security/zero-knowledge-architecture">learn how it works →</a>
+            </div>
+          </div>
+
+          <div class="ob__form">
+            <div class="ob__chips">
+              <span class="ob__chip sel">🏦 checking</span>
+              <span class="ob__chip">💰 savings</span>
+              <span class="ob__chip">📈 investment</span>
+            </div>
+            <div class="ob__field">
+              <span class="lbl">balance</span>
+              $ 12,400.00
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===================== NOTES ===================== -->
+  <div class="notes">
+    <h2>what's changed &amp; why</h2>
+
+    <div class="note">
+      <span class="num">A</span>
+      <p><strong>Hero:</strong> "privacy, guaranteed." is pulled <em>out</em> of the run-on sentence into its own beat, and rendered in the hero's existing orange→terracotta gradient — the same treatment as "counts." in the headline. It reuses a brand signature rather than inventing a new highlight, and pairs the claim with its proof (<em>"never leaves your hands"</em>) so "guaranteed" reads as architecture, not marketing. "Hands" — not "device" — stays literally true even with Google Drive sync on: the <code>.beanpod</code> is ciphertext locked to a key only you hold, so it's always in your hands, never Google's. The green <code>🔒 local-first</code> chip echoes the existing floating <code>AES-256 encrypted</code> card already in the live hero.</p>
+    </div>
+
+    <div class="note">
+      <span class="num">B</span>
+      <p><strong>Onboarding:</strong> the reassurance line mirrors the hero — <em>"your data stays with you. privacy, guaranteed."</em> The trigger is a <strong>"how?"</strong> pill (word + <code>?</code> badge), a much bigger tap target than a lone 16px icon and it states intent. It opens the existing <code>InfoHintBadge</code> popover (used in 10+ places) in <em>items</em> mode — three scannable proofs — plus one small new capability: an optional <strong>"learn how it works →"</strong> link at the foot.</p>
+    </div>
+
+    <div class="note">
+      <span class="num">C</span>
+      <p><strong>Link destination:</strong> <code>/help/security/zero-knowledge-architecture</code> — the real help article titled <em>"Zero-Knowledge Architecture"</em> (<em>"We can't see your data. Period."</em>). A far better home than the legal <code>/privacy</code> page.</p>
+    </div>
+
+    <div class="note">
+      <span class="num">i</span>
+      <p><strong>Notes:</strong> onboarding copy shown here is illustrative — real strings route through <code>uiStrings.ts</code> (CI-enforced i18n). The hero is the Astro marketing site (English-first, all-lowercase brand voice). Fonts approximate Outfit/Inter; the live surfaces use the real faces.</p>
+    </div>
+  </div>
+</div>
