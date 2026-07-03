@@ -13,6 +13,7 @@ import AiSettings from '@/components/settings/AiSettings.vue';
 import CalendarSyncSettings from '@/components/settings/CalendarSyncSettings.vue';
 import BeanieLabSection from '@/components/settings/BeanieLabSection.vue';
 import { useBeanieLab } from '@/composables/useBeanieLab';
+import { isFlagEnabled } from '@/config/flags';
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
 import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
 import BaseModal from '@/components/ui/BaseModal.vue';
@@ -105,11 +106,14 @@ const showDataManagement = ref(false);
 const showTransferOwnership = ref(false);
 const showAi = ref(false);
 const showCalendarSync = ref(false);
-// beanies AI (#133) and Google Calendar (#32/#34) now live inside The Beanie Lab —
-// a per-device opt-in. useBeanieLab is the single source of truth for their
-// visibility (Lab on + the feature's flag), shared with BeanieLabSection so the
-// cards and these drawer / deep-link guards can never disagree.
-const { hasAnyLabFeature, aiVisible, calendarVisible } = useBeanieLab();
+// beanies AI (#133) still lives inside The Beanie Lab (per-device opt-in);
+// useBeanieLab is the single source of truth for its visibility (Lab on + a
+// reader flag), shared with BeanieLabSection. Google Calendar (#32/#34)
+// graduated to an official Settings card on 2026-07-03 — it's gated on the
+// googleCalendarSync flag alone (a kill-switch), not the Lab. isFlagEnabled is
+// not reactive (flips take effect on reload), so a plain const is correct.
+const { hasAnyLabFeature, aiVisible } = useBeanieLab();
+const calendarAvailable = isFlagEnabled('googleCalendarSync');
 
 // ── Deep-link: open a specific card from a route query (e.g. ?open=family-data)
 //    Generalizable — additional cards can opt in by extending the map below.
@@ -123,8 +127,8 @@ const cardOpenMap: Record<string, () => void> = {
     if (aiVisible.value) showAi.value = true;
   },
   'calendar-sync': () => {
-    // Same gate as the Lab card (opt-in + googleCalendarSync flag).
-    if (calendarVisible.value) showCalendarSync.value = true;
+    // Official feature — gated on the googleCalendarSync flag (kill-switch), not the Lab.
+    if (calendarAvailable) showCalendarSync.value = true;
   },
   appearance: () => {
     showAppearance.value = true;
@@ -660,6 +664,14 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         @click="showCountryHolidays = true"
       />
       <SettingsCard
+        v-if="calendarAvailable"
+        icon="📅"
+        :title="t('settings.card.calendarSync')"
+        :description="t('settings.card.calendarSyncDesc')"
+        icon-bg="var(--tint-silk-20)"
+        @click="showCalendarSync = true"
+      />
+      <SettingsCard
         v-if="canManagePod"
         icon="📤"
         :title="t('settings.card.dataManagement')"
@@ -789,11 +801,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
          hasAnyLabFeature so the section disappears (no empty header/glyph/toggle)
          when zero Lab features are available — the Lab stays conceptually
          permanent, this is just a display-time emptiness guard (#35). -->
-    <BeanieLabSection
-      v-if="hasAnyLabFeature"
-      @open-ai="showAi = true"
-      @open-calendar="showCalendarSync = true"
-    />
+    <BeanieLabSection v-if="hasAnyLabFeature" @open-ai="showAi = true" />
 
     <!-- ── Feature Flags (dev-only, owner/admin) ───────────────────────────
          DevFlagsCard is undefined in prod (DEV-gated dynamic import above), so
@@ -826,12 +834,13 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     <!-- ── MODALS ────────────────────────────────────────────────────── -->
     <!-- ══════════════════════════════════════════════════════════════════ -->
 
-    <!-- ── beanies AI + Google Calendar drawers (Beanie Lab surfaces) ──────
-         Mount-gated on the same useBeanieLab computeds as their Lab cards, so a
-         drawer can never open while the Lab (or the calendar flag) is off. -->
+    <!-- ── beanies AI drawer (Beanie Lab surface) ─────────────────────────
+         Mount-gated on aiVisible so it can never open while the Lab is off. -->
     <AiSettings v-if="aiVisible" :open="showAi" @close="showAi = false" />
+    <!-- ── Google Calendar drawer (official) — gated on the googleCalendarSync
+         flag (kill-switch), independent of the Lab. -->
     <CalendarSyncSettings
-      v-if="calendarVisible"
+      v-if="calendarAvailable"
       :open="showCalendarSync"
       @close="showCalendarSync = false"
     />

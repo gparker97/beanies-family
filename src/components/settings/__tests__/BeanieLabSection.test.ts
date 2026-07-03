@@ -4,14 +4,14 @@ import { mount } from '@vue/test-utils';
 import BeanieLabSection from '../BeanieLabSection.vue';
 
 // Controllable Lab-visibility refs (the component reads these via useBeanieLab).
+// AI is the sole Lab feature since 2026-07-03 (calendar graduated out).
 const labEnabled = ref(false);
 const aiVisible = ref(false);
-const calendarVisible = ref(false);
 const prefersReducedMotion = ref(false);
 const setBeanieLabEnabled = vi.fn(async () => {});
 
 vi.mock('@/composables/useBeanieLab', () => ({
-  useBeanieLab: () => ({ labEnabled, aiVisible, calendarVisible }),
+  useBeanieLab: () => ({ labEnabled, aiVisible }),
 }));
 vi.mock('@/composables/useReducedMotion', () => ({
   useReducedMotion: () => ({ prefersReducedMotion }),
@@ -48,7 +48,6 @@ function mountSection() {
 beforeEach(() => {
   labEnabled.value = false;
   aiVisible.value = false;
-  calendarVisible.value = false;
   prefersReducedMotion.value = false;
   vi.clearAllMocks();
 });
@@ -70,31 +69,26 @@ describe('BeanieLabSection', () => {
     expect(wrapper.text()).toContain('settings.beanieLab.empty');
   });
 
-  it('Lab ON: renders both feature cards and emits the right open event', async () => {
+  it('Lab ON: renders the single AI card and emits open-ai on click', async () => {
     labEnabled.value = true;
     aiVisible.value = true;
-    calendarVisible.value = true;
     const wrapper = mountSection();
 
-    const cards = wrapper.findAll('.settings-card');
-    expect(cards).toHaveLength(2);
-    expect(wrapper.text()).not.toContain('settings.beanieLab.empty');
-
-    // Order in labFeatures is [calendar, ai].
-    await cards[0].trigger('click');
-    await cards[1].trigger('click');
-    expect(wrapper.emitted('open-calendar')).toHaveLength(1);
-    expect(wrapper.emitted('open-ai')).toHaveLength(1);
-  });
-
-  it('Lab ON but calendar flag off: only the AI card shows', () => {
-    labEnabled.value = true;
-    aiVisible.value = true;
-    calendarVisible.value = false;
-    const wrapper = mountSection();
     const cards = wrapper.findAll('.settings-card');
     expect(cards).toHaveLength(1);
     expect(cards[0].text()).toContain('settings.card.ai');
+    expect(wrapper.text()).not.toContain('settings.beanieLab.empty');
+
+    await cards[0].trigger('click');
+    expect(wrapper.emitted('open-ai')).toHaveLength(1);
+    expect(wrapper.emitted('open-calendar')).toBeUndefined();
+  });
+
+  it('Lab ON but AI unavailable: no card shows', () => {
+    labEnabled.value = true;
+    aiVisible.value = false;
+    const wrapper = mountSection();
+    expect(wrapper.findAll('.settings-card')).toHaveLength(0);
   });
 
   it('toggling the master switch calls setBeanieLabEnabled with the negated value', async () => {

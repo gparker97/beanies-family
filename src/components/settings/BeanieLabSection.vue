@@ -10,7 +10,6 @@
  * the card list here can't drift from SettingsPage's drawer / deep-link guards.
  */
 import { computed, ref } from 'vue';
-import type { ComputedRef } from 'vue';
 import SmoothHeight from '@/components/ui/SmoothHeight.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import SettingsCard from '@/components/settings/SettingsCard.vue';
@@ -20,54 +19,19 @@ import { useReducedMotion } from '@/composables/useReducedMotion';
 import { useTranslation } from '@/composables/useTranslation';
 import { useBeanieLab } from '@/composables/useBeanieLab';
 import { useSettingsStore } from '@/stores/settingsStore';
-import type { UIStringKey } from '@/services/translation/uiStrings';
 
-const emit = defineEmits<{ 'open-ai': []; 'open-calendar': [] }>();
+// AI (Tinfoil readers) is the sole Beanie Lab feature. Google Calendar graduated
+// to an official Settings card (2026-07-03). A single card lives inline below —
+// re-introduce the array pattern if a second Lab feature ever lands.
+const emit = defineEmits<{ 'open-ai': [] }>();
 
 const { t } = useTranslation();
 const { prefersReducedMotion } = useReducedMotion();
 const settingsStore = useSettingsStore();
-const { labEnabled, aiVisible, calendarVisible } = useBeanieLab();
+const { labEnabled, aiVisible } = useBeanieLab();
 
 const expanded = ref(false);
 const animateBeaker = computed(() => expanded.value && !prefersReducedMotion.value);
-
-interface LabFeature {
-  key: 'calendar' | 'ai';
-  icon: string;
-  titleKey: UIStringKey;
-  descKey: UIStringKey;
-  visible: ComputedRef<boolean>;
-  event: 'open-ai' | 'open-calendar';
-}
-
-// One entry per Lab feature — adding a future feature is a single entry here.
-const labFeatures: LabFeature[] = [
-  {
-    key: 'calendar',
-    icon: '\u{1F4C5}',
-    titleKey: 'settings.card.calendarSync',
-    descKey: 'settings.card.calendarSyncDesc',
-    visible: calendarVisible,
-    event: 'open-calendar',
-  },
-  {
-    key: 'ai',
-    icon: '\u{1F916}',
-    titleKey: 'settings.card.ai',
-    descKey: 'settings.card.aiDesc',
-    visible: aiVisible,
-    event: 'open-ai',
-  },
-];
-
-const visibleFeatures = computed(() => labFeatures.filter((f) => f.visible.value));
-
-// Narrow the union literal so the typed emit overload is satisfied.
-function openFeature(feature: LabFeature): void {
-  if (feature.event === 'open-ai') emit('open-ai');
-  else emit('open-calendar');
-}
 
 async function onToggleLab(enabled: boolean): Promise<void> {
   try {
@@ -151,18 +115,17 @@ async function onToggleLab(enabled: boolean): Promise<void> {
           />
         </div>
 
-        <!-- Revealed feature cards -->
+        <!-- Revealed feature card (AI — the sole Lab feature) -->
         <ConditionalSection :show="labEnabled">
           <div class="space-y-3">
             <SettingsCard
-              v-for="f in visibleFeatures"
-              :key="f.key"
-              :icon="f.icon"
-              :title="t(f.titleKey)"
-              :description="t(f.descKey)"
+              v-if="aiVisible"
+              icon="&#x1F916;"
+              :title="t('settings.card.ai')"
+              :description="t('settings.card.aiDesc')"
               icon-bg="var(--tint-silk-20)"
-              :data-testid="`beanie-lab-card-${f.key}`"
-              @click="openFeature(f)"
+              data-testid="beanie-lab-card-ai"
+              @click="emit('open-ai')"
             >
               <template #badge>
                 <BetaBadge label="settings.beanieLab.testingTag" />
