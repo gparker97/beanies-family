@@ -1,0 +1,323 @@
+<title>calendar connect nudge — activities page</title>
+<style>
+  :root {
+    --deep-slate: #2c3e50;
+    --heritage-orange: #f15d22;
+    --terracotta: #e67e22;
+    --sky-silk: #aed6f1;
+    --cloud-white: #f8f9fa;
+    --soft-green: #27ae60;
+    --font-display: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --ink-45: rgb(44 62 80 / 45%);
+    --ink-60: rgb(44 62 80 / 60%);
+    --ink-70: rgb(44 62 80 / 70%);
+    --sq: 16px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(120% 80% at 90% -10%, rgb(174 214 241 / 22%), transparent 60%),
+      var(--cloud-white);
+    color: var(--deep-slate);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.55;
+  }
+  .wrap { margin: 0 auto; max-width: 760px; padding: 36px 20px 64px; }
+
+  .page-head { margin-bottom: 6px; }
+  .eyebrow {
+    color: var(--heritage-orange);
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .page-title {
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 3vw, 1.95rem);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 6px 0 4px;
+  }
+  .page-sub { color: var(--ink-60); font-size: 0.92rem; max-width: 60ch; }
+
+  /* ---- phone frame to show the in-app context ---- */
+  .phone {
+    background: #fff;
+    border: 1px solid rgb(44 62 80 / 10%);
+    border-radius: 28px;
+    box-shadow: 0 18px 50px rgb(44 62 80 / 12%);
+    margin: 30px auto 0;
+    max-width: 420px;
+    overflow: hidden;
+  }
+  .phone__bar {
+    align-items: center;
+    background: var(--deep-slate);
+    color: #fff;
+    display: flex;
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 600;
+    gap: 8px;
+    justify-content: center;
+    padding: 9px;
+  }
+  .phone__body { padding: 14px 14px 18px; }
+
+  /* sticky command bar (context, faded) */
+  .cmdbar {
+    align-items: center;
+    background: #fff;
+    border: 1px solid rgb(44 62 80 / 8%);
+    border-radius: var(--sq);
+    box-shadow: 0 2px 10px rgb(44 62 80 / 4%);
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    padding: 10px 12px;
+  }
+  .cmdbar__period { font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; }
+  .cmdbar__ctrls { display: flex; gap: 6px; }
+  .cmdbar__btn {
+    align-items: center;
+    background: var(--cloud-white);
+    border-radius: 9px;
+    color: var(--ink-60);
+    display: inline-flex;
+    height: 26px;
+    justify-content: center;
+    width: 26px;
+    font-size: 0.8rem;
+  }
+  .cmdbar__add {
+    background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+    color: #fff;
+    width: auto;
+    padding: 0 10px;
+    font-weight: 700;
+    font-size: 0.78rem;
+  }
+
+  /* mini calendar grid (context, faded) */
+  .cal {
+    display: grid;
+    gap: 3px;
+    grid-template-columns: repeat(7, 1fr);
+    margin-top: 8px;
+    opacity: 0.5;
+    filter: saturate(0.85);
+  }
+  .cal__cell {
+    aspect-ratio: 1 / 1;
+    background: #fff;
+    border: 1px solid rgb(44 62 80 / 6%);
+    border-radius: 7px;
+    font-size: 0.6rem;
+    color: var(--ink-45);
+    padding: 3px 4px;
+  }
+  .cal__dot { display: block; height: 4px; width: 4px; border-radius: 50%; margin-top: 2px; }
+  .cal__dot--o { background: var(--heritage-orange); }
+  .cal__dot--t { background: var(--terracotta); }
+
+  /* ============ THE NUDGE (signature element) ============ */
+  .nudge {
+    align-items: center;
+    background:
+      linear-gradient(180deg, rgb(174 214 241 / 30%), rgb(174 214 241 / 16%));
+    border: 1px solid rgb(174 214 241 / 55%);
+    border-radius: var(--sq);
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 13px 12px 13px 13px;
+    position: relative;
+  }
+  /* icon chip — the brand's "beans → calendar" idea, kept to one accessory */
+  .nudge__icon {
+    align-items: center;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgb(44 62 80 / 8%);
+    display: flex;
+    flex-shrink: 0;
+    font-size: 1.15rem;
+    height: 40px;
+    justify-content: center;
+    position: relative;
+    width: 40px;
+  }
+  .nudge__icon .bean {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    font-size: 0.85rem;
+    filter: drop-shadow(0 1px 2px rgb(44 62 80 / 20%));
+  }
+  .nudge__text { flex: 1; min-width: 0; }
+  .nudge__title {
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: 0.92rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .nudge__sub { color: var(--ink-60); font-size: 0.8rem; line-height: 1.4; margin-top: 1px; }
+  .nudge__connect {
+    background: var(--heritage-orange);
+    border: none;
+    border-radius: 999px;
+    color: #fff;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 7px 14px;
+  }
+  .nudge__dismiss {
+    align-items: center;
+    background: rgb(44 62 80 / 6%);
+    border-radius: 50%;
+    color: var(--ink-45);
+    cursor: pointer;
+    display: flex;
+    font-size: 0.72rem;
+    height: 18px;
+    justify-content: center;
+    position: absolute;
+    right: 7px;
+    top: 7px;
+    width: 18px;
+  }
+
+  /* inactive-activities toggle (context) */
+  .inactive {
+    color: rgb(44 62 80 / 40%);
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 14px;
+  }
+
+  /* ---- annotations ---- */
+  .notes { margin-top: 40px; }
+  .notes h2 {
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin: 0 0 12px;
+  }
+  .note {
+    align-items: flex-start;
+    background: #fff;
+    border: 1px solid rgb(44 62 80 / 8%);
+    border-left: 3px solid var(--sky-silk);
+    border-radius: 12px;
+    display: flex;
+    gap: 11px;
+    margin-bottom: 10px;
+    padding: 12px 14px;
+  }
+  .note .tag {
+    background: rgb(174 214 241 / 35%);
+    border-radius: 7px;
+    color: var(--deep-slate);
+    flex-shrink: 0;
+    font-family: var(--font-display);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    text-transform: uppercase;
+  }
+  .note p { margin: 0; font-size: 0.86rem; color: var(--ink-70); }
+  .note code { background: rgb(44 62 80 / 6%); border-radius: 5px; font-size: 0.82em; padding: 1px 5px; }
+  .note strong { color: var(--deep-slate); }
+</style>
+
+<div class="wrap">
+  <div class="page-head">
+    <div class="eyebrow">beanies.family · mockup · 2026-07-03</div>
+    <h1 class="page-title">connect Google Calendar nudge</h1>
+    <p class="page-sub">A quiet, dismissible prompt on the activities page — shown to users who haven't linked Google Calendar yet. Sits below the calendar so it never crowds the hero.</p>
+  </div>
+
+  <!-- in-context preview -->
+  <div class="phone">
+    <div class="phone__bar"><span aria-hidden="true">📅</span> family planner</div>
+    <div class="phone__body">
+      <!-- command bar (context) -->
+      <div class="cmdbar">
+        <span class="cmdbar__period">July 2026</span>
+        <span class="cmdbar__ctrls">
+          <span class="cmdbar__btn">‹</span>
+          <span class="cmdbar__btn">›</span>
+          <span class="cmdbar__btn cmdbar__add">+ add</span>
+        </span>
+      </div>
+
+      <!-- mini calendar (context, faded) -->
+      <div class="cal">
+        <div class="cal__cell">28</div><div class="cal__cell">29</div><div class="cal__cell">30</div>
+        <div class="cal__cell">1<span class="cal__dot cal__dot--o"></span></div>
+        <div class="cal__cell">2</div><div class="cal__cell">3<span class="cal__dot cal__dot--t"></span></div>
+        <div class="cal__cell">4</div>
+        <div class="cal__cell">5</div><div class="cal__cell">6</div>
+        <div class="cal__cell">7<span class="cal__dot cal__dot--o"></span></div>
+        <div class="cal__cell">8</div><div class="cal__cell">9</div><div class="cal__cell">10</div>
+        <div class="cal__cell">11</div>
+      </div>
+
+      <!-- ===== THE NUDGE ===== -->
+      <div class="nudge">
+        <span class="nudge__dismiss" aria-label="Dismiss">✕</span>
+        <span class="nudge__icon"><span aria-hidden="true">📅</span><span class="bean" aria-hidden="true">🫘</span></span>
+        <span class="nudge__text">
+          <span class="nudge__title">See these in Google Calendar too</span>
+          <span class="nudge__sub">Link your calendar and your family's plans show up there automatically.</span>
+        </span>
+        <button class="nudge__connect">Connect</button>
+      </div>
+
+      <div class="inactive">▾ Past activities (3)</div>
+    </div>
+  </div>
+
+  <!-- annotations -->
+  <div class="notes">
+    <h2>how it behaves</h2>
+
+    <div class="note">
+      <span class="tag">When</span>
+      <p><strong>Gated so it's never noise:</strong> shows only when the <code>googleCalendarSync</code> flag is on, <strong>no</strong> calendar is connected (<code>connections.length === 0</code>), and it hasn't been dismissed. Connecting or dismissing hides it for good.</p>
+    </div>
+
+    <div class="note">
+      <span class="tag">Where</span>
+      <p><strong>Below the calendar</strong> (month view), in the same footer zone as the "Past activities" toggle. Never above the grid — the calendar is the page hero and butts flush against the command bar by design.</p>
+    </div>
+
+    <div class="note">
+      <span class="tag">Do</span>
+      <p><strong>"Connect"</strong> deep-links to <code>Settings ?open=calendar-sync</code> (opens the Google Calendar drawer directly — works now that Calendar is official). The <strong>✕</strong> dismisses it per-device, remembered.</p>
+    </div>
+
+    <div class="note">
+      <span class="tag">Reuse</span>
+      <p>Clone the <code>useInstallNudge</code> localStorage idiom into <code>useCalendarNudge</code> (same <code>'pending' | 'dismissed'</code> shape) — no new persistence machinery. Copy routes through <code>uiStrings.ts</code> (en + beanie).</p>
+    </div>
+
+    <div class="note">
+      <span class="tag">Look</span>
+      <p>Sky-Silk fill (calm, recedes) with a single Heritage-Orange action — one accent, quiet everywhere else. The icon chip pairs 📅 with a peeking 🫘: the brand's "your beans, in your calendar" idea, kept to one accessory.</p>
+    </div>
+  </div>
+</div>
