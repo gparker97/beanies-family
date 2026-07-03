@@ -188,7 +188,10 @@ const STRING_DEFS = {
   'modal.profileColor': { en: 'Profile Color', beanie: 'profile color' },
   'modal.permissions': { en: 'Permissions', beanie: 'permissions' },
   'modal.canViewFinances': { en: 'Can view finances', beanie: 'can view finances' },
-  'modal.canEditActivities': { en: 'Can edit family content', beanie: 'can edit family content' },
+  'modal.canEditActivities': {
+    en: 'Can edit family activities and plans',
+    beanie: 'can edit family activities and plans',
+  },
   'modal.canManagePod': { en: 'Can manage family members', beanie: 'can manage family members' },
 
   // Status labels
@@ -5267,7 +5270,7 @@ const STRING_DEFS = {
     en: '{month} — {count} activities',
     beanie: '{month} — {count} activities',
   },
-  'planner.addActivity': { en: '+ Add Activity', beanie: '+ new activity' },
+  'planner.addActivity': { en: 'Add Activity', beanie: 'new activity' },
   'planner.segmentDeparture': { en: 'Departure', beanie: 'departure' },
   'planner.segmentArrival': { en: 'Arrival', beanie: 'arrival' },
   'planner.segmentDepartureShort': { en: 'Dep', beanie: 'dep' },
