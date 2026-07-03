@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
-- **A clearer privacy promise — on the homepage and when you add your first account.** The homepage hero now says plainly that your data never leaves your hands: _privacy, guaranteed._ And right when you're first asked to add an account, a calm "Your data stays with you. Privacy, guaranteed." line sits above the form with a one-tap **How?** explainer — your data lives in a file only you hold, it's locked to your key even in the cloud, and we can't read it, ever — linking to the full zero-knowledge explainer in the help center.
+- **A clearer privacy promise — on the homepage and when you add your first account.** The homepage hero now says plainly that your data never leaves your hands: _privacy, guaranteed_ — tap it to jump straight to the data-security section. And right when you're first asked to add an account, a calm "Your data stays with you. Privacy, guaranteed." line sits above the form with a one-tap **How?** explainer — your data lives in a file only you hold, it's locked to your key even in the cloud, and we can't read it, ever — linking to the full zero-knowledge explainer in the help center.
 
 ## 2026-07-02
 
