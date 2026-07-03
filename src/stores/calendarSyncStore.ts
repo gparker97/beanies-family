@@ -71,6 +71,16 @@ import type { CalendarConnection } from '@/types/models';
 
 const FLAG = 'googleCalendarSync';
 
+/**
+ * Outcome of a single-connection reconcile, surfaced so a user-initiated
+ * "Sync now" can toast the real result instead of an unconditional success.
+ * - `ok`        — reconciled cleanly (or a healthy no-op).
+ * - `error`     — a non-auth API error; connection parked `error`.
+ * - `needs_reconnect` — an auth failure; the token needs re-consent.
+ * - `skipped`   — nothing to do (not found / mid-disconnect / within freshness window).
+ */
+export type SyncOutcome = 'ok' | 'error' | 'needs_reconnect' | 'skipped';
+
 /** Periodic full-scan cadence (5 min). On each tick we verify unchanged events
  *  exist (re-create manual remote-deletes). Edits trigger a faster, no-verify pass. */
 const RECONCILE_POLL_MS = 300_000;
@@ -304,17 +314,19 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
   async function reconcileConnection(
     connectionId: string,
     opts: { verifyExisting: boolean; force?: boolean }
-  ): Promise<void> {
+  ): Promise<SyncOutcome> {
     const connection = await getCalendarConnectionById(connectionId);
-    if (!connection) return;
+    if (!connection) return 'skipped';
 
     // A connection mid-disconnect retries its teardown instead of syncing.
     if (connection.status === 'disconnecting') {
       await finishDisconnect(connectionId);
-      return;
+      return 'skipped';
     }
-    if (!opts.force && shouldSkipForFreshness(connection)) return;
+    if (!opts.force && shouldSkipForFreshness(connection)) return 'skipped';
 
+    // Captured inside the lock and returned so a user-initiated sync can report it.
+    let outcome: SyncOutcome = 'skipped';
     await withConnectionLock(connectionId, async () => {
       const client = getCalendarClient();
       const calendarId = connection.destinationCalendarId || 'primary';
@@ -354,7 +366,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       ];
 
       await runPooled(tasks, MAX_INFLIGHT);
-      await settleConnectionStatus(connection, errors, changed);
+      outcome = await settleConnectionStatus(connection, errors, changed);
 
       // Dev-only diagnostic — surfaces what each connection actually did so a
       // per-account discrepancy is visible while developing. Keyed by connection id
@@ -367,14 +379,16 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         );
       }
     });
+    return outcome;
   }
 
-  /** Translate the batch's errors into the connection's status (shared-token-safe). */
+  /** Translate the batch's errors into the connection's status (shared-token-safe).
+   *  Returns the outcome so a user-initiated sync can report success vs. failure. */
   async function settleConnectionStatus(
     connection: CalendarConnection,
     errors: CalendarApiError[],
     changed: boolean
-  ): Promise<void> {
+  ): Promise<SyncOutcome> {
     const hasAuth = errors.some((e) => e.kind === 'auth');
 
     if (hasAuth) {
@@ -400,7 +414,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       // auth issue self-heals (a false "sustained"). Auth is handled by the
       // invalidGrant counter above.
       reconcileErrorCounters.delete(connection.id);
-      return;
+      return 'needs_reconnect';
     }
 
     // Any successful access resets the device-local auth counter + self-heals.
@@ -430,7 +444,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         severity: n === RECONCILE_ERROR_THRESHOLD ? 'critical' : CALENDAR_SYNC_ERRORS[worst.kind],
         context: { connectionId: connection.id, consecutiveFailures: n },
       });
-      return;
+      return 'error';
     }
 
     // Clean success. If nothing changed AND the connection is already ok AND its
@@ -440,7 +454,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       const lastAt = connection.lastReconciledAt
         ? new Date(connection.lastReconciledAt).getTime()
         : 0;
-      if (Date.now() - lastAt < FRESHNESS_WINDOW_MS) return;
+      if (Date.now() - lastAt < FRESHNESS_WINDOW_MS) return 'ok';
     }
 
     // Clean success — the single point a connection is confirmed healthy, so the
@@ -457,6 +471,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       lastReconciledAt: nowIso(),
       lastReconciledBy: deviceId,
     });
+    return 'ok';
   }
 
   async function reconcileAll(opts: { verifyExisting: boolean; force?: boolean }): Promise<void> {
@@ -517,15 +532,18 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
   }
 
   /** Remove the connection: delete its events first, then drop its token + record. */
-  async function disconnect(connectionId: string): Promise<void> {
+  /** Returns whether teardown fully completed (all remote events removed + record
+   *  dropped). `false` means it's parked `disconnecting` and will retry next open. */
+  async function disconnect(connectionId: string): Promise<boolean> {
     await updateCalendarConnection(connectionId, { status: 'disconnecting' });
-    await finishDisconnect(connectionId);
+    return finishDisconnect(connectionId);
   }
 
-  /** Partial-failure-safe teardown — drops the record only once all events are gone. */
-  async function finishDisconnect(connectionId: string): Promise<void> {
+  /** Partial-failure-safe teardown — drops the record only once all events are gone.
+   *  Returns whether every event cleared (record removed); `false` = stays parked. */
+  async function finishDisconnect(connectionId: string): Promise<boolean> {
     const connection = await getCalendarConnectionById(connectionId);
-    if (!connection) return;
+    if (!connection) return true; // already gone — teardown is complete
     const client = getCalendarClient();
     const calendarId = connection.destinationCalendarId || 'primary';
     const links = await getCalendarEventLinksForConnection(connectionId);
@@ -545,6 +563,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       invalidGrantCounters.delete(connectionId);
       await removeCalendarConnection(connectionId);
     }
+    return allCleared;
   }
 
   /**
@@ -633,12 +652,11 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
   }
 
   /** Manual "Sync now" — full verify reconcile, bypassing the freshness skip. */
-  async function syncNow(connectionId?: string): Promise<void> {
+  async function syncNow(connectionId?: string): Promise<SyncOutcome | void> {
     if (connectionId) {
-      await reconcileConnection(connectionId, { verifyExisting: true, force: true });
-    } else {
-      await reconcileAll({ verifyExisting: true, force: true });
+      return reconcileConnection(connectionId, { verifyExisting: true, force: true });
     }
+    await reconcileAll({ verifyExisting: true, force: true });
   }
 
   // ── Triggers (registered only when the flag is on) ──────────────────────────

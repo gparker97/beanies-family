@@ -2,7 +2,8 @@
 // Google Calendar sync settings (#32 Layer 6). Mirrors the AiSettings card→drawer
 // pattern (BeanieFormModal variant="drawer"). Lets the user connect one or more
 // Google calendars (family-wide), pick a destination calendar, sync now, reconnect,
-// and disconnect. Gated behind the googleCalendarSync flag at the SettingsPage card.
+// and disconnect. Standalone official feature — reached from the Settings → Google
+// Calendar card, gated on the googleCalendarSync flag (a kill-switch), not the Lab.
 import { ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
@@ -119,11 +120,43 @@ async function onReconnect(connection: CalendarConnection) {
 async function onSyncNow(connection: CalendarConnection) {
   busyId.value = connection.id;
   try {
-    await store.syncNow(connection.id);
+    // syncNow swallows API errors into the connection status, so toast from the
+    // returned outcome — NOT an unconditional "Synced!".
+    const outcome = await store.syncNow(connection.id);
+    if (outcome === 'needs_reconnect') {
+      showToast(
+        'error',
+        t('calendarSync.toast.syncReconnect.title'),
+        t('calendarSync.toast.syncReconnect.message'),
+        { silent: true } // user-recoverable (reconnect); no Slack noise
+      );
+    } else if (outcome === 'error') {
+      showToast(
+        'error',
+        t('calendarSync.toast.syncFailed.title'),
+        t('calendarSync.toast.syncFailed.message'),
+        { silent: true } // the store already reported the API error to Slack
+      );
+    } else {
+      // 'ok' | 'skipped' (a no-op is still "up to date").
+      showToast(
+        'success',
+        t('calendarSync.toast.synced.title'),
+        t('calendarSync.toast.synced.message')
+      );
+    }
+  } catch (e) {
+    // Unexpected throw (e.g. IndexedDB write) — never fail silently.
     showToast(
-      'success',
-      t('calendarSync.toast.synced.title'),
-      t('calendarSync.toast.synced.message')
+      'error',
+      t('calendarSync.toast.syncFailed.title'),
+      t('calendarSync.toast.syncFailed.message'),
+      {
+        silent: true,
+        surface: 'calendar-sync',
+        error: e,
+        context: { action: 'syncNow', connectionId: connection.id },
+      }
     );
   } finally {
     busyId.value = null;
@@ -140,11 +173,34 @@ async function onDisconnect(connection: CalendarConnection) {
   if (!ok) return;
   busyId.value = connection.id;
   try {
-    await store.disconnect(connection.id);
+    // disconnect returns whether teardown fully completed — a partial teardown
+    // leaves the connection parked 'disconnecting', so don't claim success.
+    const cleared = await store.disconnect(connection.id);
+    if (cleared) {
+      showToast(
+        'success',
+        t('calendarSync.toast.disconnected.title'),
+        t('calendarSync.toast.disconnected.message')
+      );
+    } else {
+      showToast(
+        'error',
+        t('calendarSync.toast.disconnectPartial.title'),
+        t('calendarSync.toast.disconnectPartial.message'),
+        { silent: true }
+      );
+    }
+  } catch (e) {
     showToast(
-      'success',
-      t('calendarSync.toast.disconnected.title'),
-      t('calendarSync.toast.disconnected.message')
+      'error',
+      t('calendarSync.toast.syncFailed.title'),
+      t('calendarSync.toast.syncFailed.message'),
+      {
+        silent: true,
+        surface: 'calendar-sync',
+        error: e,
+        context: { action: 'disconnect', connectionId: connection.id },
+      }
     );
   } finally {
     busyId.value = null;

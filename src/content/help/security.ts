@@ -1,9 +1,9 @@
 import type { HelpArticle } from './types';
 
-// #32 Google Calendar integration — HELD until launch. Flip CALENDAR_SYNC_HELP_LIVE
-// to true (together with the `googleCalendarSync` feature flag) to publish this on
-// the Help Center. Kept type-checked (not commented out) so it can't rot.
-const CALENDAR_SYNC_HELP_LIVE = false;
+// #32 Google Calendar integration — LIVE (2026-07-03). Google's OAuth verification
+// was approved and Calendar graduated from The Beanie Lab to an official
+// Settings → Google Calendar card, so this article is published on the Help Center.
+const CALENDAR_SYNC_HELP_LIVE = true;
 const CALENDAR_SYNC_ARTICLE: HelpArticle = {
   slug: 'google-calendar-sync',
   category: 'security',
@@ -66,9 +66,9 @@ const CALENDAR_SYNC_ARTICLE: HelpArticle = {
 
 // #34 External-calendar clash nudge — LIVE alongside the `calendarClashNudge`
 // flag (2026-06-12), so the "What's this?" link in the activity drawer resolves
-// for Beanie Lab testers. Flipping this publishes the article fully: a resolvable
-// page AND a listing in the help index + sitemap + llms-full (the calendar/clash
-// features themselves remain Lab-gated, so this is documentation only).
+// and the article is listed in the help index + sitemap + llms-full. As of
+// 2026-07-03 the calendar/clash features are official (Settings → Google
+// Calendar), no longer Lab-gated.
 const CLASH_NUDGE_HELP_LIVE = true;
 const CLASH_NUDGE_ARTICLE: HelpArticle = {
   slug: 'external-calendar-clash-nudge',

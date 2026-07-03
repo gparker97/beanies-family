@@ -14,6 +14,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **A clearer privacy promise — on the homepage and when you add your first account.** The homepage hero now says plainly that your data never leaves your hands: _privacy, guaranteed_ — tap it to jump straight to the data-security section. And right when you're first asked to add an account, a calm "Your data stays with you. Privacy, guaranteed." line sits above the form with a one-tap **How?** explainer — your data lives in a file only you hold, it's locked to your key even in the cloud, and we can't read it, ever — linking to the full zero-knowledge explainer in the help center.
 
+### Changed
+
+- **Google Calendar sync is now an official feature.** With Google's verification approved, syncing your family's activities to Google Calendar has graduated out of The Beanie Lab — it now has its own **Calendar** card in Settings (right after Country & Holidays), so you can connect it without turning on experimental features. The connected-calendar view (and its clash-warnings toggle) is unchanged; only its home has moved. The help-center article on how it works is now published.
+
+### Fixed
+
+- **Calendar "Sync now" and "Disconnect" now report what actually happened.** Previously these always showed a success message even if the sync or disconnect ran into trouble; they now show a clear error (or a "reconnect needed" / "partly disconnected" note) so you're never told something worked when it didn't.
+
 ## 2026-07-02
 
 ### Changed
