@@ -7278,6 +7278,24 @@ const STRING_DEFS = {
     en: 'beanies stopped syncing to this calendar.',
     beanie: 'beanies stopped syncing to this calendar.',
   },
+  'calendarSync.toast.syncFailed.title': { en: "Couldn't sync", beanie: "couldn't sync" },
+  'calendarSync.toast.syncFailed.message': {
+    en: 'Something went wrong syncing this calendar. beanies will try again automatically.',
+    beanie: 'something went wrong syncing this calendar. beanies will try again automatically.',
+  },
+  'calendarSync.toast.syncReconnect.title': { en: 'Reconnect needed', beanie: 'reconnect needed' },
+  'calendarSync.toast.syncReconnect.message': {
+    en: 'Google needs you to reconnect this calendar before it can sync again.',
+    beanie: 'google needs you to reconnect this calendar before it can sync again.',
+  },
+  'calendarSync.toast.disconnectPartial.title': {
+    en: 'Partly disconnected',
+    beanie: 'partly disconnected',
+  },
+  'calendarSync.toast.disconnectPartial.message': {
+    en: "Some events couldn't be removed yet. beanies will finish next time you open this.",
+    beanie: "some beans couldn't be removed yet. beanies will finish next time you open this.",
+  },
   'calendarSync.toast.connectFailed.title': { en: "Couldn't connect", beanie: "couldn't connect" },
   'calendarSync.toast.destinationFailed.title': {
     en: "Couldn't switch calendar",

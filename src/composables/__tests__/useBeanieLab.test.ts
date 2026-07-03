@@ -1,13 +1,11 @@
 /**
  * Unit tests for useBeanieLab — the single source of truth for Beanie Lab
- * visibility. Both SettingsPage (the section mount guard + drawer / deep-link
- * guards) and BeanieLabSection (the card list) consume these computeds, so this
- * is where the gating contract is pinned:
- *   - aiAvailable     = isFlagEnabled('aiPhotoExtract') OR isFlagEnabled('aiTravelExtract')
- *   - calendarAvailable = isFlagEnabled('googleCalendarSync')
- *   - hasAnyLabFeature  = aiAvailable OR calendarAvailable   (independent of the opt-in)
- *   - aiVisible       = labEnabled AND aiAvailable
- *   - calendarVisible = labEnabled AND calendarAvailable
+ * visibility. AI is the sole Lab feature (Google Calendar graduated to an
+ * official Settings card on 2026-07-03). SettingsPage (section mount + AI drawer
+ * guard) and BeanieLabSection (the AI card) consume these computeds:
+ *   - aiAvailable    = isFlagEnabled('aiPhotoExtract') OR isFlagEnabled('aiTravelExtract')
+ *   - hasAnyLabFeature = aiAvailable   (semantic alias; drives the section mount)
+ *   - aiVisible      = labEnabled AND aiAvailable
  */
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -40,21 +38,26 @@ describe('useBeanieLab', () => {
     mockIsFlagEnabled.mockImplementation((flag: string) => on.includes(flag));
   }
 
-  it('all hidden when the Lab is off, regardless of the flags', () => {
+  it('AI hidden when the Lab is off, regardless of the flags', () => {
     setLab(false);
-    const { labEnabled, aiVisible, calendarVisible } = useBeanieLab();
+    const { labEnabled, aiVisible } = useBeanieLab();
     expect(labEnabled.value).toBe(false);
     expect(aiVisible.value).toBe(false);
-    expect(calendarVisible.value).toBe(false);
   });
 
-  it('both AI and calendar visible when the Lab is on and every flag is alive', () => {
+  it('AI visible when the Lab is on and a reader flag is alive', () => {
     setLab(true);
     mockIsFlagEnabled.mockReturnValue(true);
-    const { aiVisible, calendarVisible } = useBeanieLab();
+    const { aiVisible } = useBeanieLab();
     expect(aiVisible.value).toBe(true);
-    expect(calendarVisible.value).toBe(true);
-    expect(mockIsFlagEnabled).toHaveBeenCalledWith('googleCalendarSync');
+  });
+
+  it('does NOT gate on googleCalendarSync (calendar is no longer a Lab feature)', () => {
+    setLab(true);
+    only('googleCalendarSync'); // only the calendar flag on, no reader flags
+    const { aiVisible, hasAnyLabFeature } = useBeanieLab();
+    expect(aiVisible.value).toBe(false);
+    expect(hasAnyLabFeature.value).toBe(false);
   });
 
   it('AI requires the Lab AND at least one reader flag (OR of the two readers)', () => {
@@ -70,32 +73,21 @@ describe('useBeanieLab', () => {
     expect(useBeanieLab().aiVisible.value).toBe(false);
   });
 
-  it('calendar requires the Lab AND googleCalendarSync', () => {
-    setLab(true);
-
-    only('googleCalendarSync');
-    expect(useBeanieLab().calendarVisible.value).toBe(true);
-
-    only(); // flag off
-    expect(useBeanieLab().calendarVisible.value).toBe(false);
-  });
-
   describe('hasAnyLabFeature (drives whether the section renders at all)', () => {
-    it('is false when no Lab feature is available — independent of the opt-in', () => {
+    it('is false when no reader flag is available — independent of the opt-in', () => {
       mockIsFlagEnabled.mockReturnValue(false);
 
       setLab(false);
       const off = useBeanieLab();
       expect(off.hasAnyLabFeature.value).toBe(false);
       expect(off.aiVisible.value).toBe(false);
-      expect(off.calendarVisible.value).toBe(false);
 
       // Even with the opt-in ON, nothing available ⟹ still empty.
       setLab(true);
       expect(useBeanieLab().hasAnyLabFeature.value).toBe(false);
     });
 
-    it.each(['aiPhotoExtract', 'aiTravelExtract', 'googleCalendarSync'])(
+    it.each(['aiPhotoExtract', 'aiTravelExtract'])(
       'is true when only %s is available, regardless of the opt-in',
       (flag) => {
         only(flag);
