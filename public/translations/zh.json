@@ -4432,9 +4432,9 @@
       "lastUpdated": "2026-03-03"
     },
     "modal.canViewFinances": {
-      "translation": "可以查看财务状况",
-      "hash": "doidtw",
-      "lastUpdated": "2026-03-03"
+      "translation": "可以查看和编辑财务状况",
+      "hash": "56qtut",
+      "lastUpdated": "2026-07-03"
     },
     "modal.canEditActivities": {
       "translation": "可编辑家庭活动和计划",

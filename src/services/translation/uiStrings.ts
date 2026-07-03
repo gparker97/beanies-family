@@ -187,7 +187,10 @@ const STRING_DEFS = {
   'modal.birthday': { en: 'Birthday', beanie: 'birthday' },
   'modal.profileColor': { en: 'Profile Color', beanie: 'profile color' },
   'modal.permissions': { en: 'Permissions', beanie: 'permissions' },
-  'modal.canViewFinances': { en: 'Can view finances', beanie: 'can view finances' },
+  'modal.canViewFinances': {
+    en: 'Can view and edit finances',
+    beanie: 'can view and edit finances',
+  },
   'modal.canEditActivities': {
     en: 'Can edit family activities and plans',
     beanie: 'can edit family activities and plans',
