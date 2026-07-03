@@ -5271,6 +5271,16 @@ const STRING_DEFS = {
     beanie: '{month} — {count} activities',
   },
   'planner.addActivity': { en: 'Add Activity', beanie: 'new activity' },
+  'planner.calendarNudge.title': {
+    en: 'See these in Google Calendar too',
+    beanie: 'see these in google calendar too',
+  },
+  'planner.calendarNudge.subtitle': {
+    en: "Link your calendar and your family's plans show up there automatically.",
+    beanie: "link your calendar and your family's plans show up there automatically.",
+  },
+  'planner.calendarNudge.connect': { en: 'Connect', beanie: 'connect' },
+  'planner.calendarNudge.dismiss': { en: 'Dismiss', beanie: 'dismiss' },
   'planner.segmentDeparture': { en: 'Departure', beanie: 'departure' },
   'planner.segmentArrival': { en: 'Arrival', beanie: 'arrival' },
   'planner.segmentDepartureShort': { en: 'Dep', beanie: 'dep' },
