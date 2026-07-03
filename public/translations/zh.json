@@ -3833,8 +3833,8 @@
     },
     "planner.addActivity": {
       "translation": "添加活动",
-      "hash": "wbbwsj",
-      "lastUpdated": "2026-03-03"
+      "hash": "l4t8gi",
+      "lastUpdated": "2026-07-03"
     },
     "planner.editActivity": {
       "translation": "编辑活动",
@@ -4437,9 +4437,9 @@
       "lastUpdated": "2026-03-03"
     },
     "modal.canEditActivities": {
-      "translation": "可以编辑家庭内容",
-      "hash": "j1rjfn",
-      "lastUpdated": "2026-04-24"
+      "translation": "可编辑家庭活动和计划",
+      "hash": "o9goho",
+      "lastUpdated": "2026-07-03"
     },
     "modal.canManagePod": {
       "translation": "可以管理家庭成员",
