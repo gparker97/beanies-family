@@ -38,6 +38,19 @@ describe('openExternal', () => {
     expect(document.querySelector('a')).toBeNull();
   });
 
+  it('no-ops loudly on an empty url without creating an anchor', () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    openExternal('');
+
+    expect(clickSpy).not.toHaveBeenCalled();
+    expect(errSpy).toHaveBeenCalledWith(
+      '[openExternal] called with an empty url — link will no-op'
+    );
+    expect(document.querySelector('a')).toBeNull();
+  });
+
   it('does not leak anchors across repeated calls', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
