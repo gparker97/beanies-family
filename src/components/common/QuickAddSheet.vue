@@ -22,13 +22,12 @@ import {
   type QuickAddGroup,
   type QuickAddItem,
 } from '@/constants/quickAddItems';
-import { isItemFlagEnabled } from '@/constants/navigation';
 import { useQuickAdd } from '@/composables/useQuickAdd';
 import { useTranslation } from '@/composables/useTranslation';
-import { usePermissions } from '@/composables/usePermissions';
+import { useQuickAddAvailability } from '@/composables/useQuickAddAvailability';
 
 const { t } = useTranslation();
-const { canViewFinances, canEditActivities } = usePermissions();
+const { itemAllowedForMember } = useQuickAddAvailability();
 const { isOpen, stage, allowedActions, close, triggerAction } = useQuickAdd();
 
 /**
@@ -42,9 +41,9 @@ const { isOpen, stage, allowedActions, close, triggerAction } = useQuickAdd();
  * (Family Scrapbook, Family Timeline) to keep the sheet relevant.
  */
 function itemAllowed(item: QuickAddItem): boolean {
-  if (!isItemFlagEnabled(item)) return false;
-  if (item.requiredPermission === 'finance' && !canViewFinances.value) return false;
-  if (item.requiredPermission === 'activities' && !canEditActivities.value) return false;
+  // Flag + permission gate is shared with QuickAddFab via useQuickAddAvailability;
+  // the sheet layers only its caller-supplied action filter on top.
+  if (!itemAllowedForMember(item)) return false;
   const filter = allowedActions.value;
   if (filter && !filter.includes(item.action)) return false;
   return true;

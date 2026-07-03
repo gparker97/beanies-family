@@ -15,13 +15,18 @@
 import { computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useQuickAdd } from '@/composables/useQuickAdd';
+import { useQuickAddAvailability } from '@/composables/useQuickAddAvailability';
 import { useTranslation } from '@/composables/useTranslation';
 
 const route = useRoute();
 const { t } = useTranslation();
 const { isOpen, toggle } = useQuickAdd();
+const { hasAnyQuickAddOption } = useQuickAddAvailability();
 
-const showFab = computed(() => !route.meta.hideQuickAdd);
+// Hidden on routes that opt out, AND when the member has no quick-add option at
+// all (otherwise the sheet opens empty — just a close button). A finance-only or
+// activities-only member still sees it; only a member with neither is excluded.
+const showFab = computed(() => !route.meta.hideQuickAdd && hasAnyQuickAddOption.value);
 
 // Dev guard: alert loudly during development if App.vue forgot to mount
 // the sprite. Production ships with the sprite in the root template, so
