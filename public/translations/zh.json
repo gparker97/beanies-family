@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-01",
-    "translationCount": 3636
+    "lastUpdated": "2026-07-03",
+    "translationCount": 3643
   },
   "translations": {
     "app.name": {
@@ -18185,6 +18185,41 @@
       "translation": "我们阅读了本PDF的前几页。完整文件仍在附件中。",
       "hash": "vrmea9",
       "lastUpdated": "2026-07-01"
+    },
+    "onboarding.privacy.reassure": {
+      "translation": "您的数据只属于您。",
+      "hash": "dtm2u2",
+      "lastUpdated": "2026-07-03"
+    },
+    "onboarding.privacy.guaranteed": {
+      "translation": "隐私，有保障。",
+      "hash": "zd0dxm",
+      "lastUpdated": "2026-07-03"
+    },
+    "onboarding.privacy.how": {
+      "translation": "如何做到?",
+      "hash": "1cc9b",
+      "lastUpdated": "2026-07-03"
+    },
+    "onboarding.privacy.proof1": {
+      "translation": "您的数据存在于只有您持有的文件中",
+      "hash": "f39ui0",
+      "lastUpdated": "2026-07-03"
+    },
+    "onboarding.privacy.proof2": {
+      "translation": "即使在云端，也只有您的密钥能解锁",
+      "hash": "xfdzvk",
+      "lastUpdated": "2026-07-03"
+    },
+    "onboarding.privacy.proof3": {
+      "translation": "我们永远无法读取它",
+      "hash": "3ss2um",
+      "lastUpdated": "2026-07-03"
+    },
+    "onboarding.privacy.learnMore": {
+      "translation": "了解具体运作方式 →",
+      "hash": "w15elx",
+      "lastUpdated": "2026-07-03"
     }
   }
 }

@@ -45,6 +45,14 @@ import { APP_URL } from '@beanies/brand/nav';
         fully encrypted. no ads, no tracking, no nonsense.
       </p>
 
+      <div class="hero__privacy">
+        <span class="hero__lockchip"><span aria-hidden="true">🔒</span> local-first</span>
+        <span class="hero__privacy-line">
+          <span class="hero__privacy-muted">your data never leaves your hands.</span>
+          <em class="hero__privacy-em">privacy, guaranteed.</em>
+        </span>
+      </div>
+
       <div class="hero__cta-group">
         <a data-testid="homepage-get-started" class="btn-primary" href={`${APP_URL}/welcome`}>
           start counting beans 🫘
@@ -866,7 +874,8 @@ import { APP_URL } from '@beanies/brand/nav';
   margin-bottom: 16px;
   position: relative;
 }
-.hero__headline em {
+.hero__headline em,
+.hero__privacy-em {
   background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
   background-clip: text;
   font-style: normal;
@@ -881,6 +890,38 @@ import { APP_URL } from '@beanies/brand/nav';
   max-width: 480px;
   opacity: 0.55;
   position: relative;
+}
+
+.hero__privacy {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin: 0 auto 28px;
+  max-width: 520px;
+  position: relative;
+}
+.hero__lockchip {
+  align-items: center;
+  background: rgb(39 174 96 / 10%);
+  border-radius: 999px;
+  color: var(--soft-green);
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 600;
+  gap: 5px;
+  padding: 4px 11px;
+}
+.hero__privacy-line {
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.hero__privacy-muted {
+  color: var(--deep-slate);
+  opacity: 0.7;
 }
 
 .hero__mascot {

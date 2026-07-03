@@ -21,6 +21,13 @@
  */
 export function openExternal(url: string): void {
   if (typeof document === 'undefined') return;
+  // Guard against an empty/unresolved href — an empty anchor href navigates to
+  // the current page (a silent no-op reload). Fail loud in the console instead
+  // so a mis-wired caller is caught in dev rather than silently doing nothing.
+  if (!url) {
+    console.error('[openExternal] called with an empty url — link will no-op');
+    return;
+  }
   const a = document.createElement('a');
   a.href = url;
   a.target = '_blank';

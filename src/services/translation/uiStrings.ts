@@ -6058,6 +6058,23 @@ const STRING_DEFS = {
   // Account step
   'onboarding.account.titlePrefix': { en: 'Add your first ', beanie: 'add your first ' },
   'onboarding.account.titleHighlight': { en: 'account', beanie: 'account' },
+  // Privacy reassurance shown before the first financial data entry.
+  'onboarding.privacy.reassure': {
+    en: 'Your data stays with you.',
+    beanie: 'your data stays with you.',
+  },
+  'onboarding.privacy.guaranteed': { en: 'Privacy, guaranteed.', beanie: 'privacy, guaranteed.' },
+  'onboarding.privacy.how': { en: 'How?', beanie: 'how?' },
+  'onboarding.privacy.proof1': {
+    en: 'your data lives in a file only you hold',
+    beanie: 'your data lives in a file only you hold',
+  },
+  'onboarding.privacy.proof2': {
+    en: "even in the cloud, it's locked to your key alone",
+    beanie: "even in the cloud, it's locked to your key alone",
+  },
+  'onboarding.privacy.proof3': { en: "we can't read it, ever", beanie: "we can't read it, ever" },
+  'onboarding.privacy.learnMore': { en: 'Learn how it works →', beanie: 'learn how it works →' },
   'onboarding.bank': { en: 'Bank', beanie: 'bank' },
   'onboarding.bankPlaceholder': { en: 'Select bank...', beanie: 'select bank...' },
   'onboarding.balance': { en: 'Balance', beanie: 'balance' },

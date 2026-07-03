@@ -1,13 +1,30 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onUnmounted } from 'vue';
+import { openExternal } from '@/utils/openExternal';
 
-defineProps<{
+const props = defineProps<{
   /** Hint text to display in the popover (plain text or array of bullet items) */
   text?: string;
   /** Array of bullet items — each rendered as a line with a marker */
   items?: string[];
   /** Use light-on-dark styling for dark card backgrounds */
   dark?: boolean;
+  /**
+   * Optional pill trigger label (ALREADY translated — pass `t('key')`, this
+   * component never calls `t()`). When set, renders a labeled "How?"-style pill
+   * with the "?" badge at the end, instead of the default bare "?" badge.
+   *
+   * NOTE: this is the last acceptable prop-based trigger variant. A third
+   * trigger shape must refactor to a `<slot name="trigger">`, not another prop.
+   */
+  triggerLabel?: string;
+  /**
+   * Optional foot link (ALREADY-translated text + absolute href). When set,
+   * renders a link at the foot of the popover. Opens externally via
+   * `openExternal` (native-safe). href must be absolute (cross-origin help
+   * lives on the marketing apex — build with `MARKETING_URL`).
+   */
+  link?: { text: string; href: string };
 }>();
 
 const show = ref(false);
@@ -54,6 +71,13 @@ async function toggle() {
   }
 }
 
+/** Opens the foot link externally (native-safe) and closes the popover. */
+function openLink() {
+  if (!props.link) return;
+  openExternal(props.link.href);
+  show.value = false;
+}
+
 function onDocClick(e: MouseEvent) {
   if (el.value && !el.value.contains(e.target as Node)) show.value = false;
 }
@@ -63,7 +87,30 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
 
 <template>
   <span ref="el" class="relative inline-flex">
+    <!-- Pill trigger: word + "?" badge (bigger tap target). Both trigger
+         branches keep ref="btn" so positionPopover() can measure either. -->
     <button
+      v-if="triggerLabel"
+      ref="btn"
+      type="button"
+      class="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors"
+      :class="
+        dark
+          ? 'bg-white/10 text-white/85 hover:bg-white/20'
+          : 'bg-heritage-orange/10 text-heritage-orange hover:bg-heritage-orange/20'
+      "
+      @click.stop="toggle"
+    >
+      {{ triggerLabel }}
+      <span
+        class="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[0.625rem] leading-none font-bold"
+        :class="dark ? 'bg-white/20' : 'bg-heritage-orange/20'"
+        >?</span
+      >
+    </button>
+    <!-- Default bare "?" badge (all existing call sites). -->
+    <button
+      v-else
       ref="btn"
       type="button"
       class="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-[0.625rem] leading-none font-bold"
@@ -101,6 +148,16 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
             </li>
           </ul>
         </template>
+        <!-- Optional foot link → opens externally (native-safe) and closes. -->
+        <button
+          v-if="link"
+          type="button"
+          class="text-heritage-orange mt-2.5 block w-full cursor-pointer border-t pt-2.5 text-left text-xs font-semibold hover:underline"
+          :class="dark ? 'border-white/15' : 'border-gray-200 dark:border-slate-600'"
+          @click.stop="openLink"
+        >
+          {{ link.text }}
+        </button>
       </div>
     </Teleport>
   </span>
