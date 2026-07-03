@@ -17,6 +17,52 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.03',
+    date: '2026-07-03',
+    month: '3 july 2026',
+    spotlight: true,
+    summary: {
+      en: 'Google Calendar sync is now official, plus a clearer privacy promise as you set up.',
+      beanie: 'google calendar sync is now official, plus a clearer privacy promise as you set up.',
+    },
+    features: [
+      {
+        icon: '📅',
+        title: {
+          en: 'Google Calendar sync is official',
+          beanie: 'google calendar sync is official',
+        },
+        description: {
+          en: "Syncing your family's activities to your Google Calendar is now a proper feature with its own card in Settings, no experimental toggle needed. Connect a calendar, choose where events go, and beanies keeps it in sync. Google's review is done, so anyone can turn it on.",
+          beanie:
+            "syncing your family's activities to your google calendar is now a proper feature with its own card in settings, no experimental toggle needed. connect a calendar, choose where events go, and beanies keeps it in sync. google's review is done, so anyone can turn it on.",
+        },
+      },
+      {
+        icon: '🔒',
+        title: { en: 'Your data stays with you', beanie: 'your data stays with you' },
+        description: {
+          en: 'When you add your first account, beanies now spells out the privacy promise with a quick "How?" note: your data lives in a file only you hold, it stays locked to your key even in the cloud, and we can\'t read it. Ever.',
+          beanie:
+            'when you add your first account, beanies now spells out the privacy promise with a quick "how?" note: your data lives in a file only you hold, it stays locked to your key even in the cloud, and we can\'t read it. ever.',
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.07.02',
     date: '2026-07-02',
     month: '2 july 2026',
