@@ -7,6 +7,7 @@ import { usePlannerNavigation, type PlannerView } from '@/composables/usePlanner
 import CalendarGrid from '@/components/planner/CalendarGrid.vue';
 import WeeklyCalendarView from '@/components/planner/WeeklyCalendarView.vue';
 import DailyCalendarView from '@/components/planner/DailyCalendarView.vue';
+import CalendarConnectNudge from '@/components/planner/CalendarConnectNudge.vue';
 import ActivityModal from '@/components/planner/ActivityModal.vue';
 import ActivityViewEditModal from '@/components/planner/ActivityViewEditModal.vue';
 import TravelSegmentEditModal from '@/components/travel/TravelSegmentEditModal.vue';
@@ -726,6 +727,12 @@ function handleActivitySwapped(newId: string) {
       @view-segment="handleViewSegment"
       @holiday-click="handleHolidayClick"
     />
+
+    <!-- Connect-Google-Calendar nudge — below the calendar (month view), self-
+         gating (flag on + not connected + not dismissed). Never above the grid.
+         The mt-4 falls through to the banner root, which only renders when the
+         nudge is actually shown, so there's no empty spacer when it's hidden. -->
+    <CalendarConnectNudge v-if="activeView === 'month'" class="mt-4" />
 
     <!-- Inactive activities toggle (month view only) -->
     <div v-if="activeView === 'month' && activityStore.inactiveActivities.length > 0" class="mt-4">

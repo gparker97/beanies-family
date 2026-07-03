@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-07-03",
-    "translationCount": 3649
+    "translationCount": 3653
   },
   "translations": {
     "app.name": {
@@ -18249,6 +18249,26 @@
     "calendarSync.toast.disconnectPartial.message": {
       "translation": "部分活动尚无法移除。下次打开时 beanies 会完成清理。",
       "hash": "6tf1hd",
+      "lastUpdated": "2026-07-03"
+    },
+    "planner.calendarNudge.title": {
+      "translation": "也可以在Google日历中查看这些",
+      "hash": "r9ope0",
+      "lastUpdated": "2026-07-03"
+    },
+    "planner.calendarNudge.subtitle": {
+      "translation": "关联您的日历，全家的计划就会自动显示在那里。",
+      "hash": "5r37ja",
+      "lastUpdated": "2026-07-03"
+    },
+    "planner.calendarNudge.connect": {
+      "translation": "连接",
+      "hash": "rrlzqu",
+      "lastUpdated": "2026-07-03"
+    },
+    "planner.calendarNudge.dismiss": {
+      "translation": "关闭",
+      "hash": "fur0k6",
       "lastUpdated": "2026-07-03"
     }
   }
