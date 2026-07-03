@@ -12,31 +12,31 @@ author: greg
 draft: true
 ---
 
-First off, let me apologize for missing my post last week. I know you all must be incredibly sad.
+First off, to all the fans of my Substack who regularly heart my articles, let me apologize for missing my scheduled post last week while I was travelling. You must be feeling incredibly sad and lonely. I therefore offer my sincerest and most humble apologies, to both of you.
 
-I was travelling with my family in China - and on top of that, the official approval for my Google Calendar integration had not come in yet. Now that both are done, I'm back to writing, which I'm sure you are all thrilled about. Until the next thing.
+However, now that my trip is over, I bring positive news: The official approval for the beanies.family Google Calendar integration is in! So I'm back to writing for my precious beans, bestowing upon my loving followers, week after week, breaking beanie news and amusing anecdotes, in a desperate but ultimately vain effort to quench the massive thirst, deep in my soul, that can only be satisfied by restacks and a handful of likes.
 
-I'm the author of beanies - the owner, the designer, the developer, the first ever pilot user. What's my process when a new family activity comes up? First, I add it in beanies. Then I add it in our family's shared Google calendar.
+But getting back to the point.
+
+I'm the author of beanies - the owner, the designer, the developer, and the first pilot user. What's my process when a new family activity comes up? First, I add it in beanies, then I add it in our family's shared Google Calendar.
 
 Fun.
 
-Telling someone to abandon a system they've been using for 20 years is a big ask - trust me - I refuse to do it myself. But seriously, if _I_, the head beanie-dude himself, can't break the Google Calendar habit, how can I expect others to?
+Telling someone to abandon a system they've been using for 20 years is a big ask - I know from experience. But seriously, if _I_, the head beanie-dude himself, can't break the Google Calendar habit, how can I expect that from others?
 
-Think about it this way: There's always that one person in your life who refuses to change their system, and will never give in no matter how much you plead (you know who I'm talking about). How we can work with that person to adopt this new and exciting family organization system, while still staying true to what's familiar?
+There's always that one person in your life who refuses to change their system, and will never give in no matter how much you plead (you know who I'm talking about). How can we work with that person to adopt this new and exciting family organization system, while still staying true to what's familiar?
 
-So, I posed the question to my claude-bot. Because clearly, somebody smarter than me needed to figure this quandary out.
+I don't know the answer to that, so I posed the question to my claude-bot. Because clearly, somebody smarter than me needed to figure this quandary out.
 
 _Hey, claude-bot - a calendar app on your phone is ubiquitous, and it's the first thing most people see on their home screen. beanies is also a calendar - or, at least a big part of it is. So, where do we fit in?_
 
-The answer? _Simple. Just push the events in beanies.family to your Google calendars, you knucklehead._
+The answer? _Simple. Just push the events in beanies.family to your Google Calendars, you knucklehead._
 
 I'm paraphrasing. My claude-bot didn't actually call me a knucklehead. He used the term "lunkhead", which I believe is more politically correct.
 
-In all seriousness though, the answer was really that simple.
+So, here we are. I'm happy to present, to my lovely beanie users: **_the [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=google-calendar-integration) Google Calendar integration_**!
 
-So, here we are. I'm happy to present, to my lovely beanie users: **_the [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=google-calendar-integration) Google calendar integration_**!
-
-If you're attached at the hip to your calendars like me, I understand and agree with you. beanies.family now pushes your events to your precious calendars - whether it's your personal calendar, your partner's calendar, your shared family calendar, or anything else, you're covered. I know - you're so happy right now you could cry. Or maybe that's just me.
+If you're attached at the hip to your calendars (like me), trust me, I understand. beanies.family now pushes your events to your precious calendars - whether it's your personal calendar, your partner's calendar, your shared family calendar, or anything else, you're covered. I know - you're so happy right now you could cry. Or maybe that's just me.
 
 **How does the beanies calendar integration work?**
 
@@ -50,7 +50,7 @@ _Privacy aside:_ beanies can technically see events on the calendars you own, bu
 
 _connect one (or more) calendars here, and every activity or travel plan in beanies will magically appear in those calendars_
 
-Add an event to the beanies.family activity calendar. A birthday party, a soccer practice, a date night, or anything else, and boom! Like magic, it's added not only to your beanies calendar, but pushed to your connected calendars as well, including all of the information in the event.
+Add an event to the beanies.family activity calendar. A birthday party, a soccer practice, a date night, or anything else, and boom! Like magic, it's added, not only to your beanies calendar, but pushed to your connected calendars as well, including all of the information in the event.
 
 - Your calendar? Check
 - Your partner's calendar? Check
@@ -63,13 +63,13 @@ Two reasons.
 
 _First:_ Synchronization nightmare hell.
 
-For true two-way synchronization to work, your two sources of data are going to be constantly fighting about who's right. What happens when two events are scheduled at the same time, for the same people? Somebody, or something, has to break the deadlock.
+For true two-way synchronization to work, your two sources of data are going to be constantly fighting about who's right. What happens when two events are scheduled at the same time, for the same people? Something, or some*body*, has to break the deadlock.
 
-Your family deserves a single, solitary, golden source of data. Let your data fan out from that one place, cleanly, to as many calendars as you'd like.
+Your family deserves a single, solitary, deliciously golden source of data. When your data fans out from that one source, cleanly, to as many calendars as you'd like, that's a beautiful thing.
 
-The _second_ reason is that beanies.family activity data is so much richer than what you get in almost any other calendar app.
+The _second_ reason is that beanies.family activity and travel data is so much richer than what you'd get in almost any other calendar app.
 
-Look at the fields you get with Google calendar:
+Look at the fields you get with Google Calendar:
 
 - Date
 - Time
@@ -86,7 +86,7 @@ What do you get with beanies? Not only the above, but:
 - Who's dropping off?
 - Who's the instructor?
 - What's their emergency contact number?
-- And lots more
+- Lots more
 
 All of this rich data is pushed to your connected calendars, even if we have to literally (well - figuratively) stuff it into the description field. So it's always there, and you never miss a beat.
 
@@ -116,9 +116,9 @@ Oh - by the way, _you're welcome_.
 
 Really? Well then why the heck didn't you tell me earlier?!
 
-You know I've been languishing in a semi-empty discord chat room (no offense to the wonderful early adopter beanies who are already there), waiting like a disgruntled Aaron Burr for people like you to join and start a conversation! Sorry for throwing in another _Hamilton_ reference there. But seriously, don't you want to be in the [room where it happens](https://discord.com/invite/NE4grWzjxV)?
+You know I've been languishing in a semi-empty discord chat room (no offense to the wonderful early adopter beanies who are already there), waiting like a disgruntled Aaron Burr for people like you to join and start a conversation! Sorry for throwing in yet another reference from my favorite historical musical. But seriously, don't you want to be in the [room where it happens](https://discord.com/invite/NE4grWzjxV)?
 
-So join me on the [beanies.family discord](https://discord.com/invite/NE4grWzjxV) and let me know! Not to mention, be the first to hear about new features, my thoughts, upcoming launches, and just have some general, fun, beanie (or non-beanie) related chat.
+So [join me on discord](https://discord.com/invite/NE4grWzjxV) and let me know! Not to mention, be the first to hear about new features, my thoughts on what's to come, upcoming launches, and just have some general, fun, beanie (or non-beanie) related chat.
 
 So there we are. I hope you enjoy your newly enriched calendars. And to pull back the curtain a bit, I'm hoping that (real) apps are also coming soon.
 
