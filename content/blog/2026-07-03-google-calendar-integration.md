@@ -1,11 +1,11 @@
 ---
-title: 'keeping everything in sync'
+title: 'keeping your calendars in sync'
 slug: google-calendar-integration
 date: 2026-07-03
 category: feature announcement
 coverEmoji: 📅
 excerpt: "If you can't break the Google Calendar habit (I can't either), beanies now pushes every family activity - who's going, who's paying, who's picking up - straight to your calendars. One golden source of truth, fanned out everywhere you already look."
-subtitle: 'the inevitable and inimitable google calendar integration'
+subtitle: 'the inevitable (and inimitable) google calendar integration'
 featured: false
 author: greg
 draft: true
