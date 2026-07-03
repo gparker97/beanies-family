@@ -28,7 +28,7 @@ So, I posed the question to my claude-bot. Because clearly, somebody smarter tha
 
 _Hey, claude-bot - a calendar app on your phone is ubiquitous, and it's the first thing most people see on their home screen. beanies is also a calendar - or, at least a big part of it is. So, where do we fit in?_
 
-The answer? Simple. _Just push the events in beanies.family to your Google calendars, you knucklehead._
+The answer? _Simple. Just push the events in beanies.family to your Google calendars, you knucklehead._
 
 I'm paraphrasing. My claude-bot didn't actually call me a knucklehead. He used the term "lunkhead", which I believe is more politically correct.
 
@@ -42,9 +42,9 @@ If you're attached at the hip to your calendars like me, I understand and agree 
 
 First, set it up.
 
-Navigate to the settings page and find the "calendar" box. From there, tap "connect a google calendar" and complete the Google consent flow to allow beanies.family access to push events to your connected calendar(s).
+Navigate to the **settings** page and find the "calendar" box. From there, tap "connect a google calendar" and complete the Google consent flow to allow beanies.family access to **push** events to your connected calendar(s).
 
-**Privacy aside:** beanies can technically see events on the calendars you own, but by design we only ever create and update events we own, and we only ask Google whether you're busy (and not for the details of any existing event). These are the limitations of the privacy scopes allowed by Google - you can trust me on that, because Google just spent the last 3+ weeks confirming that we're using the appropriate scopes before approving our integration.
+_Privacy aside:_ beanies can technically see events on the calendars you own, but **by design** we only ever create and update events we own, and we only ask Google whether you're busy (and not for the details of any existing event). These are the limitations of the privacy scopes allowed by Google - you can trust me on that, because Google just spent the last 3+ weeks confirming that we're using the appropriate scopes before approving our integration.
 
 ![the beanies.family settings page showing the calendar box where you connect a google calendar](/blog/beanies-google-calendar-settings.webp)
 
@@ -61,13 +61,13 @@ Add an event to the beanies.family activity calendar. A birthday party, a soccer
 
 Two reasons.
 
-First: Synchronization nightmare hell.
+_First:_ Synchronization nightmare hell.
 
 For true two-way synchronization to work, your two sources of data are going to be constantly fighting about who's right. What happens when two events are scheduled at the same time, for the same people? Somebody, or something, has to break the deadlock.
 
 Your family deserves a single, solitary, golden source of data. Let your data fan out from that one place, cleanly, to as many calendars as you'd like.
 
-The second reason is that beanies.family activity data is so much richer than what you get in almost any other calendar app.
+The _second_ reason is that beanies.family activity data is so much richer than what you get in almost any other calendar app.
 
 Look at the fields you get with Google calendar:
 
@@ -94,7 +94,7 @@ All of this rich data is pushed to your connected calendars, even if we have to 
 
 _there's so much useful information here i could cry. again._
 
-**Start in Google and you're lost. Start in beanies and you're found.**
+Start in Google and you're lost. Start in beanies and you're found.
 
 **But still - what happens if there's a conflict?**
 
@@ -104,19 +104,19 @@ Okay, if you really want to get into it, I'll go there with you. Take my hand, o
 
 If beanies tries to push an event to one of your calendars when an item or event already exists, it'll first check to see if the event was created by beanies or not. If it was created by beanies and the titles match up, we're sittin' pretty. We update that event with the latest details so everything is in sync. Easy peasy, lemon squeezy.
 
-However, if beanies finds an event that doesn't match the one we're trying to push, then Houston, we have a problem. First, beanies will create the event and label it as a potential conflict. A marker will be placed on the beanies.family calendar item as well, as if to tell you, "Hey! There's something not right here! Maybe you need to have a talk." And you can dismiss that conflict warning at any time if the conflict is expected.
+However, if beanies finds an event that _doesn't_ match the one we're trying to push, then Houston, we have a problem. First, beanies will create the event and label it as a potential conflict. A marker will be placed on the beanies.family calendar item as well, as if to tell you, "Hey! There's something not right here! Maybe you need to have a talk." And you can dismiss that conflict warning at any time if the conflict is expected.
 
 ![a beanies calendar item marked with a potential conflict warning](/blog/beanies-google-calendar-conflict.webp)
 
 _just beanies trying (perhaps too hard?) to be helpful_
 
-Oh - by the way, you're welcome.
+Oh - by the way, _you're welcome_.
 
-_OMG, this is it! This is the feature I've been waiting for!_
+**OMG, this is it! This is the feature I've been waiting for!**
 
 Really? Well then why the heck didn't you tell me earlier?!
 
-You know I've been languishing in a semi-empty discord chat room (no offense to the wonderful early adopter beanies who are already there), waiting like a disgruntled Aaron Burr for people like you to join and start a conversation! Sorry for throwing in another Hamilton reference there. But seriously, don't you want to be in the room where it happens?
+You know I've been languishing in a semi-empty discord chat room (no offense to the wonderful early adopter beanies who are already there), waiting like a disgruntled Aaron Burr for people like you to join and start a conversation! Sorry for throwing in another _Hamilton_ reference there. But seriously, don't you want to be in the [room where it happens](https://discord.com/invite/NE4grWzjxV)?
 
 So join me on the [beanies.family discord](https://discord.com/invite/NE4grWzjxV) and let me know! Not to mention, be the first to hear about new features, my thoughts, upcoming launches, and just have some general, fun, beanie (or non-beanie) related chat.
 
