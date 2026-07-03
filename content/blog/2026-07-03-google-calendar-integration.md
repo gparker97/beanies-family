@@ -9,7 +9,7 @@ excerpt: "If you can't break the Google Calendar habit (I can't either), beanies
 subtitle: 'the inevitable (and inimitable) google calendar integration'
 featured: false
 author: greg
-draft: true
+draft: false
 ---
 
 First off, to all the fans of my Substack who regularly heart my articles, let me apologize for missing my scheduled post last week while I was travelling. You must be feeling incredibly sad and lonely. I therefore offer my sincerest and most humble apologies, to both of you.
