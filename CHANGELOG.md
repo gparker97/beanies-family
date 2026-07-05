@@ -14,6 +14,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Homepage "why I built this" now reflects the Google Calendar integration.** The line that said beanies "doesn't pull in stuff from google calendar (yet)" now notes that while it still doesn't pull _in_, it does **push** your family activities _out_ to your calendars — linking to the new blog post on how it works. (It still won't sync with banks.)
 - **The To-Do member filter is clearer.** On the To-Do page, the row of family-member pills that filters the list has moved up next to Sort and is now labelled "Showing" — so it reads as a way to _view_ whose to-dos you're looking at, not a way to assign the task you're adding. Assigning is still done with the person picker on the add bar, unchanged.
+- **The To-Do add bar looks like one piece.** On tablet and desktop, the entry field, due-date, and assignee controls now share the same height, rounded corners, and resting colour, so the row reads left-to-right as "what needs doing → when → who". The due-date and assignee buttons are now clearly labelled ("Due date", "Assign") and fill with colour once you set them.
 
 ## 2026-07-03
 

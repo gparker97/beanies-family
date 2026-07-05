@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-07-05",
-    "translationCount": 3656
+    "translationCount": 3657
   },
   "translations": {
     "app.name": {
@@ -18284,6 +18284,11 @@
     "todo.filterGroupLabel": {
       "translation": "按成员筛选待办事项",
       "hash": "ycl8kf",
+      "lastUpdated": "2026-07-05"
+    },
+    "todo.assign": {
+      "translation": "分配",
+      "hash": "wl9frj",
       "lastUpdated": "2026-07-05"
     }
   }

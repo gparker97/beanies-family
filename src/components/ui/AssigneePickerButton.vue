@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useTranslation } from '@/composables/useTranslation';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 
 const props = withDefaults(
@@ -12,9 +13,18 @@ const props = withDefaults(
     size?: 'sm' | 'md';
     /** Popover alignment */
     align?: 'left' | 'right';
+    /**
+     * Trigger appearance. `'default'` sizes to its content. `'composer'` is
+     * the taller squircle slot used in the To-Do quick-add row so the picker
+     * aligns with the entry bar and date picker (same height + corner), and
+     * shows an explicit "Assign" label when empty. Opt-in only.
+     */
+    variant?: 'default' | 'composer';
   }>(),
-  { mode: 'multi', size: 'md', align: 'right' }
+  { mode: 'multi', size: 'md', align: 'right', variant: 'default' }
 );
+
+const { t } = useTranslation();
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | string[]];
@@ -130,9 +140,11 @@ onUnmounted(() => {
   <div ref="el" class="relative flex shrink-0 items-center">
     <button
       type="button"
-      class="flex items-center gap-1 rounded-2xl transition-colors"
+      class="flex items-center rounded-2xl transition-colors"
       :class="[
-        size === 'sm' ? 'px-2.5 py-1.5' : 'px-3 py-2',
+        variant === 'composer'
+          ? 'h-[3.25rem] gap-2 px-4'
+          : [size === 'sm' ? 'px-2.5 py-1.5' : 'px-3 py-2', 'gap-1'],
         hasSelection ? 'bg-[var(--tint-purple-8)]' : 'hover:bg-[var(--tint-slate-10)]',
       ]"
       :style="!hasSelection ? 'background: var(--tint-slate-5)' : undefined"
@@ -156,6 +168,12 @@ onUnmounted(() => {
       </template>
       <template v-else>
         <span :class="size === 'sm' ? 'text-sm' : 'text-base'">👤</span>
+        <span
+          v-if="variant === 'composer'"
+          class="font-outfit text-sm font-semibold text-[var(--color-text)] opacity-75"
+        >
+          {{ t('todo.assign') }}
+        </span>
         <span class="text-xs text-[var(--color-text-muted)]">+</span>
       </template>
     </button>
