@@ -82,6 +82,11 @@ let needsRehydrate = false;
  * #5 wires this to the persistent "local durability broken" banner. */
 let cachePersistFailedHandler: ((failed: boolean) => void) | null = null;
 
+/** Notified after every successful local `mutate` — syncService maps it to a
+ * debounced Drive save (replaces the old `onDocPersistNeeded` fan-out; the worker
+ * owns the cache persist internally, so this only drives the remote upload). */
+let localChangeHandler: (() => void) | null = null;
+
 // ─── Configuration seams (production wiring + tests) ─────────────────────────
 
 /** Test/DI: override how the worker is created. */
@@ -105,6 +110,10 @@ export function setRehydrator(fn: ((familyId: string) => Promise<void>) | null):
 /** Task #5: observe worker cache-persist failures (durability banner). */
 export function setCachePersistFailedHandler(fn: ((failed: boolean) => void) | null): void {
   cachePersistFailedHandler = fn;
+}
+/** Task #5: called after every successful local mutate (→ debounced Drive save). */
+export function setLocalChangeHandler(fn: (() => void) | null): void {
+  localChangeHandler = fn;
 }
 
 // ─── Message routing ─────────────────────────────────────────────────────────
@@ -324,9 +333,12 @@ export async function initAndLoadCache(familyId: string): Promise<{ loaded: bool
   return request('initAndLoadCache', { familyId });
 }
 
-/** Apply a declarative mutation; the response carries the entity + projection delta. */
-export function mutate<T = unknown>(op: MutationOp, opts?: RequestOpts): Promise<T> {
-  return request<T>('mutate', op, opts);
+/** Apply a declarative mutation; the response carries the entity + projection
+ * delta. Fires the local-change handler (→ Drive save) after a successful write. */
+export async function mutate<T = unknown>(op: MutationOp, opts?: RequestOpts): Promise<T> {
+  const result = await request<T>('mutate', op, opts);
+  localChangeHandler?.();
+  return result;
 }
 
 /** Decrypt + merge a fetched remote envelope; returns heads + heads-derived dirty. */
@@ -341,6 +353,21 @@ export function mergeRemoteEnvelope(
 /** Serialize + encrypt the current doc; main assembles the envelope + uploads. */
 export function exportEncryptedPayload(): Promise<{ payload: string }> {
   return request('exportEncryptedPayload');
+}
+
+/** Verify a fetched/round-tripped envelope decrypts + materializes (no install).
+ * Rejects with `CorruptPayloadError` if not. Pass `{quiet}` on classify-locally paths. */
+export function verifyEnvelope(envelope: BeanpodFileV4, opts?: RequestOpts): Promise<{ ok: true }> {
+  return request('verifyEnvelope', { envelope }, opts);
+}
+
+/** DEV/E2E-only: load a raw (unencrypted) Automerge binary as the doc. */
+export function loadSnapshot(binary: Uint8Array): Promise<{ loaded: true }> {
+  return request('loadSnapshot', { binary });
+}
+/** DEV/E2E-only: serialize the doc to a raw (unencrypted) binary. */
+export function exportSnapshot(): Promise<{ binary: Uint8Array }> {
+  return request('exportSnapshot');
 }
 
 export function getHeads(): Promise<{ heads: Heads }> {
@@ -371,6 +398,12 @@ export function readEnvelope(): Promise<{ envelope: BeanpodFileV4 | null }> {
 export function flush(): Promise<void> {
   return request('flush');
 }
+/** Drop the current doc but keep the key + cache (replace-load: the next merge
+ * adopts remote fresh). Does NOT clear the projection (the merge repopulates it). */
+export function dropDoc(): Promise<void> {
+  return request('dropDoc');
+}
+
 /** Drop the in-memory doc + projection (sign-out); does NOT delete the cache. */
 export async function reset(): Promise<void> {
   currentFamilyId = null;
@@ -404,4 +437,5 @@ export function __resetDocClientForTesting(): void {
   inlineExecutor = null;
   rehydrator = null;
   cachePersistFailedHandler = null;
+  localChangeHandler = null;
 }

@@ -247,6 +247,15 @@ export async function mergeRemoteEnvelope(
   return { heads, dirty };
 }
 
+/** Decrypt + materialize-check a fetched envelope WITHOUT installing it (verify
+ * a written/round-tripped payload loads cleanly). Throws `CorruptPayloadError`
+ * if not; otherwise `{ok:true}`. Uses the current family key. */
+export async function verifyEnvelope(envelope: BeanpodFileV4): Promise<{ ok: true }> {
+  const key = requireKey('verifyEnvelope');
+  await decryptToDoc(envelope, key); // throws CorruptPayloadError on bad bytes
+  return { ok: true };
+}
+
 /** Serialize + encrypt the current doc → base64 payload (main assembles the
  * envelope + uploads; key material never leaves main for the upload path). */
 export async function exportEncryptedPayload(): Promise<{ payload: string }> {
@@ -296,6 +305,13 @@ export async function flush(): Promise<void> {
     persistTimer = null;
   }
   await persistNow();
+}
+
+/** Drop the current doc but KEEP the family key + cache (replace semantics: the
+ * next `mergeRemoteEnvelope` adopts the remote as a fresh doc rather than merging
+ * into a stale one). Used when loading a file to REPLACE, not merge. */
+export function dropDoc(): void {
+  currentDoc = null;
 }
 
 /** Drop the in-memory doc + cancel the debounce (sign-out). Does NOT delete the
@@ -364,6 +380,8 @@ export async function dispatch(
       };
     case 'exportEncryptedPayload':
       return { result: await exportEncryptedPayload() };
+    case 'verifyEnvelope':
+      return { result: await verifyEnvelope(a.envelope as BeanpodFileV4) };
     case 'getHeads':
       return { result: getHeads() };
     case 'getChangesSince':
@@ -383,6 +401,9 @@ export async function dispatch(
       return { result: exportSnapshot() };
     case 'flush':
       await flush();
+      return {};
+    case 'dropDoc':
+      dropDoc();
       return {};
     case 'reset':
       reset();
