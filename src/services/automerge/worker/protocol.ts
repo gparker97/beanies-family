@@ -85,7 +85,23 @@ export type RpcResponse = RpcOk | RpcErr;
 export type WorkerSignal =
   | { signal: 'ready' }
   | { signal: 'perf'; label: string; durationMs: number; ctx?: Record<string, number> }
-  | { signal: 'log'; level: 'debug' | 'info' | 'warn' | 'error'; message: string };
+  | { signal: 'log'; level: 'debug' | 'info' | 'warn' | 'error'; message: string }
+  /**
+   * A streamed projection chunk for a first-load / remote-merge. The worker
+   * posts these across successive messages (one per collection slice) BEFORE the
+   * triggering RPC's response, so each is applied on the main thread as its own
+   * task (no single long task) and all land before the promise resolves (the
+   * load/merge barrier). `final` marks the last chunk — `docClient` bumps
+   * `docVersion` once then, not per-chunk. See ADR-032.
+   */
+  | { signal: 'projection'; delta: ProjectionDelta; final: boolean }
+  /**
+   * The worker's debounced cache persist failed (or recovered). Main maps this
+   * to the persistent "local durability broken" banner — the worker owns the
+   * cache post-migration, so this replaces the old main-thread
+   * `setCachePersistFailed` coupling. See ADR-032 (Persist/Drive split).
+   */
+  | { signal: 'cache-persist-failed'; failed: boolean };
 
 /** Type guards for routing an inbound worker message. */
 export function isRpcResponse(m: unknown): m is RpcResponse {
