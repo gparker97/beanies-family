@@ -12,6 +12,9 @@
  */
 import * as Automerge from '@automerge/automerge';
 
+/* eslint-disable no-console -- throwaway spike diagnostics */
+console.log('[spikeWorker] module loaded, Automerge =', typeof Automerge.init);
+
 type Txn = {
   id: string;
   accountId: string;
@@ -71,15 +74,18 @@ async function generate(targetCount: number): Promise<{
   entityCount: number;
   buildMs: number;
 }> {
+  console.log('[spikeWorker] generate start, target =', targetCount);
   const t0 = performance.now();
   let d = Automerge.init<SpikeDoc>();
   d = Automerge.change(d, (s) => {
     s.transactions = {};
     s.activities = {};
   });
-  const BATCH = 2000;
+  console.log('[spikeWorker] init done', Math.round(performance.now() - t0), 'ms');
+  const BATCH = 1000;
   let i = 0;
   while (i < targetCount) {
+    const tb = performance.now();
     d = Automerge.change(d, (s) => {
       const end = Math.min(i + BATCH, targetCount);
       for (; i < end; i++) {
@@ -87,9 +93,11 @@ async function generate(targetCount: number): Promise<{
         s.transactions[t.id] = t;
       }
     });
+    console.log('[spikeWorker] batch →', i, `(${Math.round(performance.now() - tb)}ms)`);
     post({ type: 'progress', built: i, target: targetCount });
     await new Promise((r) => setTimeout(r, 0));
   }
+  console.log('[spikeWorker] all batches done, saving…');
   // one churn pass for a bit of edit history (not just inserts)
   d = Automerge.change(d, (s) => {
     for (const k of Object.keys(s.transactions).slice(0, Math.min(3000, targetCount))) {
