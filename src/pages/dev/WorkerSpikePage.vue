@@ -13,7 +13,8 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 type Row = { label: string; value: string; warn?: boolean; good?: boolean };
 const rows = ref<Row[]>([]);
 const running = ref(false);
-const targetMB = ref(2);
+const targetCount = ref(20_000);
+const status = ref('');
 const ua = navigator.userAgent;
 
 let worker: Worker | null = null;
@@ -81,8 +82,16 @@ async function run() {
       }
     );
 
-    worker.postMessage({ type: 'generate', targetBytes: Math.round(targetMB.value * 1_048_576) });
+    const onProgress = (e: MessageEvent) => {
+      const d = e.data as Record<string, unknown>;
+      if (d?.type === 'progress') status.value = `Building doc… ${d.built}/${d.target} txns`;
+    };
+    worker.addEventListener('message', onProgress);
+    status.value = 'Building doc…';
+    worker.postMessage({ type: 'generate', targetCount: targetCount.value });
     const gen = await waitFor('generated');
+    worker.removeEventListener('message', onProgress);
+    status.value = '';
     if (gen.type === 'error') return push('Generate FAILED', String(gen.message), { warn: true });
     push(
       'Doc built',
@@ -164,14 +173,14 @@ async function run() {
       the numbers, then delete this page.
     </p>
 
-    <div style=" align-items: center;display: flex; gap: 10px; margin-bottom: 16px">
-      <label style="font-size: 0.85rem">Target doc size (MB):</label>
+    <div style="align-items: center; display: flex; gap: 10px; margin-bottom: 16px">
+      <label style="font-size: 0.85rem">Transactions (count):</label>
       <input
-        v-model.number="targetMB"
+        v-model.number="targetCount"
         type="number"
-        min="0.5"
-        step="0.5"
-        style=" border: 1px solid #cbd5e1; border-radius: 8px; padding: 4px 8px;width: 70px"
+        min="1000"
+        step="1000"
+        style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 4px 8px; width: 90px"
       />
       <button
         :disabled="running"
@@ -190,10 +199,17 @@ async function run() {
       </button>
     </div>
 
-    <table v-if="rows.length" style=" border-collapse: collapse; font-size: 0.88rem;width: 100%">
+    <p
+      v-if="status"
+      style="color: #f15d22; font-size: 0.85rem; font-weight: 600; margin-bottom: 12px"
+    >
+      {{ status }}
+    </p>
+
+    <table v-if="rows.length" style="border-collapse: collapse; font-size: 0.88rem; width: 100%">
       <tbody>
         <tr v-for="(r, i) in rows" :key="i" style="border-bottom: 1px solid #eef2f7">
-          <td style=" color: #475569;padding: 8px 10px">{{ r.label }}</td>
+          <td style="color: #475569; padding: 8px 10px">{{ r.label }}</td>
           <td
             style="
               font-variant-numeric: tabular-nums;
@@ -209,7 +225,7 @@ async function run() {
       </tbody>
     </table>
 
-    <p style=" color: #94a3b8; font-size: 0.72rem;margin-top: 20px; word-break: break-all">
+    <p style="color: #94a3b8; font-size: 0.72rem; margin-top: 20px; word-break: break-all">
       {{ ua }}
     </p>
   </div>
