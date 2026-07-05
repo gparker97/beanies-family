@@ -46,10 +46,13 @@ function handleKeydown(e: KeyboardEvent) {
 
 <template>
   <div class="space-y-2">
-    <!-- Row 1: Input bar + date (desktop) + assignee (desktop) -->
-    <div class="flex gap-2">
+    <!-- Row 1: Input bar + date (desktop) + assignee (desktop). All three
+         controls share the same 52px height, squircle corner, and slate-5
+         resting fill so the row reads as one connected composer:
+         what needs doing → when → who. -->
+    <div class="flex items-stretch gap-2">
       <div
-        class="flex flex-1 items-center gap-2.5 rounded-2xl px-4 py-3.5"
+        class="flex h-[3.25rem] flex-1 items-center gap-2.5 rounded-2xl px-4"
         style="background: var(--tint-slate-5)"
       >
         <span class="text-lg opacity-40">✏️</span>
@@ -74,12 +77,16 @@ function handleKeydown(e: KeyboardEvent) {
 
       <!-- Date picker (desktop) -->
       <div class="hidden shrink-0 sm:block">
-        <BeanieDatePicker v-model="dueDate" :placeholder="t('todo.selectDueDate')" />
+        <BeanieDatePicker
+          v-model="dueDate"
+          variant="composer"
+          :placeholder="t('todo.selectDueDate')"
+        />
       </div>
 
       <!-- Assignee (desktop) -->
       <div class="hidden sm:flex">
-        <AssigneePickerButton v-model="assigneeIds" />
+        <AssigneePickerButton v-model="assigneeIds" variant="composer" />
       </div>
     </div>
 

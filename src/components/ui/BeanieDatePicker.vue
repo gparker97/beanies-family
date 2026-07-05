@@ -20,6 +20,14 @@ interface Props {
   placeholder?: string;
   label?: string;
   required?: boolean;
+  /**
+   * Trigger appearance. `'default'` is the compact bean-pill used across
+   * forms and cards. `'composer'` is the taller squircle slot used in the
+   * To-Do quick-add row so the date trigger aligns with the entry bar and
+   * assignee picker (same height, corner, and type scale). Opt-in only —
+   * every other call site keeps the pill.
+   */
+  variant?: 'default' | 'composer';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -29,6 +37,7 @@ const props = withDefaults(defineProps<Props>(), {
   placeholder: '',
   label: '',
   required: false,
+  variant: 'default',
 });
 
 const emit = defineEmits<{
@@ -284,8 +293,11 @@ const isTomorrowDisabled = computed(() => {
       type="button"
       :disabled="disabled"
       data-testid="beanie-date-picker-trigger"
-      class="font-outfit flex w-full items-center justify-between gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
+      class="font-outfit flex w-full items-center justify-between gap-2 font-semibold transition-all duration-150"
       :class="[
+        variant === 'composer'
+          ? 'h-[3.25rem] rounded-2xl px-4 text-sm'
+          : 'rounded-full px-3.5 py-1.5 text-xs',
         modelValue
           ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
           : 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400',
