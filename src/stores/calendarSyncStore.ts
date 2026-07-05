@@ -19,7 +19,8 @@
 
 import { defineStore } from 'pinia';
 import { computed, watch } from 'vue';
-import { docVersion, getDoc, isDocLoaded } from '@/services/automerge/docService';
+import { docVersion, isDocLoaded } from '@/services/automerge/docService';
+import { list as projectionList } from '@/services/automerge/projection';
 import { toISODateString, localToday } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
 import { reportError } from '@/utils/errorReporter';
@@ -215,7 +216,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
   const connections = computed<CalendarConnection[]>(() => {
     void docVersion.value;
     if (!isDocLoaded()) return [];
-    return Object.values(getDoc().calendarConnections ?? {});
+    return projectionList('calendarConnections');
   });
 
   const isConnectSupported = computed(() => isCalendarConnectSupported());
