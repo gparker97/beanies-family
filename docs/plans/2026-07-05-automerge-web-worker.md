@@ -214,6 +214,21 @@ As a family member opening beanies after time away — or syncing across my phon
 5. **Fallback:** force `docWorker` off and re-run critical E2E; force a spawn error → graceful inline + telemetry.
 6. **Prod validation:** post-deploy, read `load-perf` — load/merge/save report from the worker; main-thread `warn`-level stalls disappear.
 
+### Spike results — GATE PASSED (2026-07-05)
+
+Ran the `/dev/worker-spike` harness on desktop Chrome (Win) and iPhone (iOS 18.7 Safari). Synthetic doc, chunked vs one-shot projection receive, `CryptoKey` postMessage, entity-delta round-trip. Verdict PASS on both.
+
+| Metric (20k txns / 2.28 MB)                | Desktop     | iPhone                         |
+| ------------------------------------------ | ----------- | ------------------------------ |
+| `Automerge.load` (now **off** main thread) | 8189 ms     | 8566 ms                        |
+| Idle baseline frame gap                    | 18 ms       | 45 ms (iOS throttles idle rAF) |
+| **Chunked receive — MAX frame gap**        | **27 ms**   | **34 ms**                      |
+| One-shot receive — MAX frame gap           | 16 ms       | 34 ms                          |
+| `CryptoKey` post → encrypt/decrypt         | ok (7/2 ms) | **ok (4/1 ms)**                |
+| Entity-delta round-trip                    | 43 ms       | 30 ms                          |
+
+**Conclusions:** (1) Moving `Automerge.load` off-thread keeps the main thread responsive — the projection receive adds ≈baseline jank (no long task), confirming the architecture kills the freeze. (2) `CryptoKey` survives `postMessage` on iOS — the one genuine unknown, resolved. (3) Structured-clone of a 20k-entity materialized array is cheap even one-shot (<1 frame), so the entity-delta + chunked design has generous headroom, not load-bearing. Caveats confirmed-not-blocking: the 8.5 s load is off-thread but still 8.5 s (writes queue behind it → the planned pending-state affordance; Plan B shrinks the load). Spike is disposable — delete `/dev/worker-spike` + `spike/` + the `server.allowedHosts`/dev-route/eslint-override additions once the real worker lands.
+
 ### Review passes
 
 - **Pass 1 (draft):** worker-owned doc, change-aware RPC, main-thread projection, migration surface, error/fallback, rollout, spike-first testing.
