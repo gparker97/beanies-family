@@ -47,6 +47,10 @@ export type MutationOp =
       patch: Record<string, unknown>;
       deleteKeys?: string[];
       updatedAt?: string;
+      /** Init `collection[id] = {}` if absent instead of throwing. Used for the
+       * two-level `notificationReads[memberId]` sub-map, whose member slice may
+       * not exist yet. Default false preserves throw-on-missing for real entities. */
+      createIfMissing?: boolean;
     }
   | { op: 'delete'; collection: CollectionName; id: string }
   /** Relative read-modify-write done atomically INSIDE one worker `changeDoc`. */

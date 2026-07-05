@@ -14,6 +14,13 @@ import { COLLECTION_NAMES, type FamilyDocument, type CollectionName } from '@/ty
 import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { CorruptPayloadError } from '@/types/sync';
+import {
+  calculateAmortization,
+  calculateExtraPayment,
+  findLoanDetails,
+  type LoanDetails,
+} from '@/utils/loanPayment';
+import type { Asset, Account, Goal } from '@/types/models';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import type { MutationOp, ProjectionDelta, Heads } from './protocol';
 
@@ -169,19 +176,130 @@ export function registerNamedOp(name: string, handler: NamedOpHandler): void {
   namedRegistry.set(name, handler);
 }
 
+// ─── Core domain named ops (atomic read-modify-write against the worker doc) ──
+//
+// These are the atomic financial ops. `increment` can't express them: goals need
+// a max(0,…) floor + auto-complete, loans a non-linear amortization written to a
+// possibly-nested host. Doing the read-modify-write inside one `Automerge.change`
+// closes the async lost-update a concurrent poll-merge would otherwise cause.
+
+const nowIso = (): string => new Date().toISOString();
+
+/** Goal contribution: clamp at 0, auto-complete at target. Returns the goal. */
+const applyGoalContributionOp: NamedOpHandler = (draft, args) => {
+  const id = args.id as string;
+  const delta = args.delta as number;
+  const goals = draft.goals as unknown as Record<string, Goal>;
+  const goal = goals[id];
+  if (!goal) throw new Error(`applyGoalContribution: goal ${id} not found`);
+  const current = typeof goal.currentAmount === 'number' ? goal.currentAmount : 0;
+  goal.currentAmount = Math.max(0, current + delta);
+  if (!goal.isCompleted && goal.currentAmount >= goal.targetAmount) goal.isCompleted = true;
+  goal.updatedAt = nowIso();
+  const entity = toPlain(goals[id]);
+  return { result: entity, deltas: [{ kind: 'upsert', collection: 'goals', id, entity }] };
+};
+
+/** Write `newBalance` to the loan host (nested asset-loan or account) + echo it. */
+function writeLoanBalance(
+  draft: FamilyDocument,
+  loan: LoanDetails,
+  newBalance: number
+): { collection: CollectionName; entity: unknown } {
+  if (loan.type === 'asset') {
+    const asset = (draft.assets as unknown as Record<string, Asset>)[loan.entityId];
+    if (asset?.loan) {
+      asset.loan.outstandingBalance = newBalance;
+      asset.updatedAt = nowIso();
+    }
+    return { collection: 'assets', entity: toPlain(asset) };
+  }
+  const account = (draft.accounts as unknown as Record<string, Account>)[loan.entityId];
+  if (account) {
+    account.balance = newBalance;
+    account.updatedAt = nowIso();
+  }
+  return { collection: 'accounts', entity: toPlain(account) };
+}
+
+const findLoan = (draft: FamilyDocument, loanId: string): LoanDetails | null =>
+  findLoanDetails(
+    loanId,
+    Object.values((draft.assets ?? {}) as unknown as Record<string, Asset>),
+    Object.values((draft.accounts ?? {}) as unknown as Record<string, Account>)
+  );
+
+/** Apply a loan payment: amortize (recurring) or extra-payment (one-time), write
+ * the new balance atomically, return the host entity + interest/principal split
+ * (main writes those onto the transaction via the existing repo). */
+const applyLoanPaymentOp: NamedOpHandler = (draft, args) => {
+  const loan = findLoan(draft, args.loanId as string);
+  if (!loan || loan.outstandingBalance <= 0) return { result: { applied: false }, deltas: [] };
+  const res = args.isRecurring
+    ? calculateAmortization(
+        loan.outstandingBalance,
+        loan.interestRate,
+        args.paymentAmount as number
+      )
+    : calculateExtraPayment(loan.outstandingBalance, args.paymentAmount as number);
+  const { collection, entity } = writeLoanBalance(draft, loan, res.newBalance);
+  return {
+    result: {
+      applied: true,
+      hostCollection: collection,
+      host: entity,
+      interestPortion: res.interestPortion,
+      principalPortion: res.principalPortion,
+    },
+    deltas: [{ kind: 'upsert', collection, id: loan.entityId, entity }],
+  };
+};
+
+/** Reverse a loan payment: restore the principal portion to the balance. */
+const reverseLoanPaymentOp: NamedOpHandler = (draft, args) => {
+  const loan = findLoan(draft, args.loanId as string);
+  if (!loan) return { result: { applied: false }, deltas: [] };
+  const restored = loan.outstandingBalance + (args.principalToRestore as number);
+  const { collection, entity } = writeLoanBalance(draft, loan, restored);
+  return {
+    result: { applied: true, hostCollection: collection, host: entity },
+    deltas: [{ kind: 'upsert', collection, id: loan.entityId, entity }],
+  };
+};
+
+/** Register the core domain ops. Called at module load + re-registered after a
+ * test reset, so production + tests always have them (plugins like photo attach
+ * register separately). */
+export function registerCoreNamedOps(): void {
+  registerNamedOp('applyGoalContribution', applyGoalContributionOp);
+  registerNamedOp('applyLoanPayment', applyLoanPaymentOp);
+  registerNamedOp('reverseLoanPayment', reverseLoanPaymentOp);
+}
+registerCoreNamedOps();
+
 // ─── Mutations ───────────────────────────────────────────────────────────────
 
 /** Mutate the draft for one op (recurses for `batch`). Pure structural mutation
  * — the projection deltas are built afterwards from the COMMITTED doc (reading a
  * mid-change proxy is fragile). Returns named-op deltas inline (they own theirs). */
-function mutateDraft(draft: FamilyDocument, op: MutationOp, named: ProjectionDelta[]): void {
+function mutateDraft(
+  draft: FamilyDocument,
+  op: MutationOp,
+  named: ProjectionDelta[],
+  namedResults: unknown[]
+): void {
   switch (op.op) {
     case 'set':
       (draft[op.collection] as AnyRecord)[op.id] = op.entity;
       break;
     case 'patch': {
-      const entity = (draft[op.collection] as Record<string, AnyRecord>)[op.id];
-      if (!entity) throw new Error(`patch: ${op.collection}/${op.id} not found`);
+      const col = draft[op.collection] as Record<string, AnyRecord>;
+      let entity = col[op.id];
+      if (!entity) {
+        if (!op.createIfMissing) throw new Error(`patch: ${op.collection}/${op.id} not found`);
+        col[op.id] = {};
+        entity = col[op.id]; // re-read: the assigned `{}` is detached; the doc holds the proxy
+      }
       for (const [k, v] of Object.entries(op.patch)) entity[k] = v;
       for (const k of op.deleteKeys ?? []) delete entity[k];
       if (op.updatedAt) entity.updatedAt = op.updatedAt;
@@ -199,12 +317,14 @@ function mutateDraft(draft: FamilyDocument, op: MutationOp, named: ProjectionDel
       break;
     }
     case 'batch':
-      for (const sub of op.ops) mutateDraft(draft, sub, named);
+      for (const sub of op.ops) mutateDraft(draft, sub, named, namedResults);
       break;
     case 'named': {
       const handler = namedRegistry.get(op.name);
       if (!handler) throw new Error(`named op not registered: ${op.name}`);
-      named.push(...handler(draft, op.args).deltas);
+      const { result, deltas } = handler(draft, op.args);
+      named.push(...deltas);
+      namedResults.push(result);
       break;
     }
   }
@@ -245,15 +365,22 @@ export function applyMutation(
   op: MutationOp
 ): { doc: Doc; result: unknown; delta: ProjectionDelta } {
   const namedDeltas: ProjectionDelta[] = [];
-  const after = Automerge.change(doc, (d) => mutateDraft(d as FamilyDocument, op, namedDeltas));
+  const namedResults: unknown[] = [];
+  const after = Automerge.change(doc, (d) =>
+    mutateDraft(d as FamilyDocument, op, namedDeltas, namedResults)
+  );
   const out: ProjectionDelta[] = [];
-  const result = deltaFor(after, op, out);
+  const structuralResult = deltaFor(after, op, out);
   const all = [...out, ...namedDeltas];
   const delta: ProjectionDelta = all.length === 1 ? all[0]! : { kind: 'multi', deltas: all };
+  // A top-level `named` op returns its handler's result (the echoed entity for
+  // read-after-write); structural ops return the affected entity.
+  const result = op.op === 'named' ? namedResults[0] : structuralResult;
   return { doc: after, result, delta };
 }
 
-/** Test-only: clear the named-op registry between cases. */
+/** Test-only: clear plugin ops but keep the core domain ops registered. */
 export function __resetNamedOpsForTesting(): void {
   namedRegistry.clear();
+  registerCoreNamedOps();
 }
