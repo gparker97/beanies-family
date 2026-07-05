@@ -35,7 +35,14 @@ export interface PerfContext {
   perf_entity_count?: number;
 }
 
-function record(label: string, durationMs: number, ctx?: PerfContext): void {
+/**
+ * Record a timing sample through the console-floor + telemetry-escalation logic.
+ * Exported so the doc-worker's own `performance.now()` samples (which cannot use
+ * `logEvent`/telemetry inside a Worker — that's a main-thread-only buffer) can be
+ * relayed to the main thread and replayed through the SAME thresholds + single
+ * telemetry buffer. See ADR-032. Prefer `measureSync`/`measureAsync` in-process.
+ */
+export function record(label: string, durationMs: number, ctx?: PerfContext): void {
   const ms = Math.round(durationMs);
   if (ms < CONSOLE_FLOOR_MS) return;
 
