@@ -21,6 +21,7 @@
  */
 import { withTimeout } from '@/utils/timing';
 import { record as recordPerf } from '@/utils/perfTiming';
+import { reportError } from '@/utils/errorReporter';
 import { showToast } from '@/composables/useToast';
 import { CorruptPayloadError } from '@/types/sync';
 import { applyDelta, applyChunk, bumpDocVersion, resetProjection } from '../projection';
@@ -119,7 +120,15 @@ function onMessage(data: unknown): void {
     try {
       applyDelta(data.delta);
     } catch (e) {
-      console.warn('[docClient] applyDelta failed', e);
+      // Post-cutover the projection is the sole main-thread read model — a delta
+      // that fails to apply after a successful mutate silently diverges the UI
+      // from the worker's doc, so this must telemeter, not just console.warn.
+      reportError({
+        surface: 'doc-worker-projection',
+        message: 'applyDelta failed — projection may be stale',
+        error: e,
+        severity: 'error',
+      });
     }
   }
   p.resolve(data);
@@ -144,7 +153,12 @@ function handleSignal(sig: WorkerSignal): void {
         applyChunk(sig.delta);
         if (sig.final) bumpDocVersion();
       } catch (e) {
-        console.warn('[docClient] applyChunk failed', e);
+        reportError({
+          surface: 'doc-worker-projection',
+          message: 'applyChunk failed — projection may be stale',
+          error: e,
+          severity: 'error',
+        });
       }
       break;
     case 'cache-persist-failed':

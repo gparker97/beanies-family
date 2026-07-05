@@ -36,7 +36,10 @@ import { usePWA } from '@/composables/usePWA';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { useCountryOptions } from '@/composables/useCountryOptions';
 import { CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
-import { getDoc } from '@/services/automerge/docService';
+import {
+  list as projectionList,
+  getSettings as getProjectionSettings,
+} from '@/services/automerge/projection';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { downloadAsFile, tryUnwrapFamilyKey } from '@/services/sync/fileSync';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
@@ -506,7 +509,6 @@ async function handleManualImport() {
 }
 
 function handleExportAsJson() {
-  const doc = getDoc();
   const collections = [
     'familyMembers',
     'accounts',
@@ -522,9 +524,9 @@ function handleExportAsJson() {
 
   const data: Record<string, unknown> = {};
   for (const key of collections) {
-    data[key] = Object.values(doc[key] ?? {});
+    data[key] = projectionList(key);
   }
-  data.settings = doc.settings ?? null;
+  data.settings = getProjectionSettings();
 
   const json = JSON.stringify(data, null, 2);
   const date = new Date().toISOString().split('T')[0];
