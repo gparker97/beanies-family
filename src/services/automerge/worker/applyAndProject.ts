@@ -31,9 +31,15 @@ import {
   decryptToDoc,
   encryptDocPayload,
   buildFullProjection,
+  registerNamedOp,
 } from './docOps';
+import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
 import * as cache from './cache';
 import type { MutationOp, ProjectionDelta, Heads } from './protocol';
+
+// Register the photo attach/collect family (the one genuinely nested op family)
+// in whichever realm loads this module — the worker AND the inline fallback.
+registerNamedOp('attachPhotoToEntity', attachPhotoNamedHandler);
 
 type Doc = Automerge.Doc<FamilyDocument>;
 type PerfCtx = Record<string, number>;
@@ -263,6 +269,12 @@ export function applyChanges(changes: Uint8Array[]): { heads: Heads } {
   schedulePersist();
   pushProjection(doc);
   return { heads };
+}
+
+/** Gather every referenced photoId (runs the collect hooks on the worker doc).
+ * Throws `PhotoCollectHookError` if a hook fails → `gcOrphans` aborts the sweep. */
+export function collectReferencedPhotoIds(): { ids: string[] } {
+  return { ids: Array.from(collectPhotoIds(requireDoc('collectReferencedPhotoIds'))) };
 }
 
 // ─── Envelope cache (main owns envelope truth; worker holds a cache copy) ─────

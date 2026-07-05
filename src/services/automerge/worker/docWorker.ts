@@ -29,6 +29,7 @@ import {
   getHeads,
   getChangesSince,
   applyChanges,
+  collectReferencedPhotoIds,
   persistEnvelope,
   readEnvelope,
   flush,
@@ -86,6 +87,8 @@ async function handle(req: RpcRequest): Promise<{ result?: unknown; delta?: unkn
       return { result: getChangesSince(a.heads as string[]) };
     case 'applyChanges':
       return { result: applyChanges(a.changes as Uint8Array[]) };
+    case 'collectReferencedPhotoIds':
+      return { result: collectReferencedPhotoIds() };
     case 'persistEnvelope':
       await persistEnvelope(a.envelope as Parameters<typeof persistEnvelope>[0]);
       return {};
