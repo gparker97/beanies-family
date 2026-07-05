@@ -1,6 +1,7 @@
 import * as Automerge from '@automerge/automerge';
 import { shallowRef } from 'vue';
 import type { FamilyDocument } from '@/types/automerge';
+import { COLLECTION_NAMES } from '@/types/automerge';
 import { measureSync } from '@/utils/perfTiming';
 
 /**
@@ -77,38 +78,11 @@ export function initDoc(): Automerge.Doc<FamilyDocument> {
 }
 
 /**
- * All collection names that should exist on a FamilyDocument.
- * Used to migrate older documents that predate newer collections (e.g. vacations).
+ * All collection names that should exist on a FamilyDocument. Used to migrate
+ * older documents that predate newer collections (e.g. vacations). Single source
+ * of truth is `COLLECTION_NAMES` (compile-time complete against `FamilyDocument`).
  */
-const ALL_COLLECTIONS: Array<Exclude<keyof FamilyDocument, 'settings'>> = [
-  'familyMembers',
-  'accounts',
-  'transactions',
-  'assets',
-  'goals',
-  'budgets',
-  'recurringItems',
-  'todos',
-  'lists',
-  'activities',
-  'vacations',
-  'photos',
-  'favorites',
-  'sayings',
-  'memberNotes',
-  'allergies',
-  'medications',
-  'medicationLogs',
-  'milestones',
-  'recipes',
-  'cookLogs',
-  'emergencyContacts',
-  'notificationReads',
-  'calendarConnections',
-  'calendarEventLinks',
-  'driveConnections',
-  'overlapAcknowledgments',
-];
+const ALL_COLLECTIONS = COLLECTION_NAMES;
 
 /**
  * Migrate a loaded document: initialize any collections missing from older beanpod files.
