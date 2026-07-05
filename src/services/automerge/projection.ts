@@ -27,6 +27,16 @@ const settingsRef = shallowRef<Settings | null>(null);
  * reactivity source for `docVersion`-subscribed consumers post-ADR-032. */
 export const docVersion = shallowRef(0);
 
+/** True once a document has been loaded/created (a full projection pushed).
+ * Re-backs `docService.isDocLoaded()`. Flipped true in `bumpDocVersion` (the
+ * "final chunk applied" hook that initDoc/initAndLoadCache/merge all end with),
+ * false in `resetProjection`. Pinned to `bumpDocVersion` — NOT `applyDelta` — so
+ * a stray first `mutate` (which bumps `docVersion` directly) can't flip it. */
+let loaded = false;
+export function isLoaded(): boolean {
+  return loaded;
+}
+
 function mapFor(collection: CollectionName): ShallowRef<EntityMap> {
   const ref = maps.get(collection);
   if (!ref) throw new Error(`[projection] unknown collection: ${collection}`);
@@ -87,8 +97,10 @@ export function applyChunk(delta: ProjectionDelta): void {
   applyOne(delta);
 }
 
-/** Bump the coarse change trigger. Called once after a chunked load/merge. */
+/** Bump the coarse change trigger. Called once after a chunked load/merge, so
+ * this is where `loaded` flips true (a full projection has landed). */
 export function bumpDocVersion(): void {
+  loaded = true;
   docVersion.value += 1;
 }
 
@@ -119,5 +131,6 @@ export function getSettings(): Settings | null {
 export function resetProjection(): void {
   for (const name of COLLECTION_NAMES) mapFor(name).value = new Map();
   settingsRef.value = null;
+  loaded = false;
   docVersion.value += 1;
 }
