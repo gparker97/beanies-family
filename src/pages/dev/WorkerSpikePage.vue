@@ -94,6 +94,23 @@ async function run() {
     worker.onmessageerror = () =>
       push('WORKER messageerror (serialization)', 'see console', { warn: true });
 
+    // Wait for the worker's handshake before posting work — the WASM import
+    // defers the worker's message handler, so an early post would be lost.
+    status.value = 'Starting worker…';
+    const ready = (await Promise.race([
+      waitFor('ready'),
+      new Promise<Record<string, unknown>>((r) =>
+        setTimeout(
+          () => r({ type: 'error', message: 'worker never signalled ready (10s)' }),
+          10_000
+        )
+      ),
+    ])) as Record<string, unknown>;
+    if (ready.type === 'error') {
+      status.value = '';
+      return push('Worker handshake FAILED', String(ready.message), { warn: true });
+    }
+
     const onProgress = (e: MessageEvent) => {
       const d = e.data as Record<string, unknown>;
       if (d?.type === 'progress') status.value = `Building doc… ${d.built}/${d.target} txns`;

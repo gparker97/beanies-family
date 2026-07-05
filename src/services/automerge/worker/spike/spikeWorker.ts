@@ -119,6 +119,7 @@ function post(msg: Record<string, unknown>): void {
 
 self.onmessage = async (e: MessageEvent) => {
   const msg = e.data as { type: string; [k: string]: unknown };
+  console.log('[spikeWorker] onmessage:', msg.type);
   try {
     switch (msg.type) {
       case 'generate': {
@@ -211,3 +212,10 @@ self.onmessage = async (e: MessageEvent) => {
     });
   }
 };
+
+// Handshake: announce the listener is attached. Under vite-plugin-top-level-await
+// the WASM import defers module evaluation, so `onmessage` is set AFTER the main
+// thread may have already posted — those early messages are lost. The harness
+// waits for this 'ready' before sending work.
+console.log('[spikeWorker] ready — listener attached');
+post({ type: 'ready' });
