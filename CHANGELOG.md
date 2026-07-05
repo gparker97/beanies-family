@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-05
+
+### Changed
+
+- **Homepage "why I built this" now reflects the Google Calendar integration.** The line that said beanies "doesn't pull in stuff from google calendar (yet)" now notes that while it still doesn't pull _in_, it does **push** your family activities _out_ to your calendars — linking to the new blog post on how it works. (It still won't sync with banks.)
+
 ## 2026-07-03
 
 ### Added
