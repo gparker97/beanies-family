@@ -88,3 +88,40 @@ export type CollectionName = Exclude<keyof FamilyDocument, 'settings'>;
 /** Utility type: resolve a collection name to its entity type */
 export type CollectionEntity<K extends CollectionName> =
   FamilyDocument[K] extends Record<string, infer E> ? E : never;
+
+/**
+ * Runtime list of every collection name (excludes the `settings` singleton).
+ * The `Record<CollectionName, 0>` seed makes this **compile-time complete**: add
+ * a collection to `FamilyDocument` and forget it here → a type error. Single
+ * source of truth for `docService` migration + the ADR-032 projection mirror.
+ */
+const COLLECTION_NAME_SEED: Record<CollectionName, 0> = {
+  familyMembers: 0,
+  accounts: 0,
+  transactions: 0,
+  assets: 0,
+  goals: 0,
+  budgets: 0,
+  recurringItems: 0,
+  todos: 0,
+  lists: 0,
+  activities: 0,
+  vacations: 0,
+  photos: 0,
+  favorites: 0,
+  sayings: 0,
+  memberNotes: 0,
+  allergies: 0,
+  medications: 0,
+  medicationLogs: 0,
+  milestones: 0,
+  recipes: 0,
+  cookLogs: 0,
+  emergencyContacts: 0,
+  notificationReads: 0,
+  calendarConnections: 0,
+  calendarEventLinks: 0,
+  driveConnections: 0,
+  overlapAcknowledgments: 0,
+};
+export const COLLECTION_NAMES = Object.keys(COLLECTION_NAME_SEED) as CollectionName[];
