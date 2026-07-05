@@ -38,10 +38,6 @@ import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds }
 import * as cache from './cache';
 import type { MutationOp, ProjectionDelta, Heads } from './protocol';
 
-// Register the photo attach/collect family (the one genuinely nested op family)
-// in whichever realm loads this module — the worker AND the inline fallback.
-registerNamedOp('attachPhotoToEntity', attachPhotoNamedHandler);
-
 type Doc = Automerge.Doc<FamilyDocument>;
 type PerfCtx = Record<string, number>;
 
@@ -73,9 +69,13 @@ let sink: WorkerSink = NOOP_SINK;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let cachePersistFailed = false;
 
-/** Wire the sink once (worker startup / inline adapter init). */
+/** Wire the sink once (worker startup / inline adapter init). Also registers the
+ * photo attach/collect family here (not at module load) so it can't hit a
+ * docOps `namedRegistry` TDZ under a circular import — configure runs after all
+ * modules have finished loading, in whichever realm (worker OR inline). */
 export function configure(nextSink: WorkerSink): void {
   sink = nextSink;
+  registerNamedOp('attachPhotoToEntity', attachPhotoNamedHandler);
 }
 
 // ─── Timing (relayed, not telemetered in-worker) ─────────────────────────────
