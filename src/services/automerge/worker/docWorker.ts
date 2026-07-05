@@ -16,26 +16,7 @@
  * is initialized. The client waits for `ready` before sending work.
  */
 import { serializeError, type RpcRequest, type RpcResponse, type WorkerSignal } from './protocol';
-import type { MutationOp } from './protocol';
-import type { WorkerSink } from './applyAndProject';
-import {
-  configure,
-  setKey,
-  initDoc,
-  initAndLoadCache,
-  mutate,
-  mergeRemoteEnvelope,
-  exportEncryptedPayload,
-  getHeads,
-  getChangesSince,
-  applyChanges,
-  collectReferencedPhotoIds,
-  persistEnvelope,
-  readEnvelope,
-  flush,
-  reset,
-  clearCache,
-} from './applyAndProject';
+import { configure, dispatch, type WorkerSink } from './applyAndProject';
 
 function post(msg: RpcResponse | WorkerSignal): void {
   (self as unknown as Worker).postMessage(msg);
@@ -56,58 +37,6 @@ const workerSink: WorkerSink = {
 };
 configure(workerSink);
 
-/** Dispatch one RPC into the shared orchestrator. Returns the `{result, delta}`
- * envelope the message loop posts back (delta only for `mutate`). */
-async function handle(req: RpcRequest): Promise<{ result?: unknown; delta?: unknown }> {
-  const a = (req.args ?? {}) as Record<string, unknown>;
-  switch (req.method) {
-    case 'setKey':
-      setKey(a.key as CryptoKey);
-      return {};
-    case 'initDoc':
-      return { result: initDoc() };
-    case 'initAndLoadCache':
-      return { result: await initAndLoadCache(a.familyId as string) };
-    case 'mutate': {
-      const { result, delta } = mutate(req.args as MutationOp);
-      return { result, delta };
-    }
-    case 'mergeRemoteEnvelope':
-      return {
-        result: await mergeRemoteEnvelope(
-          a.envelope as Parameters<typeof mergeRemoteEnvelope>[0],
-          (a.familyId as string | null) ?? null
-        ),
-      };
-    case 'exportEncryptedPayload':
-      return { result: await exportEncryptedPayload() };
-    case 'getHeads':
-      return { result: getHeads() };
-    case 'getChangesSince':
-      return { result: getChangesSince(a.heads as string[]) };
-    case 'applyChanges':
-      return { result: applyChanges(a.changes as Uint8Array[]) };
-    case 'collectReferencedPhotoIds':
-      return { result: collectReferencedPhotoIds() };
-    case 'persistEnvelope':
-      await persistEnvelope(a.envelope as Parameters<typeof persistEnvelope>[0]);
-      return {};
-    case 'readEnvelope':
-      return { result: await readEnvelope() };
-    case 'flush':
-      await flush();
-      return {};
-    case 'reset':
-      reset();
-      return {};
-    case 'clearCache':
-      await clearCache(a.familyId as string);
-      return {};
-    default:
-      throw new Error(`docWorker: unknown method '${req.method}'`);
-  }
-}
-
 // Serialized async FIFO: each request fully completes before the next begins.
 let tail: Promise<void> = Promise.resolve();
 
@@ -116,7 +45,7 @@ self.onmessage = (e: MessageEvent) => {
   if (typeof req?.cid !== 'number') return;
   tail = tail.then(async () => {
     try {
-      const { result, delta } = await handle(req);
+      const { result, delta } = await dispatch(req.method, req.args);
       post({ cid: req.cid, ok: true, result, delta } as RpcResponse);
     } catch (err) {
       post({ cid: req.cid, ok: false, error: serializeError(err) });

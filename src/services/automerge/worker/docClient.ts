@@ -91,6 +91,12 @@ export function setWorkerFactory(factory: () => DocWorkerLike): void {
 export function setInlineExecutor(exec: InlineExecutor | null): void {
   inlineExecutor = exec;
 }
+/** Force the inline path (the `docWorker` kill-switch off, or a test harness).
+ * Requires `setInlineExecutor` first. Skips ever spawning a worker. */
+export function forceInlineMode(): void {
+  mode = 'inline';
+  readyPromise = Promise.resolve('inline');
+}
 /** Task #6: how to re-hydrate a freshly re-spawned worker from cache. */
 export function setRehydrator(fn: ((familyId: string) => Promise<void>) | null): void {
   rehydrator = fn;

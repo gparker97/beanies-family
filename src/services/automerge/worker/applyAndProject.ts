@@ -22,6 +22,7 @@ import type { FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
   migrateDoc,
+  loadDoc,
   saveDoc,
   applyMutation,
   mergeDocs,
@@ -314,6 +315,84 @@ export function reset(): void {
 export async function clearCache(id: string): Promise<void> {
   reset();
   await cache.clearCache(id);
+}
+
+// ─── E2E snapshot (DEV-only — plaintext doc bytes) ───────────────────────────
+
+/** Load a raw (unencrypted) Automerge binary as the doc. DEV/E2E-only seed path. */
+export function loadSnapshot(binary: Uint8Array): { loaded: true } {
+  if (!import.meta.env.DEV) throw new Error('loadSnapshot is DEV-only');
+  currentDoc = loadDoc(binary);
+  pushProjection(currentDoc);
+  return { loaded: true };
+}
+
+/** Serialize the doc to a raw (unencrypted) binary. DEV/E2E-only snapshot path. */
+export function exportSnapshot(): { binary: Uint8Array } {
+  if (!import.meta.env.DEV) throw new Error('exportSnapshot is DEV-only');
+  return { binary: saveDoc(requireDoc('exportSnapshot')) };
+}
+
+// ─── Dispatch (single method→handler map; shared by worker loop + inline) ────
+
+/** Route one RPC method to its handler. Returns the `{result, delta}` envelope
+ * (delta only for `mutate`). Used by BOTH `docWorker` (over the async-FIFO) and
+ * the inline fallback executor — one dispatch table, no drift. */
+export async function dispatch(
+  method: string,
+  args: unknown
+): Promise<{ result?: unknown; delta?: unknown }> {
+  const a = (args ?? {}) as Record<string, unknown>;
+  switch (method) {
+    case 'setKey':
+      setKey(a.key as CryptoKey);
+      return {};
+    case 'initDoc':
+      return { result: initDoc() };
+    case 'initAndLoadCache':
+      return { result: await initAndLoadCache(a.familyId as string) };
+    case 'mutate': {
+      const { result, delta } = mutate(args as MutationOp);
+      return { result, delta };
+    }
+    case 'mergeRemoteEnvelope':
+      return {
+        result: await mergeRemoteEnvelope(
+          a.envelope as BeanpodFileV4,
+          (a.familyId as string | null) ?? null
+        ),
+      };
+    case 'exportEncryptedPayload':
+      return { result: await exportEncryptedPayload() };
+    case 'getHeads':
+      return { result: getHeads() };
+    case 'getChangesSince':
+      return { result: getChangesSince(a.heads as Heads) };
+    case 'applyChanges':
+      return { result: applyChanges(a.changes as Uint8Array[]) };
+    case 'collectReferencedPhotoIds':
+      return { result: collectReferencedPhotoIds() };
+    case 'persistEnvelope':
+      await persistEnvelope(a.envelope as BeanpodFileV4);
+      return {};
+    case 'readEnvelope':
+      return { result: await readEnvelope() };
+    case 'loadSnapshot':
+      return { result: loadSnapshot(a.binary as Uint8Array) };
+    case 'exportSnapshot':
+      return { result: exportSnapshot() };
+    case 'flush':
+      await flush();
+      return {};
+    case 'reset':
+      reset();
+      return {};
+    case 'clearCache':
+      await clearCache(a.familyId as string);
+      return {};
+    default:
+      throw new Error(`applyAndProject: unknown method '${method}'`);
+  }
 }
 
 // ─── Async timing helper (kept below the sync `time` for readability) ────────
