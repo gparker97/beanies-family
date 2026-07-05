@@ -88,6 +88,7 @@ import { bufferToBase64 } from '@/utils/encoding';
 import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
 import type { StorageProvider, StorageProviderType } from '@/services/sync/storageProvider';
 import { toISODateString } from '@/utils/date';
+import { measureAsync } from '@/utils/perfTiming';
 import { deduplicateRecurringTransactions } from '@/services/recurring/recurringProcessor';
 import {
   type CreatePodResult,
@@ -1684,28 +1685,34 @@ export const useSyncStore = defineStore('sync', () => {
       const prevMember = familyStoreInst.currentMember;
       const prevMemberId = familyStoreInst.currentMemberId;
 
-      await Promise.all([
-        familyStoreInst.loadMembers(),
-        accountsStore.loadAccounts(),
-        transactionsStore.loadTransactions(),
-        assetsStore.loadAssets(),
-        goalsStore.loadGoals(),
-        settingsStore.loadSettings(),
-        recurringStore.loadRecurringItems(),
-        todoStore.loadTodos(),
-        listStore.loadLists(),
-        activityStore.loadActivities(),
-        vacationStore.loadVacations(),
-        budgetStore.loadBudgets(),
-        favoritesStoreInst.loadFavorites(),
-        sayingsStoreInst.loadSayings(),
-        memberNotesStoreInst.loadMemberNotes(),
-        allergiesStoreInst.loadAllergies(),
-        medicationsStoreInst.loadMedications(),
-        milestonesStoreInst.loadMilestones(),
-        recipesStoreInst.loadRecipes(),
-        emergencyContactsStoreInst.loadEmergencyContacts(),
-      ]);
+      // Timed: the full ~21-store re-projection out of Automerge, re-run after
+      // every merge. `Promise.all` gives no real parallelism here (it's all
+      // synchronous WASM materialization on one thread), so its wall-clock is
+      // effectively main-thread-blocking time.
+      await measureAsync('stores.reloadAll', () =>
+        Promise.all([
+          familyStoreInst.loadMembers(),
+          accountsStore.loadAccounts(),
+          transactionsStore.loadTransactions(),
+          assetsStore.loadAssets(),
+          goalsStore.loadGoals(),
+          settingsStore.loadSettings(),
+          recurringStore.loadRecurringItems(),
+          todoStore.loadTodos(),
+          listStore.loadLists(),
+          activityStore.loadActivities(),
+          vacationStore.loadVacations(),
+          budgetStore.loadBudgets(),
+          favoritesStoreInst.loadFavorites(),
+          sayingsStoreInst.loadSayings(),
+          memberNotesStoreInst.loadMemberNotes(),
+          allergiesStoreInst.loadAllergies(),
+          medicationsStoreInst.loadMedications(),
+          milestonesStoreInst.loadMilestones(),
+          recipesStoreInst.loadRecipes(),
+          emergencyContactsStoreInst.loadEmergencyContacts(),
+        ])
+      );
 
       // Diagnostic: detect permission changes after reload
       const newMember = familyStoreInst.currentMember;

@@ -14,6 +14,7 @@ import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyServi
 import { saveDoc } from './docService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { withIdbRetry } from '@/utils/idbTransient';
+import { measureSync } from '@/utils/perfTiming';
 import * as Automerge from '@automerge/automerge';
 import type { FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
@@ -91,7 +92,11 @@ export async function loadCachedDoc(
 
   const encrypted = new Uint8Array(base64ToBuffer(entry.payload));
   const binary = await decryptPayload(familyKey, encrypted);
-  return Automerge.load<FamilyDocument>(binary);
+  // Timed: the cache-first cold-start deserialize — runs on every app open,
+  // even for daily users, and scales with accumulated history.
+  return measureSync('automerge.cacheLoad', () => Automerge.load<FamilyDocument>(binary), {
+    perf_doc_bytes: binary.byteLength,
+  });
 }
 
 /**
