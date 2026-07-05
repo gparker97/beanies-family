@@ -1,6 +1,7 @@
 import * as Automerge from '@automerge/automerge';
 import { shallowRef } from 'vue';
 import type { FamilyDocument } from '@/types/automerge';
+import { measureSync } from '@/utils/perfTiming';
 
 /**
  * Automerge document service — module-level singleton.
@@ -129,7 +130,13 @@ function migrateDoc(doc: Automerge.Doc<FamilyDocument>): Automerge.Doc<FamilyDoc
  * Migrates older documents by initializing any missing collections.
  */
 export function loadDoc(binary: Uint8Array): Automerge.Doc<FamilyDocument> {
-  currentDoc = migrateDoc(Automerge.load<FamilyDocument>(binary));
+  currentDoc = measureSync(
+    'automerge.load',
+    () => migrateDoc(Automerge.load<FamilyDocument>(binary)),
+    {
+      perf_doc_bytes: binary.byteLength,
+    }
+  );
   bumpVersion();
   return currentDoc;
 }
@@ -140,7 +147,9 @@ export function loadDoc(binary: Uint8Array): Automerge.Doc<FamilyDocument> {
 export function saveDoc(): Uint8Array {
   if (!currentDoc)
     throw new Error('No Automerge document loaded. Call initDoc() or loadDoc() first.');
-  return Automerge.save(currentDoc);
+  const doc = currentDoc;
+  const binary = measureSync('automerge.save', () => Automerge.save(doc));
+  return binary;
 }
 
 /**
@@ -183,7 +192,13 @@ export function changeDoc(
 export function mergeDoc(remote: Automerge.Doc<FamilyDocument>): Automerge.Doc<FamilyDocument> {
   if (!currentDoc)
     throw new Error('No Automerge document loaded. Call initDoc() or loadDoc() first.');
-  currentDoc = migrateDoc(Automerge.merge(Automerge.clone(currentDoc), remote));
+  const local = currentDoc;
+  // The single most-suspect line for the "back from a trip" freeze: a full
+  // deep-clone of local history immediately followed by replaying every remote
+  // change — both synchronous WASM, cost ∝ accumulated history.
+  currentDoc = measureSync('automerge.mergeClone', () =>
+    migrateDoc(Automerge.merge(Automerge.clone(local), remote))
+  );
   bumpVersion();
   schedulePersist();
   return currentDoc;
