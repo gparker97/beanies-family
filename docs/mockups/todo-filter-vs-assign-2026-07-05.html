@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family — To-Do: filter vs assign mockups (Option A & B)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --font-display: 'Outfit', 'Segoe UI', system-ui, sans-serif;
+        --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+        --ground: #e9edf1;
+        --card: #ffffff;
+        --inset: #f6f8fa;
+        --ink: #2c3e50;
+        --ink-muted: #5a6b7b;
+        --ink-faint: #93a1ad;
+        --line: rgba(44, 62, 80, 0.1);
+        --line-soft: rgba(44, 62, 80, 0.06);
+
+        --purple: #9b59b6;
+        --purple-deep: #8e44ad;
+        --purple-tint: rgba(155, 89, 182, 0.1);
+        --purple-ring: rgba(155, 89, 182, 0.32);
+
+        --sky: #2f80b5;
+        --green: #1f9d57;
+        --orange: #f15d22;
+
+        --slate-track: rgba(44, 62, 80, 0.05);
+        --slate-10: rgba(44, 62, 80, 0.1);
+
+        --m1: #e76f51;
+        --m2: #2a7fb5;
+        --m3: #2a9d8f;
+        --m4: #e9a23b;
+
+        --shadow-card: 0 1px 2px rgba(44, 62, 80, 0.05), 0 10px 30px rgba(44, 62, 80, 0.08);
+        --shadow-pop: 0 8px 28px rgba(44, 62, 80, 0.16);
+        --rc: 22px;
+        --ri: 15px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ground: #131c25;
+          --card: #223140;
+          --inset: #1b2733;
+          --ink: #ecf0f1;
+          --ink-muted: #aeb9c4;
+          --ink-faint: #7d8b98;
+          --line: rgba(255, 255, 255, 0.1);
+          --line-soft: rgba(255, 255, 255, 0.06);
+          --purple-tint: rgba(155, 89, 182, 0.2);
+          --slate-track: rgba(255, 255, 255, 0.05);
+          --slate-10: rgba(255, 255, 255, 0.1);
+          --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 34px rgba(0, 0, 0, 0.4);
+          --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--font-body);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+      .page {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: clamp(1.3rem, 4vw, 3rem) clamp(0.9rem, 4vw, 2rem) 4rem;
+      }
+      .eyebrow {
+        font-family: var(--font-display);
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--purple);
+        margin: 0 0 0.5rem;
+      }
+      h1.top {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(1.4rem, 3vw, 2rem);
+        letter-spacing: -0.02em;
+        margin: 0 0 0.5rem;
+        text-wrap: balance;
+      }
+      .intro {
+        color: var(--ink-muted);
+        font-size: 0.98rem;
+        max-width: 62ch;
+        margin: 0 0 1.4rem;
+      }
+
+      .optlabel {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin: 2.4rem 0 0.9rem;
+        flex-wrap: wrap;
+      }
+      .badge {
+        font-family: var(--font-display);
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        padding: 0.3rem 0.62rem;
+        border-radius: 999px;
+      }
+      .badge.rec {
+        background: var(--purple-tint);
+        color: var(--purple);
+      }
+      .badge.alt {
+        background: var(--slate-track);
+        color: var(--ink-muted);
+      }
+      .optlabel h2 {
+        font-family: var(--font-display);
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin: 0;
+      }
+      .optlabel .note {
+        flex-basis: 100%;
+        font-size: 0.88rem;
+        color: var(--ink-muted);
+        margin-top: -0.2rem;
+        max-width: 70ch;
+      }
+
+      .app {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--rc);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+      }
+      .chrome {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.7rem 1rem;
+        border-bottom: 1px solid var(--line-soft);
+        background: var(--inset);
+      }
+      .chrome i {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--slate-10);
+      }
+      .chrome .url {
+        margin-left: 0.6rem;
+        font-family: var(--font-display);
+        font-size: 0.74rem;
+        color: var(--ink-faint);
+        letter-spacing: 0.02em;
+      }
+      .chrome .w {
+        margin-left: auto;
+        font-size: 0.7rem;
+        color: var(--ink-faint);
+        font-family: var(--font-display);
+      }
+      .screen {
+        padding: clamp(1.1rem, 3vw, 1.7rem);
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.8rem;
+        flex-wrap: wrap;
+      }
+      .pagetitle {
+        font-family: var(--font-display);
+      }
+      .pagetitle b {
+        font-weight: 700;
+        font-size: 1.28rem;
+        letter-spacing: -0.01em;
+        display: block;
+      }
+      .pagetitle span {
+        font-family: var(--font-body);
+        font-size: 0.84rem;
+        color: var(--ink-muted);
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .sortbtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-family: var(--font-display);
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--ink-muted);
+        background: var(--slate-track);
+        border: 1px solid transparent;
+        border-radius: 999px;
+        padding: 0.46rem 0.8rem;
+        cursor: pointer;
+      }
+
+      .lens {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .lens-label {
+        font-family: var(--font-display);
+        font-size: 0.66rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+      }
+      .segtrack {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        background: var(--slate-track);
+        border: 1px solid var(--line-soft);
+        border-radius: 999px;
+        padding: 3px;
+      }
+      .seg {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border: none;
+        background: transparent;
+        border-radius: 999px;
+        padding: 0.34rem 0.6rem;
+        font-family: var(--font-display);
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: var(--ink-muted);
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          color 0.15s ease;
+      }
+      .seg .av {
+        opacity: 0.5;
+        filter: grayscale(0.35);
+        transition:
+          opacity 0.15s ease,
+          filter 0.15s ease;
+      }
+      .seg[aria-pressed='true'] {
+        background: var(--card);
+        color: var(--ink);
+        box-shadow: 0 1px 3px rgba(44, 62, 80, 0.16);
+      }
+      @media (prefers-color-scheme: dark) {
+        .seg[aria-pressed='true'] {
+          background: var(--slate-10);
+          box-shadow: none;
+        }
+      }
+      .seg[aria-pressed='true'] .av {
+        opacity: 1;
+        filter: none;
+      }
+
+      .filterwrap {
+        position: relative;
+      }
+      .stackbtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--slate-track);
+        border: 1px solid var(--line-soft);
+        border-radius: 999px;
+        padding: 0.36rem 0.72rem 0.36rem 0.55rem;
+        cursor: pointer;
+        font-family: var(--font-display);
+        font-size: 0.82rem;
+        font-weight: 500;
+        color: var(--ink);
+      }
+      .stack {
+        display: inline-flex;
+        align-items: center;
+      }
+      .stack .av {
+        margin-left: -7px;
+        box-shadow: 0 0 0 2px var(--card);
+      }
+      .stack .av:first-child {
+        margin-left: 0;
+      }
+      .caret {
+        color: var(--ink-faint);
+        font-size: 0.68rem;
+      }
+      .menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        display: none;
+        flex-direction: column;
+        gap: 1px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--ri);
+        padding: 0.35rem;
+        box-shadow: var(--shadow-pop);
+        min-width: 200px;
+        z-index: 10;
+      }
+      .menu.open {
+        display: flex;
+      }
+      .menu-item {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        border: none;
+        background: transparent;
+        border-radius: 10px;
+        padding: 0.5rem 0.55rem;
+        font-family: var(--font-body);
+        font-size: 0.86rem;
+        color: var(--ink);
+        cursor: pointer;
+        text-align: left;
+      }
+      .menu-item:hover {
+        background: var(--slate-track);
+      }
+      .menu-item[aria-pressed='true'] {
+        background: var(--purple-tint);
+        color: var(--purple);
+        font-weight: 600;
+      }
+      .menu-item .check {
+        margin-left: auto;
+        color: var(--purple);
+        opacity: 0;
+      }
+      .menu-item[aria-pressed='true'] .check {
+        opacity: 1;
+      }
+
+      .qadd {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .qadd-input {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        background: var(--slate-track);
+        border-radius: var(--ri);
+        padding: 0.8rem 0.95rem;
+        min-width: 0;
+      }
+      .qadd-input .pencil {
+        opacity: 0.4;
+      }
+      .qadd-input .ph {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 0.9rem;
+        color: var(--ink-faint);
+        flex: 1;
+      }
+      .qadd-add {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 0.8rem;
+        color: #fff;
+        background: linear-gradient(135deg, var(--purple), var(--purple-deep));
+        border: none;
+        border-radius: 12px;
+        padding: 0.4rem 0.95rem;
+        cursor: default;
+      }
+      .date-pill,
+      .assign-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        background: var(--slate-track);
+        border-radius: var(--ri);
+        padding: 0 0.8rem;
+        font-family: var(--font-display);
+        font-size: 0.8rem;
+        color: var(--ink-muted);
+        flex-shrink: 0;
+      }
+      .assign-pill {
+        box-shadow:
+          0 0 0 1.5px var(--purple-ring),
+          0 0 0 5px var(--purple-tint);
+      }
+      .assign-pill .plus {
+        color: var(--ink-faint);
+        font-size: 0.72rem;
+      }
+
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+      .sec-head {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        margin-bottom: 0.15rem;
+      }
+      .sec-label {
+        font-family: var(--font-display);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+      .sec-open .sec-label {
+        color: var(--purple);
+      }
+      .sec-someday .sec-label {
+        color: var(--sky);
+      }
+      .sec-done .sec-label {
+        color: var(--green);
+      }
+      .sec-count {
+        font-family: var(--font-display);
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: var(--ink-faint);
+        background: var(--slate-track);
+        border-radius: 999px;
+        padding: 0.1rem 0.45rem;
+      }
+      .sec-done .sec-head {
+        cursor: pointer;
+        user-select: none;
+      }
+      .sec-done .chev {
+        margin-left: auto;
+        color: var(--ink-faint);
+        font-size: 0.75rem;
+      }
+
+      .trow {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        background: var(--inset);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--ri);
+        padding: 0.72rem 0.85rem;
+      }
+      .tbox {
+        width: 18px;
+        height: 18px;
+        border-radius: 6px;
+        border: 2px solid var(--slate-10);
+        flex-shrink: 0;
+      }
+      .ttitle {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 0.9rem;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .due {
+        font-family: var(--font-display);
+        font-size: 0.72rem;
+        font-weight: 500;
+        color: var(--ink-muted);
+        flex-shrink: 0;
+      }
+      .due.soon {
+        color: var(--orange);
+      }
+      .owner {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        background: var(--slate-track);
+        border-radius: 999px;
+        padding: 0.2rem 0.55rem 0.2rem 0.24rem;
+        font-family: var(--font-display);
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--ink-muted);
+        flex-shrink: 0;
+      }
+      .empty {
+        font-size: 0.84rem;
+        color: var(--ink-faint);
+        font-style: italic;
+        padding: 0.8rem 0.9rem;
+        text-align: center;
+        background: var(--inset);
+        border: 1px dashed var(--line);
+        border-radius: var(--ri);
+      }
+      .donelist {
+        display: none;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+      .donelist.open {
+        display: flex;
+      }
+      .trow.completed .ttitle {
+        color: var(--ink-faint);
+        text-decoration: line-through;
+        text-decoration-color: var(--slate-10);
+      }
+      .trow.completed .tbox {
+        background: var(--green);
+        border-color: var(--green);
+        position: relative;
+      }
+      .trow.completed .tbox::after {
+        content: '✓';
+        color: #fff;
+        font-size: 0.7rem;
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .av {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        color: #fff;
+        font-family: var(--font-display);
+        font-weight: 700;
+        flex-shrink: 0;
+        width: 19px;
+        height: 19px;
+        font-size: 0.62rem;
+      }
+      .a1 {
+        background: linear-gradient(135deg, var(--m1), #d15f43);
+      }
+      .a2 {
+        background: linear-gradient(135deg, var(--m2), #226b99);
+      }
+      .a3 {
+        background: linear-gradient(135deg, var(--m3), #218577);
+      }
+      .a4 {
+        background: linear-gradient(135deg, var(--m4), #d18e2c);
+      }
+
+      .tryhint {
+        font-size: 0.78rem;
+        color: var(--ink-faint);
+        font-style: italic;
+        margin: 0.55rem 0 0;
+      }
+      .tryhint b {
+        color: var(--purple);
+        font-style: normal;
+        font-weight: 600;
+      }
+
+      @media (max-width: 560px) {
+        .qadd {
+          flex-wrap: wrap;
+        }
+        .date-pill,
+        .assign-pill {
+          padding: 0.5rem 0.8rem;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <p class="eyebrow">beanies.family · to-do view</p>
+      <h1 class="top">Two mockups: filtering that can't be mistaken for assigning</h1>
+      <p class="intro">
+        Both move the member filter out from under the add bar and reframe it as a <b>view lens</b>. Each
+        screen below is live — pick a member and watch the list filter, while the assignee picker (the ringed
+        👤 on the add bar) stays the only thing that changes a task.
+      </p>
+
+      <!-- OPTION A -->
+      <div class="optlabel">
+        <span class="badge rec">Option A · recommended</span>
+        <h2>"Showing" lens in the toolbar</h2>
+        <p class="note">
+          A labelled segmented track beside Sort. It reads as a switch, member colour lights up only when
+          active, and every bean stays one tap away — best for the 2–6-person families beanies is built for.
+        </p>
+      </div>
+      <div class="app">
+        <div class="chrome">
+          <i></i><i></i><i></i><span class="url">app.beanies.family/todo</span
+          ><span class="w">tablet · 900px</span>
+        </div>
+        <div class="screen">
+          <div class="toolbar">
+            <div class="pagetitle"><b>Family To-Do</b><span>what needs doing, and who's on it</span></div>
+            <div class="controls">
+              <div class="lens" id="a-lens">
+                <span class="lens-label">Showing</span>
+                <div class="segtrack">
+                  <button class="seg" data-m="all" aria-pressed="true">
+                    <span style="font-size: 0.82rem">👥</span>Everyone
+                  </button>
+                  <button class="seg" data-m="a" title="Ada"><span class="av a1">A</span></button>
+                  <button class="seg" data-m="b" title="Ben"><span class="av a2">B</span></button>
+                  <button class="seg" data-m="c" title="Cleo"><span class="av a3">C</span></button>
+                  <button class="seg" data-m="d" title="Dev"><span class="av a4">D</span></button>
+                </div>
+              </div>
+              <button class="sortbtn">⇅ Sort</button>
+            </div>
+          </div>
+          <div class="qadd">
+            <div class="qadd-input"><span class="pencil">✏️</span><span class="ph">Add a to-do…</span></div>
+            <span class="date-pill">📅 Due</span>
+            <span class="assign-pill">👤 <span class="plus">＋</span></span>
+          </div>
+          <div class="section sec-open">
+            <div class="sec-head">
+              <span class="sec-label">Open</span><span class="sec-count" id="a-open-c">4</span>
+            </div>
+            <div class="list" id="a-open"></div>
+          </div>
+          <div class="section sec-someday" id="a-someday-sec">
+            <div class="sec-head">
+              <span class="sec-label">💭 Someday · Maybe</span><span class="sec-count" id="a-some-c">2</span>
+            </div>
+            <div class="list" id="a-someday"></div>
+          </div>
+          <div class="section sec-done">
+            <div
+              class="sec-head"
+              onclick="this.parentElement.querySelector('.donelist').classList.toggle('open');this.querySelector('.chev').textContent=this.parentElement.querySelector('.donelist').classList.contains('open')?'▾':'▸'"
+            >
+              <span class="sec-label">Completed</span><span class="sec-count">3</span
+              ><span class="chev">▸</span>
+            </div>
+            <div class="donelist">
+              <div class="trow completed">
+                <span class="tbox"></span><span class="ttitle">Sign school permission slip</span
+                ><span class="owner"><span class="av a1">A</span>Ada</span>
+              </div>
+              <div class="trow completed">
+                <span class="tbox"></span><span class="ttitle">Order groceries</span
+                ><span class="owner"><span class="av a2">B</span>Ben</span>
+              </div>
+              <div class="trow completed">
+                <span class="tbox"></span><span class="ttitle">Cancel gym trial</span
+                ><span class="owner"><span class="av a4">D</span>Dev</span>
+              </div>
+            </div>
+          </div>
+          <p class="tryhint">
+            Try it: tap <b>Ada</b> or <b>Cleo</b> above — the list narrows, the label stays "Showing," and
+            nothing about the task you'd add changes.
+          </p>
+        </div>
+      </div>
+
+      <!-- OPTION B -->
+      <div class="optlabel">
+        <span class="badge alt">Option B · alternative</span>
+        <h2>Stacked-avatar filter dropdown</h2>
+        <p class="note">
+          Reuses the filter idiom beanies already ships in the header — stacked avatars, "Everyone" default.
+          The pill row disappears; filtering collapses to one compact trigger. Scales to a big family; costs
+          one click.
+        </p>
+      </div>
+      <div class="app">
+        <div class="chrome">
+          <i></i><i></i><i></i><span class="url">app.beanies.family/todo</span
+          ><span class="w">tablet · 900px</span>
+        </div>
+        <div class="screen">
+          <div class="toolbar">
+            <div class="pagetitle"><b>Family To-Do</b><span>what needs doing, and who's on it</span></div>
+            <div class="controls">
+              <div class="filterwrap">
+                <button class="stackbtn" id="b-trigger">
+                  <span class="lens-label" style="letter-spacing: 0.05em">Showing</span>
+                  <span class="stack"
+                    ><span class="av a1">A</span><span class="av a2">B</span><span class="av a3">C</span
+                    ><span class="av a4">D</span></span
+                  >
+                  <span id="b-label">Everyone</span><span class="caret">▾</span>
+                </button>
+                <div class="menu" id="b-menu">
+                  <button class="menu-item" data-m="all" aria-pressed="true">
+                    <span class="av" style="background: var(--slate-10)">👥</span>Everyone<span class="check"
+                      >✓</span
+                    >
+                  </button>
+                  <button class="menu-item" data-m="a">
+                    <span class="av a1">A</span>Ada<span class="check">✓</span>
+                  </button>
+                  <button class="menu-item" data-m="b">
+                    <span class="av a2">B</span>Ben<span class="check">✓</span>
+                  </button>
+                  <button class="menu-item" data-m="c">
+                    <span class="av a3">C</span>Cleo<span class="check">✓</span>
+                  </button>
+                  <button class="menu-item" data-m="d">
+                    <span class="av a4">D</span>Dev<span class="check">✓</span>
+                  </button>
+                </div>
+              </div>
+              <button class="sortbtn">⇅ Sort</button>
+            </div>
+          </div>
+          <div class="qadd">
+            <div class="qadd-input"><span class="pencil">✏️</span><span class="ph">Add a to-do…</span></div>
+            <span class="date-pill">📅 Due</span>
+            <span class="assign-pill">👤 <span class="plus">＋</span></span>
+          </div>
+          <div class="section sec-open">
+            <div class="sec-head">
+              <span class="sec-label">Open</span><span class="sec-count" id="b-open-c">4</span>
+            </div>
+            <div class="list" id="b-open"></div>
+          </div>
+          <div class="section sec-someday" id="b-someday-sec">
+            <div class="sec-head">
+              <span class="sec-label">💭 Someday · Maybe</span><span class="sec-count" id="b-some-c">2</span>
+            </div>
+            <div class="list" id="b-someday"></div>
+          </div>
+          <div class="section sec-done">
+            <div
+              class="sec-head"
+              onclick="this.parentElement.querySelector('.donelist').classList.toggle('open');this.querySelector('.chev').textContent=this.parentElement.querySelector('.donelist').classList.contains('open')?'▾':'▸'"
+            >
+              <span class="sec-label">Completed</span><span class="sec-count">3</span
+              ><span class="chev">▸</span>
+            </div>
+            <div class="donelist">
+              <div class="trow completed">
+                <span class="tbox"></span><span class="ttitle">Sign school permission slip</span
+                ><span class="owner"><span class="av a1">A</span>Ada</span>
+              </div>
+              <div class="trow completed">
+                <span class="tbox"></span><span class="ttitle">Order groceries</span
+                ><span class="owner"><span class="av a2">B</span>Ben</span>
+              </div>
+              <div class="trow completed">
+                <span class="tbox"></span><span class="ttitle">Cancel gym trial</span
+                ><span class="owner"><span class="av a4">D</span>Dev</span>
+              </div>
+            </div>
+          </div>
+          <p class="tryhint">
+            Try it: open <b>Showing ▾</b> and choose a bean — the trigger updates to their name and the list
+            filters to match.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const OPEN = [
+        { t: 'Book Ada’s dentist', m: 'a', due: 'Tue', soon: false },
+        { t: 'Pay the water bill', m: 'b', due: 'Today', soon: true },
+        { t: 'Pack Cleo’s swim bag', m: 'c', due: 'Wed', soon: false },
+        { t: 'Renew car insurance', m: 'b', due: 'Fri', soon: false },
+      ];
+      const SOMEDAY = [
+        { t: 'Plan Dev’s birthday', m: 'd' },
+        { t: 'Sort the garage', m: 'b' },
+      ];
+      const MEM = {
+        a: { n: 'Ada', c: 'a1' },
+        b: { n: 'Ben', c: 'a2' },
+        c: { n: 'Cleo', c: 'a3' },
+        d: { n: 'Dev', c: 'a4' },
+      };
+
+      function row(x) {
+        const m = MEM[x.m];
+        const due = x.due ? '<span class="due' + (x.soon ? ' soon' : '') + '">' + x.due + '</span>' : '';
+        return (
+          '<div class="trow"><span class="tbox"></span><span class="ttitle">' +
+          x.t +
+          '</span>' +
+          due +
+          '<span class="owner"><span class="av ' +
+          m.c +
+          '">' +
+          m.n.charAt(0) +
+          '</span>' +
+          m.n +
+          '</span></div>'
+        );
+      }
+
+      function paint(prefix, active) {
+        const open = active === 'all' ? OPEN : OPEN.filter((x) => x.m === active);
+        const some = active === 'all' ? SOMEDAY : SOMEDAY.filter((x) => x.m === active);
+        const openEl = document.getElementById(prefix + '-open');
+        const someEl = document.getElementById(prefix + '-someday');
+        const someSec = document.getElementById(prefix + '-someday-sec');
+
+        openEl.innerHTML = open.length
+          ? open.map(row).join('')
+          : '<div class="empty">No open to-dos for ' +
+            (MEM[active] ? MEM[active].n : 'anyone') +
+            ' — nice.</div>';
+        document.getElementById(prefix + '-open-c').textContent = open.length;
+
+        if (some.length) {
+          someSec.style.display = '';
+          someEl.innerHTML = some.map(row).join('');
+          document.getElementById(prefix + '-some-c').textContent = some.length;
+        } else {
+          someSec.style.display = 'none';
+        }
+      }
+
+      function wire(buttons, prefix, onPick) {
+        buttons.forEach((btn) => {
+          btn.addEventListener('click', () => {
+            buttons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+            btn.setAttribute('aria-pressed', 'true');
+            paint(prefix, btn.dataset.m);
+            if (onPick) onPick(btn.dataset.m);
+          });
+        });
+      }
+
+      wire([...document.querySelectorAll('#a-lens .seg')], 'a');
+      paint('a', 'all');
+
+      const bMenu = document.getElementById('b-menu');
+      const bTrigger = document.getElementById('b-trigger');
+      const bLabel = document.getElementById('b-label');
+      bTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        bMenu.classList.toggle('open');
+      });
+      document.addEventListener('click', () => bMenu.classList.remove('open'));
+      wire([...document.querySelectorAll('#b-menu .menu-item')], 'b', (m) => {
+        bLabel.textContent = m === 'all' ? 'Everyone' : MEM[m].n;
+        bMenu.classList.remove('open');
+      });
+      paint('b', 'all');
+    </script>
+  </body>
+</html>
