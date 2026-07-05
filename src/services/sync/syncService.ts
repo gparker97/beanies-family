@@ -14,6 +14,7 @@ import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandle
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
 import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, detectFileVersion } from './fileSync';
 import * as docClient from '@/services/automerge/worker/docClient';
+import { setInlineCachePersistFailedHandler } from '@/services/automerge/worker/inlineBridge';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
 import type { StorageProvider, StorageProviderType } from './storageProvider';
@@ -1049,7 +1050,8 @@ export function registerDocPersistCallback(): void {
   // to the durability banner. The old onDocPersistNeeded fan-out + main-thread
   // persistDoc/persistEnvelope/isCacheReady are gone.
   docClient.setLocalChangeHandler(() => triggerDebouncedSave());
-  docClient.setCachePersistFailedHandler(setCachePersistFailed);
+  docClient.setCachePersistFailedHandler(setCachePersistFailed); // worker path
+  setInlineCachePersistFailedHandler(setCachePersistFailed); // inline fallback path
 }
 
 /**

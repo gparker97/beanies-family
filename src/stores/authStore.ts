@@ -16,7 +16,7 @@ import { useFamilyStore } from './familyStore';
 import { useSettingsStore } from './settingsStore';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { flushPendingSave, cancelPendingSave } from '@/services/sync/syncService';
-import { initDoc } from '@/services/automerge/docService';
+import * as docClient from '@/services/automerge/worker/docClient';
 import { clearGoogleSessionState } from '@/services/google/googleAuth';
 import { clearFolderCache } from '@/services/google/driveService';
 import { reportError } from '@/utils/errorReporter';
@@ -72,7 +72,8 @@ export const DEFERRED_PASSWORD_HASH = '';
 
 export type RotateError = 'familyKeyMissing' | 'wrapFailed' | 'updateFailed';
 export type RotateResult =
-  { success: true; syncDeferred: boolean } | { success: false; error: RotateError };
+  | { success: true; syncDeferred: boolean }
+  | { success: false; error: RotateError };
 
 export type RotateSurface = 'change-password' | 'reset-member-password' | 'signin-heal';
 
@@ -475,8 +476,8 @@ export const useAuthStore = defineStore('auth', () => {
     owner: { name: string; email: string; passwordHash: string },
     id?: string
   ) {
-    // Must run before any changeDoc() call (createMember writes to the doc).
-    initDoc();
+    // Must run before any mutation (createMember writes to the worker doc).
+    await docClient.initDoc();
     const familyStore = useFamilyStore();
     // Clear stale state from any previous cancelled setup attempt.
     familyStore.resetState();

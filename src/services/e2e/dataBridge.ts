@@ -1,17 +1,23 @@
 /**
  * E2E Data Bridge — dev-only window bridge for Playwright tests.
  *
- * Exposes `window.__e2eDataBridge` with `exportData()` and `seedData()`
- * that read/write the in-memory Automerge document directly, replacing
- * the old per-entity IndexedDB approach.
+ * Exposes `window.__e2eDataBridge` with `exportData()` and `seedData()` that
+ * read the main-thread `projection` and write via `docClient` (ADR-032).
  *
- * Also auto-saves the Automerge binary to sessionStorage on page unload
- * so all data survives `page.goto()` reloads during E2E tests.
+ * Persistence across `page.goto()` reloads: the Automerge binary is pre-staged
+ * (worker `exportSnapshot` on `visibilitychange:hidden` and after each seed),
+ * then written to sessionStorage synchronously on `beforeunload` (a `beforeunload`
+ * handler can't await a worker RPC). App.vue restores it via `docClient.loadSnapshot`.
  */
 
-import { getDoc, changeDoc, saveDoc } from '@/services/automerge/docService';
+import {
+  list as projectionList,
+  getSettings as projectionGetSettings,
+} from '@/services/automerge/projection';
+import * as docClient from '@/services/automerge/worker/docClient';
 import { bufferToBase64 } from '@/utils/encoding';
-import type { FamilyDocument, CollectionName } from '@/types/automerge';
+import type { FamilyDocument, CollectionName, CollectionEntity } from '@/types/automerge';
+import type { MutationOp } from '@/services/automerge/worker/protocol';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { removeFamily } from '@/services/registry/registryService';
 
@@ -30,29 +36,27 @@ const COLLECTIONS: CollectionName[] = [
   'activities',
 ];
 
+/** The most recent serialized doc binary (base64), pre-staged for a sync unload. */
+let stagedSnapshot: string | null = null;
+
 export function initDataBridge(): void {
   if (!import.meta.env.DEV) return;
 
   (window as unknown as Record<string, unknown>).__e2eDataBridge = {
     exportData() {
-      const doc = getDoc();
       const result: Record<string, unknown> = {};
-
       for (const col of COLLECTIONS) {
-        result[col] = Object.values(doc[col] ?? {});
+        result[col] = projectionList(col);
       }
-      result.settings = doc.settings ?? undefined;
-
-      // Strip Automerge Proxy wrappers for safe structured-cloning
+      result.settings = projectionGetSettings() ?? undefined;
+      // Already plain (projection stores materialized objects), but round-trip
+      // for parity with the old proxy-stripping contract.
       return JSON.parse(JSON.stringify(result));
     },
 
     /**
-     * E2E afterEach cleanup hook — removes the active family from the
-     * registry DDB table so test pods don't accumulate. Fire-and-forget
-     * (registryService.removeFamily already swallows errors). Returns
-     * the familyId that was deleted (or null if none was active) so the
-     * Playwright helper can log it.
+     * E2E afterEach cleanup hook — removes the active family from the registry.
+     * Fire-and-forget. Returns the familyId that was deleted (or null).
      */
     async cleanupActiveFamily(): Promise<string | null> {
       const id = getActiveFamilyId();
@@ -61,40 +65,49 @@ export function initDataBridge(): void {
       return id;
     },
 
-    seedData(data: Partial<Record<keyof FamilyDocument, unknown>>) {
-      changeDoc((doc) => {
-        for (const col of COLLECTIONS) {
-          const items = data[col] as Array<{ id: string }> | undefined;
-          if (!items) continue;
-          for (const item of items) {
-            (doc[col] as Record<string, unknown>)[item.id] = item;
-          }
+    async seedData(data: Partial<Record<keyof FamilyDocument, unknown>>) {
+      const ops: MutationOp[] = [];
+      for (const col of COLLECTIONS) {
+        const items = data[col] as Array<{ id: string }> | undefined;
+        if (!items) continue;
+        for (const item of items) {
+          ops.push({ op: 'set', collection: col, id: item.id, entity: item });
         }
-        if (data.settings !== undefined) {
-          doc.settings = data.settings as FamilyDocument['settings'];
-        }
-      }, 'e2e: seed data');
-
-      // Snapshot now so it's in sessionStorage before the reload
-      snapshotDoc();
+      }
+      if (ops.length) await docClient.mutate({ op: 'batch', ops });
+      if (data.settings !== undefined) {
+        await docClient.mutate({
+          op: 'named',
+          name: 'setSettings',
+          args: { settings: data.settings as CollectionEntity<'familyMembers'> },
+        });
+      }
+      // Pre-stage the binary so it's in sessionStorage before the reload.
+      await refreshSnapshot();
     },
   };
 
-  // Auto-save the Automerge doc to sessionStorage before every page unload.
-  // This ensures data created through the UI (not just seedData) survives
-  // the full page reloads triggered by page.goto() in E2E tests.
+  // Pre-stage the snapshot when the tab is about to hide (fires while the page is
+  // still alive), so the sync beforeunload handler only reads a ready value.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && sessionStorage.getItem('e2e_auto_auth') === 'true') {
+      void refreshSnapshot();
+    }
+  });
+
+  // Synchronous write on unload — no await (beforeunload can't).
   window.addEventListener('beforeunload', () => {
     if (sessionStorage.getItem('e2e_auto_auth') !== 'true') return;
-    snapshotDoc();
+    if (stagedSnapshot) sessionStorage.setItem(E2E_SEED_KEY, stagedSnapshot);
   });
 }
 
-/** Serialize the current Automerge doc to sessionStorage (synchronous). */
-function snapshotDoc(): void {
+/** Fetch the current doc binary from the worker and stage it (base64). */
+async function refreshSnapshot(): Promise<void> {
   try {
-    const binary = saveDoc();
-    sessionStorage.setItem(E2E_SEED_KEY, bufferToBase64(binary));
+    const { binary } = await docClient.exportSnapshot();
+    stagedSnapshot = bufferToBase64(binary);
   } catch {
-    // Doc might not be initialized yet — ignore
+    // Doc might not be initialized yet — leave the previous staged value.
   }
 }

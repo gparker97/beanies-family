@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { initDoc } from '@/services/automerge/docService';
+import { installInlineBackend } from '@/services/automerge/worker/__tests__/inlineHarness';
 import { toISODateString } from '@/utils/date';
 import {
   createActivity,
@@ -67,9 +67,9 @@ function activityInput(): CreateFamilyActivityInput {
 }
 
 describe('calendarSyncStore reconcile engine (fake client)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     setActivePinia(createPinia());
-    initDoc();
+    await installInlineBackend();
     // Force the flag on regardless of env.
     localStorage.setItem('beanies:flag:googleCalendarSync', 'true');
   });
