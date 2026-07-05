@@ -267,6 +267,14 @@ const reverseLoanPaymentOp: NamedOpHandler = (draft, args) => {
   };
 };
 
+/** Replace the settings singleton (`doc.settings` is `Settings | null`, not a
+ * collection map — so `set`/`patch` don't fit). Emits a `settings` delta. */
+const setSettingsOp: NamedOpHandler = (draft, args) => {
+  (draft as unknown as AnyRecord).settings = args.settings;
+  const settings = toPlain(draft.settings ?? null);
+  return { result: settings, deltas: [{ kind: 'settings', settings }] };
+};
+
 /** Register the core domain ops. Called at module load + re-registered after a
  * test reset, so production + tests always have them (plugins like photo attach
  * register separately). */
@@ -274,6 +282,7 @@ export function registerCoreNamedOps(): void {
   registerNamedOp('applyGoalContribution', applyGoalContributionOp);
   registerNamedOp('applyLoanPayment', applyLoanPaymentOp);
   registerNamedOp('reverseLoanPayment', reverseLoanPaymentOp);
+  registerNamedOp('setSettings', setSettingsOp);
 }
 registerCoreNamedOps();
 
