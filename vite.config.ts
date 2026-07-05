@@ -149,6 +149,12 @@ export default defineConfig({
     format: 'es',
     plugins: () => [wasm(), topLevelAwait()],
   },
+  // Dev-server only: allow ephemeral tunnel hosts (cloudflared/ngrok/localtunnel)
+  // so the ADR-032 worker spike can be opened on an iPhone over HTTPS. Vite 7
+  // rejects unknown Host headers by default. No effect on the production build.
+  server: {
+    allowedHosts: ['.trycloudflare.com', '.ngrok-free.app', '.ngrok.io', '.loca.lt'],
+  },
   plugins: [
     assertOfficialBuildEnv(),
     featureFlagWriterDev(),
