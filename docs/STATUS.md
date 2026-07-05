@@ -62,11 +62,10 @@
 >
 > _Validated 2026-06-29: removed the Dependabot pending block — fully cleared this session (#255 merged, #251/#252 closed, astro-exclusion config shipped `709a6302`)._
 > _Validated 2026-07-01: all three items below still apply (both device checks untouched; Finding 15 not started). The 2026-07-01 shipping work (model fix, multi-page PDF, version convention, blog subtitle) was net-new, not from this pending list._
-> _Validated 2026-07-03: removed items 1 & 2 (iPhone create-flow + calendar deep-link) — both VERIFIED on a real iPhone this session. Items 3 (Finding 15) & 4 (Substack smoke) still apply: `DEFERRED_PASSWORD_HASH` confirmed still present in `authStore.ts`/`syncStore.ts`; the Substack live round-trip was not tested this session. Finding 15 is now UNBLOCKED (iOS is device-verified) but stays optional/low-priority._
+> _Validated 2026-07-03: removed items 1 & 2 (iPhone create-flow + calendar deep-link) — both VERIFIED on a real iPhone this session._
+> _Validated 2026-07-05: greg CLOSED the Substack smoke (subscribe form confirmed working) and the Google Calendar what's-new announcement (not wanted for now). Finding 15 was FILED to the Notion tracker as **#41** ("Refactor: create the family owner only once the password is known") and dropped from this list — the tracker now owns it. **The NEXT SESSION list is empty; wide-open session.**_
 >
-> 1. **Finding 15 FUTURE** (optional, low priority — now unblocked): the create-owner-late refactor that removes the `DEFERRED_PASSWORD_HASH` sentinel + fail-closed guard + rehydrate special-case. Documented in the `authStore.ts` doc-comment. iOS is now device-verified, so this can be revisited whenever.
-> 2. **⏳ Smoke the live Substack subscribe form** (blog). On `beanies.family/blog`, enter an email → confirm the Substack double-opt-in email actually arrives. The endpoint/field pattern is proven in `CreatePodView.vue`, but the live round-trip wasn't tested end-to-end. Also eyeball the constrained-width card (`.substack-strip` capped at `34rem`, centered) on a real desktop.
-> 3. **⏳ Google Calendar what's-new announcement** — the app v0.9.2 deploy shipped a `2026.07.03` spotlight note covering Calendar-official + privacy. If a _further_ dedicated Calendar announcement is wanted (e.g. tied to the blog post), it would go in a future deploy; otherwise this is covered.
+> _(No pending items. Finding 15 lives in the tracker as #41 — Not started, Low/Future — pick it up via `/beanies-pre-plan #41` whenever.)_
 >
 > ---
 >
