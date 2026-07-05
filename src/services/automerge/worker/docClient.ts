@@ -23,7 +23,7 @@ import { withTimeout } from '@/utils/timing';
 import { record as recordPerf } from '@/utils/perfTiming';
 import { showToast } from '@/composables/useToast';
 import { CorruptPayloadError } from '@/types/sync';
-import { applyDelta } from '../projection';
+import { applyDelta, applyChunk, bumpDocVersion, resetProjection } from '../projection';
 import {
   isRpcResponse,
   isWorkerSignal,
@@ -77,6 +77,10 @@ let currentFamilyId: string | null = null;
 let rehydrator: ((familyId: string) => Promise<void>) | null = null;
 let needsRehydrate = false;
 
+/** Notified when the worker's debounced cache persist fails (or recovers) — Task
+ * #5 wires this to the persistent "local durability broken" banner. */
+let cachePersistFailedHandler: ((failed: boolean) => void) | null = null;
+
 // ─── Configuration seams (production wiring + tests) ─────────────────────────
 
 /** Test/DI: override how the worker is created. */
@@ -90,6 +94,10 @@ export function setInlineExecutor(exec: InlineExecutor | null): void {
 /** Task #6: how to re-hydrate a freshly re-spawned worker from cache. */
 export function setRehydrator(fn: ((familyId: string) => Promise<void>) | null): void {
   rehydrator = fn;
+}
+/** Task #5: observe worker cache-persist failures (durability banner). */
+export function setCachePersistFailedHandler(fn: ((failed: boolean) => void) | null): void {
+  cachePersistFailedHandler = fn;
 }
 
 // ─── Message routing ─────────────────────────────────────────────────────────
@@ -121,6 +129,20 @@ function handleSignal(sig: WorkerSignal): void {
     case 'log':
       // eslint-disable-next-line no-console
       console[sig.level === 'debug' ? 'log' : sig.level](`[docWorker] ${sig.message}`);
+      break;
+    case 'projection':
+      // A streamed first-load / merge chunk. Apply WITHOUT bumping (the chunks
+      // arrive before the triggering RPC's response, so all land before the
+      // promise resolves — the load/merge barrier); bump once on the final chunk.
+      try {
+        applyChunk(sig.delta);
+        if (sig.final) bumpDocVersion();
+      } catch (e) {
+        console.warn('[docClient] applyChunk failed', e);
+      }
+      break;
+    case 'cache-persist-failed':
+      cachePersistFailedHandler?.(sig.failed);
       break;
   }
 }
@@ -271,6 +293,11 @@ export async function setFamilyKey(key: CryptoKey): Promise<void> {
   await request('setKey', { key });
 }
 
+/** Create a fresh empty document (create-family). Pushes the full projection. */
+export function initDoc(): Promise<{ loaded: true }> {
+  return request('initDoc');
+}
+
 /** Init the worker cache + load the cached doc; pushes the full projection. */
 export async function initAndLoadCache(familyId: string): Promise<{ loaded: boolean }> {
   currentFamilyId = familyId;
@@ -323,10 +350,14 @@ export async function reset(): Promise<void> {
   currentFamilyId = null;
   familyKey = null;
   await request('reset');
+  // Clear the main-thread mirror too — a worker-only reset would leave a stale
+  // projection readable across a family-switch (cross-session data bleed).
+  resetProjection();
 }
 /** Close + delete the encrypted cache DB (sign-out / family-switch). */
-export function clearCache(familyId: string): Promise<void> {
-  return request('clearCache', { familyId });
+export async function clearCache(familyId: string): Promise<void> {
+  await request('clearCache', { familyId });
+  resetProjection();
 }
 
 /** Test-only: tear down all client state between cases. */
@@ -346,4 +377,5 @@ export function __resetDocClientForTesting(): void {
   needsRehydrate = false;
   inlineExecutor = null;
   rehydrator = null;
+  cachePersistFailedHandler = null;
 }
