@@ -326,6 +326,12 @@ export function exportEncryptedPayload(): Promise<{ payload: string }> {
 export function getHeads(): Promise<{ heads: Heads }> {
   return request('getHeads');
 }
+
+/** Gather every photoId referenced across registered collections (for `gcOrphans`).
+ * Pass `{quiet:true}` — a `collect`-hook throw is the fail-safe abort, not a toast. */
+export function collectReferencedPhotoIds(opts?: RequestOpts): Promise<{ ids: string[] }> {
+  return request('collectReferencedPhotoIds', undefined, opts);
+}
 export function getChangesSince(heads: Heads): Promise<{ changes: Uint8Array[] }> {
   return request('getChangesSince', { heads });
 }
