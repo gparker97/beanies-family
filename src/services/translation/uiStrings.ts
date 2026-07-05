@@ -4306,6 +4306,12 @@ const STRING_DEFS = {
   'todo.addedDaysAgo': { en: 'Added {days} days ago', beanie: 'added {days} days ago' },
   'todo.sortLabel': { en: 'Sort:', beanie: 'sort:' },
   'todo.overdue': { en: 'Overdue', beanie: 'overdue!' },
+  'todo.showingLabel': { en: 'Showing', beanie: 'showing' },
+  'todo.filterEveryone': { en: 'Everyone', beanie: 'everyone' },
+  'todo.filterGroupLabel': {
+    en: 'Filter to-dos by member',
+    beanie: 'filter to-dos by member',
+  },
 
   // Beanie Lists (#33) — categorized family checklists
   'lists.title': { en: 'Beanie Lists', beanie: 'beanie lists' },

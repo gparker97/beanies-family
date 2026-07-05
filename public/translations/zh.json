@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-03",
-    "translationCount": 3653
+    "lastUpdated": "2026-07-05",
+    "translationCount": 3656
   },
   "translations": {
     "app.name": {
@@ -18270,6 +18270,21 @@
       "translation": "关闭",
       "hash": "fur0k6",
       "lastUpdated": "2026-07-03"
+    },
+    "todo.showingLabel": {
+      "translation": "显示",
+      "hash": "9b7c63",
+      "lastUpdated": "2026-07-05"
+    },
+    "todo.filterEveryone": {
+      "translation": "所有人",
+      "hash": "5qdaq3",
+      "lastUpdated": "2026-07-05"
+    },
+    "todo.filterGroupLabel": {
+      "translation": "按成员筛选待办事项",
+      "hash": "ycl8kf",
+      "lastUpdated": "2026-07-05"
     }
   }
 }
