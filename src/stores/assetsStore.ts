@@ -213,6 +213,12 @@ export const useAssetsStore = defineStore('assets', () => {
     return result ?? null;
   }
 
+  /** Update the local array from a worker-echoed asset WITHOUT re-writing the
+   * doc — the doc was already mutated atomically (e.g. by the loan named op). */
+  function applyEchoed(asset: Asset): void {
+    assets.value = assets.value.map((a) => (a.id === asset.id ? asset : a));
+  }
+
   async function deleteAsset(id: string): Promise<boolean> {
     const assetToDelete = assets.value.find((a) => a.id === id);
     if (assetToDelete?.loan?.linkedRecurringItemId) {
@@ -272,6 +278,7 @@ export const useAssetsStore = defineStore('assets', () => {
     loadAssets,
     createAsset,
     updateAsset,
+    applyEchoed,
     deleteAsset,
     getAssetById,
     getAssetsByMemberId,

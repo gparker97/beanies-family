@@ -7,6 +7,7 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
 import { accountNetWorthMultiplier, isLiabilityType } from '@/utils/finance';
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
+import { mutate } from '@/services/automerge/worker/docClient';
 import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
 import type { Account, CreateAccountInput, UpdateAccountInput, CurrencyCode } from '@/types/models';
 
@@ -181,6 +182,40 @@ export const useAccountsStore = defineStore('accounts', () => {
     return result ?? null;
   }
 
+  /**
+   * Atomically adjust a balance by a RELATIVE delta (via the worker `increment`
+   * op — the read-modify-write happens inside one Automerge.change, so a
+   * concurrent poll-merge can't cause a lost update). Updates the local array
+   * from the echoed account. Used by transaction cascades.
+   */
+  async function incrementBalance(id: string, delta: number): Promise<Account | null> {
+    if (!getAccountById(id)) return null;
+    return (
+      (await wrapAsync(
+        isLoading,
+        error,
+        async () => {
+          const updated = await mutate<Account>({
+            op: 'increment',
+            collection: 'accounts',
+            id,
+            field: 'balance',
+            delta,
+          });
+          accounts.value = accounts.value.map((a) => (a.id === id ? updated : a));
+          return updated;
+        },
+        { action: 'accountsStore:incrementBalance' }
+      )) ?? null
+    );
+  }
+
+  /** Update the local array from a worker-echoed account WITHOUT re-writing the
+   * doc — the doc was already mutated atomically (e.g. by the loan named op). */
+  function applyEchoed(account: Account): void {
+    accounts.value = accounts.value.map((a) => (a.id === account.id ? account : a));
+  }
+
   async function deleteAccount(id: string): Promise<boolean> {
     const result = await wrapAsync(
       isLoading,
@@ -236,6 +271,8 @@ export const useAccountsStore = defineStore('accounts', () => {
     loadAccounts,
     createAccount,
     updateAccount,
+    incrementBalance,
+    applyEchoed,
     deleteAccount,
     getAccountById,
     getAccountsByMemberId,

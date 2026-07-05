@@ -370,7 +370,7 @@ export const useFamilyStore = defineStore('family', () => {
       );
       reportError({
         surface: 'familyStore.normalize-roles',
-        message: 'changeDoc rejected during role normalization',
+        message: 'mutation batch rejected during role normalization',
         error: e,
         context: { patchCount: patches.size },
       });
