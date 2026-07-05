@@ -1,4 +1,5 @@
-import { getDoc, changeDoc } from '../docService';
+import { getSettings as projectionGetSettings } from '../projection';
+import { mutate } from '../worker/docClient';
 import { DEFAULT_CURRENCY } from '@/constants/currencies';
 import { DEFAULT_LANGUAGE } from '@/constants/languages';
 import { apiKeyForProvider } from '@/utils/aiApiKeys';
@@ -40,16 +41,16 @@ export function getDefaultSettings(): Settings {
 }
 
 export async function getSettings(): Promise<Settings> {
-  const doc = getDoc();
-  if (!doc.settings) return getDefaultSettings();
+  const current = projectionGetSettings();
+  if (!current) return getDefaultSettings();
   // Backfill any optional fields added after this doc was written, so downstream readers can
   // trust that a field with a default in getDefaultSettings() is present — no per-field
   // `?? default` coalescing required at every call site.
-  const merged: Settings = { ...getDefaultSettings(), ...doc.settings };
+  const merged: Settings = { ...getDefaultSettings(), ...current };
   // #133 migration: a doc written before `aiTier` existed but with a configured BYOK
   // provider+key was effectively on the BYOK tier. Preserve that rather than letting the
   // backfill default it to 'managed' (which would silently ignore the user's own key).
-  if (doc.settings.aiTier === undefined && apiKeyForProvider(merged.aiProvider, merged.aiApiKeys)) {
+  if (current.aiTier === undefined && apiKeyForProvider(merged.aiProvider, merged.aiApiKeys)) {
     merged.aiTier = 'byok';
   }
   return merged;
@@ -73,10 +74,7 @@ export async function saveSettings(
     updatedAt: options?.preserveTimestamp ? existing.updatedAt : toISODateString(new Date()),
   };
 
-  changeDoc((d) => {
-    d.settings = updated;
-  });
-
+  await mutate({ op: 'named', name: 'setSettings', args: { settings: updated } });
   return updated;
 }
 
