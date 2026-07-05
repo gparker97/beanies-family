@@ -11,6 +11,10 @@
  */
 import * as Automerge from '@automerge/automerge';
 import { COLLECTION_NAMES, type FamilyDocument, type CollectionName } from '@/types/automerge';
+import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
+import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
+import { CorruptPayloadError } from '@/types/sync';
+import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import type { MutationOp, ProjectionDelta, Heads } from './protocol';
 
 type Doc = Automerge.Doc<FamilyDocument>;
@@ -64,6 +68,63 @@ export function mergeDocs(local: Doc, remote: Doc): { doc: Doc; dirty: boolean; 
   const merged = migrateDoc(Automerge.merge(Automerge.clone(local), remote));
   const dirty = Automerge.getChanges(remote, merged).length > 0;
   return { doc: merged, dirty, heads: getHeads(merged) };
+}
+
+// ─── Async payload crypto (Drive path) ───────────────────────────────────────
+//
+// These are the async, CryptoKey-touching handlers the worker owns (the pure
+// sync ops are above). They are shared by the worker AND the inline fallback.
+// Timing is the caller's job (applyAndProject relays `automerge.remoteLoad` /
+// `automerge.save` perf samples to main) — these stay perf-plumbing-free.
+
+/**
+ * Load a decrypted binary as an Automerge doc, catching the "loads but the WASM
+ * materializer blows up on first read" corruption at the boundary (the same
+ * check the Drive read path has always had — `fileSync.decryptBeanpodPayload`).
+ * Does NOT migrate — the caller replaces/merges then migrates. Throws
+ * `CorruptPayloadError` (reconstructed across `postMessage` via the protocol
+ * error registry, so `instanceof` recovery dispatch on main keeps working).
+ */
+export function loadAndVerify(binary: Uint8Array, familyId: string | null): Doc {
+  let doc: Doc;
+  try {
+    doc = Automerge.load<FamilyDocument>(binary);
+  } catch (e) {
+    throw new CorruptPayloadError(
+      `Automerge.load failed on decrypted payload: ${e instanceof Error ? e.message : String(e)}`,
+      'load',
+      familyId
+    );
+  }
+  // Touching `familyMembers` (always a Record) forces the first materialize.
+  try {
+    Object.keys(doc.familyMembers ?? {});
+  } catch (e) {
+    throw new CorruptPayloadError(
+      `Automerge materialize failed on decrypted payload: ${e instanceof Error ? e.message : String(e)}`,
+      'materialize',
+      familyId
+    );
+  }
+  return doc;
+}
+
+/** Decrypt a fetched V4 envelope's payload → verified Automerge doc (unmigrated). */
+export async function decryptToDoc(envelope: BeanpodFileV4, familyKey: CryptoKey): Promise<Doc> {
+  const encrypted = new Uint8Array(base64ToBuffer(envelope.encryptedPayload));
+  const binary = await decryptPayload(familyKey, encrypted);
+  return loadAndVerify(binary, envelope.familyId ?? null);
+}
+
+/**
+ * Serialize + encrypt a doc → base64 payload. The worker returns ONLY this;
+ * envelope assembly (wrappedKeys/inviteKeys) stays on main so key material never
+ * leaves the main thread for the upload path. See ADR-032.
+ */
+export async function encryptDocPayload(doc: Doc, familyKey: CryptoKey): Promise<string> {
+  const binary = saveDoc(doc);
+  const encrypted = await encryptPayload(familyKey, binary);
+  return bufferToBase64(encrypted);
 }
 
 // ─── Materialization → projection ────────────────────────────────────────────

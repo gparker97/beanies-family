@@ -76,6 +76,22 @@ export function applyDelta(delta: ProjectionDelta): void {
   docVersion.value += 1;
 }
 
+/**
+ * Apply one streamed projection chunk WITHOUT bumping `docVersion`. First-load /
+ * remote-merge pushes arrive as many chunks (one per collection slice); bumping
+ * per-chunk would let a `docVersion`-subscribed computed observe a half-applied
+ * projection (e.g. a transaction referencing an account whose chunk hasn't
+ * landed). `docClient` calls `bumpDocVersion()` exactly once after the final
+ * chunk — see the merge/load barrier in ADR-032. */
+export function applyChunk(delta: ProjectionDelta): void {
+  applyOne(delta);
+}
+
+/** Bump the coarse change trigger. Called once after a chunked load/merge. */
+export function bumpDocVersion(): void {
+  docVersion.value += 1;
+}
+
 /** All entities in a collection, as an array (order is insertion order). */
 export function list<K extends CollectionName>(collection: K): CollectionEntity<K>[] {
   return Array.from(mapFor(collection).value.values()) as CollectionEntity<K>[];
