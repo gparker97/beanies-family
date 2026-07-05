@@ -4284,6 +4284,7 @@ const STRING_DEFS = {
   'todo.allBeans': { en: 'All Beans', beanie: 'all beanies' },
   'todo.selectDueDate': { en: 'Due Date', beanie: 'due date' },
   'todo.who': { en: 'Who', beanie: 'who' },
+  'todo.assign': { en: 'Assign', beanie: 'assign' },
   'todo.dueDate': { en: 'Due date', beanie: 'due date' },
   'todo.dueTime': { en: 'Time', beanie: 'time' },
   'todo.description': { en: 'Description', beanie: 'description' },

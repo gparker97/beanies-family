@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>To-Do composer — alignment fix</title>
+    <style>
+      :root {
+        --slate: #2c3e50;
+        --muted: #64748b;
+        --cloud: #f8f9fa;
+        --orange: #f15d22;
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+        --tint-slate-10: rgba(44, 62, 80, 0.1);
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-purple-8: rgba(155, 89, 182, 0.08);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+        background: var(--cloud);
+        color: var(--slate);
+        padding: 40px 24px 80px;
+        line-height: 1.4;
+      }
+      .wrap {
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin-bottom: 6px;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 0.95rem;
+        margin-bottom: 36px;
+      }
+      .block-label {
+        font-size: 0.7rem;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 34px 0 12px;
+      }
+      .frame-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--muted);
+        margin-bottom: 10px;
+      }
+      .surface {
+        background: #fff;
+        border: 1px solid var(--tint-slate-10);
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(44, 62, 80, 0.04);
+      }
+      .surface + .surface {
+        margin-top: 18px;
+      }
+      .w-desktop {
+        width: 100%;
+      }
+      .w-tablet {
+        max-width: 720px;
+      }
+
+      /* ── shared control primitives ─────────────────────────── */
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: stretch;
+      }
+      .entry {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--tint-slate-5);
+        border-radius: 16px;
+        padding: 0 16px;
+      }
+      .entry .pen {
+        font-size: 1.1rem;
+        opacity: 0.4;
+      }
+      .entry input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        font: inherit;
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--slate);
+        outline: none;
+      }
+      .entry input::placeholder {
+        color: var(--slate);
+        opacity: 0.4;
+      }
+      .add-btn {
+        flex-shrink: 0;
+        border: 0;
+        border-radius: 12px;
+        padding: 8px 20px;
+        font: inherit;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #fff;
+        background: linear-gradient(135deg, #9b59b6, #8e44ad);
+        cursor: pointer;
+      }
+      .chev,
+      .plus {
+        opacity: 0.5;
+        font-size: 0.85rem;
+      }
+
+      /* ── BEFORE: mismatched ────────────────────────────────── */
+      .before .entry {
+        padding-top: 14px;
+        padding-bottom: 14px;
+      }
+      .before .pill-date {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        align-self: center;
+        flex-shrink: 0;
+        background: var(--tint-slate-5);
+        border: 2px solid transparent;
+        border-radius: 999px;
+        padding: 6px 14px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .before .assignee {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        align-self: center;
+        flex-shrink: 0;
+        background: var(--tint-slate-5);
+        border-radius: 16px;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .before .assignee .plus {
+        font-size: 0.8rem;
+      }
+
+      /* ── AFTER: unified composer ───────────────────────────── */
+      .after .row {
+        align-items: stretch;
+      }
+      .after .control {
+        height: 52px;
+      }
+      .after .entry {
+        height: 52px;
+      }
+      .after .slot {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 52px;
+        padding: 0 16px;
+        border-radius: 16px;
+        border: 2px solid transparent;
+        background: var(--tint-slate-5);
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .after .slot .ico {
+        font-size: 0.95rem;
+        line-height: 1;
+      }
+      .after .slot .lbl {
+        color: var(--slate);
+        opacity: 0.75;
+      }
+      /* filled states show the control is "set" */
+      .after .slot.date-set {
+        background: var(--tint-orange-8);
+        border-color: var(--orange);
+        color: var(--orange);
+      }
+      .after .slot.date-set .lbl {
+        color: var(--orange);
+        opacity: 1;
+      }
+      .after .slot .clear-x {
+        opacity: 0.6;
+        font-weight: 700;
+        margin-left: 2px;
+      }
+      .after .slot.assign-set {
+        background: var(--tint-purple-8);
+      }
+      .avatar {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 0.65rem;
+        font-weight: 700;
+      }
+
+      .caption {
+        margin-top: 14px;
+        font-size: 0.82rem;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+      .caption b {
+        color: var(--slate);
+      }
+      .flow {
+        margin-top: 8px;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .flow span {
+        color: var(--orange);
+        font-weight: 700;
+      }
+      .legend {
+        display: flex;
+        gap: 22px;
+        flex-wrap: wrap;
+        margin-top: 28px;
+        padding-top: 20px;
+        border-top: 1px solid var(--tint-slate-10);
+      }
+      .legend div {
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .legend b {
+        color: var(--slate);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>To-Do composer — alignment fix</h1>
+      <p class="sub">
+        Making the entry bar, due-date, and assignee controls read as one connected group. Desktop + tablet.
+      </p>
+
+      <!-- ============ BEFORE ============ -->
+      <div class="block-label">Before — three mismatched controls</div>
+      <div class="surface w-desktop before">
+        <div class="frame-label">Desktop (≥ 900px)</div>
+        <div class="row">
+          <div class="entry">
+            <span class="pen">✏️</span>
+            <input placeholder="Add a to-do…" />
+          </div>
+          <div class="pill-date"><span>📅</span> Select due date <span class="chev">▾</span></div>
+          <div class="assignee"><span>👤</span> <span class="plus">+</span></div>
+        </div>
+        <p class="caption">
+          Different <b>heights</b> (52 / 30 / 40px), different <b>corners</b> (squircle vs. full
+          pill), different <b>type sizes</b>. The date pill floats small in the middle; the assignee
+          is a cryptic “👤 +”. The eye stumbles across the row instead of gliding.
+        </p>
+      </div>
+
+      <!-- ============ AFTER ============ -->
+      <div class="block-label">After — one unified composer</div>
+
+      <div class="surface w-desktop after">
+        <div class="frame-label">Desktop (≥ 900px) — empty state</div>
+        <div class="row">
+          <div class="entry control">
+            <span class="pen">✏️</span>
+            <input placeholder="Add a to-do…" />
+          </div>
+          <div class="slot control"><span class="ico">📅</span><span class="lbl">Due date</span><span class="chev">▾</span></div>
+          <div class="slot control"><span class="ico">👤</span><span class="lbl">Assign</span><span class="plus">+</span></div>
+        </div>
+        <p class="flow">Eye-flow: <span>what needs doing →</span> <span>when →</span> <span>who</span></p>
+      </div>
+
+      <div class="surface w-desktop after">
+        <div class="frame-label">Desktop — filled state (date + assignees set)</div>
+        <div class="row">
+          <div class="entry control">
+            <span class="pen">✏️</span>
+            <input value="Pack Joey's soccer kit" />
+            <button class="add-btn">Add</button>
+          </div>
+          <div class="slot control date-set">
+            <span class="ico">📅</span><span class="lbl">Sun, 5 Jul</span><span class="clear-x">×</span>
+          </div>
+          <div class="slot control assign-set">
+            <span class="avatar" style="background: linear-gradient(135deg, #f15d22, #f15d22cc)">J</span>
+            <span class="avatar" style="background: linear-gradient(135deg, #2c3e50, #2c3e50cc)">G</span>
+          </div>
+        </div>
+        <p class="caption">
+          When a value is chosen, the slot fills with its accent — <b style="color: #f15d22">orange</b>
+          for the due date, <b style="color: #8e44ad">purple</b> for assignees — so “set” vs. “empty”
+          is obvious at a glance. The inline <b>Add</b> button appears only once you start typing.
+        </p>
+      </div>
+
+      <div class="surface w-tablet after">
+        <div class="frame-label">Tablet (720px) — controls hold their shape</div>
+        <div class="row">
+          <div class="entry control">
+            <span class="pen">✏️</span>
+            <input placeholder="Add a to-do…" />
+          </div>
+          <div class="slot control"><span class="ico">📅</span><span class="lbl">Due date</span><span class="chev">▾</span></div>
+          <div class="slot control"><span class="ico">👤</span><span class="lbl">Assign</span><span class="plus">+</span></div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div><b>Same height</b> — all three 52px, vertically centred.</div>
+        <div><b>Same corner</b> — 16px squircle (no odd pill).</div>
+        <div><b>Same resting fill</b> — slate-5 tint ties them together.</div>
+        <div><b>Labelled</b> — “Due date” / “Assign” say what each does.</div>
+        <div><b>Accent = set</b> — orange / purple only when filled.</div>
+      </div>
+    </div>
+  </body>
+</html>
