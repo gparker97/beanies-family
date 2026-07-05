@@ -52,7 +52,7 @@ describe('fileSync V4 format', () => {
     });
 
     // Encrypt and build envelope
-    const envelopeJson = await createBeanpodV4('fam-1', 'Test Family', familyKey, {});
+    const envelopeJson = await createBeanpodV4('fam-1', 'Test Family', '', {});
     const envelope = parseBeanpodV4(envelopeJson);
 
     // Decrypt — this must NOT touch the singleton
@@ -87,7 +87,7 @@ describe('fileSync V4 format', () => {
       };
     });
 
-    const envelopeJson = await createBeanpodV4('fam-1', 'Test Family', familyKey, {});
+    const envelopeJson = await createBeanpodV4('fam-1', 'Test Family', '', {});
     const envelope = parseBeanpodV4(envelopeJson);
     const decrypted = await decryptBeanpodPayload(envelope, familyKey);
 
@@ -233,7 +233,7 @@ describe('fileSync V4 format', () => {
     });
 
     // Full round-trip: createBeanpodV4 → parseBeanpodV4 → decryptBeanpodPayload
-    const envelopeJson = await createBeanpodV4('fam-1', 'Test Family', familyKey, {});
+    const envelopeJson = await createBeanpodV4('fam-1', 'Test Family', '', {});
     const envelope = parseBeanpodV4(envelopeJson);
     const restored = await decryptBeanpodPayload(envelope, familyKey);
 

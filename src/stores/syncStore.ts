@@ -66,7 +66,6 @@ import {
   createBeanpodV4,
   parseBeanpodV4,
   tryUnwrapFamilyKey,
-  decryptBeanpodPayload,
   reEncryptEnvelope,
   detectFileVersion,
 } from '@/services/sync/fileSync';
@@ -76,14 +75,7 @@ import {
   deriveMemberKey,
   wrapFamilyKey,
 } from '@/services/crypto/familyKeyService';
-import { replaceDoc, mergeDoc } from '@/services/automerge/docService';
-import {
-  initPersistenceDB,
-  persistDoc,
-  persistEnvelope,
-  loadCachedDoc,
-  loadCachedEnvelope,
-} from '@/services/automerge/persistenceService';
+import * as docClient from '@/services/automerge/worker/docClient';
 import { bufferToBase64 } from '@/utils/encoding';
 import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
 import type { StorageProvider, StorageProviderType } from '@/services/sync/storageProvider';
@@ -548,30 +540,43 @@ export const useSyncStore = defineStore('sync', () => {
    * If the cache matches the remote, the merge is a no-op.
    */
   async function replaceDocWithCacheRecovery(
-    remoteDoc: Parameters<typeof replaceDoc>[0],
-    fk: CryptoKey,
+    remoteEnvelope: BeanpodFileV4,
     familyId: string
   ): Promise<void> {
-    await initPersistenceDB(familyId);
-
-    let cachedDoc: Awaited<ReturnType<typeof loadCachedDoc>> = null;
+    // Load the cache as the worker's doc, then CRDT-merge the remote in. Merge is
+    // commutative, so cache∪remote == the old replace(remote)+merge(cache). If the
+    // cache is empty/corrupt, initAndLoadCache leaves no doc and mergeRemoteEnvelope
+    // adopts the remote. The worker persists the merged doc to cache automatically.
     try {
-      cachedDoc = await loadCachedDoc(fk);
+      await docClient.initAndLoadCache(familyId);
     } catch (e) {
       console.warn('[syncStore] Cache recovery failed — proceeding with remote only:', e);
+      await docClient.dropDoc(); // corrupt cache cleared inside initAndLoadCache; adopt remote fresh
     }
+    const { dirty } = await docClient.mergeRemoteEnvelope(remoteEnvelope, familyId);
+    // Clean up duplicate recurring transactions from the CRDT merge.
+    await deduplicateRecurringTransactions();
+    // Re-upload the converged doc only if local carried unsynced changes.
+    if (dirty) syncService.triggerDebouncedSave();
+  }
 
-    replaceDoc(remoteDoc);
-
-    if (cachedDoc) {
-      mergeDoc(cachedDoc);
-      // Clean up duplicate recurring transactions from CRDT merge
-      await deduplicateRecurringTransactions();
-      // Persist merged result so the cache reflects the merge
-      persistDoc(fk).catch(console.warn);
-      // Save merged result back to remote file (debounced)
-      syncService.triggerDebouncedSave();
-    }
+  /**
+   * Shared background-recovery hydrate (both background-sync paths use it so they
+   * can't drift): post the existing key, worker-decrypt + CRDT-merge the pending
+   * envelope, adopt the envelope, refresh stores, dedup, and re-upload only if the
+   * merge left local unsynced changes (heads-derived `dirty`). Clears the pending
+   * file. The caller does its own setupAutoSync/return.
+   */
+  async function hydrateFromEnvelope(env: BeanpodFileV4): Promise<void> {
+    await docClient.setFamilyKey(familyKey.value!);
+    const { dirty } = await docClient.mergeRemoteEnvelope(env, env.familyId);
+    const merged = replaceEnvelope(env);
+    syncService.setFamilyKey(familyKey.value!, merged);
+    pendingEncryptedFile.value = null;
+    await reloadAllStores();
+    const dupsRemoved = await deduplicateRecurringTransactions();
+    if (dupsRemoved > 0) await reloadAllStores();
+    if (dirty) syncService.triggerDebouncedSave();
   }
 
   /**
@@ -635,21 +640,20 @@ export const useSyncStore = defineStore('sync', () => {
 
       const remoteEnvelope = parseBeanpodV4(text);
 
-      // If we already have a family key, try to decrypt directly
+      // If we already have a family key, the worker decrypts + merges/adopts.
       if (familyKey.value) {
         try {
-          const remoteDoc = await decryptBeanpodPayload(remoteEnvelope, familyKey.value);
-
           if (merging) {
-            // CRDT merge
-            mergeDoc(remoteDoc);
+            // CRDT merge remote into the worker's doc.
+            await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId);
           } else {
-            // Replace local doc, merging any unsynced cache to prevent data loss
+            // Replace: adopt remote (+ recover any unsynced cache) to prevent loss.
             const famId = useFamilyContextStore().activeFamilyId;
-            if (famId && familyKey.value) {
-              await replaceDocWithCacheRecovery(remoteDoc, familyKey.value, famId);
+            if (famId) {
+              await replaceDocWithCacheRecovery(remoteEnvelope, famId);
             } else {
-              replaceDoc(remoteDoc);
+              await docClient.dropDoc(); // no cache to recover — adopt remote fresh
+              await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId);
             }
           }
 
@@ -808,15 +812,16 @@ export const useSyncStore = defineStore('sync', () => {
       // when length === 1.
       const { familyKey: fk, memberIds } = await tryUnwrapFamilyKey(pending.envelope, password);
 
-      // Decrypt the Automerge payload
-      const doc = await decryptBeanpodPayload(pending.envelope, fk);
+      // Post the just-unwrapped key to the worker so it can decrypt + merge.
+      await docClient.setFamilyKey(fk);
 
-      // Replace doc with cache recovery to prevent data loss from failed saves
+      // Adopt the payload (+ recover any unsynced cache) to prevent data loss.
       const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
       if (famId) {
-        await replaceDocWithCacheRecovery(doc, fk, famId);
+        await replaceDocWithCacheRecovery(pending.envelope, famId);
       } else {
-        replaceDoc(doc);
+        await docClient.dropDoc();
+        await docClient.mergeRemoteEnvelope(pending.envelope, pending.envelope.familyId);
       }
 
       // Set the family key and envelope. `replaceEnvelope` is the safe path
@@ -890,12 +895,9 @@ export const useSyncStore = defineStore('sync', () => {
       needsPermission.value = false;
       lastSync.value = toISODateString(new Date());
 
-      // Initialize persistence cache (doc + envelope)
-      if (familyCtx.activeFamilyId) {
-        await initPersistenceDB(familyCtx.activeFamilyId);
-        persistDoc(fk).catch(console.warn);
-        persistEnvelope(pending.envelope).catch(console.warn);
-      }
+      // The worker owns the cache: replaceDocWithCacheRecovery already opened the
+      // cache DB + persisted the merged doc, and setFamilyKey seeded the envelope
+      // cache — no main-thread persist needed here.
 
       // Update settings
       await settingsRepo.saveSettings(
@@ -964,25 +966,20 @@ export const useSyncStore = defineStore('sync', () => {
     options?: { preservePermissionState?: boolean }
   ): Promise<{ success: boolean }> {
     try {
-      await initPersistenceDB(activeFamilyId);
-
-      // Load cached envelope (needed for syncService.setFamilyKey)
-      const cachedEnvelope = await loadCachedEnvelope();
-      if (!cachedEnvelope) return { success: false };
-
-      // Import family key directly from base64 (not password-derived)
+      // Import family key directly from base64 (not password-derived), post it to
+      // the worker, then open the cache DB + load the cached doc + envelope.
       const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
       const { base64ToBuffer } = await import('@/utils/encoding');
       const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(keyB64)));
+      await docClient.setFamilyKey(fk);
 
-      // Load cached Automerge doc
-      const doc = await loadCachedDoc(fk);
-      if (!doc) return { success: false };
+      const { loaded } = await docClient.initAndLoadCache(activeFamilyId);
+      const { envelope: cachedEnvelope } = await docClient.readEnvelope();
+      if (!cachedEnvelope || !loaded) return { success: false };
 
       // Set up state. `replaceEnvelope` is the uniform entry point even
       // for cache loads where `envelope.value` is typically null and the
       // merge is a no-op.
-      replaceDoc(doc);
       familyKey.value = fk;
       const cachedMerged = replaceEnvelope(cachedEnvelope);
       syncService.setFamilyKey(fk, cachedMerged);
@@ -1034,8 +1031,10 @@ export const useSyncStore = defineStore('sync', () => {
         `Verify failed: envelope familyId mismatch (read ${env.familyId}, expected ${expectedFamilyId})`
       );
     }
-    // Throws CorruptPayloadError on bad payload; propagates to the caller.
-    await decryptBeanpodPayload(env, fk);
+    // Worker decrypts + materialize-checks (current family key == fk, set during
+    // create). Throws CorruptPayloadError on bad payload; caller classifies.
+    void fk;
+    await docClient.verifyEnvelope(env, { quiet: true });
   }
 
   /**
@@ -1242,10 +1241,14 @@ export const useSyncStore = defineStore('sync', () => {
       const wrappedKeys: Record<string, WrappedMemberKey> = {
         [memberId]: { salt: bufferToBase64(salt), wrapped },
       };
-      // Note: the Automerge doc was initialized by `authStore.signUp()` before
-      // this function was called. We deliberately do NOT call `initDoc()` here
-      // — that would wipe the owner-member writes already in the doc.
-      const envelopeJson = await createBeanpodV4(familyId, familyName, fk, wrappedKeys);
+      // Note: the Automerge doc was initialized by `authStore.signUp()` (now in
+      // the worker) before this function was called. We deliberately do NOT
+      // re-init here — that would wipe the owner-member writes already in the doc.
+      // Post the key to the worker, then have it encrypt the doc → payload; main
+      // assembles the envelope (keys never leave main).
+      await docClient.setFamilyKey(fk);
+      const { payload } = await docClient.exportEncryptedPayload();
+      const envelopeJson = createBeanpodV4(familyId, familyName, payload, wrappedKeys);
 
       // 2. Write to provider. `getFileId()` is captured after write so the
       //    cleanup helper can target the correct file for rename on failure.
@@ -1273,12 +1276,13 @@ export const useSyncStore = defineStore('sync', () => {
       const mergedNew = replaceEnvelope(env);
       syncService.setFamilyKey(fk, mergedNew);
 
-      // 5. Persist local cache (was fire-and-forget — now awaited so a cache
-      //    failure surfaces as a real error before `markPodCreated`).
+      // 5. Persist local cache (awaited so a cache failure surfaces as a real
+      //    error before `markPodCreated`). The worker owns the cache: open the
+      //    DB, flush the current doc, and persist the envelope.
       step = 'persist';
-      await initPersistenceDB(familyId);
-      await persistDoc(fk);
-      await persistEnvelope(env);
+      await docClient.initAndLoadCache(familyId); // opens the cache DB (no cached doc yet)
+      await docClient.flush(); // persist the current doc to cache now
+      await docClient.persistEnvelope(env);
 
       // 6. Register with the family registry (was fire-and-forget — now the
       //    recovery anchor for `ResumePodSetup`'s registry-first flow).
@@ -1385,15 +1389,15 @@ export const useSyncStore = defineStore('sync', () => {
     if (!pending) return { success: false, error: 'No pending file' };
 
     try {
-      // Decrypt the Automerge payload with the family key
-      const doc = await decryptBeanpodPayload(pending.envelope, fk);
+      // Post the key to the worker so it can decrypt + merge/adopt.
+      await docClient.setFamilyKey(fk);
 
-      // Replace doc with cache recovery to prevent data loss from failed saves
       const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
       if (famId) {
-        await replaceDocWithCacheRecovery(doc, fk, famId);
+        await replaceDocWithCacheRecovery(pending.envelope, famId);
       } else {
-        replaceDoc(doc);
+        await docClient.dropDoc();
+        await docClient.mergeRemoteEnvelope(pending.envelope, pending.envelope.familyId);
       }
 
       familyKey.value = fk;
@@ -1464,12 +1468,8 @@ export const useSyncStore = defineStore('sync', () => {
       needsPermission.value = false;
       lastSync.value = toISODateString(new Date());
 
-      // Initialize persistence cache
-      if (familyCtx.activeFamilyId) {
-        await initPersistenceDB(familyCtx.activeFamilyId);
-        persistDoc(fk).catch(console.warn);
-        persistEnvelope(pending.envelope).catch(console.warn);
-      }
+      // The worker owns the cache (opened + persisted by replaceDocWithCacheRecovery;
+      // envelope cache seeded by setFamilyKey) — no main-thread persist needed.
 
       await settingsRepo.saveSettings(
         {
@@ -1537,12 +1537,7 @@ export const useSyncStore = defineStore('sync', () => {
       [memberId]: { wrapped: wrappedKey.wrapped, salt: wrappedKey.salt },
     };
     envelope.value = env;
-    syncService.setEnvelope(env);
-
-    // Persist updated envelope
-    if (familyKey.value) {
-      persistEnvelope(env).catch(console.warn);
-    }
+    syncService.setEnvelope(env); // also RPCs the worker to persist the envelope cache
   }
 
   /**
@@ -1560,7 +1555,7 @@ export const useSyncStore = defineStore('sync', () => {
       [tokenHash]: { salt: pkg.salt, wrapped: pkg.wrapped, expiresAt: pkg.expiresAt },
     };
     envelope.value = env;
-    syncService.setEnvelope(env);
+    syncService.setEnvelope(env); // also RPCs the worker to persist the envelope cache
 
     console.warn(
       '[syncStore] addInvitePackage: added key',
@@ -1569,10 +1564,6 @@ export const useSyncStore = defineStore('sync', () => {
       Object.keys(env.inviteKeys).length
     );
 
-    // Persist updated envelope and sync
-    if (familyKey.value) {
-      persistEnvelope(env).catch(console.warn);
-    }
     const saved = await syncNow(true);
     if (!saved) {
       console.error(
@@ -1628,7 +1619,9 @@ export const useSyncStore = defineStore('sync', () => {
       error.value = 'No family key — cannot export';
       return;
     }
-    const envelopeJson = await reEncryptEnvelope(envelope.value, familyKey.value);
+    // The worker encrypts the current doc → payload; main assembles the envelope.
+    const { payload } = await docClient.exportEncryptedPayload();
+    const envelopeJson = reEncryptEnvelope(envelope.value, payload);
     downloadAsFile(envelopeJson);
     lastSync.value = toISODateString(new Date());
   }
@@ -1851,19 +1844,7 @@ export const useSyncStore = defineStore('sync', () => {
         // Try existing family key first (loadFromFile already tried, but pending may need it)
         if (familyKey.value && pendingEncryptedFile.value) {
           try {
-            const doc = await decryptBeanpodPayload(
-              pendingEncryptedFile.value.envelope,
-              familyKey.value
-            );
-            mergeDoc(doc);
-            const bgMerged = replaceEnvelope(pendingEncryptedFile.value.envelope);
-            syncService.setFamilyKey(familyKey.value!, bgMerged);
-            pendingEncryptedFile.value = null;
-            await reloadAllStores();
-            // Clean up duplicate recurring transactions from CRDT merge
-            const dupsRemoved = await deduplicateRecurringTransactions();
-            if (dupsRemoved > 0) await reloadAllStores();
-            syncService.triggerDebouncedSave();
+            await hydrateFromEnvelope(pendingEncryptedFile.value.envelope);
             setupAutoSync();
             return;
           } catch {
@@ -1940,19 +1921,7 @@ export const useSyncStore = defineStore('sync', () => {
           // Try existing family key first (should work unless key was rotated)
           if (familyKey.value && pendingEncryptedFile.value) {
             try {
-              const doc = await decryptBeanpodPayload(
-                pendingEncryptedFile.value.envelope,
-                familyKey.value
-              );
-              mergeDoc(doc);
-              const bgRecoveryMerged = replaceEnvelope(pendingEncryptedFile.value.envelope);
-              syncService.setFamilyKey(familyKey.value!, bgRecoveryMerged);
-              pendingEncryptedFile.value = null;
-              await reloadAllStores();
-              // Clean up duplicate recurring transactions from CRDT merge
-              const dupsRemoved = await deduplicateRecurringTransactions();
-              if (dupsRemoved > 0) await reloadAllStores();
-              syncService.triggerDebouncedSave();
+              await hydrateFromEnvelope(pendingEncryptedFile.value.envelope);
               return true;
             } catch {
               // Family key doesn't work — try cached key
@@ -2538,8 +2507,8 @@ export const useSyncStore = defineStore('sync', () => {
         };
       }
 
-      // Verify the in-memory family key still decrypts the file.
-      await decryptBeanpodPayload(env, familyKey.value);
+      // Verify the family key still decrypts the file (worker; current key).
+      await docClient.verifyEnvelope(env, { quiet: true });
 
       // Swap the provider so subsequent saves/polls use the new fileId.
       // `replaceEnvelope` is the uniform entry point even though this is a
