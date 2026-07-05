@@ -13,7 +13,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 type Row = { label: string; value: string; warn?: boolean; good?: boolean };
 const rows = ref<Row[]>([]);
 const running = ref(false);
-const targetCount = ref(20_000);
+const targetCount = ref(5_000);
 const status = ref('');
 const ua = navigator.userAgent;
 
@@ -81,6 +81,18 @@ async function run() {
         type: 'module',
       }
     );
+    // Surface worker-level failures (module-init / WASM-load errors) that would
+    // otherwise hang the harness silently — the #1 cause of a stuck "Running…".
+    worker.onerror = (ev) => {
+      console.error('[spike] worker.onerror', ev);
+      push('WORKER ERROR', ev.message || String(ev), { warn: true });
+      status.value = '';
+      worker?.terminate();
+      worker = null;
+      running.value = false;
+    };
+    worker.onmessageerror = () =>
+      push('WORKER messageerror (serialization)', 'see console', { warn: true });
 
     const onProgress = (e: MessageEvent) => {
       const d = e.data as Record<string, unknown>;
@@ -89,9 +101,15 @@ async function run() {
     worker.addEventListener('message', onProgress);
     status.value = 'Building doc…';
     worker.postMessage({ type: 'generate', targetCount: targetCount.value });
-    const gen = await waitFor('generated');
+    const gen = (await Promise.race([
+      waitFor('generated'),
+      new Promise<Record<string, unknown>>((r) =>
+        setTimeout(() => r({ type: 'error', message: 'generate timed out after 60s' }), 60_000)
+      ),
+    ])) as Record<string, unknown>;
     worker.removeEventListener('message', onProgress);
     status.value = '';
+    if (!worker) return; // onerror already handled it
     if (gen.type === 'error') return push('Generate FAILED', String(gen.message), { warn: true });
     push(
       'Doc built',
