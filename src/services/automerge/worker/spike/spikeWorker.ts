@@ -59,39 +59,43 @@ function mkTxn(i: number): Txn {
   };
 }
 
-/** Build a doc whose `Automerge.save()` reaches ~targetBytes, with real change history. */
-function generate(targetBytes: number): {
+/**
+ * Build a doc with ~targetCount transactions, then `Automerge.save()` ONCE.
+ * (The old version saved every batch to hit a byte target — O(n) ever-slower
+ * saves that hung for minutes. Entity count is what drives the materialize /
+ * structured-clone cost the spike measures; we report the resulting byte size.)
+ * Yields between batches so `progress` messages actually flush to the main thread.
+ */
+async function generate(targetCount: number): Promise<{
   saveBytes: number;
   entityCount: number;
   buildMs: number;
-} {
+}> {
   const t0 = performance.now();
   let d = Automerge.init<SpikeDoc>();
   d = Automerge.change(d, (s) => {
     s.transactions = {};
     s.activities = {};
   });
+  const BATCH = 2000;
   let i = 0;
-  let bytes = 0;
-  const MAX = 200_000; // hard cap
-  // Add in batches (each its own change → grows op history like real usage).
-  while (bytes < targetBytes && i < MAX) {
+  while (i < targetCount) {
     d = Automerge.change(d, (s) => {
-      for (let b = 0; b < 500; b++, i++) {
+      const end = Math.min(i + BATCH, targetCount);
+      for (; i < end; i++) {
         const t = mkTxn(i);
         s.transactions[t.id] = t;
       }
     });
-    // churn a fraction to add history (edits, not just inserts)
-    if (i % 5000 === 0) {
-      d = Automerge.change(d, (s) => {
-        const keys = Object.keys(s.transactions).slice(-2000);
-        for (const k of keys) s.transactions[k]!.isReconciled = true;
-      });
-    }
-    savedBinary = Automerge.save(d);
-    bytes = savedBinary.byteLength;
+    post({ type: 'progress', built: i, target: targetCount });
+    await new Promise((r) => setTimeout(r, 0));
   }
+  // one churn pass for a bit of edit history (not just inserts)
+  d = Automerge.change(d, (s) => {
+    for (const k of Object.keys(s.transactions).slice(0, Math.min(3000, targetCount))) {
+      s.transactions[k]!.isReconciled = true;
+    }
+  });
   doc = d;
   savedBinary = Automerge.save(d);
   return {
@@ -110,7 +114,7 @@ self.onmessage = async (e: MessageEvent) => {
   try {
     switch (msg.type) {
       case 'generate': {
-        const info = generate((msg.targetBytes as number) ?? 2_000_000);
+        const info = await generate((msg.targetCount as number) ?? 20_000);
         // Time a fresh load of the saved binary (the cold-start cost).
         const tL = performance.now();
         Automerge.load<SpikeDoc>(savedBinary!);
