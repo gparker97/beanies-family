@@ -17,6 +17,7 @@ import * as Automerge from '@automerge/automerge';
 import { saveDoc } from '@/services/automerge/docService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { generateUUID } from '@/utils/id';
+import { measureSync } from '@/utils/perfTiming';
 import type {
   BeanpodFileV4,
   WrappedMemberKey,
@@ -125,7 +126,11 @@ export async function decryptBeanpodPayload(
 
   let doc: Automerge.Doc<FamilyDocument>;
   try {
-    doc = Automerge.load<FamilyDocument>(binary);
+    // Timed: the remote-path deserialize (whole doc + history) — the first
+    // heavy synchronous step when a fetched .beanpod is merged in.
+    doc = measureSync('automerge.remoteLoad', () => Automerge.load<FamilyDocument>(binary), {
+      perf_doc_bytes: binary.byteLength,
+    });
   } catch (e) {
     throw new CorruptPayloadError(
       `Automerge.load failed on decrypted payload: ${e instanceof Error ? e.message : String(e)}`,

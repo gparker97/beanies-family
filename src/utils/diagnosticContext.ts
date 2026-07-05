@@ -99,6 +99,14 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   // tail-trimmed by `breadcrumbsForReport` before it reaches here, so it
   // honours the firehose's PII-free contract. Developer-authored step labels.
   'breadcrumbs',
+  // Load-path performance timing (surface `load-perf`, see utils/perfTiming.ts).
+  // All PII-free by construction: an op label, a duration, and size/count
+  // proxies — no user-typed content. Added 2026-07-05 for the sync-freeze
+  // investigation to capture real-world main-thread stall durations.
+  'perf_op',
+  'perf_duration_ms',
+  'perf_doc_bytes',
+  'perf_entity_count',
 ]);
 
 export const MAX_STRING_LEN = 200;
