@@ -1,6 +1,8 @@
 import { createAutomergeRepository } from '../automergeRepository';
 import type { Recipe, CookLogEntry } from '@/types/models';
-import { changeDoc, getDoc } from '../docService';
+import { list } from '../projection';
+import { mutate } from '../worker/docClient';
+import type { MutationOp } from '../worker/protocol';
 
 const recipeRepo = createAutomergeRepository<'recipes', Recipe>('recipes');
 const cookLogRepo = createAutomergeRepository<'cookLogs', CookLogEntry>('cookLogs');
@@ -27,16 +29,16 @@ export async function getCookLogsByRecipe(recipeId: string): Promise<CookLogEntr
  * orphans once the records are gone).
  */
 export async function deleteRecipeCascade(recipeId: string): Promise<void> {
-  changeDoc((doc) => {
-    const cookLogs = doc.cookLogs ?? {};
-    for (const [id, entry] of Object.entries(cookLogs)) {
-      if (entry.recipeId === recipeId) {
-        delete cookLogs[id];
-      }
-    }
-    const recipes = doc.recipes ?? {};
-    delete recipes[recipeId];
-  }, `recipes: cascade-delete ${recipeId}`);
+  // Resolve the child cook-log ids from the projection, then delete children +
+  // parent in one atomic batch (single Automerge.change in the worker).
+  const childIds = list('cookLogs')
+    .filter((c) => c.recipeId === recipeId)
+    .map((c) => c.id);
+  const ops: MutationOp[] = [
+    ...childIds.map((id): MutationOp => ({ op: 'delete', collection: 'cookLogs', id })),
+    { op: 'delete', collection: 'recipes', id: recipeId },
+  ];
+  await mutate({ op: 'batch', ops });
 }
 
 /**
@@ -44,11 +46,5 @@ export async function deleteRecipeCascade(recipeId: string): Promise<void> {
  * prompt so users see how much history they're about to remove.
  */
 export function countCookLogsForRecipe(recipeId: string): number {
-  try {
-    const doc = getDoc();
-    const logs = Object.values(doc.cookLogs ?? {});
-    return logs.filter((c) => c.recipeId === recipeId).length;
-  } catch {
-    return 0;
-  }
+  return list('cookLogs').filter((c) => c.recipeId === recipeId).length;
 }
