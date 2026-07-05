@@ -140,8 +140,9 @@ describe('photoStore', () => {
     driveMocks.getFileMetadata.mockReset().mockResolvedValue({ parents: ['folder-1'] });
     driveMocks.setPublicLinkPermission.mockReset().mockResolvedValue(undefined);
 
-    // Clear the registered integration collections between tests.
-    storeInternals.photoCollections.clear();
+    // Photo collections are now statically registered in worker/photoOps.ts
+    // (no per-test clear needed). [ADR-032 consolidated test pass pending]
+    void storeInternals;
 
     const store = usePhotoStore();
     await store.activate(FAMILY_ID);
