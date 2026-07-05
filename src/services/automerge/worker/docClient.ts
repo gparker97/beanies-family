@@ -273,8 +273,26 @@ function ensureReady(): Promise<'worker' | 'inline'> {
   return readyPromise;
 }
 
+// Methods whose `args` carry ONLY plain-JSON doc data (mutation ops, envelopes).
+// We deep-plainify these before `postMessage` so a Vue reactive proxy (or any
+// non-structured-cloneable wrapper) that slipped in can't crash the clone. NOT
+// applied to setKey (CryptoKey) / loadSnapshot / getChangesSince / applyChanges,
+// whose args carry a CryptoKey or Uint8Array that must survive intact and are
+// already clone-safe. Inline mode skips postMessage entirely, so this is
+// worker-mode-only hardening.
+const JSON_SAFE_METHODS = new Set([
+  'mutate',
+  'mergeRemoteEnvelope',
+  'verifyEnvelope',
+  'persistEnvelope',
+]);
+
 function postRaw(req: RpcRequest): void {
-  worker?.postMessage(req);
+  const args =
+    req.args != null && JSON_SAFE_METHODS.has(req.method)
+      ? (JSON.parse(JSON.stringify(req.args)) as unknown)
+      : req.args;
+  worker?.postMessage({ ...req, args });
 }
 
 // ─── Core request ────────────────────────────────────────────────────────────
