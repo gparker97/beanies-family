@@ -89,32 +89,9 @@ import { useToday } from '@/composables/useToday';
 import { useStaleTabRefresh } from '@/composables/useStaleTabRefresh';
 import { attemptSilentReconnect } from '@/utils/silentReconnect';
 import { saveNow, hasFamilyKey, setFamilyKey } from '@/services/sync/syncService';
-import { __internals as photoStoreInternals } from '@/stores/photoStore';
-import { avatarPhotoHooks, vacationPhotoHooks } from '@/services/photos/photoCollectionHooks';
-
-/**
- * Register every collection that owns photo references so the photoStore
- * GC sweep finds orphans across all of them. Lives at the app-init
- * boundary (rather than inside each store) to avoid the top-level import
- * cycle family/medications → photoStore → syncStore → family/medications
- * that broke test loading in P3 dev. Safe to call multiple times —
- * registerPhotoCollection is idempotent (backed by a Map).
- *
- * Flat collections (a `photoIds?: UUID[]` array) register by name only and
- * get the default flat hooks. Non-flat hosts pass explicit hooks:
- *   - familyMembers: a scalar `avatarPhotoId` (NOT a photoIds array) — MUST
- *     use the avatar collect hook, else GC (which has no grace for orphans)
- *     would wipe every avatar.
- *   - vacations: booking-segment photoIds nested inside
- *     `vacations[*].{travelSegments,accommodations,transportation}[]`.
- */
-photoStoreInternals.registerPhotoCollection('familyMembers', avatarPhotoHooks);
-photoStoreInternals.registerPhotoCollection('medications');
-photoStoreInternals.registerPhotoCollection('recipes');
-photoStoreInternals.registerPhotoCollection('cookLogs');
-photoStoreInternals.registerPhotoCollection('milestones');
-photoStoreInternals.registerPhotoCollection('activities');
-photoStoreInternals.registerPhotoCollection('vacations', vacationPhotoHooks);
+// ADR-032: photo collections are now statically registered at module load in
+// `worker/photoOps.ts` (the pure, worker-shared registry) — no App.vue runtime
+// registration needed.
 
 const route = useRoute();
 const router = useRouter();
@@ -577,26 +554,21 @@ async function loadFamilyData() {
   // This path is for first-time users or users without a sync file
   initBreadcrumbs.push('path3: no file configured, initializing empty doc');
   try {
-    // Check if a doc is already loaded (e.g. from signup flow that just completed)
-    const { getDoc, initDoc } = await import('@/services/automerge/docService');
-    let hasExistingDoc = false;
-    try {
-      getDoc();
-      hasExistingDoc = true;
-    } catch {
-      // No doc loaded — need to initialize one
-    }
+    // Check if a doc is already loaded (e.g. from the signup flow that just
+    // completed) via the projection loaded-flag (no throwing getDoc probe).
+    const docClient = await import('@/services/automerge/worker/docClient');
+    const { isLoaded } = await import('@/services/automerge/projection');
 
-    if (!hasExistingDoc) {
+    if (!isLoaded()) {
       // E2E seed: if the data bridge saved a binary to sessionStorage, load it
+      // into the worker; otherwise create a fresh empty doc.
       if (import.meta.env.DEV && sessionStorage.getItem('__e2eSeedDoc')) {
-        const { loadDoc } = await import('@/services/automerge/docService');
         const { base64ToBuffer } = await import('@/utils/encoding');
         const b64 = sessionStorage.getItem('__e2eSeedDoc')!;
         sessionStorage.removeItem('__e2eSeedDoc');
-        loadDoc(new Uint8Array(base64ToBuffer(b64)));
+        await docClient.loadSnapshot(new Uint8Array(base64ToBuffer(b64)));
       } else {
-        initDoc();
+        await docClient.initDoc();
       }
     }
 
@@ -1018,8 +990,8 @@ onMounted(async () => {
     // Post-init health check: verify the Automerge doc is loaded
     let docLoaded = false;
     try {
-      const { getDoc } = await import('@/services/automerge/docService');
-      getDoc(); // throws if currentDoc is null
+      const { isLoaded } = await import('@/services/automerge/projection');
+      if (!isLoaded()) throw new Error('no document loaded');
       docLoaded = true;
       initBreadcrumbs.push('health: automerge doc OK');
       // App booted successfully — reset the chunk-load retry counter so

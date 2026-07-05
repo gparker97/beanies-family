@@ -197,13 +197,39 @@ function onWorkerError(err: unknown): void {
 
 // ─── Spawn + handshake ───────────────────────────────────────────────────────
 
+/** Enter inline mode + re-drive the inline realm from retained state. Critical
+ * for the mid-session fall-through: the DEAD worker received `setKey`/the doc,
+ * but the inline `applyAndProject` realm never did — without re-driving, every
+ * crypto op throws `family key not set`. (First-unlock inline is already covered
+ * by the normal setFamilyKey→inlineRequest('setKey') flow; guard the key re-post
+ * to the retained key so we don't double-post on that path.) */
+async function enterInlineMode(): Promise<void> {
+  mode = 'inline';
+  if (!inlineExecutor) return; // not wired yet (bootstrap pending / tests)
+  if (familyKey) {
+    try {
+      await inlineExecutor('setKey', { key: familyKey });
+    } catch (e) {
+      console.error('[docClient] inline setKey re-drive failed', e);
+    }
+  }
+  if (needsRehydrate && currentFamilyId && rehydrator) {
+    needsRehydrate = false;
+    try {
+      await rehydrator(currentFamilyId);
+    } catch (e) {
+      console.error('[docClient] inline re-hydrate failed', e);
+    }
+  }
+}
+
 async function spawn(): Promise<'worker' | 'inline'> {
   let w: DocWorkerLike;
   try {
     w = workerFactory();
   } catch (e) {
     console.error('[docClient] worker spawn failed — falling back to inline', e);
-    mode = 'inline';
+    await enterInlineMode();
     return 'inline';
   }
   const ready = new Promise<void>((resolve) => {
@@ -224,7 +250,7 @@ async function spawn(): Promise<'worker' | 'inline'> {
       /* noop */
     }
     worker = null;
-    mode = 'inline';
+    await enterInlineMode();
     return 'inline';
   }
   mode = 'worker';
