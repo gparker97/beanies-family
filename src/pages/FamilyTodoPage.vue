@@ -15,6 +15,7 @@ import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import QuickAddBar from '@/components/todo/QuickAddBar.vue';
 import TodoSection from '@/components/todo/TodoSection.vue';
 import TodoSortMenu from '@/components/todo/TodoSortMenu.vue';
+import TodoMemberFilter from '@/components/todo/TodoMemberFilter.vue';
 import type { TodoItem } from '@/types/models';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useTodoSort } from '@/composables/useTodoSort';
@@ -155,10 +156,19 @@ async function handleDelete(id: string) {
 
 <template>
   <div class="space-y-6">
-    <!-- Page header with sort -->
-    <div class="flex items-center justify-between">
+    <!-- Page header with view controls (filter + sort grouped as siblings) -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <PageWelcomeSubtitle :text="t('todo.subtitle')" />
-      <TodoSortMenu v-if="hasAnyTodos" v-model:sort-by="sortBy" />
+      <div v-if="hasAnyTodos" class="flex flex-wrap items-center justify-end gap-2">
+        <!-- Member view-filter (desktop/tablet only) — a lens, not an assignee control -->
+        <TodoMemberFilter
+          v-if="sortedMembers.length > 1"
+          v-model="memberFilter"
+          :members="sortedMembers"
+          class="hidden sm:flex"
+        />
+        <TodoSortMenu v-model:sort-by="sortBy" />
+      </div>
     </div>
 
     <!-- Quick add bar -->
@@ -171,34 +181,8 @@ async function handleDelete(id: string) {
       <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ t('todo.getStarted') }}</p>
     </div>
 
-    <!-- Filters (only show when there are todos) -->
+    <!-- Sections (only show when there are todos) -->
     <template v-if="hasAnyTodos">
-      <!-- Member chip filter (desktop only, toggle to filter) -->
-      <div v-if="sortedMembers.length > 1" class="hidden flex-wrap items-center gap-2 sm:flex">
-        <button
-          v-for="member in sortedMembers"
-          :key="member.id"
-          type="button"
-          class="inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-sm font-medium transition-all"
-          :class="
-            memberFilter === member.id
-              ? 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
-              : 'bg-[var(--tint-slate-5)] text-[var(--color-text)]/65 dark:bg-slate-700 dark:text-gray-400'
-          "
-          @click="memberFilter = memberFilter === member.id ? 'all' : member.id"
-        >
-          <span
-            class="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-xs font-bold text-white"
-            :style="{
-              background: `linear-gradient(135deg, ${member.color}, ${member.color}dd)`,
-            }"
-          >
-            {{ member.name.charAt(0).toUpperCase() }}
-          </span>
-          {{ member.name }}
-        </button>
-      </div>
-
       <!-- Open Tasks -->
       <TodoSection
         :label="t('todo.section.open')"
