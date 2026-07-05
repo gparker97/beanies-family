@@ -872,6 +872,9 @@ onMounted(async () => {
           'JoinFamily',
           'CreateFamily',
           'OpenFromDrive',
+          // Dev-only ADR-032 worker spike — a standalone measurement page with no
+          // auth/pod; exempt from the onboarding redirect (dev builds only).
+          'DevWorkerSpike',
         ];
         if (!authPages.includes(route.name as string)) {
           initBreadcrumbs.push('auth: redirecting to /welcome (not authenticated)');
@@ -887,7 +890,7 @@ onMounted(async () => {
     // screen rather than letting an empty `/nook` render. (The router-level
     // guard handles this for SPA navigations; this is the fresh-page-load
     // path, after async auth hydration completes.)
-    if (authStore.needsPodSetup) {
+    if (authStore.needsPodSetup && !route.path.startsWith('/dev')) {
       initBreadcrumbs.push('auth: authenticated but no pod file — routing to resume-setup');
       // Only alert when this is a genuinely UNEXPECTED zombie. A podless
       // session is the NORMAL mid-flow state on the onboarding routes
@@ -1496,14 +1499,16 @@ watch(
           <pre
             v-if="initErrorDetail"
             class="mt-2 max-h-32 overflow-auto rounded-lg bg-gray-100 p-2 text-xs text-gray-700 dark:bg-slate-900 dark:text-gray-300"
-            >{{ initErrorDetail }}</pre>
+            >{{ initErrorDetail }}</pre
+          >
           <div class="mt-2">
             <p class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
               {{ t('app.initError.diagnostics') }}
             </p>
             <pre
               class="max-h-24 overflow-auto rounded-lg bg-gray-100 p-2 text-xs text-gray-700 dark:bg-slate-900 dark:text-gray-300"
-              >{{ getDeviceDiagnostics() }}</pre>
+              >{{ getDeviceDiagnostics() }}</pre
+            >
           </div>
         </details>
       </div>
