@@ -9,6 +9,8 @@ import {
   applyMutation,
   materializeCollection,
   buildFullProjection,
+  projectionDeltasBetween,
+  getHeads,
   registerNamedOp,
   __resetNamedOpsForTesting,
 } from '../docOps';
@@ -183,6 +185,133 @@ describe('docOps — merge dirty (heads-derived)', () => {
     const remote = Automerge.clone(b);
     const { dirty } = mergeDocs(local, remote);
     expect(dirty).toBe(true);
+  });
+
+  it('clean (local === remote) → dirty false', () => {
+    const b = base();
+    const { dirty } = mergeDocs(Automerge.clone(b), Automerge.clone(b));
+    expect(dirty).toBe(false);
+  });
+
+  it('diverged (both carry own changes) → dirty true (local has changes remote lacks)', () => {
+    const b = base();
+    const local = applyMutation(Automerge.clone(b), {
+      op: 'set',
+      collection: 'todos',
+      id: 'l',
+      entity: { id: 'l' },
+    }).doc;
+    const remote = applyMutation(Automerge.clone(b), {
+      op: 'set',
+      collection: 'todos',
+      id: 'r',
+      entity: { id: 'r' },
+    }).doc;
+    const { dirty, doc } = mergeDocs(local, remote);
+    expect(dirty).toBe(true);
+    expect(Object.keys(doc.todos).sort()).toEqual(['l', 'r']); // both kept
+  });
+
+  it('merges in place into local without cloning → the device actorId stays stable', () => {
+    // The old clone(local) minted a fresh random actorId per merge; merging in
+    // place must preserve local's actor (one stable actor per device).
+    const b = base();
+    const local = applyMutation(Automerge.clone(b), {
+      op: 'set',
+      collection: 'todos',
+      id: 'l',
+      entity: { id: 'l' },
+    }).doc;
+    const localActor = Automerge.getActorId(local);
+    const remote = applyMutation(Automerge.clone(b), {
+      op: 'set',
+      collection: 'todos',
+      id: 'r',
+      entity: { id: 'r' },
+    }).doc;
+    const { doc } = mergeDocs(local, remote);
+    expect(Automerge.getActorId(doc)).toBe(localActor);
+  });
+});
+
+describe('docOps — projectionDeltasBetween (poll-merge delta)', () => {
+  const withTodo = (doc: Automerge.Doc<FamilyDocument>, id: string, extra = {}) =>
+    applyMutation(doc, { op: 'set', collection: 'todos', id, entity: { id, ...extra } }).doc;
+
+  it('emits an upsert only for the entity a merge brought in (not the whole doc)', () => {
+    const origin = withTodo(base(), 'l1', { title: 'local' });
+    const from = getHeads(origin);
+    const remote = withTodo(Automerge.clone(origin), 'r1', { title: 'remote' });
+    const { doc: merged, heads: to } = mergeDocs(origin, remote);
+
+    const deltas = projectionDeltasBetween(merged, from, to);
+    expect(deltas).toEqual([
+      { kind: 'upsert', collection: 'todos', id: 'r1', entity: { id: 'r1', title: 'remote' } },
+    ]);
+  });
+
+  it('emits a remove when the merge deletes an entity', () => {
+    const origin = withTodo(withTodo(base(), 'a'), 'b');
+    const from = getHeads(origin);
+    const remote = applyMutation(Automerge.clone(origin), {
+      op: 'delete',
+      collection: 'todos',
+      id: 'b',
+    }).doc;
+    const { doc: merged, heads: to } = mergeDocs(origin, remote);
+
+    expect(projectionDeltasBetween(merged, from, to)).toEqual([
+      { kind: 'remove', collection: 'todos', id: 'b' },
+    ]);
+  });
+
+  it('emits a single settings delta when settings change', () => {
+    __resetNamedOpsForTesting();
+    const origin = base();
+    const from = getHeads(origin);
+    const remote = applyMutation(Automerge.clone(origin), {
+      op: 'named',
+      name: 'setSettings',
+      args: { settings: { baseCurrency: 'GBP' } },
+    }).doc;
+    const { doc: merged, heads: to } = mergeDocs(origin, remote);
+
+    const deltas = projectionDeltasBetween(merged, from, to);
+    expect(deltas).toEqual([{ kind: 'settings', settings: { baseCurrency: 'GBP' } }]);
+  });
+
+  it('empty delta (no changes brought in) → empty array (not null)', () => {
+    const origin = withTodo(base(), 'x');
+    const heads = getHeads(origin);
+    // diff against itself → nothing changed.
+    expect(projectionDeltasBetween(origin, heads, heads)).toEqual([]);
+  });
+
+  it('ignores length-1 migrate patches (top-level collection creation)', () => {
+    // A genuinely un-migrated origin: the diff from its heads includes the
+    // length-1 migrate patches (collection roots, no id) that must be ignored.
+    const rawOrigin = Automerge.init<FamilyDocument>(); // NOT migrated (no collections)
+    const from = getHeads(rawOrigin);
+    // remote descends from the same raw origin, is migrated, and adds a todo.
+    const remote = withTodo(migrateDoc(Automerge.clone(rawOrigin)), 'r1');
+    const { doc: merged, heads: to } = mergeDocs(rawOrigin, remote);
+    // Only the real entity, never a bogus delta from the migrate creates.
+    expect(projectionDeltasBetween(merged, from, to)).toEqual([
+      { kind: 'upsert', collection: 'todos', id: 'r1', entity: { id: 'r1' } },
+    ]);
+  });
+
+  it('returns null (→ caller falls back to full) on an unexpected top-level diff path', () => {
+    // Force a patch whose path root is an unknown top-level key (path.length >= 2).
+    const origin = base();
+    const from = getHeads(origin);
+    const remote = Automerge.change(Automerge.clone(origin), (d) => {
+      (d as unknown as Record<string, Record<string, unknown>>).bogusCollection = {
+        x: { id: 'x' },
+      };
+    });
+    const { doc: merged, heads: to } = mergeDocs(origin, remote);
+    expect(projectionDeltasBetween(merged, from, to)).toBeNull();
   });
 });
 

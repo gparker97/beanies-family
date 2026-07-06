@@ -72,9 +72,87 @@ export function applyChanges(doc: Doc, changes: Uint8Array[]): { doc: Doc; heads
  * flag a clean local and re-introduce the save ping-pong). See ADR-032.
  */
 export function mergeDocs(local: Doc, remote: Doc): { doc: Doc; dirty: boolean; heads: Heads } {
-  const merged = migrateDoc(Automerge.merge(Automerge.clone(local), remote));
+  // Merge into `local` in place (NOT a defensive clone): `Automerge.merge(a, b)`
+  // applies b's changes onto a's handle and only READS b, so `dirty` — computed
+  // as `getChanges(remote, merged)` — is byte-identical to the old clone-based
+  // path (ADR-032; a pre-merge heads compare would re-introduce save ping-pong).
+  // Never invert to `merge(remote, local)`: that switches the converged doc's
+  // actorId to remote's. Safe because the caller immediately reassigns
+  // `currentDoc = merged` and drops the stale `local` reference; and it keeps ONE
+  // stable actorId per device (the old `clone` did `fork()` → a fresh random actor
+  // every poll-merge → actor-list bloat). See docs/plans/2026-07-06-worker-ios-large-doc-load.md.
+  const merged = migrateDoc(Automerge.merge(local, remote));
   const dirty = Automerge.getChanges(remote, merged).length > 0;
   return { doc: merged, dirty, heads: getHeads(merged) };
+}
+
+/**
+ * Poll-merge projection optimization: the entities that changed between two heads
+ * of the SAME doc, as `ProjectionDelta[]` — instead of re-materializing the whole
+ * document. Returns `null` when the diff can't be confidently interpreted (an
+ * unknown top-level key, an unexpected shape, or `Automerge.diff` throwing) so the
+ * caller falls back to a full `buildFullProjection` — a correct full rebuild beats
+ * a wrong delta.
+ *
+ * PURE + half-update-safe: it fully derives its result (or `null`) BEFORE the
+ * caller streams anything, so a derivation failure can never leave a partially
+ * streamed projection. Do NOT make this stream directly.
+ *
+ * Closed over the known doc shape (`COLLECTION_NAMES` + the `settings` singleton),
+ * so a future schema change degrades to correct-but-full, never a wrong delta.
+ */
+export function projectionDeltasBetween(
+  doc: Doc,
+  fromHeads: Heads,
+  toHeads: Heads
+): ProjectionDelta[] | null {
+  try {
+    const patches = Automerge.diff(doc, fromHeads, toHeads);
+    const touched = new Map<CollectionName, Set<string>>();
+    let settingsChanged = false;
+    for (const patch of patches) {
+      const top = patch.path[0];
+      if (top === 'settings') {
+        settingsChanged = true;
+        continue;
+      }
+      if (patch.path.length < 2) continue; // top-level/migrate create — no entity
+      if (typeof top !== 'string' || !(COLLECTION_NAMES as readonly string[]).includes(top)) {
+        // Unknown top-level key / unexpected shape → fall back to a full rebuild.
+        console.warn(
+          `[docOps] projectionDeltasBetween: unexpected diff path root "${String(top)}" — falling back to full projection.`
+        );
+        return null;
+      }
+      const collection = top as CollectionName;
+      const id = String(patch.path[1]);
+      let ids = touched.get(collection);
+      if (!ids) {
+        ids = new Set();
+        touched.set(collection, ids);
+      }
+      ids.add(id);
+    }
+    const deltas: ProjectionDelta[] = [];
+    for (const [collection, ids] of touched) {
+      const coll = (doc[collection] ?? {}) as AnyRecord;
+      for (const id of ids) {
+        const raw = coll[id];
+        if (raw === undefined) deltas.push({ kind: 'remove', collection, id });
+        else deltas.push({ kind: 'upsert', collection, id, entity: toPlain(raw) });
+      }
+    }
+    // One settings delta regardless of how many settings.* keys changed
+    // (re-materializing the singleton is idempotent).
+    if (settingsChanged) deltas.push({ kind: 'settings', settings: toPlain(doc.settings ?? null) });
+    return deltas;
+  } catch (e) {
+    console.warn(
+      '[docOps] projectionDeltasBetween: Automerge.diff derivation failed — falling back to full projection.',
+      e
+    );
+    return null;
+  }
 }
 
 // ─── Async payload crypto (Drive path) ───────────────────────────────────────
