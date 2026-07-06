@@ -35,6 +35,7 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
   setLocalChangeHandler: vi.fn(),
   setCachePersistFailedHandler: vi.fn(),
 }));
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
 // Fake CryptoKey for tests (never actually used for encryption because reEncryptEnvelope is mocked)
 const fakeFamilyKey = {} as CryptoKey;
@@ -64,6 +65,23 @@ describe('syncService — save failure tracking', () => {
   describe('getSaveFailureLevel', () => {
     it('starts at "none"', () => {
       expect(syncService.getSaveFailureLevel()).toBe('none');
+    });
+  });
+
+  describe('envelope-cache persist failure (F7 — no silent failure)', () => {
+    it('classifies + logs a persistEnvelope failure instead of swallowing it', async () => {
+      const { reportError } = await import('@/utils/errorReporter');
+      const docClient = await import('@/services/automerge/worker/docClient');
+      vi.mocked(reportError).mockClear();
+      vi.mocked(docClient.persistEnvelope).mockRejectedValueOnce(new Error('IndexedDB quota'));
+
+      // setFamilyKey seeds the envelope cache via persistEnvelopeSafely.
+      syncService.setFamilyKey(fakeFamilyKey, fakeEnvelope);
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'doc-worker-envelope-cache', severity: 'warning' })
+      );
     });
   });
 

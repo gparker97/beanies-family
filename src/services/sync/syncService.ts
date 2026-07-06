@@ -327,6 +327,25 @@ export function setProvider(provider: StorageProvider): void {
 }
 
 /**
+ * Seed the worker's envelope cache, quietly. Envelope-cache persistence is a
+ * cold-start-unlock convenience, not a critical write — a failure must NOT fire
+ * the critical doc-worker toast (so it's `{quiet}`), but it also must NOT vanish
+ * silently: a swallowed failure means a later cold start has no cached envelope
+ * and can't unlock, with no breadcrumb. Classify + log at warning.
+ */
+function persistEnvelopeSafely(envelope: BeanpodFileV4): void {
+  void docClient.persistEnvelope(envelope, { quiet: true }).catch((e) => {
+    reportError({
+      surface: 'doc-worker-envelope-cache',
+      message:
+        'Failed to persist the envelope cache — a cold-start unlock may need the file/password',
+      error: e,
+      severity: 'warning',
+    });
+  });
+}
+
+/**
  * Set the family key and envelope for the current session.
  * Called by syncStore after successful unlock.
  */
@@ -336,7 +355,7 @@ export function setFamilyKey(familyKey: CryptoKey, envelope: BeanpodFileV4): voi
   noKeyWarnedOnce = false; // Reset so future skips can warn again
   // Post the key to the worker (once at unlock) + seed the envelope cache.
   void docClient.setFamilyKey(familyKey);
-  void docClient.persistEnvelope(envelope).catch(() => {});
+  persistEnvelopeSafely(envelope);
 }
 
 /**
@@ -369,7 +388,7 @@ export function setEnvelope(envelope: BeanpodFileV4 | null): void {
   currentEnvelope = envelope;
   // Keep the worker's envelope cache in sync (every currentEnvelope mutation
   // funnels here) so a cold start unlocks after a peer key-add / rotation.
-  if (envelope) void docClient.persistEnvelope(envelope).catch(() => {});
+  if (envelope) persistEnvelopeSafely(envelope);
 }
 
 /**
