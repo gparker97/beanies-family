@@ -33,7 +33,7 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
     id: string;
     patch?: Record<string, string>;
     deleteKeys?: string[];
-    createIfMissing?: boolean;
+    onMissing?: 'throw' | 'create' | 'skip';
   }) => {
     if (op.op !== 'patch') return;
     const slice = (reads[op.id] ??= {});

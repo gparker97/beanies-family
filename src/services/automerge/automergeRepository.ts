@@ -3,6 +3,7 @@ import { list, getById as projectionGetById } from './projection';
 import { mutate } from './worker/docClient';
 import { toISODateString } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
+import { reportError } from '@/utils/errorReporter';
 
 /**
  * Strip keys whose value is `undefined` from a plain object.
@@ -84,8 +85,8 @@ export function createAutomergeRepository<
   }
 
   async function update(id: string, input: UpdateInput): Promise<Entity | undefined> {
-    // Existence check up front (the worker `patch` throws on a missing entity;
-    // returning undefined preserves the repository contract).
+    // Existence check up front (fast path). Returning undefined preserves the
+    // repository contract.
     if (!projectionGetById(collectionName, id)) return undefined;
 
     const now = toISODateString(new Date());
@@ -99,6 +100,12 @@ export function createAutomergeRepository<
     }
 
     const cleanInput = toPlain(stripUndefined(rawInput));
+    // `onMissing:'skip'` tolerates the concurrent-delete TOCTOU race: the up-front
+    // check passed, but a poll-merge on another device may have deleted the entity
+    // before the worker applies this patch. Rather than a rejected RPC + spurious
+    // critical toast, the worker no-ops and echoes undefined; we return undefined
+    // (the old graceful contract) but leave a warning breadcrumb so a genuine
+    // worker/projection divergence is diagnosable (never a silent success).
     const result = await mutate<Entity | undefined>({
       op: 'patch',
       collection: collectionName,
@@ -106,8 +113,17 @@ export function createAutomergeRepository<
       patch: cleanInput,
       deleteKeys: keysToDelete,
       updatedAt: now,
+      onMissing: 'skip',
     });
-    return result ? transform(result) : undefined;
+    if (!result) {
+      reportError({
+        surface: 'automergeRepository.update.concurrent-delete',
+        message: `patch skipped: ${collectionName}/${id} vanished between the projection check and the worker write (concurrent delete)`,
+        severity: 'warning',
+      });
+      return undefined;
+    }
+    return transform(result);
   }
 
   async function remove(id: string): Promise<boolean> {

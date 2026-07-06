@@ -305,9 +305,16 @@ function mutateDraft(
       const col = draft[op.collection] as Record<string, AnyRecord>;
       let entity = col[op.id];
       if (!entity) {
-        if (!op.createIfMissing) throw new Error(`patch: ${op.collection}/${op.id} not found`);
-        col[op.id] = {};
-        entity = col[op.id]; // re-read: the assigned `{}` is detached; the doc holds the proxy
+        switch (op.onMissing ?? 'throw') {
+          case 'skip':
+            return; // no-op: tolerates the concurrent-delete race (echoes undefined)
+          case 'create':
+            col[op.id] = {};
+            entity = col[op.id]; // re-read: the assigned `{}` is detached; the doc holds the proxy
+            break;
+          default:
+            throw new Error(`patch: ${op.collection}/${op.id} not found`);
+        }
       }
       for (const [k, v] of Object.entries(op.patch)) entity[k] = v;
       for (const k of op.deleteKeys ?? []) delete entity[k];
@@ -320,9 +327,13 @@ function mutateDraft(
     case 'increment': {
       // Read-modify-write ATOMIC inside the change — no interleave with a merge.
       const entity = (draft[op.collection] as Record<string, AnyRecord>)[op.id];
-      if (!entity) throw new Error(`increment: ${op.collection}/${op.id} not found`);
+      if (!entity) {
+        if ((op.onMissing ?? 'throw') === 'skip') return; // concurrent-delete race → no-op
+        throw new Error(`increment: ${op.collection}/${op.id} not found`);
+      }
       const cur = typeof entity[op.field] === 'number' ? (entity[op.field] as number) : 0;
       entity[op.field] = cur + op.delta;
+      if (op.updatedAt) entity.updatedAt = op.updatedAt;
       break;
     }
     case 'batch':
@@ -347,7 +358,17 @@ function deltaFor(after: Doc, op: MutationOp, out: ProjectionDelta[]): unknown {
       return op.entity;
     case 'patch':
     case 'increment': {
-      const entity = toPlain((after[op.collection] as Record<string, unknown>)[op.id]);
+      const raw = (after[op.collection] as Record<string, unknown>)[op.id];
+      if (raw === undefined) {
+        // The target is absent post-change — the op was skipped (onMissing:'skip')
+        // or the entity was deleted earlier in the same batch. Sync the projection
+        // to reality with a `remove` instead of round-tripping `undefined` (which
+        // would throw in toPlain). Only reachable for a skipped/deleted target,
+        // never a live entity. Echo `undefined` so callers can detect the skip.
+        out.push({ kind: 'remove', collection: op.collection, id: op.id });
+        return undefined;
+      }
+      const entity = toPlain(raw);
       out.push({ kind: 'upsert', collection: op.collection, id: op.id, entity });
       return entity;
     }

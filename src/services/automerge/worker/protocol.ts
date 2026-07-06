@@ -47,14 +47,29 @@ export type MutationOp =
       patch: Record<string, unknown>;
       deleteKeys?: string[];
       updatedAt?: string;
-      /** Init `collection[id] = {}` if absent instead of throwing. Used for the
-       * two-level `notificationReads[memberId]` sub-map, whose member slice may
-       * not exist yet. Default false preserves throw-on-missing for real entities. */
-      createIfMissing?: boolean;
+      /** Behavior when `collection[id]` is absent (default `'throw'`):
+       *  - `'throw'`  — reject (a real entity should exist; a genuine bug).
+       *  - `'create'` — init `collection[id] = {}` then apply (the two-level
+       *                 `notificationReads[memberId]` sub-map, whose member slice
+       *                 may not exist yet).
+       *  - `'skip'`   — no-op, echo `undefined` (tolerates the concurrent-delete
+       *                 TOCTOU race; the caller leaves a breadcrumb). */
+      onMissing?: 'throw' | 'create' | 'skip';
     }
   | { op: 'delete'; collection: CollectionName; id: string }
-  /** Relative read-modify-write done atomically INSIDE one worker `changeDoc`. */
-  | { op: 'increment'; collection: CollectionName; id: string; field: string; delta: number }
+  /** Relative read-modify-write done atomically INSIDE one worker `changeDoc`.
+   * `onMissing:'skip'` no-ops (echoes `undefined`) on the concurrent-delete race
+   * instead of throwing. `updatedAt`, when supplied, is stamped onto the entity
+   * (mirrors `patch`) so a cascade balance change advances the entity timestamp. */
+  | {
+      op: 'increment';
+      collection: CollectionName;
+      id: string;
+      field: string;
+      delta: number;
+      updatedAt?: string;
+      onMissing?: 'throw' | 'skip';
+    }
   | { op: 'batch'; ops: MutationOp[] }
   /** Named handlers whose domain logic lives in the worker (e.g. photo attach). */
   | { op: 'named'; name: string; args: Record<string, unknown> };

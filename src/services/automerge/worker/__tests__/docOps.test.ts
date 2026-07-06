@@ -202,8 +202,8 @@ describe('docOps — projection + named ops', () => {
     expect(deltas.some((x) => x.kind === 'settings')).toBe(true);
   });
 
-  it('patch createIfMissing inits an absent two-level slice (notificationReads)', () => {
-    // Without the flag, patching an absent target throws.
+  it("patch onMissing:'create' inits an absent two-level slice (notificationReads)", () => {
+    // Default (throw): patching an absent target throws.
     expect(() =>
       applyMutation(base(), {
         op: 'patch',
@@ -212,15 +212,101 @@ describe('docOps — projection + named ops', () => {
         patch: { n1: '2026-01-01' },
       })
     ).toThrow(/not found/);
-    // With it, the member sub-map is created then the keys applied.
+    // 'create': the member sub-map is created then the keys applied.
     const { doc } = applyMutation(base(), {
       op: 'patch',
       collection: 'notificationReads',
       id: 'm1',
       patch: { n1: '2026-01-01' },
-      createIfMissing: true,
+      onMissing: 'create',
     });
     expect(materializeCollection(doc, 'notificationReads')).toEqual([['m1', { n1: '2026-01-01' }]]);
+  });
+
+  it("patch onMissing:'skip' is a delta-safe no-op on an absent entity (concurrent delete)", () => {
+    const d0 = base();
+    const { doc, delta, result } = applyMutation(d0, {
+      op: 'patch',
+      collection: 'accounts',
+      id: 'gone',
+      patch: { name: 'X' },
+      onMissing: 'skip',
+    });
+    // No throw; nothing created; echoes undefined; delta is a `remove` (not an
+    // upsert of undefined, which would throw in toPlain).
+    expect(materializeCollection(doc, 'accounts')).toEqual([]);
+    expect(result).toBeUndefined();
+    expect(delta).toEqual({ kind: 'remove', collection: 'accounts', id: 'gone' });
+  });
+
+  it("increment stamps updatedAt and onMissing:'skip' no-ops on an absent entity", () => {
+    // Seed an account, then increment its balance with an updatedAt.
+    let d = applyMutation(base(), {
+      op: 'set',
+      collection: 'accounts',
+      id: 'a1',
+      entity: { id: 'a1', balance: 100, updatedAt: '2026-01-01' },
+    }).doc;
+    d = applyMutation(d, {
+      op: 'increment',
+      collection: 'accounts',
+      id: 'a1',
+      field: 'balance',
+      delta: -30,
+      updatedAt: '2026-02-02',
+    }).doc;
+    expect(materializeCollection(d, 'accounts')[0]![1]).toEqual({
+      id: 'a1',
+      balance: 70,
+      updatedAt: '2026-02-02',
+    });
+    // Absent entity + skip → delta-safe no-op.
+    const skip = applyMutation(d, {
+      op: 'increment',
+      collection: 'accounts',
+      id: 'gone',
+      field: 'balance',
+      delta: 5,
+      onMissing: 'skip',
+    });
+    expect(skip.result).toBeUndefined();
+    expect(skip.delta).toEqual({ kind: 'remove', collection: 'accounts', id: 'gone' });
+    // Default (throw) still rejects.
+    expect(() =>
+      applyMutation(d, {
+        op: 'increment',
+        collection: 'accounts',
+        id: 'gone',
+        field: 'balance',
+        delta: 5,
+      })
+    ).toThrow(/not found/);
+  });
+
+  it('a batch that deletes then patches the same id does not throw (deltaFor guard)', () => {
+    const seeded = applyMutation(base(), {
+      op: 'set',
+      collection: 'todos',
+      id: 't1',
+      entity: { id: 't1', title: 'old' },
+    }).doc;
+    // delete t1, then patch t1 with skip → the patch is a no-op; deltaFor must
+    // emit `remove`, not toPlain(undefined) (which would throw).
+    expect(() =>
+      applyMutation(seeded, {
+        op: 'batch',
+        ops: [
+          { op: 'delete', collection: 'todos', id: 't1' },
+          {
+            op: 'patch',
+            collection: 'todos',
+            id: 't1',
+            patch: { title: 'new' },
+            onMissing: 'skip',
+          },
+        ],
+      })
+    ).not.toThrow();
   });
 
   it('named op runs its registered handler and contributes its delta', () => {
