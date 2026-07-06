@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- ADR-032 Task #17: pending test rewrite to the inline/docClient path (red in the migration window)
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { FamilyMember } from '@/types/models';
@@ -14,8 +12,16 @@ vi.mock('@/services/automerge/repositories/familyMemberRepository', () => ({
   getOwner: vi.fn(),
 }));
 
-vi.mock('@/services/automerge/docService', () => ({
-  changeDoc: vi.fn(),
+// ADR-032: normalizeRoles/transferOwnership now read the projection to confirm a
+// member is present, then write via a single docClient.mutate batch op (was a
+// changeDoc closure). Mock both — getById returns truthy so patched members are
+// included in the batch; mutate is asserted for the batch shape.
+vi.mock('@/services/automerge/projection', () => ({
+  getById: vi.fn(),
+}));
+
+vi.mock('@/services/automerge/worker/docClient', () => ({
+  mutate: vi.fn(),
 }));
 
 vi.mock('@/utils/errorReporter', () => ({
@@ -31,7 +37,8 @@ vi.mock('@/stores/authStore', () => ({
 
 import { useFamilyStore } from './familyStore';
 import * as familyRepo from '@/services/automerge/repositories/familyMemberRepository';
-import { changeDoc } from '@/services/automerge/docService';
+import { getById as projectionGetById } from '@/services/automerge/projection';
+import { mutate } from '@/services/automerge/worker/docClient';
 import { useAuthStore } from '@/stores/authStore';
 
 function makeMember(overrides: Partial<FamilyMember>): FamilyMember {
@@ -58,6 +65,10 @@ describe('familyStore — normalizeRoles', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     setActivePinia(createPinia());
+    // Re-establish defaults after resetAllMocks: every member is present in the
+    // projection (truthy) and the mutate batch resolves.
+    vi.mocked(projectionGetById).mockReturnValue({ id: 'present' } as never);
+    vi.mocked(mutate).mockResolvedValue(undefined as never);
   });
 
   it('no-ops when exactly one owner exists', async () => {
@@ -68,7 +79,7 @@ describe('familyStore — normalizeRoles', () => {
     const store = useFamilyStore();
     await store.loadMembers();
 
-    expect(changeDoc).not.toHaveBeenCalled();
+    expect(mutate).not.toHaveBeenCalled();
     expect(store.owner?.id).toBe('owner-1');
   });
 
@@ -86,21 +97,11 @@ describe('familyStore — normalizeRoles', () => {
     vi.mocked(familyRepo.getAllFamilyMembers)
       .mockResolvedValueOnce([earlier, later])
       .mockResolvedValueOnce([earlier, { ...later, role: 'member' }]);
-    vi.mocked(changeDoc).mockImplementation((fn) => {
-      const fakeDoc = {
-        familyMembers: {
-          'owner-old': { ...earlier },
-          'owner-new': { ...later },
-        },
-      } as never;
-      fn(fakeDoc);
-      return fakeDoc;
-    });
 
     const store = useFamilyStore();
     await store.loadMembers();
 
-    expect(changeDoc).toHaveBeenCalledOnce();
+    expect(mutate).toHaveBeenCalledOnce();
     // The mocked second getAllFamilyMembers returns the demoted state.
     expect(store.owner?.id).toBe('owner-old');
   });
@@ -121,21 +122,11 @@ describe('familyStore — normalizeRoles', () => {
     vi.mocked(familyRepo.getAllFamilyMembers)
       .mockResolvedValueOnce([creator, joinedLater])
       .mockResolvedValueOnce([{ ...creator, role: 'owner', canManagePod: true }, joinedLater]);
-    vi.mocked(changeDoc).mockImplementation((fn) => {
-      const doc = {
-        familyMembers: {
-          creator: { ...creator },
-          joiner: { ...joinedLater },
-        },
-      } as never;
-      fn(doc);
-      return doc;
-    });
 
     const store = useFamilyStore();
     await store.loadMembers();
 
-    expect(changeDoc).toHaveBeenCalledOnce();
+    expect(mutate).toHaveBeenCalledOnce();
     expect(store.owner?.id).toBe('creator');
   });
 
@@ -155,16 +146,6 @@ describe('familyStore — normalizeRoles', () => {
     vi.mocked(familyRepo.getAllFamilyMembers)
       .mockResolvedValueOnce([m1, m2])
       .mockResolvedValueOnce([{ ...m1, role: 'owner' }, m2]);
-    vi.mocked(changeDoc).mockImplementation((fn) => {
-      const doc = {
-        familyMembers: {
-          a: { ...m1 },
-          b: { ...m2 },
-        },
-      } as never;
-      fn(doc);
-      return doc;
-    });
 
     const store = useFamilyStore();
     await store.loadMembers();
@@ -182,33 +163,21 @@ describe('familyStore — normalizeRoles', () => {
     vi.mocked(familyRepo.getAllFamilyMembers)
       .mockResolvedValueOnce([owner, legacyAdmin])
       .mockResolvedValueOnce([owner, { ...legacyAdmin, role: 'member', canManagePod: true }]);
-    vi.mocked(changeDoc).mockImplementation((fn) => {
-      const doc = {
-        familyMembers: {
-          o: { ...owner },
-          admin: { ...legacyAdmin },
-        },
-      } as never;
-      fn(doc);
-      return doc;
-    });
 
     const store = useFamilyStore();
     await store.loadMembers();
 
-    expect(changeDoc).toHaveBeenCalledOnce();
+    expect(mutate).toHaveBeenCalledOnce();
     const adminAfter = store.members.find((m) => m.id === 'admin');
     expect(adminAfter?.role).toBe('member');
     expect(adminAfter?.canManagePod).toBe(true);
   });
 
-  it('returns input unchanged when changeDoc throws', async () => {
+  it('returns input unchanged when the mutate batch throws', async () => {
     const owner = makeMember({ id: 'o', role: 'owner' });
     const legacyAdmin = makeMember({ id: 'admin', role: 'admin' });
     vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([owner, legacyAdmin]);
-    vi.mocked(changeDoc).mockImplementation(() => {
-      throw new Error('boom');
-    });
+    vi.mocked(mutate).mockRejectedValue(new Error('boom'));
 
     const store = useFamilyStore();
     await store.loadMembers();
@@ -224,7 +193,7 @@ describe('familyStore — normalizeRoles', () => {
     const store = useFamilyStore();
     await store.loadMembers();
 
-    expect(changeDoc).not.toHaveBeenCalled();
+    expect(mutate).not.toHaveBeenCalled();
     expect(store.members).toEqual([]);
   });
 });
@@ -233,6 +202,10 @@ describe('familyStore — transferOwnership', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     setActivePinia(createPinia());
+    // Re-establish defaults after resetAllMocks: every member is present in the
+    // projection (truthy) and the mutate batch resolves.
+    vi.mocked(projectionGetById).mockReturnValue({ id: 'present' } as never);
+    vi.mocked(mutate).mockResolvedValue(undefined as never);
   });
 
   it('demotes current owner and promotes target with full permissions', async () => {
@@ -246,19 +219,6 @@ describe('familyStore — transferOwnership', () => {
       canEditActivities: false,
     });
     vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([owner, target]);
-    let recordedOps: Record<string, FamilyMember> = {};
-    vi.mocked(changeDoc).mockImplementation((fn) => {
-      const doc = {
-        familyMembers: {
-          owner: { ...owner },
-          target: { ...target },
-        },
-      } as never;
-      fn(doc);
-      recordedOps = (doc as unknown as { familyMembers: Record<string, FamilyMember> })
-        .familyMembers;
-      return doc;
-    });
 
     const store = useFamilyStore();
     await store.loadMembers();
@@ -266,12 +226,32 @@ describe('familyStore — transferOwnership', () => {
     const result = await store.transferOwnership('target');
 
     expect(result).toBe(true);
-    expect(changeDoc).toHaveBeenCalledOnce();
-    expect(recordedOps.owner.role).toBe('member');
-    expect(recordedOps.target.role).toBe('owner');
-    expect(recordedOps.target.canManagePod).toBe(true);
-    expect(recordedOps.target.canViewFinances).toBe(true);
-    expect(recordedOps.target.canEditActivities).toBe(true);
+    // One atomic batch: demote the old owner + promote the target with full perms.
+    expect(mutate).toHaveBeenCalledOnce();
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        op: 'batch',
+        ops: expect.arrayContaining([
+          expect.objectContaining({
+            op: 'patch',
+            collection: 'familyMembers',
+            id: 'owner',
+            patch: expect.objectContaining({ role: 'member' }),
+          }),
+          expect.objectContaining({
+            op: 'patch',
+            collection: 'familyMembers',
+            id: 'target',
+            patch: expect.objectContaining({
+              role: 'owner',
+              canManagePod: true,
+              canViewFinances: true,
+              canEditActivities: true,
+            }),
+          }),
+        ]),
+      })
+    );
 
     // In-place local state reflects the swap.
     expect(store.owner?.id).toBe('target');
@@ -282,38 +262,30 @@ describe('familyStore — transferOwnership', () => {
     const owner = makeMember({ id: 'owner', role: 'owner' });
     const pet = makeMember({ id: 'pet', role: 'member', isPet: true });
     vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([owner, pet]);
-    vi.mocked(changeDoc).mockImplementation((fn) => {
-      fn({ familyMembers: {} } as never);
-      return {} as never;
-    });
 
     const store = useFamilyStore();
     await store.loadMembers();
-    vi.mocked(changeDoc).mockClear();
+    vi.mocked(mutate).mockClear();
 
     const result = await store.transferOwnership('pet');
 
     expect(result).toBe(false);
-    expect(changeDoc).not.toHaveBeenCalled();
+    expect(mutate).not.toHaveBeenCalled();
     expect(store.owner?.id).toBe('owner');
   });
 
   it('rejects same-owner target', async () => {
     const owner = makeMember({ id: 'owner', role: 'owner' });
     vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([owner]);
-    vi.mocked(changeDoc).mockImplementation((fn) => {
-      fn({ familyMembers: {} } as never);
-      return {} as never;
-    });
 
     const store = useFamilyStore();
     await store.loadMembers();
-    vi.mocked(changeDoc).mockClear();
+    vi.mocked(mutate).mockClear();
 
     const result = await store.transferOwnership('owner');
 
     expect(result).toBe(false);
-    expect(changeDoc).not.toHaveBeenCalled();
+    expect(mutate).not.toHaveBeenCalled();
   });
 
   it('rejects non-existent target', async () => {
@@ -322,12 +294,12 @@ describe('familyStore — transferOwnership', () => {
 
     const store = useFamilyStore();
     await store.loadMembers();
-    vi.mocked(changeDoc).mockClear();
+    vi.mocked(mutate).mockClear();
 
     const result = await store.transferOwnership('ghost');
 
     expect(result).toBe(false);
-    expect(changeDoc).not.toHaveBeenCalled();
+    expect(mutate).not.toHaveBeenCalled();
   });
 
   it('rejects unjoined target (requiresPassword === true)', async () => {
@@ -338,19 +310,15 @@ describe('familyStore — transferOwnership', () => {
       requiresPassword: true,
     });
     vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([owner, unjoined]);
-    vi.mocked(changeDoc).mockImplementation((fn) => {
-      fn({ familyMembers: {} } as never);
-      return {} as never;
-    });
 
     const store = useFamilyStore();
     await store.loadMembers();
-    vi.mocked(changeDoc).mockClear();
+    vi.mocked(mutate).mockClear();
 
     const result = await store.transferOwnership('unjoined');
 
     expect(result).toBe(false);
-    expect(changeDoc).not.toHaveBeenCalled();
+    expect(mutate).not.toHaveBeenCalled();
     expect(store.owner?.id).toBe('owner');
   });
 
@@ -363,16 +331,6 @@ describe('familyStore — transferOwnership', () => {
       currentUser: { memberId: 'owner', email: '', familyId: 'fam', role: 'owner' },
       updateCurrentUserRole: updateRole,
     } as unknown as ReturnType<typeof useAuthStore>);
-    vi.mocked(changeDoc).mockImplementation((fn) => {
-      const doc = {
-        familyMembers: {
-          owner: { ...owner },
-          target: { ...target },
-        },
-      } as never;
-      fn(doc);
-      return doc;
-    });
 
     const store = useFamilyStore();
     await store.loadMembers();

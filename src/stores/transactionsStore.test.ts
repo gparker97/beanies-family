@@ -53,9 +53,110 @@ vi.mock('@/services/automerge/repositories/goalRepository', () => ({
   getGoalsByMemberId: vi.fn().mockResolvedValue([]),
 }));
 
+// Mock the worker docClient — the store atomic methods route through `mutate`
+// (the worker/inline op RPC) instead of the repos for balance cascades.
+vi.mock('@/services/automerge/worker/docClient', () => ({ mutate: vi.fn() }));
+
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
-import * as accountRepo from '@/services/automerge/repositories/accountRepository';
 import * as assetRepo from '@/services/automerge/repositories/assetRepository';
+import { mutate } from '@/services/automerge/worker/docClient';
+
+/**
+ * Centralized smart `mutate` mock. Reads the seeded store state and returns the
+ * echoed entity exactly as the real worker op would, so the store atomic methods
+ * (`incrementBalance` / `applyContribution` / `applyLoanPayment` /
+ * `reverseLoanPayment`) complete and surgically update their local refs. Call
+ * from each describe's `beforeEach` (after `clearAllMocks`).
+ */
+function setupMutateMock(): void {
+  vi.mocked(mutate).mockImplementation(async (op: any) => {
+    const accountsStore = useAccountsStore();
+    const goalsStore = useGoalsStore();
+    const assetsStore = useAssetsStore();
+
+    // Atomic relative balance adjustment.
+    if (op.op === 'increment' && op.collection === 'accounts') {
+      const a = accountsStore.accounts.find((x) => x.id === op.id)!;
+      return { ...a, [op.field]: (a as any)[op.field] + op.delta } as any;
+    }
+
+    // Atomic relative goal contribution (clamp at 0 + auto-complete).
+    if (op.op === 'named' && op.name === 'applyGoalContribution') {
+      const g = goalsStore.goals.find((x) => x.id === op.args.id)!;
+      const currentAmount = Math.max(0, g.currentAmount + op.args.delta);
+      return { ...g, currentAmount, isCompleted: currentAmount >= g.targetAmount } as any;
+    }
+
+    // Loan payment: fold the loan host (asset loan.outstandingBalance OR
+    // standalone loan account balance) downward by a principal portion. Exact
+    // amortization lives in the worker docOps unit suite; here we only need a
+    // plausible echoed host + split so the cascade wiring can be asserted.
+    if (op.op === 'named' && op.name === 'applyLoanPayment') {
+      const { loanId, paymentAmount, isRecurring } = op.args;
+      const asset = assetsStore.assets.find((x) => x.id === loanId);
+      if (asset?.loan) {
+        const outstanding = asset.loan.outstandingBalance ?? 0;
+        if (outstanding <= 0) return { applied: false } as any;
+        const interestPortion = isRecurring ? Math.min(outstanding, paymentAmount * 0.5) : 0;
+        const principalPortion = isRecurring ? paymentAmount - interestPortion : paymentAmount;
+        const host = {
+          ...asset,
+          loan: { ...asset.loan, outstandingBalance: Math.max(0, outstanding - principalPortion) },
+        };
+        return {
+          applied: true,
+          hostCollection: 'assets',
+          host,
+          interestPortion,
+          principalPortion,
+        } as any;
+      }
+      const account = accountsStore.accounts.find((x) => x.id === loanId);
+      if (account) {
+        const outstanding = account.balance;
+        if (outstanding <= 0) return { applied: false } as any;
+        const interestPortion = isRecurring ? Math.min(outstanding, paymentAmount * 0.5) : 0;
+        const principalPortion = isRecurring ? paymentAmount - interestPortion : paymentAmount;
+        const host = { ...account, balance: Math.max(0, outstanding - principalPortion) };
+        return {
+          applied: true,
+          hostCollection: 'accounts',
+          host,
+          interestPortion,
+          principalPortion,
+        } as any;
+      }
+      return { applied: false } as any;
+    }
+
+    // Reverse loan payment: fold the loan host upward by the restored principal.
+    if (op.op === 'named' && op.name === 'reverseLoanPayment') {
+      const { loanId, principalToRestore } = op.args;
+      const asset = assetsStore.assets.find((x) => x.id === loanId);
+      if (asset?.loan) {
+        const host = {
+          ...asset,
+          loan: {
+            ...asset.loan,
+            outstandingBalance: (asset.loan.outstandingBalance ?? 0) + principalToRestore,
+          },
+        };
+        return { applied: true, hostCollection: 'assets', host } as any;
+      }
+      const account = accountsStore.accounts.find((x) => x.id === loanId);
+      if (account) {
+        return {
+          applied: true,
+          hostCollection: 'accounts',
+          host: { ...account, balance: account.balance + principalToRestore },
+        } as any;
+      }
+      return { applied: false } as any;
+    }
+
+    return undefined as any;
+  });
+}
 
 const mockAccount: Account = {
   id: 'test-account-1',
@@ -103,6 +204,7 @@ describe('transactionsStore - Account Balance Sync', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    setupMutateMock();
   });
 
   describe('createTransaction - balance updates', () => {
@@ -116,10 +218,6 @@ describe('transactionsStore - Account Balance Sync', () => {
       // Mock repository responses
       const newTransaction = { ...mockTransaction, id: 'new-tx-1' };
       vi.mocked(transactionRepo.createTransaction).mockResolvedValue(newTransaction);
-      vi.mocked(accountRepo.updateAccount).mockResolvedValue({
-        ...mockAccount,
-        balance: 900,
-      });
 
       // Act: create an expense transaction
       const result = await transactionsStore.createTransaction({
@@ -133,9 +231,9 @@ describe('transactionsStore - Account Balance Sync', () => {
         isReconciled: false,
       });
 
-      // Assert
+      // Assert: expense of 100 on a 1000 balance → 900 (via atomic increment)
       expect(result).not.toBeNull();
-      expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-1', { balance: 900 });
+      expect(accountsStore.getAccountById('test-account-1')!.balance).toBe(900);
     });
 
     it('should increase account balance when creating an income', async () => {
@@ -153,10 +251,6 @@ describe('transactionsStore - Account Balance Sync', () => {
         category: 'salary',
       };
       vi.mocked(transactionRepo.createTransaction).mockResolvedValue(incomeTransaction);
-      vi.mocked(accountRepo.updateAccount).mockResolvedValue({
-        ...mockAccount,
-        balance: 1500,
-      });
 
       // Act
       const result = await transactionsStore.createTransaction({
@@ -170,9 +264,9 @@ describe('transactionsStore - Account Balance Sync', () => {
         isReconciled: false,
       });
 
-      // Assert
+      // Assert: income of 500 on a 1000 balance → 1500
       expect(result).not.toBeNull();
-      expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-1', { balance: 1500 });
+      expect(accountsStore.getAccountById('test-account-1')!.balance).toBe(1500);
     });
 
     it('should update both accounts when creating a transfer', async () => {
@@ -191,9 +285,6 @@ describe('transactionsStore - Account Balance Sync', () => {
         amount: 200,
       };
       vi.mocked(transactionRepo.createTransaction).mockResolvedValue(transferTransaction);
-      vi.mocked(accountRepo.updateAccount)
-        .mockResolvedValueOnce({ ...mockAccount, balance: 800 })
-        .mockResolvedValueOnce({ ...mockDestAccount, balance: 5200 });
 
       // Act
       const result = await transactionsStore.createTransaction({
@@ -208,11 +299,10 @@ describe('transactionsStore - Account Balance Sync', () => {
         isReconciled: false,
       });
 
-      // Assert
+      // Assert: transfer of 200 → source 1000-200=800, dest 5000+200=5200
       expect(result).not.toBeNull();
-      expect(accountRepo.updateAccount).toHaveBeenCalledTimes(2);
-      expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-1', { balance: 800 });
-      expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-2', { balance: 5200 });
+      expect(accountsStore.getAccountById('test-account-1')!.balance).toBe(800);
+      expect(accountsStore.getAccountById('test-account-2')!.balance).toBe(5200);
     });
   });
 
@@ -227,17 +317,13 @@ describe('transactionsStore - Account Balance Sync', () => {
       transactionsStore.transactions.push({ ...mockTransaction });
 
       vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
-      vi.mocked(accountRepo.updateAccount).mockResolvedValue({
-        ...mockAccount,
-        balance: 1000,
-      });
 
       // Act
       const result = await transactionsStore.deleteTransaction('test-transaction-1');
 
-      // Assert
+      // Assert: deleting expense of 100 restores 900 → 1000
       expect(result).toBe(true);
-      expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-1', { balance: 1000 });
+      expect(accountsStore.getAccountById('test-account-1')!.balance).toBe(1000);
     });
 
     it('should restore account balance when deleting an income', async () => {
@@ -256,17 +342,13 @@ describe('transactionsStore - Account Balance Sync', () => {
       transactionsStore.transactions.push(incomeTransaction);
 
       vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
-      vi.mocked(accountRepo.updateAccount).mockResolvedValue({
-        ...mockAccount,
-        balance: 1000,
-      });
 
       // Act
       const result = await transactionsStore.deleteTransaction('income-tx-1');
 
-      // Assert
+      // Assert: deleting income of 500 reverses 1500 → 1000
       expect(result).toBe(true);
-      expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-1', { balance: 1000 });
+      expect(accountsStore.getAccountById('test-account-1')!.balance).toBe(1000);
     });
 
     it('should restore both account balances when deleting a transfer', async () => {
@@ -286,18 +368,14 @@ describe('transactionsStore - Account Balance Sync', () => {
       transactionsStore.transactions.push(transferTransaction);
 
       vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
-      vi.mocked(accountRepo.updateAccount)
-        .mockResolvedValueOnce({ ...mockAccount, balance: 1000 })
-        .mockResolvedValueOnce({ ...mockDestAccount, balance: 5000 });
 
       // Act
       const result = await transactionsStore.deleteTransaction('transfer-tx-1');
 
-      // Assert
+      // Assert: deleting transfer restores source 800→1000, dest 5200→5000
       expect(result).toBe(true);
-      expect(accountRepo.updateAccount).toHaveBeenCalledTimes(2);
-      expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-1', { balance: 1000 });
-      expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-2', { balance: 5000 });
+      expect(accountsStore.getAccountById('test-account-1')!.balance).toBe(1000);
+      expect(accountsStore.getAccountById('test-account-2')!.balance).toBe(5000);
     });
   });
 
@@ -314,18 +392,15 @@ describe('transactionsStore - Account Balance Sync', () => {
       // Updating to 150 should change balance to 850
       const updatedTransaction = { ...mockTransaction, amount: 150 };
       vi.mocked(transactionRepo.updateTransaction).mockResolvedValue(updatedTransaction);
-      vi.mocked(accountRepo.updateAccount)
-        .mockResolvedValueOnce({ ...mockAccount, balance: 1000 }) // Reverse old
-        .mockResolvedValueOnce({ ...mockAccount, balance: 850 }); // Apply new
 
       // Act
       const result = await transactionsStore.updateTransaction('test-transaction-1', {
         amount: 150,
       });
 
-      // Assert
+      // Assert: reverse old expense (+100 → 1000), apply new expense (-150 → 850)
       expect(result).not.toBeNull();
-      expect(accountRepo.updateAccount).toHaveBeenCalledTimes(2);
+      expect(accountsStore.getAccountById('test-account-1')!.balance).toBe(850);
     });
 
     it('should adjust balance when transaction type changes from expense to income', async () => {
@@ -340,18 +415,15 @@ describe('transactionsStore - Account Balance Sync', () => {
       // Changing to income should change balance to 1100 (reverse -100, apply +100)
       const updatedTransaction = { ...mockTransaction, type: 'income' as const };
       vi.mocked(transactionRepo.updateTransaction).mockResolvedValue(updatedTransaction);
-      vi.mocked(accountRepo.updateAccount)
-        .mockResolvedValueOnce({ ...mockAccount, balance: 1000 }) // Reverse old expense
-        .mockResolvedValueOnce({ ...mockAccount, balance: 1100 }); // Apply new income
 
       // Act
       const result = await transactionsStore.updateTransaction('test-transaction-1', {
         type: 'income',
       });
 
-      // Assert
+      // Assert: reverse old expense (+100 → 1000), apply new income (+100 → 1100)
       expect(result).not.toBeNull();
-      expect(accountRepo.updateAccount).toHaveBeenCalledTimes(2);
+      expect(accountsStore.getAccountById('test-account-1')!.balance).toBe(1100);
     });
   });
 });
@@ -360,6 +432,7 @@ describe('transactionsStore - Summary Card Calculations', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    setupMutateMock();
   });
 
   // Helper to create a transaction for current month
@@ -803,15 +876,11 @@ describe('transactionsStore - Summary Card Calculations', () => {
       );
 
       vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
-      vi.mocked(accountRepo.updateAccount).mockResolvedValue({
-        ...mockAccount,
-        balance: 1500,
-      });
 
       await store.deleteTransactionsByRecurringItemId('recurring-1');
 
-      // Balance should be reversed: expense of 500 reversed = +500
-      expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-1', { balance: 1500 });
+      // Balance should be reversed: expense of 500 reversed = +500 → 1000 + 500 = 1500
+      expect(accountsStore.getAccountById('test-account-1')!.balance).toBe(1500);
     });
   });
 });
@@ -831,12 +900,11 @@ const mockGoal: Goal = {
   updatedAt: '2024-01-01T00:00:00.000Z',
 };
 
-import * as goalRepo from '@/services/automerge/repositories/goalRepository';
-
 describe('transactionsStore - Goal Allocation Sync', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    setupMutateMock();
   });
 
   function seedStores() {
@@ -865,11 +933,6 @@ describe('transactionsStore - Goal Allocation Sync', () => {
     vi.mocked(transactionRepo.updateTransaction).mockResolvedValue({
       ...createdTx,
       goalAllocApplied: 200,
-    });
-    vi.mocked(accountRepo.updateAccount).mockResolvedValue({ ...mockAccount, balance: 2000 });
-    vi.mocked(goalRepo.updateGoal).mockResolvedValue({
-      ...mockGoal,
-      currentAmount: 200,
     });
 
     await transactionsStore.createTransaction({
@@ -910,11 +973,6 @@ describe('transactionsStore - Goal Allocation Sync', () => {
       ...createdTx,
       goalAllocApplied: 300,
     });
-    vi.mocked(accountRepo.updateAccount).mockResolvedValue({ ...mockAccount, balance: 2000 });
-    vi.mocked(goalRepo.updateGoal).mockResolvedValue({
-      ...mockGoal,
-      currentAmount: 300,
-    });
 
     await transactionsStore.createTransaction({
       accountId: 'test-account-1',
@@ -953,12 +1011,6 @@ describe('transactionsStore - Goal Allocation Sync', () => {
       ...createdTx,
       goalAllocApplied: 100,
     });
-    vi.mocked(accountRepo.updateAccount).mockResolvedValue({ ...mockAccount, balance: 2000 });
-    vi.mocked(goalRepo.updateGoal).mockResolvedValue({
-      ...mockGoal,
-      currentAmount: 10000,
-      isCompleted: true,
-    });
 
     await transactionsStore.createTransaction({
       accountId: 'test-account-1',
@@ -996,11 +1048,6 @@ describe('transactionsStore - Goal Allocation Sync', () => {
     });
 
     vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
-    vi.mocked(accountRepo.updateAccount).mockResolvedValue({ ...mockAccount, balance: 0 });
-    vi.mocked(goalRepo.updateGoal).mockResolvedValue({
-      ...mockGoal,
-      currentAmount: 0,
-    });
 
     await transactionsStore.deleteTransaction(mockTransaction.id);
 
@@ -1030,12 +1077,6 @@ describe('transactionsStore - Goal Allocation Sync', () => {
       goalAllocValue: 50,
     };
     vi.mocked(transactionRepo.updateTransaction).mockResolvedValue(updatedTx);
-    vi.mocked(accountRepo.updateAccount).mockResolvedValue({ ...mockAccount });
-    vi.mocked(goalRepo.updateGoal).mockImplementation(async (_id, input) => {
-      goalsStore.goals[0]!.currentAmount =
-        input.currentAmount ?? goalsStore.goals[0]!.currentAmount;
-      return { ...goalsStore.goals[0]! };
-    });
 
     await transactionsStore.updateTransaction(mockTransaction.id, {
       goalAllocMode: 'percentage',
@@ -1074,12 +1115,6 @@ describe('transactionsStore - Goal Allocation Sync', () => {
     );
 
     vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
-    vi.mocked(accountRepo.updateAccount).mockResolvedValue({ ...mockAccount });
-    vi.mocked(goalRepo.updateGoal).mockImplementation(async (_id, input) => {
-      goalsStore.goals[0]!.currentAmount =
-        input.currentAmount ?? goalsStore.goals[0]!.currentAmount;
-      return { ...goalsStore.goals[0]! };
-    });
 
     await transactionsStore.deleteTransactionsByRecurringItemId('recurring-1');
 
@@ -1133,6 +1168,7 @@ describe('transactionsStore - Loan Balance Reduction', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    setupMutateMock();
   });
 
   it('should apply amortization and reduce asset loan balance when creating expense with loanId', async () => {
@@ -1155,25 +1191,12 @@ describe('transactionsStore - Loan Balance Reduction', () => {
       recurringItemId: 'recurring-loan-1', // recurring → standard amortization
     };
     vi.mocked(transactionRepo.createTransaction).mockResolvedValue(loanTx);
-    vi.mocked(accountRepo.updateAccount).mockResolvedValue({
-      ...mockAccount,
-      balance: mockAccount.balance - 1500,
-    });
 
     // applyLoanPayment calls transactionRepo.updateTransaction to store amortization fields
     vi.mocked(transactionRepo.updateTransaction).mockResolvedValue({
       ...loanTx,
       loanInterestPortion: 1000,
       loanPrincipalPortion: 500,
-    });
-
-    // assetsStore.updateAsset → assetRepo.updateAsset (reduce balance)
-    vi.mocked(assetRepo.updateAsset).mockImplementation(async (_id, input) => {
-      const updated = {
-        ...mockAssetWithLoan,
-        ...input,
-      } as Asset;
-      return updated;
     });
 
     await transactionsStore.createTransaction({
@@ -1195,14 +1218,17 @@ describe('transactionsStore - Loan Balance Reduction', () => {
       loanPrincipalPortion: expect.any(Number),
     });
 
-    // Verify asset repo was called to reduce the loan balance
-    expect(assetRepo.updateAsset).toHaveBeenCalledWith(
-      'asset-loan-1',
+    // Verify the atomic loan op ran with the right args…
+    expect(mutate).toHaveBeenCalledWith(
       expect.objectContaining({
-        loan: expect.objectContaining({
-          outstandingBalance: expect.any(Number),
-        }),
+        op: 'named',
+        name: 'applyLoanPayment',
+        args: expect.objectContaining({ loanId: 'asset-loan-1', isRecurring: true }),
       })
+    );
+    // …and the echoed host folded into the store reduced the loan balance.
+    expect(assetsStore.getAssetById('asset-loan-1')!.loan!.outstandingBalance!).toBeLessThan(
+      200000
     );
   });
 
@@ -1224,11 +1250,6 @@ describe('transactionsStore - Loan Balance Reduction', () => {
       recurringItemId: 'recurring-car-loan', // recurring → standard amortization
     };
     vi.mocked(transactionRepo.createTransaction).mockResolvedValue(loanTx);
-    // First updateAccount call: deduct payment from source account
-    // Second updateAccount call: reduce loan account balance
-    vi.mocked(accountRepo.updateAccount)
-      .mockResolvedValueOnce({ ...mockAccount, balance: 600 }) // source account after payment
-      .mockResolvedValueOnce({ ...mockLoanAccount, balance: 14662.5 }); // loan balance reduced
 
     // applyLoanPayment stores amortization fields
     vi.mocked(transactionRepo.updateTransaction).mockResolvedValue({
@@ -1256,11 +1277,15 @@ describe('transactionsStore - Loan Balance Reduction', () => {
       loanPrincipalPortion: expect.any(Number),
     });
 
-    // Verify loan account balance was updated (second updateAccount call)
-    expect(accountRepo.updateAccount).toHaveBeenCalledWith(
-      'loan-account-1',
-      expect.objectContaining({ balance: expect.any(Number) })
+    // Verify the atomic loan op ran and the echoed host reduced the loan balance
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        op: 'named',
+        name: 'applyLoanPayment',
+        args: expect.objectContaining({ loanId: 'loan-account-1', isRecurring: true }),
+      })
     );
+    expect(accountsStore.getAccountById('loan-account-1')!.balance).toBeLessThan(15000);
   });
 
   it('should restore loan balance when deleting a loan-linked transaction', async () => {
@@ -1287,19 +1312,20 @@ describe('transactionsStore - Loan Balance Reduction', () => {
     transactionsStore.transactions.push(existingTx);
 
     vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
-    // Reverse source account balance
-    vi.mocked(accountRepo.updateAccount)
-      .mockResolvedValueOnce({ ...mockAccount, balance: 1000 }) // source account restored
-      .mockResolvedValueOnce({ ...mockLoanAccount, balance: 15000 }); // loan balance restored
 
     const result = await transactionsStore.deleteTransaction('loan-tx-del');
 
     expect(result).toBe(true);
-    // Verify loan account balance was restored (principal added back)
-    expect(accountRepo.updateAccount).toHaveBeenCalledWith(
-      'loan-account-1',
-      expect.objectContaining({ balance: expect.any(Number) })
+    // Verify the atomic reverse op ran with the stored principal…
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        op: 'named',
+        name: 'reverseLoanPayment',
+        args: expect.objectContaining({ loanId: 'loan-account-1', principalToRestore: 337.5 }),
+      })
     );
+    // …and the echoed host restored the loan balance upward (principal added back).
+    expect(accountsStore.getAccountById('loan-account-1')!.balance).toBeGreaterThan(14662.5);
   });
 
   it('should use extra payment calculation for one-time payment (no recurringItemId)', async () => {
@@ -1321,9 +1347,6 @@ describe('transactionsStore - Loan Balance Reduction', () => {
       // No recurringItemId — this is an extra payment
     };
     vi.mocked(transactionRepo.createTransaction).mockResolvedValue(extraTx);
-    vi.mocked(accountRepo.updateAccount)
-      .mockResolvedValueOnce({ ...mockAccount, balance: 0 }) // source account
-      .mockResolvedValueOnce({ ...mockLoanAccount, balance: 14000 }); // loan balance reduced
 
     // Extra payment: full amount goes to principal, no interest
     vi.mocked(transactionRepo.updateTransaction).mockResolvedValue({
@@ -1370,10 +1393,6 @@ describe('transactionsStore - Loan Balance Reduction', () => {
       recurringItemId: 'recurring-car-loan',
     };
     vi.mocked(transactionRepo.createTransaction).mockResolvedValue(loanTx);
-    vi.mocked(accountRepo.updateAccount).mockResolvedValue({
-      ...mockAccount,
-      balance: 600,
-    });
 
     await transactionsStore.createTransaction({
       accountId: 'test-account-1',
@@ -1389,7 +1408,7 @@ describe('transactionsStore - Loan Balance Reduction', () => {
     });
 
     // transactionRepo.updateTransaction should NOT be called for loan fields
-    // because the loan has zero balance — applyLoanPayment returns early
+    // because the loan has zero balance — the atomic op returns applied:false
     expect(transactionRepo.updateTransaction).not.toHaveBeenCalled();
   });
 });
@@ -1400,6 +1419,7 @@ describe('transactionsStore - Activity Linking', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    setupMutateMock();
   });
 
   it('should store activityId when creating a transaction with activityId', async () => {
@@ -1414,10 +1434,6 @@ describe('transactionsStore - Activity Linking', () => {
       activityId: 'activity-swim-1',
     };
     vi.mocked(transactionRepo.createTransaction).mockResolvedValue(txWithActivity);
-    vi.mocked(accountRepo.updateAccount).mockResolvedValue({
-      ...mockAccount,
-      balance: 900,
-    });
 
     const result = await transactionsStore.createTransaction({
       accountId: 'test-account-1',
@@ -1513,9 +1529,6 @@ describe('transactionsStore - Activity Linking', () => {
     };
     vi.mocked(transactionRepo.updateTransaction).mockResolvedValue(updatedTx);
 
-    // updateAccount calls for balance adjustments
-    vi.mocked(accountRepo.updateAccount).mockResolvedValue({} as any);
-
     await transactionsStore.updateTransaction('loan-switch-tx', {
       loanId: 'new-loan-1',
     });
@@ -1548,22 +1561,19 @@ describe('transactionsStore - Activity Linking', () => {
     transactionsStore.transactions.push(activityOnlyTx);
 
     vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
-    vi.mocked(accountRepo.updateAccount).mockResolvedValue({
-      ...mockAccount,
-      balance: 1150, // Balance restored after expense deletion
-    });
 
     const result = await transactionsStore.deleteTransaction('activity-only-tx');
 
     expect(result).toBe(true);
-    // Source account balance should be restored (expense deleted → add back)
-    expect(accountRepo.updateAccount).toHaveBeenCalledWith(
-      'test-account-1',
-      expect.objectContaining({ balance: 1150 })
-    );
+    // Source account balance should be restored (expense of 150 deleted → 1000 + 150)
+    expect(accountsStore.getAccountById('test-account-1')!.balance).toBe(1150);
     // No asset update should occur (no loan involved)
     expect(assetRepo.updateAsset).not.toHaveBeenCalled();
-    // updateAccount should only be called once (for the source account, not for any loan)
-    expect(accountRepo.updateAccount).toHaveBeenCalledTimes(1);
+    // Only ONE atomic mutation should occur — the source-account increment; no
+    // loan op runs (reverseLoanPayment early-returns without a loanId/principal).
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ op: 'increment', collection: 'accounts', id: 'test-account-1' })
+    );
   });
 });

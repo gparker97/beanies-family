@@ -13,35 +13,35 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 
-const { parseMock, reEncryptMock, decryptMock } = vi.hoisted(() => ({
+const { parseMock, reEncryptMock } = vi.hoisted(() => ({
   parseMock: vi.fn<(text: string) => BeanpodFileV4>(),
-  reEncryptMock: vi.fn<(env: BeanpodFileV4, _key: CryptoKey) => Promise<string>>(async (env) =>
+  // ADR-032: reEncryptEnvelope now takes the worker-produced base64 payload, not
+  // the key. The stub just stringifies the (merged) envelope so the test can read
+  // back what was written.
+  reEncryptMock: vi.fn<(env: BeanpodFileV4, _payload: string) => string>((env) =>
     JSON.stringify(env)
   ),
-  decryptMock: vi.fn<(env: BeanpodFileV4, _key: CryptoKey) => Promise<unknown>>(async () => ({})),
 }));
 
 vi.mock('@/services/sync/fileSync', () => ({
   parseBeanpodV4: parseMock,
   reEncryptEnvelope: reEncryptMock,
-  decryptBeanpodPayload: decryptMock,
   detectFileVersion: vi.fn(() => '4.0'),
   tryUnwrapFamilyKey: vi.fn(),
   createBeanpodV4: vi.fn(),
   unwrapWrappedKey: vi.fn(),
 }));
 
-vi.mock('@/services/automerge/docService', () => ({
-  mergeDoc: vi.fn(),
-  onDocPersistNeeded: vi.fn(),
-  saveDoc: vi.fn(() => new Uint8Array()),
-  replaceDoc: vi.fn(),
-}));
-
-vi.mock('@/services/automerge/persistenceService', () => ({
-  persistDoc: vi.fn(async () => {}),
+// ADR-032: the worker owns decrypt/merge + cache persist + payload export. The
+// merge under test here is `preserveLocalKeyDicts` (main-side, on the envelope),
+// so the worker RPCs are stubbed — a no-op/remote-ahead merge (dirty:false).
+vi.mock('@/services/automerge/worker/docClient', () => ({
+  setFamilyKey: vi.fn(),
   persistEnvelope: vi.fn(async () => {}),
-  isCacheReady: vi.fn(() => false),
+  exportEncryptedPayload: vi.fn(async () => ({ payload: 'base64-payload==' })),
+  mergeRemoteEnvelope: vi.fn(async () => ({ dirty: false })),
+  setLocalChangeHandler: vi.fn(),
+  setCachePersistFailedHandler: vi.fn(),
 }));
 
 vi.mock('@/services/indexeddb/database', () => ({
