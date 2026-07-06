@@ -211,14 +211,28 @@ export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }>
   return { loaded: true };
 }
 
-/** Apply a declarative mutation; schedule a cache persist. The delta rides the
- * response (applied to the projection before the caller's promise resolves). */
-export function mutate(op: MutationOp): { result: unknown; delta: ProjectionDelta } {
+/** Compare two Automerge heads (deterministic sorted change-hash arrays). */
+function headsEqual(a: Heads, b: Heads): boolean {
+  return a.length === b.length && a.every((h, i) => h === b[i]);
+}
+
+/** Apply a declarative mutation; schedule a cache persist ONLY if the doc actually
+ * changed. The delta rides the response (applied to the projection before the
+ * caller's promise resolves). `changed:false` for a no-op (skipped `onMissing`, or
+ * a named op that wrote nothing) → no cache persist here, and the caller skips the
+ * Drive save (F10). */
+export function mutate(op: MutationOp): {
+  result: unknown;
+  delta: ProjectionDelta;
+  changed: boolean;
+} {
   const doc = requireDoc('mutate');
+  const before = headsOf(doc);
   const { doc: next, result, delta } = applyMutation(doc, op);
+  const changed = !headsEqual(before, headsOf(next));
   currentDoc = next;
-  schedulePersist();
-  return { result, delta };
+  if (changed) schedulePersist();
+  return { result, delta, changed };
 }
 
 /**
@@ -369,7 +383,7 @@ export function exportSnapshot(): { binary: Uint8Array } {
 export async function dispatch(
   method: string,
   args: unknown
-): Promise<{ result?: unknown; delta?: unknown }> {
+): Promise<{ result?: unknown; delta?: unknown; changed?: boolean }> {
   const a = (args ?? {}) as Record<string, unknown>;
   switch (method) {
     case 'setKey':
@@ -382,8 +396,8 @@ export async function dispatch(
     case 'openCache':
       return { result: await openCache(a.familyId as string) };
     case 'mutate': {
-      const { result, delta } = mutate(args as MutationOp);
-      return { result, delta };
+      const { result, delta, changed } = mutate(args as MutationOp);
+      return { result, delta, changed };
     }
     case 'mergeRemoteEnvelope':
       return {

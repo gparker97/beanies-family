@@ -15,6 +15,7 @@ import {
   getHeads,
   mutate,
   mergeRemoteEnvelope,
+  setLocalChangeHandler,
   type DocWorkerLike,
 } from '../docClient';
 
@@ -81,6 +82,25 @@ describe('docClient', () => {
     });
     expect(applyDelta).toHaveBeenCalledWith(delta);
     expect(r).toEqual({ entity: { id: 't1' } });
+  });
+
+  it('fires the local-change handler only when the mutate changed the doc (F10)', async () => {
+    const onChange = vi.fn();
+    setLocalChangeHandler(onChange);
+    // Worker echoes `changed` based on the op id.
+    useWorker((req) => {
+      if (req.method !== 'mutate') return null;
+      const op = req.args as { id: string };
+      return { cid: req.cid, ok: true, result: {}, changed: op.id === 'real' };
+    });
+
+    // A no-op (changed:false) schedules NO Drive save.
+    await mutate({ op: 'set', collection: 'todos', id: 'noop', entity: { id: 'noop' } });
+    expect(onChange).not.toHaveBeenCalled();
+
+    // A real change schedules the save.
+    await mutate({ op: 'set', collection: 'todos', id: 'real', entity: { id: 'real' } });
+    expect(onChange).toHaveBeenCalledTimes(1);
   });
 
   it('times out, rejects, and discards the late reply by cid', async () => {

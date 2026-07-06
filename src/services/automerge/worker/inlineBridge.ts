@@ -51,11 +51,11 @@ let tail: Promise<unknown> = Promise.resolve();
 export function inlineExecutor(
   method: string,
   args: unknown
-): Promise<{ result?: unknown; delta?: ProjectionDelta }> {
+): Promise<{ result?: unknown; delta?: ProjectionDelta; changed?: boolean }> {
   ensureConfigured();
   const run = tail.then(() => dispatch(method, args));
   tail = run.catch(() => undefined); // keep the chain alive even if a call rejects
-  return run as Promise<{ result?: unknown; delta?: ProjectionDelta }>;
+  return run as Promise<{ result?: unknown; delta?: ProjectionDelta; changed?: boolean }>;
 }
 
 /** Test-only: reset the one-time configure guard + the serialization chain. */
