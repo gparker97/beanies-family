@@ -5,15 +5,18 @@ import { serializeError, type RpcRequest } from '../protocol';
 vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
 vi.mock('@/utils/perfTiming', () => ({ record: vi.fn() }));
 vi.mock('../../projection', () => ({ applyDelta: vi.fn() }));
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
 import { showToast } from '@/composables/useToast';
 import { record } from '@/utils/perfTiming';
 import { applyDelta } from '../../projection';
+import { reportError } from '@/utils/errorReporter';
 import {
   setWorkerFactory,
   __resetDocClientForTesting,
   getHeads,
   mutate,
+  fireAndForgetMutate,
   mergeRemoteEnvelope,
   setLocalChangeHandler,
   type DocWorkerLike,
@@ -101,6 +104,21 @@ describe('docClient', () => {
     // A real change schedules the save.
     await mutate({ op: 'set', collection: 'todos', id: 'real', entity: { id: 'real' } });
     expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('fireAndForgetMutate catches a rejected mutate and reports it — no unhandled rejection (F8)', async () => {
+    useWorker((req) =>
+      req.method === 'mutate'
+        ? { cid: req.cid, ok: false, error: serializeError(new Error('mutate boom')) }
+        : null
+    );
+    // Un-awaited by design — the .catch inside must prevent an unhandled rejection.
+    fireAndForgetMutate({ op: 'delete', collection: 'todos', id: 'z' });
+    await tick();
+    await tick();
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'doc-mutate-fire-forget' })
+    );
   });
 
   it('times out, rejects, and discards the late reply by cid', async () => {

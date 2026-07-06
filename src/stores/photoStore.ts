@@ -37,9 +37,11 @@ import { docVersion } from '@/services/automerge/docService';
 import {
   list as projectionList,
   getById as projectionGetById,
+  collectionRef,
 } from '@/services/automerge/projection';
 import {
   mutate,
+  fireAndForgetMutate,
   collectReferencedPhotoIds as collectPhotoIdsRpc,
 } from '@/services/automerge/worker/docClient';
 import {
@@ -123,9 +125,7 @@ function isTransientUploadError(e: unknown): boolean {
 export type PhotoSize = 'thumb' | 'full';
 
 export type PhotoResolution =
-  | { status: 'ok'; url: string }
-  | { status: 'pending' }
-  | { status: 'missing' };
+  { status: 'ok'; url: string } | { status: 'pending' } | { status: 'missing' };
 
 /**
  * How a collection references photos. Two functions cover the two
@@ -177,11 +177,17 @@ export const usePhotoStore = defineStore('photos', () => {
    */
   const blobUrlCache = new Map<string, string>();
 
-  // Reactive projection of `photos` collection — re-reads on every docVersion bump.
+  // Reactive projection of the `photos` collection. Depends on the photos map ref
+  // specifically (NOT `docVersion`), so it re-derives ONLY when a photos delta
+  // lands — not on every unrelated mutation, which forced an O(n) rebuild of the
+  // whole Record on a hot reactive path (F9).
   const photos = computed<Record<UUID, PhotoAttachment>>(() => {
-    void docVersion.value; // subscribe to reactivity
+    const map = collectionRef('photos').value;
     const out: Record<UUID, PhotoAttachment> = {};
-    for (const p of projectionList('photos')) out[p.id] = p;
+    for (const p of map.values()) {
+      const photo = p as PhotoAttachment;
+      out[photo.id] = photo;
+    }
     return out;
   });
 
@@ -786,7 +792,7 @@ export const usePhotoStore = defineStore('photos', () => {
     const photo = photos.value[photoId];
     if (!photo) return;
     const now = new Date().toISOString();
-    void mutate({
+    fireAndForgetMutate({
       op: 'patch',
       collection: 'photos',
       id: photoId,
@@ -900,8 +906,7 @@ export const usePhotoStore = defineStore('photos', () => {
     if (!entityId) return undefined;
     void docVersion.value;
     const entity = projectionGetById(entityCollection as CollectionName, entityId) as
-      | { photoIds?: UUID[] }
-      | undefined;
+      { photoIds?: UUID[] } | undefined;
     return entity?.photoIds;
   }
 
@@ -916,7 +921,7 @@ export const usePhotoStore = defineStore('photos', () => {
    * there, never thrown.
    */
   function linkPhotoToEntity(entityCollection: string, entityId: string, photoId: UUID): void {
-    void mutate({
+    fireAndForgetMutate({
       op: 'named',
       name: 'attachPhotoToEntity',
       args: { entityCollection, entityId, photoId },

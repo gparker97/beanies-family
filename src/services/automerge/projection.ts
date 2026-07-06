@@ -43,6 +43,17 @@ function mapFor(collection: CollectionName): ShallowRef<EntityMap> {
   return ref;
 }
 
+/**
+ * The per-collection reactive ref, for a computed that must re-derive ONLY when
+ * THAT collection changes (not on every unrelated `docVersion` bump). The ref
+ * `triggerRef`s on each of its own deltas, so a consumer reading `.value` re-runs
+ * precisely. Read-only usage — never mutate the returned Map. Used by
+ * `photoStore.photos` to avoid an O(n) rebuild on every unrelated mutation (F9).
+ */
+export function collectionRef(collection: CollectionName): ShallowRef<EntityMap> {
+  return mapFor(collection);
+}
+
 /** Apply one delta (recurses for `multi`) WITHOUT bumping the version — the
  * public `applyDelta` bumps once at the end so a multi-collection merge triggers
  * reactivity a single time. */
