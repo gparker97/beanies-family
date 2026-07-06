@@ -90,6 +90,11 @@ export interface RpcOk {
   ok: true;
   result?: unknown;
   delta?: ProjectionDelta;
+  /** `mutate` only: did the op actually change the doc? A no-op (a skipped
+   * `onMissing:'skip'`, or a named op that wrote nothing) leaves heads unchanged;
+   * `docClient.mutate` then skips the Drive-save trigger. Absent ⇒ treated as
+   * changed (the safe default for every non-mutate response). */
+  changed?: boolean;
 }
 
 export interface RpcErr {
