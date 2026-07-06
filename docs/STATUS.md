@@ -1,17 +1,21 @@
 # Project Status
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
-     ⭐⭐ ADR-032 AUTOMERGE WEB WORKER MIGRATION — IN PROGRESS (resume here) ⭐⭐
-     Branch: feat/automerge-web-worker  ·  24 commits ahead of main  ·  NOT pushed
+     ⭐⭐ ADR-032 AUTOMERGE WEB WORKER MIGRATION — MERGED TO MAIN + DEPLOYING ⭐⭐
+     Merged 2026-07-06 (merge commit on main)  ·  docWorker prod-OFF (inline)
      ═══════════════════════════════════════════════════════════════════════════ -->
 
-> ## ⭐ RESUME: ADR-032 worker migration (branch `feat/automerge-web-worker`)
+> ## ⭐ ADR-032 worker migration — MERGED TO `main` + DEPLOYING (2026-07-06)
 >
-> **Last worked:** 2026-07-06 PM. **Status: SOURCE CUTOVER + TEST-GREEN PASS (Task #17) 100% COMPLETE + a create-family data-integrity fix (below). Branch PUSHED GREEN** (latest `63b419e0`; pre-push full suite **316 files / 3494 tests passed, 0 failed**). Working tree clean; branch ~28 commits ahead of `main`, **on origin, NOT merged, NOT deployed**. `docWorker` flag is dev-on / prod-off, so prod still runs the inline fallback until flipped.
+> **Status: MERGED to `main` and deploying to prod with `docWorker` OFF (prod runs the well-tested inline fallback; dev runs the worker).** Source cutover + Task #17 test-green pass complete; full suite green (3504 tests). The migration ships behind the kill-switch, so prod behaviour is the inline path all tests + greg's desktop run exercise — the worker itself is activated later by flipping `docWorker` to prod-on gradually, with rollback ready.
 >
-> > **✅ Create-family data-integrity fix (`63b419e0`, DESKTOP-VERIFIED by greg 2026-07-06).** Creating a new family from an active session leaked the previous family's data and could lose the just-created onboarding activity. Root causes + fix in `docs/plans/2026-07-06-create-family-state-teardown.md`; all in `authStore.ts`: (D1/D2) new `resetInMemoryFamilyState()` runs `docClient.reset()`→`initDoc()`→`familyStore.resetState()`→`reloadAllStores()` in `buildOwnerDoc` (clears all ~21 stores + nulls the worker key so pre-pod mutations can't write the old family's cache); (D3) sign-out wrapper renamed `flushPendingSaveWithTimeout`→`forceSaveWithTimeout`, now `saveNow()` unconditionally before `deleteFamilyDatabase` so the freshest edit reaches Drive. greg confirmed no data overlap AND account+activity persist across sign-out. **Structurally latent on `main` too** — consider a separate backport if not merging the branch soon.
+> > **✅ Create-family data-integrity fix (DESKTOP-VERIFIED by greg 2026-07-06).** Creating a new family from an active session leaked the previous family's data and could lose the just-created onboarding activity. Root causes + fix in `docs/plans/2026-07-06-create-family-state-teardown.md`; all in `authStore.ts`: (D1/D2) new `resetInMemoryFamilyState()` runs `docClient.reset()`→`initDoc()`→`familyStore.resetState()`→`reloadAllStores()` in `buildOwnerDoc` (clears all ~21 stores + nulls the worker key so pre-pod mutations can't write the old family's cache); (D3) sign-out wrapper renamed `flushPendingSaveWithTimeout`→`forceSaveWithTimeout`, now `saveNow()` unconditionally before `deleteFamilyDatabase` so the freshest edit reaches Drive. greg confirmed no data overlap AND account+activity persist across sign-out.
 > >
-> > **⭐ NEXT (before merge):** (a) boot a FRESH dev server (lessons.md #15) with `docWorker` ON — confirm the cold-start load-freeze is gone / no main-thread long task; flip OFF → inline path works. (b) Re-test dev **login** (the `c62d5a7c` postMessage-clone fix). (c) **iPhone**: run the create flow through the Google redirect resume path (the create-family fix's Req 4 — resume-to-create must still complete). (d) On merge to `main`: reconcile this STATUS block + add a `CHANGELOG.md` entry when it deploys. Real-worker Playwright smoke = separate Task #7.
+> > **✅ 10-finding worker-migration hardening** (`docs/plans/2026-07-06-worker-migration-hardening.md`): `onMissing` tri-state, `WorkerCrashError`, `RpcOk.changed`, `openCache`, `persistEnvelopeSafely`, `fireAndForgetMutate`, `collectionRef` — all fixed, suite green.
+> >
+> > **iOS onboarding loop (2026-07-06, tunnel test) — NOT a migration regression.** An iPhone create-flow loop hit via a `trycloudflare.com` tunnel was diagnosed to `tokenValid=false` after every OAuth redirect return, in OAuth code **byte-identical to `main`** (`createNewFile` never reached). It is the classic iOS-Safari + ephemeral-tunnel ITP/bounce-tracking artifact (token wiped across the cross-site bounce on an unfamiliar domain; consistent with ADR-026). The real `app.beanies.family` domain has first-party standing and is unaffected. **Validate real-iOS onboarding on prod post-deploy**, then flip `docWorker` prod-on gradually.
+> >
+> > **⭐ NEXT (post-deploy):** (a) test iOS onboarding on `app.beanies.family` (the tunnel can't — OAuth won't survive the bounce there); (b) if clean, flip `docWorker` to prod-on gradually via the Settings feature-flag / committed map, watching telemetry, rollback ready; (c) real-worker Playwright smoke = separate Task #7.
 >
 > ### What this migration is
 >

@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-06
+
+### Fixed
+
+- **Creating a new family while already signed in no longer mixes in your old family's data — or loses what you just added.** Starting a fresh family from an active session now wipes every trace of the previous family from the screen before the new one loads, and the last thing you enter in the setup wizard (like your first activity) is now saved to your file before you sign out, so it's still there when you sign back in.
+
+### Changed
+
+- **Internal groundwork: the family-data engine can now run off the main thread.** A large behind-the-scenes migration moves the app's data document (Automerge) into a background Web Worker so the screen stays responsive while big families load. It ships switched **off** in production for now (the app runs exactly as before), and will be turned on gradually once validated on real devices. No change to your data, your file, or how you sign in.
+
 ## 2026-07-05
 
 ### Changed
