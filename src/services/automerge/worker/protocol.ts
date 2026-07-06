@@ -150,6 +150,20 @@ export class DocWorkerError extends Error {
   }
 }
 
+/**
+ * The worker crashed while calls were in flight. `onWorkerError` rejects EVERY
+ * pending call with this — so it's classified as an expected-degradation in
+ * `surface()` (like `CorruptPayloadError`) and stays QUIET per-call: the crash is
+ * surfaced exactly ONCE at the crash site, not once per drained pending RPC.
+ * Awaiting callers still reject (only the duplicate toasts are suppressed).
+ */
+export class WorkerCrashError extends DocWorkerError {
+  constructor(message: string, op?: string) {
+    super(message, op);
+    this.name = 'WorkerCrashError';
+  }
+}
+
 interface ErrorCodec {
   serialize: (err: unknown) => Record<string, unknown> | undefined;
   reconstruct: (message: string, data: Record<string, unknown> | undefined) => Error;
@@ -171,6 +185,12 @@ const ERROR_REGISTRY: Record<string, ErrorCodec> = {
         (data?.step as 'load' | 'materialize') ?? 'load',
         (data?.familyId as string | null) ?? null
       ),
+  },
+  // Reconstruct to the real class so `surface()`'s `instanceof WorkerCrashError`
+  // check (crash-toast dedup) works when a drained pending call rejects.
+  WorkerCrashError: {
+    serialize: () => undefined,
+    reconstruct: (message) => new WorkerCrashError(message),
   },
 };
 

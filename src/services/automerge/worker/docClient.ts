@@ -30,6 +30,7 @@ import {
   isWorkerSignal,
   reconstructError,
   DocWorkerError,
+  WorkerCrashError,
   type RpcRequest,
   type RpcResponse,
   type WorkerSignal,
@@ -179,9 +180,20 @@ function handleSignal(sig: WorkerSignal): void {
 function onWorkerError(err: unknown): void {
   const message = err instanceof Error ? err.message : 'worker crashed';
   console.error('[docClient] worker error — rejecting pending + scheduling recovery', err);
+  // Surface the crash ONCE here (only when calls were actually awaiting — a crash
+  // with no in-flight work self-heals on the next request's re-spawn). Every
+  // drained pending call below rejects with WorkerCrashError, which `surface()`
+  // classifies as expected → quiet: N in-flight RPCs produce ONE toast, not N.
+  if (pending.size > 0) {
+    showToast('error', "We couldn't update your data", message, {
+      surface: 'doc-worker',
+      error: err instanceof Error ? err : new DocWorkerError(message),
+      critical: true,
+    });
+  }
   // Reject every in-flight call so awaiting stores get a definite failure.
   for (const [cid, p] of pending) {
-    p.resolve({ cid, ok: false, error: { name: 'DocWorkerError', message } });
+    p.resolve({ cid, ok: false, error: { name: 'WorkerCrashError', message } });
   }
   pending.clear();
   try {
@@ -335,7 +347,9 @@ async function request<T = unknown>(
 /** Turn a failure into a surfaced-or-quiet rejection. Returns the error to throw. */
 function surface(err: unknown, method: string, quiet?: boolean): Error {
   const error = err instanceof Error ? err : new DocWorkerError(String(err), method);
-  const expected = error instanceof CorruptPayloadError; // recovery dispatches on this
+  // Expected-degradation classes stay quiet: CorruptPayloadError (recovery
+  // dispatches on it) + WorkerCrashError (already surfaced once at the crash site).
+  const expected = error instanceof CorruptPayloadError || error instanceof WorkerCrashError;
   if (!quiet && !expected) {
     showToast('error', "We couldn't update your data", error.message, {
       surface: 'doc-worker',
