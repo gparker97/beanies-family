@@ -1,7 +1,7 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { GlobalSettings } from '@/types/models';
-import { flushPendingSave } from '@/services/sync/syncService';
+import { saveNow } from '@/services/sync/syncService';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared before importing stores
@@ -450,16 +450,17 @@ describe('Sensitive Data Clearing Security', () => {
       removeItemSpy.mockRestore();
     });
 
-    it('flushes pending save before clearing', async () => {
+    it('force-saves the latest doc before clearing (ADR-032: durable save then delete)', async () => {
       const { auth } = populateAllStores();
 
       await auth.signOutAndClearData();
 
-      expect(vi.mocked(flushPendingSave)).toHaveBeenCalled();
-      // flush should be called before deleteFamilyDatabase
-      const flushOrder = vi.mocked(flushPendingSave).mock.invocationCallOrder[0]!;
+      expect(vi.mocked(saveNow)).toHaveBeenCalled();
+      // The force-save must run before deleteFamilyDatabase, so the freshest edit
+      // reaches Drive before the local cache is deleted.
+      const saveOrder = vi.mocked(saveNow).mock.invocationCallOrder[0]!;
       const deleteOrder = mockDeleteFamilyDatabase.mock.invocationCallOrder[0]!;
-      expect(flushOrder).toBeLessThan(deleteOrder);
+      expect(saveOrder).toBeLessThan(deleteOrder);
     });
   });
 
@@ -496,12 +497,33 @@ describe('Sensitive Data Clearing Security', () => {
       removeItemSpy.mockRestore();
     });
 
-    it('flushes pending save before clearing', async () => {
+    it('force-saves the latest doc before clearing', async () => {
       const { auth } = populateAllStores();
 
       await auth.signOut();
 
-      expect(vi.mocked(flushPendingSave)).toHaveBeenCalled();
+      expect(vi.mocked(saveNow)).toHaveBeenCalled();
+    });
+
+    it('completes sign-out even when the force-save REJECTS (never traps the user)', async () => {
+      const { auth } = populateAllStores();
+      vi.mocked(saveNow).mockRejectedValueOnce(new Error('Drive 500'));
+
+      await expect(auth.signOut()).resolves.toBeUndefined();
+
+      // Teardown still ran; auth state cleared.
+      expect(mockDeleteFamilyDatabase).toHaveBeenCalled();
+      expect(auth.currentUser).toBeNull();
+    });
+
+    it('completes sign-out when the force-save saves nothing (returns false)', async () => {
+      const { auth } = populateAllStores();
+      vi.mocked(saveNow).mockResolvedValueOnce(false);
+
+      await expect(auth.signOut()).resolves.toBeUndefined();
+
+      expect(mockDeleteFamilyDatabase).toHaveBeenCalled();
+      expect(auth.currentUser).toBeNull();
     });
   });
 

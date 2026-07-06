@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import * as familyRepo from '@/services/automerge/repositories/familyMemberRepository';
-import { changeDoc } from '@/services/automerge/docService';
+import { getById as projectionGetById } from '@/services/automerge/projection';
+import { mutate } from '@/services/automerge/worker/docClient';
+import type { MutationOp } from '@/services/automerge/worker/protocol';
 import { reportError } from '@/utils/errorReporter';
 import { wrapAsync } from '@/composables/useStoreActions';
 import type {
@@ -344,19 +346,23 @@ export const useFamilyStore = defineStore('family', () => {
 
     if (patches.size === 0) return list;
 
-    // Apply all patches in a single Automerge transaction.
+    // Apply all patches in a single atomic batch. Skip members absent from the
+    // projection (the worker `patch` would reject the whole batch on a missing
+    // entity — the old code skipped them per-member). `{quiet}`: this fires on a
+    // load path where a critical toast is wrong; the reportError below classifies.
     try {
-      changeDoc((doc) => {
-        for (const [id, patch] of patches) {
-          const target = doc.familyMembers[id];
-          if (!target) continue;
-          if (patch.role !== undefined) target.role = patch.role;
-          if (patch.canManagePod !== undefined) target.canManagePod = patch.canManagePod;
-          if (patch.canViewFinances !== undefined) target.canViewFinances = patch.canViewFinances;
-          if (patch.canEditActivities !== undefined)
-            target.canEditActivities = patch.canEditActivities;
-        }
-      }, 'normalize roles');
+      const ops: MutationOp[] = [];
+      for (const [id, patch] of patches) {
+        if (!projectionGetById('familyMembers', id)) continue;
+        const p: Record<string, unknown> = {};
+        if (patch.role !== undefined) p.role = patch.role;
+        if (patch.canManagePod !== undefined) p.canManagePod = patch.canManagePod;
+        if (patch.canViewFinances !== undefined) p.canViewFinances = patch.canViewFinances;
+        if (patch.canEditActivities !== undefined) p.canEditActivities = patch.canEditActivities;
+        if (Object.keys(p).length)
+          ops.push({ op: 'patch', collection: 'familyMembers', id, patch: p });
+      }
+      if (ops.length) await mutate({ op: 'batch', ops }, { quiet: true });
     } catch (e) {
       console.error(
         '[familyStore.normalizeRoles] Automerge change rejected. Pod may render without an owner until reload.',
@@ -364,7 +370,7 @@ export const useFamilyStore = defineStore('family', () => {
       );
       reportError({
         surface: 'familyStore.normalize-roles',
-        message: 'changeDoc rejected during role normalization',
+        message: 'mutation batch rejected during role normalization',
         error: e,
         context: { patchCount: patches.size },
       });
@@ -413,20 +419,30 @@ export const useFamilyStore = defineStore('family', () => {
         return false;
       }
 
-      changeDoc((doc) => {
-        if (currentOwner) {
-          const out = doc.familyMembers[currentOwner.id];
-          if (out) out.role = 'member';
-        }
-        const t = doc.familyMembers[toMemberId];
-        if (!t) {
-          throw new Error(`Target member ${toMemberId} not found in document`);
-        }
-        t.role = 'owner';
-        t.canManagePod = true;
-        t.canViewFinances = true;
-        t.canEditActivities = true;
-      }, 'transfer ownership');
+      // Demote old owner + promote target in one atomic batch. The target was
+      // validated present above; the worker `patch` still throws (→ rejects the
+      // batch) if it's somehow gone, preserving the "target not found" guard.
+      const ops: MutationOp[] = [];
+      if (currentOwner && projectionGetById('familyMembers', currentOwner.id)) {
+        ops.push({
+          op: 'patch',
+          collection: 'familyMembers',
+          id: currentOwner.id,
+          patch: { role: 'member' },
+        });
+      }
+      ops.push({
+        op: 'patch',
+        collection: 'familyMembers',
+        id: toMemberId,
+        patch: {
+          role: 'owner',
+          canManagePod: true,
+          canViewFinances: true,
+          canEditActivities: true,
+        },
+      });
+      await mutate({ op: 'batch', ops });
 
       // In-place local state update — same pattern as updateMember above.
       members.value = members.value.map((m) => {

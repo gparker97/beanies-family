@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { initDoc, resetDoc } from '@/services/automerge/docService';
+import { installInlineBackend } from '@/services/automerge/worker/__tests__/inlineHarness';
 import {
   upsertDriveConnection,
   getDriveConnectionByAccount,
@@ -52,9 +52,8 @@ import {
   tryReconnectSilently,
 } from '@/services/google/driveTokenRecovery';
 
-beforeEach(() => {
-  resetDoc();
-  initDoc();
+beforeEach(async () => {
+  await installInlineBackend();
   primeRefreshToken.mockClear();
   attemptSilentRefresh.mockReset();
   storeGoogleRefreshToken.mockClear();

@@ -19,7 +19,9 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useBeanTips } from '@/composables/useBeanTips';
 import { useCommunityNudge } from '@/composables/useCommunityNudge';
 import { useInstallNudge } from '@/composables/useInstallNudge';
-import { changeDoc, docVersion, getDoc, isDocLoaded } from '@/services/automerge/docService';
+import { docVersion, isDocLoaded } from '@/services/automerge/docService';
+import { getById as projectionGetById } from '@/services/automerge/projection';
+import { mutate } from '@/services/automerge/worker/docClient';
 import { getAllReleaseNotes, getReleaseNote, isSpotlightRelease } from '@/content/release-notes';
 import {
   getAllAnnouncements,
@@ -84,7 +86,9 @@ export const useNotificationsStore = defineStore('notifications', () => {
     const currentMember = familyStore.currentMember;
     if (!currentMember) return null;
 
-    const readState = isDocLoaded() ? (getDoc().notificationReads?.[currentMember.id] ?? {}) : {};
+    const readState = isDocLoaded()
+      ? ((projectionGetById('notificationReads', currentMember.id) ?? {}) as Record<string, string>)
+      : {};
 
     // One pass over the distinct months spanning the window (≤2), over the
     // UNFILTERED activeActivities, so duty-only occurrences survive and we never
@@ -171,10 +175,10 @@ export const useNotificationsStore = defineStore('notifications', () => {
   // The pure reducer computes the target slice (its tested semantics); we then
   // apply the diff PER KEY so concurrent reads on the member's other devices
   // merge cleanly in Automerge (replacing the whole slice object would conflict).
-  function applyReducer(
+  async function applyReducer(
     label: string,
     reduce: (slice: Record<string, string>) => Record<string, string>
-  ): void {
+  ): Promise<void> {
     const member = familyStore.currentMember;
     if (!isDocLoaded() || !member) {
       reportError({
@@ -185,18 +189,30 @@ export const useNotificationsStore = defineStore('notifications', () => {
       return;
     }
     try {
-      changeDoc((doc) => {
-        if (!doc.notificationReads) doc.notificationReads = {};
-        if (!doc.notificationReads[member.id]) doc.notificationReads[member.id] = {};
-        const slice = doc.notificationReads[member.id];
-        const next = reduce({ ...slice });
-        for (const key of Object.keys(slice)) {
-          if (next[key] === undefined) delete slice[key];
-        }
-        for (const [key, value] of Object.entries(next)) {
-          if (slice[key] !== value) slice[key] = value;
-        }
-      }, `notifications: ${label}`);
+      // Compute the per-key diff on main from the projected slice, then patch the
+      // member sub-map (createIfMissing) — applying per key (not replacing the
+      // whole slice) keeps concurrent reads on other devices merging cleanly.
+      const slice = (projectionGetById('notificationReads', member.id) ?? {}) as Record<
+        string,
+        string
+      >;
+      const next = reduce({ ...slice });
+      const patch: Record<string, unknown> = {};
+      const deleteKeys: string[] = [];
+      for (const key of Object.keys(slice)) if (next[key] === undefined) deleteKeys.push(key);
+      for (const [key, value] of Object.entries(next)) if (slice[key] !== value) patch[key] = value;
+      if (Object.keys(patch).length === 0 && deleteKeys.length === 0) return; // no-op
+      await mutate(
+        {
+          op: 'patch',
+          collection: 'notificationReads',
+          id: member.id,
+          patch,
+          deleteKeys,
+          onMissing: 'create',
+        },
+        { quiet: true }
+      );
     } catch (err) {
       reportError({
         surface: `notifications-${label}`,
@@ -210,19 +226,19 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const nowIso = (): string => new Date().toISOString();
 
   function markRead(id: string): void {
-    applyReducer('markRead', (slice) => markReadIn(slice, id, nowIso()));
+    void applyReducer('markRead', (slice) => markReadIn(slice, id, nowIso()));
   }
   function markUnread(id: string): void {
-    applyReducer('markUnread', (slice) => markUnreadIn(slice, id));
+    void applyReducer('markUnread', (slice) => markUnreadIn(slice, id));
   }
   function markAllRead(): void {
     const ids = notifications.value.filter((n) => !n.read).map((n) => n.id);
     if (ids.length === 0) return;
-    applyReducer('markAllRead', (slice) => markAllReadIn(slice, ids, nowIso()));
+    void applyReducer('markAllRead', (slice) => markAllReadIn(slice, ids, nowIso()));
   }
   function pruneReads(): void {
     const keep = notifications.value.map((n) => n.id);
-    applyReducer('pruneReads', (slice) => pruneReadState(slice, keep));
+    void applyReducer('pruneReads', (slice) => pruneReadState(slice, keep));
   }
 
   // ── Drawer actions (the only mutators of isOpen/view/selectedId) ────────────

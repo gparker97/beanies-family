@@ -1,7 +1,9 @@
 import type { CollectionName, CollectionEntity } from '@/types/automerge';
-import { getDoc, changeDoc } from './docService';
+import { list, getById as projectionGetById } from './projection';
+import { mutate } from './worker/docClient';
 import { toISODateString } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
+import { reportError } from '@/utils/errorReporter';
 
 /**
  * Strip keys whose value is `undefined` from a plain object.
@@ -24,11 +26,12 @@ function toPlain<T>(obj: T): T {
  * Mirrors the IndexedDB `createRepository` API exactly:
  * same function signatures, same async return types, same auto-ID + timestamps.
  *
- * Key differences from IndexedDB:
- * - getAll() → Object.values() on the in-memory CRDT map
- * - create() → changeDoc(d => { d[collection][id] = entity })
- * - update() → changeDoc(d => { Object.assign(...) }) — property-level CRDT merge
- * - remove() → changeDoc(d => { delete d[collection][id] })
+ * Post-ADR-032 the Automerge doc lives in the worker: reads come from the
+ * main-thread `projection` (synchronous), writes go through `docClient.mutate`
+ * (async RPC; the response delta is applied to the projection before it
+ * resolves, so read-after-write is race-free). Public signatures are unchanged
+ * (already `Promise`-returning). Array-ref stores keep their own surgical update
+ * from the echoed return.
  */
 export function createAutomergeRepository<
   K extends CollectionName,
@@ -44,15 +47,11 @@ export function createAutomergeRepository<
   const transform = options?.transform ?? ((e: Entity) => e);
 
   async function getAll(): Promise<Entity[]> {
-    const doc = getDoc();
-    const collection = (doc[collectionName] ?? {}) as Record<string, Entity>;
-    return Object.values(collection).map(transform);
+    return (list(collectionName) as Entity[]).map(transform);
   }
 
   async function getById(id: string): Promise<Entity | undefined> {
-    const doc = getDoc();
-    const collection = (doc[collectionName] ?? {}) as Record<string, Entity>;
-    const item = collection[id];
+    const item = projectionGetById(collectionName, id) as Entity | undefined;
     return item ? transform(item) : undefined;
   }
 
@@ -79,61 +78,57 @@ export function createAutomergeRepository<
       })
     ) as unknown as Entity;
 
-    changeDoc((d) => {
-      const collection = d[collectionName] as Record<string, Entity>;
-      collection[id] = entity;
-    });
-
+    // The worker echoes the stored entity; its delta lands in the projection
+    // before this resolves (read-after-write is safe).
+    await mutate({ op: 'set', collection: collectionName, id, entity });
     return transform(entity);
   }
 
   async function update(id: string, input: UpdateInput): Promise<Entity | undefined> {
-    const doc = getDoc();
-    const collection = doc[collectionName] as Record<string, Entity>;
-    const existing = collection[id];
-
-    if (!existing) return undefined;
+    // Existence check up front (fast path). Returning undefined preserves the
+    // repository contract.
+    if (!projectionGetById(collectionName, id)) return undefined;
 
     const now = toISODateString(new Date());
     const rawInput = input as Record<string, unknown>;
 
-    // Collect keys explicitly set to undefined — these should be deleted
-    // from the Automerge doc (e.g., clearing goalId to unlink a goal).
-    // Keys NOT present in the input are left untouched.
+    // Keys explicitly set to undefined are deleted from the doc (e.g. clearing
+    // goalId to unlink a goal). Keys NOT present in the input are left untouched.
     const keysToDelete: string[] = [];
     for (const key of Object.keys(rawInput)) {
       if (rawInput[key] === undefined) keysToDelete.push(key);
     }
 
     const cleanInput = toPlain(stripUndefined(rawInput));
-    changeDoc((d) => {
-      const col = d[collectionName] as Record<string, Entity>;
-      const target = col[id];
-      if (target) {
-        Object.assign(target, cleanInput, { updatedAt: now });
-        for (const key of keysToDelete) {
-          delete (target as Record<string, unknown>)[key];
-        }
-      }
+    // `onMissing:'skip'` tolerates the concurrent-delete TOCTOU race: the up-front
+    // check passed, but a poll-merge on another device may have deleted the entity
+    // before the worker applies this patch. Rather than a rejected RPC + spurious
+    // critical toast, the worker no-ops and echoes undefined; we return undefined
+    // (the old graceful contract) but leave a warning breadcrumb so a genuine
+    // worker/projection divergence is diagnosable (never a silent success).
+    const result = await mutate<Entity | undefined>({
+      op: 'patch',
+      collection: collectionName,
+      id,
+      patch: cleanInput,
+      deleteKeys: keysToDelete,
+      updatedAt: now,
+      onMissing: 'skip',
     });
-
-    // Return the updated entity from the new doc state
-    const updated = getDoc()[collectionName] as Record<string, Entity>;
-    const result = updated[id];
-    return result ? transform(result) : undefined;
+    if (!result) {
+      reportError({
+        surface: 'automergeRepository.update.concurrent-delete',
+        message: `patch skipped: ${collectionName}/${id} vanished between the projection check and the worker write (concurrent delete)`,
+        severity: 'warning',
+      });
+      return undefined;
+    }
+    return transform(result);
   }
 
   async function remove(id: string): Promise<boolean> {
-    const doc = getDoc();
-    const collection = doc[collectionName] as Record<string, Entity>;
-
-    if (!collection[id]) return false;
-
-    changeDoc((d) => {
-      const col = d[collectionName] as Record<string, Entity>;
-      delete col[id];
-    });
-
+    if (!projectionGetById(collectionName, id)) return false;
+    await mutate({ op: 'delete', collection: collectionName, id });
     return true;
   }
 

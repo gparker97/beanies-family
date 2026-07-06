@@ -9,12 +9,14 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
 import { computeGoalAllocRaw, calculateBalanceAdjustment } from '@/utils/finance';
-import { calculateAmortization, calculateExtraPayment, findLoanDetails } from '@/utils/loanPayment';
+import { mutate } from '@/services/automerge/worker/docClient';
 import type {
   Transaction,
   CreateTransactionInput,
   UpdateTransactionInput,
   ISODateString,
+  Account,
+  Asset,
 } from '@/types/models';
 import {
   getStartOfMonth,
@@ -219,16 +221,14 @@ export const useTransactionsStore = defineStore('transactions', () => {
    * Update account balance in both store and database.
    */
   async function adjustAccountBalance(accountId: string, adjustment: number): Promise<void> {
-    const accountsStore = useAccountsStore();
-    const account = accountsStore.getAccountById(accountId);
-    if (account) {
-      const newBalance = account.balance + adjustment;
-      await accountsStore.updateAccount(accountId, { balance: newBalance });
-    }
+    // Atomic relative adjustment (worker `increment` op) — no lost update if a
+    // poll-merge lands a peer's balance change between read and write.
+    await useAccountsStore().incrementBalance(accountId, adjustment);
   }
 
   /**
-   * Adjust a linked goal's progress. Mirrors adjustAccountBalance pattern.
+   * Adjust a linked goal's progress by a relative delta. The worker
+   * `applyGoalContribution` op clamps at 0 + auto-completes atomically.
    */
   async function adjustGoalProgress(
     goalId: string | undefined,
@@ -236,12 +236,8 @@ export const useTransactionsStore = defineStore('transactions', () => {
     reverse = false
   ): Promise<void> {
     if (!goalId || !appliedAmount) return;
-    const goalsStore = useGoalsStore();
-    const goal = goalsStore.goals.find((g) => g.id === goalId);
-    if (!goal) return;
     const delta = reverse ? -appliedAmount : appliedAmount;
-    const newAmount = Math.max(0, goal.currentAmount + delta);
-    await goalsStore.updateProgress(goal.id, newAmount);
+    await useGoalsStore().applyContribution(goalId, delta);
   }
 
   /**
@@ -272,66 +268,71 @@ export const useTransactionsStore = defineStore('transactions', () => {
    * Apply loan payment: calculate amortization, store interest/principal on tx, reduce loan balance.
    * Recurring payments use standard amortization; one-time payments are extra (full to principal).
    */
+  /** Route the echoed loan host into the owning store's local array (the doc was
+   * already mutated atomically by the named op — no re-write / re-read race). */
+  function applyLoanHost(hostCollection: string | undefined, host: unknown): void {
+    if (!host) return;
+    if (hostCollection === 'assets') useAssetsStore().applyEchoed(host as Asset);
+    else useAccountsStore().applyEchoed(host as Account);
+  }
+
   async function applyLoanPayment(transaction: Transaction): Promise<void> {
     if (!transaction.loanId) return;
     try {
-      const accountsStore = useAccountsStore();
-      const assetsStore = useAssetsStore();
-      const loan = findLoanDetails(transaction.loanId, assetsStore.assets, accountsStore.accounts);
-      if (!loan || loan.outstandingBalance <= 0) return;
-
-      // Recurring → standard amortization, one-time → extra payment (full to principal)
-      const result = transaction.recurringItemId
-        ? calculateAmortization(loan.outstandingBalance, loan.interestRate, transaction.amount)
-        : calculateExtraPayment(loan.outstandingBalance, transaction.amount);
-
-      // Store amortization fields on the transaction
-      await transactionRepo.updateTransaction(transaction.id, {
-        loanInterestPortion: result.interestPortion,
-        loanPrincipalPortion: result.principalPortion,
+      // The worker `applyLoanPayment` op reads the loan host, amortizes, and
+      // writes the new balance atomically — closing the async lost-update the
+      // old read-then-absolute-write had. It returns the echoed host + split.
+      const res = await mutate<{
+        applied: boolean;
+        hostCollection?: string;
+        host?: Account | Asset;
+        interestPortion?: number;
+        principalPortion?: number;
+      }>({
+        op: 'named',
+        name: 'applyLoanPayment',
+        args: {
+          loanId: transaction.loanId,
+          paymentAmount: transaction.amount,
+          isRecurring: !!transaction.recurringItemId,
+        },
       });
-      transaction.loanInterestPortion = result.interestPortion;
-      transaction.loanPrincipalPortion = result.principalPortion;
-
-      // Reduce the loan balance
-      if (loan.type === 'asset') {
-        const asset = assetsStore.getAssetById(loan.entityId);
-        if (asset?.loan) {
-          await assetsStore.updateAsset(loan.entityId, {
-            loan: { ...asset.loan, outstandingBalance: result.newBalance },
-          });
-        }
-      } else {
-        await accountsStore.updateAccount(loan.entityId, { balance: result.newBalance });
-      }
+      if (!res.applied) return;
+      applyLoanHost(res.hostCollection, res.host);
+      // The interest/principal portions belong to the just-created transaction
+      // (no concurrent writer) → write them the ordinary way.
+      await transactionRepo.updateTransaction(transaction.id, {
+        loanInterestPortion: res.interestPortion,
+        loanPrincipalPortion: res.principalPortion,
+      });
+      transaction.loanInterestPortion = res.interestPortion;
+      transaction.loanPrincipalPortion = res.principalPortion;
     } catch (e) {
       console.error('Failed to apply loan payment:', e);
     }
   }
 
   /**
-   * Reverse a loan payment: add principal portion back to the loan balance.
+   * Reverse a loan payment: add the principal portion back to the loan balance
+   * (atomic worker `reverseLoanPayment` op).
    */
   async function reverseLoanPayment(transaction: Transaction): Promise<void> {
     if (!transaction.loanId || !transaction.loanPrincipalPortion) return;
     try {
-      const accountsStore = useAccountsStore();
-      const assetsStore = useAssetsStore();
-      const loan = findLoanDetails(transaction.loanId, assetsStore.assets, accountsStore.accounts);
-      if (!loan) return;
-
-      const restoredBalance = loan.outstandingBalance + transaction.loanPrincipalPortion;
-
-      if (loan.type === 'asset') {
-        const asset = assetsStore.getAssetById(loan.entityId);
-        if (asset?.loan) {
-          await assetsStore.updateAsset(loan.entityId, {
-            loan: { ...asset.loan, outstandingBalance: restoredBalance },
-          });
-        }
-      } else {
-        await accountsStore.updateAccount(loan.entityId, { balance: restoredBalance });
-      }
+      const res = await mutate<{
+        applied: boolean;
+        hostCollection?: string;
+        host?: Account | Asset;
+      }>({
+        op: 'named',
+        name: 'reverseLoanPayment',
+        args: {
+          loanId: transaction.loanId,
+          principalToRestore: transaction.loanPrincipalPortion,
+        },
+      });
+      if (!res.applied) return;
+      applyLoanHost(res.hostCollection, res.host);
     } catch (e) {
       console.error('Failed to reverse loan payment:', e);
     }

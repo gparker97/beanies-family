@@ -12,18 +12,11 @@
 import { supportsFileSystemAccess, isNative } from './capabilities';
 import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
-import {
-  parseBeanpodV4,
-  reEncryptEnvelope,
-  openFilePicker,
-  detectFileVersion,
-  decryptBeanpodPayload,
-} from './fileSync';
-import { mergeDoc } from '@/services/automerge/docService';
+import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, detectFileVersion } from './fileSync';
+import * as docClient from '@/services/automerge/worker/docClient';
+import { setInlineCachePersistFailedHandler } from '@/services/automerge/worker/inlineBridge';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
-import { onDocPersistNeeded } from '@/services/automerge/docService';
-import { persistDoc, persistEnvelope, isCacheReady } from '@/services/automerge/persistenceService';
 import type { StorageProvider, StorageProviderType } from './storageProvider';
 import { LocalStorageProvider } from './providers/localProvider';
 import { CapacitorFileProvider } from './providers/capacitorFileProvider';
@@ -159,7 +152,7 @@ function notifyIfConflictFile(provider: StorageProvider): void {
 
 // When true, mergeDoc → schedulePersist → triggerDebouncedSave is suppressed
 // (we're already inside doSave, so scheduling another save would be redundant)
-let suppressAutoSave = false;
+const suppressAutoSave = false;
 
 // Callbacks for state changes
 type StateCallback = (state: SyncServiceState) => void;
@@ -334,6 +327,25 @@ export function setProvider(provider: StorageProvider): void {
 }
 
 /**
+ * Seed the worker's envelope cache, quietly. Envelope-cache persistence is a
+ * cold-start-unlock convenience, not a critical write — a failure must NOT fire
+ * the critical doc-worker toast (so it's `{quiet}`), but it also must NOT vanish
+ * silently: a swallowed failure means a later cold start has no cached envelope
+ * and can't unlock, with no breadcrumb. Classify + log at warning.
+ */
+function persistEnvelopeSafely(envelope: BeanpodFileV4): void {
+  void docClient.persistEnvelope(envelope, { quiet: true }).catch((e) => {
+    reportError({
+      surface: 'doc-worker-envelope-cache',
+      message:
+        'Failed to persist the envelope cache — a cold-start unlock may need the file/password',
+      error: e,
+      severity: 'warning',
+    });
+  });
+}
+
+/**
  * Set the family key and envelope for the current session.
  * Called by syncStore after successful unlock.
  */
@@ -341,6 +353,9 @@ export function setFamilyKey(familyKey: CryptoKey, envelope: BeanpodFileV4): voi
   currentFamilyKey = familyKey;
   currentEnvelope = envelope;
   noKeyWarnedOnce = false; // Reset so future skips can warn again
+  // Post the key to the worker (once at unlock) + seed the envelope cache.
+  void docClient.setFamilyKey(familyKey);
+  persistEnvelopeSafely(envelope);
 }
 
 /**
@@ -371,6 +386,9 @@ export function getEnvelope(): BeanpodFileV4 | null {
  */
 export function setEnvelope(envelope: BeanpodFileV4 | null): void {
   currentEnvelope = envelope;
+  // Keep the worker's envelope cache in sync (every currentEnvelope mutation
+  // funnels here) so a cold start unlocks after a peer key-add / rotation.
+  if (envelope) persistEnvelopeSafely(envelope);
 }
 
 /**
@@ -671,27 +689,24 @@ async function fetchAndMergeRemote(): Promise<void> {
   if (!text) return;
 
   const remoteEnvelope = parseBeanpodV4(text);
-  const remoteDoc = await decryptBeanpodPayload(remoteEnvelope, currentFamilyKey);
 
-  // Suppress auto-save during merge to avoid re-entrant save scheduling
-  suppressAutoSave = true;
-  try {
-    mergeDoc(remoteDoc);
-  } finally {
-    suppressAutoSave = false;
-  }
+  // The worker decrypts + CRDT-merges the remote into its doc and returns
+  // heads-derived `dirty` (did local carry unsynced changes the converged doc
+  // must push back?). No suppressAutoSave bracket is needed — the worker doesn't
+  // fire a main persist callback; main decides when to save via `dirty`.
+  const { dirty } = await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId);
 
   // Local-wins merge of the three key dicts (wrappedKeys / inviteKeys /
   // passkeyWrappedKeys) — the local side is the just-mutated state about to
-  // be pushed (changePassword, join, passkey register, admin reset all
-  // mutate local first). Without local-wins, a stale remote entry would
-  // silently overwrite the freshly-rotated local one and the corresponding
-  // member/invite/passkey would diverge from its in-doc passwordHash —
-  // exactly the root cause of the welcome-gate sign-in regression. The
-  // store-side equivalent is `replaceEnvelope`; both flow through
-  // `preserveLocalKeyDicts` so this is the single source of truth.
-  currentEnvelope = preserveLocalKeyDicts(remoteEnvelope, currentEnvelope);
+  // be pushed. `setEnvelope` also RPCs the worker to re-persist the envelope
+  // cache (keeps cold-start unlock working after a peer key-add/rotation).
+  setEnvelope(preserveLocalKeyDicts(remoteEnvelope, currentEnvelope));
   lastKnownFileTimestamp = remoteTimestamp;
+
+  // The poll path's ONLY re-upload trigger: re-push a converged doc that still
+  // carries local unsynced changes (heads-derived dirty), without ping-ponging
+  // on a no-op/remote-ahead merge.
+  if (dirty) triggerDebouncedSave();
 }
 
 /**
@@ -750,7 +765,10 @@ async function doSave(): Promise<boolean> {
     if (inviteKeyCount > 0) {
       console.warn('[syncService] doSave: writing envelope with', inviteKeyCount, 'invite key(s)');
     }
-    const fileContent = await reEncryptEnvelope(currentEnvelope, currentFamilyKey);
+    // The worker serializes + encrypts the doc → base64 payload; main assembles
+    // the envelope (keys never leave main for the upload path).
+    const { payload } = await docClient.exportEncryptedPayload();
+    const fileContent = reEncryptEnvelope(currentEnvelope, payload);
 
     // Write via the storage provider abstraction
     await currentProvider.write(fileContent);
@@ -1045,27 +1063,14 @@ export async function loadDroppedFile(
  * ensuring the cache is always fresh for fast startup on page refresh.
  */
 export function registerDocPersistCallback(): void {
-  onDocPersistNeeded(() => {
-    // Update local persistence cache immediately (fire-and-forget).
-    // This ensures the cache survives page refresh even if the file
-    // save (below) hasn't completed yet.
-    if (currentFamilyKey && isCacheReady()) {
-      persistDoc(currentFamilyKey)
-        .then(() => setCachePersistFailed(false))
-        .catch((err) => {
-          console.warn('[syncService] persistDoc failed:', err);
-          setCachePersistFailed(true);
-        });
-      if (currentEnvelope) {
-        persistEnvelope(currentEnvelope).catch((err) => {
-          console.warn('[syncService] persistEnvelope failed:', err);
-        });
-      }
-    }
-
-    // Schedule file save (debounced, slower)
-    triggerDebouncedSave();
-  });
+  // ADR-032: the worker now owns the cache persist (debounced internally after
+  // every mutate/merge). Main only needs to (a) schedule the debounced Drive
+  // save after each local change, and (b) surface worker cache-persist failures
+  // to the durability banner. The old onDocPersistNeeded fan-out + main-thread
+  // persistDoc/persistEnvelope/isCacheReady are gone.
+  docClient.setLocalChangeHandler(() => triggerDebouncedSave());
+  docClient.setCachePersistFailedHandler(setCachePersistFailed); // worker path
+  setInlineCachePersistFailedHandler(setCachePersistFailed); // inline fallback path
 }
 
 /**

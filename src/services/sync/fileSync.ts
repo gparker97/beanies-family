@@ -7,15 +7,13 @@
  */
 
 import {
-  encryptPayload,
   decryptPayload,
   deriveMemberKey,
   unwrapFamilyKey,
   SALT_LENGTH,
 } from '@/services/crypto/familyKeyService';
 import * as Automerge from '@automerge/automerge';
-import { saveDoc } from '@/services/automerge/docService';
-import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
+import { base64ToBuffer } from '@/utils/encoding';
 import { generateUUID } from '@/utils/id';
 import { measureSync } from '@/utils/perfTiming';
 import type {
@@ -33,17 +31,16 @@ import { CorruptPayloadError } from '@/types/sync';
  * Serializes the doc to binary, encrypts with the family key,
  * and wraps the result in a V4 JSON envelope.
  */
-export async function createBeanpodV4(
+export function createBeanpodV4(
   familyId: string,
   familyName: string,
-  familyKey: CryptoKey,
+  encryptedPayload: string,
   wrappedKeys: Record<string, WrappedMemberKey>,
   passkeyWrappedKeys: Record<string, WrappedPasskeyKey> = {},
   inviteKeys: Record<string, InviteKeyPackage> = {}
-): Promise<string> {
-  const binary = saveDoc();
-  const encrypted = await encryptPayload(familyKey, binary);
-
+): string {
+  // ADR-032: the worker produces `encryptedPayload` (via docClient.exportEncrypted
+  // Payload); main assembles the envelope so wrappedKeys/inviteKeys never leave it.
   const envelope: BeanpodFileV4 = {
     version: '4.0',
     familyId,
@@ -52,7 +49,7 @@ export async function createBeanpodV4(
     wrappedKeys,
     passkeyWrappedKeys,
     inviteKeys,
-    encryptedPayload: bufferToBase64(encrypted),
+    encryptedPayload,
   };
 
   return JSON.stringify(envelope, null, 2);
@@ -233,18 +230,9 @@ export async function tryUnwrapFamilyKey(
  * Returns the updated envelope as a JSON string.
  * Does NOT modify wrappedKeys/passkeyWrappedKeys/inviteKeys — caller handles those.
  */
-export async function reEncryptEnvelope(
-  envelope: BeanpodFileV4,
-  familyKey: CryptoKey
-): Promise<string> {
-  const binary = saveDoc();
-  const encrypted = await encryptPayload(familyKey, binary);
-
-  const updated: BeanpodFileV4 = {
-    ...envelope,
-    encryptedPayload: bufferToBase64(encrypted),
-  };
-
+export function reEncryptEnvelope(envelope: BeanpodFileV4, encryptedPayload: string): string {
+  // ADR-032: `encryptedPayload` comes from docClient.exportEncryptedPayload().
+  const updated: BeanpodFileV4 = { ...envelope, encryptedPayload };
   return JSON.stringify(updated, null, 2);
 }
 

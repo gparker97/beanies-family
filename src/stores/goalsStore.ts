@@ -6,6 +6,7 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import { generateUUID } from '@/utils/id';
 import { parseIsoDateSafely } from '@/utils/safeDate';
 import * as goalRepo from '@/services/automerge/repositories/goalRepository';
+import { mutate } from '@/services/automerge/worker/docClient';
 import type {
   Goal,
   GoalManualContribution,
@@ -191,6 +192,38 @@ export const useGoalsStore = defineStore('goals', () => {
     return updateGoal(id, { currentAmount });
   }
 
+  /**
+   * Atomically apply a RELATIVE contribution delta via the worker
+   * `applyGoalContribution` op (clamp at 0 + auto-complete happen inside one
+   * Automerge.change, closing the async lost-update). Updates the local array
+   * and fires the completion celebration on the !completed → completed edge
+   * (celebration is inherently main-side). Used by transaction cascades.
+   */
+  async function applyContribution(id: string, delta: number): Promise<Goal | null> {
+    const existing = goals.value.find((g) => g.id === id);
+    if (!existing) return null;
+    const wasCompleted = existing.isCompleted ?? false;
+    return (
+      (await wrapAsync(
+        isLoading,
+        error,
+        async () => {
+          const updated = await mutate<Goal>({
+            op: 'named',
+            name: 'applyGoalContribution',
+            args: { id, delta },
+          });
+          goals.value = goals.value.map((g) => (g.id === id ? updated : g));
+          if (updated.isCompleted && !wasCompleted) {
+            celebrate(updated.type === 'debt_payoff' ? 'debt-free' : 'goal-reached');
+          }
+          return updated;
+        },
+        { action: 'goalsStore:applyContribution' }
+      )) ?? null
+    );
+  }
+
   function getGoalById(id: string): Goal | undefined {
     return goals.value.find((g) => g.id === id);
   }
@@ -232,6 +265,7 @@ export const useGoalsStore = defineStore('goals', () => {
     updateGoal,
     deleteGoal,
     updateProgress,
+    applyContribution,
     getGoalById,
     getGoalsByMemberId,
     getGoalProgress,
