@@ -429,6 +429,22 @@ export async function mutate<T = unknown>(op: MutationOp, opts?: RequestOpts): P
   return result;
 }
 
+/** Fire-and-forget a mutation whose result the caller doesn't await. Attaches a
+ * `.catch` so a rejection can't become an unhandled promise rejection, and
+ * `reportError`s it — critical because in INLINE mode a failed `mutate` never
+ * routes through `surface()` (no toast), so this is the ONLY signal there. In
+ * worker mode `surface()` has already toasted; the errorReporter bucket dedups. */
+export function fireAndForgetMutate(op: MutationOp): void {
+  void mutate(op).catch((e) => {
+    reportError({
+      surface: 'doc-mutate-fire-forget',
+      message: `fire-and-forget mutate '${op.op}' failed`,
+      error: e,
+      severity: 'error',
+    });
+  });
+}
+
 /** Decrypt + merge a fetched remote envelope; returns heads + heads-derived dirty. */
 export function mergeRemoteEnvelope(
   envelope: BeanpodFileV4,
@@ -474,9 +490,13 @@ export function applyChanges(changes: Uint8Array[]): Promise<{ heads: Heads }> {
   return request('applyChanges', { changes });
 }
 
-/** Re-persist the envelope cache after a main-thread `currentEnvelope` change. */
-export function persistEnvelope(envelope: BeanpodFileV4): Promise<void> {
-  return request('persistEnvelope', { envelope });
+/** Re-persist the envelope cache after a main-thread `currentEnvelope` change.
+ * Envelope-cache persistence is a degradation (a cold-start unlock convenience),
+ * not a critical write — pass `{quiet:true}` so a failure doesn't fire the
+ * misleading critical "We couldn't update your data" toast; the caller classifies
+ * + logs it instead (see `syncService.persistEnvelopeSafely`). */
+export function persistEnvelope(envelope: BeanpodFileV4, opts?: RequestOpts): Promise<void> {
+  return request('persistEnvelope', { envelope }, opts);
 }
 export function readEnvelope(): Promise<{ envelope: BeanpodFileV4 | null }> {
   return request('readEnvelope');

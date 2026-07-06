@@ -141,6 +141,10 @@ async function ensureEntity(collection: string, id: string): Promise<void> {
 async function settleMutations(): Promise<void> {
   const last = vi.mocked(mutate).mock.results.at(-1);
   if (last?.type === 'return') await last.value;
+  // `markDeleted`/`linkPhotoToEntity` now go through `fireAndForgetMutate`, which
+  // calls the real module-local `mutate` (not the vi.fn above), so its inline
+  // apply chain isn't captured here — flush a macrotask so it settles too.
+  await new Promise((r) => setTimeout(r, 0));
 }
 
 // --- Tests -----------------------------------------------------------
@@ -180,6 +184,20 @@ describe('photoStore', () => {
       attach: () => {},
       collect: () => [],
     });
+  });
+
+  it('photos does NOT re-materialize on an unrelated (non-photos) mutation (F9)', async () => {
+    await ensureEntity('activities', 'act-f9');
+    const store = usePhotoStore();
+    await store.addPhoto(makeFile(), 'activities', 'act-f9');
+
+    const before = store.photos; // cached computed value
+    // A mutation to a DIFFERENT collection bumps docVersion but must NOT
+    // invalidate the photos computed (it depends on the photos map ref alone).
+    await mutate({ op: 'set', collection: 'todos', id: 'unrelated', entity: { id: 'unrelated' } });
+    const after = store.photos;
+
+    expect(after).toBe(before); // same object → the O(n) rebuild did not re-run
   });
 
   it('addPhoto (online) compresses, uploads, and writes an Automerge record', async () => {
