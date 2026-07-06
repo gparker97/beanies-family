@@ -63,13 +63,22 @@ vi.mock('@/services/familyContext', () => ({
   createFamilyWithId: vi.fn(async () => ({ id: 'fam-resume-1', name: 'Test' })),
   hasActiveFamily: vi.fn(() => true),
 }));
-vi.mock('@/services/automerge/persistenceService', () => ({
-  initPersistenceDB: vi.fn(async () => {}),
-  persistDoc: vi.fn(async () => {}),
+// ADR-032: the worker owns decrypt/merge/cache/persist. syncStore drives it via
+// docClient. The resume/auto-load orchestrators under test call these RPCs; the
+// CorruptPayloadError that was previously thrown by fileSync.decryptBeanpodPayload
+// now surfaces from docClient.mergeRemoteEnvelope (worker decrypt + materialize).
+vi.mock('@/services/automerge/worker/docClient', () => ({
+  setFamilyKey: vi.fn(async () => {}),
   persistEnvelope: vi.fn(async () => {}),
-  loadCachedDoc: vi.fn(async () => null),
-  loadCachedEnvelope: vi.fn(async () => null),
-  isCacheReady: vi.fn(() => false),
+  initAndLoadCache: vi.fn(async () => ({ loaded: false })),
+  mergeRemoteEnvelope: vi.fn(async () => ({ dirty: false })),
+  verifyEnvelope: vi.fn(async () => {}),
+  exportEncryptedPayload: vi.fn(async () => ({ payload: 'base64==' })),
+  dropDoc: vi.fn(async () => {}),
+  reset: vi.fn(async () => {}),
+  clearCache: vi.fn(async () => {}),
+  setLocalChangeHandler: vi.fn(),
+  setCachePersistFailedHandler: vi.fn(),
 }));
 vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
   getDefaultGlobalSettings: () => ({
@@ -165,14 +174,14 @@ vi.mock('@/services/sync/offlineQueue', () => ({
   clearQueue: vi.fn(),
 }));
 
-// File sync — keep parseBeanpodV4 + detectFileVersion real-shape but mock crypto-y ones
+// File sync — keep parseBeanpodV4 + detectFileVersion real-shape but mock the
+// key-unwrap (crypto). Decrypt/materialize now lives in the worker (docClient).
 vi.mock('@/services/sync/fileSync', async () => {
   const actual = await vi.importActual<typeof import('@/services/sync/fileSync')>(
     '@/services/sync/fileSync'
   );
   return {
     ...actual,
-    decryptBeanpodPayload: vi.fn(),
     tryUnwrapFamilyKey: vi.fn(),
   };
 });
@@ -201,10 +210,8 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { CorruptPayloadError } from '@/types/sync';
-import {
-  decryptBeanpodPayload as mockedDecryptBeanpodPayload,
-  tryUnwrapFamilyKey as mockedTryUnwrapFamilyKey,
-} from '@/services/sync/fileSync';
+import { tryUnwrapFamilyKey as mockedTryUnwrapFamilyKey } from '@/services/sync/fileSync';
+import * as docClient from '@/services/automerge/worker/docClient';
 
 const envelopeJsonFor = (familyId: string, familyName: string): string =>
   JSON.stringify({
@@ -376,12 +383,15 @@ describe('syncStore.completeAutoLoad', () => {
     expect(useAuthStore().podCreated).toBe(false);
   });
 
-  it('returns corrupted when decryptBeanpodPayload throws CorruptPayloadError', async () => {
+  it('returns corrupted when the worker merge throws CorruptPayloadError', async () => {
     vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
       familyKey: {} as CryptoKey,
       memberIds: ['m-1'],
     });
-    vi.mocked(mockedDecryptBeanpodPayload).mockRejectedValueOnce(
+    // ADR-032: decrypt + materialize-check moved into the worker; the corrupt
+    // payload now surfaces from docClient.mergeRemoteEnvelope (via
+    // replaceDocWithCacheRecovery), not fileSync.decryptBeanpodPayload.
+    vi.mocked(docClient.mergeRemoteEnvelope).mockRejectedValueOnce(
       new CorruptPayloadError('Out of bounds', 'materialize', 'fam-resume-1')
     );
     const syncStore = useSyncStore();
