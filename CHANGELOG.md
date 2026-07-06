@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Fixed
 
 - **Creating a new family while already signed in no longer mixes in your old family's data — or loses what you just added.** Starting a fresh family from an active session now wipes every trace of the previous family from the screen before the new one loads, and the last thing you enter in the setup wizard (like your first activity) is now saved to your file before you sign out, so it's still there when you sign back in.
+- **Switching between families can no longer mix one family's data into another's file.** If you belong to more than one family and sign out of one and into another (especially on a device where you'd chosen "trust this device"), the app now fully clears the first family from memory before loading the second, and never merges the second family's data on top of a leftover one. Previously, in that specific sequence, the two families' data could combine and get saved into the second family's file. Single-family users were never affected.
 
 ### Changed
 
