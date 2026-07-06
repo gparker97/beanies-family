@@ -159,4 +159,23 @@ describe('docClient', () => {
     fw.onerror?.(new Error('worker died'));
     await expect(p).rejects.toThrow(/worker died/);
   });
+
+  it('a worker crash with N in-flight non-quiet calls fires exactly ONE toast (F5 dedup)', async () => {
+    const fw = useWorker(() => null); // never responds → the calls stay pending
+    const ps = [
+      mutate({ op: 'delete', collection: 'todos', id: 'a' }, { timeoutMs: 5000 }),
+      mutate({ op: 'delete', collection: 'todos', id: 'b' }, { timeoutMs: 5000 }),
+      mutate({ op: 'delete', collection: 'todos', id: 'c' }, { timeoutMs: 5000 }),
+    ];
+    await tick();
+    expect(fw.posted.filter((m) => m.method === 'mutate')).toHaveLength(3);
+
+    fw.onerror?.(new Error('worker died'));
+
+    // Every in-flight call still rejects (a definite failure)…
+    const settled = await Promise.allSettled(ps);
+    expect(settled.every((s) => s.status === 'rejected')).toBe(true);
+    // …but the crash surfaces exactly ONCE, not once per drained call.
+    expect(showToast).toHaveBeenCalledTimes(1);
+  });
 });
