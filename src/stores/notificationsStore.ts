@@ -209,7 +209,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
           id: member.id,
           patch,
           deleteKeys,
-          createIfMissing: true,
+          onMissing: 'create',
         },
         { quiet: true }
       );

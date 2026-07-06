@@ -9,6 +9,8 @@ import { accountNetWorthMultiplier, isLiabilityType } from '@/utils/finance';
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
 import { mutate } from '@/services/automerge/worker/docClient';
 import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
+import { toISODateString } from '@/utils/date';
+import { reportError } from '@/utils/errorReporter';
 import type { Account, CreateAccountInput, UpdateAccountInput, CurrencyCode } from '@/types/models';
 
 export const useAccountsStore = defineStore('accounts', () => {
@@ -195,13 +197,27 @@ export const useAccountsStore = defineStore('accounts', () => {
         isLoading,
         error,
         async () => {
-          const updated = await mutate<Account>({
+          const updated = await mutate<Account | undefined>({
             op: 'increment',
             collection: 'accounts',
             id,
             field: 'balance',
             delta,
+            updatedAt: toISODateString(new Date()),
+            onMissing: 'skip',
           });
+          // Concurrent-delete race: the account vanished worker-side between the
+          // guard above and the write, so the echo is undefined. Do NOT splice
+          // undefined into the array; leave a warning breadcrumb (no toast — rare
+          // race) so a genuine ledger/balance divergence is diagnosable.
+          if (!updated) {
+            reportError({
+              surface: 'accounts.increment-missing',
+              message: `incrementBalance skipped: account ${id} not found worker-side (concurrent delete)`,
+              severity: 'warning',
+            });
+            return null;
+          }
           accounts.value = accounts.value.map((a) => (a.id === id ? updated : a));
           return updated;
         },
