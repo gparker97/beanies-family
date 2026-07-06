@@ -45,8 +45,8 @@ self.onmessage = (e: MessageEvent) => {
   if (typeof req?.cid !== 'number') return;
   tail = tail.then(async () => {
     try {
-      const { result, delta } = await dispatch(req.method, req.args);
-      post({ cid: req.cid, ok: true, result, delta } as RpcResponse);
+      const { result, delta, changed } = await dispatch(req.method, req.args);
+      post({ cid: req.cid, ok: true, result, delta, changed } as RpcResponse);
     } catch (err) {
       post({ cid: req.cid, ok: false, error: serializeError(err) });
     }

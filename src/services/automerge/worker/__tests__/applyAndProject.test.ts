@@ -183,6 +183,28 @@ describe('worker/applyAndProject', () => {
     expect(perf).toContain('automerge.remoteLoad');
   });
 
+  it('mutate reports changed:false for a no-op (skipped op) and changed:true for a real write (F10)', () => {
+    setKey(key);
+    initDoc();
+    // A skipped patch on an absent entity writes nothing → no-op.
+    const noop = mutate({
+      op: 'patch',
+      collection: 'accounts',
+      id: 'gone',
+      patch: { name: 'X' },
+      onMissing: 'skip',
+    });
+    expect(noop.changed).toBe(false);
+    // A genuine write advances the doc heads → changed.
+    const real = mutate({
+      op: 'set',
+      collection: 'accounts',
+      id: 'a',
+      entity: { id: 'a', balance: 1 },
+    });
+    expect(real.changed).toBe(true);
+  });
+
   it('openCache opens the DB WITHOUT loading a cached doc — create keeps the fresh owner doc (F1)', async () => {
     // A stale cache row exists for this family (a prior/interrupted create attempt).
     const staleBin = saveDoc(

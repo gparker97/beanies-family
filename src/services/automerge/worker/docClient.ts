@@ -53,7 +53,7 @@ export interface DocWorkerLike {
 export type InlineExecutor = (
   method: string,
   args: unknown
-) => Promise<{ result?: unknown; delta?: ProjectionDelta }>;
+) => Promise<{ result?: unknown; delta?: ProjectionDelta; changed?: boolean }>;
 
 const READY_TIMEOUT_MS = 10_000;
 const DEFAULT_RPC_TIMEOUT_MS = 45_000;
@@ -213,7 +213,7 @@ function onWorkerError(err: unknown): void {
  * for the mid-session fall-through: the DEAD worker received `setKey`/the doc,
  * but the inline `applyAndProject` realm never did — without re-driving, every
  * crypto op throws `family key not set`. (First-unlock inline is already covered
- * by the normal setFamilyKey→inlineRequest('setKey') flow; guard the key re-post
+ * by the normal setFamilyKey→request('setKey') flow; guard the key re-post
  * to the retained key so we don't double-post on that path.) */
 async function enterInlineMode(): Promise<void> {
   mode = 'inline';
@@ -315,13 +315,27 @@ interface RequestOpts {
   timeoutMs?: number;
 }
 
-async function request<T = unknown>(
+/** Send one RPC (worker or inline) and return its `{result, changed}`. Applies the
+ * response delta to the projection before resolving (worker: via `handleResponse`;
+ * inline: here). The single send/await/surface path shared by `request` (result
+ * only) and `requestMutate` (result + the `changed` no-op flag). */
+async function requestCore(
   method: string,
-  args?: unknown,
-  opts: RequestOpts = {}
-): Promise<T> {
+  args: unknown,
+  opts: RequestOpts
+): Promise<{ result: unknown; changed?: boolean }> {
   const via = await ensureReady();
-  if (via === 'inline') return inlineRequest<T>(method, args);
+  if (via === 'inline') {
+    if (!inlineExecutor) {
+      throw new DocWorkerError(
+        `doc-worker unavailable and no inline fallback for '${method}'`,
+        method
+      );
+    }
+    const { result, delta, changed } = await inlineExecutor(method, args);
+    if (delta) applyDelta(delta);
+    return { result, changed };
+  }
 
   const cid = nextCid++;
   const responsePromise = new Promise<RpcResponse>((resolve) => {
@@ -340,8 +354,26 @@ async function request<T = unknown>(
     pending.delete(cid); // discard by cid — a late reply now finds no pending entry
     throw surface(timeoutErr, method, opts.quiet);
   }
-  if (res.ok) return res.result as T;
+  if (res.ok) return { result: res.result, changed: res.changed };
   throw surface(reconstructError(res.error, method), method, opts.quiet);
+}
+
+async function request<T = unknown>(
+  method: string,
+  args?: unknown,
+  opts: RequestOpts = {}
+): Promise<T> {
+  return (await requestCore(method, args, opts)).result as T;
+}
+
+/** `mutate`-only variant that also returns the worker's `changed` flag (default
+ * `true` when absent) so the caller can skip the Drive-save trigger on a no-op. */
+async function requestMutate<T>(
+  op: MutationOp,
+  opts: RequestOpts = {}
+): Promise<{ result: T; changed: boolean }> {
+  const { result, changed } = await requestCore('mutate', op, opts);
+  return { result: result as T, changed: changed ?? true };
 }
 
 /** Turn a failure into a surfaced-or-quiet rejection. Returns the error to throw. */
@@ -358,18 +390,6 @@ function surface(err: unknown, method: string, quiet?: boolean): Error {
     });
   }
   return error;
-}
-
-async function inlineRequest<T>(method: string, args: unknown): Promise<T> {
-  if (!inlineExecutor) {
-    throw new DocWorkerError(
-      `doc-worker unavailable and no inline fallback for '${method}'`,
-      method
-    );
-  }
-  const { result, delta } = await inlineExecutor(method, args);
-  if (delta) applyDelta(delta);
-  return result as T;
 }
 
 // ─── Typed method wrappers (mirror the retired docService/persistence API) ───
@@ -400,10 +420,12 @@ export async function openCache(familyId: string): Promise<{ loaded: false }> {
 }
 
 /** Apply a declarative mutation; the response carries the entity + projection
- * delta. Fires the local-change handler (→ Drive save) after a successful write. */
+ * delta. Fires the local-change handler (→ Drive save) after a write that actually
+ * CHANGED the doc — a no-op (skipped `onMissing:'skip'` / a named op that wrote
+ * nothing) leaves heads unchanged and schedules no save/persist (F10). */
 export async function mutate<T = unknown>(op: MutationOp, opts?: RequestOpts): Promise<T> {
-  const result = await request<T>('mutate', op, opts);
-  localChangeHandler?.();
+  const { result, changed } = await requestMutate<T>(op, opts);
+  if (changed) localChangeHandler?.();
   return result;
 }
 
