@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-07
+
+### Fixed
+
+- **The cross-family data-mixing fix is now live in production** (app v0.9.2R4). The safeguards logged on 2026-07-06 — fully clearing one family from memory before another loads, and never merging one family's data on top of a leftover one — have shipped to everyone. Single-family users were never affected.
+
 ## 2026-07-06
 
 ### Fixed
