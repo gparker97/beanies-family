@@ -1,11 +1,12 @@
 // @vitest-environment node
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- ADR-032 Task #17: pending test rewrite to the inline/docClient path (red in the migration window)
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ref } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
-import { initDoc, resetDoc, changeDoc } from '@/services/automerge/docService';
+// ADR-032: the doc lives in the worker; drive the REAL inline backend (docClient
+// → applyAndProject → projection) on the main thread and seed via set ops.
+import { installInlineBackend } from '@/services/automerge/worker/__tests__/inlineHarness';
+import { mutate } from '@/services/automerge/worker/docClient';
 
 // Minimal window / navigator stubs (same as photoStore.test.ts).
 if (typeof globalThis.navigator === 'undefined') {
@@ -113,8 +114,7 @@ describe('usePhotos', () => {
   beforeEach(async () => {
     toastCalls.length = 0;
     setActivePinia(createPinia());
-    resetDoc();
-    initDoc();
+    await installInlineBackend();
     setOnlineStatus(true);
 
     driveMocks.createFile.mockReset().mockResolvedValue({ fileId: 'drive-1', name: 'x' });
@@ -124,11 +124,11 @@ describe('usePhotos', () => {
     driveMocks.getFileMetadata.mockReset().mockResolvedValue({ parents: ['folder-1'] });
 
     // Seed an activity that will own the photos.
-    changeDoc((d) => {
-      (d as unknown as { activities: Record<string, unknown> }).activities['act-1'] = {
-        id: 'act-1',
-        photoIds: [],
-      };
+    await mutate({
+      op: 'set',
+      collection: 'activities',
+      id: 'act-1',
+      entity: { id: 'act-1', photoIds: [] },
     });
 
     const store = usePhotoStore();
@@ -230,7 +230,7 @@ describe('usePhotos', () => {
     expect(ids).toHaveLength(1);
   });
 
-  it('remove calls markDeleted AND updates the caller photoIds', () => {
+  it('remove calls markDeleted AND updates the caller photoIds', async () => {
     const photoIds = ref<string[]>(['p-keep', 'p-delete']);
     const updates: string[][] = [];
     const { remove } = usePhotos({
@@ -244,8 +244,11 @@ describe('usePhotos', () => {
     });
 
     // Seed a record so markDeleted has something to tombstone.
-    changeDoc((d) => {
-      d.photos['p-delete'] = {
+    await mutate({
+      op: 'set',
+      collection: 'photos',
+      id: 'p-delete',
+      entity: {
         id: 'p-delete',
         driveFileId: 'x',
         mime: 'image/jpeg',
@@ -254,7 +257,7 @@ describe('usePhotos', () => {
         sizeBytes: 1,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      };
+      },
     });
 
     remove('p-delete');
