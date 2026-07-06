@@ -11,6 +11,7 @@ import {
   setKey,
   initDoc,
   initAndLoadCache,
+  openCache,
   mutate,
   mergeRemoteEnvelope,
   exportEncryptedPayload,
@@ -180,6 +181,43 @@ describe('worker/applyAndProject', () => {
     const ids = todos.entities.map(([id]) => id).sort();
     expect(ids).toEqual(['l1', 'r1']);
     expect(perf).toContain('automerge.remoteLoad');
+  });
+
+  it('openCache opens the DB WITHOUT loading a cached doc — create keeps the fresh owner doc (F1)', async () => {
+    // A stale cache row exists for this family (a prior/interrupted create attempt).
+    const staleBin = saveDoc(
+      applyMutation(base(), {
+        op: 'set',
+        collection: 'todos',
+        id: 'stale',
+        entity: { id: 'stale', title: 'old' },
+      }).doc
+    );
+    await cache.initPersistenceDB(FAMILY_ID);
+    await cache.persistDocBinary(key, staleBin);
+
+    // Build a FRESH owner doc (as createNewFile does), then openCache.
+    setKey(key);
+    initDoc();
+    mutate({ op: 'set', collection: 'accounts', id: 'fresh', entity: { id: 'fresh', balance: 1 } });
+    chunks = [];
+    const res = await openCache(FAMILY_ID);
+
+    // openCache returns loaded:false and installs NOTHING (no projection push), so
+    // the fresh doc survives — initAndLoadCache WOULD have clobbered it with `stale`.
+    expect(res.loaded).toBe(false);
+    expect(chunks).toEqual([]);
+    expect(__hasDocForTesting()).toBe(true);
+    // The current doc is still the fresh one: its encrypted export round-trips to a
+    // doc containing `fresh`, not the stale cache's `stale`.
+    const { payload } = await exportEncryptedPayload();
+    const { decryptToDoc } = await import('../docOps');
+    const current = await decryptToDoc(
+      { ...(await envelopeFor(base(), key)), encryptedPayload: payload },
+      key
+    );
+    expect(Object.keys(current.accounts)).toEqual(['fresh']);
+    expect(Object.keys(current.todos)).toEqual([]);
   });
 
   it('guards: mutate without a doc throws; crypto op without a key throws', async () => {
