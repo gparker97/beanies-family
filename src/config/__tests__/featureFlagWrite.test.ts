@@ -35,6 +35,7 @@ describe('config/featureFlagWrite', () => {
       aiPhotoExtract: true,
       aiTravelExtract: false,
       calendarClashNudge: false,
+      docWorker: false,
       familyLists: false,
       googleCalendarSync: false,
     });
@@ -67,6 +68,7 @@ describe('config/featureFlagWrite', () => {
       aiPhotoExtract: false,
       aiTravelExtract: true,
       calendarClashNudge: false,
+      docWorker: false,
       familyLists: false,
       googleCalendarSync: false,
     });

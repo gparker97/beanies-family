@@ -45,6 +45,17 @@ function externalRedirect(path: string, name: string): RouteRecordRaw {
 }
 
 const routes: RouteRecordRaw[] = [
+  // Dev-only ADR-032 worker spike harness (measurement page; removed with the spike).
+  ...(import.meta.env.DEV
+    ? [
+        {
+          path: '/dev/worker-spike',
+          name: 'DevWorkerSpike',
+          component: () => import('@/pages/dev/WorkerSpikePage.vue'),
+          meta: { requiresAuth: false, noChrome: true, hideQuickAdd: true },
+        } as RouteRecordRaw,
+      ]
+    : []),
   {
     path: '/',
     redirect: '/nook',

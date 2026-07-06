@@ -35,7 +35,14 @@ export interface PerfContext {
   perf_entity_count?: number;
 }
 
-function record(label: string, durationMs: number, ctx?: PerfContext): void {
+/**
+ * Record a timing sample through the console-floor + telemetry-escalation logic.
+ * Exported so the doc-worker's own `performance.now()` samples (which cannot use
+ * `logEvent`/telemetry inside a Worker — that's a main-thread-only buffer) can be
+ * relayed to the main thread and replayed through the SAME thresholds + single
+ * telemetry buffer. See ADR-032. Prefer `measureSync`/`measureAsync` in-process.
+ */
+export function record(label: string, durationMs: number, ctx?: PerfContext): void {
   const ms = Math.round(durationMs);
   if (ms < CONSOLE_FLOOR_MS) return;
 
@@ -52,7 +59,12 @@ function record(label: string, durationMs: number, ctx?: PerfContext): void {
   // eslint-disable-next-line no-console -- deliberate load-path perf instrumentation
   console.info(`[perf] ${label}: ${ms}ms${suffix ? ` (${suffix})` : ''}`);
 
-  if (ms >= TELEMETRY_FLOOR_MS) {
+  // Telemetry is main-thread-only: `logEvent`'s queue flushes on `window`/
+  // `pagehide`/`sendBeacon`, which don't exist in a Web Worker. So the worker
+  // (which reuses this via encoding/crypto/persistence) console-times only; its
+  // heavy load/merge/save ops relay explicit perf samples to the main thread,
+  // where `docClient` replays them through this same `record` (see ADR-032).
+  if (ms >= TELEMETRY_FLOOR_MS && typeof window !== 'undefined') {
     logEvent({
       level: ms >= WARN_FLOOR_MS ? 'warn' : 'info',
       surface: 'load-perf',

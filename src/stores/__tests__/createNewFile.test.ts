@@ -21,54 +21,43 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 // ---------------------------------------------------------------------------
 // Hoisted mocks — must be created before vi.mock factories reference them
 // ---------------------------------------------------------------------------
-const {
-  mockProvider,
-  mockSelectSyncFile,
-  mockSave,
-  stateChangeCallbackHolder,
-  mockFamilyKey,
-  mockInitPersistenceDB,
-  mockPersistDoc,
-  mockPersistEnvelope,
-} = vi.hoisted(() => {
-  const mockFamilyKey = {} as CryptoKey;
-  const mockProviderWrite = vi.fn(async () => {});
-  // read() is called by `verifyJustWritten` after every successful write —
-  // return a parseable V4 envelope so the verify step's decrypt call (also
-  // mocked at the fileSync level) doesn't trip on empty bytes.
-  const mockProviderRead = vi.fn(async () =>
-    JSON.stringify({
-      version: '4.0',
-      familyId: 'fam-test-1',
-      familyName: 'Test Family',
-      keyId: 'k',
-      wrappedKeys: {},
-      passkeyWrappedKeys: {},
-      inviteKeys: {},
-      encryptedPayload: 'base64==',
-    })
-  );
-  const mockProvider = {
-    write: mockProviderWrite,
-    read: mockProviderRead,
-    getAccountEmail: () => null,
-    getDisplayName: () => 'test.beanpod',
-    getFileId: () => 'mock-file-id',
-    type: 'local' as const,
-  };
-  return {
-    mockProvider,
-    mockSelectSyncFile: vi.fn(async () => true),
-    mockSave: vi.fn(async () => true),
-    stateChangeCallbackHolder: {
-      callback: null as ((state: Record<string, unknown>) => void) | null,
-    },
-    mockFamilyKey,
-    mockInitPersistenceDB: vi.fn(async () => {}),
-    mockPersistDoc: vi.fn(async () => {}),
-    mockPersistEnvelope: vi.fn(async () => {}),
-  };
-});
+const { mockProvider, mockSelectSyncFile, mockSave, stateChangeCallbackHolder, mockFamilyKey } =
+  vi.hoisted(() => {
+    const mockFamilyKey = {} as CryptoKey;
+    const mockProviderWrite = vi.fn(async () => {});
+    // read() is called by `verifyJustWritten` after every successful write —
+    // return a parseable V4 envelope so the verify step's decrypt call (also
+    // mocked at the fileSync level) doesn't trip on empty bytes.
+    const mockProviderRead = vi.fn(async () =>
+      JSON.stringify({
+        version: '4.0',
+        familyId: 'fam-test-1',
+        familyName: 'Test Family',
+        keyId: 'k',
+        wrappedKeys: {},
+        passkeyWrappedKeys: {},
+        inviteKeys: {},
+        encryptedPayload: 'base64==',
+      })
+    );
+    const mockProvider = {
+      write: mockProviderWrite,
+      read: mockProviderRead,
+      getAccountEmail: () => null,
+      getDisplayName: () => 'test.beanpod',
+      getFileId: () => 'mock-file-id',
+      type: 'local' as const,
+    };
+    return {
+      mockProvider,
+      mockSelectSyncFile: vi.fn(async () => true),
+      mockSave: vi.fn(async () => true),
+      stateChangeCallbackHolder: {
+        callback: null as ((state: Record<string, unknown>) => void) | null,
+      },
+      mockFamilyKey,
+    };
+  });
 
 // ---------------------------------------------------------------------------
 // REAL modules (NOT mocked) — these are the ones that trigger the bug:
@@ -242,15 +231,23 @@ vi.mock('@/utils/encoding', () => ({
   base64ToBuffer: vi.fn(() => new ArrayBuffer(16)),
 }));
 
-// Persistence service — mock IDB
-vi.mock('@/services/automerge/persistenceService', () => ({
-  initPersistenceDB: mockInitPersistenceDB,
-  persistDoc: mockPersistDoc,
-  persistEnvelope: mockPersistEnvelope,
-  loadCachedDoc: vi.fn(async () => null),
-  loadCachedEnvelope: vi.fn(async () => null),
-  isCacheReady: vi.fn(() => false),
-}));
+// ADR-032: the doc + persistence live in the worker, driven via docClient. This
+// test exercises the REAL create-flow doc path (signUp → createMember →
+// createNewFile) through the inline backend, so the doc-CRDT methods (mutate,
+// initDoc, setFamilyKey, exportEncryptedPayload) stay REAL. The cache/verify RPCs
+// touch encrypted IDB + real materialize — which can't round-trip the mocked
+// crypto/read-back bytes here — so they're stubbed as controllable no-ops.
+vi.mock('@/services/automerge/worker/docClient', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/automerge/worker/docClient')>();
+  return {
+    ...actual,
+    verifyEnvelope: vi.fn(async () => {}),
+    initAndLoadCache: vi.fn(async () => ({ loaded: false })),
+    openCache: vi.fn(async () => ({ loaded: false })),
+    flush: vi.fn(async () => {}),
+    persistEnvelope: vi.fn(async () => {}),
+  };
+});
 
 // Google Drive deps
 vi.mock('@/services/sync/providers/googleDriveProvider', () => ({
@@ -321,7 +318,11 @@ vi.mock('@/stores/syncHighlightStore', () => ({
 import { useAuthStore, DEFERRED_PASSWORD_HASH } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useAccountsStore } from '@/stores/accountsStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { resetDoc } from '@/services/automerge/docService';
+import { installInlineBackend } from '@/services/automerge/worker/__tests__/inlineHarness';
+import * as docClient from '@/services/automerge/worker/docClient';
 
 // ---------------------------------------------------------------------------
 // Tests — full end-to-end pod creation flow
@@ -330,12 +331,14 @@ import { resetDoc } from '@/services/automerge/docService';
 describe('pod creation: full end-to-end flow', () => {
   let pinia: Pinia;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     pinia = createPinia();
     setActivePinia(pinia);
     vi.clearAllMocks();
-    // Ensure clean Automerge state — no document loaded
-    resetDoc();
+    // Wire the REAL inline doc backend (docClient → applyAndProject → projection)
+    // on the main thread so signUp→createMember→createNewFile drives the true
+    // doc path. Starts from a fresh empty doc.
+    await installInlineBackend();
     // authStore.podCreated defaults to TRUE when localStorage key is absent
     // (migration-true semantics — see restorePodCreated). Reset to '0' so
     // failure-path tests can assert it never flips to '1'.
@@ -448,6 +451,65 @@ describe('pod creation: full end-to-end flow', () => {
     expect(syncResult).toBe(true);
   });
 
+  // ── ADR-032: create tears down the PREVIOUS family's in-memory state ──────
+  //
+  // Regression guard for the cross-family data-mixing bug: creating a new family
+  // while another family's rows are still resident in the entity store ref arrays
+  // must leave the new family with EMPTY stores (only the new owner).
+
+  it('signUp clears leftover entity-store rows from a previous family', async () => {
+    const accountsStore = useAccountsStore();
+    const activityStore = useActivityStore();
+    // Simulate a previous family's data still resident in the store refs.
+    accountsStore.accounts.push({ id: 'old-acct', name: 'Old Family Checking' } as never);
+    activityStore.activities.push({ id: 'old-act', title: 'Old Family Activity' } as never);
+    expect(accountsStore.accounts).toHaveLength(1);
+    expect(activityStore.activities).toHaveLength(1);
+
+    const authStore = useAuthStore();
+    const result = await authStore.signUp({
+      email: 'new@example.com',
+      password: 'password123',
+      familyName: 'New Family',
+      memberName: 'New Owner',
+    });
+    expect(result.success).toBe(true);
+
+    // The previous family's rows are gone; only the new owner remains.
+    expect(accountsStore.accounts).toHaveLength(0);
+    expect(activityStore.activities).toHaveLength(0);
+    const familyStore = useFamilyStore();
+    expect(familyStore.members).toHaveLength(1);
+    expect(familyStore.owner?.name).toBe('New Owner');
+  });
+
+  it('resetInMemoryFamilyState runs reset → initDoc → reloadAllStores (before createMember)', async () => {
+    const resetSpy = vi.spyOn(docClient, 'reset');
+    const initSpy = vi.spyOn(docClient, 'initDoc');
+    const syncStore = useSyncStore();
+    const reloadSpy = vi.spyOn(syncStore, 'reloadAllStores');
+
+    const authStore = useAuthStore();
+    await authStore.signUp({
+      email: 'order@example.com',
+      password: 'password123',
+      familyName: 'Order Family',
+      memberName: 'Owner',
+    });
+
+    // The order is load-bearing: reset (drop old doc + key) → initDoc (fresh doc)
+    // → reloadAllStores (clear stale store refs) — all before the owner is written.
+    expect(resetSpy).toHaveBeenCalled();
+    expect(initSpy).toHaveBeenCalled();
+    expect(reloadSpy).toHaveBeenCalled();
+    expect(resetSpy.mock.invocationCallOrder[0]!).toBeLessThan(
+      initSpy.mock.invocationCallOrder[0]!
+    );
+    expect(initSpy.mock.invocationCallOrder[0]!).toBeLessThan(
+      reloadSpy.mock.invocationCallOrder[0]!
+    );
+  });
+
   // ── Discriminated-result failure paths ──────────────────────────────────
   //
   // Every reason in `CreatePodFailureReason` is exercised here so the
@@ -534,10 +596,13 @@ describe('pod creation: full end-to-end flow', () => {
     expect(useAuthStore().podCreated).toBe(false);
   });
 
-  it('returns reason="persist" when persistDoc throws', async () => {
+  it('returns reason="persist" when the worker cache flush throws', async () => {
     const { memberId } = await signUpAndConfigureStorage();
     const syncStore = useSyncStore();
-    mockPersistDoc.mockRejectedValueOnce(new Error('IndexedDB quota'));
+    // ADR-032: the worker owns cache persistence — the persist step is
+    // docClient.initAndLoadCache → flush → persistEnvelope. A cache-flush failure
+    // surfaces as reason="persist".
+    vi.mocked(docClient.flush).mockRejectedValueOnce(new Error('IndexedDB quota'));
     const result = await syncStore.createNewFile(
       'test.beanpod',
       'pod-password',
@@ -690,11 +755,11 @@ describe('pod creation: full end-to-end flow', () => {
 describe('unified create flow: deferred password (signUp → rehydrateOwnerDoc → createNewFile)', () => {
   let pinia: Pinia;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     pinia = createPinia();
     setActivePinia(pinia);
     vi.clearAllMocks();
-    resetDoc();
+    await installInlineBackend();
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('beanies_pod_created', '0');
     }
