@@ -1280,7 +1280,12 @@ export const useSyncStore = defineStore('sync', () => {
       //    error before `markPodCreated`). The worker owns the cache: open the
       //    DB, flush the current doc, and persist the envelope.
       step = 'persist';
-      await docClient.initAndLoadCache(familyId); // opens the cache DB (no cached doc yet)
+      // OPEN the cache DB without loading — the fresh owner doc is already
+      // installed + verified. `initAndLoadCache` would LOAD any pre-existing cache
+      // row (a prior/interrupted create for this familyId) OVER the owner doc,
+      // then `flush()` would persist the stale doc + Drive-upload it over the good
+      // file just written → data loss (ADR-032 F1).
+      await docClient.openCache(familyId);
       await docClient.flush(); // persist the current doc to cache now
       await docClient.persistEnvelope(env);
 

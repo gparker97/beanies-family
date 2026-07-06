@@ -243,6 +243,7 @@ vi.mock('@/services/automerge/worker/docClient', async (importOriginal) => {
     ...actual,
     verifyEnvelope: vi.fn(async () => {}),
     initAndLoadCache: vi.fn(async () => ({ loaded: false })),
+    openCache: vi.fn(async () => ({ loaded: false })),
     flush: vi.fn(async () => {}),
     persistEnvelope: vi.fn(async () => {}),
   };
