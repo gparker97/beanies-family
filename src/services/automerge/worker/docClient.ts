@@ -391,6 +391,14 @@ export async function initAndLoadCache(familyId: string): Promise<{ loaded: bool
   return request('initAndLoadCache', { familyId });
 }
 
+/** Open the family's cache DB WITHOUT loading a cached doc (create-family — the
+ * fresh owner doc is already installed; loading a stale cache row would clobber
+ * it). Sets `currentFamilyId` so a worker-death rehydrate targets this family. */
+export async function openCache(familyId: string): Promise<{ loaded: false }> {
+  currentFamilyId = familyId;
+  return request('openCache', { familyId });
+}
+
 /** Apply a declarative mutation; the response carries the entity + projection
  * delta. Fires the local-change handler (→ Drive save) after a successful write. */
 export async function mutate<T = unknown>(op: MutationOp, opts?: RequestOpts): Promise<T> {

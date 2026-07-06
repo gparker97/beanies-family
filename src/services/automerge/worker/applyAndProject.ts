@@ -180,6 +180,18 @@ export function initDoc(): { loaded: true } {
  * materialize-corrupt cache throws `CorruptPayloadError` → the caller clears +
  * rebuilds (rather than the old invisible later-throw).
  */
+/**
+ * Open the family's cache DB WITHOUT loading a cached doc — for `createNewFile`,
+ * which has just built + verified the owner doc and only needs an open DB to
+ * `flush()`/`persistEnvelope` into. `initAndLoadCache` would instead LOAD any
+ * pre-existing cache row (from a prior/interrupted create attempt for the same
+ * familyId) and install it OVER the fresh owner doc → data loss (ADR-032 F1).
+ */
+export async function openCache(id: string): Promise<{ loaded: false }> {
+  await cache.initPersistenceDB(id);
+  return { loaded: false };
+}
+
 export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }> {
   await cache.initPersistenceDB(id);
   const key = requireKey('initAndLoadCache');
@@ -367,6 +379,8 @@ export async function dispatch(
       return { result: initDoc() };
     case 'initAndLoadCache':
       return { result: await initAndLoadCache(a.familyId as string) };
+    case 'openCache':
+      return { result: await openCache(a.familyId as string) };
     case 'mutate': {
       const { result, delta } = mutate(args as MutationOp);
       return { result, delta };
