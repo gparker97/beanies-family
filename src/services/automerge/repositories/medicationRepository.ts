@@ -1,6 +1,8 @@
 import { createAutomergeRepository } from '../automergeRepository';
 import type { Medication } from '@/types/models';
-import { changeDoc } from '../docService';
+import { list } from '../projection';
+import { mutate } from '../worker/docClient';
+import type { MutationOp } from '../worker/protocol';
 
 const repo = createAutomergeRepository<'medications', Medication>('medications');
 
@@ -22,14 +24,12 @@ export async function getMedicationsByMember(memberId: string): Promise<Medicati
  * photoStore.gcOrphans for Drive cleanup.
  */
 export async function deleteMedicationCascade(medicationId: string): Promise<void> {
-  changeDoc((doc) => {
-    const logs = doc.medicationLogs ?? {};
-    for (const [id, entry] of Object.entries(logs)) {
-      if (entry.medicationId === medicationId) {
-        delete logs[id];
-      }
-    }
-    const medications = doc.medications ?? {};
-    delete medications[medicationId];
-  }, `medications: cascade-delete ${medicationId}`);
+  const childIds = list('medicationLogs')
+    .filter((entry) => entry.medicationId === medicationId)
+    .map((entry) => entry.id);
+  const ops: MutationOp[] = [
+    ...childIds.map((id): MutationOp => ({ op: 'delete', collection: 'medicationLogs', id })),
+    { op: 'delete', collection: 'medications', id: medicationId },
+  ];
+  await mutate({ op: 'batch', ops });
 }

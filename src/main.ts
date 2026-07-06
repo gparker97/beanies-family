@@ -7,9 +7,15 @@ import { isNative } from './services/sync/capabilities';
 import { reportError } from './utils/errorReporter';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from './utils/hardReload';
 import { isIdbTransientError } from './utils/idbTransient';
+import { bootstrapDocClient } from './services/automerge/worker/bootstrap';
 import './style.css';
 
 initAnalytics();
+
+// ADR-032: wire the doc worker / inline fallback before anything touches the
+// data layer (docClient lazily spawns the worker on first use, or runs inline
+// when the docWorker flag is off / the worker can't spawn).
+bootstrapDocClient();
 
 const app = createApp(App);
 

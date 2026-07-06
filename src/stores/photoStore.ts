@@ -33,10 +33,26 @@ import {
   QUEUE_SOFT_CAP,
   type QueuedPhotoUpload,
 } from '@/services/sync/photoUploadQueue';
-import { changeDoc, getDoc, docVersion } from '@/services/automerge/docService';
+import { docVersion } from '@/services/automerge/docService';
+import {
+  list as projectionList,
+  getById as projectionGetById,
+  collectionRef,
+} from '@/services/automerge/projection';
+import {
+  mutate,
+  fireAndForgetMutate,
+  collectReferencedPhotoIds as collectPhotoIdsRpc,
+} from '@/services/automerge/worker/docClient';
+import {
+  registerPhotoCollection,
+  hasPhotoCollections,
+  flatHooks,
+  type PhotoCollectionHooks,
+} from '@/services/automerge/worker/photoOps';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
-import type { FamilyDocument } from '@/types/automerge';
+import type { CollectionName } from '@/types/automerge';
 import type { PhotoAttachment, UUID } from '@/types/models';
 import { PDF_MIME } from '@/utils/attachmentKind';
 
@@ -126,54 +142,10 @@ export type PhotoResolution =
  * via a scalar `avatarPhotoId`; vacation booking segments nested inside
  * `doc.vacations[*].{travelSegments,…}[]`) pass explicit hooks.
  */
-export interface PhotoCollectionHooks {
-  attach: (doc: FamilyDocument, entityId: string, photoId: UUID) => void;
-  collect: (doc: FamilyDocument) => Iterable<UUID>;
-}
-
-/** Thrown when a registered `collect` hook fails. Signals `gcOrphans` to
- *  abort the sweep (fail-safe: never delete photos we couldn't prove orphaned). */
-export class PhotoCollectHookError extends Error {
-  readonly collection: string;
-  readonly cause: unknown;
-  constructor(collection: string, cause: unknown) {
-    super(`photo collect hook failed for "${collection}"`);
-    this.name = 'PhotoCollectHookError';
-    this.collection = collection;
-    this.cause = cause;
-  }
-}
-
-/** The standard flat shape: `doc[collection][entityId].photoIds`. */
-function flatHooks(collection: string): PhotoCollectionHooks {
-  type FlatEntities = Record<string, { photoIds?: UUID[] }>;
-  return {
-    attach(doc, entityId, photoId) {
-      const entities = (doc as unknown as Record<string, FlatEntities>)[collection];
-      const entity = entities?.[entityId];
-      if (!entity) return;
-      entity.photoIds = [...(entity.photoIds ?? []), photoId];
-    },
-    *collect(doc) {
-      const entities = (doc as unknown as Record<string, FlatEntities>)[collection];
-      if (!entities) return;
-      for (const entity of Object.values(entities)) {
-        for (const pid of entity?.photoIds ?? []) yield pid;
-      }
-    },
-  };
-}
-
-/**
- * Registered photo-referencing collections. Replaces the former
- * `Set<string>` + hardcoded `avatarPhotoId` branch with one consistent
- * shape — every collection (flat or not) is just a registration.
- */
-const photoCollections = new Map<string, PhotoCollectionHooks>();
-
-export function registerPhotoCollection(name: string, hooks?: PhotoCollectionHooks): void {
-  photoCollections.set(name, hooks ?? flatHooks(name));
-}
+// The hook contract, registry, flatHooks, attach/collect, and PhotoCollectHookError
+// now live in `worker/photoOps.ts` (pure, worker-shared) and are re-exported below
+// for backward compatibility. See ADR-032.
+export { registerPhotoCollection, type PhotoCollectionHooks };
 
 export const usePhotoStore = defineStore('photos', () => {
   const syncStore = useSyncStore();
@@ -205,14 +177,18 @@ export const usePhotoStore = defineStore('photos', () => {
    */
   const blobUrlCache = new Map<string, string>();
 
-  // Reactive projection of `photos` collection — re-reads on every docVersion bump.
+  // Reactive projection of the `photos` collection. Depends on the photos map ref
+  // specifically (NOT `docVersion`), so it re-derives ONLY when a photos delta
+  // lands — not on every unrelated mutation, which forced an O(n) rebuild of the
+  // whole Record on a hot reactive path (F9).
   const photos = computed<Record<UUID, PhotoAttachment>>(() => {
-    void docVersion.value; // subscribe to reactivity
-    try {
-      return getDoc().photos ?? {};
-    } catch {
-      return {};
+    const map = collectionRef('photos').value;
+    const out: Record<UUID, PhotoAttachment> = {};
+    for (const p of map.values()) {
+      const photo = p as PhotoAttachment;
+      out[photo.id] = photo;
     }
+    return out;
   });
 
   const photosEnabled = computed(() => !!syncStore.driveFileId);
@@ -471,24 +447,38 @@ export const usePhotoStore = defineStore('photos', () => {
 
     try {
       const now = new Date().toISOString();
-      changeDoc((doc: FamilyDocument) => {
-        const record: PhotoAttachment = {
-          id: payload.photoId,
-          driveFileId: fileId,
-          mime: payload.mime,
-          width: payload.width,
-          height: payload.height,
-          sizeBytes: payload.sizeBytes,
-          createdAt: now,
-          updatedAt: now,
-        };
-        // Automerge rejects undefined property assignments — only set
-        // optional fields when they have a value.
-        if (payload.createdBy) record.createdBy = payload.createdBy;
-        if (payload.fileName) record.fileName = payload.fileName;
-        doc.photos[payload.photoId] = record;
-        attachPhotoToEntity(doc, payload.entityCollection, payload.entityId, payload.photoId);
-      }, `photos: add ${payload.photoId}`);
+      const record: PhotoAttachment = {
+        id: payload.photoId,
+        driveFileId: fileId,
+        mime: payload.mime,
+        width: payload.width,
+        height: payload.height,
+        sizeBytes: payload.sizeBytes,
+        createdAt: now,
+        updatedAt: now,
+      };
+      // Automerge rejects undefined property assignments — only set optional
+      // fields when they have a value.
+      if (payload.createdBy) record.createdBy = payload.createdBy;
+      if (payload.fileName) record.fileName = payload.fileName;
+      // Atomic: store the photo record + attach it to the host in one batch. A
+      // benign attach miss (mid-wizard vacation) does NOT reject the batch (the
+      // worker attach handler catches + logs), so the record still lands.
+      await mutate({
+        op: 'batch',
+        ops: [
+          { op: 'set', collection: 'photos', id: payload.photoId, entity: record },
+          {
+            op: 'named',
+            name: 'attachPhotoToEntity',
+            args: {
+              entityCollection: payload.entityCollection,
+              entityId: payload.entityId,
+              photoId: payload.photoId,
+            },
+          },
+        ],
+      });
     } catch (writeErr) {
       // Rollback: try to delete the Drive file we just created.
       try {
@@ -709,20 +699,18 @@ export const usePhotoStore = defineStore('photos', () => {
 
     try {
       const now = new Date().toISOString();
-      changeDoc((doc: FamilyDocument) => {
-        const record: PhotoAttachment = {
-          id: photoId,
-          driveFileId: fileId,
-          mime: compressed.mime,
-          width: compressed.width,
-          height: compressed.height,
-          sizeBytes: compressed.blob.size,
-          createdAt: now,
-          updatedAt: now,
-        };
-        if (createdBy) record.createdBy = createdBy;
-        doc.photos[photoId] = record;
-      }, `photos: add avatar ${photoId}`);
+      const record: PhotoAttachment = {
+        id: photoId,
+        driveFileId: fileId,
+        mime: compressed.mime,
+        width: compressed.width,
+        height: compressed.height,
+        sizeBytes: compressed.blob.size,
+        createdAt: now,
+        updatedAt: now,
+      };
+      if (createdBy) record.createdBy = createdBy;
+      await mutate({ op: 'set', collection: 'photos', id: photoId, entity: record });
     } catch (writeErr) {
       try {
         await deleteFile(token, fileId);
@@ -768,16 +756,19 @@ export const usePhotoStore = defineStore('photos', () => {
     });
 
     const previousDriveFileId = existing.driveFileId;
-    changeDoc((doc: FamilyDocument) => {
-      const record = doc.photos[photoId];
-      if (!record) return;
-      record.driveFileId = newDriveFileId;
-      record.mime = compressed.mime;
-      record.width = compressed.width;
-      record.height = compressed.height;
-      record.sizeBytes = compressed.blob.size;
-      record.updatedAt = new Date().toISOString();
-    }, `photos: replace ${photoId}`);
+    await mutate({
+      op: 'patch',
+      collection: 'photos',
+      id: photoId,
+      patch: {
+        driveFileId: newDriveFileId,
+        mime: compressed.mime,
+        width: compressed.width,
+        height: compressed.height,
+        sizeBytes: compressed.blob.size,
+      },
+      updatedAt: new Date().toISOString(),
+    });
 
     thumbUrlCache.delete(previousDriveFileId);
     thumbUrlCache.delete(newDriveFileId);
@@ -800,37 +791,40 @@ export const usePhotoStore = defineStore('photos', () => {
   function markDeleted(photoId: UUID): void {
     const photo = photos.value[photoId];
     if (!photo) return;
-    changeDoc((doc: FamilyDocument) => {
-      const record = doc.photos[photoId];
-      if (!record) return;
-      record.deletedAt = new Date().toISOString();
-      record.updatedAt = record.deletedAt;
-    }, `photos: tombstone ${photoId}`);
+    const now = new Date().toISOString();
+    fireAndForgetMutate({
+      op: 'patch',
+      collection: 'photos',
+      id: photoId,
+      patch: { deletedAt: now },
+      updatedAt: now,
+    });
   }
 
   // --- Garbage collection ---------------------------------------------
 
   async function gcOrphans(): Promise<{ scanned: number; deleted: number }> {
-    const doc = getDoc();
-    const all = Object.values(doc.photos ?? {});
+    const all = projectionList('photos');
     const now = Date.now();
     const toDelete: PhotoAttachment[] = [];
 
-    // Fail-safe: if ANY collect hook throws we cannot reliably tell which
-    // photos are referenced — deleting on a partial set would wipe live
-    // attachments app-wide. Abort the sweep entirely (delete nothing) and
-    // retry next time. The error is logged in collectReferencedPhotoIds.
+    // Fail-safe: if ANY collect hook throws (surfaced as an RPC rejection) we
+    // cannot reliably tell which photos are referenced — deleting on a partial
+    // set would wipe live attachments. Abort the sweep entirely (delete nothing)
+    // and retry next time. `{quiet}`: the abort is expected, not a toast.
     let referenced: Set<UUID>;
     try {
-      referenced = collectReferencedPhotoIds(doc);
+      const { ids } = await collectPhotoIdsRpc({ quiet: true });
+      referenced = new Set(ids);
     } catch {
       return { scanned: all.length, deleted: 0 };
     }
 
+    const hosts = hasPhotoCollections();
     for (const photo of all) {
       const tombstoneExpired =
         photo.deletedAt && now - Date.parse(photo.deletedAt) > TOMBSTONE_GRACE_MS;
-      const orphaned = photoCollections.size > 0 && !referenced.has(photo.id);
+      const orphaned = hosts && !referenced.has(photo.id);
       if (tombstoneExpired || orphaned) toDelete.push(photo);
     }
 
@@ -849,37 +843,15 @@ export const usePhotoStore = defineStore('photos', () => {
           }
         }
       }
-      changeDoc((d: FamilyDocument) => {
-        delete d.photos[photo.id];
-      }, `photos: gc ${photo.id}`);
+      // Delete the record only AFTER the Drive file is gone (or 404s) — the
+      // worker owns the doc, so this is a single-id delete RPC per survivor.
+      await mutate({ op: 'delete', collection: 'photos', id: photo.id });
       thumbUrlCache.delete(photo.driveFileId);
       unresolvedIds.value.delete(photo.id);
     }
 
     triggerRef(unresolvedIds);
     return { scanned: all.length, deleted: toDelete.length };
-  }
-
-  /**
-   * Gather every photoId referenced by any registered collection, via its
-   * `collect` hook. Throws `PhotoCollectHookError` if a hook fails — the
-   * caller (`gcOrphans`) treats that as "cannot determine references" and
-   * aborts the sweep (fail-safe: never delete on a partial set).
-   */
-  function collectReferencedPhotoIds(doc: FamilyDocument): Set<UUID> {
-    const ids = new Set<UUID>();
-    for (const [name, hooks] of photoCollections) {
-      try {
-        for (const pid of hooks.collect(doc)) ids.add(pid);
-      } catch (e) {
-        console.error(
-          `[photoStore] collect hook failed for "${name}" — aborting GC sweep to avoid deleting referenced photos`,
-          e
-        );
-        throw new PhotoCollectHookError(name, e);
-      }
-    }
-    return ids;
   }
 
   // --- Pending uploads -------------------------------------------------
@@ -933,47 +905,26 @@ export const usePhotoStore = defineStore('photos', () => {
   ): UUID[] | undefined {
     if (!entityId) return undefined;
     void docVersion.value;
-    try {
-      const entities = (
-        getDoc() as unknown as Record<string, Record<string, { photoIds?: UUID[] }>>
-      )[entityCollection];
-      return entities?.[entityId]?.photoIds;
-    } catch {
-      return undefined;
-    }
+    const entity = projectionGetById(entityCollection as CollectionName, entityId) as
+      { photoIds?: UUID[] } | undefined;
+    return entity?.photoIds;
   }
 
   // --- Helpers ---------------------------------------------------------
-
-  function attachPhotoToEntity(
-    doc: FamilyDocument,
-    entityCollection: string,
-    entityId: string,
-    photoId: UUID
-  ): void {
-    // Registered hooks know how to reach the entity (flat or nested);
-    // an unregistered collection falls back to flat behavior (preserves the
-    // pre-registry contract). A throwing hook must never break the upload —
-    // the caller's `updatePhotoIds` emit is the primary reference path.
-    const hooks = photoCollections.get(entityCollection) ?? flatHooks(entityCollection);
-    try {
-      hooks.attach(doc, entityId, photoId);
-    } catch (e) {
-      console.error(`[photoStore] attach hook failed for "${entityCollection}"/${entityId}`, e);
-    }
-  }
 
   /**
    * Link an ALREADY-STORED photo to an additional entity, without re-uploading the
    * blob. Used when one source document belongs to several entities (e.g. a travel
    * itinerary that extracts into multiple booking segments — #30): the file is stored
    * once via `addPhoto`, then its photoId is linked to every other segment here.
-   * Runs the collection's attach hook inside a single changeDoc; a throwing hook is
-   * logged, never thrown (consistent with `attachPhotoToEntity`).
+   * Runs the `attachPhotoToEntity` named op in the worker; a throwing hook is logged
+   * there, never thrown.
    */
   function linkPhotoToEntity(entityCollection: string, entityId: string, photoId: UUID): void {
-    changeDoc((doc: FamilyDocument) => {
-      attachPhotoToEntity(doc, entityCollection, entityId, photoId);
+    fireAndForgetMutate({
+      op: 'named',
+      name: 'attachPhotoToEntity',
+      args: { entityCollection, entityId, photoId },
     });
   }
 
@@ -1007,9 +958,8 @@ export const usePhotoStore = defineStore('photos', () => {
   };
 });
 
-// Exported for tests only.
+// Exported for tests only. The registry now lives in `worker/photoOps.ts`.
 export const __internals = {
   registerPhotoCollection,
-  photoCollections,
   flatHooks,
 };

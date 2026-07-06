@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest';
-import { initDoc, resetDoc } from '@/services/automerge/docService';
+import 'fake-indexeddb/auto';
+import { installInlineBackend } from '@/services/automerge/worker/__tests__/inlineHarness';
 import {
   driveConnectionId,
   upsertDriveConnection,
@@ -10,9 +11,8 @@ import {
 } from '@/services/automerge/repositories/driveRepository';
 
 describe('driveRepository', () => {
-  beforeEach(() => {
-    resetDoc();
-    initDoc();
+  beforeEach(async () => {
+    await installInlineBackend();
   });
 
   describe('driveConnectionId', () => {

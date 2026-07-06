@@ -298,7 +298,7 @@ export default [
     // Dev-only admin tooling (rendered only in `import.meta.env.DEV`) — its
     // copy is for the developer, not end users, so it is intentionally exempt
     // from the i18n bare-string rule.
-    files: ['src/components/settings/DevFeatureFlagsCard.vue'],
+    files: ['src/components/settings/DevFeatureFlagsCard.vue', 'src/pages/dev/**'],
     rules: {
       'vue/no-bare-strings-in-template': 'off',
     },

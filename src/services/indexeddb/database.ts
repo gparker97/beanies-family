@@ -11,7 +11,7 @@
  * - deleteFamilyDatabase for sign-out cleanup
  */
 
-import { clearCache, closeCacheDB } from '@/services/automerge/persistenceService';
+import * as docClient from '@/services/automerge/worker/docClient';
 import { deletePhotoQueueDatabase } from '@/services/sync/photoUploadQueue';
 
 const DB_NAME_PREFIX = 'beanies-data-';
@@ -53,7 +53,10 @@ export function getAutomergeDatabaseName(familyId: string): string {
  * Close any open database connections.
  */
 export async function closeDatabase(): Promise<void> {
-  closeCacheDB();
+  // The worker owns the cache connection now; dropping the doc + projection is
+  // the main-thread equivalent of closing (a following delete goes via
+  // deleteFamilyDatabase → docClient.clearCache, which close-then-deletes).
+  await docClient.reset();
 }
 
 /**
@@ -61,8 +64,10 @@ export async function closeDatabase(): Promise<void> {
  * Used on sign-out to treat local storage as an ephemeral cache.
  */
 export async function deleteFamilyDatabase(familyId: string): Promise<void> {
-  // Delete Automerge persistence cache
-  await clearCache(familyId);
+  // Delete the Automerge persistence cache via the worker (close-then-delete —
+  // the only open connection lives in the worker post-ADR-032; a main-thread
+  // delete would fire onblocked and silently keep the encrypted cache).
+  await docClient.clearCache(familyId);
 
   // Delete legacy per-family IndexedDB (if it still exists from before migration)
   const legacyDbName = getFamilyDatabaseName(familyId);

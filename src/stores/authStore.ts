@@ -15,8 +15,8 @@ import { useFamilyContextStore } from './familyContextStore';
 import { useFamilyStore } from './familyStore';
 import { useSettingsStore } from './settingsStore';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
-import { flushPendingSave, cancelPendingSave } from '@/services/sync/syncService';
-import { initDoc } from '@/services/automerge/docService';
+import { saveNow, cancelPendingSave } from '@/services/sync/syncService';
+import * as docClient from '@/services/automerge/worker/docClient';
 import { clearGoogleSessionState } from '@/services/google/googleAuth';
 import { clearFolderCache } from '@/services/google/driveService';
 import { reportError } from '@/utils/errorReporter';
@@ -471,15 +471,47 @@ export const useAuthStore = defineStore('auth', () => {
    * `ageGroup: 'adult'` match `signUp`'s long-standing behavior (the role
    * picker in the wizard is cosmetic; the owner is always stored as an adult).
    */
+  /**
+   * Tear down ALL in-memory family state before building a fresh owner doc.
+   *
+   * ORDER IS LOAD-BEARING — do not reorder:
+   *  1. `docClient.reset()` — drop the previous family's worker doc + family key
+   *     + persist debounce, and reset the projection. With the key now null, any
+   *     in-flight pre-pod `createMember` persist early-returns, so the new
+   *     family's doc can never be written into the OLD family's encrypted cache
+   *     (ADR-032 defect 2). Does NOT delete the old cache DB (correct — we don't
+   *     delete another family's data; `createNewFile`'s `initAndLoadCache` later
+   *     re-points the handle).
+   *  2. `docClient.initDoc()` — fresh empty doc + empty projection.
+   *  3. `familyStore.resetState()` — null the stale `currentMemberId` sentinel
+   *     (`reloadAllStores` → `loadMembers` RESTORES, not nulls, `currentMemberId`;
+   *     `createMember` + `setCurrentMember` set it fresh afterwards).
+   *  4. `reloadAllStores()` — re-derive every entity store from the now-empty
+   *     projection, clearing any previous family's rows still resident in the
+   *     store `ref<T[]>` arrays (ADR-032 defect 1 — the cross-family mixing).
+   *
+   * Runs BEFORE `createMember`, so the owner write (which appends to the reactive
+   * ref, with no later reload) survives. A cheap, safe no-op on the resume-after-
+   * redirect path where the worker respawned fresh (keyless reset + empty-
+   * projection reload). Dynamic `import('./syncStore')` matches the existing
+   * cross-store pattern used in sign-out below.
+   */
+  async function resetInMemoryFamilyState(): Promise<void> {
+    await docClient.reset();
+    await docClient.initDoc();
+    useFamilyStore().resetState();
+    const { useSyncStore } = await import('./syncStore');
+    await useSyncStore().reloadAllStores();
+  }
+
   async function buildOwnerDoc(
     owner: { name: string; email: string; passwordHash: string },
     id?: string
   ) {
-    // Must run before any changeDoc() call (createMember writes to the doc).
-    initDoc();
+    // Tear down any previous family's in-memory state, then start a fresh doc.
+    // Must run before any mutation (createMember writes to the worker doc).
+    await resetInMemoryFamilyState();
     const familyStore = useFamilyStore();
-    // Clear stale state from any previous cancelled setup attempt.
-    familyStore.resetState();
     const memberInput = {
       name: owner.name,
       email: owner.email,
@@ -1045,11 +1077,11 @@ export const useAuthStore = defineStore('auth', () => {
    * a missed final save.
    */
   async function signOut(): Promise<void> {
-    // Flush any pending debounced save so recent changes persist to file.
-    // Bounded timeout — Drive can hang indefinitely if its API key is
-    // rejected, the file was deleted, or the network is offline. Don't
-    // let that block sign-out.
-    await flushPendingSaveWithTimeout(3000);
+    // Force a durable save of the latest doc BEFORE the cache is torn down, so
+    // the freshest edit (which may live only in the worker cache) reaches Drive.
+    // Bounded timeout — Drive can hang indefinitely if its API key is rejected,
+    // the file was deleted, or the network is offline. Don't let that block sign-out.
+    await forceSaveWithTimeout(3000);
 
     // Wipe Google session state (in-memory tokens, refresh tokens in
     // IndexedDB+localStorage, folder cache). Without this, signing in
@@ -1099,23 +1131,37 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Wrap flushPendingSave so a hung Drive call cannot block sign-out.
-   * Resolves on timeout or error — a missed final save is acceptable;
-   * a user trapped on the page is not.
+   * Force a durable save of the current worker doc before sign-out tears the
+   * local cache down — bounded so a hung Drive call cannot block sign-out.
+   *
+   * Uses `saveNow()` (not a flush-if-pending): the freshest edits may live only
+   * in the worker cache with NO pending debounce timer — the auto-save already
+   * fired-and-failed, or elapsed — so a flush-if-pending would no-op and those
+   * edits would be lost when the cache is deleted (ADR-032 defect 3). `saveNow`
+   * returns `false` when there's no family key/envelope (e.g. signing out
+   * mid-create before the pod file is configured) → nothing is uploaded, so a
+   * partial/empty doc can never be written. Resolves on timeout or error — a
+   * missed final save is acceptable; a user trapped on the page is not.
    */
-  async function flushPendingSaveWithTimeout(timeoutMs: number): Promise<void> {
+  async function forceSaveWithTimeout(timeoutMs: number): Promise<void> {
     try {
-      await Promise.race([
-        flushPendingSave(),
-        new Promise<void>((resolve) => {
+      const saved = await Promise.race([
+        saveNow(),
+        new Promise<boolean>((resolve) => {
           setTimeout(() => {
-            console.warn('[authStore] flushPendingSave timed out — proceeding with sign-out');
-            resolve();
+            console.warn('[authStore] force-save timed out — proceeding with sign-out');
+            resolve(false);
           }, timeoutMs);
         }),
       ]);
+      if (!saved) {
+        // Not an error — no key/envelope yet (mid-create), nothing dirty, or the
+        // timeout won the race. Logged (never silent) so a lost-last-edit repro
+        // can confirm whether the final save reached Drive.
+        console.warn('[authStore] force-save on sign-out saved nothing (no durable state to save)');
+      }
     } catch (e) {
-      console.warn('[authStore] flushPendingSave failed — proceeding with sign-out', e);
+      console.warn('[authStore] force-save failed — proceeding with sign-out', e);
     }
     // Cancel any debounced save still pending so it doesn't fire after
     // sign-out clears auth state. Idempotent if no timer is set.
@@ -1171,9 +1217,9 @@ export const useAuthStore = defineStore('auth', () => {
    * regardless of trusted device status. Also resets the trust flag.
    */
   async function signOutAndClearData(): Promise<void> {
-    // Flush any pending debounced save so recent changes persist to file.
+    // Force a durable save of the latest doc before clearing the cache.
     // Bounded — see signOut() for rationale.
-    await flushPendingSaveWithTimeout(3000);
+    await forceSaveWithTimeout(3000);
 
     // Wipe Google session state — same rationale as signOut().
     await clearGoogleSessionStateWithTimeout(3000);

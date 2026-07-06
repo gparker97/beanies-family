@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { initDoc } from '@/services/automerge/docService';
+import { installInlineBackend } from '@/services/automerge/worker/__tests__/inlineHarness';
 import { createCalendarConnection } from '@/services/automerge/repositories/calendarRepository';
 import { setCalendarClientForTesting } from '@/services/calendar/clientInstance';
 import { CalendarApiError, type CalendarClient } from '@/services/calendar/CalendarClient';
@@ -84,9 +84,9 @@ const overlappingEvents = () => [
 ];
 
 describe('calendarClashStore (#34)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     setActivePinia(createPinia());
-    initDoc();
+    await installInlineBackend();
     localStorage.setItem('beanies:flag:calendarClashNudge', 'true');
     localStorage.setItem('beanies:flag:googleCalendarSync', 'true');
     reportErrorMock.mockClear();

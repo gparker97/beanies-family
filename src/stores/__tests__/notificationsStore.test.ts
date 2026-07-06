@@ -12,17 +12,34 @@ const viewer = {
   isPet: false,
 } as FamilyMember;
 let currentMember: FamilyMember | undefined = viewer;
-const mockDoc: { notificationReads: Record<string, Record<string, string>> } = {
-  notificationReads: {},
-};
+// ADR-032: store reads notificationReads[memberId] from the projection and
+// writes it via docClient.mutate(patch, createIfMissing). `reads` is the fake.
+const reads: Record<string, Record<string, string>> = {};
+const flush = () => new Promise((r) => setTimeout(r, 0));
 let docLoaded = true;
 const reportErrorSpy = vi.fn();
 
 vi.mock('@/services/automerge/docService', () => ({
   docVersion: ref(0),
   isDocLoaded: () => docLoaded,
-  getDoc: () => mockDoc,
-  changeDoc: (fn: (d: typeof mockDoc) => void) => fn(mockDoc),
+}));
+vi.mock('@/services/automerge/projection', () => ({
+  getById: (collection: string, id: string) =>
+    collection === 'notificationReads' ? reads[id] : undefined,
+}));
+vi.mock('@/services/automerge/worker/docClient', () => ({
+  mutate: async (op: {
+    op: string;
+    id: string;
+    patch?: Record<string, string>;
+    deleteKeys?: string[];
+    onMissing?: 'throw' | 'create' | 'skip';
+  }) => {
+    if (op.op !== 'patch') return;
+    const slice = (reads[op.id] ??= {});
+    Object.assign(slice, op.patch ?? {});
+    for (const k of op.deleteKeys ?? []) delete slice[k];
+  },
 }));
 vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({
@@ -44,12 +61,12 @@ beforeEach(() => {
   setActivePinia(createPinia());
   currentMember = viewer;
   docLoaded = true;
-  mockDoc.notificationReads = {};
+  for (const k of Object.keys(reads)) delete reads[k];
   reportErrorSpy.mockClear();
 });
 
 describe('notificationsStore — drawer state machine', () => {
-  it('open → list; openTo → detail (+marks read); back pops detail→list then closes', () => {
+  it('open → list; openTo → detail (+marks read); back pops detail→list then closes', async () => {
     const s = useNotificationsStore();
     s.open();
     expect(s.isOpen).toBe(true);
@@ -61,7 +78,8 @@ describe('notificationsStore — drawer state machine', () => {
     s.openTo(id);
     expect(s.view).toBe('detail');
     expect(s.selectedId).toBe(id);
-    expect(mockDoc.notificationReads['v']?.[id]).toBeTruthy(); // marked read
+    await flush();
+    expect(reads['v']?.[id]).toBeTruthy(); // marked read
 
     s.back();
     expect(s.isOpen).toBe(true);
@@ -83,22 +101,26 @@ describe('notificationsStore — drawer state machine', () => {
 });
 
 describe('notificationsStore — read-state mutations', () => {
-  it('markRead writes notificationReads[memberId][id]; markUnread deletes it', () => {
+  it('markRead writes notificationReads[memberId][id]; markUnread deletes it', async () => {
     const s = useNotificationsStore();
     s.markRead('todo-due:t1:2026-05-27');
-    expect(mockDoc.notificationReads['v']['todo-due:t1:2026-05-27']).toBeTruthy();
+    await flush();
+    expect(reads['v']['todo-due:t1:2026-05-27']).toBeTruthy();
     s.markUnread('todo-due:t1:2026-05-27');
-    expect(mockDoc.notificationReads['v']['todo-due:t1:2026-05-27']).toBeUndefined();
+    await flush();
+    expect(reads['v']['todo-due:t1:2026-05-27']).toBeUndefined();
   });
 
-  it('markAllRead marks the full derived unread set (not just rendered rows)', () => {
+  it('markAllRead marks the full derived unread set (not just rendered rows)', async () => {
     const s = useNotificationsStore();
     const unreadBefore = s.unreadCount;
     expect(unreadBefore).toBeGreaterThan(0); // the real whats-new releases
+    const ids = s.notifications.map((n) => n.id);
     s.markAllRead();
+    await flush();
     // every derived id now has a readAt entry
-    for (const n of s.notifications) {
-      expect(mockDoc.notificationReads['v'][n.id]).toBeTruthy();
+    for (const id of ids) {
+      expect(reads['v'][id]).toBeTruthy();
     }
   });
 
@@ -107,7 +129,7 @@ describe('notificationsStore — read-state mutations', () => {
     currentMember = undefined;
     expect(() => s.markRead('x')).not.toThrow();
     expect(reportErrorSpy).toHaveBeenCalled();
-    expect(mockDoc.notificationReads).toEqual({});
+    expect(reads).toEqual({});
   });
 
   it('guards: no loaded doc → reports + no-op', () => {

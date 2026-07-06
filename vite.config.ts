@@ -141,6 +141,20 @@ function featureFlagWriterDev() {
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Worker bundles do NOT inherit the top-level `plugins`, so the Automerge WASM
+  // module (loaded with top-level await) needs these declared here explicitly —
+  // without them a `@automerge/automerge` import inside a Web Worker fails to
+  // build/load. See ADR-032 (off-main-thread Automerge).
+  worker: {
+    format: 'es',
+    plugins: () => [wasm(), topLevelAwait()],
+  },
+  // Dev-server only: allow ephemeral tunnel hosts (cloudflared/ngrok/localtunnel)
+  // so the ADR-032 worker spike can be opened on an iPhone over HTTPS. Vite 7
+  // rejects unknown Host headers by default. No effect on the production build.
+  server: {
+    allowedHosts: ['.trycloudflare.com', '.ngrok-free.app', '.ngrok.io', '.loca.lt'],
+  },
   plugins: [
     assertOfficialBuildEnv(),
     featureFlagWriterDev(),

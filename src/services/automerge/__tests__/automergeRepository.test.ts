@@ -1,10 +1,10 @@
 // @vitest-environment node
+import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach } from 'vitest';
-import * as Automerge from '@automerge/automerge';
-import { initDoc, resetDoc, getDoc, saveDoc } from '../docService';
+import { getById as projGetById } from '../projection';
 import { createAutomergeRepository } from '../automergeRepository';
+import { installInlineBackend } from '../worker/__tests__/inlineHarness';
 import type { FamilyMember } from '@/types/models';
-import type { FamilyDocument } from '@/types/automerge';
 
 // Test with familyMembers collection using a transform
 function applyDefaults(member: FamilyMember): FamilyMember {
@@ -24,9 +24,8 @@ const repo = createAutomergeRepository<
 >('familyMembers', { transform: applyDefaults });
 
 describe('createAutomergeRepository', () => {
-  beforeEach(() => {
-    resetDoc();
-    initDoc();
+  beforeEach(async () => {
+    await installInlineBackend();
   });
 
   describe('create', () => {
@@ -59,8 +58,7 @@ describe('createAutomergeRepository', () => {
         requiresPassword: false,
       });
 
-      const doc = getDoc();
-      const stored = doc.familyMembers[member.id];
+      const stored = projGetById('familyMembers', member.id) as FamilyMember | undefined;
       expect(stored).toBeDefined();
       expect(stored!.name).toBe('Bob');
     });
@@ -263,10 +261,9 @@ describe('createAutomergeRepository', () => {
       expect(item.id).toBeDefined();
       expect(item.description).toBe('Electric bill');
       // undefined fields should NOT be present on the stored entity
-      const doc = getDoc();
-      const stored = doc.recurringItems[item.id];
+      const stored = projGetById('recurringItems', item.id) as unknown as Record<string, unknown>;
       expect(stored).toBeDefined();
-      expect('monthOfYear' in stored!).toBe(false);
+      expect('monthOfYear' in stored).toBe(false);
     });
 
     it('update() strips undefined values instead of passing them to Automerge', async () => {
@@ -299,59 +296,8 @@ describe('createAutomergeRepository', () => {
     });
   });
 
-  describe('CRDT merge', () => {
-    it('concurrent changes from two docs merge cleanly', async () => {
-      // Create initial member
-      await repo.create({
-        name: 'Initial',
-        email: 'initial@example.com',
-        gender: 'other',
-        ageGroup: 'adult',
-        role: 'owner',
-        color: '#000',
-        requiresPassword: false,
-      });
-
-      // Save and fork
-      const binary = saveDoc();
-      const docB = Automerge.load<FamilyDocument>(binary);
-
-      // Change on A: add another member
-      await repo.create({
-        name: 'From A',
-        email: 'a@example.com',
-        gender: 'female',
-        ageGroup: 'adult',
-        role: 'member',
-        color: '#AAA',
-        requiresPassword: false,
-      });
-
-      // Change on B: add a different member
-      const docBChanged = Automerge.change(docB, (d) => {
-        d.familyMembers['b-member'] = {
-          id: 'b-member',
-          name: 'From B',
-          email: 'b@example.com',
-          gender: 'male',
-          ageGroup: 'adult',
-          role: 'member',
-          color: '#BBB',
-          requiresPassword: false,
-          createdAt: '2026-01-01',
-          updatedAt: '2026-01-01',
-        };
-      });
-
-      // Merge
-      const { mergeDoc } = await import('../docService');
-      mergeDoc(docBChanged);
-
-      // All three members should exist
-      const all = await repo.getAll();
-      expect(all).toHaveLength(3);
-      const names = all.map((m) => m.name).sort();
-      expect(names).toEqual(['From A', 'From B', 'Initial']);
-    });
-  });
+  // CRDT-merge behaviour now lives in the doc layer (worker) — covered by
+  // worker/__tests__/{docOps,applyAndProject}.test.ts (mergeDocs + the
+  // mergeRemoteEnvelope round-trip). The repository is a thin projection/RPC
+  // adapter and no longer owns merge.
 });

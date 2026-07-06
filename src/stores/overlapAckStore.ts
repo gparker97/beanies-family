@@ -12,7 +12,10 @@
 
 import { defineStore } from 'pinia';
 import { useFamilyStore } from '@/stores/familyStore';
-import { changeDoc, docVersion, getDoc, isDocLoaded } from '@/services/automerge/docService';
+import { docVersion, isDocLoaded } from '@/services/automerge/docService';
+import { getById as projectionGetById } from '@/services/automerge/projection';
+import { mutate } from '@/services/automerge/worker/docClient';
+import type { MutationOp } from '@/services/automerge/worker/protocol';
 import { overlapAckKey } from '@/utils/calendar/clashDetection';
 import { reportError } from '@/utils/errorReporter';
 import type { OverlapAck } from '@/types/models';
@@ -32,22 +35,25 @@ export const useOverlapAckStore = defineStore('overlapAck', () => {
     connectionId: string,
     fingerprint: string
   ): boolean {
-    void docVersion.value; // re-read after any changeDoc (raw doc projection)
+    void docVersion.value; // re-read after any write (raw doc projection)
     if (!isDocLoaded()) return false;
-    const entry =
-      getDoc().overlapAcknowledgments?.[overlapAckKey(activityId, occurrenceDate, connectionId)];
+    const entry = projectionGetById(
+      'overlapAcknowledgments',
+      overlapAckKey(activityId, occurrenceDate, connectionId)
+    ) as OverlapAck | undefined;
     return entry?.fingerprint === fingerprint;
   }
 
   /**
    * Single guarded writer for both acknowledge/unacknowledge — pre-checks a loaded
-   * doc + current member (reports a warning + returns if missing), then applies the
-   * mutation inside try/catch (reports an error on any throw). Never silent.
+   * doc + current member (reports a warning + returns if missing), then awaits the
+   * declarative op inside try/catch (reports an error on any throw). `{quiet}`: a
+   * click-handler failure classifies here, not via a critical doc-worker toast.
    */
-  function applyChange(
+  async function applyChange(
     label: string,
-    mutate: (acks: Record<string, OverlapAck>, memberId: string) => void
-  ): void {
+    buildOp: (memberId: string) => MutationOp
+  ): Promise<void> {
     const member = familyStore.currentMember;
     if (!isDocLoaded() || !member) {
       reportError({
@@ -58,10 +64,7 @@ export const useOverlapAckStore = defineStore('overlapAck', () => {
       return;
     }
     try {
-      changeDoc((doc) => {
-        if (!doc.overlapAcknowledgments) doc.overlapAcknowledgments = {};
-        mutate(doc.overlapAcknowledgments, member.id);
-      }, `overlapAck: ${label}`);
+      await mutate(buildOp(member.id), { quiet: true });
     } catch (err) {
       reportError({
         surface: `overlap-ack-${label}`,
@@ -79,23 +82,30 @@ export const useOverlapAckStore = defineStore('overlapAck', () => {
     connectionId: string,
     fingerprint: string
   ): void {
-    applyChange('acknowledge', (acks, memberId) => {
-      acks[overlapAckKey(activityId, occurrenceDate, connectionId)] = {
+    const key = overlapAckKey(activityId, occurrenceDate, connectionId);
+    void applyChange('acknowledge', (memberId) => ({
+      op: 'set',
+      collection: 'overlapAcknowledgments',
+      id: key,
+      entity: {
         activityId,
         occurrenceDate,
         connectionId,
         fingerprint,
         acknowledgedAt: new Date().toISOString(),
         acknowledgedBy: memberId,
-      };
-    });
+      } satisfies OverlapAck,
+    }));
   }
 
   /** Undo — re-raise this overlap (remove the key). */
   function unacknowledge(activityId: string, occurrenceDate: string, connectionId: string): void {
-    applyChange('unacknowledge', (acks) => {
-      delete acks[overlapAckKey(activityId, occurrenceDate, connectionId)];
-    });
+    const key = overlapAckKey(activityId, occurrenceDate, connectionId);
+    void applyChange('unacknowledge', () => ({
+      op: 'delete',
+      collection: 'overlapAcknowledgments',
+      id: key,
+    }));
   }
 
   return { isAcknowledged, acknowledge, unacknowledge };
