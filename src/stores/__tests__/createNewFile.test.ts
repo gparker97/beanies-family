@@ -317,6 +317,8 @@ vi.mock('@/stores/syncHighlightStore', () => ({
 import { useAuthStore, DEFERRED_PASSWORD_HASH } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useAccountsStore } from '@/stores/accountsStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { resetDoc } from '@/services/automerge/docService';
 import { installInlineBackend } from '@/services/automerge/worker/__tests__/inlineHarness';
 import * as docClient from '@/services/automerge/worker/docClient';
@@ -446,6 +448,65 @@ describe('pod creation: full end-to-end flow', () => {
     const syncResult = await syncStore.syncNow(true);
     // syncService.save is mocked to return true
     expect(syncResult).toBe(true);
+  });
+
+  // ── ADR-032: create tears down the PREVIOUS family's in-memory state ──────
+  //
+  // Regression guard for the cross-family data-mixing bug: creating a new family
+  // while another family's rows are still resident in the entity store ref arrays
+  // must leave the new family with EMPTY stores (only the new owner).
+
+  it('signUp clears leftover entity-store rows from a previous family', async () => {
+    const accountsStore = useAccountsStore();
+    const activityStore = useActivityStore();
+    // Simulate a previous family's data still resident in the store refs.
+    accountsStore.accounts.push({ id: 'old-acct', name: 'Old Family Checking' } as never);
+    activityStore.activities.push({ id: 'old-act', title: 'Old Family Activity' } as never);
+    expect(accountsStore.accounts).toHaveLength(1);
+    expect(activityStore.activities).toHaveLength(1);
+
+    const authStore = useAuthStore();
+    const result = await authStore.signUp({
+      email: 'new@example.com',
+      password: 'password123',
+      familyName: 'New Family',
+      memberName: 'New Owner',
+    });
+    expect(result.success).toBe(true);
+
+    // The previous family's rows are gone; only the new owner remains.
+    expect(accountsStore.accounts).toHaveLength(0);
+    expect(activityStore.activities).toHaveLength(0);
+    const familyStore = useFamilyStore();
+    expect(familyStore.members).toHaveLength(1);
+    expect(familyStore.owner?.name).toBe('New Owner');
+  });
+
+  it('resetInMemoryFamilyState runs reset → initDoc → reloadAllStores (before createMember)', async () => {
+    const resetSpy = vi.spyOn(docClient, 'reset');
+    const initSpy = vi.spyOn(docClient, 'initDoc');
+    const syncStore = useSyncStore();
+    const reloadSpy = vi.spyOn(syncStore, 'reloadAllStores');
+
+    const authStore = useAuthStore();
+    await authStore.signUp({
+      email: 'order@example.com',
+      password: 'password123',
+      familyName: 'Order Family',
+      memberName: 'Owner',
+    });
+
+    // The order is load-bearing: reset (drop old doc + key) → initDoc (fresh doc)
+    // → reloadAllStores (clear stale store refs) — all before the owner is written.
+    expect(resetSpy).toHaveBeenCalled();
+    expect(initSpy).toHaveBeenCalled();
+    expect(reloadSpy).toHaveBeenCalled();
+    expect(resetSpy.mock.invocationCallOrder[0]!).toBeLessThan(
+      initSpy.mock.invocationCallOrder[0]!
+    );
+    expect(initSpy.mock.invocationCallOrder[0]!).toBeLessThan(
+      reloadSpy.mock.invocationCallOrder[0]!
+    );
   });
 
   // ── Discriminated-result failure paths ──────────────────────────────────
