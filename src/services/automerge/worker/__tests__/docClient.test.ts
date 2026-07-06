@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { reactive, isReactive } from 'vue';
 import { CorruptPayloadError } from '@/types/sync';
 import { serializeError, type RpcRequest } from '../protocol';
 
@@ -215,5 +216,84 @@ describe('docClient', () => {
     expect(settled.every((s) => s.status === 'rejected')).toBe(true);
     // …but the crash surfaces exactly ONCE, not once per drained call.
     expect(showToast).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('docClient — postRaw envelope-payload narrowing', () => {
+  beforeEach(() => {
+    __resetDocClientForTesting();
+    vi.clearAllMocks();
+  });
+
+  it('passes the large encryptedPayload straight through and strips reactive envelope fields', async () => {
+    const bigPayload = 'x'.repeat(100_000);
+    const reactiveWrapped = reactive({ k1: { wrapped: 'v' } }); // a Vue proxy that would break structuredClone
+    const stringifySpy = vi.spyOn(JSON, 'stringify');
+
+    const fw = useWorker((req) =>
+      req.method === 'mergeRemoteEnvelope'
+        ? { cid: req.cid, ok: true, result: { heads: [], dirty: false } }
+        : null
+    );
+    await mergeRemoteEnvelope(
+      { encryptedPayload: bigPayload, wrappedKeys: reactiveWrapped, familyId: 'f' } as never,
+      'f'
+    );
+
+    const posted = fw.posted.find((p) => p.method === 'mergeRemoteEnvelope')!;
+    const env = (posted.args as { envelope: { encryptedPayload: string; wrappedKeys: unknown } })
+      .envelope;
+    // Payload survives intact (same value, not re-serialized)…
+    expect(env.encryptedPayload).toBe(bigPayload);
+    // …reactive field is stripped to a clone-safe plain object…
+    expect(env.wrappedKeys).toEqual({ k1: { wrapped: 'v' } });
+    expect(isReactive(env.wrappedKeys)).toBe(false);
+    // …and JSON.stringify was NEVER handed the big payload.
+    const sawPayload = stringifySpy.mock.calls.some(
+      ([arg]) => arg != null && typeof arg === 'object' && 'encryptedPayload' in (arg as object)
+    );
+    expect(sawPayload).toBe(false);
+    stringifySpy.mockRestore();
+  });
+});
+
+describe('docClient — Set-driven two-tier RPC timeout', () => {
+  beforeEach(() => {
+    __resetDocClientForTesting();
+    vi.clearAllMocks();
+  });
+
+  it('a HEAVY_METHOD (mergeRemoteEnvelope) survives past the 45s mutation budget; a mutate times out at 45s', async () => {
+    vi.useFakeTimers();
+    try {
+      useWorker(() => null); // never responds → both hang until their timeout fires
+      const mergeOutcome = mergeRemoteEnvelope(
+        { encryptedPayload: '', familyId: 'f' } as never,
+        'f'
+      ).then(
+        () => 'resolved',
+        (e: Error) => e.message
+      );
+      const mutateOutcome = mutate({
+        op: 'set',
+        collection: 'todos',
+        id: 't',
+        entity: { id: 't' },
+      }).then(
+        () => 'resolved',
+        (e: Error) => e.message
+      );
+
+      await vi.advanceTimersByTimeAsync(0); // flush the ready handshake
+      await vi.advanceTimersByTimeAsync(46_000); // past 45s: mutation budget fires, 120s heavy ceiling does not
+
+      await expect(mutateOutcome).resolves.toContain("'mutate' timed out");
+      expect(await Promise.race([mergeOutcome, Promise.resolve('pending')])).toBe('pending');
+
+      await vi.advanceTimersByTimeAsync(80_000); // past 120s total
+      await expect(mergeOutcome).resolves.toContain("'mergeRemoteEnvelope' timed out");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
