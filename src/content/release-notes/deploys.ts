@@ -17,6 +17,15 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.06',
+    date: '2026-07-06',
+    month: '6 july 2026',
+    summary: {
+      en: 'Minor bug fixes and improvements.',
+      beanie: 'minor bug fixes and improvements.',
+    },
+  },
+  {
     version: '2026.07.03',
     date: '2026-07-03',
     month: '3 july 2026',
