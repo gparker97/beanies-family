@@ -57,6 +57,14 @@ export type InlineExecutor = (
 
 const READY_TIMEOUT_MS = 10_000;
 const DEFAULT_RPC_TIMEOUT_MS = 45_000;
+// Whole-doc load/save/merge ops run off-thread (the UI stays responsive), but on
+// iOS Safari/JSC the WASM Automerge.load/merge floor can legitimately take tens of
+// seconds on a large deep-history doc — so they get a generous stuck-worker ceiling
+// instead of the 45 s mutation budget (which was killing a slow-but-progressing
+// first load → the "doc-worker … timed out" lockout). Still BOUNDED: a genuinely
+// hung worker surfaces a classified error at the ceiling.
+// See docs/plans/2026-07-06-worker-ios-large-doc-load.md.
+const HEAVY_RPC_TIMEOUT_MS = 120_000;
 
 interface Pending {
   resolve: (r: RpcResponse) => void;
@@ -299,11 +307,37 @@ const JSON_SAFE_METHODS = new Set([
   'persistEnvelope',
 ]);
 
+// Whole-doc load/save/merge ops → the generous HEAVY_RPC_TIMEOUT_MS ceiling
+// (see the constant). Kept as ONE Set (not threaded per call site) so adding a
+// new whole-doc op is a single line here — it can't silently fall back to the
+// tight 45 s budget and re-introduce the iOS large-doc lockout.
+const HEAVY_METHODS = new Set([
+  'mergeRemoteEnvelope',
+  'initAndLoadCache',
+  'verifyEnvelope',
+  'exportEncryptedPayload',
+]);
+
+// Of the JSON-safe methods, these carry a `.envelope` whose `encryptedPayload` is
+// a large (~2.7 MB) base64 string — a proxy-free primitive Vue never wraps. We
+// plainify only the SMALL envelope fields (wrappedKeys/inviteKeys/metadata) so the
+// main thread doesn't JSON-round-trip megabytes per call. `mutate` is deliberately
+// NOT here — its small entity payload needs full proxy-stripping.
+const ENVELOPE_METHODS = new Set(['mergeRemoteEnvelope', 'verifyEnvelope', 'persistEnvelope']);
+
+const plainify = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
+
 function postRaw(req: RpcRequest): void {
-  const args =
-    req.args != null && JSON_SAFE_METHODS.has(req.method)
-      ? (JSON.parse(JSON.stringify(req.args)) as unknown)
-      : req.args;
+  let args = req.args;
+  if (args != null && JSON_SAFE_METHODS.has(req.method)) {
+    const envelope = (args as { envelope?: Record<string, unknown> }).envelope;
+    if (ENVELOPE_METHODS.has(req.method) && envelope && typeof envelope === 'object') {
+      const { encryptedPayload, ...rest } = envelope;
+      args = { ...(args as object), envelope: { ...(plainify(rest) as object), encryptedPayload } };
+    } else {
+      args = plainify(args);
+    }
+  }
   worker?.postMessage({ ...req, args });
 }
 
@@ -343,13 +377,13 @@ async function requestCore(
   });
   postRaw({ cid, method, args });
 
+  // Heavy whole-doc ops get the generous ceiling (HEAVY_METHODS); everything else
+  // the tight mutation budget. An explicit opts.timeoutMs still overrides both.
+  const timeoutMs =
+    opts.timeoutMs ?? (HEAVY_METHODS.has(method) ? HEAVY_RPC_TIMEOUT_MS : DEFAULT_RPC_TIMEOUT_MS);
   let res: RpcResponse;
   try {
-    res = await withTimeout(
-      responsePromise,
-      opts.timeoutMs ?? DEFAULT_RPC_TIMEOUT_MS,
-      `doc-worker '${method}' timed out`
-    );
+    res = await withTimeout(responsePromise, timeoutMs, `doc-worker '${method}' timed out`);
   } catch (timeoutErr) {
     pending.delete(cid); // discard by cid — a late reply now finds no pending entry
     throw surface(timeoutErr, method, opts.quiet);

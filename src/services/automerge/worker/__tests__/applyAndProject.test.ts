@@ -154,7 +154,7 @@ describe('worker/applyAndProject', () => {
     expect(todos!.entities).toContainEqual(['r1', { id: 'r1', title: 'remote' }]);
   });
 
-  it('mergeRemoteEnvelope with an unsynced local change reports dirty:true and keeps both', async () => {
+  it('poll-merge reports dirty:true, streams a DELTA (not a full rebuild), and keeps both', async () => {
     // Local and remote must share ancestry (as they do in production — both
     // descend from the same created doc), else the two independently-migrated
     // `todos` maps conflict on merge and one side's entry is dropped. Prime the
@@ -164,7 +164,7 @@ describe('worker/applyAndProject', () => {
     await cache.persistDocBinary(key, originBin);
 
     setKey(key);
-    await initAndLoadCache(FAMILY_ID); // currentDoc = origin
+    await initAndLoadCache(FAMILY_ID); // currentDoc = origin (poll-merge path)
     mutate({ op: 'set', collection: 'todos', id: 'l1', entity: { id: 'l1', title: 'local' } });
 
     const remote = applyMutation(Automerge.load<FamilyDocument>(originBin), {
@@ -177,10 +177,54 @@ describe('worker/applyAndProject', () => {
     const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
 
     expect(res.dirty).toBe(true); // local l1 is not in remote → must push back
-    const todos = bulkFor('todos').at(-1)!;
-    const ids = todos.entities.map(([id]) => id).sort();
-    expect(ids).toEqual(['l1', 'r1']);
+    // A poll-merge now streams a DELTA (only the entity the merge brought in),
+    // NOT a full 27-collection rebuild: an upsert for r1, and NO bulk reset.
+    expect(bulkFor('todos')).toHaveLength(0);
+    const todoUpserts = chunks
+      .map((c) => c.delta)
+      .filter((d): d is Extract<ProjectionDelta, { kind: 'upsert' }> => d.kind === 'upsert')
+      .filter((d) => d.collection === 'todos');
+    expect(todoUpserts.map((d) => d.id)).toEqual(['r1']);
+    expect(todoUpserts[0]!.entity).toEqual({ id: 'r1', title: 'remote' });
     expect(perf).toContain('automerge.remoteLoad');
+
+    // No data loss at the doc level: the merged doc keeps BOTH l1 and r1 even
+    // though only r1 was streamed (l1 was already projected by the earlier mutate).
+    const { payload } = await exportEncryptedPayload();
+    const merged = await mergeReadBack(payload, key);
+    expect(Object.keys(merged.todos).sort()).toEqual(['l1', 'r1']);
+  });
+
+  it('poll-merge falls back to a COMPLETE full projection (never a partial) when the delta cannot be derived', async () => {
+    const originBin = saveDoc(base());
+    await cache.initPersistenceDB(FAMILY_ID);
+    await cache.persistDocBinary(key, originBin);
+
+    setKey(key);
+    await initAndLoadCache(FAMILY_ID); // currentDoc = origin (poll-merge path)
+    mutate({ op: 'set', collection: 'todos', id: 'l1', entity: { id: 'l1' } });
+
+    // Remote adds an UNKNOWN top-level key → projectionDeltasBetween returns null
+    // → the merge must fall back to a full projection.
+    const remote = Automerge.change(Automerge.load<FamilyDocument>(originBin), (d) => {
+      (d as unknown as Record<string, Record<string, unknown>>).bogus = { x: { id: 'x' } };
+    });
+    chunks = [];
+    await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+
+    // Half-update safety: the sink sees a COMPLETE full rebuild — every todos delta
+    // is a bulk reset, NO partial upsert/remove leaked, a settings delta is present,
+    // exactly one final chunk. Never a partial delta prefix followed by a reset.
+    const todoBulks = bulkFor('todos');
+    expect(todoBulks.length).toBeGreaterThan(0);
+    expect(todoBulks.every((d) => d.reset)).toBe(true);
+    expect(todoBulks.at(-1)!.entities.map(([id]) => id)).toContain('l1'); // full state kept
+    const partial = chunks
+      .map((c) => c.delta)
+      .filter((d) => (d.kind === 'upsert' || d.kind === 'remove') && d.collection === 'todos');
+    expect(partial).toHaveLength(0);
+    expect(chunks.some((c) => c.delta.kind === 'settings')).toBe(true);
+    expect(chunks.filter((c) => c.final)).toHaveLength(1);
   });
 
   it('mutate reports changed:false for a no-op (skipped op) and changed:true for a real write (F10)', () => {

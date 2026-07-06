@@ -15,7 +15,18 @@
 > >
 > > **iOS onboarding loop (2026-07-06, tunnel test) — NOT a migration regression.** An iPhone create-flow loop hit via a `trycloudflare.com` tunnel was diagnosed to `tokenValid=false` after every OAuth redirect return, in OAuth code **byte-identical to `main`** (`createNewFile` never reached). It is the classic iOS-Safari + ephemeral-tunnel ITP/bounce-tracking artifact (token wiped across the cross-site bounce on an unfamiliar domain; consistent with ADR-026). The real `app.beanies.family` domain has first-party standing and is unaffected. **Validate real-iOS onboarding on prod post-deploy**, then flip `docWorker` prod-on gradually.
 > >
-> > **⭐ NEXT (post-deploy):** (a) test iOS onboarding on `app.beanies.family` (the tunnel can't — OAuth won't survive the bounce there); (b) if clean, flip `docWorker` to prod-on gradually via the Settings feature-flag / committed map, watching telemetry, rollback ready; (c) real-worker Playwright smoke = separate Task #7.
+> > **✅ iOS onboarding + persistence + cross-device sync (inline path) — VERIFIED on real iPhone + 2nd machine (greg, 2026-07-06).** Deploy `1738b1d4` shipped (docWorker prod-off). Confirmed on `app.beanies.family`: fresh account create → sign out → sign in persists; account/activity/member present on a 2nd machine.
+> >
+> > **🐛 iOS worker path times out on a large doc (2026-07-06) — Layer-1 fix PLANNED + IN PROGRESS.** greg enabled the worker on his iPhone via the per-browser `localStorage` override (`beanies:flag:docWorker`) and loading his ~2 MB `.beanpod` hit the fixed 45 s RPC ceiling (`mergeRemoteEnvelope timed out`). 4-agent investigation: the cost is Automerge WASM `load`/`merge` (~5–15× slower on iOS JSC) + redundant whole-doc work; the fixed uniform 45 s timeout kills a slow-but-progressing load. **NOT a data-safety issue; prod is safe on inline.** Fix plan: `docs/plans/2026-07-06-worker-ios-large-doc-load.md` (4-pass reviewed, Go) — HEAVY_METHODS 120 s ceiling, drop redundant `Automerge.clone`, delta projection on poll-merge, narrowed `postRaw` plainify, `pushProjection` telemetry. **Implementing now.**
+> >
+> > **⭐ NEXT (worker re-enable, gated on the Layer-1 fix):** (a) land the Layer-1 fix above; (b) re-test the large-doc load on greg's iPhone via the `localStorage` override; (c) if clean, flip `docWorker` to prod-on via `featureFlags.committed.ts`, watching telemetry, rollback ready; (d) real-worker Playwright smoke = separate Task #7.
+> >
+> > **📋 FOLLOW-UP WORK (needs its own beanies issue → plan → implement — NOT yet planned):**
+> >
+> > 1. **Layer 2 — worker large-doc durability (the real `Automerge.load` ceiling).** Layer 1 makes the load _complete + cheap around_ the WASM floor, but a huge deep-history doc still has a long first-load. The durable fix is **history compaction / snapshotting** + **incremental changes-based sync** (only apply `getChangesSince`/`applyChanges` deltas instead of re-loading/merging the whole 2 MB doc per poll). The `getChangesSince`/`applyChanges` hooks are already stubbed at `applyAndProject.ts:296-308`. Needs its own ADR + plan.
+> > 2. **ADR-032 Plan B — incremental delta sync (the migration's 2nd phase).** The original worker-migration plan (`docs/plans/2026-07-05-automerge-web-worker.md`) shipped Plan A (off-main-thread) with a change-aware RPC surface _specifically so Plan B is a transport swap_: sync only Automerge change-deltas over Drive rather than whole-envelope re-encrypt/merge each time. This is the natural companion to Layer 2 (they share the incremental-changes machinery) and should be planned together.
+> >
+> > **⏳ REMINDER FOR GREG:** create a **beanies issue in Notion** for the two follow-up items above (Layer 2 + Plan B) so they get planned + implemented properly (they are intentionally NOT in the Layer-1 scope).
 >
 > ### What this migration is
 >

@@ -18,6 +18,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Internal groundwork: the family-data engine can now run off the main thread.** A large behind-the-scenes migration moves the app's data document (Automerge) into a background Web Worker so the screen stays responsive while big families load. It ships switched **off** in production for now (the app runs exactly as before), and will be turned on gradually once validated on real devices. No change to your data, your file, or how you sign in.
 
+### Performance
+
+- **Internal (worker, still flag-off): large-doc loads on iOS no longer time out.** When the background Web Worker is enabled, loading a large family file on iPhone no longer errors out at the sign-in step: whole-doc load/merge operations now get a generous, bounded timeout, a redundant document copy on every sync was removed, and syncing now updates only the entries that changed instead of rebuilding the whole projection. Groundwork for turning the worker on. (The durable large-doc fix — history compaction / incremental sync — is a tracked follow-up.)
+
 ## 2026-07-05
 
 ### Changed

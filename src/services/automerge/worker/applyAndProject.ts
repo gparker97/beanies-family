@@ -18,7 +18,7 @@
  * single main-thread buffer. See ADR-032.
  */
 import * as Automerge from '@automerge/automerge';
-import type { FamilyDocument } from '@/types/automerge';
+import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
   migrateDoc,
@@ -32,6 +32,7 @@ import {
   decryptToDoc,
   encryptDocPayload,
   buildFullProjection,
+  projectionDeltasBetween,
   registerNamedOp,
 } from './docOps';
 import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
@@ -126,11 +127,14 @@ async function persistNow(): Promise<void> {
 
 // ─── Projection push (chunked) ───────────────────────────────────────────────
 
-/** Push the full projection for `doc`, slicing large collections so no single
- * main-thread receive is a long task. Always emits ≥1 delta, so `final` lands. */
-function pushProjection(doc: Doc): void {
+/** Stream a list of projection deltas, slicing large `bulk` collections so no
+ * single main-thread receive is a long task. A non-empty list lands `final` on
+ * its last chunk (→ main bumps `docVersion` once); an EMPTY list streams nothing
+ * — correct for a no-op poll-merge (the projection already matches; the RPC result
+ * resolves via its response, not a projection chunk). */
+function pushDeltas(deltas: ProjectionDelta[]): void {
   const chunks: ProjectionDelta[] = [];
-  for (const delta of buildFullProjection(doc)) {
+  for (const delta of deltas) {
     if (delta.kind === 'bulk' && delta.entities.length > PROJECTION_CHUNK) {
       for (let i = 0; i < delta.entities.length; i += PROJECTION_CHUNK) {
         chunks.push({
@@ -146,6 +150,20 @@ function pushProjection(doc: Doc): void {
   }
   const last = chunks.length - 1;
   chunks.forEach((delta, i) => sink.pushChunk(delta, i === last));
+}
+
+/** Push the FULL projection for `doc` (first-load / replace / create). Always
+ * emits ≥1 delta (27 collections + settings), so `final` always lands. */
+function pushProjection(doc: Doc): void {
+  pushDeltas(buildFullProjection(doc));
+}
+
+/** Cheap entity count across all collections — for the `pushProjection` perf
+ * sample only (reads proxy keys, not full materialize). */
+function countEntities(doc: Doc): number {
+  let n = 0;
+  for (const name of COLLECTION_NAMES) n += Object.keys((doc[name] ?? {}) as object).length;
+  return n;
 }
 
 // ─── Guards ──────────────────────────────────────────────────────────────────
@@ -207,7 +225,10 @@ export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }>
   }
   if (!loaded) return { loaded: false };
   currentDoc = migrateDoc(loaded);
-  pushProjection(currentDoc);
+  const doc = currentDoc;
+  time('automerge.pushProjection', () => pushProjection(doc), {
+    perf_entity_count: countEntities(doc),
+  });
   return { loaded: true };
 }
 
@@ -251,26 +272,42 @@ export async function mergeRemoteEnvelope(
     perf_doc_bytes: envelope.encryptedPayload.length,
   });
 
-  let dirty: boolean;
-  let heads: Heads;
+  void id; // familyId is tracked inside `cache`; kept in the signature for the wire contract
+
+  // Two projection strategies, keyed on `currentDoc`:
+  //  • first-load adopt (no local doc) — every entity is new → a FULL projection is
+  //    both correct and cheaper than diffing against an empty doc. Timed, because
+  //    the load-vs-projection split matters on the cold-load critical path.
+  //  • poll-merge (local doc present) — few entities changed → stream a DELTA
+  //    (guarded; falls back to full). Below the telemetry floor, not timed.
+  // Do NOT convert other pushProjection callers (initAndLoadCache/loadSnapshot/
+  // applyChanges) to deltas without the same diff+fallback guard.
   if (!currentDoc) {
-    // No local doc yet (remote-first load) — adopt the remote as-is. Nothing
-    // local to push back, so not dirty.
     currentDoc = migrateDoc(remote);
-    dirty = false;
-    heads = headsOf(currentDoc);
-  } else {
-    const local = currentDoc;
-    const merged = time('automerge.mergeClone', () => mergeDocs(local, remote));
-    currentDoc = merged.doc;
-    dirty = merged.dirty;
-    heads = merged.heads;
+    const heads = headsOf(currentDoc);
+    schedulePersist();
+    const doc = currentDoc;
+    time('automerge.pushProjection', () => pushProjection(doc), {
+      perf_entity_count: countEntities(doc),
+    });
+    return { heads, dirty: false };
   }
 
-  void id; // familyId is tracked inside `cache`; kept in the signature for the wire contract
+  const local = currentDoc;
+  // Capture localHeads BEFORE the merge: `merged` contains local's full history,
+  // so localHeads is a valid `diff` ancestor of merged.heads (getHeads returns a
+  // value snapshot, so it survives the in-place merge that mutates `local`).
+  const localHeads = headsOf(local);
+  const merged = time('automerge.merge', () => mergeDocs(local, remote));
+  currentDoc = merged.doc;
   schedulePersist();
-  pushProjection(currentDoc);
-  return { heads, dirty };
+  // projectionDeltasBetween is pure and derives fully (or null) BEFORE pushDeltas
+  // streams anything → a derivation failure can never leave a half-updated
+  // projection. `?? buildFullProjection` is NULLISH: an empty (but valid) delta
+  // set streams nothing rather than triggering a spurious full rebuild.
+  const deltas = projectionDeltasBetween(currentDoc, localHeads, merged.heads);
+  pushDeltas(deltas ?? buildFullProjection(currentDoc));
+  return { heads: merged.heads, dirty: merged.dirty };
 }
 
 /** Decrypt + materialize-check a fetched envelope WITHOUT installing it (verify
