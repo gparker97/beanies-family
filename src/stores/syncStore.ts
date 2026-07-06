@@ -543,16 +543,27 @@ export const useSyncStore = defineStore('sync', () => {
     remoteEnvelope: BeanpodFileV4,
     familyId: string
   ): Promise<void> {
-    // Load the cache as the worker's doc, then CRDT-merge the remote in. Merge is
-    // commutative, so cache∪remote == the old replace(remote)+merge(cache). If the
-    // cache is empty/corrupt, initAndLoadCache leaves no doc and mergeRemoteEnvelope
-    // adopts the remote. The worker persists the merged doc to cache automatically.
+    // Load THIS family's cache as the worker's doc, then CRDT-merge the remote in.
+    // Merge is commutative, so cache∪remote == the old replace(remote)+merge(cache).
+    //
+    // CRITICAL (cross-family safety): only merge into a doc that belongs to THIS
+    // family. On a cache MISS (or corrupt cache), `initAndLoadCache` returns
+    // `{loaded:false}` and leaves whatever `currentDoc` the worker was holding —
+    // which, if the previous family wasn't torn down (e.g. a trusted-device
+    // sign-out that keeps the cache), is a DIFFERENT family's doc. Merging the
+    // remote into it produces an A∪B doc that then gets persisted to B's cache and
+    // uploaded to B's file — durable cross-family corruption. So on anything other
+    // than a genuine cache hit, drop the doc first → `mergeRemoteEnvelope` takes
+    // its `!currentDoc` full-adopt branch and installs a clean B. See the
+    // cross-family teardown in `authStore.signOut` (defence-in-depth).
+    let loadedFromCache = false;
     try {
-      await docClient.initAndLoadCache(familyId);
+      const cacheResult = await docClient.initAndLoadCache(familyId);
+      loadedFromCache = cacheResult?.loaded === true; // only a genuine HIT authorises a merge
     } catch (e) {
       console.warn('[syncStore] Cache recovery failed — proceeding with remote only:', e);
-      await docClient.dropDoc(); // corrupt cache cleared inside initAndLoadCache; adopt remote fresh
     }
+    if (!loadedFromCache) await docClient.dropDoc(); // no doc for THIS family → adopt remote fresh, never merge into a foreign doc
     const { dirty } = await docClient.mergeRemoteEnvelope(remoteEnvelope, familyId);
     // Clean up duplicate recurring transactions from the CRDT merge.
     await deduplicateRecurringTransactions();

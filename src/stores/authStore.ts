@@ -1112,6 +1112,21 @@ export const useAuthStore = defineStore('auth', () => {
       console.warn('[authStore] syncStore.resetState failed during sign-out', e);
     }
 
+    // Cross-family safety: drop the in-memory worker doc + family key + projection
+    // on EVERY sign-out, INDEPENDENT of the trusted-device cache-retention gate
+    // below. `docClient.reset()` keeps the cache DB (so a trusted device still gets
+    // fast silent re-login), but without it a trusted-device sign-out leaves the
+    // previous family's doc resident in the worker — and the next sign-in to a
+    // family whose cache missed would CRDT-merge its remote into that stale doc,
+    // producing an A∪B doc that gets persisted + uploaded to the new family's file
+    // (durable cross-family corruption; see `replaceDocWithCacheRecovery`). On an
+    // untrusted device `deleteFamilyDatabase` → `clearCache` resets again (idempotent).
+    try {
+      await docClient.reset();
+    } catch (e) {
+      console.warn('[authStore] docClient.reset failed during sign-out', e);
+    }
+
     const familyId = currentUser.value?.familyId;
 
     // Delete the per-family IndexedDB cache unless this is a trusted device

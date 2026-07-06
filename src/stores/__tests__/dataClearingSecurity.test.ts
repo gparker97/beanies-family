@@ -2,6 +2,7 @@ import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { GlobalSettings } from '@/types/models';
 import { saveNow } from '@/services/sync/syncService';
+import * as docClient from '@/services/automerge/worker/docClient';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared before importing stores
@@ -86,6 +87,26 @@ vi.mock('@/services/indexeddb/database', () => ({
   getActiveFamilyId: () => mockGetActiveFamilyId(),
   getDatabase: vi.fn(async () => ({})),
   initializeDatabase: vi.fn(async () => ({})),
+}));
+
+// Doc worker (ADR-032): mock the RPC surface so we can assert the cross-family
+// in-memory teardown (`reset`) runs on sign-out — even on a trusted device where
+// the cache DB is preserved. Mirrors the mock in syncStore.resume.test.ts.
+vi.mock('@/services/automerge/worker/docClient', () => ({
+  setFamilyKey: vi.fn(async () => {}),
+  setKey: vi.fn(async () => {}),
+  initDoc: vi.fn(async () => ({ loaded: true })),
+  initAndLoadCache: vi.fn(async () => ({ loaded: false })),
+  openCache: vi.fn(async () => ({ loaded: false })),
+  persistEnvelope: vi.fn(async () => {}),
+  mergeRemoteEnvelope: vi.fn(async () => ({ dirty: false })),
+  verifyEnvelope: vi.fn(async () => {}),
+  exportEncryptedPayload: vi.fn(async () => ({ payload: 'base64==' })),
+  dropDoc: vi.fn(async () => {}),
+  reset: vi.fn(async () => {}),
+  clearCache: vi.fn(async () => {}),
+  setLocalChangeHandler: vi.fn(),
+  setCachePersistFailedHandler: vi.fn(),
 }));
 
 // Sync service — uses shared auto-mock from __mocks__/syncService.ts
@@ -538,6 +559,20 @@ describe('Sensitive Data Clearing Security', () => {
       await auth.signOut();
 
       expect(mockDeleteFamilyDatabase).not.toHaveBeenCalled();
+    });
+
+    // Cross-family data-integrity regression (2026-07-06): even though the cache DB
+    // is KEPT on a trusted device, the in-memory worker doc + family key MUST be
+    // reset — else the next sign-in to a cache-missed family CRDT-merges its remote
+    // into this family's resident doc and uploads the mix to the new family's file.
+    it('still resets the in-memory worker doc (docClient.reset) even when trusted (cache kept)', async () => {
+      const { auth, settings } = populateAllStores();
+      await settings.setTrustedDevice(true);
+
+      await auth.signOut();
+
+      expect(docClient.reset).toHaveBeenCalled();
+      expect(mockDeleteFamilyDatabase).not.toHaveBeenCalled(); // cache DB still preserved
     });
 
     it('still clears auth session state', async () => {

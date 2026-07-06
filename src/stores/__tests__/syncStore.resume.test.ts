@@ -407,4 +407,43 @@ describe('syncStore.completeAutoLoad', () => {
     // If it did, the next reload would route to /nook with no doc.
     expect(useAuthStore().podCreated).toBe(false);
   });
+
+  // Cross-family data-integrity regression (2026-07-06): a cache MISS must adopt
+  // the remote FRESH, never CRDT-merge it into whatever (possibly foreign) doc the
+  // worker still holds — else A∪B gets persisted + uploaded to B's file.
+  it('cross-family safety: a cache MISS drops the resident doc BEFORE merging (adopts remote fresh)', async () => {
+    vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
+      familyKey: {} as CryptoKey,
+      memberIds: ['m-1'],
+    });
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({ loaded: false }); // B never cached here
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({ heads: [], dirty: false });
+
+    const syncStore = useSyncStore();
+    preloadPendingFile(syncStore);
+    await syncStore.completeAutoLoad('right-pw');
+
+    expect(docClient.dropDoc).toHaveBeenCalledTimes(1);
+    expect(docClient.mergeRemoteEnvelope).toHaveBeenCalledTimes(1);
+    // dropDoc must run BEFORE the merge (so the merge takes the fresh-adopt branch).
+    expect(vi.mocked(docClient.dropDoc).mock.invocationCallOrder[0]!).toBeLessThan(
+      vi.mocked(docClient.mergeRemoteEnvelope).mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('cross-family safety: a cache HIT merges into THIS family cached doc WITHOUT dropping it', async () => {
+    vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
+      familyKey: {} as CryptoKey,
+      memberIds: ['m-1'],
+    });
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({ loaded: true }); // this family's cache present
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({ heads: [], dirty: false });
+
+    const syncStore = useSyncStore();
+    preloadPendingFile(syncStore);
+    await syncStore.completeAutoLoad('right-pw');
+
+    expect(docClient.dropDoc).not.toHaveBeenCalled();
+    expect(docClient.mergeRemoteEnvelope).toHaveBeenCalledTimes(1);
+  });
 });
