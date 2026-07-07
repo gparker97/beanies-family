@@ -33,6 +33,7 @@ import {
   encryptDocPayload,
   buildFullProjection,
   projectionDeltasBetween,
+  frameChanges,
   registerNamedOp,
 } from './docOps';
 import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
@@ -58,8 +59,12 @@ const NOOP_SINK: WorkerSink = { pushChunk() {}, perf() {}, cachePersistFailed() 
 /** Entities per streamed chunk. A big collection is sliced so each `postMessage`
  * is a bounded main-thread task rather than one giant structured clone. */
 const PROJECTION_CHUNK = 1000;
-/** Cache-persist coalesce window. Short (off-thread now), non-zero (whole-doc save). */
+/** Cache-persist coalesce window. Short (off-thread now, incremental) — a safety
+ * valve, not zero (batches a rapid burst of mutations into one increment write). */
 const PERSIST_DEBOUNCE_MS = 120;
+/** Re-compact (rewrite a fresh whole-doc base, clearing increments) once this many
+ * increments sit on top of the base — bounds both cache size and cold-reload cost. */
+const INCREMENT_COMPACTION_THRESHOLD = 200;
 
 // ─── Module state (one instance per realm — worker OR inline main) ───────────
 
@@ -69,6 +74,15 @@ let sink: WorkerSink = NOOP_SINK;
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let cachePersistFailed = false;
+/** B1 cache-persist cursor: the heads already written to the IDB increments. `null`
+ * forces the next persist to write a fresh whole-doc BASE (first persist for a doc,
+ * after an adopt/replace, or a recovery). In-memory + DERIVED — never a stored row;
+ * on reload it is re-derived from the reconstructed doc, so it can't drift. */
+let lastPersistedHeads: Heads | null = null;
+/** Single-flight chain: every persist + re-compaction runs one-at-a-time so two
+ * overlapping persists (e.g. a debounce firing while `flush()` runs) can't interleave
+ * their shared `seq`/`lastPersistedHeads`/row mutations. */
+let persistInFlight: Promise<void> = Promise.resolve();
 
 /** Wire the sink once (worker startup / inline adapter init). Also registers the
  * photo attach/collect family here (not at module load) so it can't hit a
@@ -96,31 +110,86 @@ function schedulePersist(): void {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     persistTimer = null;
-    void persistNow();
+    void enqueuePersist();
   }, PERSIST_DEBOUNCE_MS);
 }
 
-/** Serialize + encrypt + write the current doc to cache. Surfaces failure to the
- * durability banner (does not throw — it runs detached from any RPC). */
-async function persistNow(): Promise<void> {
+/** Run a persist behind the single-flight chain (never two at once). `persistOnce`
+ * never rejects (it catches), so the chain never breaks. */
+function enqueuePersist(): Promise<void> {
+  persistInFlight = persistInFlight.catch(() => {}).then(() => persistOnce());
+  return persistInFlight;
+}
+
+/** Clear the durability banner after a successful write. */
+function markPersistOk(): void {
+  if (cachePersistFailed) {
+    cachePersistFailed = false;
+    sink.cachePersistFailed(false);
+  }
+}
+
+/** Write a fresh whole-doc BASE (clears increments, resets seq) and advance the
+ * cursor. Used for the first persist of a doc, after adopt/replace, on recovery,
+ * and for re-compaction. `doc` is the entry snapshot — stable across the await even
+ * if a concurrent `reset()`/replace nulls or swaps `currentDoc`. */
+async function writeBase(key: CryptoKey, doc: Doc): Promise<void> {
+  const captureHeads = headsOf(doc);
+  const start = performance.now();
+  const binary = saveDoc(doc);
+  sink.perf('automerge.saveBase', performance.now() - start, { perf_doc_bytes: binary.byteLength });
+  await cache.persistDocBinary(key, binary);
+  if (currentDoc === doc) lastPersistedHeads = captureHeads;
+}
+
+/**
+ * Persist the current doc to cache INCREMENTALLY: capture `getChangesSince(doc,
+ * lastPersistedHeads)`, encrypt only that delta, append it as an `inc:*` row, and
+ * advance the cursor — so a persist costs a delta, enabling persist-on-(near-)every-
+ * mutation (closing the backgrounding last-edit-loss window). Writes a whole-doc base
+ * instead when there's no base yet (`lastPersistedHeads === null`) or when the
+ * increment count crosses the re-compaction threshold. Surfaces failure to the
+ * durability banner (does not throw — it runs detached from any RPC).
+ *
+ * ATOMICITY: everything is computed from ONE entry snapshot (`doc`/`captureHeads`/
+ * `changes`, all read before the first `await`). The cursor advances to
+ * `captureHeads` (the snapshot's heads), NEVER a post-await re-read of `currentDoc`
+ * — a mutation landing during the IDB write must not be skipped from the next
+ * capture. The `currentDoc === doc` guard drops a stale cursor advance if the doc
+ * was replaced/reset mid-write.
+ */
+async function persistOnce(): Promise<void> {
   if (!currentDoc || !familyKey || !cache.isCacheReady()) return;
+  const doc = currentDoc;
+  const key = familyKey;
   try {
-    const doc = currentDoc;
-    const key = familyKey;
-    const start = performance.now();
-    const binary = saveDoc(doc);
-    sink.perf('automerge.save', performance.now() - start, { perf_doc_bytes: binary.byteLength });
-    await cache.persistDocBinary(key, binary);
-    if (cachePersistFailed) {
-      cachePersistFailed = false;
-      sink.cachePersistFailed(false);
+    if (lastPersistedHeads === null) {
+      await writeBase(key, doc);
+    } else {
+      const captureHeads = headsOf(doc);
+      const changes = changesSince(doc, lastPersistedHeads);
+      if (changes.length === 0) {
+        markPersistOk();
+        return;
+      }
+      const framed = frameChanges(changes);
+      const start = performance.now();
+      await cache.persistIncrement(key, framed);
+      sink.perf('automerge.saveIncremental', performance.now() - start, {
+        perf_chunk_bytes: framed.byteLength,
+      });
+      if (currentDoc === doc) lastPersistedHeads = captureHeads;
+      if (cache.incrementCount() >= INCREMENT_COMPACTION_THRESHOLD) {
+        await writeBase(key, doc); // re-compaction: fresh base drops the increments
+      }
     }
+    markPersistOk();
   } catch (e) {
     // A durable-cache write failure is the "local durability broken" signal —
-    // surface it (persistent banner on main), don't swallow it.
+    // surface it (persistent banner on main), don't swallow it. `lastPersistedHeads`
+    // is NOT advanced on failure → the delta is re-captured next tick.
     cachePersistFailed = true;
     sink.cachePersistFailed(true);
-
     console.error('[applyAndProject] cache persist failed', e);
   }
 }
@@ -187,6 +256,7 @@ export function setKey(key: CryptoKey): void {
 /** Create a fresh empty document (create-family). Pushes the full projection. */
 export function initDoc(): { loaded: true } {
   currentDoc = migrateDoc(Automerge.init<FamilyDocument>());
+  lastPersistedHeads = null; // fresh doc → first persist writes a base
   pushProjection(currentDoc);
   return { loaded: true };
 }
@@ -213,7 +283,7 @@ export async function openCache(id: string): Promise<{ loaded: false }> {
 export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }> {
   await cache.initPersistenceDB(id);
   const key = requireKey('initAndLoadCache');
-  let loaded: Doc | null;
+  let loaded: { doc: Doc; recovered: boolean } | null;
   try {
     loaded = await time2('automerge.cacheLoad', () => cache.loadCachedDoc(key, id));
   } catch (e) {
@@ -224,7 +294,19 @@ export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }>
     throw e;
   }
   if (!loaded) return { loaded: false };
-  currentDoc = migrateDoc(loaded);
+  // Capture the reconstructed heads BEFORE migrate (which consumes the handle). A
+  // migrate delta, if any, then persists as an increment on the next tick; the
+  // cursor is DERIVED here from the reconstructed doc, never a stored value.
+  const preHeads = headsOf(loaded.doc);
+  currentDoc = migrateDoc(loaded.doc);
+  if (loaded.recovered) {
+    // A corrupt increment was skipped on load — rewrite a clean base to drop the
+    // corrupt tail rows (base-write clears all increments).
+    lastPersistedHeads = null;
+    void enqueuePersist();
+  } else {
+    lastPersistedHeads = preHeads;
+  }
   const doc = currentDoc;
   time('automerge.pushProjection', () => pushProjection(doc), {
     perf_entity_count: countEntities(doc),
@@ -284,6 +366,7 @@ export async function mergeRemoteEnvelope(
   // applyChanges) to deltas without the same diff+fallback guard.
   if (!currentDoc) {
     currentDoc = migrateDoc(remote);
+    lastPersistedHeads = null; // adopted a fresh doc → first persist writes a base
     const heads = headsOf(currentDoc);
     schedulePersist();
     const doc = currentDoc;
@@ -361,13 +444,14 @@ export async function readEnvelope(): Promise<{ envelope: BeanpodFileV4 | null }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
-/** Force an immediate cache persist (backgrounding flush). Cancels the debounce. */
+/** Force an immediate cache persist (backgrounding flush). Cancels the debounce and
+ * awaits the single-flight chain so any in-flight persist completes too. */
 export async function flush(): Promise<void> {
   if (persistTimer) {
     clearTimeout(persistTimer);
     persistTimer = null;
   }
-  await persistNow();
+  await enqueuePersist();
 }
 
 /** Drop the current doc but KEEP the family key + cache (replace semantics: the
@@ -375,6 +459,7 @@ export async function flush(): Promise<void> {
  * into a stale one). Used when loading a file to REPLACE, not merge. */
 export function dropDoc(): void {
   currentDoc = null;
+  lastPersistedHeads = null;
 }
 
 /** Drop the in-memory doc + cancel the debounce (sign-out). Does NOT delete the
@@ -388,6 +473,7 @@ export function reset(): void {
   currentDoc = null;
   familyKey = null;
   cachePersistFailed = false;
+  lastPersistedHeads = null;
 }
 
 /** Sign-out / family-switch: drop the doc AND close-then-delete the cache DB. */
@@ -402,6 +488,7 @@ export async function clearCache(id: string): Promise<void> {
 export function loadSnapshot(binary: Uint8Array): { loaded: true } {
   if (!import.meta.env.DEV) throw new Error('loadSnapshot is DEV-only');
   currentDoc = loadDoc(binary);
+  lastPersistedHeads = null; // fresh doc → first persist writes a base
   pushProjection(currentDoc);
   return { loaded: true };
 }
@@ -499,6 +586,8 @@ export function __resetApplyAndProjectForTesting(): void {
   currentDoc = null;
   familyKey = null;
   cachePersistFailed = false;
+  lastPersistedHeads = null;
+  persistInFlight = Promise.resolve();
   sink = NOOP_SINK;
 }
 
