@@ -29,6 +29,19 @@ function makeTokenProvider() {
   return { provider, getMints: () => mints, invalidated };
 }
 
+/** A token provider whose mint always throws `err`, counting mint attempts. */
+function makeThrowingTokenProvider(err: unknown) {
+  let mints = 0;
+  const provider: TokenProvider = {
+    async getAccessToken() {
+      mints++;
+      throw err;
+    },
+    invalidate() {},
+  };
+  return { provider, getMints: () => mints };
+}
+
 function jsonResponse(status: number, body: unknown = {}): Response {
   return { status, ok: status >= 200 && status < 300, json: async () => body } as Response;
 }
@@ -89,5 +102,71 @@ describe('googleCalendarClient authedFetch — 401 handling (F4)', () => {
         expect(e).toBeInstanceOf(CalendarApiError);
         expect((e as CalendarApiError).kind).toBe('auth');
       });
+  });
+});
+
+describe('googleCalendarClient authedFetch — mint-failure kind preservation (2026-07-08)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it("surfaces a dead refresh token as 'auth' (not 'transient') and does NOT retry", async () => {
+    // The token mint throws the classified auth error the real provider raises for
+    // a revoked grant. Pre-fix this was clobbered to 'transient' and retried 3×,
+    // hiding the reconnect signal from settleConnectionStatus.
+    const authErr = new CalendarApiError(
+      'auth',
+      'token refresh failed: Token refresh failed: Token has been expired or revoked.'
+    );
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { provider, getMints } = makeThrowingTokenProvider(authErr);
+    const client = createGoogleCalendarClient(provider);
+
+    await expect(client.insertEvent('conn-1', 'primary', 'evt', RESOURCE)).rejects.toMatchObject({
+      kind: 'auth',
+    });
+
+    // Exactly one mint attempt — a dead refresh token is not retried into life.
+    expect(getMints()).toBe(1);
+    // The request never reached the network (the mint failed first).
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("retries a 'transient' mint failure across the backoff budget, then throws 'transient'", async () => {
+    vi.useFakeTimers();
+    const transientErr = new CalendarApiError('transient', 'refresh proxy 503');
+    const { provider, getMints } = makeThrowingTokenProvider(transientErr);
+    const client = createGoogleCalendarClient(provider);
+
+    const p = client.insertEvent('conn-1', 'primary', 'evt', RESOURCE);
+    const assertion = expect(p).rejects.toMatchObject({ kind: 'transient' });
+    await vi.runAllTimersAsync();
+    await assertion;
+
+    // Initial attempt + 2 backoff retries (RETRY_BACKOFF_MS has length 2) = 3 mints.
+    expect(getMints()).toBe(3);
+  });
+
+  it("wraps a raw network throw from fetch as 'transient' and retries (unchanged)", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockRejectedValue(new Error('network down'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { provider } = makeTokenProvider(); // mint succeeds; fetch is what fails
+    const client = createGoogleCalendarClient(provider);
+
+    const p = client.insertEvent('conn-1', 'primary', 'evt', RESOURCE);
+    const assertion = expect(p).rejects.toMatchObject({ kind: 'transient' });
+    await vi.runAllTimersAsync();
+    await assertion;
+
+    // Initial attempt + 2 backoff retries = 3 fetches for a raw network transient.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

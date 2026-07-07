@@ -170,6 +170,63 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
     expect(sev[3]).not.toBe('critical'); // does not keep paging
   });
 
+  it('parks needs_reconnect (single warning, never sustained-critical) when the token is dead', async () => {
+    // Regression guard (2026-07-08): a dead refresh token reaches the engine as a
+    // classified 'auth' error (googleCalendarClient no longer clobbers it to
+    // 'transient'). It must park needs_reconnect after INVALID_GRANT_THRESHOLD (2)
+    // and page a single 'warning' — NOT the sustained-critical non-auth path.
+    const { reportError } = await import('@/utils/errorReporter');
+    const mockReport = vi.mocked(reportError);
+    mockReport.mockClear();
+
+    const deadToken: CalendarClient = {
+      async insertEvent() {
+        throw new CalendarApiError(
+          'auth',
+          'token refresh failed: Token has been expired or revoked.'
+        );
+      },
+      async patchEvent() {},
+      async deleteEvent() {},
+      async eventExists() {
+        return false;
+      },
+      async listCalendars() {
+        return [{ id: 'primary', summary: 'Primary', primary: true }];
+      },
+      async listEventTimes() {
+        return [];
+      },
+    };
+    setCalendarClientForTesting(deadToken);
+
+    const connection = await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'primary',
+      refreshToken: 'refresh-dead',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.owned'],
+      status: 'ok',
+    });
+    await createActivity(activityInput());
+    const store = useCalendarSyncStore();
+
+    await store.syncNow(); // n=1 (below threshold — no park, no page)
+    await store.syncNow(); // n=2 (crosses INVALID_GRANT_THRESHOLD → park)
+
+    // Connection parked for reconnect (drives the Settings reconnect prompt).
+    expect((await getCalendarConnectionById(connection.id))?.status).toBe('needs_reconnect');
+
+    const calendarReports = mockReport.mock.calls
+      .map((c) => c[0] as { surface: string; severity?: string })
+      .filter((a) => a.surface === 'calendar-sync');
+    // Exactly one page — the needs_reconnect park — and it is a 'warning'.
+    expect(calendarReports).toHaveLength(1);
+    expect(calendarReports[0].severity).toBe('warning');
+    // Never the sustained-critical non-auth path.
+    expect(calendarReports.every((a) => a.severity !== 'critical')).toBe(true);
+  });
+
   it('disconnect removes events and drops the connection', async () => {
     const { client, calls } = makeFakeClient();
     setCalendarClientForTesting(client);
