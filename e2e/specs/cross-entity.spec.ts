@@ -5,7 +5,11 @@ import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { gotoRoot, gotoRoute } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
-import { dismissActivityCreatedConfirm } from '../helpers/activity-modal';
+import {
+  dismissActivityCreatedConfirm,
+  openAddActivity,
+  submitActivity,
+} from '../helpers/activity-modal';
 import { selectBeanieDate } from '../helpers/date-picker';
 import { tomorrowOrTodayStr } from '../helpers/test-dates';
 
@@ -291,7 +295,7 @@ test.describe('Loan & Activity Linking', () => {
     await page.waitForURL('/activities');
 
     // Open add activity modal
-    await page.getByRole('button', { name: /\+ add activity/i }).click();
+    await openAddActivity(page);
     await expect(page.getByText(/new activity/i)).toBeVisible();
 
     // Fill title
@@ -340,7 +344,7 @@ test.describe('Loan & Activity Linking', () => {
     await accountOption.dispatchEvent('mousedown');
 
     // Save the activity
-    await page.getByRole('button', { name: /^add activity$/i }).click();
+    await submitActivity(page);
 
     // Dismiss the "Activity Created" confirmation modal
     await dismissActivityCreatedConfirm(page);
@@ -426,7 +430,7 @@ test.describe('Loan & Activity Linking', () => {
     await gotoRoute(page, '/activities');
     await page.waitForURL('/activities');
 
-    await page.getByRole('button', { name: /\+ add activity/i }).click();
+    await openAddActivity(page);
     await expect(page.getByText(/new activity/i)).toBeVisible();
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Guitar Lesson');
     await selectAssignee(page);
@@ -439,7 +443,7 @@ test.describe('Loan & Activity Linking', () => {
     await selectBeanieDate(page.locator('div[role="dialog"]'), tomorrowStr);
 
     // Save without cost
-    await page.getByRole('button', { name: /^add activity$/i }).click();
+    await submitActivity(page);
 
     // Dismiss the "Activity Created" confirmation modal
     await dismissActivityCreatedConfirm(page);
