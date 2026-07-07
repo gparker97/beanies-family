@@ -418,6 +418,13 @@ export async function exportEncryptedPayload(): Promise<{ payload: string }> {
 export function getHeads(): { heads: Heads } {
   return { heads: headsOf(requireDoc('getHeads')) };
 }
+
+/** This device's stable Automerge actor id — used to name its own change-log
+ * chunks (`changes/<actorId>-<seq>.beanchanges`). Stable per device since Layer 1
+ * merges in place (one actor per device, no per-poll actor churn). */
+export function getActorId(): { actorId: string } {
+  return { actorId: Automerge.getActorId(requireDoc('getActorId')) };
+}
 export function getChangesSince(heads: Heads): { changes: Uint8Array[] } {
   return { changes: changesSince(requireDoc('getChangesSince'), heads) };
 }
@@ -604,6 +611,8 @@ export async function dispatch(
       return { result: await verifyEnvelope(a.envelope as BeanpodFileV4) };
     case 'getHeads':
       return { result: getHeads() };
+    case 'getActorId':
+      return { result: getActorId() };
     case 'getChangesSince':
       return { result: getChangesSince(a.heads as Heads) };
     case 'applyChanges':

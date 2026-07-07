@@ -518,6 +518,11 @@ export function getHeads(): Promise<{ heads: Heads }> {
   return request('getHeads');
 }
 
+/** This device's stable Automerge actor id (names its own change-log chunks). */
+export function getActorId(): Promise<{ actorId: string }> {
+  return request('getActorId');
+}
+
 /** Gather every photoId referenced across registered collections (for `gcOrphans`).
  * Pass `{quiet:true}` — a `collect`-hook throw is the fail-safe abort, not a toast. */
 export function collectReferencedPhotoIds(opts?: RequestOpts): Promise<{ ids: string[] }> {
