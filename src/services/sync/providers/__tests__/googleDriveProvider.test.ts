@@ -27,6 +27,8 @@ const mockPatchFileMetadata = vi.fn().mockResolvedValue(undefined);
 const mockGetOrCreateAppFolder = vi.fn().mockResolvedValue('folder-id');
 const mockCreateFile = vi.fn().mockResolvedValue({ fileId: 'new-file-id', name: 'test.beanpod' });
 const mockListBeanpodFiles = vi.fn().mockResolvedValue([]);
+const mockListFilesInFolder = vi.fn().mockResolvedValue([]);
+const mockDeleteFile = vi.fn().mockResolvedValue(undefined);
 const mockClearFolderCache = vi.fn();
 
 vi.mock('@/services/google/driveService', () => ({
@@ -38,6 +40,8 @@ vi.mock('@/services/google/driveService', () => ({
   getOrCreateAppFolder: (...args: unknown[]) => mockGetOrCreateAppFolder(...args),
   createFile: (...args: unknown[]) => mockCreateFile(...args),
   listBeanpodFiles: (...args: unknown[]) => mockListBeanpodFiles(...args),
+  listFilesInFolder: (...args: unknown[]) => mockListFilesInFolder(...args),
+  deleteFile: (...args: unknown[]) => mockDeleteFile(...args),
   clearFolderCache: () => mockClearFolderCache(),
   DriveApiError: class DriveApiError extends Error {
     readonly status: number;
@@ -486,6 +490,60 @@ describe('GoogleDriveProvider', () => {
         GoogleDriveProvider.createNew('LaFleur.beanpod', { forceConsent: false })
       ).rejects.toBeInstanceOf(CollisionCheckUnavailableError);
       expect(mockCreateFile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('aux change-log (ADR-032 Plan B)', () => {
+    beforeEach(() => {
+      // resolveAuxFolder reads the .beanpod's parent folder.
+      mockGetFileMetadata.mockResolvedValue({ parents: ['folder-id'] });
+    });
+
+    it('writeAux creates a sibling chunk file in the .beanpod folder', async () => {
+      mockCreateFile.mockResolvedValueOnce({ fileId: 'chunk-1', name: 'changes/a-0.beanchanges' });
+      await provider.writeAux('changes/a-0.beanchanges', 'CIPHERTEXT');
+      expect(mockCreateFile).toHaveBeenCalledWith(
+        'mock-token',
+        'folder-id',
+        'changes/a-0.beanchanges',
+        'CIPHERTEXT'
+      );
+    });
+
+    it('listAux returns the chunk names in the folder', async () => {
+      mockListFilesInFolder.mockResolvedValueOnce([
+        { id: 'c1', name: 'changes/a-0.beanchanges' },
+        { id: 'c2', name: 'changes/b-0.beanchanges' },
+      ]);
+      expect(await provider.listAux()).toEqual([
+        'changes/a-0.beanchanges',
+        'changes/b-0.beanchanges',
+      ]);
+      expect(mockListFilesInFolder).toHaveBeenCalledWith('mock-token', 'folder-id', '.beanchanges');
+    });
+
+    it('readAux resolves name→id via a list, then reads the file', async () => {
+      mockListFilesInFolder.mockResolvedValue([{ id: 'c1', name: 'changes/a-0.beanchanges' }]);
+      mockReadFile.mockResolvedValueOnce('CHUNK_BODY');
+      expect(await provider.readAux('changes/a-0.beanchanges')).toBe('CHUNK_BODY');
+      expect(mockReadFile).toHaveBeenCalledWith('mock-token', 'c1');
+    });
+
+    it('readAux returns null for an absent (pruned) chunk', async () => {
+      mockListFilesInFolder.mockResolvedValue([]);
+      expect(await provider.readAux('changes/gone-9.beanchanges')).toBeNull();
+      expect(mockReadFile).not.toHaveBeenCalled();
+    });
+
+    it('deleteAux resolves name→id and deletes; no-op when already absent', async () => {
+      mockListFilesInFolder.mockResolvedValueOnce([{ id: 'c1', name: 'changes/a-0.beanchanges' }]);
+      await provider.deleteAux('changes/a-0.beanchanges');
+      expect(mockDeleteFile).toHaveBeenCalledWith('mock-token', 'c1');
+
+      mockDeleteFile.mockClear();
+      mockListFilesInFolder.mockResolvedValueOnce([]);
+      await provider.deleteAux('changes/gone-9.beanchanges');
+      expect(mockDeleteFile).not.toHaveBeenCalled();
     });
   });
 });
