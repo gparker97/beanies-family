@@ -231,6 +231,7 @@ vi.mock('@/services/sync/fileHandleStore', () => ({
   clearProviderConfig: vi.fn(async () => {}),
 }));
 vi.mock('@/services/google/googleAuth', () => ({
+  whenRedirectAuthSettled: vi.fn(async () => {}),
   initializeAuth: vi.fn(async () => {}),
   requestAccessToken: vi.fn(async () => 'mock-token'),
   onTokenExpired: vi.fn(() => () => {}),

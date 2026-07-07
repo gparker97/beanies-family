@@ -23,6 +23,7 @@ import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 import { DriveConsentDeniedError } from '@/types/sync';
+import { withTimeout } from '@/utils/timing';
 import { Browser } from '@capacitor/browser';
 import { App as CapacitorApp, type URLOpenListenerEvent } from '@capacitor/app';
 import { isNative, isIosOrIpadOs, isStandalone } from '@/services/sync/capabilities';
@@ -1851,6 +1852,87 @@ export async function completeRedirectAuth(): Promise<string | null> {
 
   console.warn(`[googleAuth] Token acquired via redirect PKCE, expires in ${tokens.expires_in}s`);
   return result.token;
+}
+
+// ─── Redirect-auth settlement (ADR-032 iOS init-race fix) ────────────────────
+//
+// The post-consent reload runs App.vue init, which flips the reactive auth state
+// (driving the resume/family-list consumer) BEFORE it awaits `completeRedirectAuth`
+// — so a consumer can read `isTokenValid()===false` while the code↔token exchange
+// is still in flight and misclassify "token still settling" as a hard auth
+// failure (the first-attempt sign-in bug). Fix: every token consumer awaits this
+// shared, memoized settlement first. See docs/plans/2026-07-07-ios-redirect-auth-race.md.
+
+const REDIRECT_AUTH_SETTLE_TIMEOUT_MS = 20_000; // one fetch + commit; was App.vue's INIT_TIMEOUTS.completeRedirectAuth
+
+// Per-page-load memo. REJECT-STICKY BY DESIGN: `completeRedirectAuth` removes the
+// one-time code on entry, so a failed exchange is unrecoverable without a fresh
+// redirect (= a new page load, which resets this module state). Do NOT convert
+// this to a retry-on-reject scheme — retrying a consumed code always fails.
+let redirectSettlePromise: Promise<string | null> | null = null;
+
+/**
+ * The single web-side funnel for redeeming a pending redirect `code`. Memoized
+ * per page load: the first caller runs the one-shot `completeRedirectAuth()`
+ * (bounded by `withTimeout`); all concurrent/subsequent callers await the SAME
+ * promise, so the one-time code is redeemed exactly once and every awaiter sees
+ * the same settled result. No-op (`null`) on native — the `appUrlOpen` listener
+ * owns redemption there (ADR-029). Rejects with the same typed errors
+ * `completeRedirectAuth` throws (`DriveConsentDeniedError`, …), so App.vue's boot
+ * branch is unchanged.
+ *
+ * INVARIANT: the returned promise MUST be consumed by a synchronous `await` or
+ * `.then` at the call site (never stored bare for a later tick) — that is what
+ * keeps the reject-sticky memo from ever sitting handler-less and tripping
+ * unhandled-rejection detection.
+ *
+ * For the BOOT OWNER (App.vue) and `useJoinFlow` (via `tryStep`), which surface
+ * the typed error. Consumers making a `!isTokenValid()` decision should use the
+ * non-throwing `whenRedirectAuthSettled()` instead.
+ */
+export function ensureRedirectAuthSettled(): Promise<string | null> {
+  if (isNative()) return Promise.resolve(null);
+  if (!redirectSettlePromise) {
+    redirectSettlePromise = withTimeout(
+      completeRedirectAuth(),
+      REDIRECT_AUTH_SETTLE_TIMEOUT_MS,
+      'completeRedirectAuth() timed out — redirect-auth settle exceeded budget'
+    );
+  }
+  return redirectSettlePromise;
+}
+
+/**
+ * Non-throwing consumer wrapper: await settlement before a synchronous
+ * `!isTokenValid()` decision, without letting a genuine exchange failure reject
+ * the caller. The failure is NOT swallowed — it is logged here (one central
+ * breadcrumb) and independently surfaced to the user by App.vue's boot handler,
+ * which awaits the same memo. Consumers then fall through to their existing
+ * failure/redirect UI. THIS is the function consumer guards should call.
+ *
+ * Guard pattern: any new synchronous `!isTokenValid()` gate that can run at
+ * post-redirect boot before a token is acquired must be preceded by
+ * `await whenRedirectAuthSettled();`.
+ */
+export function whenRedirectAuthSettled(): Promise<void> {
+  return ensureRedirectAuthSettled().then(
+    () => {},
+    (e) =>
+      console.warn(
+        '[googleAuth] redirect-auth settle failed before a token gate; treating token as absent. ' +
+          "A genuine consent/exchange failure is surfaced by App.vue's boot handler. See ADR-026.",
+        e
+      )
+  );
+}
+
+/**
+ * Test-only — reset the redirect-settle memo so each case starts clean without a
+ * full `vi.resetModules()`. Mirrors `__resetWakeListenerForTesting` /
+ * `__resetNativeAuthForTesting`. Production code never calls this.
+ */
+export function __resetRedirectSettleForTesting(): void {
+  redirectSettlePromise = null;
 }
 
 // ─── Native (Capacitor) deep-link OAuth completion ──────────────────────────

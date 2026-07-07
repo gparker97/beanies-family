@@ -126,6 +126,7 @@ vi.mock('@/services/sync/capabilities', () => ({
 
 // Google layers
 vi.mock('@/services/google/googleAuth', () => ({
+  whenRedirectAuthSettled: vi.fn(async () => {}),
   initializeAuth: vi.fn(async () => {}),
   requestAccessToken: vi.fn(async () => 'mock-token'),
   onTokenAcquired: vi.fn(() => () => {}),

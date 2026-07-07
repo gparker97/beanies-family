@@ -13,6 +13,7 @@ vi.mock('@/services/sync/syncService', () => ({
   getProvider: vi.fn(() => null),
 }));
 vi.mock('@/services/google/googleAuth', () => ({
+  whenRedirectAuthSettled: vi.fn(async () => {}),
   shouldUseRedirectAuth: vi.fn(() => false),
   startRedirectAuth: vi.fn(),
   isTokenValid: vi.fn(() => true),
