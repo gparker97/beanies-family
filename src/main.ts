@@ -7,6 +7,7 @@ import { isNative } from './services/sync/capabilities';
 import { reportError } from './utils/errorReporter';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from './utils/hardReload';
 import { isIdbTransientError } from './utils/idbTransient';
+import { isBenignBrowserError } from './utils/benignBrowserError';
 import { bootstrapDocClient } from './services/automerge/worker/bootstrap';
 import './style.css';
 
@@ -48,6 +49,15 @@ app.config.errorHandler = (err, instance, info) => {
 
 // Synchronous JS errors that escape the call stack
 window.addEventListener('error', (event) => {
+  // Benign browser-platform signals (e.g. the ResizeObserver "loop" notification)
+  // are not app faults and carry no user impact — surface to console for devs but
+  // skip the Slack reporter. Same allowlist discipline as the `isChunkLoadError` /
+  // `isIdbTransientError` guards on the `unhandledrejection` handler below. The
+  // signal lives in `event.message` (ResizeObserver's `event.error` is often null).
+  if (isBenignBrowserError(event.message)) {
+    console.warn('[main] benign browser signal — not reporting:', event.message);
+    return;
+  }
   reportError({
     surface: 'unhandled-error',
     // An uncaught synchronous error escaped every call-site catch — fatal.

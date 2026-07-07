@@ -43,6 +43,12 @@ function isPermanentRefreshFailure(message: string): boolean {
   return message.includes('invalid_grant') || message.includes('expired or revoked');
 }
 
+/** Kinds worth retrying within the backoff budget; every other kind is terminal
+ *  and must propagate with its true kind (notably 'auth' → parks needs_reconnect). */
+function isRetryableKind(kind: CalendarErrorKind): boolean {
+  return kind === 'rate_limited' || kind === 'transient';
+}
+
 /** One `events.list` item, restricted to the masked fields (times-only read). */
 interface GoogleEventTimeItem {
   id: string;
@@ -177,13 +183,25 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
       try {
         res = await attempt();
       } catch (e) {
-        // Network / timeout — transient; retry within budget.
-        lastErr = new CalendarApiError('transient', e instanceof Error ? e.message : String(e));
-        if (i < RETRY_BACKOFF_MS.length) {
+        // `attempt()` throws from one of two places: the token mint
+        // (`tokenProvider.getAccessToken` → a *classified* CalendarApiError —
+        // notably 'auth' when the shared refresh token is dead), or fetch/timeout
+        // (a raw Error = network transient). Preserve a classified kind: blindly
+        // re-wrapping as 'transient' hid dead-refresh 'auth' errors from the
+        // reconcile engine, so the connection never parked needs_reconnect and
+        // paged Slack as a sustained transient on every poll. Same retry policy as
+        // the response path below — only retryable kinds back off; every other
+        // kind (auth/forbidden/not_found/conflict/unknown) propagates immediately.
+        const classified =
+          e instanceof CalendarApiError
+            ? e
+            : new CalendarApiError('transient', e instanceof Error ? e.message : String(e));
+        lastErr = classified;
+        if (isRetryableKind(classified.kind) && i < RETRY_BACKOFF_MS.length) {
           await delay(RETRY_BACKOFF_MS[i]);
           continue;
         }
-        throw lastErr;
+        throw classified;
       }
 
       if (res.ok) return res;
@@ -204,7 +222,7 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
 
       const err = new CalendarApiError(kind, `Google Calendar HTTP ${res.status}`, res.status);
       // Only 429 / 5xx are worth retrying; everything else is the caller's to handle.
-      if ((kind === 'rate_limited' || kind === 'transient') && i < RETRY_BACKOFF_MS.length) {
+      if (isRetryableKind(kind) && i < RETRY_BACKOFF_MS.length) {
         lastErr = err;
         await delay(RETRY_BACKOFF_MS[i]);
         continue;
@@ -270,11 +288,13 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
       const data = (await res.json()) as {
         items?: Array<{ id: string; summary?: string; primary?: boolean }>;
       };
-      return (data.items ?? []).map((c): CalendarSummary => ({
-        id: c.id,
-        summary: c.summary ?? c.id,
-        primary: c.primary === true,
-      }));
+      return (data.items ?? []).map(
+        (c): CalendarSummary => ({
+          id: c.id,
+          summary: c.summary ?? c.id,
+          primary: c.primary === true,
+        })
+      );
     },
 
     async listEventTimes(connectionId, calendarId, timeMinIso, timeMaxIso) {
