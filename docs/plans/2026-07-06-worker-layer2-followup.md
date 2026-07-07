@@ -29,4 +29,6 @@ Layer 1 (`docs/plans/2026-07-06-worker-ios-large-doc-load.md`) stopped the worke
 
 ## Next action
 
-**Open a beanies issue in Notion** covering both items above, then plan via `/beanies-plan`.
+**✅ Beanies issue FILED (2026-07-07): [#42](https://app.notion.com/p/ADR-032-Plan-B-Layer-2-incremental-Automerge-delta-sync-worker-large-doc-durability-396247d9a99f81c78996f4559d52d377) — "ADR-032 Plan B / Layer 2 — incremental Automerge delta sync (worker large-doc durability)"** (`Not started`, High, Feature). Covers both items above; scoped around incremental delta sync as the sanctioned lever, with **history compaction explicitly out-of-scope** (ADR-032 rejected it as merge-breaking). Gated on Part A (worker migration + Layer 1 + prod `docWorker` verification) being fully verified.
+
+**Remaining next action:** once Part A is verified, run `/beanies-pre-plan #42` → `/beanies-plan`.
