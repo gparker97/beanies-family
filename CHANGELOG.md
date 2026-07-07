@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-07-07
 
+### Changed
+
+- **The off-main-thread data engine is now live for everyone** (app v0.9.4). The background Web Worker that shipped switched off is now enabled in production, so the screen stays responsive while large families load — the app no longer feels frozen when you open it after being away. Incremental cross-device sync (appending just what changed instead of re-uploading the whole file) turns on with it. Rollback is a single flag flip if needed.
+
 ### Fixed
 
 - **iPhone sign-in: signing in to an existing family now works on the first try.** After completing the Google consent screen on iOS, the app could show a "your sign-in information is incorrect" error even though sign-in had actually succeeded (tapping "sign in" a second time worked, with no repeat of the consent screen). It was a timing race — the app checked your Google token a moment before it finished being saved. Now every sign-in step waits for that to fully settle first.
