@@ -4,11 +4,23 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as Automerge from '@automerge/automerge';
 import type { FamilyDocument } from '@/types/automerge';
 import { CorruptPayloadError } from '@/types/sync';
-import { generateFamilyKey } from '@/services/crypto/familyKeyService';
-import { migrateDoc, saveDoc, applyMutation, materializeCollection } from '../docOps';
+import { openDB } from 'idb';
+import { generateFamilyKey, encryptPayload } from '@/services/crypto/familyKeyService';
+import { bufferToBase64 } from '@/utils/encoding';
+import {
+  migrateDoc,
+  saveDoc,
+  applyMutation,
+  materializeCollection,
+  getHeads,
+  getChangesSince,
+  frameChanges,
+} from '../docOps';
 import {
   initPersistenceDB,
   persistDocBinary,
+  persistIncrement,
+  incrementCount,
   loadCachedDoc,
   persistEnvelope,
   loadCachedEnvelope,
@@ -21,6 +33,18 @@ import type { BeanpodFileV4 } from '@/types/syncFileV4';
 
 const FAMILY_ID = 'cache-test-family';
 const base = () => migrateDoc(Automerge.init<FamilyDocument>());
+
+/** Seed a base doc + one framed increment carrying `doc`'s changes since `fromHeads`. */
+async function seedIncrement(
+  key: CryptoKey,
+  baseDoc: ReturnType<typeof base>,
+  nextDoc: ReturnType<typeof base>
+): Promise<void> {
+  await persistIncrement(key, frameChanges(getChangesSince(nextDoc, getHeads(baseDoc))));
+}
+
+const setAccount = (doc: ReturnType<typeof base>, id: string, balance: number) =>
+  applyMutation(doc, { op: 'set', collection: 'accounts', id, entity: { id, balance } }).doc;
 
 describe('worker/cache', () => {
   let key: CryptoKey;
@@ -47,7 +71,10 @@ describe('worker/cache', () => {
     const loaded = await loadCachedDoc(key, FAMILY_ID);
 
     expect(loaded).not.toBeNull();
-    expect(materializeCollection(loaded!, 'accounts')).toEqual([['a1', { id: 'a1', balance: 42 }]]);
+    expect(loaded!.recovered).toBe(false);
+    expect(materializeCollection(loaded!.doc, 'accounts')).toEqual([
+      ['a1', { id: 'a1', balance: 42 }],
+    ]);
   });
 
   it('returns null when the cache has no doc row', async () => {
@@ -96,5 +123,103 @@ describe('worker/cache', () => {
     // Reopen and the row is still there.
     await initPersistenceDB(FAMILY_ID);
     expect(await loadCachedDoc(key, FAMILY_ID)).not.toBeNull();
+  });
+
+  // ─── B1: incremental persistence (base + inc:* rows) ───────────────────────
+
+  it('reconstructs base + N increments deep-equal to the whole-doc path', async () => {
+    const d0 = setAccount(base(), 'a1', 1);
+    await persistDocBinary(key, saveDoc(d0)); // base
+    const d1 = setAccount(d0, 'a2', 2);
+    await seedIncrement(key, d0, d1); // inc:0
+    const d2 = setAccount(d1, 'a3', 3);
+    await seedIncrement(key, d1, d2); // inc:1
+
+    const loaded = await loadCachedDoc(key, FAMILY_ID);
+    expect(loaded!.recovered).toBe(false);
+    expect(materializeCollection(loaded!.doc, 'accounts')).toEqual(
+      materializeCollection(d2, 'accounts')
+    );
+  });
+
+  it('a legacy `current`-only cache still loads (no base/inc rows)', async () => {
+    // Emulate a pre-B1 cache: the whole doc written under the legacy `current` id.
+    const d0 = setAccount(base(), 'a1', 5);
+    const enc = await encryptPayload(key, saveDoc(d0));
+    const raw = await openDB(`beanies-automerge-${FAMILY_ID}`, 1);
+    await raw.put('doc', {
+      id: 'current',
+      payload: bufferToBase64(enc),
+      updatedAt: new Date().toISOString(),
+    });
+    raw.close();
+
+    const loaded = await loadCachedDoc(key, FAMILY_ID);
+    expect(materializeCollection(loaded!.doc, 'accounts')).toEqual([
+      ['a1', { id: 'a1', balance: 5 }],
+    ]);
+  });
+
+  it('a fresh base write clears prior increments and resets the seq', async () => {
+    const d0 = setAccount(base(), 'a1', 1);
+    await persistDocBinary(key, saveDoc(d0));
+    const d1 = setAccount(d0, 'a2', 2);
+    await seedIncrement(key, d0, d1);
+    const d2 = setAccount(d1, 'a3', 3);
+    await seedIncrement(key, d1, d2);
+    expect(incrementCount()).toBe(2);
+
+    // Re-compaction: rewrite the base from the latest doc, increments cleared.
+    await persistDocBinary(key, saveDoc(d2));
+    expect(incrementCount()).toBe(0);
+
+    const loaded = await loadCachedDoc(key, FAMILY_ID);
+    expect(loaded!.recovered).toBe(false);
+    expect(materializeCollection(loaded!.doc, 'accounts')).toEqual(
+      materializeCollection(d2, 'accounts')
+    );
+  });
+
+  it('recovers base + increments before the first bad one (corrupt tail, not all-discarded)', async () => {
+    const d0 = setAccount(base(), 'a1', 1);
+    await persistDocBinary(key, saveDoc(d0));
+    const d1 = setAccount(d0, 'a2', 2);
+    await seedIncrement(key, d0, d1); // inc:0 (good)
+    // inc:1 corrupt: write bytes that decrypt but won't unframe/apply.
+    await persistIncrement(key, new Uint8Array([9, 9, 9, 9, 9, 9, 9, 9]));
+    const d2 = setAccount(d1, 'a3', 3);
+    await seedIncrement(key, d1, d2); // inc:2 (good, but after the bad one)
+
+    const loaded = await loadCachedDoc(key, FAMILY_ID);
+    expect(loaded!.recovered).toBe(true);
+    // Base + inc:0 recovered (a1, a2); inc:2 dropped because replay stopped at inc:1.
+    expect(materializeCollection(loaded!.doc, 'accounts')).toEqual(
+      materializeCollection(d1, 'accounts')
+    );
+  });
+
+  it('re-initializes the seq from the max existing inc key on reopen (no clobber)', async () => {
+    const d0 = setAccount(base(), 'a1', 1);
+    await persistDocBinary(key, saveDoc(d0));
+    const d1 = setAccount(d0, 'a2', 2);
+    await seedIncrement(key, d0, d1); // inc:0
+    const d2 = setAccount(d1, 'a3', 3);
+    await seedIncrement(key, d1, d2); // inc:1
+    expect(incrementCount()).toBe(2);
+
+    // Simulate a worker respawn: drop the handle, reopen — seq must resume at 2.
+    closeCacheDB();
+    await initPersistenceDB(FAMILY_ID);
+    expect(incrementCount()).toBe(2);
+
+    // A further increment lands at inc:2 and all three replay in order.
+    const d3 = setAccount(d2, 'a4', 4);
+    await seedIncrement(key, d2, d3);
+    const loaded = await loadCachedDoc(key, FAMILY_ID);
+    expect(
+      materializeCollection(loaded!.doc, 'accounts')
+        .map(([id]) => id)
+        .sort()
+    ).toEqual(['a1', 'a2', 'a3', 'a4']);
   });
 });
