@@ -256,14 +256,14 @@ describe('incrementalTransport — own-chunk pruning', () => {
 
     await publishIncremental(aux, deps, session);
 
-    // cutoff = 60 - 50 = 10 → own seq 0..9 pruned, 10..59 kept, other untouched.
+    // cutoff = 60 - 12 = 48 → own seq 0..47 pruned, 48..59 kept, other untouched.
     const ownSeqs = [...aux.map.keys()]
       .map((n) => parseChunkName(n))
       .filter((p): p is { actorId: string; seq: number } => !!p && p.actorId === 'me')
       .map((p) => p.seq)
       .sort((a, b) => a - b);
-    expect(ownSeqs[0]).toBe(10);
-    expect(ownSeqs).toHaveLength(50);
+    expect(ownSeqs[0]).toBe(48);
+    expect(ownSeqs).toHaveLength(12);
     expect(aux.map.has(chunkName('other', 0))).toBe(true);
   });
 });
