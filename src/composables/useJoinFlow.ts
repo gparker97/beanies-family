@@ -28,7 +28,7 @@ import {
   buildInviteLink,
 } from '@/services/crypto/inviteService';
 import {
-  completeRedirectAuth,
+  ensureRedirectAuthSettled,
   tryGetSilentToken,
   shouldUseRedirectAuth,
   getGoogleAccountEmail,
@@ -370,7 +370,9 @@ export function useJoinFlow() {
    * pending redirect to consume.
    */
   async function consumePendingRedirectAuth(): Promise<void> {
-    await tryStep('OAUTH_REDIRECT_FAILED', () => completeRedirectAuth());
+    // Share the one memoized redemption with App.vue's boot handler so the invite
+    // page can't double-consume the one-time code (native-safe no-op). See ADR-026.
+    await tryStep('OAUTH_REDIRECT_FAILED', () => ensureRedirectAuthSettled());
   }
 
   /**

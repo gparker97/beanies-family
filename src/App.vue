@@ -35,7 +35,6 @@ import {
   isNavigationCancelled,
 } from '@/utils/appChrome';
 import { isPodlessRecoveryQuery, RESUME_SETUP_PATH } from '@/components/login/resumePaths';
-import { withTimeout } from '@/utils/timing';
 import {
   hardReload,
   isChunkLoadError,
@@ -625,7 +624,7 @@ let chunkReloadInProgress = false;
 // a silent "counting beans" wedge (init stuck with `isInitializing` true and no
 // inner timeout to escape it) — the iOS onboarding freeze, 2026-06-20.
 const INIT_TIMEOUTS = {
-  completeRedirectAuth: 20_000, // the whole code↔token exchange (one fetch + commit)
+  // (redirect-auth completion is now bounded inside googleAuth.ensureRedirectAuthSettled)
   dataLoad: 30_000, // dismiss the data skeleton; loading continues in the background
   watchdog: 35_000, // last resort: flip isInitializing false + show the recovery overlay
 } as const;
@@ -778,16 +777,13 @@ onMounted(async () => {
     // without the listener's navigation, stranding the user. See ADR-029.
     if (!isNative())
       try {
-        const { completeRedirectAuth } = await import('@/services/google/googleAuth');
-        // Defense-in-depth: even with the inner fetch timeout in oauthProxy, an
-        // outer race ensures app init never wedges at `isInitializing=true` if
-        // a future code path adds another awaited fetch here. 20s is generous
-        // (the inner fetch already times out at 15s).
-        const redirectToken = await withTimeout(
-          completeRedirectAuth(),
-          INIT_TIMEOUTS.completeRedirectAuth,
-          'completeRedirectAuth() timed out — silent refresh failed'
-        );
+        // Redeem a pending redirect `code` through the shared, memoized settlement
+        // (bounded + native-safe internally). Routing every redemption through this
+        // one memo is what lets the resume/family-list consumers await the SAME
+        // in-flight exchange instead of racing it and misreading `isTokenValid()`.
+        // See docs/plans/2026-07-07-ios-redirect-auth-race.md.
+        const { ensureRedirectAuthSettled } = await import('@/services/google/googleAuth');
+        const redirectToken = await ensureRedirectAuthSettled();
         if (redirectToken) {
           initBreadcrumbs.push('auth: consumed pending redirect-auth token');
         } else {
@@ -806,7 +802,7 @@ onMounted(async () => {
         // App boot still continues; the user lands on the welcome/recovery
         // surface and can retry.
         const msg = (e as Error).message;
-        console.warn('[App] completeRedirectAuth failed during init:', msg);
+        console.warn('[App] redirect-auth completion failed during init:', msg);
         initBreadcrumbs.push(`auth: redirect-auth completion failed: ${msg}`);
         // Granular-consent denial (drive.file unchecked) is a SPECIFIC,
         // user-fixable failure (2026-06-19, finding 3) — stash a reason so the

@@ -65,6 +65,9 @@ vi.mock('@/services/sync/capabilities', () => ({
   getSyncCapabilities: () => ({ hasFileSystemAccess: true }),
   canAutoSync: () => true,
   supportsFileSystemAccess: () => true,
+  // loadFromFile now awaits whenRedirectAuthSettled() → ensureRedirectAuthSettled(),
+  // which reads isNative(); web (false) → no pending code → immediate no-op.
+  isNative: () => false,
 }));
 
 vi.mock('@/services/sync/fileSync', () => ({

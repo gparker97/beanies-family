@@ -17,6 +17,7 @@ import {
   getGoogleAccountEmail,
   shouldUseRedirectAuth,
   isTokenValid,
+  whenRedirectAuthSettled,
 } from '@/services/google/googleAuth';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
@@ -591,6 +592,10 @@ async function openDrivePicker(opts: { forceNewAccount?: boolean; isResume?: boo
   // may be committed in IndexedDB but not yet in memory (the bounce greg hit,
   // 2026-06-19, cluster 2). `tryReconnectSilently` checks isTokenValid first and
   // recovers the local/doc refresh token; it never redirects, so no consent loop.
+  // On the post-consent resume, the redirect `code` may still be mid-exchange —
+  // settle it (shared, once) before judging the token, so we list files instead
+  // of surfacing a spurious auth error. No-op once settled / on native. See ADR-026.
+  await whenRedirectAuthSettled();
   if (opts.isResume && !isTokenValid()) {
     const recovered = await tryReconnectSilently(syncStore.providerAccountEmail ?? undefined);
     if (!recovered || !isTokenValid()) {

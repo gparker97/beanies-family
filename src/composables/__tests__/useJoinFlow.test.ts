@@ -101,7 +101,7 @@ const mockGoogleAuth = {
   redirectAuth: false,
 };
 vi.mock('@/services/google/googleAuth', () => ({
-  completeRedirectAuth: () => mockGoogleAuth.completeRedirect(),
+  ensureRedirectAuthSettled: () => mockGoogleAuth.completeRedirect(),
   tryGetSilentToken: () => mockGoogleAuth.silent(),
   getGoogleAccountEmail: () => mockGoogleAuth.email,
   shouldUseRedirectAuth: () => mockGoogleAuth.redirectAuth,
