@@ -1863,7 +1863,9 @@ export async function completeRedirectAuth(): Promise<string | null> {
 // failure (the first-attempt sign-in bug). Fix: every token consumer awaits this
 // shared, memoized settlement first. See docs/plans/2026-07-07-ios-redirect-auth-race.md.
 
-const REDIRECT_AUTH_SETTLE_TIMEOUT_MS = 20_000; // one fetch + commit; was App.vue's INIT_TIMEOUTS.completeRedirectAuth
+// One code→token fetch + commit. Matches the 20s bound App.vue's init used before
+// this shared primitive owned the redirect-auth completion timeout.
+const REDIRECT_AUTH_SETTLE_TIMEOUT_MS = 20_000;
 
 // Per-page-load memo. REJECT-STICKY BY DESIGN: `completeRedirectAuth` removes the
 // one-time code on entry, so a failed exchange is unrecoverable without a fresh
