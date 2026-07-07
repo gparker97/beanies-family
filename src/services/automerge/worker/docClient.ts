@@ -316,6 +316,12 @@ const HEAVY_METHODS = new Set([
   'initAndLoadCache',
   'verifyEnvelope',
   'exportEncryptedPayload',
+  // Plan B incremental transport — a large first chunk / catch-up apply must get
+  // the generous ceiling too, not the tight 45 s mutation budget.
+  'applyRemoteChunks',
+  'exportIncrementalPayload',
+  'applyChanges',
+  'getChangesSince',
 ]);
 
 // Of the JSON-safe methods, these carry a `.envelope` whose `encryptedPayload` is
@@ -520,8 +526,24 @@ export function collectReferencedPhotoIds(opts?: RequestOpts): Promise<{ ids: st
 export function getChangesSince(heads: Heads): Promise<{ changes: Uint8Array[] }> {
   return request('getChangesSince', { heads });
 }
-export function applyChanges(changes: Uint8Array[]): Promise<{ heads: Heads }> {
+export function applyChanges(changes: Uint8Array[]): Promise<{ heads: Heads; landed: boolean }> {
   return request('applyChanges', { changes });
+}
+
+/** Plan B publish: export local changes since `sinceHeads` as an encrypted,
+ * self-describing `.beanchanges` chunk body (base64) for the caller to `writeAux`. */
+export function exportIncrementalPayload(sinceHeads: Heads): Promise<{ payload: string }> {
+  return request('exportIncrementalPayload', { sinceHeads });
+}
+
+/** Plan B poll: decrypt + apply a batch of remote `.beanchanges` chunk ciphertexts.
+ * `landed:false` means a chunk's causal deps are absent (silently buffered) — the
+ * caller MUST fall back to a whole-doc base adopt. `dirty` (landed only) drives the
+ * re-publish decision. */
+export function applyRemoteChunks(
+  payloads: string[]
+): Promise<{ heads: Heads; landed: boolean; dirty: boolean }> {
+  return request('applyRemoteChunks', { payloads });
 }
 
 /** Re-persist the envelope cache after a main-thread `currentEnvelope` change.
