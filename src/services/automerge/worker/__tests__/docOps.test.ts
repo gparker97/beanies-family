@@ -11,6 +11,10 @@ import {
   buildFullProjection,
   projectionDeltasBetween,
   getHeads,
+  getChangesSince,
+  applyChanges,
+  frameChanges,
+  unframeChanges,
   registerNamedOp,
   __resetNamedOpsForTesting,
 } from '../docOps';
@@ -38,6 +42,53 @@ describe('docOps — lifecycle', () => {
     }).doc;
     const reloaded = loadDoc(saveDoc(withOne));
     expect(materializeCollection(reloaded, 'transactions')).toEqual([['t1', txn('t1')]]);
+  });
+});
+
+describe('docOps — change primitives (B1/B2 incremental)', () => {
+  const setAcct = (doc: Doc, id: string, balance: number): Doc =>
+    applyMutation(doc, { op: 'set', collection: 'accounts', id, entity: { id, balance } }).doc;
+
+  it('frameChanges / unframeChanges round-trips a Uint8Array[] with boundaries intact', () => {
+    const parts = [new Uint8Array([1, 2, 3]), new Uint8Array([]), new Uint8Array([9, 8, 7, 6])];
+    const framed = frameChanges(parts);
+    const back = unframeChanges(framed);
+    expect(back).toHaveLength(3);
+    expect(Array.from(back[0]!)).toEqual([1, 2, 3]);
+    expect(Array.from(back[1]!)).toEqual([]);
+    expect(Array.from(back[2]!)).toEqual([9, 8, 7, 6]);
+  });
+
+  it('unframeChanges throws on a truncated buffer (→ caught by cache recovery)', () => {
+    const framed = frameChanges([new Uint8Array([1, 2, 3, 4])]);
+    expect(() => unframeChanges(framed.subarray(0, framed.length - 2))).toThrow();
+  });
+
+  it('getChangesSince → frame → unframe → applyChanges reconstructs the same state', () => {
+    const d0 = setAcct(base(), 'a1', 1);
+    const heads0 = getHeads(d0);
+    const d0bin = saveDoc(d0); // snapshot the base before d0's handle is consumed
+    const d1 = setAcct(setAcct(d0, 'a2', 2), 'a3', 3);
+    const framed = frameChanges(getChangesSince(d1, heads0));
+    // Apply onto a FRESH base (the real cache-reload path: base from disk + increments).
+    const rebuilt = applyChanges(loadDoc(d0bin), unframeChanges(framed)).doc;
+    expect(materializeCollection(rebuilt, 'accounts')).toEqual(
+      materializeCollection(d1, 'accounts')
+    );
+  });
+
+  it('applyChanges is idempotent — re-applying already-present changes is a no-op', () => {
+    const d0 = setAcct(base(), 'a1', 1);
+    const heads0 = getHeads(d0);
+    const d1 = setAcct(d0, 'a2', 2);
+    const d1bin = saveDoc(d1);
+    const changes = getChangesSince(d1, heads0);
+    const once = applyChanges(loadDoc(d1bin), changes).doc; // d1 already has these changes
+    const expected = loadDoc(d1bin);
+    expect(materializeCollection(once, 'accounts')).toEqual(
+      materializeCollection(expected, 'accounts')
+    );
+    expect(getHeads(once)).toEqual(getHeads(expected));
   });
 });
 

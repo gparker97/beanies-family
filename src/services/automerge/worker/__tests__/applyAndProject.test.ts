@@ -105,8 +105,9 @@ describe('worker/applyAndProject', () => {
 
     await flush();
     const reloaded = await cache.loadCachedDoc(key, FAMILY_ID);
-    expect(reloaded!.accounts.a1).toEqual({ id: 'a1', balance: 7 });
-    expect(perf).toContain('automerge.save'); // save timing relayed
+    expect(reloaded!.doc.accounts.a1).toEqual({ id: 'a1', balance: 7 });
+    // First persist of a fresh doc writes a whole-doc base (B1); timing relayed.
+    expect(perf).toContain('automerge.saveBase');
   });
 
   it('initAndLoadCache streams a large collection as multiple bulk chunks (chunking)', async () => {
@@ -313,6 +314,57 @@ describe('worker/applyAndProject', () => {
     // Decrypt it back through the same crypto the Drive read path uses.
     const roundTripped = await mergeReadBack(payload, key);
     expect(roundTripped.accounts.a1).toEqual({ id: 'a1', balance: 99 });
+  });
+
+  // ─── B1: incremental cache persistence ─────────────────────────────────────
+
+  it('B1: first persist writes a base, subsequent persists write increments; reload reconstructs', async () => {
+    setKey(key);
+    await initAndLoadCache(FAMILY_ID); // miss → loaded:false
+    initDoc(); // lastPersistedHeads = null → next persist is a base
+
+    mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 1 } });
+    await flush(); // base write
+    mutate({ op: 'set', collection: 'accounts', id: 'a2', entity: { id: 'a2', balance: 2 } });
+    await flush(); // increment (delta only)
+
+    expect(perf).toContain('automerge.saveBase');
+    expect(perf).toContain('automerge.saveIncremental');
+    expect(cache.incrementCount()).toBe(1);
+
+    const reloaded = await cache.loadCachedDoc(key, FAMILY_ID);
+    expect(reloaded!.recovered).toBe(false);
+    expect(reloaded!.doc.accounts.a1).toEqual({ id: 'a1', balance: 1 });
+    expect(reloaded!.doc.accounts.a2).toEqual({ id: 'a2', balance: 2 });
+  });
+
+  it('B1: concurrent flushes are single-flighted — one pending delta → exactly one increment', async () => {
+    setKey(key);
+    await initAndLoadCache(FAMILY_ID);
+    initDoc();
+    mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 1 } });
+    await flush(); // base
+    mutate({ op: 'set', collection: 'accounts', id: 'a2', entity: { id: 'a2', balance: 2 } });
+
+    // Fire two flushes for the single pending delta without awaiting the first.
+    // Serialized: the second sees an empty `getChangesSince` → no second row, and
+    // the cursor never regresses (no duplicate `inc:` key).
+    await Promise.all([flush(), flush()]);
+
+    expect(cache.incrementCount()).toBe(1);
+    const reloaded = await cache.loadCachedDoc(key, FAMILY_ID);
+    expect(reloaded!.doc.accounts.a2).toEqual({ id: 'a2', balance: 2 });
+  });
+
+  it('B1: a no-op flush (no changes since last persist) writes nothing', async () => {
+    setKey(key);
+    await initAndLoadCache(FAMILY_ID);
+    initDoc();
+    mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 1 } });
+    await flush(); // base
+    expect(cache.incrementCount()).toBe(0);
+    await flush(); // nothing changed → no increment
+    expect(cache.incrementCount()).toBe(0);
   });
 });
 

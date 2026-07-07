@@ -60,9 +60,58 @@ export function getChangesSince(doc: Doc, heads: Heads): Uint8Array[] {
 }
 
 export function applyChanges(doc: Doc, changes: Uint8Array[]): { doc: Doc; heads: Heads } {
-  const [next] = Automerge.applyChanges(Automerge.clone(doc), changes);
+  // Apply in place (NOT a defensive clone): `Automerge.applyChanges` consumes
+  // `doc`'s handle and only READS `changes` — same pattern as `mergeDocs`. Every
+  // caller immediately reassigns to the returned doc and drops the old handle
+  // (the worker's `currentDoc`, or a freshly-loaded base in the cache-reload path,
+  // which owns no shared handle). See ADR-032 Plan B (docs/plans/2026-07-07-…).
+  const [next] = Automerge.applyChanges(doc, changes);
   const migrated = migrateDoc(next);
   return { doc: migrated, heads: getHeads(migrated) };
+}
+
+// ─── Change-log framing (length-delimited `Uint8Array[]` ⇄ one buffer) ────────
+//
+// A capture from `getChangesSince` is a `Uint8Array[]`; AES-GCM encrypts a single
+// buffer, so both the B1 cache increments and the B2 Drive chunks serialize the
+// array with an explicit per-change length prefix. A naive concatenation would
+// lose the boundaries `applyChanges(Change[])` needs. Format (little-endian):
+//   [uint32 count] ( [uint32 len] [len bytes] )*
+// Pure + symmetric; a malformed buffer throws (caught by the cache recovery path).
+
+export function frameChanges(changes: Uint8Array[]): Uint8Array {
+  let total = 4;
+  for (const c of changes) total += 4 + c.byteLength;
+  const buf = new Uint8Array(total);
+  const view = new DataView(buf.buffer);
+  let off = 0;
+  view.setUint32(off, changes.length, true);
+  off += 4;
+  for (const c of changes) {
+    view.setUint32(off, c.byteLength, true);
+    off += 4;
+    buf.set(c, off);
+    off += c.byteLength;
+  }
+  return buf;
+}
+
+export function unframeChanges(buf: Uint8Array): Uint8Array[] {
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  if (buf.byteLength < 4) throw new Error('unframeChanges: buffer too short for count');
+  let off = 0;
+  const count = view.getUint32(off, true);
+  off += 4;
+  const out: Uint8Array[] = [];
+  for (let i = 0; i < count; i++) {
+    if (off + 4 > buf.byteLength) throw new Error('unframeChanges: truncated length prefix');
+    const len = view.getUint32(off, true);
+    off += 4;
+    if (off + len > buf.byteLength) throw new Error('unframeChanges: truncated change payload');
+    out.push(buf.subarray(off, off + len));
+    off += len;
+  }
+  return out;
 }
 
 /**
