@@ -888,7 +888,9 @@ import { APP_URL } from '@beanies/brand/nav';
   color: var(--body-text);
   font-size: 1.05rem;
   line-height: 1.7;
-  margin-bottom: 28px;
+  /* Trimmed to offset this paragraph's 1.7 line-height leading (~6px), which
+   * otherwise makes the gap ABOVE the privacy line read larger than below. */
+  margin-bottom: 14px;
   max-width: 480px;
   opacity: 0.55;
   position: relative;
@@ -900,7 +902,9 @@ import { APP_URL } from '@beanies/brand/nav';
   flex-wrap: wrap;
   gap: 10px;
   justify-content: center;
-  margin: 0 auto 28px;
+  /* Even gap below to match the (leading-adjusted) gap above; both tightened
+   * from 28px toward the hero's 16px rhythm. */
+  margin: 0 auto 20px;
   max-width: 520px;
   position: relative;
 }
