@@ -12,7 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **iPhone sign-in: signing in to an existing family now works on the first try.** After completing the Google consent screen on iOS, the app could show a "your sign-in information is incorrect" error even though sign-in had actually succeeded (tapping "sign in" a second time worked, with no repeat of the consent screen). It was a timing race — the app checked your Google token a moment before it finished being saved. Now every sign-in step waits for that to fully settle first.
 - **The cross-family data-mixing fix is now live in production** (app v0.9.2R4). The safeguards logged on 2026-07-06 — fully clearing one family from memory before another loads, and never merging one family's data on top of a leftover one — have shipped to everyone. Single-family users were never affected.
+
+### Performance
+
+- **Your most recent edit is safer when you background the app.** The app now saves changes to its local cache incrementally (just what changed) instead of rewriting the whole file each time, closing a small window where the very last edit could be lost if the app was backgrounded or closed at the wrong moment. (Also groundwork for faster cross-device sync, which ships switched off for now.)
 
 ## 2026-07-06
 
