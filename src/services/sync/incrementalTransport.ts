@@ -26,8 +26,9 @@ const SEQ_PAD = 8;
 
 /** How many of THIS device's own chunks to keep before pruning older ones. The
  * base always carries our full history, so a peer that falls further behind than
- * this reads the whole-doc base (a correct, slower fallback) instead. */
-const OWN_CHUNK_KEEP = 50;
+ * this reads the whole-doc base (a correct, slower fallback) instead — kept small
+ * so the Drive folder stays tidy (peers poll frequently, rarely falling behind). */
+const OWN_CHUNK_KEEP = 12;
 
 /** `changes/<actorId>-<zero-padded seq>.beanchanges`. Names are unique + monotonic
  * per device and never reused, so a pruned name is permanently gone (no ABA). */
