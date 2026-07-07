@@ -17,6 +17,44 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.07',
+    date: '2026-07-07',
+    month: '7 july 2026',
+    spotlight: true,
+    summary: {
+      en: "Improved data handling under the hood, and the app no longer feels frozen when you open it after you've been away.",
+      beanie:
+        "improved data handling under the hood, and the app no longer feels frozen when you open it after you've been away.",
+    },
+    features: [
+      {
+        icon: '⚡',
+        title: {
+          en: 'Smoother loading, no more freeze',
+          beanie: 'smoother loading, no more freeze',
+        },
+        description: {
+          en: "Loading and syncing your family's data now happens in the background, so the app stays responsive even when there's a lot to catch up on, like when you haven't opened it in a while. We also improved how your data is saved and synced, so your most recent change is safer and updates do less work.",
+          beanie:
+            "loading and syncing your family's data now happens in the background, so the app stays responsive even when there's a lot to catch up on, like when you haven't opened it in a while. we also improved how your data is saved and synced, so your most recent change is safer and updates do less work.",
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.07.06',
     date: '2026-07-06',
     month: '6 july 2026',
