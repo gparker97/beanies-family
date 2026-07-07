@@ -18,6 +18,15 @@ import { setInlineCachePersistFailedHandler } from '@/services/automerge/worker/
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
 import type { StorageProvider, StorageProviderType } from './storageProvider';
+import { getAuxStore } from './storageProvider';
+import {
+  pullIncremental,
+  publishIncremental,
+  newTransportSession,
+  type TransportDeps,
+  type TransportSession,
+} from './incrementalTransport';
+import { isFlagEnabled } from '@/config/flags';
 import { LocalStorageProvider } from './providers/localProvider';
 import { CapacitorFileProvider } from './providers/capacitorFileProvider';
 import { DriveApiError } from '@/services/google/driveService';
@@ -70,6 +79,29 @@ let noKeyWarnedOnce = false;
 
 // Drive-reported modifiedTime of the last file we read or wrote
 let lastKnownFileTimestamp: string | null = null;
+
+// ADR-032 Plan B — incremental change-log transport state (in-memory, per provider).
+// Reset whenever the provider changes (setProvider). Deps route to the worker/inline
+// backend via docClient, so incremental sync works in both modes.
+let transportSession: TransportSession = newTransportSession();
+const transportDeps: TransportDeps = {
+  applyRemoteChunks: (payloads) => docClient.applyRemoteChunks(payloads),
+  exportIncrementalPayload: (sinceHeads) => docClient.exportIncrementalPayload(sinceHeads),
+  getHeads: () => docClient.getHeads(),
+  getActorId: () => docClient.getActorId(),
+};
+
+/** The provider's aux change-log store IFF incremental sync is active — gated on
+ * the `docWorker` kill-switch so flipping the flag OFF reverts to pure whole-doc
+ * transport (writes no chunks, reads only the base). Returns null otherwise. */
+function activeAuxStore(): ReturnType<typeof getAuxStore> {
+  if (!currentProvider || !isFlagEnabled('docWorker')) return null;
+  return getAuxStore(currentProvider);
+}
+
+function resetTransportSession(): void {
+  transportSession = newTransportSession();
+}
 
 // Poll-while-visible watcher for providers that opt in via
 // supportsLocalPolling(). Lifecycle is tied to the active provider — started
@@ -312,6 +344,7 @@ export function getProvider(): StorageProvider | null {
 export function setProvider(provider: StorageProvider): void {
   currentProvider = provider;
   currentProviderFamilyId = getActiveFamilyId();
+  resetTransportSession(); // a new provider → a fresh change-log cursor
   // This is the single write-intent install seam, so it OWNS offline-queue
   // flush registration (2026-06-19, finding 11). Provider builds (createNew /
   // fromExisting) no longer self-register, so read-only resume/recovery paths
@@ -674,6 +707,24 @@ async function fetchAndMergeRemote(): Promise<void> {
   if (!isDrive && !opts) return;
   if (!currentFamilyKey || !currentEnvelope) return;
 
+  // ADR-032 Plan B: try the incremental change-log first (docWorker-gated aux).
+  //  • applied → we ingested KB of peer deltas; re-publish if we carried unsynced
+  //    local changes, then we're done (no whole-doc read needed).
+  //  • noop / fallback → fall through to the whole-doc fast-path + merge below: a
+  //    whole-doc peer (or a docWorker-off device) may have advanced the base
+  //    WITHOUT writing a chunk, and a fallback needs the base to carry missing deps.
+  const aux = activeAuxStore();
+  if (aux) {
+    const pull = await pullIncremental(aux, transportDeps, transportSession);
+    if (pull.outcome === 'applied') {
+      if (pull.dirty) triggerDebouncedSave();
+      return;
+    }
+    if (pull.outcome === 'fallback') {
+      console.warn(`[syncService] incremental pull fell back (${pull.reason}) → whole-doc merge`);
+    }
+  }
+
   // Fast path: check if remote has changed since we last read/wrote
   const remoteTimestamp = await currentProvider.getLastModified();
   if (
@@ -772,6 +823,13 @@ async function doSave(): Promise<boolean> {
 
     // Write via the storage provider abstraction
     await currentProvider.write(fileContent);
+
+    // ADR-032 Plan B: dual-publish — after the whole-doc base write, append the
+    // delta chunk so incremental peers apply KB instead of re-loading the base.
+    // Best-effort (publishIncremental swallows + logs): the base is authoritative,
+    // so a chunk-write failure never risks data — peers just fall back to the base.
+    const auxOut = activeAuxStore();
+    if (auxOut) await publishIncremental(auxOut, transportDeps, transportSession);
 
     // Update timestamp after successful write
     try {
