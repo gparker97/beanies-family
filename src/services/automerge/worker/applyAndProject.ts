@@ -31,6 +31,8 @@ import {
   applyChanges as applyChangesOp,
   decryptToDoc,
   encryptDocPayload,
+  encryptChunk,
+  decryptChunk,
   buildFullProjection,
   projectionDeltasBetween,
   frameChanges,
@@ -411,7 +413,7 @@ export async function exportEncryptedPayload(): Promise<{ payload: string }> {
   return { payload };
 }
 
-// ─── Change-aware hooks (unused by Plan A transport; wired for Plan B) ────────
+// ─── Change-aware transport (Plan B — incremental delta sync) ────────────────
 
 export function getHeads(): { heads: Heads } {
   return { heads: headsOf(requireDoc('getHeads')) };
@@ -419,12 +421,78 @@ export function getHeads(): { heads: Heads } {
 export function getChangesSince(heads: Heads): { changes: Uint8Array[] } {
   return { changes: changesSince(requireDoc('getChangesSince'), heads) };
 }
-export function applyChanges(changes: Uint8Array[]): { heads: Heads } {
-  const { doc, heads } = applyChangesOp(requireDoc('applyChanges'), changes);
-  currentDoc = doc;
-  schedulePersist();
-  pushProjection(doc);
-  return { heads };
+
+/**
+ * Apply changes to the live doc in place, then report whether they LANDED. Plan B
+ * MUST NOT assume `applyChanges` threw on a missing dependency — Automerge 3.2.6
+ * SILENTLY BUFFERS a change whose causal deps are absent (it neither throws nor
+ * advances heads; the change sits invisible until its deps arrive). So the only
+ * correct "did it land" signal is `getMissingDeps(doc, []) === []` after applying.
+ * On landed → guarded delta projection + persist. On NOT landed → leave the doc
+ * (with its buffered changes) but push NOTHING and persist NOTHING: the caller
+ * falls back to a whole-doc base adopt, which carries every dep and resolves the
+ * buffered changes into a correct, fully-projected state.
+ */
+function applyChangesInternal(changes: Uint8Array[]): { heads: Heads; landed: boolean } {
+  const local = requireDoc('applyChanges');
+  const localHeads = headsOf(local);
+  const { doc: next } = applyChangesOp(local, changes);
+  currentDoc = next;
+  const landed = Automerge.getMissingDeps(next, []).length === 0;
+  const heads = headsOf(next);
+  if (landed) {
+    schedulePersist();
+    pushDeltas(projectionDeltasBetween(next, localHeads, heads) ?? buildFullProjection(next));
+  }
+  return { heads, landed };
+}
+
+/** Apply plaintext changes (DEV/E2E + inline symmetry). Returns `landed`. */
+export function applyChanges(changes: Uint8Array[]): { heads: Heads; landed: boolean } {
+  return applyChangesInternal(changes);
+}
+
+/**
+ * Export the local changes since `sinceHeads` as an encrypted, self-describing
+ * `.beanchanges` chunk (Plan B publish). Crypto stays in the worker — main gets
+ * only ciphertext to upload. `frontierHeads` lets any reader apply idempotently
+ * and derive `dirty` without a shared manifest.
+ */
+export async function exportIncrementalPayload(sinceHeads: Heads): Promise<{ payload: string }> {
+  const doc = requireDoc('exportIncrementalPayload');
+  const key = requireKey('exportIncrementalPayload');
+  const chunk = { frontierHeads: headsOf(doc), changes: changesSince(doc, sinceHeads) };
+  const payload = await time2('automerge.saveIncremental', () => encryptChunk(chunk, key));
+  return { payload };
+}
+
+/**
+ * Decrypt + apply a batch of remote `.beanchanges` chunk ciphertexts (Plan B poll).
+ * All chunks apply in ONE `applyChanges` so intra-batch deps resolve in a single
+ * pass. Returns `landed` (see `applyChangesInternal`) and, only when landed,
+ * `dirty` = did the merged doc advance beyond the remote frontier (local carried
+ * unsynced changes → the caller re-publishes). A non-landed batch returns
+ * `dirty:false` and the caller reconciles via the whole-doc base.
+ */
+export async function applyRemoteChunks(
+  payloads: string[]
+): Promise<{ heads: Heads; landed: boolean; dirty: boolean }> {
+  requireDoc('applyRemoteChunks');
+  const key = requireKey('applyRemoteChunks');
+  const chunks = await time2('automerge.remoteLoad', () =>
+    Promise.all(payloads.map((p) => decryptChunk(p, key)))
+  );
+  const allChanges: Uint8Array[] = [];
+  const remoteFrontier: Heads = [];
+  for (const c of chunks) {
+    allChanges.push(...c.changes);
+    remoteFrontier.push(...c.frontierHeads);
+  }
+  const { heads, landed } = applyChangesInternal(allChanges);
+  if (!landed) return { heads, landed, dirty: false };
+  // Landed → every remote frontier hash is materialized, so getChangesSince is safe.
+  const dirty = changesSince(requireDoc('applyRemoteChunks'), remoteFrontier).length > 0;
+  return { heads, landed, dirty };
 }
 
 /** Gather every referenced photoId (runs the collect hooks on the worker doc).
@@ -540,6 +608,10 @@ export async function dispatch(
       return { result: getChangesSince(a.heads as Heads) };
     case 'applyChanges':
       return { result: applyChanges(a.changes as Uint8Array[]) };
+    case 'exportIncrementalPayload':
+      return { result: await exportIncrementalPayload(a.sinceHeads as Heads) };
+    case 'applyRemoteChunks':
+      return { result: await applyRemoteChunks(a.payloads as string[]) };
     case 'collectReferencedPhotoIds':
       return { result: collectReferencedPhotoIds() };
     case 'persistEnvelope':
