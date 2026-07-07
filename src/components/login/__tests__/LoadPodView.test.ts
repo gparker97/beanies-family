@@ -75,6 +75,7 @@ vi.mock('@/stores/familyStore', () => ({
 }));
 
 vi.mock('@/services/google/googleAuth', () => ({
+  whenRedirectAuthSettled: vi.fn(async () => {}),
   getGoogleAccountEmail: () => 'owner2@example.com',
   shouldUseRedirectAuth: () => false,
   isTokenValid: () => true,

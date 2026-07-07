@@ -16,6 +16,7 @@ import {
   shouldUseRedirectAuth,
   startRedirectAuth,
   isTokenValid,
+  whenRedirectAuthSettled,
 } from '@/services/google/googleAuth';
 import type { RedirectMode } from '@/services/google/redirectState';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
@@ -60,6 +61,10 @@ export async function beginDriveAuthRedirectIfNeeded(
   mode: RedirectMode,
   opts: { forceReauth?: boolean } = {}
 ): Promise<boolean> {
+  // A pending redirect `code` may still be mid-exchange on the post-redirect boot;
+  // redeem it (shared, once) before judging the token — otherwise we bounce a
+  // spurious second redirect. No-op once settled / on native. See ADR-026.
+  await whenRedirectAuthSettled();
   if (shouldUseRedirectAuth() && (opts.forceReauth || !isTokenValid())) {
     // B: on a redirect surface (the iPhone case), try a silent recovery using
     // the beanpod-mirrored refresh token before bouncing through Google. Wired

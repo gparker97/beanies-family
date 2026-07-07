@@ -46,6 +46,7 @@ import {
   isSilentRefreshPending,
   isTokenValid,
   isUserCancellation,
+  whenRedirectAuthSettled,
 } from '@/services/google/googleAuth';
 import {
   registerDriveTokenMirror,
@@ -601,6 +602,13 @@ export const useSyncStore = defineStore('sync', () => {
     reason?: 'auth' | 'not-found' | 'error';
   }> {
     const merging = !!options.merge;
+
+    // The single read chokepoint for the login flow (single-family auto-select +
+    // FamilyPicker). On the post-consent redirect return the Google token may still
+    // be mid-exchange; settle it (shared, once) before the first Drive read so a
+    // "token still settling" transient isn't misread as a hard load failure. No-op
+    // once settled / on native. See docs/plans/2026-07-07-ios-redirect-auth-race.md.
+    await whenRedirectAuthSettled();
 
     if (merging) {
       isReloading = true;
