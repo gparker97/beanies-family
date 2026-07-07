@@ -53,6 +53,44 @@ export interface StorageProvider {
    * `fetchAndMergeRemote` instead). Optional method; treat absent as false.
    */
   supportsLocalPolling?(): boolean;
+
+  // ─── Plan B (ADR-032) incremental change-log — optional multi-object API ─────
+  //
+  // A provider that can store sibling objects beside the `.beanpod` (Google Drive
+  // app-folder files, a local sibling directory) implements ALL FOUR to opt into
+  // incremental delta sync. A provider missing any of them stays whole-doc-only
+  // (graceful, logged degradation) — `getAuxStore()` returns null for it.
+
+  /** List the names of every aux object (change-log chunks) for this family. */
+  listAux?(): Promise<string[]>;
+  /** Read one aux object's content, or null if absent (pruned/never-written). */
+  readAux?(name: string): Promise<string | null>;
+  /** Create/overwrite one aux object (chunks are immutable — name never reused). */
+  writeAux?(name: string, content: string): Promise<void>;
+  /** Delete one aux object (compaction). A no-op if already absent. */
+  deleteAux?(name: string): Promise<void>;
 }
 
 export type StorageProviderType = StorageProvider['type'];
+
+/** The four aux methods bound together, or null if the provider is whole-doc-only. */
+export interface AuxStore {
+  list(): Promise<string[]>;
+  read(name: string): Promise<string | null>;
+  write(name: string, content: string): Promise<void>;
+  delete(name: string): Promise<void>;
+}
+
+/** Bind a provider's optional aux methods into an `AuxStore`, or null if it
+ * doesn't implement the full set (→ the family stays on the whole-doc path). */
+export function getAuxStore(p: StorageProvider): AuxStore | null {
+  if (p.listAux && p.readAux && p.writeAux && p.deleteAux) {
+    return {
+      list: () => p.listAux!(),
+      read: (name) => p.readAux!(name),
+      write: (name, content) => p.writeAux!(name, content),
+      delete: (name) => p.deleteAux!(name),
+    };
+  }
+  return null;
+}
