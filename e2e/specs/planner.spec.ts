@@ -3,7 +3,11 @@ import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { gotoRoot, gotoRoute } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
-import { dismissActivityCreatedConfirm } from '../helpers/activity-modal';
+import {
+  dismissActivityCreatedConfirm,
+  openAddActivity,
+  submitActivity,
+} from '../helpers/activity-modal';
 import { selectBeanieDate } from '../helpers/date-picker';
 import { tomorrowOrTodayStr } from '../helpers/test-dates';
 
@@ -49,11 +53,11 @@ test.describe('Family Planner', () => {
   /** Helper to create a recurring activity starting tomorrow and dismiss the confirmation. */
   async function createRecurringActivity(page: import('@playwright/test').Page, title: string) {
     const tomorrowStr = getTomorrowStr();
-    await page.getByRole('button', { name: /\+ add activity/i }).click();
+    await openAddActivity(page);
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill(title);
     await selectAssignee(page);
     await selectBeanieDate(page.locator('div[role="dialog"]'), tomorrowStr);
-    await page.getByRole('button', { name: /^add activity$/i }).click();
+    await submitActivity(page);
     await dismissActivityCreatedConfirm(page);
   }
 
@@ -72,7 +76,7 @@ test.describe('Family Planner', () => {
     await setupPlanner(page);
 
     // --- CREATE: one-time activity ---
-    await page.getByRole('button', { name: /\+ add activity/i }).click();
+    await openAddActivity(page);
 
     // Verify modal opened
     await expect(page.getByText(/new activity/i)).toBeVisible();
@@ -90,7 +94,7 @@ test.describe('Family Planner', () => {
     await selectBeanieDate(page.locator('div[role="dialog"]'), tomorrowStr);
 
     // Save
-    await page.getByRole('button', { name: /^add activity$/i }).click();
+    await submitActivity(page);
 
     // Dismiss confirmation modal
     await dismissActivityCreatedConfirm(page);
@@ -102,7 +106,7 @@ test.describe('Family Planner', () => {
     expect(exported.activities![0].recurrence).toBe('none');
 
     // --- CREATE: recurring activity ---
-    await page.getByRole('button', { name: /\+ add activity/i }).click();
+    await openAddActivity(page);
 
     // Fill in form — recurrence defaults to "Recurring"
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Piano Lesson');
@@ -117,7 +121,7 @@ test.describe('Family Planner', () => {
     // Recurrence stays at default (Recurring + Weekly)
 
     // Save
-    await page.getByRole('button', { name: /^add activity$/i }).click();
+    await submitActivity(page);
 
     // Dismiss confirmation modal
     await dismissActivityCreatedConfirm(page);
@@ -296,11 +300,11 @@ test.describe('Family Planner', () => {
     rescheduleTarget.setDate(rescheduleTarget.getDate() + 3);
     const rescheduleStr = `${rescheduleTarget.getFullYear()}-${String(rescheduleTarget.getMonth() + 1).padStart(2, '0')}-${String(rescheduleTarget.getDate()).padStart(2, '0')}`;
 
-    await page.getByRole('button', { name: /\+ add activity/i }).click();
+    await openAddActivity(page);
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Reschedule Test');
     await selectAssignee(page);
     await selectBeanieDate(page.locator('div[role="dialog"]'), tomorrowStr);
-    await page.getByRole('button', { name: /^add activity$/i }).click();
+    await submitActivity(page);
 
     // Dismiss confirmation modal
     await dismissActivityCreatedConfirm(page);

@@ -65,6 +65,24 @@ export function initDataBridge(): void {
       return id;
     },
 
+    /**
+     * Pre-stage the current worker doc binary into sessionStorage-ready form so
+     * it survives the next full-page reload (`page.goto`). Called by the E2E
+     * navigation helper before every programmatic navigation.
+     *
+     * Why this is needed: with the ADR-032 worker migration, reload-persistence
+     * for a memory-provider family (no configured `.beanpod` file → App.vue init
+     * Path 3) comes ONLY from the `__e2eSeedDoc` snapshot. That snapshot was
+     * previously staged solely by `seedData()` / `visibilitychange:hidden`, so
+     * data created through the REAL create-a-family UI (never seeded, and
+     * `page.goto` doesn't fire `visibilitychange:hidden`) was lost on the first
+     * reload — leaving the family with 0 members. Staging on navigation closes
+     * that gap for UI-created data.
+     */
+    async stageSnapshot(): Promise<void> {
+      await refreshSnapshot();
+    },
+
     async seedData(data: Partial<Record<keyof FamilyDocument, unknown>>) {
       const ops: MutationOp[] = [];
       for (const col of COLLECTIONS) {

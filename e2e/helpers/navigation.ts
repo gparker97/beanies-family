@@ -30,6 +30,21 @@ const NAV_INTERRUPTED = /interrupted by another navigation|Frame load interrupte
  * with the interrupt beating commit). See docs/E2E_HEALTH.md.
  */
 export async function gotoRoute(page: Page, path: string): Promise<void> {
+  // Pre-stage the current worker doc so UI-created data (e.g. the owner member
+  // from the create-a-family flow) survives this full-page reload. Without it,
+  // a memory-provider family has no configured file → App.vue init Path 3
+  // restores only from the `__e2eSeedDoc` snapshot, which was never staged for
+  // UI-created data → the reloaded page has 0 members. See dataBridge
+  // `stageSnapshot`. Guarded + best-effort: the bridge is absent on the very
+  // first navigation from about:blank, and staging an empty/uninitialised doc
+  // is a safe no-op.
+  await page
+    .evaluate(async () => {
+      const bridge = (window as unknown as Record<string, any>).__e2eDataBridge;
+      if (bridge?.stageSnapshot) await bridge.stageSnapshot();
+    })
+    .catch(() => {});
+
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
