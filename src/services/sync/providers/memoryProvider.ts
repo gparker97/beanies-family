@@ -24,6 +24,8 @@ class MemoryProvider implements StorageProvider {
   private content: string | null = null;
   private lastModified: string | null = null;
   private readonly fileName: string;
+  /** ADR-032 Plan B change-log chunks (sibling objects beside the .beanpod). */
+  private readonly aux = new Map<string, string>();
 
   constructor(fileName = 'e2e-memory.beanpod') {
     this.fileName = fileName;
@@ -82,6 +84,20 @@ class MemoryProvider implements StorageProvider {
 
   supportsLocalPolling(): boolean {
     return false;
+  }
+
+  // ─── Plan B aux change-log (in-memory sibling objects) ──────────────────────
+  async listAux(): Promise<string[]> {
+    return [...this.aux.keys()];
+  }
+  async readAux(name: string): Promise<string | null> {
+    return this.aux.get(name) ?? null;
+  }
+  async writeAux(name: string, content: string): Promise<void> {
+    this.aux.set(name, content);
+  }
+  async deleteAux(name: string): Promise<void> {
+    this.aux.delete(name);
   }
 }
 
