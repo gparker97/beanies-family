@@ -394,6 +394,25 @@ export async function searchBeanpodFilesGlobal(token: string): Promise<BeanpodFi
 }
 
 /**
+ * List files in a folder, optionally filtered by a `name contains` fragment.
+ * Generic sibling-object lister for ADR-032 Plan B change-log chunks (returns id
+ * + name only; the caller maps name → id). Single page (pageSize 1000) — the
+ * change-log is compaction-bounded well below that.
+ */
+export async function listFilesInFolder(
+  token: string,
+  folderId: string,
+  nameContains?: string
+): Promise<{ id: string; name: string }[]> {
+  let query = `'${folderId}' in parents and trashed=false`;
+  if (nameContains) query += ` and name contains '${nameContains.replace(/'/g, "\\'")}'`;
+  const url = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=1000`;
+  const res = await driveRequest(token, url);
+  const data = await res.json();
+  return (data.files ?? []).map((f: { id: string; name: string }) => ({ id: f.id, name: f.name }));
+}
+
+/**
  * Delete a file from Google Drive.
  */
 export async function deleteFile(token: string, fileId: string): Promise<void> {

@@ -32,6 +32,8 @@ import {
   getOrCreateAppFolder,
   createFile,
   listBeanpodFiles,
+  listFilesInFolder,
+  deleteFile,
   clearFolderCache,
   DriveApiError,
 } from '@/services/google/driveService';
@@ -76,6 +78,10 @@ export class GoogleDriveProvider implements StorageProvider {
   private fileName: string;
   private accountEmail: string | null;
   private mimeTypeMigrationDone = false;
+  // ADR-032 Plan B aux change-log: the .beanpod's parent folder + a name→fileId
+  // cache refreshed by listAux (chunks live as sibling files in the app folder).
+  private auxFolderId: string | null = null;
+  private auxIdByName = new Map<string, string>();
 
   constructor(fileId: string, fileName: string, accountEmail?: string | null) {
     this.fileId = fileId;
@@ -346,6 +352,65 @@ export class GoogleDriveProvider implements StorageProvider {
    */
   supportsLocalPolling(): boolean {
     return false;
+  }
+
+  // ─── ADR-032 Plan B aux change-log (sibling files in the app folder) ─────────
+  //
+  // Best-effort by contract — the incremental transport treats ANY aux failure as
+  // a whole-doc fallback (the .beanpod base is always authoritative). So these
+  // reuse the same token/retry path as read/write but do not add new recovery
+  // beyond the account-bound guard; a throw simply degrades to whole-doc sync.
+
+  /** The .beanpod's parent folder = where sibling change chunks live. Cached. */
+  private async resolveAuxFolder(token: string): Promise<string> {
+    if (this.auxFolderId) return this.auxFolderId;
+    const meta = await getFileMetadata(token, this.fileId, 'parents');
+    const parent = (meta.parents as string[] | undefined)?.[0];
+    if (!parent) throw new Error('[GoogleDriveProvider] .beanpod has no parent folder for aux');
+    this.auxFolderId = parent;
+    return parent;
+  }
+
+  async listAux(): Promise<string[]> {
+    this.ensureBoundAccount();
+    const token = await getValidTokenSilent();
+    const folderId = await this.resolveAuxFolder(token);
+    const files = await withRetry(() => listFilesInFolder(token, folderId, '.beanchanges'));
+    this.auxIdByName = new Map(files.map((f) => [f.name, f.id]));
+    return files.map((f) => f.name);
+  }
+
+  async readAux(name: string): Promise<string | null> {
+    this.ensureBoundAccount();
+    const token = await getValidTokenSilent();
+    let id = this.auxIdByName.get(name);
+    if (!id) {
+      await this.listAux(); // refresh the name→id map (e.g. after a reload)
+      id = this.auxIdByName.get(name);
+    }
+    if (!id) return null; // absent (pruned/never-written) → transport falls back
+    return withRetry(() => readFile(token, id));
+  }
+
+  async writeAux(name: string, content: string): Promise<void> {
+    this.ensureBoundAccount();
+    const token = await getValidTokenSilent();
+    const folderId = await this.resolveAuxFolder(token);
+    const { fileId } = await withRetry(() => createFile(token, folderId, name, content));
+    this.auxIdByName.set(name, fileId);
+  }
+
+  async deleteAux(name: string): Promise<void> {
+    this.ensureBoundAccount();
+    const token = await getValidTokenSilent();
+    let id = this.auxIdByName.get(name);
+    if (!id) {
+      await this.listAux();
+      id = this.auxIdByName.get(name);
+    }
+    if (!id) return; // already gone — delete is idempotent
+    await withRetry(() => deleteFile(token, id));
+    this.auxIdByName.delete(name);
   }
 
   /**
