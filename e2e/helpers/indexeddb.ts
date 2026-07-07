@@ -79,6 +79,10 @@ export class IndexedDBHelper {
     await this.page.evaluate(async () => {
       // Clear E2E auto-auth flag so the next load shows the login page
       sessionStorage.removeItem('e2e_auto_auth');
+      // Clear any staged Automerge snapshot so a prior test's UI-created data
+      // (now staged on every navigation, see gotoRoute) can't leak into the
+      // next test via App.vue's init Path 3 restore.
+      sessionStorage.removeItem('__e2eSeedDoc');
       // Use databases() API to find all databases to delete
       if ('databases' in indexedDB) {
         const dbs = await indexedDB.databases();
@@ -129,6 +133,16 @@ export class IndexedDBHelper {
       data
     );
     await this.page.reload();
+    // Wait for the app to finish restoring the seeded doc before returning.
+    // `reload()` only awaits the `load` event; App.vue's snapshot restore into
+    // the worker + store projection is async and completes AFTER load. Without
+    // this gate the next navigation's `stageSnapshot` (see gotoRoute) can run
+    // against a not-yet-restored (empty) doc and stage nothing, dropping the
+    // seeded data on that reload — a race that surfaced webkit-only (slower
+    // restore) as an empty account dropdown. `app-content` becomes visible only
+    // once `isLoadingData` clears, so it is the same readiness signal
+    // `bypassLoginIfNeeded` gates on.
+    await this.page.getByTestId('app-content').waitFor({ state: 'visible', timeout: 30000 });
   }
 
   async exportData(): Promise<ExportedData> {
