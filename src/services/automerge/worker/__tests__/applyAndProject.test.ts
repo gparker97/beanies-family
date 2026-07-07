@@ -4,7 +4,17 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as Automerge from '@automerge/automerge';
 import type { FamilyDocument } from '@/types/automerge';
 import { generateFamilyKey } from '@/services/crypto/familyKeyService';
-import { migrateDoc, applyMutation, saveDoc, encryptDocPayload } from '../docOps';
+import {
+  migrateDoc,
+  applyMutation,
+  saveDoc,
+  loadDoc,
+  encryptDocPayload,
+  encryptChunk,
+  decryptChunk,
+  getHeads,
+  getChangesSince,
+} from '../docOps';
 import * as cache from '../cache';
 import {
   configure,
@@ -15,6 +25,8 @@ import {
   mutate,
   mergeRemoteEnvelope,
   exportEncryptedPayload,
+  exportIncrementalPayload,
+  applyRemoteChunks,
   flush,
   reset,
   __resetApplyAndProjectForTesting,
@@ -365,6 +377,110 @@ describe('worker/applyAndProject', () => {
     expect(cache.incrementCount()).toBe(0);
     await flush(); // nothing changed → no increment
     expect(cache.incrementCount()).toBe(0);
+  });
+
+  // ─── B2: incremental Drive transport (applyRemoteChunks / exportIncremental) ─
+
+  const acct = (doc: Automerge.Doc<FamilyDocument>, id: string, bal: number) =>
+    applyMutation(doc, { op: 'set', collection: 'accounts', id, entity: { id, balance: bal } }).doc;
+  const copy = (doc: Automerge.Doc<FamilyDocument>) => loadDoc(saveDoc(doc));
+  const chunkFrom = (
+    fromDoc: Automerge.Doc<FamilyDocument>,
+    toDoc: Automerge.Doc<FamilyDocument>,
+    k: CryptoKey
+  ) =>
+    encryptChunk(
+      { frontierHeads: getHeads(toDoc), changes: getChangesSince(toDoc, getHeads(fromDoc)) },
+      k
+    );
+
+  /** Adopt `doc` as the worker's currentDoc via a first-load merge (shared history). */
+  const adopt = async (doc: Automerge.Doc<FamilyDocument>) => {
+    setKey(key);
+    await mergeRemoteEnvelope(await envelopeFor(copy(doc), key), FAMILY_ID);
+  };
+
+  it('B2: applyRemoteChunks applies a peer chunk (landed, not dirty, delta projection)', async () => {
+    const shared = acct(base(), 'a1', 1);
+    await adopt(shared);
+    const peer = acct(copy(shared), 'a2', 2);
+    chunks.length = 0;
+
+    const r = await applyRemoteChunks([await chunkFrom(shared, peer, key)]);
+
+    expect(r.landed).toBe(true);
+    expect(r.dirty).toBe(false); // worker had no changes the peer lacked
+    // Delta projection (not a 27-collection full reset): an upsert for a2.
+    const upserts = chunks
+      .map((c) => c.delta)
+      .filter((d): d is Extract<ProjectionDelta, { kind: 'upsert' }> => d.kind === 'upsert');
+    expect(upserts.some((d) => d.collection === 'accounts' && d.id === 'a2')).toBe(true);
+    expect(chunks.some((c) => c.delta.kind === 'bulk')).toBe(false);
+  });
+
+  it('B2: a chunk whose causal deps are absent does NOT land (silently buffered → fallback)', async () => {
+    const shared = acct(base(), 'a1', 1);
+    await adopt(shared);
+    const peerA2 = acct(copy(shared), 'a2', 2);
+    const peerA3 = acct(copy(peerA2), 'a3', 3);
+    // Chunk carries ONLY a3's change, which depends on a2 (the worker lacks a2).
+    const orphan = await encryptChunk(
+      { frontierHeads: getHeads(peerA3), changes: getChangesSince(peerA3, getHeads(peerA2)) },
+      key
+    );
+
+    const r = await applyRemoteChunks([orphan]);
+
+    expect(r.landed).toBe(false);
+    expect(r.dirty).toBe(false);
+  });
+
+  it('B2: out-of-order chunks in ONE batch converge (dependent listed before its dependency)', async () => {
+    const shared = acct(base(), 'a1', 1);
+    await adopt(shared);
+    const peerA2 = acct(copy(shared), 'a2', 2);
+    const peerA3 = acct(copy(peerA2), 'a3', 3);
+    const ctA3 = await encryptChunk(
+      { frontierHeads: getHeads(peerA3), changes: getChangesSince(peerA3, getHeads(peerA2)) },
+      key
+    );
+    const ctA2 = await encryptChunk(
+      { frontierHeads: getHeads(peerA2), changes: getChangesSince(peerA2, getHeads(shared)) },
+      key
+    );
+
+    // Dependent (a3) BEFORE its dependency (a2) — one applyChanges call resolves both.
+    const r = await applyRemoteChunks([ctA3, ctA2]);
+
+    expect(r.landed).toBe(true);
+    const { payload } = await exportEncryptedPayload();
+    const back = await mergeReadBack(payload, key);
+    expect(back.accounts.a2).toEqual({ id: 'a2', balance: 2 });
+    expect(back.accounts.a3).toEqual({ id: 'a3', balance: 3 });
+  });
+
+  it('B2: dirty=true when the worker carries a concurrent change the peer lacks', async () => {
+    const shared = acct(base(), 'a1', 1);
+    await adopt(shared);
+    mutate({ op: 'set', collection: 'accounts', id: 'w1', entity: { id: 'w1', balance: 9 } });
+    const peer = acct(copy(shared), 'a2', 2);
+
+    const r = await applyRemoteChunks([await chunkFrom(shared, peer, key)]);
+
+    expect(r.landed).toBe(true);
+    expect(r.dirty).toBe(true); // local w1 is not in the remote frontier → re-publish
+  });
+
+  it('B2: exportIncrementalPayload emits a chunk with only the changes since the given heads', async () => {
+    const shared = acct(base(), 'a1', 1);
+    const sinceHeads = getHeads(shared);
+    await adopt(shared);
+    mutate({ op: 'set', collection: 'accounts', id: 'a2', entity: { id: 'a2', balance: 2 } });
+
+    const { payload } = await exportIncrementalPayload(sinceHeads);
+    const chunk = await decryptChunk(payload, key);
+    expect(chunk.changes).toHaveLength(1); // just the a2 mutation
+    expect(chunk.frontierHeads.length).toBeGreaterThan(0);
   });
 });
 
