@@ -1,0 +1,77 @@
+---
+import LegalLayout from '../layouts/LegalLayout.astro';
+---
+
+<LegalLayout
+  title="delete your data — beanies.family"
+  description="how to delete all of your beanies.family data. it's local-first, so you're always in control — here's exactly how to remove everything."
+  canonicalPath="/delete-account"
+  lastUpdated="8 July 2026"
+  breadcrumbLabel="delete your data"
+>
+  <section>
+    <h2>you're in control</h2>
+    <p>
+      beanies.family is local-first: there's no account on our servers to close, and your family
+      data (finances, activities, goals, to-dos, everyone's details) lives on your own device and,
+      if you turned on sync, in your own Google Drive. that means deleting it is entirely in your
+      hands. here's how to remove everything.
+    </p>
+  </section>
+
+  <section>
+    <h2>delete everything from inside the app</h2>
+    <p>the quickest way to wipe all of your family data:</p>
+    <ul>
+      <li>open <strong>Settings</strong> in beanies.family</li>
+      <li>choose <strong>"Delete Family &amp; All Data"</strong></li>
+      <li>
+        follow the prompts. the app offers to export a backup first, then permanently removes your
+        local data and, if you enabled Google Drive sync, deletes the <code>.beanpod</code> file
+        from your Drive too
+      </li>
+    </ul>
+    <p>this is irreversible, so export a copy first if you might want your data back.</p>
+  </section>
+
+  <section>
+    <h2>other ways to remove your data</h2>
+    <ul>
+      <li>
+        <strong>clear your browser or app storage:</strong> removing beanies.family's site data (or
+        uninstalling the app) deletes everything stored locally on that device
+      </li>
+      <li>
+        <strong>delete the file from Google Drive:</strong> if you used sync, delete the
+        <code>.beanpod</code> file from your Drive. you can also revoke the app's access entirely at
+        <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>
+      </li>
+    </ul>
+    <p>
+      once you've done the above, no copy of your family data remains anywhere. we never had a copy
+      to begin with, because we don't store your family content on our servers.
+    </p>
+  </section>
+
+  <section>
+    <h2>what about diagnostics?</h2>
+    <p>
+      to keep the app working, beanies.family sends us a small amount of diagnostic and error
+      information (never your family content). this is covered in detail in our
+      <a href="/privacy#diagnostics">privacy policy</a>. these logs are PII-free (correlated only by
+      a random id) except when a critical error report includes the account owner's email so we can
+      reach you. they are kept only to investigate and fix problems, and are never sold or used for
+      advertising. if you'd like us to remove any error report tied to your email, contact us via the
+      <a href="/">homepage</a> and we'll delete it.
+    </p>
+  </section>
+
+  <section>
+    <h2>contact</h2>
+    <p>
+      questions about deleting your data? reach out via our <a href="/">homepage</a> or open an issue
+      on
+      <a href="https://github.com/gparker97/beanies-family" target="_blank" rel="noopener">GitHub</a>.
+    </p>
+  </section>
+</LegalLayout>

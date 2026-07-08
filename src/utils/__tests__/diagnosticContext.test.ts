@@ -165,6 +165,27 @@ describe('diagnosticContext', () => {
       expect(withoutEmail.family_email).toBeUndefined();
     });
 
+    it('includes family_name only when includeEmail is true (PII stays off the firehose)', async () => {
+      const ctxMod = await import('@/stores/familyContextStore');
+      // mockReturnValueOnce ×2 — self-cleaning, one read per enrichAndRedact call
+      vi.mocked(ctxMod.useFamilyContextStore)
+        .mockReturnValueOnce({ activeFamilyId: 'fam-uuid', activeFamilyName: 'Robinsons' } as never)
+        .mockReturnValueOnce({
+          activeFamilyId: 'fam-uuid',
+          activeFamilyName: 'Robinsons',
+        } as never);
+
+      // Slack error path: user-typed family name (PII) is included alongside email
+      const slackPath = enrichAndRedact({ surface: 's' }, { includeEmail: true });
+      expect(slackPath.family_name).toBe('Robinsons');
+      expect(slackPath.family_id).toBe('fam-uuid');
+
+      // Telemetry firehose: family_name must NOT ship; only the random family_id correlates
+      const firehose = enrichAndRedact({ surface: 's' }, { includeEmail: false });
+      expect(firehose.family_name).toBeUndefined();
+      expect(firehose.family_id).toBe('fam-uuid');
+    });
+
     it('always stamps build_sha and merges caller context (allowlisted only)', () => {
       const ctx = enrichAndRedact({
         surface: 's',

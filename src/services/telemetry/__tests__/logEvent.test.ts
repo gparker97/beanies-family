@@ -54,10 +54,14 @@ describe('logEvent', () => {
     expect(record.build_sha).toBe('test-sha');
   });
 
-  it('never includes family_email (PII-free firehose) even though an owner email exists', () => {
+  it('never includes family_email or family_name (PII-free firehose) even though both exist', () => {
     logEvent({ level: 'info', surface: 's', message: 'm' });
     const record = enqueueSpy.mock.calls[0][0];
+    // Both PII fields are gated behind includeEmail (the Slack path); the
+    // firehose passes includeEmail:false and correlates by the random family_id.
     expect(record.family_email).toBeUndefined();
+    expect(record.family_name).toBeUndefined();
+    expect(record.family_id).toBe('fam-uuid');
   });
 
   it('drops non-allowlisted context keys', () => {

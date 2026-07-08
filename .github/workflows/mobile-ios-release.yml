@@ -39,6 +39,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Derive store marketing version
+        # MARKETING_VERSION (CFBundleShortVersionString) tracks APP_VERSION
+        # (src/constants/appVersion.ts), R-suffix stripped so it's a valid ≤3-part
+        # numeric (e.g. 0.9.4R1 → 0.9.4). Helper prints only the bare version and
+        # exits non-zero on malformed input; `set -euo pipefail` fails the job
+        # instead of stamping an empty version. CFBundleVersion stays the run number.
+        run: |
+          set -euo pipefail
+          echo "STORE_VERSION=$(node scripts/derive-store-version.mjs)" >> "$GITHUB_ENV"
+
       - name: Build web app
         run: npm run build
         env:
@@ -83,9 +93,10 @@ jobs:
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_PATH: ${{ runner.temp }}/asc/AuthKey.p8
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # Monotonic build number from the run; marketing version is informational.
+          # Monotonic build number from the run; marketing version tracks
+          # APP_VERSION (derived above, R-suffix stripped).
           BUILD_NUMBER: ${{ github.run_number }}
-          MARKETING_VERSION: 1.0.${{ github.run_number }}
+          MARKETING_VERSION: ${{ env.STORE_VERSION }}
         run: |
           gem install fastlane --no-document
           fastlane beta

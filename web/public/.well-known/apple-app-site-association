@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["<APPLE_TEAM_ID>.family.beanies.app"],
+        "components": [
+          { "/": "/oauth/native" },
+          { "/": "/oauth/native/*" }
+        ]
+      }
+    ]
+  }
+}
