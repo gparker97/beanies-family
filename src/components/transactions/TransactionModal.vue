@@ -37,9 +37,15 @@ import type {
   UpdateTransactionInput,
   CreateRecurringItemInput,
   RecurringFrequency,
+  Account,
 } from '@/types/models';
 import { toDateInputValue, formatNookDate } from '@/utils/date';
-import { computeGoalAllocRaw } from '@/utils/finance';
+import { computeGoalAllocRaw, isLiabilityType } from '@/utils/finance';
+import {
+  buildAccountOptionGroups,
+  type AccountGroupId,
+  type AccountOptionGroup,
+} from '@/utils/accountOptions';
 import { calculateAmortization, calculateExtraPayment, findLoanDetails } from '@/utils/loanPayment';
 import { activityCategoryToExpenseCategory } from '@/constants/categories';
 
@@ -111,14 +117,6 @@ watch(
   },
   { flush: 'sync' }
 );
-
-const LAST_ACCOUNT_KEY = 'beanies_last_transaction_account';
-
-function getLastAccountId(): string {
-  const saved = localStorage.getItem(LAST_ACCOUNT_KEY);
-  if (saved && accountsStore.accounts.some((a) => a.id === saved)) return saved;
-  return accountsStore.accounts[0]?.id ?? '';
-}
 
 function todayStr() {
   return toDateInputValue(new Date());
@@ -272,7 +270,8 @@ const { isEditing, isSubmitting } = useFormModal(
       date.value = iv?.date ?? todayStr();
       startDate.value = todayStr();
       endDate.value = '';
-      accountId.value = iv?.accountId ?? getLastAccountId();
+      // No pre-selection — the user deliberately picks the account(s).
+      accountId.value = iv?.accountId ?? '';
       activityId.value = undefined;
       linkType.value = '';
       loanId.value = undefined;
@@ -289,10 +288,36 @@ const { isEditing, isSubmitting } = useFormModal(
   }
 );
 
-const accountOptions = computed(() =>
-  accountsStore.activeAccounts
-    .filter((a) => !hasActiveLink.value || a.currency === currency.value)
-    .map((a) => ({ value: a.id, label: a.name }))
+// Shared label + group builders for every account picker: alphabetical within a
+// group, grouped by kind, with the balance (or amount owed) shown inline.
+const groupLabel = (id: AccountGroupId): string => {
+  switch (id) {
+    case 'cash':
+      return t('txn.accountGroup.cash');
+    case 'cards':
+      return t('txn.accountGroup.cards');
+    case 'investments':
+      return t('txn.accountGroup.investments');
+    case 'loans':
+      return t('txn.accountGroup.loans');
+    case 'other':
+      return t('txn.accountGroup.other');
+  }
+};
+const makeAccountLabel = (a: Account) =>
+  isLiabilityType(a.type)
+    ? `${a.name} · ${t('txn.owedLabel')} ${formatCurrencyWithCode(a.balance, a.currency)}`
+    : `${a.name} · ${formatCurrencyWithCode(a.balance, a.currency)}`;
+
+// Money in/out source: any active account (currency-restricted when linked).
+const accountGroups = computed<AccountOptionGroup[]>(() =>
+  buildAccountOptionGroups(
+    accountsStore.activeAccounts.filter(
+      (a) => !hasActiveLink.value || a.currency === currency.value
+    ),
+    makeAccountLabel,
+    groupLabel
+  )
 );
 
 const effectiveCategoryType = computed(() => (direction.value === 'in' ? 'income' : 'expense'));
@@ -320,7 +345,7 @@ const canSave = computed(() => {
       transferHasRate.value
     );
   }
-  return description.value.trim().length > 0 && hasAmount;
+  return description.value.trim().length > 0 && hasAmount && !!accountId.value;
 });
 
 const modalTitle = computed(() => {
@@ -361,19 +386,27 @@ const {
   sameAccount: transferSameAccount,
 } = useTransferForm({ sourceAccountId: accountId, toAccountId, amount, sourceCurrency: currency });
 
-const accountLabel = (a: { name: string; currency: string }) => `${a.name} · ${a.currency}`;
-// Source picker (transfer mode) shows currency; destination excludes the source.
-const transferSourceOptions = computed(() =>
-  accountsStore.activeAccounts.map((a) => ({ value: a.id, label: accountLabel(a) }))
+// Transfer SOURCE is restricted to cash/asset accounts (you can't sensibly
+// "send" money out of a card/loan — that would be borrowing). DESTINATION can be
+// any other account (paying a card/loan is a transfer to it).
+const transferSourceGroups = computed<AccountOptionGroup[]>(() =>
+  buildAccountOptionGroups(
+    accountsStore.activeAccounts.filter((a) => !isLiabilityType(a.type)),
+    makeAccountLabel,
+    groupLabel
+  )
 );
-const transferDestOptions = computed(() =>
-  accountsStore.activeAccounts
-    .filter((a) => a.id !== accountId.value)
-    .map((a) => ({ value: a.id, label: accountLabel(a) }))
+const transferDestGroups = computed<AccountOptionGroup[]>(() =>
+  buildAccountOptionGroups(
+    accountsStore.activeAccounts.filter((a) => a.id !== accountId.value),
+    makeAccountLabel,
+    groupLabel
+  )
 );
 
 // Entering transfer mode: transfers are one-time + unlinked, and the amount is
-// denominated in the source account's currency. Leaving: drop the destination.
+// denominated in the source account's currency. A liability that was selected as
+// the source in income/expense mode is not a valid transfer source — clear it.
 watch(isTransfer, (on) => {
   if (on) {
     recurrenceMode.value = 'one-time';
@@ -384,7 +417,8 @@ watch(isTransfer, (on) => {
     goalId.value = undefined;
     goalAllocValue.value = undefined;
     const source = accountsStore.accounts.find((a) => a.id === accountId.value);
-    if (source) currency.value = source.currency;
+    if (source && isLiabilityType(source.type)) accountId.value = '';
+    else if (source) currency.value = source.currency;
   } else {
     toAccountId.value = undefined;
   }
@@ -494,7 +528,6 @@ watch([loanId, activityId], () => {
 function handleSave() {
   if (!canSave.value) return;
   isSubmitting.value = true;
-  localStorage.setItem(LAST_ACCOUNT_KEY, accountId.value);
 
   try {
     // Transfer: a one-time move between two accounts (no category / goal / loan /
@@ -626,6 +659,7 @@ const hasLinkableActivities = computed(() => activityStore.activeActivities.leng
 const showLinkPrompt = computed(
   () =>
     direction.value === 'out' &&
+    !isTransfer.value &&
     !isLinkLocked.value &&
     !hasActiveLink.value &&
     linkType.value === '' &&
@@ -770,7 +804,7 @@ function dismissLinkPrompt() {
     <FormFieldGroup :label="isTransfer ? t('transfer.from') : t('form.account')" required>
       <AccountSelect
         v-model="accountId"
-        :options="isTransfer ? transferSourceOptions : accountOptions"
+        :groups="isTransfer ? transferSourceGroups : accountGroups"
         :placeholder="t('form.selectAccount')"
         :aria-label="isTransfer ? t('transfer.from') : t('form.account')"
       />
@@ -781,7 +815,7 @@ function dismissLinkPrompt() {
       <FormFieldGroup :label="t('transfer.to')" required>
         <AccountSelect
           v-model="toAccountId"
-          :options="transferDestOptions"
+          :groups="transferDestGroups"
           :placeholder="t('transfer.selectDestination')"
           :aria-label="t('transfer.to')"
         />
