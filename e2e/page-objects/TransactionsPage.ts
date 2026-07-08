@@ -54,11 +54,18 @@ export class TransactionsPage {
       await dialog.getByRole('button', { name: ui('modal.moneyIn') }).click();
     }
 
-    // Account — BaseSelect with placeholder option
-    await dialog
+    // Account — AccountSelect renders grouped <optgroup> options whose labels are
+    // "<name> · <balance>" (e.g. "Checking · S$0.00"), so an exact-label match no
+    // longer works. Disambiguate the select via its placeholder option, then match
+    // the account by name substring and select by its value (the account id).
+    const accountSelect = dialog
       .locator('select')
-      .filter({ has: this.page.locator('option', { hasText: ui('form.selectAccount') }) })
-      .selectOption({ label: data.account });
+      .filter({ has: this.page.locator('option', { hasText: ui('form.selectAccount') }) });
+    const accountValue = await accountSelect
+      .locator('option', { hasText: data.account })
+      .first()
+      .getAttribute('value');
+    await accountSelect.selectOption({ value: accountValue! });
 
     // Description
     await dialog.getByPlaceholder(ui('form.description')).fill(data.description);
