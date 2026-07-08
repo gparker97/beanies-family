@@ -18,6 +18,10 @@ android {
         applicationId "family.beanies.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
+        // CI is the source of truth: the release lane sets ANDROID_VERSION_CODE
+        // (monotonic run number) and ANDROID_VERSION_NAME (derived from APP_VERSION
+        // via scripts/derive-store-version.mjs). The literal fallbacks below apply
+        // only to local dev builds.
         versionCode Integer.parseInt(System.getenv("ANDROID_VERSION_CODE") ?: "1")
         versionName(System.getenv("ANDROID_VERSION_NAME") ?: "1.0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

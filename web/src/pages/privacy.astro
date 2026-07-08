@@ -42,8 +42,12 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       <li>your passwords or encryption keys</li>
       <li>your location data</li>
       <li>your contacts or address book</li>
-      <li>any personally identifiable information (PII) on our servers</li>
+      <li>your personal information beyond the limited technical diagnostics described below</li>
     </ul>
+    <p>
+      the one thing that does reach us is a small amount of technical diagnostics, covered in
+      <a href="#diagnostics">diagnostics &amp; error reporting</a> below.
+    </p>
   </section>
 
   <section>
@@ -64,6 +68,40 @@ import LegalLayout from '../layouts/LegalLayout.astro';
     <p>
       no individual user can be identified from this data. Plausible's full privacy policy is at
       <a href="https://plausible.io/data-policy" target="_blank" rel="noopener">plausible.io/data-policy</a>.
+    </p>
+  </section>
+
+  <section id="diagnostics">
+    <h2>diagnostics &amp; error reporting</h2>
+    <p>
+      to keep beanies.family reliable, the app sends us a small amount of technical diagnostic and
+      error information. this never includes your family content (finances, activities, names,
+      goals, documents), only what we need to find and fix bugs.
+    </p>
+    <ul>
+      <li>
+        <strong>error reports:</strong> when something breaks in a way that could affect your data,
+        the app sends an error report to our maintainer alerting channel. because we may need to
+        contact you about a serious problem, that report includes the account owner's email address
+      </li>
+      <li>
+        <strong>diagnostic logs:</strong> a stream of technical events (error messages, the screen
+        or route where an error happened, timings, browser and network type, and a build id) helps
+        us spot and reproduce issues. this stream is PII-free: it carries no family content and is
+        correlated only by a random family id, not by your name or email
+      </li>
+      <li>
+        <strong>what we do with it:</strong> we use it solely to diagnose and fix problems and keep
+        the app working. we do not sell it, use it for advertising, or build profiles from it
+      </li>
+      <li>
+        <strong>retention:</strong> we keep this information only for as long as we need it to
+        investigate issues
+      </li>
+    </ul>
+    <p>
+      you can ask us to delete any error report tied to your email at any time. see
+      <a href="/delete-account">delete your data</a>.
     </p>
   </section>
 
@@ -159,7 +197,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
     <ul>
       <li><strong>encryption at rest:</strong> local data is encrypted in IndexedDB</li>
       <li><strong>encryption in transit:</strong> Google Drive files are AES-GCM encrypted before upload</li>
-      <li><strong>no server-side data:</strong> there is no server to breach — your data lives only on your devices</li>
+      <li><strong>your family data stays with you:</strong> your family content lives only on your devices and your own Google Drive, never on our servers. the only information that reaches us is the limited diagnostics described above</li>
       <li><strong>open source:</strong> our code is publicly auditable on <a href="https://github.com/gparker97/beanies-family" target="_blank" rel="noopener">GitHub</a></li>
     </ul>
   </section>

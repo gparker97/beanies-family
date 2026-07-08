@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Associated Domains (ADR-029). Two associations, two purposes:
+    - applinks:beanies.family      → the OAuth return Universal Link
+                                      (https://beanies.family/oauth/native), matched
+                                      by web/public/.well-known/apple-app-site-association.
+    - webcredentials:app.beanies.family → passkey (biometric) association, matched by
+                                      public/.well-known/apple-app-site-association.
+  Both AASA files must carry the real Apple Team ID (they currently hold the
+  <APPLE_TEAM_ID> placeholder) before either association verifies on-device — see
+  the Tranche-2 substitution checklist in docs/runbooks/native-store-submission.md.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:beanies.family</string>
+		<string>webcredentials:app.beanies.family</string>
+	</array>
+</dict>
+</plist>

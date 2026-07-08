@@ -9,7 +9,9 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
-    include: ['src/**/*.{test,spec}.ts'],
+    // `src/**` is the app suite; `scripts/**/*.mjs` picks up build-script helpers
+    // (e.g. derive-store-version) so their tests actually run in `npm run validate`.
+    include: ['src/**/*.{test,spec}.ts', 'scripts/**/*.{test,spec}.mjs'],
   },
   resolve: {
     alias: {

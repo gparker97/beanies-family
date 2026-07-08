@@ -1,9 +1,37 @@
-# Android App Links — `assetlinks.json`
+# App-link association files on `beanies.family`
 
-This file makes Android route the OAuth redirect `https://beanies.family/oauth/native`
-into the installed beanies.family app instead of opening it in the browser
-(ADR-029 A2). Without a verified `assetlinks.json`, the link opens the website
-(the `/oauth/native` fallback page) and native Google sign-in cannot complete.
+Two files here make **both** platforms route the OAuth redirect
+`https://beanies.family/oauth/native` into the installed beanies.family app instead
+of opening it in the browser (ADR-029 A2):
+
+| File | Platform | Purpose |
+| --- | --- | --- |
+| `assetlinks.json` | Android | App Link verification (`handle_all_urls`) |
+| `apple-app-site-association` | iOS | Universal Link verification (`applinks`) |
+
+Without a verified file, the link opens the website (the `/oauth/native` fallback
+page) and native Google sign-in cannot complete on that platform.
+
+> **Note — two origins.** These files (on **beanies.family**) handle the OAuth
+> return. A separate pair on **app.beanies.family** (`public/.well-known/`) handles
+> passkeys (`get_login_creds` / `webcredentials`). Don't confuse them; see that
+> directory's README and the sync table in `public/.well-known/README.md`.
+
+## `apple-app-site-association` — iOS Universal Link (OAuth return)
+
+Authorizes the iOS app to claim `https://beanies.family/oauth/native` as a Universal
+Link, paired with the `applinks:beanies.family` Associated Domains entitlement in
+`ios/App/App/App.entitlements`. Uses the modern `applinks.details[].appIDs` +
+`components` schema. Served extensionless with `Content-Type: application/json`.
+
+> **`<APPLE_TEAM_ID>` is a placeholder.** No iOS build exists yet. Substitute the
+> real 10-char Apple Team ID (`grep -rn '<APPLE_TEAM_ID>'` finds every file that
+> needs it — this one plus the passkey AASA on app.beanies.family) once the Apple
+> Developer Organization account is verified. iOS won't match the placeholder, so
+> the OAuth Universal Link silently falls back to the website until it's replaced.
+> See the Tranche-2 substitution checklist in `docs/runbooks/native-store-submission.md`.
+
+## `assetlinks.json` — Android App Link (OAuth return)
 
 ## What needs doing before native OAuth works on a device
 
