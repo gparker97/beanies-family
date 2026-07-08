@@ -107,6 +107,8 @@ vi.mock('@/composables/useCurrencyDisplay', () => ({
       displayCurrency: 'USD',
     }),
   }),
+  // Standalone export used by the transaction modal's account-picker labels.
+  formatCurrencyWithCode: (amount: number, currency: string) => `${currency} ${amount.toFixed(2)}`,
 }));
 
 // Mock vue-router

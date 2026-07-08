@@ -1,16 +1,13 @@
 <script setup lang="ts">
+import type { AccountOptionGroup } from '@/utils/accountOptions';
+
 // Themed account picker — the standard beanies select chrome (squircle, tinted
 // fill, Heritage-Orange focus, chevron). Extracted so the transaction modal's
-// source AND destination pickers share one implementation. Generic on options;
-// callers build the labels (e.g. name · currency).
-interface Option {
-  value: string;
-  label: string;
-}
-
+// source AND destination pickers share one implementation. Options are grouped
+// (by account kind) and each label is caller-built (e.g. name + balance).
 defineProps<{
   modelValue: string | undefined;
-  options: Option[];
+  groups: AccountOptionGroup[];
   placeholder?: string;
   ariaLabel?: string;
 }>();
@@ -27,9 +24,11 @@ defineEmits<{ 'update:modelValue': [value: string] }>();
       @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
     >
       <option v-if="placeholder" value="" disabled>{{ placeholder }}</option>
-      <option v-for="opt in options" :key="opt.value" :value="opt.value">
-        {{ opt.label }}
-      </option>
+      <optgroup v-for="group in groups" :key="group.id" :label="group.label">
+        <option v-for="opt in group.options" :key="opt.value" :value="opt.value">
+          {{ opt.label }}
+        </option>
+      </optgroup>
     </select>
     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
       <svg

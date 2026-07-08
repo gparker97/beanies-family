@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-07-08",
-    "translationCount": 3667
+    "translationCount": 3673
   },
   "translations": {
     "app.name": {
@@ -18339,6 +18339,36 @@
     "transfer.filter": {
       "translation": "转账",
       "hash": "kh9yyg",
+      "lastUpdated": "2026-07-08"
+    },
+    "txn.owedLabel": {
+      "translation": "尚欠",
+      "hash": "21e9z",
+      "lastUpdated": "2026-07-08"
+    },
+    "txn.accountGroup.cash": {
+      "translation": "资金",
+      "hash": "ethklf",
+      "lastUpdated": "2026-07-08"
+    },
+    "txn.accountGroup.cards": {
+      "translation": "信用卡",
+      "hash": "tqr0xo",
+      "lastUpdated": "2026-07-08"
+    },
+    "txn.accountGroup.investments": {
+      "translation": "投资",
+      "hash": "m47b34",
+      "lastUpdated": "2026-07-08"
+    },
+    "txn.accountGroup.loans": {
+      "translation": "贷款",
+      "hash": "17tbab",
+      "lastUpdated": "2026-07-08"
+    },
+    "txn.accountGroup.other": {
+      "translation": "其他",
+      "hash": "19k0z4",
       "lastUpdated": "2026-07-08"
     }
   }
