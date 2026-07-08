@@ -44,11 +44,14 @@ member profiles) — it lives only in the user's encrypted `.beanpod` / their ow
 No advertising, no third-party analytics SDK in the app, no cross-app tracking → **NSPrivacyTracking =
 false**, no ATT prompt, Google "data used to track users" = none.
 
-> **TODO before filling the store forms:** confirm the exact retention window of the telemetry ingest
-> (AWS) and the Slack alerting channel, and whether the AWS ingest captures the client IP server-side.
-> If IP is retained, add it to this table (Diagnostics / "Approximate location" as applicable) and to
-> `privacy.astro`. `privacy.astro` currently states retention as "only for as long as we need it to
-> investigate issues" — replace with the confirmed window if a specific number is required.
+> **Retention (decided 2026-07-08, greg):** there is no archival process or fixed deletion date for
+> the telemetry ingest / Slack alerting, and the data held is non-sensitive — so we do NOT set an
+> explicit retention window. `privacy.astro` keeps the "only for as long as we need it to investigate
+> issues" phrasing (no fixed number). On the Google Data Safety form, answer retention accordingly (no
+> guaranteed deletion timeline) and keep the user-initiated deletion path (email → we delete on
+> request; see `/delete-account`). Minor open confirm (non-blocking): whether the AWS ingest logs the
+> client IP server-side — if it does, declare it (Diagnostics / "Approximate location") when
+> finalizing the Data Safety form.
 
 ---
 
