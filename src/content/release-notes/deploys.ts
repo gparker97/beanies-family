@@ -17,6 +17,44 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.08',
+    date: '2026-07-08',
+    month: '8 july 2026',
+    spotlight: true,
+    summary: {
+      en: 'You can now move money between your accounts and pay down credit cards, so your account balances stay correct. Thanks to my early-adopter beanie whose feedback on Discord made this happen!',
+      beanie:
+        'you can now move money between your accounts and pay down credit cards, so your account balances stay correct. thanks to my early-adopter beanie whose feedback on discord made this happen!',
+    },
+    features: [
+      {
+        icon: '🔄',
+        title: {
+          en: 'Transfers and credit-card payments',
+          beanie: 'transfers and credit-card payments',
+        },
+        description: {
+          en: "Add a transaction, pick Transfer, and choose where the money leaves and where it lands. Both balances update at once. Paying a credit card is simply a transfer to the card, and transfers between different currencies convert automatically. This one came straight from an early-adopter beanie's feedback on Discord.",
+          beanie:
+            "add a transaction, pick transfer, and choose where the money leaves and where it lands. both balances update at once. paying a credit card is simply a transfer to the card, and transfers between different currencies convert automatically. this one came straight from an early-adopter beanie's feedback on discord.",
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not). Your feedback shapes what we build next, just like this update.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not). your feedback shapes what we build next, just like this update.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.07.07',
     date: '2026-07-07',
     month: '7 july 2026',
