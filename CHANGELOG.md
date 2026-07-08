@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-07-08
 
+### Changed
+
+- **beanstalk blog masthead polish.** The blog header's "not written by AI" line is now "not written by AI (usually)", and the title/subtitle spacing was tightened into a cleaner, more even rhythm.
+
 ### Fixed
 
 - **Google Calendar now prompts you to reconnect when your authorization actually expires.** Previously, if your Google sign-in for calendar sync was revoked or expired, the app kept silently retrying in the background forever — it never told you to reconnect, so your activities quietly stopped reaching your calendar. Now that state correctly surfaces the "reconnect" prompt in Settings, and stops the pointless retrying. (Single-account testing artifact on our side; no user was affected, but the same path would have hit anyone whose Google grant lapsed.)
