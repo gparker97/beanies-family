@@ -17,6 +17,8 @@ import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
+import AccountSelect from '@/components/ui/AccountSelect.vue';
+import { useTransferForm } from '@/composables/useTransferForm';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useActivityStore } from '@/stores/activityStore';
@@ -66,6 +68,10 @@ const settingsStore = useSettingsStore();
 
 // Form state
 const direction = ref<'in' | 'out'>('out');
+// Transfer mode is a third transaction kind alongside income/expense. It's
+// one-time only and carries no category / goal / loan / activity link.
+const isTransfer = ref(false);
+const toAccountId = ref<string | undefined>(undefined);
 const amount = ref<number | undefined>(undefined);
 const description = ref('');
 const category = ref('');
@@ -176,8 +182,10 @@ const { isEditing, isSubmitting } = useFormModal(
     onEdit: (entity) => {
       suppressDaySync = true;
       if (props.recurringItem) {
-        // Editing a recurring item
+        // Editing a recurring item (never a transfer)
         const item = props.recurringItem;
+        isTransfer.value = false;
+        toAccountId.value = undefined;
         direction.value = item.type === 'income' ? 'in' : 'out';
         amount.value = item.amount;
         description.value = item.description;
@@ -210,7 +218,15 @@ const { isEditing, isSubmitting } = useFormModal(
       } else {
         // Editing a transaction
         const transaction = entity as Transaction;
-        direction.value = transaction.type === 'income' ? 'in' : 'out';
+        if (transaction.type === 'transfer') {
+          isTransfer.value = true;
+          toAccountId.value = transaction.toAccountId;
+          direction.value = 'out';
+        } else {
+          isTransfer.value = false;
+          toAccountId.value = undefined;
+          direction.value = transaction.type === 'income' ? 'in' : 'out';
+        }
         amount.value = transaction.amount;
         description.value = transaction.description;
         category.value = transaction.category;
@@ -246,6 +262,8 @@ const { isEditing, isSubmitting } = useFormModal(
     onNew: () => {
       suppressDaySync = true;
       const iv = props.initialValues;
+      isTransfer.value = iv?.type === 'transfer';
+      toAccountId.value = iv?.toAccountId;
       direction.value = iv?.type === 'income' ? 'in' : iv?.type === 'expense' ? 'out' : 'out';
       amount.value = iv?.amount ?? undefined;
       description.value = iv?.description ?? '';
@@ -289,9 +307,21 @@ const frequencyOptions = computed(() => [
 // every month). Shares the option builder with the DOB pickers (31-day).
 const { monthOptions, dayOptions: dayOfMonthOptions } = useCalendarSelectOptions(28);
 
-const canSave = computed(
-  () => description.value.trim().length > 0 && amount.value !== undefined && amount.value > 0
-);
+const canSave = computed(() => {
+  const hasAmount = amount.value !== undefined && amount.value > 0;
+  if (isTransfer.value) {
+    // Transfers need source + a distinct destination, a positive amount, and (if
+    // cross-currency) an available rate. Description is optional.
+    return (
+      hasAmount &&
+      !!accountId.value &&
+      !!toAccountId.value &&
+      !transferSameAccount.value &&
+      transferHasRate.value
+    );
+  }
+  return description.value.trim().length > 0 && hasAmount;
+});
 
 const modalTitle = computed(() => {
   if (isEditingRecurring.value)
@@ -307,6 +337,67 @@ const saveLabel = computed(() => {
 const effectiveType = computed<'income' | 'expense'>(() =>
   direction.value === 'in' ? 'income' : 'expense'
 );
+
+// ── Transfer mode ──────────────────────────────────────────────────────────
+// The 3-way type selector maps to income / expense / transfer.
+const typeChoice = computed<'out' | 'in' | 'transfer'>({
+  get: () => (isTransfer.value ? 'transfer' : direction.value),
+  set: (v) => {
+    if (v === 'transfer') {
+      isTransfer.value = true;
+    } else {
+      isTransfer.value = false;
+      direction.value = v;
+    }
+  },
+});
+
+const {
+  destCurrency: transferDestCurrency,
+  destIsLiability: transferDestIsLiability,
+  isCrossCurrency: transferIsCrossCurrency,
+  hasRate: transferHasRate,
+  convertedAmount: transferConvertedAmount,
+  sameAccount: transferSameAccount,
+} = useTransferForm({ sourceAccountId: accountId, toAccountId, amount, sourceCurrency: currency });
+
+const accountLabel = (a: { name: string; currency: string }) => `${a.name} · ${a.currency}`;
+// Source picker (transfer mode) shows currency; destination excludes the source.
+const transferSourceOptions = computed(() =>
+  accountsStore.activeAccounts.map((a) => ({ value: a.id, label: accountLabel(a) }))
+);
+const transferDestOptions = computed(() =>
+  accountsStore.activeAccounts
+    .filter((a) => a.id !== accountId.value)
+    .map((a) => ({ value: a.id, label: accountLabel(a) }))
+);
+
+// Entering transfer mode: transfers are one-time + unlinked, and the amount is
+// denominated in the source account's currency. Leaving: drop the destination.
+watch(isTransfer, (on) => {
+  if (on) {
+    recurrenceMode.value = 'one-time';
+    category.value = '';
+    linkType.value = '';
+    loanId.value = undefined;
+    activityId.value = undefined;
+    goalId.value = undefined;
+    goalAllocValue.value = undefined;
+    const source = accountsStore.accounts.find((a) => a.id === accountId.value);
+    if (source) currency.value = source.currency;
+  } else {
+    toAccountId.value = undefined;
+  }
+});
+
+// Keep the transfer amount's currency locked to the source, and clear a
+// destination that has become equal to the source.
+watch(accountId, (id) => {
+  if (!isTransfer.value) return;
+  const source = accountsStore.accounts.find((a) => a.id === id);
+  if (source) currency.value = source.currency;
+  if (toAccountId.value === id) toAccountId.value = undefined;
+});
 
 // Goal linking
 const goalItems = computed(() =>
@@ -406,6 +497,28 @@ function handleSave() {
   localStorage.setItem(LAST_ACCOUNT_KEY, accountId.value);
 
   try {
+    // Transfer: a one-time move between two accounts (no category / goal / loan /
+    // recurrence). The store is the authority for the converted `toAmount`.
+    if (isTransfer.value) {
+      const data = {
+        accountId: accountId.value,
+        toAccountId: toAccountId.value,
+        type: 'transfer' as const,
+        amount: amount.value!,
+        currency: currency.value,
+        category: '',
+        date: date.value,
+        description: description.value.trim(),
+        isReconciled: false,
+      };
+      if (isEditing.value && props.transaction) {
+        emit('save', { id: props.transaction.id, data: data as UpdateTransactionInput });
+      } else {
+        emit('save', data as CreateTransactionInput);
+      }
+      return;
+    }
+
     // Editing an existing recurring item
     if (isEditingRecurring.value) {
       const recurringData: CreateRecurringItemInput = {
@@ -544,13 +657,11 @@ function dismissLinkPrompt() {
     size="wide"
     :open="open"
     :title="modalTitle"
-    :icon="isEditingRecurring ? '🔄' : direction === 'in' ? '💚' : '🧡'"
+    :icon="isTransfer || isEditingRecurring ? '🔄' : direction === 'in' ? '💚' : '🧡'"
     :icon-bg="
-      isEditingRecurring
-        ? 'var(--tint-orange-8)'
-        : direction === 'in'
-          ? 'var(--tint-green-10)'
-          : 'var(--tint-orange-8)'
+      !isTransfer && !isEditingRecurring && direction === 'in'
+        ? 'var(--tint-green-10)'
+        : 'var(--tint-orange-8)'
     "
     :save-label="saveLabel"
     :save-disabled="!canSave"
@@ -573,9 +684,9 @@ function dismissLinkPrompt() {
       </div>
     </div>
 
-    <!-- 0. Recurring / One-time tab bar (top of form, hidden when editing a recurring item) -->
+    <!-- 0. Recurring / One-time tab bar (hidden for recurring-item edits and transfers) -->
     <div
-      v-if="!isEditingRecurring"
+      v-if="!isEditingRecurring && !isTransfer"
       class="rounded-2xl bg-[var(--tint-slate-5)] p-1.5 dark:bg-slate-700/50"
     >
       <div class="grid grid-cols-2 gap-1.5">
@@ -646,43 +757,79 @@ function dismissLinkPrompt() {
       </div>
       <TogglePillGroup
         v-else
-        v-model="direction"
+        v-model="typeChoice"
         :options="[
           { value: 'out', label: '🧡 ' + t('modal.moneyOut'), variant: 'orange' },
           { value: 'in', label: '💚 ' + t('modal.moneyIn'), variant: 'green' },
+          { value: 'transfer', label: '🔄 ' + t('transfer.type'), variant: 'default' },
         ]"
       />
     </FormFieldGroup>
 
-    <!-- 2. Account select -->
-    <FormFieldGroup :label="t('form.account')" required>
-      <div class="relative">
-        <select
-          v-model="accountId"
-          class="focus:border-primary-500 font-outfit w-full cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 pr-10 text-base font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
-        >
-          <option value="" disabled>{{ t('form.selectAccount') }}</option>
-          <option v-for="opt in accountOptions" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
-        </select>
-        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-          <svg
-            class="h-4 w-4 text-[var(--color-text)] opacity-35"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </div>
-      </div>
+    <!-- 2. Account select (source; "From" in transfer mode) -->
+    <FormFieldGroup :label="isTransfer ? t('transfer.from') : t('form.account')" required>
+      <AccountSelect
+        v-model="accountId"
+        :options="isTransfer ? transferSourceOptions : accountOptions"
+        :placeholder="t('form.selectAccount')"
+        :aria-label="isTransfer ? t('transfer.from') : t('form.account')"
+      />
     </FormFieldGroup>
+
+    <!-- 2b. Transfer destination + conversion (transfer mode only) -->
+    <template v-if="isTransfer">
+      <FormFieldGroup :label="t('transfer.to')" required>
+        <AccountSelect
+          v-model="toAccountId"
+          :options="transferDestOptions"
+          :placeholder="t('transfer.selectDestination')"
+          :aria-label="t('transfer.to')"
+        />
+        <!-- Paying a card / loan reduces what you owe -->
+        <div
+          v-if="transferDestIsLiability"
+          class="mt-2 flex items-center gap-2 rounded-[14px] border border-orange-200/50 bg-gradient-to-r from-orange-50/80 to-amber-50/50 px-3 py-2 dark:border-orange-800/30 dark:from-orange-900/10 dark:to-amber-900/10"
+        >
+          <span aria-hidden="true">💡</span>
+          <span class="text-xs text-[var(--color-text-muted)]">{{
+            t('transfer.liabilityHint')
+          }}</span>
+        </div>
+      </FormFieldGroup>
+
+      <!-- Converted amount (cross-currency, rate available) -->
+      <div
+        v-if="transferIsCrossCurrency && transferHasRate && transferConvertedAmount !== undefined"
+        class="rounded-[16px] bg-[var(--tint-silk-20)] px-4 py-3"
+      >
+        <div
+          class="font-outfit flex flex-wrap items-center gap-2 text-base font-bold text-[var(--color-text)]"
+        >
+          <span class="text-[var(--color-text-muted)]"
+            >{{ t('transfer.youSend') }} {{ formatCurrencyWithCode(amount ?? 0, currency) }}</span
+          >
+          <span class="text-primary-500" aria-hidden="true">{{ '→' }}</span>
+          <span
+            >{{ t('transfer.theyReceive') }}
+            {{ formatCurrencyWithCode(transferConvertedAmount, transferDestCurrency!) }}</span
+          >
+        </div>
+        <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ t('transfer.convertedNote') }}</p>
+      </div>
+
+      <!-- No exchange rate — Heritage Orange (routine block), never Alert Red -->
+      <div
+        v-else-if="transferIsCrossCurrency && !transferHasRate"
+        class="flex items-start gap-2.5 rounded-[16px] border border-orange-300/60 bg-[var(--tint-orange-8)] px-4 py-3"
+      >
+        <span aria-hidden="true">🧡</span>
+        <span class="text-sm text-[var(--color-text)]">{{
+          t('transfer.noRate')
+            .replace('{from}', currency)
+            .replace('{to}', transferDestCurrency ?? '')
+        }}</span>
+      </div>
+    </template>
 
     <!-- 2a. Quick-link prompt (outgoing only, when linkable items exist) -->
     <div
@@ -721,7 +868,7 @@ function dismissLinkPrompt() {
     </div>
 
     <!-- 3. Description -->
-    <FormFieldGroup :label="t('form.description')" required>
+    <FormFieldGroup :label="t('form.description')" :required="!isTransfer">
       <div
         class="focus-within:border-primary-500 rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] dark:bg-slate-700"
       >
@@ -762,11 +909,13 @@ function dismissLinkPrompt() {
           <InfoHintBadge :text="t('txLink.hintCurrency')" />
         </div>
       </div>
+      <!-- Transfer: amount is in the source account's currency (locked). -->
+      <AmountInput v-else-if="isTransfer" v-model="amount" :currency-symbol="currency" />
       <CurrencyAmountInput v-else v-model:amount="amount" v-model:currency="currency" />
     </FormFieldGroup>
 
-    <!-- 5. Category chips (two-level drill-down) -->
-    <FormFieldGroup :label="t('form.category')" required>
+    <!-- 5. Category chips (two-level drill-down; not applicable to transfers) -->
+    <FormFieldGroup v-if="!isTransfer" :label="t('form.category')" required>
       <CategoryChipPicker v-model="category" :type="effectiveCategoryType" />
     </FormFieldGroup>
 
@@ -889,8 +1038,8 @@ function dismissLinkPrompt() {
       </div>
     </ConditionalSection>
 
-    <!-- 8a. Link Payment (outgoing only) -->
-    <ConditionalSection :show="direction === 'out'">
+    <!-- 8a. Link Payment (outgoing only; not for transfers) -->
+    <ConditionalSection :show="direction === 'out' && !isTransfer">
       <div class="space-y-3">
         <!-- Locked link display (editing an already-linked item) -->
         <template v-if="isLinkLocked">
@@ -991,8 +1140,8 @@ function dismissLinkPrompt() {
       </div>
     </ConditionalSection>
 
-    <!-- 8b. Goal link (income only, after date/schedule section) -->
-    <ConditionalSection :show="direction === 'in' && goalItems.length > 0">
+    <!-- 8b. Goal link (income only, after date/schedule section; not for transfers) -->
+    <ConditionalSection :show="!isTransfer && direction === 'in' && goalItems.length > 0">
       <div class="space-y-3">
         <div>
           <div class="mb-2 flex items-center gap-1.5">

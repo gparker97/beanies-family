@@ -80,7 +80,7 @@ const { playWhoosh } = useSounds();
 const selectedMonth = ref(new Date());
 const { isFutureMonth, projectedTransactions } = useProjectedTransactions(selectedMonth);
 const activeFilter = ref<'all' | 'recurring' | 'one-time'>('all');
-const directionFilter = ref<'all' | 'income' | 'expense'>('all');
+const directionFilter = ref<'all' | 'income' | 'expense' | 'transfer'>('all');
 /** Account-scope filter (set from `?account=<id>` query param). `null` means "all accounts". */
 const accountFilter = ref<string | null>(null);
 /** Goal-scope filter (set from `?goal=<id>` query param). `null` means "all goals". */
@@ -133,7 +133,7 @@ function handleTransactionQueryParam() {
   }
 
   const direction = route.query.direction as string | undefined;
-  if (direction === 'income' || direction === 'expense') {
+  if (direction === 'income' || direction === 'expense' || direction === 'transfer') {
     directionFilter.value = direction;
     delete next.direction;
     changed = true;
@@ -168,7 +168,7 @@ function handleTransactionQueryParam() {
   if (changed) router.replace({ query: next });
 }
 
-function toggleDirection(direction: 'income' | 'expense') {
+function toggleDirection(direction: 'income' | 'expense' | 'transfer') {
   directionFilter.value = directionFilter.value === direction ? 'all' : direction;
 }
 watch(
@@ -1028,9 +1028,25 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
       </button>
     </div>
 
-    <!-- Direction filter chip -->
-    <div v-if="directionFilter !== 'all'" class="flex items-center gap-2">
+    <!-- Filters row: transfers toggle + active income/expense chip -->
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- Transfers filter toggle (neutral Deep Slate when active) -->
       <button
+        type="button"
+        class="font-outfit inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors"
+        :class="
+          directionFilter === 'transfer'
+            ? 'bg-secondary-500 text-white dark:bg-slate-200 dark:text-slate-900'
+            : 'bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] dark:bg-slate-700'
+        "
+        @click="toggleDirection('transfer')"
+      >
+        <span aria-hidden="true">🔄</span> {{ t('transfer.filter') }}
+      </button>
+
+      <!-- Active income/expense filter chip (set from the stat cards) -->
+      <button
+        v-if="directionFilter === 'income' || directionFilter === 'expense'"
         type="button"
         class="font-outfit inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors"
         :class="
