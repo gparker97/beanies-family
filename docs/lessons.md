@@ -4,6 +4,27 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## Stop a background dev server with TaskStop + its task_id — never a broad `pkill`
+
+**Date:** 2026-07-08
+**Context:** Asked to kill the Astro dev server I'd started on port 4322, I ran `pkill -f "astro dev"`. That pattern matched **every** astro dev process — including greg's own server on 4321 — so I took both down. `kill %1` also doesn't work: a harness `run_in_background` task is not a shell job, so `%1` targets nothing.
+
+**Rule:** To stop a server I launched with `run_in_background: true`, call **`TaskStop` with the specific `task_id`** (returned when the task started). Never use `pkill -f "<generic-name>"` to stop one process when others of the same kind may be running — it's a blast-radius footgun that hits the user's own processes. If a shell-level kill is truly needed, target the exact PID bound to the port (`ss -ltnp | grep :<port>`), not a name pattern.
+
+---
+
+## Keep local `node_modules` in sync with the pinned toolchain (esp. prettier) before committing
+
+**Date:** 2026-07-08
+**Context:** During the `0.9.4R1` deploy, `package.json` pinned `prettier ^3.9.4` but local `node_modules` still had `3.8.3` (the dependabot bump merged but was never `npm install`ed locally). The commit-time lint-staged hook ran the stale 3.8.3, formatting files that CI's fresh 3.9.4 rejected — burning **two CI rounds** (`googleCalendarClient.ts`, then pre-existing drift in `docs/STATUS.md`).
+
+**Rules:**
+
+1. If CI fails on `prettier/prettier` or `format:check` but local `npm run lint` is clean, **suspect a prettier version mismatch first**: compare `cat node_modules/prettier/package.json | grep version` against the `package.json` pin. Run `npm install`, then reformat with `npx prettier --write` (now the pinned version) and re-verify with `npm run format:check` across the whole repo before pushing.
+2. **Never commit the `package-lock.json` churn** that a local `npm install` produces from a differing npm version — it's the known spurious `libc`-field deletion (see the 2026-06-30 dependabot note). `git checkout package-lock.json` after installing; stage only the real source/format fixes.
+
+---
+
 ## Feature-gate ONLY by request — and surface every gate in the Settings admin
 
 **Date:** 2026-06-14
