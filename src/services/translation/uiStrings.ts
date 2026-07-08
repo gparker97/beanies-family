@@ -148,6 +148,13 @@ const STRING_DEFS = {
     beanie: 'no exchange rate for {from} → {to}. add one in settings → currencies.',
   },
   'transfer.filter': { en: 'Transfers', beanie: 'transfers' },
+  // Account-picker groups + the "owed" prefix shown for liability balances
+  'txn.owedLabel': { en: 'owed', beanie: 'owed' },
+  'txn.accountGroup.cash': { en: 'Cash & Bank', beanie: 'cash & bank' },
+  'txn.accountGroup.cards': { en: 'Credit Cards', beanie: 'credit cards' },
+  'txn.accountGroup.investments': { en: 'Investments', beanie: 'investments' },
+  'txn.accountGroup.loans': { en: 'Loans', beanie: 'loans' },
+  'txn.accountGroup.other': { en: 'Other', beanie: 'other' },
   'modal.includeInNetWorth': { en: 'Include in Net Worth', beanie: 'include in net worth' },
   'modal.includeInNetWorthDesc': {
     en: 'Count this towards your family net worth',
