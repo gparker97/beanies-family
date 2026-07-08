@@ -82,7 +82,7 @@ const latestDate = byDateDesc[0]?.data.date;
         <p class="masthead-pitch">
           a newsletter about <span class="masthead-pitch-brand">beanies.family</span>,
           vibe coding, or just life in general. published every friday, or roughly whenever
-          I feel like it. <span class="masthead-pitch-em">not</span> written by AI.
+          I feel like it. <span class="masthead-pitch-em">not</span> written by AI (usually).
         </p>
         <p class="masthead-issue">
           <span class="masthead-issue-chip">VOL. 01</span>
@@ -347,7 +347,7 @@ const latestDate = byDateDesc[0]?.data.date;
     gap: 10px;
     justify-content: center;
     letter-spacing: 0.26em;
-    margin-bottom: 28px;
+    margin-bottom: 22px;
     padding: 8px 18px;
     position: relative;
     text-transform: uppercase;
@@ -372,7 +372,7 @@ const latestDate = byDateDesc[0]?.data.date;
     color: var(--deep-slate);
     font-family: var(--font-display);
     line-height: 1;
-    margin: 0 0 18px;
+    margin: 0 0 22px;
     position: relative;
     z-index: 1;
   }
@@ -394,7 +394,7 @@ const latestDate = byDateDesc[0]?.data.date;
     font-size: clamp(1.4rem, 2.6vw, 1.9rem);
     font-weight: 700;
     letter-spacing: -0.02em;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
   }
   .masthead-title-main {
     color: var(--deep-slate);
@@ -404,6 +404,10 @@ const latestDate = byDateDesc[0]?.data.date;
     font-weight: 800;
     letter-spacing: -0.035em;
     line-height: 0.95;
+    /* Pull "beanstalk" up under "beanies.family": absorbs the large font's
+       internal ascent leading so the two lines read as a tight lockup, not a
+       floating headline. Scales with the clamp'd font-size (em-relative). */
+    margin-top: -0.07em;
     position: relative;
   }
   /* Hand-drawn squiggle underline, stroked in Heritage Orange. SVG
@@ -425,7 +429,7 @@ const latestDate = byDateDesc[0]?.data.date;
     font-size: clamp(1rem, 1.55vw, 1.15rem);
     font-weight: 400;
     line-height: 1.6;
-    margin: 0 auto 26px;
+    margin: 0 auto 22px;
     max-width: 580px;
     position: relative;
     z-index: 1;
