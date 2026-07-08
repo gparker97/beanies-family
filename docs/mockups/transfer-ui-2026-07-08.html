@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Transfer UI — TransactionModal mockup · beanies.family</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --slate: #2c3e50;
+        --slate-1a: #1a252f;
+        --orange: #f15d22;
+        --orange-dark: #d14d1a;
+        --terracotta: #e67e22;
+        --silk: #aed6f1;
+        --cloud: #f8f9fa;
+        --green: #27ae60;
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-silk-20: rgba(174, 214, 241, 0.2);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+        --tint-slate-10: rgba(44, 62, 80, 0.1);
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --soft-shadow: 0 12px 48px rgba(44, 62, 80, 0.12);
+        --text: var(--slate);
+        --text-muted: rgba(44, 62, 80, 0.55);
+        --label: rgba(44, 62, 80, 0.45);
+        --modal-bg: #ffffff;
+        --body-bg: var(--cloud);
+        --input-bg: var(--tint-slate-5);
+        --page-bg: #eef1f4;
+        --border: rgba(44, 62, 80, 0.08);
+        --footer-bg: #f4f6f8;
+      }
+      :root[data-theme='dark'] {
+        --text: #ecf0f1;
+        --text-muted: #a7b3bd;
+        --label: rgba(236, 240, 241, 0.5);
+        --modal-bg: #34495e;
+        --body-bg: rgba(26, 37, 47, 0.6);
+        --input-bg: #2c3e50;
+        --page-bg: #1a252f;
+        --border: rgba(255, 255, 255, 0.08);
+        --footer-bg: #2c3e50;
+        --tint-slate-5: rgba(255, 255, 255, 0.05);
+        --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        --soft-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Inter', system-ui, sans-serif;
+        background: var(--page-bg);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        transition: background 200ms;
+      }
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 40px 24px 80px;
+      }
+      .page-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
+      }
+      h1 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 1.9rem;
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+      h1 .fam {
+        color: var(--orange);
+      }
+      .sub {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        max-width: 640px;
+        line-height: 1.5;
+      }
+      .theme-toggle {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.8rem;
+        color: var(--text);
+        background: var(--modal-bg);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 9px 16px;
+        cursor: pointer;
+        box-shadow: var(--card-shadow);
+        white-space: nowrap;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 40px 32px;
+        margin-top: 36px;
+        align-items: start;
+      }
+      .state {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .state-caption {
+        font-family: 'Outfit', sans-serif;
+      }
+      .state-caption b {
+        display: block;
+        font-size: 0.95rem;
+        font-weight: 700;
+      }
+      .state-caption span {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        line-height: 1.45;
+      }
+
+      /* ── Modal (BeanieFormModal chrome) ── */
+      .modal {
+        background: var(--modal-bg);
+        border-radius: 24px;
+        box-shadow: var(--soft-shadow);
+        overflow: hidden;
+        width: 100%;
+        max-width: 440px;
+      }
+      .modal__header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--border);
+      }
+      .icon-box {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        background: var(--tint-orange-8);
+        display: grid;
+        place-items: center;
+        font-size: 1.35rem;
+        flex-shrink: 0;
+      }
+      .modal__title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 1.125rem;
+        margin: 0;
+      }
+      .modal__title small {
+        display: block;
+        font-family: 'Inter', sans-serif;
+        font-weight: 400;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 1px;
+      }
+      .modal__x {
+        margin-left: auto;
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        border: none;
+        background: var(--tint-slate-5);
+        color: var(--text-muted);
+        font-size: 1rem;
+        cursor: pointer;
+      }
+      .modal__body {
+        background: var(--body-bg);
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      /* ── Field ── */
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .field > label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--label);
+      }
+      .field > label .req {
+        color: var(--orange);
+        margin-left: 2px;
+      }
+      .row-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+
+      /* ── Toggle pill group (3-way) ── */
+      .pills {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        background: var(--tint-slate-5);
+        padding: 5px;
+        border-radius: 16px;
+      }
+      .pill {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.82rem;
+        text-align: center;
+        padding: 9px 6px;
+        border-radius: 12px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 160ms;
+        white-space: nowrap;
+      }
+      .pill.is-active-transfer {
+        background: var(--slate);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(44, 62, 80, 0.25);
+      }
+      :root[data-theme='dark'] .pill.is-active-transfer {
+        background: var(--silk);
+        color: var(--slate);
+      }
+
+      /* ── Select / input ── */
+      .select,
+      .input {
+        position: relative;
+      }
+      .select select,
+      .input input {
+        width: 100%;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 1rem;
+        color: var(--text);
+        background: var(--input-bg);
+        border: 2px solid transparent;
+        border-radius: 16px;
+        padding: 13px 40px 13px 16px;
+        appearance: none;
+        transition: all 200ms;
+      }
+      .input input {
+        font-weight: 700;
+        padding-left: 46px;
+      }
+      .input input::placeholder {
+        color: var(--text-muted);
+        font-weight: 500;
+      }
+      .select select:focus,
+      .input input:focus {
+        outline: none;
+        border-color: var(--orange);
+        box-shadow: 0 0 0 3px rgba(241, 93, 34, 0.1);
+      }
+      .select .chev {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        opacity: 0.35;
+        pointer-events: none;
+        font-size: 0.7rem;
+      }
+      .input .cur {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: var(--text-muted);
+      }
+
+      /* liability hint under the "to" picker */
+      .hint {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        background: linear-gradient(90deg, rgba(241, 93, 34, 0.07), rgba(230, 126, 34, 0.05));
+        border: 1px solid rgba(241, 93, 34, 0.18);
+        border-radius: 14px;
+        padding: 8px 12px;
+      }
+      .hint b {
+        color: var(--orange);
+        font-weight: 600;
+      }
+
+      /* ── Converted (FX) row ── */
+      .fx {
+        background: var(--tint-silk-20);
+        border-radius: 16px;
+        padding: 13px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .fx__line {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--text);
+        flex-wrap: wrap;
+      }
+      .fx__arrow {
+        color: var(--orange);
+        font-size: 1.05rem;
+      }
+      .fx__send {
+        color: var(--text-muted);
+      }
+      .fx__note {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+      }
+
+      /* ── No-rate alert (Heritage Orange, NOT red) ── */
+      .alert {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        background: var(--tint-orange-8);
+        border: 1px solid rgba(241, 93, 34, 0.28);
+        border-radius: 16px;
+        padding: 12px 14px;
+      }
+      .alert .ico {
+        font-size: 1rem;
+        line-height: 1.3;
+      }
+      .alert .msg {
+        font-size: 0.82rem;
+        line-height: 1.4;
+        color: var(--text);
+      }
+      .alert .msg a {
+        color: var(--orange);
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      /* ── Reconciled toggle switch ── */
+      .switch-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .switch-row .lbl {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--text);
+      }
+      .switch-row .lbl small {
+        display: block;
+        font-family: 'Inter', sans-serif;
+        font-weight: 400;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+      }
+      .switch {
+        width: 46px;
+        height: 27px;
+        border-radius: 999px;
+        background: var(--tint-slate-10);
+        position: relative;
+        flex-shrink: 0;
+        cursor: pointer;
+      }
+      .switch::after {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 21px;
+        height: 21px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        transition: 180ms;
+      }
+      .switch.on {
+        background: var(--green);
+      }
+      .switch.on::after {
+        left: 22px;
+      }
+
+      /* ── Footer ── */
+      .modal__footer {
+        display: flex;
+        gap: 12px;
+        padding: 16px 22px;
+        background: var(--footer-bg);
+        border-top: 1px solid var(--border);
+      }
+      .save {
+        flex: 1;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: #fff;
+        border: none;
+        border-radius: 16px;
+        padding: 14px;
+        cursor: pointer;
+        background: linear-gradient(90deg, var(--orange), var(--terracotta));
+        box-shadow: 0 4px 14px rgba(241, 93, 34, 0.25);
+      }
+      .save[disabled] {
+        background: var(--tint-slate-10);
+        color: var(--text-muted);
+        box-shadow: none;
+        cursor: not-allowed;
+      }
+      .footnote {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin: 2px 2px 0;
+      }
+      .legend {
+        margin-top: 44px;
+        background: var(--modal-bg);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 20px 24px;
+        box-shadow: var(--card-shadow);
+      }
+      .legend h2 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1rem;
+        margin: 0 0 10px;
+      }
+      .legend ul {
+        margin: 0;
+        padding-left: 18px;
+        font-size: 0.84rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+      .legend b {
+        color: var(--text);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <h1>transfer UI — <span class="fam">transaction modal</span></h1>
+          <p class="sub">
+            CIG-clamped mockup for the new <b>Transfer</b> mode inside the existing transaction
+            modal. Adds a third type alongside Money In / Money Out: pick where money leaves, where
+            it lands, and (across currencies) see exactly what arrives. Paying a credit card is
+            simply a transfer <em>to</em> the card.
+          </p>
+        </div>
+        <button class="theme-toggle" onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">
+          ◐ toggle light / dark
+        </button>
+      </div>
+
+      <div class="grid">
+        <!-- STATE A — cross-currency, paying a credit card -->
+        <div class="state">
+          <div class="state-caption">
+            <b>1 · Transfer across currencies (credit-card payoff)</b>
+            <span>Source in SGD, destination card in USD. The converted amount is shown before you
+              save, and a gentle note confirms paying the card reduces what you owe.</span>
+          </div>
+          <div class="modal">
+            <div class="modal__header">
+              <div class="icon-box">🔄</div>
+              <div>
+                <p class="modal__title">New Transaction<small>Move money between your accounts</small></p>
+              </div>
+              <button class="modal__x">✕</button>
+            </div>
+            <div class="modal__body">
+              <div class="field">
+                <label>Type</label>
+                <div class="pills">
+                  <button class="pill">🧡 Money Out</button>
+                  <button class="pill">💚 Money In</button>
+                  <button class="pill is-active-transfer">🔄 Transfer</button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>From <span class="req">*</span></label>
+                <div class="select">
+                  <select><option>🏦 DBS Everyday · SGD</option></select>
+                  <span class="chev">▼</span>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>To <span class="req">*</span></label>
+                <div class="select">
+                  <select><option>💳 Amex Platinum · USD</option></select>
+                  <span class="chev">▼</span>
+                </div>
+                <div class="hint">
+                  <span aria-hidden="true">💡</span>
+                  <span>Paying this card <b>reduces what you owe</b> on it.</span>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>Amount <span class="req">*</span></label>
+                <div class="input">
+                  <span class="cur">S$</span>
+                  <input value="500.00" />
+                </div>
+              </div>
+
+              <div class="fx">
+                <div class="fx__line">
+                  <span class="fx__send">You send S$500.00</span>
+                  <span class="fx__arrow">→</span>
+                  <span>They receive US$372.00</span>
+                </div>
+                <span class="fx__note">Converted at today's rate · 1 SGD = 0.744 USD</span>
+              </div>
+
+              <div class="row-2">
+                <div class="field">
+                  <label>Date</label>
+                  <div class="select">
+                    <select><option>8 Jul 2026</option></select>
+                    <span class="chev">▼</span>
+                  </div>
+                </div>
+                <div class="field">
+                  <label>Description</label>
+                  <div class="input" style="--x: 0">
+                    <input style="padding-left: 16px; font-weight: 600" value="Card payment" />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+            <div class="modal__footer">
+              <button class="save">Add Transfer</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATE B — same currency -->
+        <div class="state">
+          <div class="state-caption">
+            <b>2 · Same-currency transfer</b>
+            <span>Both accounts in SGD — no conversion row, nothing extra to read. The simplest,
+              most common case stays clean.</span>
+          </div>
+          <div class="modal">
+            <div class="modal__header">
+              <div class="icon-box">🔄</div>
+              <div>
+                <p class="modal__title">New Transaction<small>Move money between your accounts</small></p>
+              </div>
+              <button class="modal__x">✕</button>
+            </div>
+            <div class="modal__body">
+              <div class="field">
+                <label>Type</label>
+                <div class="pills">
+                  <button class="pill">🧡 Money Out</button>
+                  <button class="pill">💚 Money In</button>
+                  <button class="pill is-active-transfer">🔄 Transfer</button>
+                </div>
+              </div>
+              <div class="field">
+                <label>From <span class="req">*</span></label>
+                <div class="select">
+                  <select><option>🏦 DBS Everyday · SGD</option></select>
+                  <span class="chev">▼</span>
+                </div>
+              </div>
+              <div class="field">
+                <label>To <span class="req">*</span></label>
+                <div class="select">
+                  <select><option>🐷 POSB Savings · SGD</option></select>
+                  <span class="chev">▼</span>
+                </div>
+              </div>
+              <div class="field">
+                <label>Amount <span class="req">*</span></label>
+                <div class="input">
+                  <span class="cur">S$</span>
+                  <input value="300.00" />
+                </div>
+              </div>
+              <div class="row-2">
+                <div class="field">
+                  <label>Date</label>
+                  <div class="select">
+                    <select><option>8 Jul 2026</option></select>
+                    <span class="chev">▼</span>
+                  </div>
+                </div>
+                <div class="field">
+                  <label>Description</label>
+                  <div class="input">
+                    <input style="padding-left: 16px; font-weight: 600" value="Move to savings" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="modal__footer">
+              <button class="save">Add Transfer</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATE C — no rate available -->
+        <div class="state">
+          <div class="state-caption">
+            <b>3 · No exchange rate yet (blocked, not scary)</b>
+            <span>When there's no rate for the pair, we block the save and say exactly how to fix it
+              — in Heritage Orange, never Alert Red. No silent 1:1 conversion.</span>
+          </div>
+          <div class="modal">
+            <div class="modal__header">
+              <div class="icon-box">🔄</div>
+              <div>
+                <p class="modal__title">New Transaction<small>Move money between your accounts</small></p>
+              </div>
+              <button class="modal__x">✕</button>
+            </div>
+            <div class="modal__body">
+              <div class="field">
+                <label>Type</label>
+                <div class="pills">
+                  <button class="pill">🧡 Money Out</button>
+                  <button class="pill">💚 Money In</button>
+                  <button class="pill is-active-transfer">🔄 Transfer</button>
+                </div>
+              </div>
+              <div class="field">
+                <label>From <span class="req">*</span></label>
+                <div class="select">
+                  <select><option>🏦 DBS Everyday · SGD</option></select>
+                  <span class="chev">▼</span>
+                </div>
+              </div>
+              <div class="field">
+                <label>To <span class="req">*</span></label>
+                <div class="select">
+                  <select><option>🗾 Yen Savings · JPY</option></select>
+                  <span class="chev">▼</span>
+                </div>
+              </div>
+              <div class="field">
+                <label>Amount <span class="req">*</span></label>
+                <div class="input">
+                  <span class="cur">S$</span>
+                  <input value="500.00" />
+                </div>
+              </div>
+              <div class="alert">
+                <span class="ico" aria-hidden="true">🧡</span>
+                <span class="msg">No exchange rate for <b>SGD → JPY</b>. <a href="#">Add one in Settings → Currencies</a> and this transfer will convert automatically.</span>
+              </div>
+            </div>
+            <div class="modal__footer">
+              <button class="save" disabled>Add Transfer</button>
+            </div>
+          </div>
+          <p class="footnote">Save is disabled until a rate exists — the transfer can never be created mis-converted.</p>
+        </div>
+      </div>
+
+      <div class="legend">
+        <h2>Design notes</h2>
+        <ul>
+          <li><b>Third pill, not a new screen.</b> Transfer joins the existing Money Out / Money In toggle. Its active state is <b>Deep Slate</b> (neutral) rather than orange/green — a transfer isn't income or spending, it's your own money moving between accounts.</li>
+          <li><b>Transfer mode hides</b> the category, and the goal / loan / activity link controls — none apply to a transfer. It's one-time only (recurring transfers come later).</li>
+          <li><b>Converted row</b> appears only when the two accounts differ in currency: "you send X → they receive Y", with the rate spelled out. Same-currency transfers stay clean.</li>
+          <li><b>No-rate state</b> uses Heritage Orange (routine block), disables save, and tells the user exactly how to fix it — per the CIG's "no Alert Red for routine signals" rule.</li>
+          <li><b>Credit-card payoff hint</b> appears under the destination when it's a card/loan, reinforcing that paying it reduces what you owe.</li>
+          <li>Everything else — squircle radii, Outfit/Inter type, tinted inputs, the 44×44 icon box, the full-width gradient save — is the standard BeanieFormModal, unchanged.</li>
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>
