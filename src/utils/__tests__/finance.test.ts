@@ -3,6 +3,7 @@ import {
   calculateMonthlyFee,
   computeGoalAllocRaw,
   calculateBalanceAdjustment,
+  signedAccountDelta,
   isLiabilityType,
   accountNetWorthMultiplier,
   accountBalanceDeltaFromTx,
@@ -255,39 +256,123 @@ describe('accountNetWorthMultiplier', () => {
   });
 });
 
+describe('signedAccountDelta', () => {
+  it('asset accounts match the asset-perspective primitive', () => {
+    expect(signedAccountDelta('income', 100, 'checking')).toBe(100);
+    expect(signedAccountDelta('expense', 100, 'checking')).toBe(-100);
+    expect(signedAccountDelta('transfer', 100, 'checking', true)).toBe(-100);
+    expect(signedAccountDelta('transfer', 100, 'checking', false)).toBe(100);
+  });
+
+  it('expense on a liability (card purchase) → owed increases', () => {
+    expect(signedAccountDelta('expense', 100, 'credit_card')).toBe(100);
+    expect(signedAccountDelta('expense', 100, 'loan')).toBe(100);
+  });
+
+  it('income on a liability (card refund) → owed decreases', () => {
+    expect(signedAccountDelta('income', 100, 'credit_card')).toBe(-100);
+  });
+
+  it('transfer TO a liability (card payoff, destination) → owed decreases', () => {
+    expect(signedAccountDelta('transfer', 100, 'credit_card', false)).toBe(-100);
+  });
+
+  it('transfer FROM a liability (cash advance, source) → owed increases', () => {
+    expect(signedAccountDelta('transfer', 100, 'credit_card', true)).toBe(100);
+  });
+
+  it('balance_adjustment is 0 regardless of account type', () => {
+    expect(signedAccountDelta('balance_adjustment', 500, 'credit_card')).toBe(0);
+    expect(signedAccountDelta('balance_adjustment', 500, 'checking')).toBe(0);
+  });
+});
+
 describe('accountBalanceDeltaFromTx', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
+  // acc-1 + acc-2 are assets unless a test builds its own map.
+  const assets = new Map<string, Account>([
+    ['acc-1', makeAccount({ id: 'acc-1', type: 'checking' })],
+    ['acc-2', makeAccount({ id: 'acc-2', type: 'checking' })],
+  ]);
+
   it('income on this account → +amount', () => {
     const tx = makeTx({ type: 'income', amount: 200, accountId: 'acc-1' });
-    expect(accountBalanceDeltaFromTx(tx, 'acc-1')).toBe(200);
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1', assets)).toBe(200);
   });
 
   it('expense on this account → -amount', () => {
     const tx = makeTx({ type: 'expense', amount: 75, accountId: 'acc-1' });
-    expect(accountBalanceDeltaFromTx(tx, 'acc-1')).toBe(-75);
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1', assets)).toBe(-75);
   });
 
   it('transfer with this account as source → -amount', () => {
     const tx = makeTx({ type: 'transfer', amount: 100, accountId: 'acc-1', toAccountId: 'acc-2' });
-    expect(accountBalanceDeltaFromTx(tx, 'acc-1')).toBe(-100);
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1', assets)).toBe(-100);
   });
 
   it('transfer with this account as destination → +amount', () => {
     const tx = makeTx({ type: 'transfer', amount: 100, accountId: 'acc-1', toAccountId: 'acc-2' });
-    expect(accountBalanceDeltaFromTx(tx, 'acc-2')).toBe(100);
+    expect(accountBalanceDeltaFromTx(tx, 'acc-2', assets)).toBe(100);
   });
 
   it('transfer with unrelated vantage → 0', () => {
     const tx = makeTx({ type: 'transfer', amount: 100, accountId: 'acc-1', toAccountId: 'acc-2' });
-    expect(accountBalanceDeltaFromTx(tx, 'acc-3')).toBe(0);
+    expect(accountBalanceDeltaFromTx(tx, 'acc-3', assets)).toBe(0);
   });
 
   it('income on a different account → 0', () => {
     const tx = makeTx({ type: 'income', amount: 200, accountId: 'acc-1' });
-    expect(accountBalanceDeltaFromTx(tx, 'acc-2')).toBe(0);
+    expect(accountBalanceDeltaFromTx(tx, 'acc-2', assets)).toBe(0);
+  });
+
+  // ── Liability-aware cases ──
+  it('expense on a credit card (purchase) → owed increases (+amount)', () => {
+    const map = new Map<string, Account>([
+      ['acc-1', makeAccount({ id: 'acc-1', type: 'credit_card' })],
+    ]);
+    const tx = makeTx({ type: 'expense', amount: 75, accountId: 'acc-1' });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1', map)).toBe(75);
+  });
+
+  it('income on a credit card (refund) → owed decreases (-amount)', () => {
+    const map = new Map<string, Account>([
+      ['acc-1', makeAccount({ id: 'acc-1', type: 'credit_card' })],
+    ]);
+    const tx = makeTx({ type: 'income', amount: 200, accountId: 'acc-1' });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1', map)).toBe(-200);
+  });
+
+  it('transfer to a credit card (payoff, destination) → owed decreases', () => {
+    const map = new Map<string, Account>([
+      ['acc-1', makeAccount({ id: 'acc-1', type: 'checking' })],
+      ['acc-2', makeAccount({ id: 'acc-2', type: 'credit_card' })],
+    ]);
+    const tx = makeTx({ type: 'transfer', amount: 100, accountId: 'acc-1', toAccountId: 'acc-2' });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1', map)).toBe(-100); // checking drops
+    expect(accountBalanceDeltaFromTx(tx, 'acc-2', map)).toBe(-100); // card owed drops
+  });
+
+  it('cross-currency transfer credits the destination its converted toAmount', () => {
+    const tx = makeTx({
+      type: 'transfer',
+      amount: 100, // source currency
+      toAmount: 74, // destination currency (converted)
+      accountId: 'acc-1',
+      toAccountId: 'acc-2',
+    });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1', assets)).toBe(-100); // source debited raw
+    expect(accountBalanceDeltaFromTx(tx, 'acc-2', assets)).toBe(74); // dest credited converted
+  });
+
+  it('referenced account missing from the map → 0 + console.warn', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const tx = makeTx({ type: 'expense', amount: 75, accountId: 'acc-1' });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1', new Map())).toBe(0);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]?.[0]).toContain('account not found');
   });
 
   it('balance_adjustment with positive delta → +delta', () => {
@@ -297,7 +382,7 @@ describe('accountBalanceDeltaFromTx', () => {
       accountId: 'acc-1',
       adjustment: { delta: 500, updatedBy: 'm-1' },
     });
-    expect(accountBalanceDeltaFromTx(tx, 'acc-1')).toBe(500);
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1', assets)).toBe(500);
   });
 
   it('balance_adjustment with negative delta → -delta (signed)', () => {
@@ -307,7 +392,7 @@ describe('accountBalanceDeltaFromTx', () => {
       accountId: 'acc-1',
       adjustment: { delta: -300, updatedBy: 'm-1' },
     });
-    expect(accountBalanceDeltaFromTx(tx, 'acc-1')).toBe(-300);
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1', assets)).toBe(-300);
   });
 
   it('balance_adjustment on a different account → 0', () => {
@@ -317,13 +402,13 @@ describe('accountBalanceDeltaFromTx', () => {
       accountId: 'acc-1',
       adjustment: { delta: 500, updatedBy: 'm-1' },
     });
-    expect(accountBalanceDeltaFromTx(tx, 'acc-2')).toBe(0);
+    expect(accountBalanceDeltaFromTx(tx, 'acc-2', assets)).toBe(0);
   });
 
   it('balance_adjustment missing adjustment metadata → 0 + console.warn', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const tx = makeTx({ type: 'balance_adjustment', amount: 500, accountId: 'acc-1' });
-    expect(accountBalanceDeltaFromTx(tx, 'acc-1')).toBe(0);
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1', assets)).toBe(0);
     expect(warn).toHaveBeenCalledOnce();
     expect(warn.mock.calls[0]?.[0]).toContain('balance_adjustment missing adjustment metadata');
   });

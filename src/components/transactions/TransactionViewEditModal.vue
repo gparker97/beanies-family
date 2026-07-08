@@ -191,6 +191,14 @@ const accountName = computed(() => {
   return account?.name ?? getMemberNameByAccountId(transaction.value.accountId);
 });
 
+// Transfer destination — orphan-safe (falls back if the account was deleted).
+const isTransfer = computed(() => transaction.value?.type === 'transfer');
+const toAccountName = computed(() => {
+  const toId = transaction.value?.toAccountId;
+  if (!toId) return '';
+  return accountsStore.accounts.find((a) => a.id === toId)?.name ?? t('family.unknownAccount');
+});
+
 const linkedRecurringItem = computed(() => {
   if (!transaction.value?.recurringItemId) return null;
   return (
@@ -476,8 +484,8 @@ async function handleDelete() {
         </InlineEditField>
       </FormFieldGroup>
 
-      <!-- Category — inline editable -->
-      <FormFieldGroup v-if="isEditable" :label="t('planner.field.category')">
+      <!-- Category — inline editable (transfers have no category) -->
+      <FormFieldGroup v-if="isEditable && !isTransfer" :label="t('planner.field.category')">
         <InlineEditField
           :editing="editingField === 'category'"
           tint-color="orange"
@@ -545,10 +553,15 @@ async function handleDelete() {
         </InlineEditField>
       </FormFieldGroup>
 
-      <!-- Account — read-only -->
-      <FormFieldGroup :label="t('form.account')">
+      <!-- Account — read-only ("From" + "To" for transfers) -->
+      <FormFieldGroup :label="isTransfer ? t('transfer.from') : t('form.account')">
         <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
           {{ accountName }}
+        </span>
+      </FormFieldGroup>
+      <FormFieldGroup v-if="isTransfer" :label="t('transfer.to')">
+        <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+          {{ toAccountName }}
         </span>
       </FormFieldGroup>
 
