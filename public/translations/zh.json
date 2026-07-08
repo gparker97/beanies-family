@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-05",
-    "translationCount": 3657
+    "lastUpdated": "2026-07-08",
+    "translationCount": 3667
   },
   "translations": {
     "app.name": {
@@ -18290,6 +18290,56 @@
       "translation": "分配",
       "hash": "wl9frj",
       "lastUpdated": "2026-07-05"
+    },
+    "transfer.type": {
+      "translation": "转账",
+      "hash": "m93b4b",
+      "lastUpdated": "2026-07-08"
+    },
+    "transfer.from": {
+      "translation": "从",
+      "hash": "1b4cq",
+      "lastUpdated": "2026-07-08"
+    },
+    "transfer.to": {
+      "translation": "至",
+      "hash": "23f",
+      "lastUpdated": "2026-07-08"
+    },
+    "transfer.selectDestination": {
+      "translation": "选择目标帐户...",
+      "hash": "5mlp1l",
+      "lastUpdated": "2026-07-08"
+    },
+    "transfer.liabilityHint": {
+      "translation": "支付这笔费用会减少您的欠款。",
+      "hash": "j6bx2l",
+      "lastUpdated": "2026-07-08"
+    },
+    "transfer.youSend": {
+      "translation": "您发送",
+      "hash": "bg6t4n",
+      "lastUpdated": "2026-07-08"
+    },
+    "transfer.theyReceive": {
+      "translation": "他们收到",
+      "hash": "kread1",
+      "lastUpdated": "2026-07-08"
+    },
+    "transfer.convertedNote": {
+      "translation": "按今天的汇率转换。",
+      "hash": "a3hem5",
+      "lastUpdated": "2026-07-08"
+    },
+    "transfer.noRate": {
+      "translation": "{from} → {to}没有汇率。在“设置→货币”中添加。",
+      "hash": "2oqktc",
+      "lastUpdated": "2026-07-08"
+    },
+    "transfer.filter": {
+      "translation": "转账",
+      "hash": "kh9yyg",
+      "lastUpdated": "2026-07-08"
     }
   }
 }

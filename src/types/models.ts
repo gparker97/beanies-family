@@ -208,7 +208,15 @@ export interface BalanceAdjustmentMeta {
 export interface Transaction {
   id: UUID;
   accountId: UUID;
-  toAccountId?: UUID; // For transfers
+  toAccountId?: UUID; // For transfers: the destination account
+  // For transfers ONLY: the amount credited to the destination account, in the
+  // destination account's currency. Equals `amount` when source and destination
+  // share a currency; the converted value otherwise. The store is the sole
+  // authority for this field and only recomputes it when a conversion input
+  // (amount / source currency / destination) changes, so unrelated edits never
+  // drift the destination. Undefined for all non-transfer types. Read as
+  // `toAmount ?? amount`.
+  toAmount?: number;
   activityId?: UUID; // Link transaction to an activity
   loanId?: UUID; // Link transaction to an asset loan (by asset ID) or loan account (by account ID)
   loanInterestPortion?: number; // Interest portion from amortization calculation

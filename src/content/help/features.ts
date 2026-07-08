@@ -2,6 +2,77 @@ import type { HelpArticle } from './types';
 
 export const FEATURES_ARTICLES: HelpArticle[] = [
   {
+    slug: 'transfers-and-credit-card-payments',
+    category: 'features',
+    title: 'Transfers & credit-card payments',
+    excerpt:
+      'Move money between your own accounts — and pay down or spend on a credit card — so every balance stays right.',
+    icon: '\u{1F504}',
+    readTime: 3,
+    updatedDate: '2026-07-08',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          'Sometimes money just moves from one of your accounts to another — savings from checking, cash to a family member, or a payment to your credit card. A <strong>transfer</strong> records exactly that: it takes the amount out of one account and puts it into the other, in a single step.',
+      },
+      {
+        type: 'heading',
+        content: 'Move money between accounts',
+        level: 2,
+        id: 'transfers',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Tap <strong>Add transaction</strong>.',
+          'At the top, choose <strong>🔄 Transfer</strong>.',
+          'Pick the account the money leaves (<strong>From</strong>) and where it lands (<strong>To</strong>).',
+          'Enter the amount and tap <strong>Add Transfer</strong>. Both balances update right away.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Paying a credit card',
+        level: 2,
+        id: 'card-payments',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Paying a card <em>is</em> a transfer — money leaves your checking or cash account and goes <strong>to</strong> the card. Choose your funding account as <strong>From</strong> and the card as <strong>To</strong>; the payment lowers what you owe on the card and the cash you paid with. beanies reminds you of this right under the destination.',
+      },
+      {
+        type: 'heading',
+        content: 'Spending on a credit card',
+        level: 2,
+        id: 'card-spending',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'To record a purchase you made on a card, add a normal <strong>expense</strong> and pick the card as the account. That raises what you owe on it — the mirror image of a payment. (When the money genuinely moves between two accounts, use a transfer instead.)',
+      },
+      {
+        type: 'heading',
+        content: 'Accounts in different currencies',
+        level: 2,
+        id: 'cross-currency',
+      },
+      {
+        type: 'paragraph',
+        content:
+          "If the two accounts use different currencies, beanies converts the amount at today's rate and shows you exactly what will arrive before you save. If there's no rate for that pair yet, add one in <strong>Settings → Currencies</strong> and the transfer will convert automatically.",
+      },
+      {
+        type: 'infoBox',
+        content:
+          'If you tracked a credit card or loan before this update by logging its spending directly on the card, take a quick look at that account’s balance once. Going forward, a purchase on a card raises what you owe and a payment lowers it — the way you’d expect.',
+      },
+    ],
+  },
+  {
     slug: 'notifications',
     category: 'features',
     title: 'Notifications — staying on top of what needs you',

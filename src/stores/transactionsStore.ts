@@ -7,8 +7,10 @@ import { useAssetsStore } from '@/stores/assetsStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { wrapAsync } from '@/composables/useStoreActions';
-import { convertToBaseCurrency } from '@/utils/currency';
-import { computeGoalAllocRaw, calculateBalanceAdjustment } from '@/utils/finance';
+import { convertToBaseCurrency, getRate } from '@/utils/currency';
+import { computeGoalAllocRaw, signedAccountDelta } from '@/utils/finance';
+import { reportError } from '@/utils/errorReporter';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { mutate } from '@/services/automerge/worker/docClient';
 import type {
   Transaction,
@@ -17,6 +19,7 @@ import type {
   ISODateString,
   Account,
   Asset,
+  CurrencyCode,
 } from '@/types/models';
 import {
   getStartOfMonth,
@@ -227,6 +230,101 @@ export const useTransactionsStore = defineStore('transactions', () => {
   }
 
   /**
+   * The amount to credit a transfer's DESTINATION, in the destination's own
+   * currency. Same currency → the raw amount; different currency → converted at
+   * the current rate. This is the sole authority for a transfer's `toAmount`.
+   *
+   * No silent 1:1: if no exchange rate exists for the pair it reports and THROWS
+   * so the caller aborts BEFORE mutating any balance (resolve-before-mutate) —
+   * never a half-applied cascade. The modal blocks this case up-front; this is
+   * the defensive backstop for any other caller.
+   */
+  function resolveTransferToAmount(
+    sourceCurrency: CurrencyCode,
+    toAccountId: string,
+    amount: number
+  ): number {
+    const dest = useAccountsStore().accounts.find((a) => a.id === toAccountId);
+    // Dangling destination (shouldn't happen from the modal) — no conversion basis.
+    if (!dest || dest.currency === sourceCurrency) return amount;
+    const rate = getRate(useSettingsStore().exchangeRates, sourceCurrency, dest.currency);
+    if (rate === undefined) {
+      reportError({
+        surface: 'transactions.transfer-missing-rate',
+        message: `No exchange rate ${sourceCurrency}->${dest.currency}; transfer not applied`,
+        severity: 'error',
+        context: { from: sourceCurrency, to: dest.currency },
+      });
+      throw new Error(`No exchange rate for ${sourceCurrency} → ${dest.currency}`);
+    }
+    return Math.round(amount * rate * 100) / 100;
+  }
+
+  /**
+   * Apply (`direction: 1`) or reverse (`direction: -1`) a transaction's effect
+   * on account balances — the SINGLE place balance signs + the transfer
+   * destination live. Liability-aware via `signedAccountDelta` (a card purchase
+   * raises owed; a transfer to a card lowers it); the destination of a transfer
+   * is credited its stored `toAmount` (converted). Mirrors the store's existing
+   * apply/reverse symmetry for goals and loans, so create/update/delete each
+   * reduce to one or two calls instead of three parallel copies of the math.
+   *
+   * A missing (deleted) account is warned and skipped, matching the app's
+   * existing tolerance of dangling references.
+   */
+  async function applyTransactionToBalances(tx: Transaction, direction: 1 | -1): Promise<void> {
+    const accountsStore = useAccountsStore();
+    const source = accountsStore.accounts.find((a) => a.id === tx.accountId);
+    if (source) {
+      const delta = signedAccountDelta(tx.type, tx.amount, source.type, true) * direction;
+      if (delta !== 0) await adjustAccountBalance(tx.accountId, delta);
+    } else {
+      console.warn(
+        '[transactionsStore] source account not found; balance not adjusted:',
+        tx.accountId
+      );
+    }
+    if (tx.type === 'transfer' && tx.toAccountId) {
+      const dest = accountsStore.accounts.find((a) => a.id === tx.toAccountId);
+      if (dest) {
+        const magnitude = tx.toAmount ?? tx.amount;
+        const delta = signedAccountDelta('transfer', magnitude, dest.type, false) * direction;
+        if (delta !== 0) await adjustAccountBalance(tx.toAccountId, delta);
+      } else {
+        console.warn(
+          '[transactionsStore] transfer destination not found; balance not adjusted:',
+          tx.toAccountId
+        );
+      }
+    }
+  }
+
+  /**
+   * Resolve the `toAmount` a transfer edit should carry. Recompute the
+   * conversion only when an input that affects it actually changed (amount,
+   * source currency, destination), when switching INTO transfer, or when the
+   * original lacked a `toAmount` — otherwise carry the original forward so an
+   * unrelated edit (description/date) never re-runs FX or drifts the balance.
+   * Returns undefined for non-transfer results. May throw (missing rate).
+   */
+  function resolveUpdatedTransferToAmount(
+    original: Transaction,
+    updated: Transaction,
+    input: UpdateTransactionInput
+  ): number | undefined {
+    if (updated.type !== 'transfer' || !updated.toAccountId) return undefined;
+    const conversionInputChanged =
+      (input.amount !== undefined && input.amount !== original.amount) ||
+      (input.toAccountId !== undefined && input.toAccountId !== original.toAccountId) ||
+      (input.currency !== undefined && input.currency !== original.currency) ||
+      original.type !== 'transfer' ||
+      original.toAmount === undefined;
+    return conversionInputChanged
+      ? resolveTransferToAmount(updated.currency, updated.toAccountId, updated.amount)
+      : original.toAmount;
+  }
+
+  /**
    * Adjust a linked goal's progress by a relative delta. The worker
    * `applyGoalContribution` op clamps at 0 + auto-completes atomically.
    */
@@ -368,7 +466,17 @@ export const useTransactionsStore = defineStore('transactions', () => {
           return transaction;
         }
 
-        const transaction = await transactionRepo.createTransaction(input);
+        // For a transfer, resolve the destination amount up-front (converts
+        // cross-currency; THROWS on a missing rate so nothing is persisted).
+        const createInput: CreateTransactionInput =
+          input.type === 'transfer' && input.toAccountId
+            ? {
+                ...input,
+                toAmount: resolveTransferToAmount(input.currency, input.toAccountId, input.amount),
+              }
+            : input;
+
+        const transaction = await transactionRepo.createTransaction(createInput);
         const isFirst = transactions.value.length === 0;
         // Immutable update: assign a new array so downstream computeds re-evaluate
         transactions.value = [...transactions.value, transaction];
@@ -376,15 +484,9 @@ export const useTransactionsStore = defineStore('transactions', () => {
           celebrate('first-transaction');
         }
 
-        // Update account balance
-        const adjustment = calculateBalanceAdjustment(input.type, input.amount, true);
-        await adjustAccountBalance(input.accountId, adjustment);
-
-        // For transfers, also update destination account
-        if (input.type === 'transfer' && input.toAccountId) {
-          const destAdjustment = calculateBalanceAdjustment(input.type, input.amount, false);
-          await adjustAccountBalance(input.toAccountId, destAdjustment);
-        }
+        // Update account balance(s) — liability-aware, transfer destination
+        // credited its converted toAmount (single shared routine).
+        await applyTransactionToBalances(transaction, 1);
 
         // Apply goal allocation (if linked)
         await applyGoalAllocation(transaction);
@@ -422,39 +524,28 @@ export const useTransactionsStore = defineStore('transactions', () => {
             return updated;
           }
 
-          // If amount, type, or account changed, adjust balances
+          // If amount, type, account, destination, or currency changed, adjust balances
           if (original) {
-            // Reverse the original transaction's effect
-            const originalAdjustment = calculateBalanceAdjustment(
-              original.type,
-              original.amount,
-              true
-            );
-            await adjustAccountBalance(original.accountId, -originalAdjustment);
+            // Resolve the updated shape's toAmount FIRST (may THROW on a missing
+            // rate) so the whole cascade aborts before any balance is touched —
+            // never a reversed-but-not-reapplied (half-applied) state.
+            const resolvedToAmount = resolveUpdatedTransferToAmount(original, updated, input);
+            const updatedForCascade: Transaction = { ...updated, toAmount: resolvedToAmount };
 
-            // If it was a transfer, also reverse destination
-            if (original.type === 'transfer' && original.toAccountId) {
-              const originalDestAdjustment = calculateBalanceAdjustment(
-                original.type,
-                original.amount,
-                false
+            // Reverse the original effect, then apply the updated effect — both
+            // via the single liability-aware routine (dest uses each shape's toAmount).
+            await applyTransactionToBalances(original, -1);
+            await applyTransactionToBalances(updatedForCascade, 1);
+
+            // Persist the corrected toAmount when it changed on a transfer result.
+            if (
+              updatedForCascade.type === 'transfer' &&
+              updatedForCascade.toAmount !== updated.toAmount
+            ) {
+              await transactionRepo.updateTransaction(id, { toAmount: updatedForCascade.toAmount });
+              transactions.value = transactions.value.map((t) =>
+                t.id === id ? { ...t, toAmount: updatedForCascade.toAmount } : t
               );
-              await adjustAccountBalance(original.toAccountId, -originalDestAdjustment);
-            }
-
-            // Apply the new transaction's effect
-            const newType = input.type ?? original.type;
-            const newAmount = input.amount ?? original.amount;
-            const newAccountId = input.accountId ?? original.accountId;
-            const newToAccountId = input.toAccountId ?? original.toAccountId;
-
-            const newAdjustment = calculateBalanceAdjustment(newType, newAmount, true);
-            await adjustAccountBalance(newAccountId, newAdjustment);
-
-            // For transfers, also update destination
-            if (newType === 'transfer' && newToAccountId) {
-              const newDestAdjustment = calculateBalanceAdjustment(newType, newAmount, false);
-              await adjustAccountBalance(newToAccountId, newDestAdjustment);
             }
 
             // Reverse old goal allocation
@@ -494,24 +585,9 @@ export const useTransactionsStore = defineStore('transactions', () => {
             return success;
           }
 
-          // Reverse the transaction's effect on account balance
+          // Reverse the transaction's effect on account balance(s)
           if (transaction) {
-            const adjustment = calculateBalanceAdjustment(
-              transaction.type,
-              transaction.amount,
-              true
-            );
-            await adjustAccountBalance(transaction.accountId, -adjustment);
-
-            // For transfers, also reverse destination
-            if (transaction.type === 'transfer' && transaction.toAccountId) {
-              const destAdjustment = calculateBalanceAdjustment(
-                transaction.type,
-                transaction.amount,
-                false
-              );
-              await adjustAccountBalance(transaction.toAccountId, -destAdjustment);
-            }
+            await applyTransactionToBalances(transaction, -1);
 
             // Reverse goal allocation
             await adjustGoalProgress(transaction.goalId, transaction.goalAllocApplied, true);
@@ -537,9 +613,8 @@ export const useTransactionsStore = defineStore('transactions', () => {
         for (const tx of toDelete) {
           const success = await transactionRepo.deleteTransaction(tx.id);
           if (success) {
-            // Reverse balance
-            const adjustment = calculateBalanceAdjustment(tx.type, tx.amount, true);
-            await adjustAccountBalance(tx.accountId, -adjustment);
+            // Reverse balance (liability-aware; recurring items are income/expense)
+            await applyTransactionToBalances(tx, -1);
             // Reverse goal allocation
             await adjustGoalProgress(tx.goalId, tx.goalAllocApplied, true);
             count++;

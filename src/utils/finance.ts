@@ -106,6 +106,37 @@ export function calculateBalanceAdjustment(
 }
 
 /**
+ * The signed amount by which a transaction changes ONE account's stored
+ * `balance`, accounting for whether that account is an asset or a liability.
+ *
+ * This is THE single source of truth for balance signs across the app — the
+ * cascade (`transactionsStore`), the recurring processor, and historical
+ * reconstruction (`accountBalanceDeltaFromTx`) all route through it. Do NOT
+ * re-derive the liability sign at call sites.
+ *
+ * Liability balances (`credit_card`, `loan`) are stored as a positive "amount
+ * owed", so the effect is the INVERSE of the asset-perspective primitive:
+ * - Expense on a card (a purchase) → owed increases (`+amount`).
+ * - Income/refund on a card → owed decreases (`−amount`).
+ * - Transfer TO a card (a payoff, this account is the destination) → owed
+ *   decreases; transfer FROM a card (a cash advance, this account is the
+ *   source) → owed increases.
+ * Asset accounts are unchanged (multiplier `+1`).
+ *
+ * `balance_adjustment` is 0 here (cascade short-circuit), same as the primitive.
+ */
+export function signedAccountDelta(
+  type: TransactionType,
+  amount: number,
+  accountType: AccountType,
+  isSourceAccount: boolean = true
+): number {
+  const base = calculateBalanceAdjustment(type, amount, isSourceAccount);
+  if (base === 0) return 0; // normalize (avoid -0 for balance_adjustment / zero amounts)
+  return isLiabilityType(accountType) ? -base : base;
+}
+
+/**
  * True when an account's balance represents money owed (subtracts from net
  * worth) rather than money held. Currently `credit_card` and `loan`.
  *
@@ -131,27 +162,30 @@ export function accountNetWorthMultiplier(account: Account): -1 | 1 {
 }
 
 /**
- * The signed amount by which `tx` historically changed the balance of
- * `accountId`. Returns 0 if the transaction doesn't reference this account.
+ * The signed amount by which `tx` historically changed the stored balance of
+ * `accountId`, accounting for whether the account is an asset or a liability.
+ * Returns 0 if the transaction doesn't reference this account.
  *
- * Sign convention:
- * - Income on this account → `+amount`
- * - Expense on this account → `-amount`
- * - Transfer with this account as source → `-amount`; as destination → `+amount`
- * - Balance adjustment on this account → `adjustment.delta` (signed)
+ * Sign convention (via `signedAccountDelta`, so it matches the live cascade):
+ * - Income/expense/transfer on an asset account → the asset-perspective sign.
+ * - The same on a liability account → inverted (a card purchase raises owed).
+ * - The destination leg of a cross-currency transfer uses `toAmount` (the
+ *   amount actually credited in the destination's currency), falling back to
+ *   `amount` for same-currency transfers.
+ * - Balance adjustment on this account → `adjustment.delta` (the raw signed
+ *   stored-balance change — NOT re-signed; it already IS the effect).
  *
- * For income/expense/transfer, this composes `calculateBalanceAdjustment`
- * with the correct source/destination perspective. For balance_adjustment,
- * it returns the raw delta — which differs from `calculateBalanceAdjustment`
- * (that returns 0 for cascade short-circuit reasons). For *historical
- * reconstruction* the delta IS the effect.
+ * `accountsById` supplies each account's type. Logs a warn and returns 0 if a
+ * referenced account can't be resolved, or if a `balance_adjustment` row is
+ * missing its `adjustment` metadata (data anomalies — no silent miscount).
  *
- * Logs a warn and returns 0 if a `balance_adjustment` row is missing its
- * `adjustment` metadata (data corruption — should never happen in practice).
- *
- * @see calculateBalanceAdjustment — for the cascade-time application path
+ * @see signedAccountDelta — the cascade-time application path (same signs)
  */
-export function accountBalanceDeltaFromTx(tx: Transaction, accountId: string): number {
+export function accountBalanceDeltaFromTx(
+  tx: Transaction,
+  accountId: string,
+  accountsById: ReadonlyMap<string, Account>
+): number {
   switch (tx.type) {
     case 'balance_adjustment': {
       if (tx.accountId !== accountId) return 0;
@@ -167,10 +201,17 @@ export function accountBalanceDeltaFromTx(tx: Transaction, accountId: string): n
     case 'income':
     case 'expense':
     case 'transfer': {
-      if (tx.accountId === accountId) return calculateBalanceAdjustment(tx.type, tx.amount, true);
-      if (tx.toAccountId === accountId)
-        return calculateBalanceAdjustment(tx.type, tx.amount, false);
-      return 0;
+      const isSource = tx.accountId === accountId;
+      const isDest = tx.toAccountId === accountId;
+      if (!isSource && !isDest) return 0;
+      const account = accountsById.get(accountId);
+      if (!account) {
+        console.warn('[accountBalanceDeltaFromTx] account not found for tx:', accountId, tx.id);
+        return 0;
+      }
+      // Destination of a transfer is credited the converted `toAmount`.
+      const magnitude = isDest ? (tx.toAmount ?? tx.amount) : tx.amount;
+      return signedAccountDelta(tx.type, magnitude, account.type, isSource);
     }
     default:
       assertNever(tx.type, 'accountBalanceDeltaFromTx');

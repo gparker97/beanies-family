@@ -13,7 +13,7 @@ import {
   parseLocalDate,
   extractDatePart,
 } from '@/utils/date';
-import { computeGoalAllocRaw, calculateBalanceAdjustment } from '@/utils/finance';
+import { computeGoalAllocRaw, signedAccountDelta } from '@/utils/finance';
 import { calculateAmortization, findLoanDetails } from '@/utils/loanPayment';
 import { getOrdinalSuffix } from '@/utils/format';
 
@@ -258,7 +258,8 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
     // Update account balance
     const account = await accountRepo.getAccountById(item.accountId);
     if (account) {
-      const adjustment = calculateBalanceAdjustment(item.type, item.amount);
+      // Liability-aware: a recurring expense on a credit card raises what's owed.
+      const adjustment = signedAccountDelta(item.type, item.amount, account.type);
       await accountRepo.updateAccountBalance(item.accountId, account.balance + adjustment);
     }
 

@@ -125,6 +125,29 @@ const STRING_DEFS = {
   'modal.moneyIn': { en: 'Money In', beanie: 'money in' },
   'modal.moneyOut': { en: 'Money Out', beanie: 'money out' },
   'modal.direction': { en: 'Direction', beanie: 'direction' },
+  // Transfers (move money between accounts; a credit-card payment is a transfer)
+  'transfer.type': { en: 'Transfer', beanie: 'transfer' },
+  'transfer.from': { en: 'From', beanie: 'from' },
+  'transfer.to': { en: 'To', beanie: 'to' },
+  'transfer.selectDestination': {
+    en: 'Select destination account...',
+    beanie: 'select destination account...',
+  },
+  'transfer.liabilityHint': {
+    en: 'Paying this reduces what you owe on it.',
+    beanie: 'paying this reduces what you owe on it.',
+  },
+  'transfer.youSend': { en: 'You send', beanie: 'you send' },
+  'transfer.theyReceive': { en: 'They receive', beanie: 'they receive' },
+  'transfer.convertedNote': {
+    en: "Converted at today's exchange rate.",
+    beanie: "converted at today's exchange rate.",
+  },
+  'transfer.noRate': {
+    en: 'No exchange rate for {from} → {to}. Add one in Settings → Currencies.',
+    beanie: 'no exchange rate for {from} → {to}. add one in settings → currencies.',
+  },
+  'transfer.filter': { en: 'Transfers', beanie: 'transfers' },
   'modal.includeInNetWorth': { en: 'Include in Net Worth', beanie: 'include in net worth' },
   'modal.includeInNetWorthDesc': {
     en: 'Count this towards your family net worth',

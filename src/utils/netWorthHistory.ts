@@ -163,19 +163,24 @@ export function deriveAccountInitialBalances(
   transactions: ReadonlyArray<Transaction>
 ): Map<string, number> {
   const netSignedChange = new Map<string, number>();
-  for (const account of accounts) netSignedChange.set(account.id, 0);
+  const accountById = new Map<string, Account>();
+  for (const account of accounts) {
+    netSignedChange.set(account.id, 0);
+    accountById.set(account.id, account);
+  }
 
   for (const tx of transactions) {
     // Source side
     if (netSignedChange.has(tx.accountId)) {
-      const effect = accountBalanceDeltaFromTx(tx, tx.accountId);
+      const effect = accountBalanceDeltaFromTx(tx, tx.accountId, accountById);
       if (effect !== 0) {
         netSignedChange.set(tx.accountId, netSignedChange.get(tx.accountId)! + effect);
       }
     }
-    // Destination side (transfers)
+    // Destination side (transfers) — the liability-aware, currency-converted
+    // per-account effect lives in accountBalanceDeltaFromTx.
     if (tx.toAccountId && netSignedChange.has(tx.toAccountId)) {
-      const effect = accountBalanceDeltaFromTx(tx, tx.toAccountId);
+      const effect = accountBalanceDeltaFromTx(tx, tx.toAccountId, accountById);
       if (effect !== 0) {
         netSignedChange.set(tx.toAccountId, netSignedChange.get(tx.toAccountId)! + effect);
       }
@@ -221,12 +226,13 @@ export function transactionToChange(
       return delta === 0 ? null : { date: getStartOfDay(new Date(tx.date)), delta };
     }
     case 'transfer':
-      // Net-zero across the two accounts when both are the same liability
-      // class (asset↔asset or liability↔liability). For mixed-class
-      // transfers (e.g. checking → credit-card payoff), the underlying
-      // account-update logic in calculateBalanceAdjustment is itself
-      // arguably wrong — that's tracked separately. The chart treats all
-      // transfers as net-zero here for now.
+      // A transfer is net-worth-neutral by construction: it moves value between
+      // two of the user's own accounts. Even a mixed-class transfer nets to zero
+      // — e.g. a credit-card payoff lowers cash (−X) AND lowers debt (owed −X,
+      // which is +X to net worth). The per-account balance effects (including the
+      // liability sign and any cross-currency conversion) are handled in
+      // `deriveAccountInitialBalances` via `signedAccountDelta`; this net-worth
+      // series correctly contributes nothing for a transfer.
       return null;
     case 'balance_adjustment': {
       if (!tx.adjustment) {
