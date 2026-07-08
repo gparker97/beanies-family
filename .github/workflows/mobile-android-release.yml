@@ -61,6 +61,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Derive store marketing version
+        # Store versionName tracks APP_VERSION (src/constants/appVersion.ts),
+        # R-suffix stripped for a store-safe value (e.g. 0.9.4R1 → 0.9.4). The
+        # helper prints ONLY the bare version to stdout and exits non-zero on a
+        # malformed APP_VERSION; `set -euo pipefail` then fails the job rather
+        # than stamping an empty version. versionCode stays the monotonic run number.
+        run: |
+          set -euo pipefail
+          echo "STORE_VERSION=$(node scripts/derive-store-version.mjs)" >> "$GITHUB_ENV"
+
       - name: Build web app
         run: npm run build
         env:
@@ -105,9 +115,10 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          # Monotonic versionCode from the run number; versionName is informational.
+          # Monotonic versionCode from the run number; versionName tracks
+          # APP_VERSION (derived above, R-suffix stripped).
           ANDROID_VERSION_CODE: ${{ github.run_number }}
-          ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
+          ANDROID_VERSION_NAME: ${{ env.STORE_VERSION }}
         run: ./gradlew bundleRelease --no-daemon --stacktrace
 
       - name: Upload to Google Play (${{ inputs.track }})

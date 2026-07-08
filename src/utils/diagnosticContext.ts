@@ -41,12 +41,22 @@ import { useSyncStore } from '@/stores/syncStore';
  * adding a new context field requires explicit opt-in here AND the test
  * continues to pass.
  *
- * Email is the only PII allowed. Family name allowed as identification.
+ * Email and family name are the only PII allowed, and BOTH ship only on the
+ * low-volume Slack error path (gated by `includeEmail` in `enrichAndRedact` —
+ * `family_email` and `family_name` are added to the payload only when
+ * `includeEmail: true`). The high-volume telemetry firehose omits them and
+ * correlates by `family_id` (a random UUID) instead, so it stays PII-free.
  * Add new fields only after confirming they cannot carry user-typed content
  * (transaction descriptions, activity titles, member names, etc.).
  *
  * MIRROR: `infrastructure/lambda/telemetry/index.mjs` has a copy of this set,
  * pinned by a Lambda test. Update both together.
+ *
+ * APP-STORE DECLARATION: the fields transmitted here are declared to Apple &
+ * Google. If you add/remove a field (or change which path it ships on), update
+ * the data-collection table in `docs/runbooks/native-store-submission.md` and
+ * its consumers (ios/App/App/PrivacyInfo.xcprivacy, the store Data-Safety/App-
+ * Privacy answers, and web/src/pages/privacy.astro) so they can't drift.
  */
 export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'family_id',
@@ -291,11 +301,16 @@ export function enrichAndRedact(
     ...input.context,
   };
 
-  // Family identity (read once; tolerant of pre-auth state)
+  // Family identity (read once; tolerant of pre-auth state). `family_id` is a
+  // random UUID (generateUUID → crypto.randomUUID; familyContext.ts) — non-PII,
+  // so it ships on BOTH paths as the correlation key. `family_name` is user-typed
+  // (commonly a surname) → PII, so it ships ONLY with `includeEmail` (the
+  // low-volume Slack error path, which already carries the owner email), NEVER on
+  // the high-volume telemetry firehose. This is what keeps the firehose PII-free.
   try {
     const ctx = useFamilyContextStore();
     if (ctx.activeFamilyId) raw.family_id = ctx.activeFamilyId;
-    if (ctx.activeFamilyName) raw.family_name = ctx.activeFamilyName;
+    if (opts.includeEmail && ctx.activeFamilyName) raw.family_name = ctx.activeFamilyName;
   } catch {
     /* pre-auth, no Pinia, or store error — context is just less rich */
   }

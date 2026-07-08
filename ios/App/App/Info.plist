@@ -24,6 +24,12 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Export compliance: beanies uses only standard, exempt cryptography —
+	     AES-GCM / AES-KW via the Web Crypto API and HTTPS/TLS. No proprietary or
+	     custom crypto ships. `false` declares "no non-exempt encryption" so App
+	     Store Connect stops prompting for export compliance on every upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

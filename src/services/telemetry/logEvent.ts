@@ -44,7 +44,15 @@ export interface LogEventInput {
   flush?: boolean;
 }
 
-/** A finished, redacted, ship-ready record. System fields + allowlisted context. */
+/**
+ * A finished, redacted, ship-ready record. System fields + allowlisted context.
+ *
+ * APP-STORE DECLARATION: the fields shipped in this firehose are declared to
+ * Apple & Google as collected Diagnostics. If you change what leaves the device
+ * here (or in the `ALLOWED_CONTEXT_KEYS` allowlist), update the data-collection
+ * table in `docs/runbooks/native-store-submission.md` and its consumers
+ * (PrivacyInfo.xcprivacy, the store Data-Safety/App-Privacy answers, privacy.astro).
+ */
 export interface LogRecord {
   level: LogLevel;
   surface: string;

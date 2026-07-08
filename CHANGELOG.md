@@ -10,8 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-07-08
 
+### Added
+
+- **New "delete your data" page.** A public page at `/delete-account` explains exactly how to remove all of your beanies.family data — from inside the app, by clearing device storage, or by deleting the file from your own Google Drive.
+
 ### Changed
 
+- **Clearer, more honest privacy policy.** The policy now transparently describes the small amount of technical diagnostic and error information the app sends us to stay reliable (never your family content) — including that a critical-error report may include the account owner's email so we can reach you. The diagnostic stream itself carries no personal information.
+- **Groundwork for the iOS App Store and Google Play launch.** Behind-the-scenes preparation so beanies.family can ship as a real installable app on both stores — no change to how the web app works today.
 - **beanstalk blog masthead polish.** The blog header's "not written by AI" line is now "not written by AI (usually)", and the title/subtitle spacing was tightened into a cleaner, more even rhythm.
 
 ### Fixed
