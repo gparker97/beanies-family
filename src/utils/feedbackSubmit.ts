@@ -25,18 +25,25 @@ export interface FeedbackInput {
   answer?: string; // optional adaptive free-text
   contactName?: string; // optional, reply-only
   contactEmail?: string; // optional, reply-only
+  anonymous?: boolean; // when true, omit the family name + id (nothing identifying)
 }
 
-/** Best-effort family id for correlation (non-PII UUID). Never throws. */
-function readFamilyId(): string | null {
+/** Best-effort family identity for correlation. Never throws. */
+function readFamily(): { id: string | null; name: string | null } {
   try {
-    return useFamilyContextStore().activeFamilyId ?? null;
+    const ctx = useFamilyContextStore();
+    return { id: ctx.activeFamilyId ?? null, name: ctx.activeFamilyName ?? null };
   } catch {
-    return null;
+    return { id: null, name: null };
   }
 }
 
-/** Pure formatter → the Slack `text` body. No financial data; contact only if provided. */
+/**
+ * Pure formatter → the Slack `text` body. No financial data. By default the
+ * family name + id are attached so the team can follow up; when `anonymous` is
+ * set, nothing identifying (name or id) is included. Contact fields only appear
+ * if the user provided them.
+ */
 export function buildFeedbackText(input: FeedbackInput): string {
   const band = npsBand(input.score);
   const answer = input.answer?.trim();
@@ -44,17 +51,20 @@ export function buildFeedbackText(input: FeedbackInput): string {
   const email = input.contactEmail?.trim();
   const platform =
     typeof navigator !== 'undefined' && navigator.userAgent ? navigator.userAgent : 'unknown';
-  const familyId = readFamilyId();
+  const family = input.anonymous ? { id: null, name: null } : readFamily();
 
   const lines = [
     `📣 *New beanies.family feedback*`,
     `*NPS:* ${input.score}/10 (${band})`,
     `*Comment:* ${answer || '—'}`,
   ];
+  lines.push(`*From:* ${input.anonymous ? '(anonymous)' : (family.name ?? '(unknown family)')}`);
   if (name || email) {
     lines.push(`*Reply to:* ${[name, email].filter(Boolean).join(' · ')}`);
   }
-  lines.push(`_${getFullVersionLabel()} · ${platform}${familyId ? ` · family ${familyId}` : ''}_`);
+  lines.push(
+    `_${getFullVersionLabel()} · ${platform}${family.id ? ` · family ${family.id}` : ''}_`
+  );
   return lines.join('\n');
 }
 

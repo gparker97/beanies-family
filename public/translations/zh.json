@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-07-09",
-    "translationCount": 3697
+    "translationCount": 3699
   },
   "translations": {
     "app.name": {
@@ -15432,9 +15432,9 @@
       "lastUpdated": "2026-06-07"
     },
     "nav.community": {
-      "translation": "Discord Beanies",
-      "hash": "eneodv",
-      "lastUpdated": "2026-06-14"
+      "translation": "Beanies Discord",
+      "hash": "g7rkst",
+      "lastUpdated": "2026-07-09"
     },
     "discord.openFailedTitle": {
       "translation": "无法打开Discord",
@@ -18453,7 +18453,7 @@
     },
     "feedback.thanks.defaultTitle": {
       "translation": "谢谢，我们听到了",
-      "hash": "tpw73w",
+      "hash": "nlytn9",
       "lastUpdated": "2026-07-09"
     },
     "feedback.thanks.defaultBody": {
@@ -18462,8 +18462,8 @@
       "lastUpdated": "2026-07-09"
     },
     "feedback.thanks.promoterTitle": {
-      "translation": "你让我们度过了美好的一天",
-      "hash": "grymde",
+      "translation": "谢谢，您让我们度过了美好的一天！",
+      "hash": "ckkrdn",
       "lastUpdated": "2026-07-09"
     },
     "feedback.thanks.promoterBody": {
@@ -18489,6 +18489,16 @@
     "feedback.settings.toggleHint": {
       "translation": "偶尔，询问您推荐beanies.family的可能性。您可以随时关闭此功能。",
       "hash": "q6sjam",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.anonymousLabel": {
+      "translation": "匿名发送",
+      "hash": "c470e6",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.anonymousHint": {
+      "translation": "如果选中此选项，我们将不会在提交内容中包含您的姓氏。但您也无法收到我们的回复（嗯……我）。",
+      "hash": "hs3ddq",
       "lastUpdated": "2026-07-09"
     }
   }
