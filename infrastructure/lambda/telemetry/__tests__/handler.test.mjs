@@ -226,6 +226,7 @@ describe('Telemetry Lambda handler', () => {
         'route_name',
         'route_path',
         'save_failure_level',
+        'severity',
         'silent_refresh_attempts',
         'silent_refresh_consecutive_failures',
         'silent_refresh_had_refresh_token',
