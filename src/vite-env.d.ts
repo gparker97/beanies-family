@@ -11,6 +11,7 @@ interface ImportMetaEnv {
   readonly VITE_INVITE_WEBHOOK_URL: string | undefined;
   readonly VITE_SLACK_WEBHOOK_URL: string | undefined;
   readonly VITE_BEANIES_ERROR_WEBHOOK_URL: string | undefined;
+  readonly VITE_FEEDBACK_WEBHOOK_URL: string | undefined;
   readonly VITE_MARKETING_URL: string | undefined;
   readonly VITE_PLAUSIBLE_DOMAIN: string | undefined;
   readonly VITE_MYMEMORY_EMAIL: string | undefined;

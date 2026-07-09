@@ -20,6 +20,7 @@ import { usePollWhileVisible } from '@/composables/usePollWhileVisible';
 import { useBeanTips } from '@/composables/useBeanTips';
 import { useCommunityNudge } from '@/composables/useCommunityNudge';
 import { useInstallNudge } from '@/composables/useInstallNudge';
+import { useFeedbackModal } from '@/composables/useFeedbackModal';
 import { useToday } from '@/composables/useToday';
 import { isDocLoaded } from '@/services/automerge/docService';
 import { getAllReleaseNotes } from '@/content/release-notes';
@@ -43,6 +44,7 @@ export function useNotifications(): void {
   const beanTips = useBeanTips();
   const communityNudge = useCommunityNudge();
   const installNudge = useInstallNudge();
+  const feedbackModal = useFeedbackModal();
   const { today } = useToday();
 
   // Shared session-ready gate — both the migration/auto-open watcher (#4) and
@@ -133,6 +135,12 @@ export function useNotifications(): void {
       // predicate App.vue uses for podless routing (no duplicated route logic).
       if (!isPodlessExpectedRoute(router.currentRoute.value)) {
         store.openToLatestAutoOpen();
+        // #45: lowest-priority auto-interruption — runs AFTER openToLatestAutoOpen so
+        // the what's-new drawer claims the session's single slot first. Self-gated on
+        // cadence + the shared claim; never throws (reports + swallows internally).
+        // Deliberately NOT on the day-roll watcher below (no podless guard → would pop
+        // mid-session); req is "on app load", satisfied by this session-ready seam.
+        feedbackModal.maybeAutoPromptFeedback(settingsStore);
       }
     },
     { immediate: true }

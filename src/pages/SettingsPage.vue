@@ -789,11 +789,21 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         <!-- Daily Tips — one bell entry per day; mute keeps existing tips
              readable, just stops new ones (see TipBody/useBeanTips). -->
         <SettingToggleRow
+          divider
           testid="daily-tips-toggle"
           :title="t('settings.dailyTips')"
           :hint="t('settings.dailyTipsDescription')"
           :model-value="beanTips.tipsEnabled.value"
           @update:model-value="(v) => (v ? beanTips.enableTips() : beanTips.muteAllTips())"
+        />
+        <!-- #45: periodic feedback prompt. ON = prompt enabled (maps to feedbackOptOut = !v).
+             The store toasts + reverts on failure, so the handler can swallow. -->
+        <SettingToggleRow
+          testid="feedback-prompt-toggle"
+          :title="t('feedback.settings.toggleLabel')"
+          :hint="t('feedback.settings.toggleHint')"
+          :model-value="!settingsStore.feedbackOptOut"
+          @update:model-value="(v) => settingsStore.setFeedbackOptOut(!v).catch(() => {})"
         />
       </div>
     </div>
