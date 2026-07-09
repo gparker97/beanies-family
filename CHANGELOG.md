@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
-- **Share feedback from inside the app.** A new "Share feedback" entry (sidebar + menu) opens a quick ~10-second form: rate how likely you'd recommend beanies.family (0–10), add an optional comment, and optionally leave contact details if you'd like a reply. Every so often the same short prompt appears on its own — answer it or just close it, and you can switch the occasional prompt off any time in Settings. No financial data is ever included.
+- **Share feedback from inside the app.** A new "Share feedback" entry (sidebar + menu) opens a quick ~10-second form: rate how likely you'd recommend beanies.family (0–10), and the form then invites an optional comment and, if you'd like a reply, your contact details. You can also tick "send anonymously" to leave your family name off. Every so often the same short prompt appears on its own — answer it or just close it, and you can switch the occasional prompt off any time in Settings. No financial data is ever included.
 - **Lightweight, privacy-respecting usage signals.** The family registry now records a last-login date and an approximate data size (the size of your already-encrypted data file, rounded to the nearest KB) so we can gauge overall app usage and growth. Both are metadata only — never the contents of your data — and no automatic deletion window was added.
 
 ### Changed
