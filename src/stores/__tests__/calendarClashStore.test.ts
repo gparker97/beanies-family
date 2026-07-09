@@ -48,6 +48,7 @@ function timedOcc(
 
 function makeClient(listEventTimes: CalendarClient['listEventTimes']): CalendarClient {
   return {
+    invalidateConnection() {},
     async insertEvent() {},
     async patchEvent() {},
     async deleteEvent() {},
