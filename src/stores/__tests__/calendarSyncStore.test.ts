@@ -21,10 +21,18 @@ import type { CreateFamilyActivityInput } from '@/types/models';
 // hitting the real Slack webhook. Other tests in this file don't assert on it.
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
+// `reconnect()` drives a real OAuth consent flow; stub the seam so the store's
+// post-consent bookkeeping (which is what we're testing) can run headless.
+vi.mock('@/services/calendar/calendarAuth', () => ({
+  connectGoogleCalendar: vi.fn(),
+  isCalendarConnectSupported: vi.fn(() => true),
+}));
+
 function makeFakeClient() {
   const calls = { insert: [] as string[], patch: [] as string[], delete: [] as string[] };
   const existing = new Set<string>();
   const client: CalendarClient = {
+    invalidateConnection() {},
     async insertEvent(_c, _cal, eventId) {
       calls.insert.push(eventId);
       existing.add(eventId);
@@ -53,9 +61,9 @@ function todayYmd(): string {
   return toISODateString(new Date()).slice(0, 10);
 }
 
-function activityInput(): CreateFamilyActivityInput {
+function activityInput(title = 'Soccer practice'): CreateFamilyActivityInput {
   return {
-    title: 'Soccer practice',
+    title,
     date: todayYmd(),
     recurrence: 'none',
     category: 'sports',
@@ -116,6 +124,88 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
     expect((await getCalendarConnectionById(connection.id))?.status).toBe('ok');
   });
 
+  // Regression guard for the 2026-07-09 storm fix. The Google token provider
+  // latches an `invalid_grant` so a dead grant stops hammering the OAuth proxy.
+  // That latch survives the session and ONLY `invalidateConnection` clears it —
+  // so if `reconnect()` forgets the call, a user who re-consents sees calendar
+  // sync stay dead until they reload the page. Strictly worse than the storm.
+  it('reconnect() invalidates the connection so the permanent-failure latch clears', async () => {
+    const { connectGoogleCalendar } = await import('@/services/calendar/calendarAuth');
+    const { client } = makeFakeClient();
+    const invalidateSpy = vi.spyOn(client, 'invalidateConnection');
+    setCalendarClientForTesting(client);
+
+    const connection = await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'primary',
+      refreshToken: 'dead-refresh-token',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.owned'],
+      status: 'needs_reconnect',
+    });
+
+    vi.mocked(connectGoogleCalendar).mockResolvedValue({
+      status: 'connected',
+      email: 'mum@example.com',
+      refreshToken: 'fresh-refresh-token',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.owned'],
+    } as never);
+
+    await useCalendarSyncStore().reconnect(connection.id);
+
+    expect(invalidateSpy).toHaveBeenCalledWith(connection.id);
+    expect((await getCalendarConnectionById(connection.id))?.status).toBe('ok');
+  });
+
+  // Before the abort, every queued op independently re-asked Google about the
+  // same dead token — hundreds of `POST /oauth/google/refresh` 400s per load.
+  it('aborts the reconcile run on the first auth failure instead of running every task', async () => {
+    const attempted: string[] = [];
+    const deadToken: CalendarClient = {
+      invalidateConnection() {},
+      async insertEvent(_c: string, _cal: string, eventId: string) {
+        attempted.push(eventId);
+        throw new CalendarApiError('auth', 'token refresh failed: invalid_grant');
+      },
+      async patchEvent() {},
+      async deleteEvent() {},
+      async eventExists() {
+        return false;
+      },
+      async listCalendars() {
+        return [];
+      },
+      async listEventTimes() {
+        return [];
+      },
+    };
+    setCalendarClientForTesting(deadToken);
+
+    await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'primary',
+      refreshToken: 'dead-refresh-token',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.owned'],
+      status: 'ok',
+    });
+
+    // 20 activities vs MAX_INFLIGHT=5. The pool's first 5 workers all dispatch
+    // before any error lands — that's fine, the provider's `dead` latch makes
+    // them fail locally with no network call. What must NOT happen is the
+    // remaining 15 being dispatched once the auth failure is known.
+    const TASKS = 20;
+    for (let i = 0; i < TASKS; i++) {
+      await createActivity(activityInput(`Activity ${i}`));
+    }
+
+    await useCalendarSyncStore().syncNow();
+
+    expect(attempted.length).toBeLessThan(TASKS);
+    // Bounded by the pool width: one in-flight batch, then abort.
+    expect(attempted.length).toBeLessThanOrEqual(5);
+  });
+
   it('pages Slack for a reconcile error only when sustained (critical on the 3rd, not before/after)', async () => {
     const { reportError } = await import('@/utils/errorReporter');
     const mockReport = vi.mocked(reportError);
@@ -123,6 +213,7 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
 
     // insertEvent always 403s → every reconcile ends in a non-auth error.
     const failing: CalendarClient = {
+      invalidateConnection() {},
       async insertEvent() {
         throw new CalendarApiError('forbidden', 'Google Calendar HTTP 403', 403);
       },
@@ -180,6 +271,7 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
     mockReport.mockClear();
 
     const deadToken: CalendarClient = {
+      invalidateConnection() {},
       async insertEvent() {
         throw new CalendarApiError(
           'auth',
@@ -256,6 +348,7 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
     // never complete, so the switch must abort with the destination + links intact.
     const existing = new Set<string>();
     const client: CalendarClient = {
+      invalidateConnection() {},
       async insertEvent(_c, _cal, eventId) {
         existing.add(eventId);
       },
@@ -302,6 +395,7 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
 
   it('normalizes a "primary" destination to the concrete calendar id for the picker', async () => {
     const client: CalendarClient = {
+      invalidateConnection() {},
       async insertEvent() {},
       async patchEvent() {},
       async deleteEvent() {},
