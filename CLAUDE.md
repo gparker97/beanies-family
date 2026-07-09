@@ -37,7 +37,7 @@ beanies.family is the focal point of your family. It is a local-first, PWA-enabl
 ## Brand Identity
 
 - **App name:** `beanies.family` — always lowercase with `.family`. Never "Beanies", "beanies", or "GP Family Planner".
-- **Tagline:** _Every bean counts_ (sentence case, no period)
+- **Tagline:** _every bean counts_ — canonical form and all casing/punctuation rules live in `.claude/skills/beanies-theme/SKILL.md` § Identity. **Do not restate them here.** In code, always render `t('app.tagline')`; never hardcode the string.
 - **Primary font:** Outfit (headings, values) + Inter (body, data)
 - **Primary color:** Heritage Orange `#F15D22` (energy, actions, CTAs, routine alerts — never use Alert Red for warnings, budget overruns, or notifications. Red is reserved for destructive confirmations like delete/leave and hard form-validation errors only.)
 - **Foundation color:** Deep Slate `#2C3E50` (anchor, trust, sidebar, headings, body text)
@@ -248,7 +248,7 @@ npm run lint
 | Correct             | Incorrect                                                              |
 | ------------------- | ---------------------------------------------------------------------- |
 | `beanies.family`    | Beanies, beanies, Beanies Family, GP Family Planner, GP Family Finance |
-| _Every bean counts_ | Every Bean Counts, every bean counts.                                  |
+| _every bean counts_ | Every Bean Counts, Every bean counts, every bean counts.               |
 | `.beanpod`          | `.json` (for family data files)                                        |
 | Family Data File    | Sync File                                                              |
 | Family Data Options | File Sync (in Settings)                                                |

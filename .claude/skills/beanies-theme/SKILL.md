@@ -7,7 +7,7 @@ Use this skill whenever writing UI copy, designing components, choosing colors, 
 ## Identity
 
 - **App name:** `beanies.family` (always lowercase, always with the `.family` TLD — never "Beanies", "beanies", or "Beanies Family")
-- **Tagline:** *every bean counts* (lower case, no period)
+- **Tagline:** *every bean counts* — **lower case, no period. This is the canonical form and this file is its single source of truth.** In code, never hardcode it: render `t('app.tagline')` (`uiStrings.ts`). The one exception is running prose and legal text, where it may be capitalised and punctuated as an ordinary sentence would demand (`TRADEMARK.md`, meta descriptions, marketing sentences). A standalone tagline lockup is never capitalised and never takes a period.
 - **Origin story:** A parent lovingly called their child "beanie." That nickname became the heart of a product built to help families grow together — financially and emotionally.
 - **Core promise:** "We don't just count beans; we grow them."
 - **Brand intersection:** The brand exists where the serious responsibility of financial planning meets the gentle, joyful chaos of family life. Warmth, clarity, and playful confidence.
@@ -189,7 +189,7 @@ Because the six-level scale and all Tailwind spacing/sizing utilities are rem-ba
 ## Logo & Mascot Rules
 
 - **Wordmark:** "beanies.family" in Outfit 700 — "beanies" in white/Deep Slate, ".family" in Heritage Orange
-- **Tagline lockup:** "every bean counts." in italic below the wordmark (0.5rem, 25% opacity, tracking 0.06em)
+- **Tagline lockup:** "every bean counts" in italic below the wordmark (0.5rem, 25% opacity, tracking 0.06em). No period — see Identity above. Outfit ships no italic cut, so the oblique is synthesised (browser `italic`, or a shear when rendering to a raster asset).
 - **Symbol:** A parent bean in Deep Slate blue wearing a Heritage Orange beanie hat, holding hands with a smaller child bean in Heritage Orange wearing a Sky Silk hat. An upward-trending Heritage Orange arrow rises behind them.
 - **The Golden Rule:** The beanies hold hands to show they are together as a family. **Never separate them. Never rotate the arrow.**
 - **Clear space:** 2× hat height on all sides
@@ -709,7 +709,7 @@ Security is foundational but should feel safe, never scary. Security UI communic
 | Correct | Incorrect |
 |---------|-----------|
 | beanies.family | Beanies, beanies, Beanies Family, GP Family Planner, GP Family Finance |
-| Every bean counts | Every Bean Counts, every bean counts. |
+| every bean counts | Every Bean Counts, Every bean counts, every bean counts. |
 | Family Data File | Sync File |
 | Family Data Options | File Sync |
 | My Family's Data | Sync File (configured state) |
