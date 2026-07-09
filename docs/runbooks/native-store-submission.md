@@ -63,9 +63,14 @@ false**, no ATT prompt, Google "data used to track users" = none.
 > explicit retention window. `privacy.astro` keeps the "only for as long as we need it to investigate
 > issues" phrasing (no fixed number). On the Google Data Safety form, answer retention accordingly (no
 > guaranteed deletion timeline) and keep the user-initiated deletion path (email → we delete on
-> request; see `/delete-account`). Minor open confirm (non-blocking): whether the AWS ingest logs the
-> client IP server-side — if it does, declare it (Diagnostics / "Approximate location") when
-> finalizing the Data Safety form.
+> request; see `/delete-account`). **AWS ingest client-IP question — RESOLVED 2026-07-09: no IP is
+> logged or retained.** Evidence: `infrastructure/lambda/telemetry/index.mjs` reads only
+> `event.requestContext.http.method` (never `.sourceIp` / `x-forwarded-for`); no
+> `access_log_settings` block exists on the API Gateway in any `.tf`; and `aws logs
+describe-log-groups` returns only the four `/aws/lambda/beanies-family-*-prod` groups — there is no
+> API-Gateway access-log group at all. So **do NOT declare "Approximate location"** on either store
+> form. (Residual, non-declarable: AWS's own edge infrastructure sees the IP transiently, as any
+> HTTPS endpoint does; we neither configure nor retain it.)
 
 ---
 
