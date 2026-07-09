@@ -332,6 +332,138 @@ describe('googleAuth (PKCE)', () => {
     });
   });
 
+  // Regression suite for the 2026-07-09 telemetry blindness. `hadRefreshToken`
+  // alone cannot distinguish "user never connected Drive" from "Google revoked
+  // the grant a moment ago", because the permanent branch clears the stored
+  // token — so every later refresh this session also reports false. The
+  // `reason` discriminator (surfaced as `error_code`) is what tells them apart,
+  // and it MUST reset whenever the session identity changes.
+  // See docs/plans/2026-07-09-drive-refresh-token-telemetry-and-calendar-storm.md
+  describe('silent-refresh `reason` discriminator', () => {
+    /** Load a stored refresh token and bind a family. */
+    async function bindFamilyWithToken(familyId = 'family-123'): Promise<void> {
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: Date.now() - 604_800_000, // 7 days old
+      });
+      await googleAuth.initializeAuth(familyId);
+    }
+
+    /** Make the OAuth proxy reject the refresh as permanently revoked. */
+    async function makeRefreshRevoked(): Promise<void> {
+      const { refreshAccessToken } = await import('../oauthProxy');
+      (refreshAccessToken as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('Token refresh failed: invalid_grant — Token has been expired or revoked.')
+      );
+    }
+
+    beforeEach(() => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+    });
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('reports `no-token-stored` when nothing was ever stored', async () => {
+      await googleAuth.attemptSilentRefresh();
+
+      expect(googleAuth.getLastSilentRefreshDiagnostics()).toMatchObject({
+        reason: 'no-token-stored',
+        hadRefreshToken: false,
+      });
+    });
+
+    it('reports `revoked` with the token age on an invalid_grant rejection', async () => {
+      await bindFamilyWithToken();
+      await makeRefreshRevoked();
+
+      await googleAuth.attemptSilentRefresh();
+
+      const diag = googleAuth.getLastSilentRefreshDiagnostics();
+      expect(diag).toMatchObject({ reason: 'revoked', hadRefreshToken: true });
+      // The age at revocation is what discriminates an expiry clock from
+      // Google's per-client refresh-token cap evicting oldest-first.
+      expect(diag?.refreshTokenAgeMs).toBeGreaterThanOrEqual(604_800_000);
+    });
+
+    // THE bug: after a revocation clears the token, the next refresh takes the
+    // `!currentRefreshToken` early return. Before this fix it reported
+    // `hadRefreshToken: false` and was suppressed as by-design.
+    it('keeps reporting `revoked` on later attempts once the token is cleared', async () => {
+      await bindFamilyWithToken();
+      await makeRefreshRevoked();
+
+      await googleAuth.attemptSilentRefresh(); // clears the stored token
+      await googleAuth.attemptSilentRefresh(); // early-returns, no token
+
+      expect(googleAuth.getLastSilentRefreshDiagnostics()).toMatchObject({
+        reason: 'revoked',
+        hadRefreshToken: false, // indistinguishable from never-connected without `reason`
+      });
+    });
+
+    it('resets to `no-token-stored` after session teardown', async () => {
+      await bindFamilyWithToken();
+      await makeRefreshRevoked();
+      await googleAuth.attemptSilentRefresh();
+
+      await googleAuth.clearGoogleSessionState();
+      await googleAuth.attemptSilentRefresh();
+
+      // A leaked flag here would page Slack for the next user's by-design state.
+      expect(googleAuth.getLastSilentRefreshDiagnostics()).toMatchObject({
+        reason: 'no-token-stored',
+      });
+    });
+
+    it('resets to `no-token-stored` when a different family is bound', async () => {
+      await bindFamilyWithToken('family-A');
+      await makeRefreshRevoked();
+      await googleAuth.attemptSilentRefresh();
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+      await googleAuth.initializeAuth('family-B');
+      await googleAuth.attemptSilentRefresh();
+
+      expect(googleAuth.getLastSilentRefreshDiagnostics()).toMatchObject({
+        reason: 'no-token-stored',
+      });
+    });
+
+    it('clears the revoked latch after a successful refresh', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'test@example.com' }),
+      });
+      await bindFamilyWithToken();
+      await makeRefreshRevoked();
+      await googleAuth.attemptSilentRefresh();
+
+      // Reconnect: a fresh token is acquired and the next refresh succeeds.
+      const { refreshAccessToken } = await import('../oauthProxy');
+      (refreshAccessToken as ReturnType<typeof vi.fn>).mockResolvedValue({
+        access_token: 'mock-refreshed-token',
+        expires_in: 3600,
+      });
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'fresh-refresh-token',
+        issuedAt: Date.now(),
+      });
+      await googleAuth.initializeAuth('family-123');
+      expect(await googleAuth.attemptSilentRefresh()).toBe('mock-refreshed-token');
+
+      // Now drop the token entirely — this is a by-design state again.
+      await googleAuth.clearGoogleSessionState();
+      await googleAuth.attemptSilentRefresh();
+      expect(googleAuth.getLastSilentRefreshDiagnostics()).toMatchObject({
+        reason: 'no-token-stored',
+      });
+    });
+  });
+
   describe('attemptSilentRefresh', () => {
     it('returns null when no client ID is configured', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', '');

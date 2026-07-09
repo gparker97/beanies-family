@@ -1817,15 +1817,26 @@ export const useSyncStore = defineStore('sync', () => {
       // 2026-05-14 to disambiguate iOS PWA wake-race vs Lambda cold start vs
       // token revocation vs other transient causes. Builder is shared with
       // the `offline-queue-flush` surface (2026-05-20) — DRY single source.
+      // Carries `refresh_token_age_ms` on the revocation path: a consistent
+      // ~7d age implies an expiry clock, scattered ages imply Google's
+      // per-client refresh-token cap evicting oldest-first.
       const ctx = buildSilentRefreshAlertContext();
 
-      // hadRefreshToken=false → no refresh was even attempted (none stored).
-      // This is the "user must reconnect" terminal state, not a transient
-      // failure — the banner is the designed UX response and there is no
-      // bug to investigate. Log to console for local diagnostics but don't
-      // pollute #beanies-errors with by-design events. Real silent-refresh
-      // failures (hadRefreshToken=true with attempts) still alert.
-      if (ctx.silent_refresh_had_refresh_token === false) {
+      // Suppress ONLY the genuinely by-design case: a user who has never
+      // connected Drive has no token to refresh, the banner is the designed
+      // UX response, and there is nothing to investigate.
+      //
+      // Do NOT key this on `hadRefreshToken === false`. That flag cannot tell
+      // the by-design case apart from a revocation: `performSilentRefresh`'s
+      // permanent branch CLEARS the stored token, so every refresh after the
+      // first one this session takes the `!currentRefreshToken` early return
+      // and also reports `hadRefreshToken: false`. Keying on it suppressed a
+      // week of real `invalid_grant` revocations (2026-07-09) — the cold-start
+      // surface stayed silent while only `offline-queue-flush` paged, biasing
+      // the sample and misdirecting two sessions of investigation.
+      //
+      // `error_code` carries the disambiguated reason (see SilentRefreshReason).
+      if (ctx.error_code === 'silent-refresh:no-token-stored') {
         console.warn(
           '[syncStore] cold-start reconnect: no stored refresh token, banner shown ' +
             '(no auto-recovery possible; user must reconnect). ' +

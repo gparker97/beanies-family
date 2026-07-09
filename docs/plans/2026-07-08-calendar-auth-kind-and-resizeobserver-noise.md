@@ -10,6 +10,16 @@
 
 As a beanies.family user with Google Calendar connected, I want the app to prompt me to reconnect when my Google authorization actually expires (instead of silently retrying forever and never syncing again) so that my activities keep reaching my calendar; and as the operator, I want `#beanies-errors` to page only on genuine, actionable problems so the channel stays trustworthy.
 
+> ## ⚠️ Correction (2026-07-09) — the root-cause claim below is WRONG
+>
+> The Context section states the token errors were "most likely" caused by refresh tokens minted while the OAuth app was in "Testing" publishing status (7-day expiry). **That is false.** Verified in the Google Cloud console on 2026-07-09: the app is `In production`, branding is verified, data access is verified, and the sensitive `calendar.events.owned` scope is approved — and was throughout the period in question. Re-consent shows no unverified-app warning.
+>
+> What is actually established: Google rejects the refresh token with `400 invalid_grant — "Token has been expired or revoked"` while the grant **remains listed** in the user's linked apps. The client's own behaviour is correct (it clears the dead token and stops retrying). **The root cause remains unknown.** A Google account password change is ruled out. The leading remaining candidate is Google's ~100-refresh-tokens-per-user-per-client cap silently evicting oldest-first.
+>
+> This note is left in place rather than rewritten: the incorrect conclusion, stated as settled fact, became the starting hypothesis of the 2026-07-09 investigation and cost hours. See `docs/lessons.md` → "Get the cheapest discriminating observation before proposing a mechanism", and `docs/plans/2026-07-09-drive-refresh-token-telemetry-and-calendar-storm.md`.
+>
+> The two _fixes_ this plan shipped (calendar `auth`-kind clobbering; ResizeObserver noise) are unaffected and remain correct.
+
 ## Context
 
 An `/error-review` triage of the 2026-07-07 `#beanies-errors` batch found three distinct signals. Investigation confirmed **none is a regression from the ADR-032 worker migration or the Layer-2 delta-sync work** — the OAuth proxy, calendar token refresh, and Drive token code are byte-identical across every build in the batch (`d60a5c81` → `8c3cdf5d`) and unchanged since 2026-06-10. The token errors are all from Greg's own accounts (`gparker97@gmail.com` + two dev/test families), and the common signal — "Token has been expired or revoked" / `silent_refresh_had_refresh_token: false` — means the Google grant itself is dead. Most likely cause: refresh tokens minted while the OAuth app was still in "Testing" publishing status expire after 7 days; OAuth verification was approved 2026-07-03, so pre-verification grants started dying ~2026-07-07, coinciding with (but not caused by) the worker rollout.

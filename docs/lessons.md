@@ -4,6 +4,19 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## Get the cheapest discriminating observation before proposing a mechanism
+
+**Date:** 2026-07-09
+**Context:** Investigating the Google Drive reconnect loop, five successive root causes were asserted with high confidence and each was refuted by one cheap observation: (1) "the worker migration wiped the token" — refuted by reading which IndexedDB databases the migration actually touches; (2) "an account-email mismatch wiped it" — refuted by one `grep` of the user's console log for `[accountAssertion]`, and built on a misread of `family_email` (the family owner's profile email) as `member.googleAccountEmail`, two unrelated fields; (3) "Testing-mode 7-day refresh-token expiry" — refuted by one glance at the OAuth publishing status; (4) "unapproved sensitive scope" — refuted by a tooltip on the same console page; (5) "unregistered `drive.file` scope" — refuted by re-consenting and observing no unverified-app warning. The previous session's `/error-review` made the same mistake, committing "dead Google grants (testing-mode 7-day token expiry)" to `STATUS.md` as settled fact; that note then became this session's starting hypothesis and cost hours.
+
+Each refutation was available _before_ the hypothesis was voiced, and cost seconds to obtain.
+
+**Rule:** For a production incident, before proposing _any_ mechanism, enumerate the candidate causes and identify the single cheapest observation that distinguishes them — then go get that observation. Prefer a `grep` of the user's log, a DevTools key lookup, or a console screenshot over a code-reading argument, however elegant the argument. State hypotheses as hypotheses, each with its discriminating test attached, never as conclusions. Write findings into `STATUS.md` with the evidence that supports them, so a future reader can tell a measurement from a guess.
+
+**Corollary — treat telemetry suppression as a suspect, not a given.** When a code path silently swallows a signal "because it's by design", verify the suppression can actually tell the by-design case apart from the incident it would hide. Here it could not: the revocation path _clears_ the refresh token, so the "no token stored" branch swallowed both a never-connected user and a live revocation, and the resulting biased sample is what made the bug invisible for a week and misdirected two investigations.
+
+---
+
 ## Stop a background dev server with TaskStop + its task_id — never a broad `pkill`
 
 **Date:** 2026-07-08
