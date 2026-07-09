@@ -17,6 +17,40 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.09',
+    date: '2026-07-09',
+    month: '9 july 2026',
+    summary: {
+      en: 'You can now tell me what you think right inside the app - a quick score and a few words, in about ten seconds.',
+      beanie:
+        'you can now tell me what you think right inside the app - a quick score and a few words, in about ten seconds.',
+    },
+    features: [
+      {
+        icon: '📣',
+        title: { en: 'Share your feedback', beanie: 'share your feedback' },
+        description: {
+          en: "Open the menu and tap Share feedback: rate how likely you'd recommend beanies.family and add a few words, in about ten seconds. Stay anonymous or leave your details if you'd like a reply, and you can switch off the occasional prompt any time in Settings.",
+          beanie:
+            "open the menu and tap share feedback: rate how likely you'd recommend beanies.family and add a few words, in about ten seconds. stay anonymous or leave your details if you'd like a reply, and you can switch off the occasional prompt any time in settings.",
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.07.08',
     date: '2026-07-08',
     month: '8 july 2026',
