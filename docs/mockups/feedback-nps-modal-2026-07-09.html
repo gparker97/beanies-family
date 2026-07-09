@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>beanies.family — In-app feedback &amp; NPS modal (#45)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --slate: #2C3E50;
+    --slate-dark: #1a252f;
+    --orange: #F15D22;
+    --orange-hover: #D14D1A;
+    --terracotta: #E67E22;
+    --silk: #AED6F1;
+    --cloud: #F8F9FA;
+    --success: #27AE60;
+    --tint-orange-8: rgba(241, 93, 34, 0.08);
+    --tint-orange-15: rgba(241, 93, 34, 0.15);
+    --tint-silk-20: rgba(174, 214, 241, 0.2);
+    --tint-slate-5: rgba(44, 62, 80, 0.05);
+    --tint-slate-10: rgba(44, 62, 80, 0.1);
+    --tint-success-10: rgba(39, 174, 96, 0.1);
+    --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+    --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+    --modal-shadow: 0 24px 60px rgba(44, 62, 80, 0.22);
+    --sq: 24px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(174, 214, 241, 0.25), transparent 60%),
+      radial-gradient(1000px 500px at 0% 110%, rgba(241, 93, 34, 0.06), transparent 55%),
+      var(--cloud);
+    color: var(--slate);
+    min-height: 100vh;
+    padding: 3rem 1.25rem 5rem;
+    line-height: 1.5;
+  }
+
+  .page {
+    max-width: 78rem;
+    margin: 0 auto;
+  }
+
+  /* ---- Page chrome / doc header ---- */
+  .doc-header { text-align: center; margin-bottom: 2.75rem; }
+  .doc-eyebrow {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 0.5rem;
+  }
+  .doc-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 2.25rem;
+    font-weight: 800;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  .doc-title .fam { color: var(--orange); }
+  .doc-sub { font-size: 0.95rem; color: rgba(44,62,80,0.62); max-width: 40rem; margin: 0 auto; }
+
+  /* ---- Section labels ---- */
+  .section-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(44,62,80,0.42);
+    margin: 3rem 0 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .section-label::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--tint-slate-10);
+  }
+
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .approach-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--slate);
+    background: var(--tint-silk-20);
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    margin-bottom: 0.9rem;
+  }
+  .approach-note { font-size: 0.8rem; color: rgba(44,62,80,0.55); margin: 0 0 1rem; }
+
+  /* ---- Modal shell (BeanieFormModal) ---- */
+  .modal {
+    background: #fff;
+    border-radius: var(--sq);
+    box-shadow: var(--modal-shadow);
+    overflow: hidden;
+    max-width: 30rem;
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 1.15rem 1.5rem;
+    border-bottom: 1px solid var(--tint-slate-10);
+  }
+  .icon-box {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: var(--tint-orange-8);
+    display: grid;
+    place-items: center;
+    font-size: 1.35rem;
+    flex-shrink: 0;
+  }
+  .modal-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.2;
+  }
+  .modal-title small {
+    display: block;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: rgba(44,62,80,0.55);
+    margin-top: 0.1rem;
+  }
+  .modal-x {
+    margin-left: auto;
+    width: 32px; height: 32px;
+    border-radius: 12px;
+    border: none;
+    background: var(--tint-slate-5);
+    color: rgba(44,62,80,0.55);
+    font-size: 1rem;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .modal-body {
+    background: var(--cloud);
+    padding: 1.35rem 1.5rem 1.5rem;
+  }
+
+  .field { margin-bottom: 1.35rem; }
+  .field:last-child { margin-bottom: 0; }
+  .field-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(44,62,80,0.45);
+    display: block;
+    margin-bottom: 0.6rem;
+  }
+  .field-label .opt {
+    color: rgba(44,62,80,0.35);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: none;
+  }
+
+  /* ---- NPS Direction A: chip row ---- */
+  .nps-question {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.85rem;
+    line-height: 1.35;
+  }
+  .chip-row {
+    display: grid;
+    grid-template-columns: repeat(11, 1fr);
+    gap: 0.3rem;
+  }
+  .chip {
+    aspect-ratio: 1;
+    border: 1.5px solid var(--tint-slate-10);
+    background: #fff;
+    border-radius: 12px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--slate);
+    cursor: pointer;
+    transition: transform 120ms, border-color 120ms, background 120ms, color 120ms;
+    display: grid;
+    place-items: center;
+  }
+  .chip:hover { transform: translateY(-2px); border-color: var(--silk); }
+  .chip.is-selected {
+    background: var(--orange);
+    border-color: var(--orange);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(241,93,34,0.35);
+  }
+  .scale-ends {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.55rem;
+    font-size: 0.72rem;
+    color: rgba(44,62,80,0.5);
+  }
+
+  /* ---- NPS Direction B: segmented gradient track ---- */
+  .track {
+    display: flex;
+    gap: 0;
+    border-radius: 12px;
+    /* CIG warmth ramp — a smooth, continuous gradient of Heritage Orange (#F15D22)
+       mixed down into white: pale peach at 0, gradually deepening to full Heritage Orange at 10.
+       Terracotta tones fall out naturally mid-scale. No Alert Red, no blue. */
+    background: linear-gradient(90deg,
+      rgb(253,236,229) 0%,
+      rgb(248,179,151) 45%,
+      rgb(244,131,84) 78%,
+      rgb(241,93,34) 100%);
+  }
+  .seg {
+    flex: 1;
+    border: none;
+    padding: 0.8rem 0;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--slate);
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition: transform 120ms, box-shadow 120ms;
+  }
+  .seg:first-child { border-radius: 12px 0 0 12px; }
+  .seg:last-child { border-radius: 0 12px 12px 0; }
+  /* white numerals only where the ramp is deep enough (scores 8–10) */
+  .seg:nth-child(9), .seg:nth-child(10), .seg:nth-child(11) { color: #fff; }
+  .seg:hover { transform: translateY(-2px); z-index: 2; }
+  .seg.is-selected {
+    transform: translateY(-3px);
+    z-index: 3;
+    font-weight: 700;
+    border-radius: 10px;
+    /* Sky Silk focus ring (CIG) + soft lift */
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--silk), 0 8px 18px rgba(44,62,80,0.22);
+  }
+  .track-hint {
+    display: flex; justify-content: space-between;
+    margin-top: 0.55rem; font-size: 0.72rem; color: rgba(44,62,80,0.5);
+  }
+
+  /* ---- Adaptive free-text ---- */
+  .adaptive-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--slate);
+    margin: 0 0 0.5rem;
+    min-height: 1.2rem;
+    transition: opacity 150ms;
+  }
+  .adaptive-label .band-pill {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.5rem;
+    border-radius: 20px;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+    background: var(--tint-orange-15);
+    color: var(--orange);
+  }
+  textarea {
+    width: 100%;
+    border: 1.5px solid var(--tint-slate-10);
+    border-radius: 12px;
+    padding: 0.7rem 0.85rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    color: var(--slate);
+    resize: vertical;
+    min-height: 4.5rem;
+    background: #fff;
+  }
+  textarea:focus, input[type=text]:focus, input[type=email]:focus {
+    outline: none;
+    border-color: var(--silk);
+    box-shadow: 0 0 0 3px rgba(174,214,241,0.5);
+  }
+
+  /* ---- Contact section ---- */
+  .contact-toggle {
+    display: flex; align-items: center; gap: 0.6rem;
+    cursor: pointer; user-select: none;
+    font-size: 0.85rem; color: var(--slate);
+  }
+  .contact-toggle .chev { transition: transform 200ms; color: rgba(44,62,80,0.4); }
+  .contact-toggle.open .chev { transform: rotate(180deg); }
+  .contact-body {
+    margin-top: 0.85rem;
+    display: grid; gap: 0.65rem;
+  }
+  .contact-body.hidden { display: none; }
+  .contact-help {
+    font-size: 0.78rem;
+    color: rgba(44,62,80,0.55);
+    margin: 0 0 0.2rem;
+  }
+  input[type=text], input[type=email] {
+    width: 100%;
+    border: 1.5px solid var(--tint-slate-10);
+    border-radius: 12px;
+    padding: 0.6rem 0.85rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    color: var(--slate);
+    background: #fff;
+  }
+
+  /* ---- Footer / save ---- */
+  .modal-footer {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1.1rem 1.5rem;
+    border-top: 1px solid var(--tint-slate-10);
+    background: #fff;
+  }
+  .btn-save {
+    flex: 1;
+    border: none;
+    border-radius: 16px;
+    padding: 0.85rem 1rem;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, var(--orange), var(--terracotta));
+    cursor: pointer;
+    transition: transform 120ms, opacity 120ms;
+  }
+  .btn-save:hover { transform: translateY(-1px); }
+  .btn-save:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .privacy-foot {
+    display: flex; align-items: center; gap: 0.4rem;
+    font-size: 0.72rem; color: rgba(44,62,80,0.5);
+    padding: 0 1.5rem 1.2rem; background: #fff;
+    margin-top: -0.2rem;
+  }
+
+  /* ---- Thank-you state ---- */
+  .thanks {
+    text-align: center;
+    padding: 2.4rem 1.75rem 2rem;
+    background: var(--cloud);
+  }
+  .thanks-emoji { font-size: 2.75rem; margin-bottom: 0.4rem; }
+  .thanks-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 0.4rem;
+  }
+  .thanks-body { font-size: 0.9rem; color: rgba(44,62,80,0.62); margin: 0 auto 1.5rem; max-width: 20rem; }
+  .discord-cta {
+    display: inline-flex; align-items: center; gap: 0.55rem;
+    font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.9rem;
+    color: #fff; text-decoration: none;
+    background: linear-gradient(135deg, var(--orange), var(--terracotta));
+    padding: 0.8rem 1.5rem; border-radius: 16px;
+    transition: transform 120ms;
+  }
+  .discord-cta:hover { transform: translateY(-1px); }
+  .thanks-dismiss {
+    display: block; margin: 1rem auto 0;
+    background: none; border: none; cursor: pointer;
+    font-family: 'Inter', sans-serif; font-size: 0.82rem; color: rgba(44,62,80,0.5);
+    text-decoration: underline; text-underline-offset: 2px;
+  }
+  .caveat { font-family: 'Caveat', cursive; font-weight: 700; color: var(--orange); font-size: 1.25rem; }
+
+  /* ---- Bell nudge notification card ---- */
+  .nudge-wrap { max-width: 24rem; }
+  .nudge {
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: var(--soft-shadow);
+    padding: 1.1rem 1.15rem;
+    display: flex;
+    gap: 0.85rem;
+    border-left: 4px solid var(--orange);
+  }
+  .nudge-icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--tint-orange-8);
+    display: grid; place-items: center; font-size: 1.2rem; flex-shrink: 0;
+  }
+  .nudge-title {
+    font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.95rem; margin: 0 0 0.2rem;
+  }
+  .nudge-body { font-size: 0.82rem; color: rgba(44,62,80,0.62); margin: 0 0 0.75rem; }
+  .nudge-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .nudge-primary {
+    border: none; border-radius: 12px; padding: 0.5rem 0.95rem;
+    font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.8rem; color: #fff;
+    background: var(--orange); cursor: pointer;
+  }
+  .nudge-ghost {
+    border: none; border-radius: 12px; padding: 0.5rem 0.85rem;
+    font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.8rem;
+    color: rgba(44,62,80,0.6); background: var(--tint-slate-5); cursor: pointer;
+  }
+  .nudge-time { font-size: 0.7rem; color: rgba(44,62,80,0.4); margin-top: 0.6rem; }
+
+  /* ---- Scheduled auto-modal representation ---- */
+  .stage {
+    position: relative;
+    background:
+      linear-gradient(160deg, rgba(44,62,80,0.55), rgba(44,62,80,0.72)),
+      repeating-linear-gradient(180deg, rgba(255,255,255,0.04) 0 22px, transparent 22px 44px);
+    border-radius: 24px;
+    padding: 2.5rem 1.5rem;
+    display: grid;
+    place-items: center;
+    box-shadow: var(--soft-shadow);
+    overflow: hidden;
+  }
+  .stage-hint {
+    position: absolute; top: 0.9rem; left: 1.1rem;
+    font-family: 'Outfit', sans-serif; font-size: 0.72rem; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.55);
+  }
+  .stage .modal { max-width: 26rem; width: 100%; }
+
+  .callout {
+    background: #fff; border-radius: 18px; box-shadow: var(--card-shadow);
+    padding: 1.1rem 1.25rem; font-size: 0.83rem; color: rgba(44,62,80,0.7);
+    max-width: 78rem; margin-top: 1rem; border-left: 4px solid var(--silk);
+  }
+  .callout b { color: var(--slate); font-family: 'Outfit', sans-serif; }
+  .callout code { background: var(--tint-slate-5); padding: 0.05rem 0.35rem; border-radius: 6px; font-size: 0.78rem; }
+  .callout ul { margin: 0.5rem 0 0; padding-left: 1.1rem; }
+  .callout li { margin-bottom: 0.25rem; }
+
+  @media (max-width: 640px) {
+    body { padding: 2rem 0.85rem 4rem; }
+    .doc-title { font-size: 1.75rem; }
+    .modal { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="doc-header">
+    <div class="doc-eyebrow">Mockup · Issue #45 · 2026-07-09</div>
+    <h1 class="doc-title">In-app feedback &amp; NPS · <span class="fam">beanies.family</span></h1>
+    <p class="doc-sub">A ~10-second sentiment check. One tap for the score on the warmth track, one optional adaptive prompt, optional contact. Try clicking the numbers to see the adaptive prompt change.</p>
+  </div>
+
+  <!-- ============ NPS SCALE DIRECTIONS ============ -->
+  <div class="section-label">The feedback form</div>
+  <div class="gallery">
+
+    <!-- Feedback form: warmth track (approved design) -->
+    <div>
+      <span class="approach-tag">Warmth track — approved design</span>
+      <p class="approach-note">An 11-step warmth ramp — every step is Heritage Orange mixed into white, so 0 is a pale peach building to full Heritage Orange at 10. Visible at rest. The picked step lifts with a Sky Silk ring. All derived from the CIG (no Alert Red, no blue).</p>
+      <div class="modal" data-modal="B">
+        <div class="modal-header">
+          <div class="icon-box">💬</div>
+          <h2 class="modal-title">Share your feedback<small>Every bean counts — takes about 10 seconds</small></h2>
+          <button class="modal-x" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="field">
+            <p class="nps-question">How likely are you to recommend beanies.family to a friend?</p>
+            <div class="track" data-nps="B">
+              <button class="seg" data-score="0" data-band="detractor">0</button>
+              <button class="seg" data-score="1" data-band="detractor">1</button>
+              <button class="seg" data-score="2" data-band="detractor">2</button>
+              <button class="seg" data-score="3" data-band="detractor">3</button>
+              <button class="seg" data-score="4" data-band="detractor">4</button>
+              <button class="seg" data-score="5" data-band="detractor">5</button>
+              <button class="seg" data-score="6" data-band="detractor">6</button>
+              <button class="seg" data-score="7" data-band="passive">7</button>
+              <button class="seg" data-score="8" data-band="passive">8</button>
+              <button class="seg" data-score="9" data-band="promoter">9</button>
+              <button class="seg" data-score="10" data-band="promoter">10</button>
+            </div>
+            <div class="track-hint"><span>Not likely</span><span>Very likely</span></div>
+          </div>
+
+          <div class="field">
+            <p class="adaptive-label" data-adaptive="B">Anything you'd like to add? <span class="opt" style="font-weight:500;color:rgba(44,62,80,.4)">(optional)</span></p>
+            <textarea data-text="B" placeholder="Pick a score above and this prompt will tailor itself…"></textarea>
+          </div>
+
+          <div class="field">
+            <div class="contact-toggle" data-contact-toggle="B">
+              <span class="chev">▾</span>
+              <span>Want a reply? Add your contact <span style="color:rgba(44,62,80,.45)">(optional)</span></span>
+            </div>
+            <div class="contact-body hidden" data-contact-body="B">
+              <p class="contact-help">Only used if you want us to get back to you. Never shared.</p>
+              <input type="text" placeholder="Your name (optional)" />
+              <input type="email" placeholder="Email (optional)" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-save" data-save="B" disabled>Send feedback</button>
+        </div>
+        <div class="privacy-foot">🔒 No financial data is ever included — just your score &amp; words.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ THANK YOU STATE ============ -->
+  <div class="section-label">After submit — thank-you state</div>
+  <div class="gallery">
+    <div>
+      <span class="approach-tag">Post-submit · promoter path</span>
+      <p class="approach-note">Same modal shell, swapped to a warm confirmation with a real reason to join Discord — participation, not a data dump.</p>
+      <div class="modal">
+        <div class="modal-header">
+          <div class="icon-box">🌱</div>
+          <h2 class="modal-title">Thanks for sharing<small>Your feedback landed with the team</small></h2>
+          <button class="modal-x" aria-label="Close">✕</button>
+        </div>
+        <div class="thanks">
+          <div class="thanks-emoji">🫘💛</div>
+          <p class="thanks-title">You made our day</p>
+          <p class="thanks-body">Every bit of what you told us helps the beanies grow. Want to help shape what comes next?</p>
+          <a class="discord-cta" href="#">💬 Join us on Discord</a>
+          <button class="thanks-dismiss">No thanks, maybe later</button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <span class="approach-tag">Post-submit · detractor path</span>
+      <p class="approach-note">If they scored low, the tone stays warm and constructive (never apologetic-grovel), still invites the conversation.</p>
+      <div class="modal">
+        <div class="modal-header">
+          <div class="icon-box">🌱</div>
+          <h2 class="modal-title">Thanks — we hear you<small>Your feedback landed with the team</small></h2>
+          <button class="modal-x" aria-label="Close">✕</button>
+        </div>
+        <div class="thanks">
+          <div class="thanks-emoji">🤝</div>
+          <p class="thanks-title">Thanks for the honesty</p>
+          <p class="thanks-body">This is exactly the stuff that makes beanies better. If you'd like to talk it through, the door's open.</p>
+          <a class="discord-cta" href="#">💬 Chat with us on Discord</a>
+          <button class="thanks-dismiss">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCHEDULED AUTO-MODAL ============ -->
+  <div class="section-label">The periodic prompt — modal appears on schedule</div>
+  <p class="approach-note" style="max-width:46rem;">No pre-question. On the defined cadence, at a natural pause (app load onto the Nook home), the feedback modal simply opens over the app. The user answers, or closes it — closing (X / Esc / backdrop) counts as "asked" and resets the 30-day clock, so we never re-interrupt soon.</p>
+  <div class="stage">
+    <span class="stage-hint">↓ appears over the app, on schedule</span>
+    <div class="modal">
+      <div class="modal-header">
+        <div class="icon-box">💬</div>
+        <h2 class="modal-title">How's beanies treating your family?<small>A quick 10-second check-in — answer or close</small></h2>
+        <button class="modal-x" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <p class="nps-question">How likely are you to recommend beanies.family to a friend?</p>
+          <div class="track" data-nps="C">
+            <button class="seg" data-score="0" data-band="detractor">0</button>
+            <button class="seg" data-score="1" data-band="detractor">1</button>
+            <button class="seg" data-score="2" data-band="detractor">2</button>
+            <button class="seg" data-score="3" data-band="detractor">3</button>
+            <button class="seg" data-score="4" data-band="detractor">4</button>
+            <button class="seg" data-score="5" data-band="detractor">5</button>
+            <button class="seg" data-score="6" data-band="detractor">6</button>
+            <button class="seg" data-score="7" data-band="passive">7</button>
+            <button class="seg" data-score="8" data-band="passive">8</button>
+            <button class="seg" data-score="9" data-band="promoter">9</button>
+            <button class="seg" data-score="10" data-band="promoter">10</button>
+          </div>
+          <div class="track-hint"><span>Not likely</span><span>Very likely</span></div>
+        </div>
+        <div class="field">
+          <p class="adaptive-label" data-adaptive="C">Anything you'd like to add? <span class="opt" style="font-weight:500;color:rgba(44,62,80,.4)">(optional)</span></p>
+          <textarea data-text="C" placeholder="Pick a score above and this prompt will tailor itself…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-save" data-save="C" disabled>Send feedback</button>
+      </div>
+      <div class="privacy-foot">🔒 No financial data is ever included — just your score &amp; words.</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <b>Behaviour notes (for the build)</b>
+    <ul>
+      <li><b>Adaptive prompt</b> — one optional free-text; its label keys to the score band: <code>0–6</code> "What's letting you down? What would make it better?" · <code>7–8</code> "What's one thing you wish beanies could do?" · <code>9–10</code> "What do you love most? (and anything you wish it did?)"</li>
+      <li><b>NPS-only</b> — no separate star rating; the 0–10 recommend score is the rating. Send button enables once a score is picked.</li>
+      <li><b>Cadence</b> — the modal auto-opens on a 30-day cycle at a natural pause (Nook home on app load, never mid-task); re-asked 30 days after a prompt whether or not they responded; engagement-gated + hard-capped + opt-out; per-family synced state so "don't ask again" carries across devices. Never on the first session / during onboarding.</li>
+      <li><b>Dismiss = asked</b> — closing via X / Esc / backdrop counts as prompted and resets the 30-day clock, so closing is a valid answer and we don't re-interrupt soon.</li>
+      <li><b>Entry points</b> — permanent "Share feedback" in the sidebar footer (near Help/Discord/Settings) + the scheduled auto-modal.</li>
+      <li><b>Privacy</b> — payload carries app version + platform only; never financial data. Contact fields are optional and clearly reply-only.</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+  var PROMPTS = {
+    detractor: "What's letting you down? What would make it better?",
+    passive:   "What's one thing you wish beanies could do?",
+    promoter:  "What do you love most? (and anything you wish it did?)"
+  };
+  var BAND_LABEL = { detractor: "we're listening", passive: "good to know", promoter: "love that" };
+  function bandFor(score) {
+    if (score <= 6) return "detractor";
+    if (score <= 8) return "passive";
+    return "promoter";
+  }
+  function wire(key) {
+    var container = document.querySelector('[data-nps="' + key + '"]');
+    if (!container) return;
+    var buttons = container.querySelectorAll('[data-score]');
+    var adaptive = document.querySelector('[data-adaptive="' + key + '"]');
+    var save = document.querySelector('[data-save="' + key + '"]');
+    buttons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        buttons.forEach(function (b) { b.classList.remove('is-selected'); });
+        btn.classList.add('is-selected');
+        var score = parseInt(btn.getAttribute('data-score'), 10);
+        var band = bandFor(score);
+        adaptive.innerHTML = PROMPTS[band] +
+          ' <span class="opt" style="font-weight:500;color:rgba(44,62,80,.4)">(optional)</span>' +
+          '<span class="band-pill">' + BAND_LABEL[band] + '</span>';
+        if (save) save.disabled = false;
+      });
+    });
+  }
+  wire('A');
+  wire('B');
+  wire('C');
+
+  document.querySelectorAll('[data-contact-toggle]').forEach(function (t) {
+    t.addEventListener('click', function () {
+      var key = t.getAttribute('data-contact-toggle');
+      var body = document.querySelector('[data-contact-body="' + key + '"]');
+      t.classList.toggle('open');
+      body.classList.toggle('hidden');
+    });
+  });
+</script>
+</body>
+</html>
