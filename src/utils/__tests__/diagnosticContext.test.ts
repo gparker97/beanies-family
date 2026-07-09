@@ -96,6 +96,15 @@ describe('diagnosticContext', () => {
       );
     });
 
+    // `errorReporter.handleReport` injects `severity` so the firehose can answer
+    // "which events actually paged Slack?" (LogLevel has no 'critical'). It was
+    // never allowlisted, so it was stripped from every report ever sent and the
+    // stated intent was silently defeated. Regression guard.
+    it('preserves severity so the firehose stays filterable', () => {
+      expect(redactContext({ severity: 'critical' })).toEqual({ severity: 'critical' });
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
     it('preserves email as the only PII', () => {
       const result = redactContext({
         family_email: 'greg@example.com',

@@ -45,6 +45,9 @@ const SYSTEM_FIELDS = new Set(['level', 'surface', 'message', 'timestamp', 'stac
 // test — adding a context key on the client requires mirroring it here or the
 // test fails. Anything not listed here (or in SYSTEM_FIELDS) is dropped.
 export const ALLOWED_CONTEXT_KEYS = new Set([
+  // Real report severity ('warning' | 'error' | 'critical') — `level` cannot
+  // carry 'critical'. Lets the firehose answer "which events paged Slack?".
+  'severity',
   'family_id',
   'family_name',
   'route_path',

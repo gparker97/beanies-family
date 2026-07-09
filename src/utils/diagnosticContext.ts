@@ -81,6 +81,15 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'context_build_error',
   'vue_info',
   'component',
+  // The report's real severity ('warning' | 'error' | 'critical'), injected by
+  // `errorReporter.handleReport` so the firehose stays filterable ("which events
+  // actually paged Slack?" = severity === 'critical'). `LogLevel` has no
+  // 'critical', so it cannot ride on `level`.
+  //
+  // This was NOT allowlisted until 2026-07-10 — the key was stripped (with a
+  // console warn) from every report ever sent, silently defeating the stated
+  // intent. Fixed-enum, developer-authored, no user-typed content.
+  'severity',
   // Silent-refresh diagnostic capture (added 2026-05-14 for the
   // cold-start-reconnect-escalation surface — see `googleAuth.performSilentRefresh`).
   // These ship as JSON-serialized arrays/primitives, no user-typed content:
