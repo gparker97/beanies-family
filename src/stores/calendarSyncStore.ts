@@ -338,8 +338,15 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       const plan = planReconcile(activities, links, todayYmd(), memberName);
 
       const errors: CalendarApiError[] = [];
+      // An `auth` error means the connection's refresh token is permanently
+      // rejected: every remaining task in this run would fail identically. Stop
+      // dispatching them. (The token provider also latches the failure, so the
+      // already-dispatched ones fail locally without touching the network.)
+      let authAborted = false;
       const record = (e: unknown) => {
-        errors.push(e instanceof CalendarApiError ? e : new CalendarApiError('unknown', String(e)));
+        const err = e instanceof CalendarApiError ? e : new CalendarApiError('unknown', String(e));
+        if (err.kind === 'auth') authAborted = true;
+        errors.push(err);
       };
       // Whether any actual Google write happened — gates the connection status write
       // so a no-op reconcile doesn't churn the CRDT (and re-trigger itself). (F1)
@@ -366,7 +373,13 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         }),
       ];
 
-      await runPooled(tasks, MAX_INFLIGHT);
+      await runPooled(tasks, MAX_INFLIGHT, () => authAborted);
+      if (authAborted) {
+        console.warn(
+          `[calendarSync] aborted reconcile for ${connection.id} — refresh token rejected; ` +
+            `${errors.length} of ${tasks.length} task(s) attempted before stopping.`
+        );
+      }
       outcome = await settleConnectionStatus(connection, errors, changed);
 
       // Dev-only diagnostic — surfaces what each connection actually did so a
@@ -532,6 +545,11 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       lastError: undefined,
     });
     invalidGrantCounters.delete(connectionId);
+    // Clear the token provider's cached access token AND its latched
+    // permanent-failure state. Without this the provider keeps fast-failing
+    // every request with the pre-reconnect `invalid_grant`, so a user who
+    // re-consents sees calendar sync stay dead until they reload the page.
+    getCalendarClient().invalidateConnection(connectionId);
     void reconcileConnection(connectionId, { verifyExisting: true, force: true });
     return result;
   }

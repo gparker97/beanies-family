@@ -74,6 +74,17 @@ export interface TokenProvider {
  * missing remote event idempotently rather than throwing.
  */
 export interface CalendarClient {
+  /**
+   * Drop every cached token decision for a connection: the access token, any
+   * in-flight refresh, and — critically — the latched permanent-failure state.
+   *
+   * MUST be called after a successful reconnect. The Google provider latches an
+   * `invalid_grant` so a dead grant stops hammering the OAuth proxy; that latch
+   * survives for the session and only this clears it. Skip the call and calendar
+   * sync stays dead until a page reload, even after the user re-consents.
+   */
+  invalidateConnection(connectionId: string): void;
+
   /** Insert with a caller-supplied event id. Throws `conflict` if the id already exists. */
   insertEvent(
     connectionId: string,

@@ -8,6 +8,7 @@ import {
   updateCalendarConnection,
 } from '@/services/automerge/repositories/calendarRepository';
 import { refreshCalendarToken } from './calendarAuth';
+import { isPermanentRefreshFailure } from '@/services/google/refreshFailure';
 import { delay, withTimeout } from '@/utils/timing';
 import { parseLocalDate } from '@/utils/date';
 import {
@@ -37,10 +38,6 @@ function classifyStatus(status: number): CalendarErrorKind {
   if (status === 429) return 'rate_limited';
   if (status >= 500) return 'transient';
   return 'unknown';
-}
-
-function isPermanentRefreshFailure(message: string): boolean {
-  return message.includes('invalid_grant') || message.includes('expired or revoked');
 }
 
 /** Kinds worth retrying within the backoff budget; every other kind is terminal
@@ -93,16 +90,32 @@ interface CachedToken {
  * Google returns one (no silent discard — #32 Layer 2). A permanent refresh
  * failure (`invalid_grant`) surfaces as `CalendarApiError('auth')`; the reconcile
  * engine handles it WITHOUT clearing the shared token.
+ *
+ * Three per-connection maps guard the OAuth proxy, all keyed on `connectionId`,
+ * all cleared together by `invalidate()`, and all discarded wholesale when
+ * `resetCalendarClient()` drops this closure:
+ *
+ *  - `cache`    — a live access token (the happy path).
+ *  - `inflight` — one shared refresh promise, so N concurrent callers make ONE
+ *                 network call instead of N.
+ *  - `dead`     — a latched permanent failure, so once Google says the refresh
+ *                 token is revoked we stop asking. Transient failures are never
+ *                 latched; they must stay retryable.
+ *
+ * Without `inflight` + `dead`, a single dead grant produced HUNDREDS of
+ * `POST /oauth/google/refresh` 400s per page load — every queued calendar op
+ * (`eventExists`, `insertEvent`, `deleteEvent`) independently re-asked Google
+ * about the same dead token (observed in prod, 2026-07-09). `googleAuth` has
+ * had the equivalent protection (`pendingSilentRefresh` + permanent
+ * short-circuit) all along; this brings the calendar client up to parity.
  */
 export function createGoogleTokenProvider(): TokenProvider {
   const cache = new Map<string, CachedToken>();
+  const inflight = new Map<string, Promise<string>>();
+  const dead = new Map<string, CalendarApiError>();
 
-  async function getAccessToken(connectionId: string): Promise<string> {
-    const cached = cache.get(connectionId);
-    if (cached && cached.expiresAt - TOKEN_EXPIRY_SKEW_MS > Date.now()) {
-      return cached.token;
-    }
-
+  /** Mint a fresh access token. One caller at a time per connection. */
+  async function mintAccessToken(connectionId: string): Promise<string> {
     const connection = await getCalendarConnectionById(connectionId);
     if (!connection) {
       throw new CalendarApiError('unknown', `calendar connection ${connectionId} not found`);
@@ -113,10 +126,16 @@ export function createGoogleTokenProvider(): TokenProvider {
       tokens = await refreshCalendarToken(connection.refreshToken);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      throw new CalendarApiError(
-        isPermanentRefreshFailure(msg) ? 'auth' : 'transient',
+      const permanent = isPermanentRefreshFailure(msg);
+      const classified = new CalendarApiError(
+        permanent ? 'auth' : 'transient',
         `token refresh failed: ${msg}`
       );
+      // Latch ONLY permanent failures. A transient (network, 5xx, timeout) must
+      // remain retryable on the next poll, or a brief outage would look like a
+      // revocation and strand the connection until reconnect.
+      if (permanent) dead.set(connectionId, classified);
+      throw classified;
     }
 
     cache.set(connectionId, {
@@ -132,9 +151,49 @@ export function createGoogleTokenProvider(): TokenProvider {
     return tokens.access_token;
   }
 
+  async function getAccessToken(connectionId: string): Promise<string> {
+    const cached = cache.get(connectionId);
+    if (cached && cached.expiresAt - TOKEN_EXPIRY_SKEW_MS > Date.now()) {
+      return cached.token;
+    }
+
+    // Fast-fail a known-dead grant without touching the network. Never silent:
+    // the original classified error is re-thrown (so the reconcile engine still
+    // routes `auth` → `needs_reconnect`) and the short-circuit is logged.
+    const latched = dead.get(connectionId);
+    if (latched) {
+      console.warn(
+        `[googleCalendarClient] skipping token refresh for ${connectionId} — ` +
+          `refresh token permanently rejected this session (${latched.message}). ` +
+          `Reconnect the calendar connection to clear this.`
+      );
+      throw latched;
+    }
+
+    // Coalesce concurrent callers onto one refresh.
+    const pending = inflight.get(connectionId);
+    if (pending) return pending;
+
+    const promise = mintAccessToken(connectionId).finally(() => {
+      inflight.delete(connectionId);
+    });
+    inflight.set(connectionId, promise);
+    return promise;
+  }
+
   return {
     getAccessToken,
-    invalidate: (connectionId: string) => cache.delete(connectionId),
+    /**
+     * Drop every cached decision for a connection. Called on a 401 (stale access
+     * token) and — critically — after a successful reconnect, which is the ONLY
+     * thing that can clear the `dead` latch. Forgetting that call would brick
+     * calendar sync for the rest of the session.
+     */
+    invalidate: (connectionId: string) => {
+      cache.delete(connectionId);
+      inflight.delete(connectionId);
+      dead.delete(connectionId);
+    },
   };
 }
 
@@ -240,6 +299,10 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
   const authedFetch = createAuthedFetch(tokenProvider);
 
   return {
+    invalidateConnection(connectionId) {
+      tokenProvider.invalidate(connectionId);
+    },
+
     async insertEvent(connectionId, calendarId, eventId, resource) {
       await authedFetch(connectionId, `/calendars/${enc(calendarId)}/events`, {
         method: 'POST',

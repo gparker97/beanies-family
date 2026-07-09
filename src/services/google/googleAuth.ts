@@ -12,6 +12,7 @@
 
 import { generateCodeVerifier, generateCodeChallenge } from './pkce';
 import { exchangeCodeForTokens, refreshAccessToken } from './oauthProxy';
+import { isPermanentRefreshFailure } from './refreshFailure';
 import { encodeRedirectState, type RedirectMode } from './redirectState';
 import {
   storeGoogleRefreshToken,
@@ -980,7 +981,8 @@ export function getLastSilentRefreshDiagnostics(): SilentRefreshDiagnostics | nu
  *  (often invalid_grant or 5xx); 'permanent' → refresh token revoked. */
 function classifySilentRefreshError(e: unknown): SilentRefreshAttemptDiagnostic['classification'] {
   const msg = e instanceof Error ? e.message : String(e);
-  if (msg.includes('invalid_grant') || msg.includes('Token has been expired or revoked')) {
+  // Shared with the calendar token provider — one rule, one home.
+  if (isPermanentRefreshFailure(msg)) {
     return 'permanent';
   }
   if (msg.includes('timed out after') || msg.includes('AbortError')) return 'timeout';
