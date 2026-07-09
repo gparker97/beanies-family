@@ -154,6 +154,11 @@ jobs:
           # the rule in tasks/lessons.md — it sits in the client bundle anyway
           # and being a variable makes it auditable + rotatable from the UI.
           VITE_BEANIES_ERROR_WEBHOOK_URL: ${{ vars.BEANIES_ERROR_WEBHOOK_URL }}
+          # #45: in-app feedback / NPS → private #beanies-feedback channel. A repo
+          # VARIABLE (not a secret) — it ships in the client bundle anyway (VITE_),
+          # and a variable stays auditable + rotatable from the UI (same rule as the
+          # error webhook above). Empty → the feature is inert (submit warns to console).
+          VITE_FEEDBACK_WEBHOOK_URL: ${{ vars.FEEDBACK_WEBHOOK_URL }}
           # Diagnostic-logging firehose (ADR-027). Ingest URL is a repository
           # VARIABLE (Terraform `telemetry_ingest_url` output) — non-sensitive,
           # sits in the client bundle anyway. The soft x-api-key is a SECRET

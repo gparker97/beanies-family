@@ -17,6 +17,7 @@ import OnboardingComplete from './OnboardingComplete.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { claimInterruption } from '@/composables/useSessionInterruption';
 import { reportError } from '@/utils/errorReporter';
 import { ErrorSurfaces } from './errorSurfaces';
 
@@ -72,7 +73,13 @@ onMounted(() => {
     settingsStore.setOnboardingCompleted(true);
     visible.value = false;
     mounted.value = false;
+    return;
   }
+  // #45: the wizard is a full-takeover and only mounts when actually shown
+  // (FamilyNookPage `v-if="!onboardingCompleted"`), so claim the session's single
+  // interruption slot here. This is what stops the feedback survey / what's-new
+  // from immediately following when onboarding completes mid-session.
+  claimInterruption('onboarding');
 });
 
 function goNext() {

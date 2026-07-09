@@ -10,6 +10,7 @@ import { useMemberAvatar } from '@/composables/useMemberAvatar';
 import { useNavBadges, type NavBadge as NavBadgeType } from '@/composables/useNavBadges';
 import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useTranslation } from '@/composables/useTranslation';
+import { useFeedbackModal } from '@/composables/useFeedbackModal';
 import { getProductVersionLabel } from '@/utils/diagnosticContext';
 import { isRouteActive } from '@/utils/route';
 import { openExternal } from '@/utils/openExternal';
@@ -29,6 +30,7 @@ import { useSyncStore } from '@/stores/syncStore';
 const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
+const { openFeedback } = useFeedbackModal();
 /** Friendly product version (e.g. "v0.9"); bumped per release in constants/appVersion.ts. */
 const productVersionLabel = getProductVersionLabel();
 const familyStore = useFamilyStore();
@@ -254,6 +256,16 @@ function subItemsOf(item: MappedNavItem): NavSubItemDef[] {
       >
         <span class="w-6 text-center text-base">{{ item.emoji }}</span>
         <span>{{ item.label }}</span>
+      </button>
+
+      <!-- #45: Share feedback — opens the feedback modal (not a route), so it lives
+           outside NAV_ITEMS but reuses the inactive pinned-item styling. -->
+      <button
+        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl border-l-4 border-transparent px-3.5 py-2 text-left text-lg font-medium text-white/40 transition-all duration-150 hover:bg-white/[0.05] hover:text-white/70"
+        @click="openFeedback('nav')"
+      >
+        <span class="w-6 text-center text-base" aria-hidden="true">💬</span>
+        <span>{{ t('feedback.shareEntry') }}</span>
       </button>
     </nav>
 

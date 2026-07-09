@@ -24,6 +24,8 @@ import TrustDeviceModal from '@/components/common/TrustDeviceModal.vue';
 import PasskeyPromptModal from '@/components/common/PasskeyPromptModal.vue';
 import NotificationsDrawer from '@/components/notifications/NotificationsDrawer.vue';
 import PwaReinstallModal from '@/components/common/PwaReinstallModal.vue';
+import FeedbackModal from '@/components/feedback/FeedbackModal.vue';
+import { claimInterruption } from '@/composables/useSessionInterruption';
 import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
@@ -1345,7 +1347,11 @@ watch(
         const hasPasskeys = await authStore.checkHasRegisteredPasskeys(familyId);
         if (!hasPasskeys) {
           const hasPlatform = await isPlatformAuthenticatorAvailable();
-          if (hasPlatform) {
+          // #45: claim the session's single interruption slot only at the true
+          // show-site (a no-show branch above never wastes it). If another surface
+          // won this load, defer — passkey re-fires on the next fresh sign-in and
+          // stays reachable in Settings, so nothing is lost.
+          if (hasPlatform && claimInterruption('auth-prompt')) {
             showPasskeyPrompt.value = true;
             return;
           }
@@ -1354,7 +1360,7 @@ watch(
     }
 
     // Fall back to trust device prompt
-    if (!settingsStore.trustedDevicePromptShown) {
+    if (!settingsStore.trustedDevicePromptShown && claimInterruption('auth-prompt')) {
       showTrustPrompt.value = true;
     }
   }
@@ -1737,6 +1743,7 @@ watch(
     />
     <NotificationsDrawer />
     <PwaReinstallModal />
+    <FeedbackModal />
 
     <div v-if="showLayout" class="flex h-screen overflow-hidden">
       <!-- Desktop sidebar -->

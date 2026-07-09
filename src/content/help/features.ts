@@ -1380,4 +1380,64 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'sharing-feedback',
+    category: 'features',
+    title: 'Sharing feedback with the beanies team',
+    excerpt:
+      'Tell us how beanies.family is treating your family — a quick score and a few words go straight to the people building it.',
+    icon: '\u{1F4AC}',
+    readTime: 2,
+    updatedDate: '2026-07-09',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          "beanies.family is built by a small team that genuinely wants to hear from you. The quickest way to reach us from inside the app is to share a little feedback — how likely you'd be to recommend beanies, and anything on your mind.",
+      },
+      {
+        type: 'heading',
+        content: 'Sharing feedback any time',
+        level: 2,
+        id: 'share',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open the menu and tap <strong>Share feedback</strong> (in the footer, near Help and Settings).',
+          'Tap a number from 0 to 10 for how likely you are to recommend beanies.family.',
+          'Add a few words if you like — the question tailors itself to your score, and it’s always optional.',
+          'Tap <strong>Send feedback</strong>. That’s it — usually about ten seconds.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'The occasional prompt',
+        level: 2,
+        id: 'prompt',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Every so often the same short prompt may pop up on its own when you open the app, so you don’t have to go looking for it. You can answer it, or just close it — closing counts as “asked,” so we won’t bring it up again for a while. You’ll never see it stacked on top of another pop-up.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Prefer not to be prompted? Turn it off any time in <strong>Settings → Occasional feedback prompt</strong>. The <strong>Share feedback</strong> menu entry stays available whenever you do want to reach us.',
+      },
+      {
+        type: 'heading',
+        content: 'What we can (and can’t) see',
+        level: 2,
+        id: 'privacy',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Your feedback never includes any of your financial data — just your score and whatever words you choose to write. Contact details are optional and only used if you asked us to reply; they’re never shared.',
+      },
+    ],
+  },
 ];

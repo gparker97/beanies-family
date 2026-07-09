@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-08",
-    "translationCount": 3673
+    "lastUpdated": "2026-07-09",
+    "translationCount": 3697
   },
   "translations": {
     "app.name": {
@@ -18370,6 +18370,126 @@
       "translation": "其他",
       "hash": "19k0z4",
       "lastUpdated": "2026-07-08"
+    },
+    "feedback.shareEntry": {
+      "translation": "分享反馈",
+      "hash": "g5xa7a",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.title": {
+      "translation": "分享您的反馈意见",
+      "hash": "c8dadr",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.send": {
+      "translation": "发送反馈",
+      "hash": "jae5gd",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.commentGeneric": {
+      "translation": "您想添加什么？ （选填）",
+      "hash": "o6hscj",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.commentDetractor": {
+      "translation": "是什么让你失望？有什么可以让它变得更好？ （可选）",
+      "hash": "4eyf9r",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.commentPassive": {
+      "translation": "您希望Beanies能做什么？ （可选）",
+      "hash": "itoekp",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.commentPromoter": {
+      "translation": "您最喜欢什么？ （以及您希望它做的任何事情？ ） （可选）",
+      "hash": "h12q3e",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.contactToggle": {
+      "translation": "想要回复吗？添加您的联系人（可选）",
+      "hash": "48sv83",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.contactHelp": {
+      "translation": "仅在您希望我们回复您时使用。从不分享。",
+      "hash": "qw3xg8",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.contactNamePlaceholder": {
+      "translation": "您的姓名（可选）",
+      "hash": "opkubb",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.contactEmailPlaceholder": {
+      "translation": "电邮地址（选填项）",
+      "hash": "5el16j",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.form.privacyNote": {
+      "translation": "不包括财务数据，只包括您的分数和单词。",
+      "hash": "5nln9j",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.nps.question": {
+      "translation": "您向朋友推荐beanies.family的可能性有多大？",
+      "hash": "f49rj2",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.nps.low": {
+      "translation": "不太可能。",
+      "hash": "aaw31t",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.nps.high": {
+      "translation": "经常发生",
+      "hash": "8o2lqq",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.nps.scoreAria": {
+      "translation": "得分{score}分（满分10分）",
+      "hash": "qdzvle",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.thanks.defaultTitle": {
+      "translation": "谢谢，我们听到了",
+      "hash": "tpw73w",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.thanks.defaultBody": {
+      "translation": "这正是让豆豆变得更好的东西。如果您想说清楚，门是开着的。",
+      "hash": "6l8yd4",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.thanks.promoterTitle": {
+      "translation": "你让我们度过了美好的一天",
+      "hash": "grymde",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.thanks.promoterBody": {
+      "translation": "您告诉我们的每一点都有助于豆豆生长。想帮助塑造接下来会发生什么吗？",
+      "hash": "ds4kj8",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.thanks.discordCta": {
+      "translation": "加入我们的 Discord",
+      "hash": "ddl4a1",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.thanks.dismiss": {
+      "translation": "先不了",
+      "hash": "c5nnyg",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.settings.toggleLabel": {
+      "translation": "偶尔反馈提示",
+      "hash": "pas28f",
+      "lastUpdated": "2026-07-09"
+    },
+    "feedback.settings.toggleHint": {
+      "translation": "偶尔，询问您推荐beanies.family的可能性。您可以随时关闭此功能。",
+      "hash": "q6sjam",
+      "lastUpdated": "2026-07-09"
     }
   }
 }

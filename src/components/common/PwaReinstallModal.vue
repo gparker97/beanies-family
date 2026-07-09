@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import { useStalePwaNotice } from '@/composables/useStalePwaNotice';
 import { useTranslation } from '@/composables/useTranslation';
 import { MARKETING_URL } from '@/utils/marketing';
 import { isIosOrIpadOs } from '@/services/sync/capabilities';
+import { claimInterruption } from '@/composables/useSessionInterruption';
 
 const { t } = useTranslation();
 const { shouldShow, dismiss, trackInstallClicked } = useStalePwaNotice();
@@ -19,9 +20,9 @@ const platform = computed<Platform>(() => {
   return 'desktop';
 });
 
-// Suppress modal during E2E runs (the same `e2e_auto_auth` guard the
-// notifications auto-open uses — see useNotifications)
-const openModal = computed(() => {
+// Pure eligibility: stale-pwa notice active AND not an E2E run (the same
+// `e2e_auto_auth` guard the notifications auto-open uses — see useNotifications).
+const eligible = computed(() => {
   if (!shouldShow.value) return false;
   try {
     if (sessionStorage.getItem('e2e_auto_auth')) return false;
@@ -30,6 +31,25 @@ const openModal = computed(() => {
   }
   return true;
 });
+
+// #45: one-shot show flag. A `claimInterruption` is a side effect, so it must NOT
+// live in a (pure) computed — drive a ref from a watcher that claims once at the
+// true show-site. Dismiss closes it; if another surface won this load, we defer.
+const showModal = ref(false);
+watch(
+  eligible,
+  (isEligible) => {
+    if (isEligible && !showModal.value && claimInterruption('pwa-reinstall')) {
+      showModal.value = true;
+    }
+  },
+  { immediate: true }
+);
+
+function handleDismiss(): void {
+  showModal.value = false;
+  dismiss();
+}
 
 const guideUrl = `${MARKETING_URL}/help/getting-started/install-as-app`;
 
@@ -67,12 +87,12 @@ const screenshot = computed<string | null>(() => {
 
 <template>
   <BaseModal
-    :open="openModal"
+    :open="showModal"
     size="lg"
     layer="top"
     fullscreen-mobile
     custom-header
-    @close="dismiss"
+    @close="handleDismiss"
   >
     <!-- Custom header: gradient strip + title -->
     <template #header>
@@ -91,7 +111,7 @@ const screenshot = computed<string | null>(() => {
           </div>
           <button
             class="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[rgba(44,62,80,0.05)] text-gray-400 transition-all hover:bg-[rgba(44,62,80,0.1)] dark:bg-white/5 dark:text-gray-500 dark:hover:bg-white/10"
-            @click="dismiss"
+            @click="handleDismiss"
           >
             ✕
           </button>
@@ -161,7 +181,7 @@ const screenshot = computed<string | null>(() => {
       <div class="flex flex-col items-center gap-3">
         <button
           class="from-primary-500 to-terracotta-400 font-outfit w-full rounded-2xl bg-gradient-to-br px-6 py-3.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(241,93,34,0.25)] transition-all hover:-translate-y-px hover:shadow-[0_6px_24px_rgba(241,93,34,0.35)]"
-          @click="dismiss"
+          @click="handleDismiss"
         >
           {{ t('pwaReinstall.dismiss') }}
         </button>

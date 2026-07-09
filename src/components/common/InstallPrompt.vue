@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { usePWA } from '@/composables/usePWA';
 import { useTranslation } from '@/composables/useTranslation';
+import { claimInterruption } from '@/composables/useSessionInterruption';
 
 const { canInstall, isInstalled, isDismissed, installApp, dismissInstallPrompt } = usePWA();
 const { t } = useTranslation();
@@ -12,7 +13,9 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 onMounted(() => {
   // Show after 30 seconds if installable and not dismissed
   timer = setTimeout(() => {
-    if (canInstall.value && !isInstalled.value && !isDismissed()) {
+    // #45: claim the session's single interruption slot last (only when actually
+    // showing) — never pop over a popup already shown at load.
+    if (canInstall.value && !isInstalled.value && !isDismissed() && claimInterruption('install')) {
       showPrompt.value = true;
     }
   }, 30_000);

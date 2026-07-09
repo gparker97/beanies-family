@@ -12,6 +12,7 @@
  */
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
+import { claimInterruption } from '@/composables/useSessionInterruption';
 import { useTodoStore } from '@/stores/todoStore';
 import { useListStore } from '@/stores/listStore';
 import { useActivityStore } from '@/stores/activityStore';
@@ -275,6 +276,10 @@ export const useNotificationsStore = defineStore('notifications', () => {
     if (autoOpenedThisSession) return;
     const latest = latestUnseenAutoOpen.value;
     if (!latest) return;
+    // #45: one auto-interruption per session — claim only once we know there IS
+    // something to show. If another surface won this load, yield: leave the item
+    // unread in the bell (no latch, no markRead) so nothing is lost.
+    if (!claimInterruption('notifications')) return;
     autoOpenedThisSession = true;
     openTo(latest.id);
   }

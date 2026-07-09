@@ -10,6 +10,7 @@ import type {
   AiTier,
   CurrencyCode,
   LanguageCode,
+  ISODateString,
 } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 
@@ -35,6 +36,7 @@ export function getDefaultSettings(): Settings {
     preferredCurrencies: [],
     customInstitutions: [],
     onboardingCompleted: true,
+    feedbackOptOut: false,
     createdAt: now,
     updatedAt: now,
   };
@@ -108,6 +110,15 @@ export async function setSyncEnabled(enabled: boolean): Promise<Settings> {
 
 export async function setCalendarClashNudgeEnabled(enabled: boolean): Promise<Settings> {
   return saveSettings({ calendarClashNudgeEnabled: enabled });
+}
+
+export async function setFeedbackOptOut(optOut: boolean): Promise<Settings> {
+  return saveSettings({ feedbackOptOut: optOut });
+}
+
+// #45: stamp the feedback cadence clock (date-only). Set when the prompt auto-opens or on submit.
+export async function setFeedbackPromptedAt(date: ISODateString): Promise<Settings> {
+  return saveSettings({ feedbackLastPromptedAt: date });
 }
 
 export async function setAutoSyncEnabled(enabled: boolean): Promise<Settings> {
