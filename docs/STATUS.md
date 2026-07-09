@@ -85,7 +85,31 @@
 >
 > _(Below this block is the pre-migration STATUS from main, unchanged.)_
 >
-> **Last updated:** 2026-07-09 (session 3) (**The parallel app-store session referenced in session 2's note. NO prod deploy. Dual-publish sunset (#44) investigated → **BLOCKED** (see NEXT SESSION item 2); two new bugs filed (#46, #47); Play Store submission advanced (feature graphic built + committed, Data-Safety AWS-IP question resolved); tagline drift reconciled to a single source of truth; promo-video harness started (WIP). Working tree clean on `main`, in sync with `origin/main`.**)
+> ## 🔬 Drive reconnect loop — INSTRUMENTED, root cause NOT yet known (2026-07-09 session 4, committed not pushed)
+>
+> **Symptom:** the orange "Google session expired" toast on almost every tab open / PWA resume, across all browsers, from ~2026-07-07 (coincident with, but **not caused by**, the `docWorker` prod-ON flip).
+>
+> **What is proven.** Google returns `400 invalid_grant — "Token has been expired or revoked"` for the refresh token, while the grant **remains listed** in the user's linked apps. The client's behaviour is correct: it clears the dead token and stops retrying. The empty `beanies-file-handles/handles` store is a _consequence_ of Google's rejection, not a cause. Ruled out by evidence, not argument: the ADR-032 worker migration (different IndexedDB database, untouched since 2026-05-22); `googleAccountAssertion` (never fired — no `[accountAssertion]` line in the console log); Testing-mode 7-day expiry (app is `In production`, branding + data access verified, sensitive calendar scope approved); an unregistered `drive.file` scope (re-consent showed no unverified-app warning); a Google password change (greg confirms none).
+>
+> **Root cause remains UNKNOWN.** Leading candidate: Google's ~100-refresh-tokens-per-user-per-client cap silently evicting oldest-first (the app mints a new token on every reconnect via `prompt=consent` and never revokes the one it displaces — do NOT "fix" that by weakening consent or adding revoke calls; see the plan's Caveats).
+>
+> **Why it hid for a week.** `scheduleColdStartReconnectEscalation` suppressed its Slack alert on `hadRefreshToken === false`, commented "there is no bug to investigate". But the permanent branch _clears_ the token, so every refresh after the first also reports `false` — the by-design case and a live revocation were indistinguishable. Only `offline-queue-flush` ever paged, biasing the sample. That is how the 2026-07-08 `/error-review` reached its confidently-wrong "testing-mode 7-day expiry" conclusion (now corrected in this file and in its plan).
+>
+> **Shipped (3 commits, `28cac2fb` → `c35f5206` → `b417343b`; full suite 3700 green, type-check + lint clean; NOT pushed, NOT deployed):**
+>
+> 1. **Telemetry un-blinded** — `SilentRefreshReason` (`no-token-stored` | `revoked` | `exhausted`) backed by a session-scoped latch that survives the token being cleared, surfaced as `error_code: silent-refresh:*` on the already-allowlisted key (no `ALLOWED_CONTEXT_KEYS` / Lambda-mirror / app-store-declaration change). Suppression now keys on the genuinely by-design case only. **`refresh_token_age_ms` finally reaches Slack on the revocation path.**
+> 2. **Calendar refresh storm fixed** — `createGoogleTokenProvider` cached only successes, so one dead grant produced _hundreds_ of `POST /oauth/google/refresh` 400s per page load (every queued `eventExists`/`insertEvent`/`deleteEvent` re-asked independently). Added per-connection in-flight dedupe + a permanent-failure latch, consolidated the duplicated `isPermanentRefreshFailure` predicate into `services/google/refreshFailure.ts`, and wired `invalidateConnection` into `calendarSyncStore.reconnect()` — **without that call the latch would brick calendar sync until a page reload.** `runPooled` gained an opt-in `shouldAbort`.
+> 3. **Boot-adjacent flushes gated on auth readiness** — `tryFlush('visible'|'startup')` now awaits `whenRedirectAuthSettled()`; `online`/`token-acquired` deliberately are not.
+>
+> **⭐ NEXT ACTION — this is a measurement, not a code task.** Push + deploy, then wait for the next revocation and read **`refresh_token_age_ms`** from `#beanies-errors`. It discriminates: a consistent **~7 days** ⇒ an expiry clock; **scattered ages** ⇒ cap eviction; **all tokens dying on one date** ⇒ a Google-side security event. greg re-consented 2026-07-09 after re-adding the `drive.file` + `userinfo.email` scopes that had vanished from the consent screen, so that token's lifetime is already a live experiment. Record the value here before proposing any further fix.
+>
+> **Also open (deliberately not done):** (a) `errorReporter.ts:259` injects `severity` into the telemetry context to keep the firehose "filterable", but `severity` is not allowlisted — it has been silently stripped from **every** report ever sent; fixing it means widening the allowlist (3-place coupled change incl. app-store privacy declarations) — greg's call. (b) **Drive and Calendar share one OAuth client**, so a consent-screen scope edit made for Calendar can take Drive persistence down for every user (this session produced direct evidence: `drive.file` had disappeared from the consent screen). Splitting them is a real design decision with migration cost — raise once the root cause is known.
+>
+> Plan: `docs/plans/2026-07-09-drive-refresh-token-telemetry-and-calendar-storm.md`. Lesson: `docs/lessons.md` → "Get the cheapest discriminating observation before proposing a mechanism".
+
+> **Last updated:** 2026-07-09 (session 4) (**Drive reconnect-loop investigation + 3 commits above; committed to `main` locally, NOT pushed, NOT deployed. Root cause still unknown by design — the work shipped the instrument that will name it.**)
+
+> **Previously:** 2026-07-09 (session 3) (**The parallel app-store session referenced in session 2's note. NO prod deploy. Dual-publish sunset (#44) investigated → **BLOCKED** (see NEXT SESSION item 2); two new bugs filed (#46, #47); Play Store submission advanced (feature graphic built + committed, Data-Safety AWS-IP question resolved); tagline drift reconciled to a single source of truth; promo-video harness started (WIP). Working tree clean on `main`, in sync with `origin/main`.**)
 >
 > ## ✅ DONE THIS SESSION (2026-07-09, session 3 — app store + investigations)
 >
