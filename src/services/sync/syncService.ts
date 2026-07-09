@@ -79,6 +79,10 @@ let noKeyWarnedOnce = false;
 
 // Drive-reported modifiedTime of the last file we read or wrote
 let lastKnownFileTimestamp: string | null = null;
+// UTF-8 byte length of the last .beanpod string we persisted or loaded. Used as
+// a coarse (KB-rounded, client-side) usage signal in the family registry. Not
+// content — the string is an encrypted envelope. Populated by recordPersistedBytes().
+let lastPersistedBytes: number | null = null;
 
 // ADR-032 Plan B — incremental change-log transport state (in-memory, per provider).
 // Reset whenever the provider changes (setProvider). Deps route to the worker/inline
@@ -314,6 +318,26 @@ export function getState(): SyncServiceState {
 }
 
 /**
+ * Record the byte size of a .beanpod envelope string we just persisted or
+ * loaded. Single write path for `lastPersistedBytes` — the UTF-8 encode lives
+ * here only, so every caller records the same (true on-disk) unit. `encode`
+ * cannot throw on a string, so no error handling is warranted.
+ */
+export function recordPersistedBytes(envelope: string): void {
+  lastPersistedBytes = new TextEncoder().encode(envelope).byteLength;
+}
+
+/**
+ * The byte size of the most recently persisted-or-loaded .beanpod, or null if
+ * nothing has been persisted/loaded this session. Read-only companion to
+ * `recordPersistedBytes` — consumed by the registry write to report an
+ * approximate data-volume usage signal.
+ */
+export function getLastPersistedBytes(): number | null {
+  return lastPersistedBytes;
+}
+
+/**
  * Register a callback invoked after every successful save with the file's timestamp.
  */
 export function onSaveComplete(callback: SaveCompleteCallback): () => void {
@@ -454,6 +478,7 @@ export function reset(): void {
   currentEnvelope = null;
   noKeyWarnedOnce = false;
   lastKnownFileTimestamp = null;
+  lastPersistedBytes = null;
   resetSaveFailures();
   setCachePersistFailed(false);
   updateState({
@@ -823,6 +848,7 @@ async function doSave(): Promise<boolean> {
 
     // Write via the storage provider abstraction
     await currentProvider.write(fileContent);
+    recordPersistedBytes(fileContent); // capture size for the registry usage signal
 
     // ADR-032 Plan B: dual-publish — after the whole-doc base write, append the
     // delta chunk so incremental peers apply KB instead of re-loading the base.
@@ -900,6 +926,7 @@ export async function load(): Promise<string | null> {
       updateState({ isSyncing: false, lastError: null });
       return null;
     }
+    recordPersistedBytes(text); // capture size for the registry usage signal
 
     // Track the file's timestamp so doSave() can detect remote changes
     try {
