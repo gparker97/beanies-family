@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-09
+
+### Added
+
+- **Lightweight, privacy-respecting usage signals.** The family registry now records a last-login date and an approximate data size (the size of your already-encrypted data file, rounded to the nearest KB) so we can gauge overall app usage and growth. Both are metadata only — never the contents of your data — and no automatic deletion window was added.
+
 ## 2026-07-08
 
 ### Added
