@@ -77,10 +77,11 @@ describe('buildSilentRefreshAlertContext', () => {
     expect(ctx.refresh_token_age_ms).toBeNull();
   });
 
-  it('hadRefreshToken=false short-circuits would-be-noise alerts (caller responsibility)', () => {
-    // The builder itself does not branch — it surfaces the field; callers
-    // (syncStore cold-start path, offlineQueue flush path) decide whether
-    // to suppress based on `ctx.silent_refresh_had_refresh_token === false`.
+  it('surfaces hadRefreshToken=false without branching (caller responsibility)', () => {
+    // The builder itself does not branch — it surfaces the fields; callers
+    // (syncStore cold-start path, offlineQueue flush path) decide whether to
+    // suppress. NOTE: they must branch on `error_code`, NOT on
+    // `silent_refresh_had_refresh_token` — see the `error_code` cases below.
     getDiagMock.mockReturnValue({
       attempts: [],
       hadRefreshToken: false,
@@ -91,5 +92,50 @@ describe('buildSilentRefreshAlertContext', () => {
     const ctx = buildSilentRefreshAlertContext();
     expect(ctx.silent_refresh_had_refresh_token).toBe(false);
     expect(ctx.silent_refresh_attempts).toEqual([]);
+  });
+
+  describe('error_code discriminator', () => {
+    // `hadRefreshToken: false` is produced BOTH by a user who never connected
+    // Drive AND by every refresh after a revocation (the permanent branch
+    // clears the stored token). Only `reason` can tell them apart.
+    it.each([
+      ['no-token-stored', 'silent-refresh:no-token-stored'],
+      ['revoked', 'silent-refresh:revoked'],
+      ['exhausted', 'silent-refresh:exhausted'],
+    ] as const)('maps reason=%s onto error_code=%s', (reason, expected) => {
+      getDiagMock.mockReturnValue({
+        attempts: [],
+        hadRefreshToken: false,
+        consecutiveFailures: 0,
+        reason,
+      });
+      getHiddenMock.mockReturnValue(0);
+
+      expect(buildSilentRefreshAlertContext().error_code).toBe(expected);
+    });
+
+    it('is null when no diagnostics have been recorded', () => {
+      getDiagMock.mockReturnValue(null);
+      getHiddenMock.mockReturnValue(0);
+
+      expect(buildSilentRefreshAlertContext().error_code).toBeNull();
+    });
+
+    it('carries refresh_token_age_ms alongside a revoked reason', () => {
+      // This pairing is the whole point: the age at revocation is what
+      // distinguishes an expiry clock from cap-eviction.
+      getDiagMock.mockReturnValue({
+        attempts: [],
+        hadRefreshToken: true,
+        consecutiveFailures: 0,
+        reason: 'revoked',
+        refreshTokenAgeMs: 604_800_000,
+      });
+      getHiddenMock.mockReturnValue(0);
+
+      const ctx = buildSilentRefreshAlertContext();
+      expect(ctx.error_code).toBe('silent-refresh:revoked');
+      expect(ctx.refresh_token_age_ms).toBe(604_800_000);
+    });
   });
 });

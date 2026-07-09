@@ -590,9 +590,11 @@ describe('offlineQueue', () => {
         const call = reportErrorMock.mock.calls.at(-1)?.[0];
         expect(call?.surface).toBe('offline-queue-flush');
         // The misleading silent-refresh diagnostic blob is omitted on non-auth
-        // failures; only the always-present consecutive-failure count remains
-        // (it drives the sustained-page gate and is not auth-specific noise).
-        expect(call?.context).toEqual({ consecutiveFailures: 1 });
+        // failures, and no context remains: `consecutiveFailures` was removed
+        // because it is not in ALLOWED_CONTEXT_KEYS (it was dropped-with-warn
+        // on every report). The count still rides in `message` as `(sustained ×N)`.
+        expect(call?.context).toBeUndefined();
+        expect(call?.message).toContain('Drive 404');
       });
     });
   });

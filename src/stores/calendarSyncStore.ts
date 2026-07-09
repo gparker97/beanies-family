@@ -404,9 +404,13 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         });
         reportError({
           surface: 'calendar-sync',
-          message: `[calendarSync] connection parked needs_reconnect after ${n} auth failures`,
+          // `connectionId` is not in `ALLOWED_CONTEXT_KEYS` (it was dropped with
+          // a console warn on every park). It is device-local and useless in
+          // Slack, so it rides in the message rather than widening the allowlist.
+          message:
+            `[calendarSync] connection parked needs_reconnect after ${n} auth failures ` +
+            `(connection ${connection.id})`,
           severity: 'warning',
-          context: { connectionId: connection.id },
         });
       }
       // An auth failure interrupts any non-auth error streak, so the

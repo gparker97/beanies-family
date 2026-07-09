@@ -197,7 +197,10 @@ function reportFlushFailure(reason: FlushReason, err: unknown): void {
         : ''
     }: ${inner.message}`,
     error: inner,
-    context: { ...context, consecutiveFailures: consecutiveFlushFailures },
+    // No `consecutiveFailures` key: it is not in `ALLOWED_CONTEXT_KEYS`, so it
+    // was dropped-with-console-warn on every flush failure. The count already
+    // rides in `message` above as `(sustained ×N)`.
+    context,
   });
 }
 
