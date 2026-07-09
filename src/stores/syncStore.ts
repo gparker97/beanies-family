@@ -1081,6 +1081,8 @@ export const useSyncStore = defineStore('sync', () => {
       ownerEmail: authStoreInst.currentUser?.email ?? null,
       subscribeNewsletter: authStoreInst.newsletterOptIn ?? null,
       country: useSettingsStore().country ?? null,
+      beanpodSizeKb: currentBeanpodSizeKb(),
+      isLoginEvent: true, // pod creation is the family's first login
     });
   }
 
@@ -1280,6 +1282,10 @@ export const useSyncStore = defineStore('sync', () => {
       }
       step = 'write';
       await provider.write(envelopeJson);
+      // Capture size for the registry usage signal. This create write bypasses
+      // syncService.doSave, so record it here — before step 'register' below —
+      // so the create-path registration carries a real beanpodSizeKb, not null.
+      syncService.recordPersistedBytes(envelopeJson);
       partialFileId = provider.getFileId() ?? null;
 
       // 3. Verify the bytes we just wrote round-trip cleanly. Throws
@@ -2746,14 +2752,31 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * The most recently persisted-or-loaded .beanpod size, rounded to KB, or null
+   * if nothing has been persisted/loaded yet this session (in which case the
+   * registry omits the field and preserves any stored value). Single converter
+   * for all registry payloads. The byte size is owned by syncService.
+   */
+  function currentBeanpodSizeKb(): number | null {
+    const bytes = syncService.getLastPersistedBytes();
+    return bytes == null ? null : Math.round(bytes / 1024);
+  }
+
+  /**
    * Register (or re-register) the current family in the cloud registry.
    * Fire-and-forget: always a single PUT with the current sync + owner state.
    * Write-once fields (createdAt, ownerEmail, subscribeNewsletter) are
-   * preserved server-side, so all three call sites (file configure, Drive
-   * connect, ensureRegistered) can share one payload.
+   * preserved server-side, so all call sites can share one payload.
+   *
+   * `opts.isLoginEvent` marks a genuine login/resume so the server stamps
+   * `lastLoginAt`. It MUST stay false for background/config writes (country
+   * change, Drive connect) — otherwise `lastLoginAt` degrades into `updatedAt`.
+   * Sent as an explicit boolean (not omitted) so the two-state contract is
+   * self-documenting and doesn't lean on JSON dropping `undefined`.
    */
   function registerCurrentFamily(
-    overrides: Partial<Pick<RegistryEntry, 'provider' | 'fileId' | 'displayPath'>> = {}
+    overrides: Partial<Pick<RegistryEntry, 'provider' | 'fileId' | 'displayPath'>> = {},
+    opts: { isLoginEvent?: boolean } = {}
   ): void {
     const ctx = useFamilyContextStore();
     if (!ctx.activeFamilyId) return;
@@ -2768,6 +2791,8 @@ export const useSyncStore = defineStore('sync', () => {
         ownerEmail: authStore.currentUser?.email ?? null,
         subscribeNewsletter: authStore.newsletterOptIn ?? null,
         country: useSettingsStore().country ?? null,
+        beanpodSizeKb: currentBeanpodSizeKb(),
+        isLoginEvent: opts.isLoginEvent === true,
       })
       .catch((e: unknown) => {
         // Non-critical: registry is optional smoothness; saves proceed
@@ -2776,8 +2801,13 @@ export const useSyncStore = defineStore('sync', () => {
       });
   }
 
-  function ensureRegistered(): void {
-    registerCurrentFamily();
+  /**
+   * Arm-and-register at a family entry point. `isLogin` distinguishes the
+   * canonical login/resume site (LoginPage.handleSignedIn → true) from the
+   * country watcher below (→ false), which must not move `lastLoginAt`.
+   */
+  function ensureRegistered(isLogin = false): void {
+    registerCurrentFamily({}, { isLoginEvent: isLogin });
   }
 
   // Keep the registry's `country` field in sync with the family doc. Fires on

@@ -1,6 +1,17 @@
 import type { RegistryEntry } from '@/types/models';
 import { features } from '@/config/features';
 
+/**
+ * The shape a caller supplies when writing a registry entry. It's the stored
+ * `RegistryEntry` minus the server-owned key/timestamp, plus a transient
+ * `isLoginEvent` flag. The flag is NOT a stored attribute: the Lambda reads it
+ * to decide whether to stamp `lastLoginAt = today` and then discards it, so it
+ * lives on the write payload only, never on `RegistryEntry`.
+ */
+export type RegistryWritePayload = Omit<RegistryEntry, 'familyId' | 'updatedAt'> & {
+  isLoginEvent?: boolean;
+};
+
 const API_URL = import.meta.env.VITE_REGISTRY_API_URL;
 const API_KEY = import.meta.env.VITE_REGISTRY_API_KEY;
 
@@ -44,10 +55,7 @@ export async function lookupFamily(familyId: string): Promise<RegistryEntry | nu
  * recovery anchor for resume-from-registry) must use
  * `registerFamilyOrThrow` instead.
  */
-export async function registerFamily(
-  familyId: string,
-  entry: Omit<RegistryEntry, 'familyId' | 'updatedAt'>
-): Promise<void> {
+export async function registerFamily(familyId: string, entry: RegistryWritePayload): Promise<void> {
   try {
     await registerFamilyOrThrow(familyId, entry);
   } catch (err) {
@@ -69,7 +77,7 @@ export async function registerFamily(
  */
 export async function registerFamilyOrThrow(
   familyId: string,
-  entry: Omit<RegistryEntry, 'familyId' | 'updatedAt'>
+  entry: RegistryWritePayload
 ): Promise<void> {
   if (!features.registry) return;
 

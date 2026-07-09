@@ -1496,5 +1496,7 @@ export interface RegistryEntry {
   ownerEmail?: string | null;
   subscribeNewsletter?: boolean | null;
   country?: CountryCode | null; // mirror of family Settings.country — denormalized for ops introspection
+  lastLoginAt?: ISODateString | null; // date-only (YYYY-MM-DD), server-stamped on login/resume PUTs — usage signal
+  beanpodSizeKb?: number | null; // approx .beanpod size in KB, client-rounded — coarse data-volume signal
   updatedAt: ISODateString;
 }

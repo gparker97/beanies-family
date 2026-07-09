@@ -33,11 +33,25 @@ The anti-drift comments at `ALLOWED_CONTEXT_KEYS` and the telemetry `LogRecord` 
 | Crash/error info (message, stack, error_code, http_status, surface, route, action, breadcrumbs)                         | Slack + telemetry firehose     | Diagnostics → Crash Data            | App info & performance → Crash logs  | App functionality (debug)                                       | Yes¹            | No        |
 | Diagnostic events (timings, provider/sync state, browser UA, os, online, connection type, web_storage, build_sha, perf) | Slack + telemetry firehose     | Diagnostics → Other Diagnostic Data | App info & performance → Diagnostics | App functionality (reliability)                                 | Yes¹            | No        |
 | Random `family_id` (UUID)                                                                                               | Slack + telemetry firehose     | Identifiers → User ID               | Device or other IDs                  | App functionality (correlate diagnostics)                       | Yes¹            | No        |
+| Last-login date (`lastLoginAt`, date-only, server-stamped)                                                              | Family registry PUT            | Usage Data → Product Interaction    | App activity → App interactions      | Analytics (gauge active usage / retention)                      | Yes²            | No        |
+| Approximate data size (`beanpodSizeKb`, encrypted-file size rounded to KB)                                              | Family registry PUT            | Usage Data → Product Interaction    | App activity → App interactions      | Analytics (gauge data growth)                                   | Yes²            | No        |
 
 ¹ The high-volume telemetry firehose is PII-free (correlated only by the random `family_id`, which is
 `crypto.randomUUID`, `familyContext.ts`). It's marked "Linked" because on the low-volume critical-error
 Slack path these types co-travel with the owner email, so across all collection they can be tied to a
 person. This is the safe (never under-declaring) answer.
+
+² **The family registry is a distinct server-side collection surface** (the registry PUT, not the
+diagnostics firehose). Each family row already holds the account owner email, family name, `country`,
+Drive `fileId`, and display path (the recovery-anchor metadata), and now also the two usage signals
+above. Both are metadata, never content: `beanpodSizeKb` is the length of an **encrypted** blob (reveals
+rough data volume, not content) and `lastLoginAt` is a date. They're "Linked" because the same row
+carries the owner email. **When finalizing the store forms**, declare these under Analytics/App-activity
+and confirm the four consumers (`PrivacyInfo.xcprivacy`, Apple App Privacy, Google Data Safety,
+`privacy.astro`) reflect the registry surface — the pre-existing registry PII (email/name/country) plus
+these usage signals. No TTL is set on the registry (it is the resume-from-registry recovery anchor;
+auto-expiry would strand a returning user on a new device), so registry data has no guaranteed deletion
+timeline beyond the user-initiated `/delete-account` path.
 
 **NOT collected:** family content (accounts, transactions, activities, goals, to-dos, documents,
 member profiles) — it lives only in the user's encrypted `.beanpod` / their own Google Drive.

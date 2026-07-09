@@ -531,3 +531,73 @@ describe('syncStore — registry country sync', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Registry usage signals — the login flag (isLoginEvent) and beanpod size.
+// lastLoginAt must move ONLY on a genuine login/resume, so ensureRegistered()
+// (the country-watcher default) sends false and ensureRegistered(true) (the
+// LoginPage site) sends true. beanpodSizeKb is the last persisted size in KB.
+// ---------------------------------------------------------------------------
+
+describe('syncStore — registry usage signals (login flag + size)', () => {
+  beforeEach(async () => {
+    settingsState.current = { ...defaultSettings };
+    globalSettingsState.current = { ...defaultGlobalSettings };
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    mockSave.mockResolvedValue(true);
+    mockGetFileTimestamp.mockResolvedValue(null);
+    mockGetProvider.mockReturnValue(makeProvider('local', 'my-family.beanpod'));
+  });
+
+  function armStore() {
+    const store = useSyncStore();
+    store.isConfigured = true;
+    store.storageProviderType = 'local';
+    return store;
+  }
+
+  it('sends isLoginEvent: false from ensureRegistered() (non-login, e.g. country watcher)', async () => {
+    const store = armStore();
+    store.ensureRegistered();
+    await nextTick();
+    expect(mockRegisterFamily).toHaveBeenCalledWith(
+      'family-123',
+      expect.objectContaining({ isLoginEvent: false })
+    );
+  });
+
+  it('sends isLoginEvent: true from ensureRegistered(true) (the canonical login site)', async () => {
+    const store = armStore();
+    store.ensureRegistered(true);
+    await nextTick();
+    expect(mockRegisterFamily).toHaveBeenCalledWith(
+      'family-123',
+      expect.objectContaining({ isLoginEvent: true })
+    );
+  });
+
+  it('includes beanpodSizeKb rounded from the last persisted byte size', async () => {
+    const svc = await import('@/services/sync/syncService');
+    vi.mocked(svc.getLastPersistedBytes).mockReturnValue(35840); // 35 KB exactly
+    const store = armStore();
+    store.ensureRegistered(true);
+    await nextTick();
+    expect(mockRegisterFamily).toHaveBeenCalledWith(
+      'family-123',
+      expect.objectContaining({ beanpodSizeKb: 35 })
+    );
+  });
+
+  it('sends beanpodSizeKb: null when no size has been persisted yet', async () => {
+    const svc = await import('@/services/sync/syncService');
+    vi.mocked(svc.getLastPersistedBytes).mockReturnValue(null);
+    const store = armStore();
+    store.ensureRegistered();
+    await nextTick();
+    expect(mockRegisterFamily).toHaveBeenCalledWith(
+      'family-123',
+      expect.objectContaining({ beanpodSizeKb: null })
+    );
+  });
+});
