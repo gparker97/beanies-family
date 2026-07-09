@@ -5,6 +5,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import { isDocLoaded } from '@/services/automerge/docService';
+import { reportError } from '@/utils/errorReporter';
+import { toISODateString } from '@/utils/date';
 import * as globalSettingsRepo from '@/services/indexeddb/repositories/globalSettingsRepository';
 import type {
   Settings,
@@ -118,6 +120,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const calendarClashNudgeEnabled = computed<boolean>(
     () => settings.value.calendarClashNudgeEnabled ?? true
   );
+  // #45: when true, the periodic in-app feedback/NPS prompt never auto-opens.
+  // Family-scoped (synced); default OFF (prompts enabled).
+  const feedbackOptOut = computed<boolean>(() => settings.value.feedbackOptOut ?? false);
   const isTrustedDevice = computed(() => globalSettings.value.isTrustedDevice ?? false);
   const trustedDevicePromptShown = computed(
     () => globalSettings.value.trustedDevicePromptShown ?? false
@@ -343,6 +348,31 @@ export const useSettingsStore = defineStore('settings', () => {
     persistAiSetting('calendarSync.clashNudge.label', 'calendarClashNudgeEnabled', () =>
       settingsRepo.setCalendarClashNudgeEnabled(enabled)
     );
+
+  // #45: opt out of (or back into) the periodic feedback prompt. Same family-only
+  // report-on-failure contract so the Settings toggle reverts if the write fails.
+  const setFeedbackOptOut = (optOut: boolean) =>
+    persistAiSetting('feedback.settings.toggleLabel', 'feedbackOptOut', () =>
+      settingsRepo.setFeedbackOptOut(optOut)
+    );
+
+  // #45: stamp the feedback cadence clock (date-only) when the prompt auto-opens or on
+  // submit. Background (non-user-initiated) family-only write: guard on isDocLoaded, and
+  // on failure report a warning (telemetry + console) WITHOUT throwing into the caller —
+  // a failed cadence stamp must never break the notifications daemon or the modal flow.
+  async function recordFeedbackPrompted(): Promise<void> {
+    if (!isDocLoaded()) return;
+    try {
+      settings.value = await settingsRepo.setFeedbackPromptedAt(toISODateString(new Date()));
+    } catch (e) {
+      reportError({
+        surface: 'feedback-record',
+        severity: 'warning',
+        message: 'failed to stamp feedback cadence clock',
+        error: e,
+      });
+    }
+  }
 
   const setAIProvider = (provider: AIProvider) =>
     persistAiSetting('settings.ai.byok.provider', 'aiProvider', () =>
@@ -687,10 +717,13 @@ export const useSettingsStore = defineStore('settings', () => {
     showPublicHolidays,
     skipDocumentConsentPrompt,
     calendarClashNudgeEnabled,
+    feedbackOptOut,
     isTrustedDevice,
     trustedDevicePromptShown,
     passkeyPromptShown,
     // Actions
+    setFeedbackOptOut,
+    recordFeedbackPrompted,
     loadGlobalSettings,
     loadSettings,
     setBaseCurrency,

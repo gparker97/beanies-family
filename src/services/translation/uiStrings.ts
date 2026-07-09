@@ -1090,6 +1090,73 @@ const STRING_DEFS = {
   'communityNudge.join': { en: 'Join us on Discord', beanie: 'join us on discord' },
   'communityNudge.snooze': { en: 'Not now', beanie: 'not now' },
   'communityNudge.joined': { en: "I'm already there!", beanie: "i'm already there!" },
+  // #45 — in-app feedback / NPS
+  'feedback.shareEntry': { en: 'Share Feedback', beanie: 'share feedback 💬' },
+  'feedback.form.title': { en: 'Share Your Feedback', beanie: 'share your feedback' },
+  'feedback.form.send': { en: 'Send Feedback', beanie: 'send feedback' },
+  'feedback.form.commentGeneric': {
+    en: 'Anything you would like to add? (optional)',
+    beanie: 'anything you want to add? (optional)',
+  },
+  'feedback.form.commentDetractor': {
+    en: "What's letting you down? What would make it better? (optional)",
+    beanie: "what's letting you down? what would make it better? (optional)",
+  },
+  'feedback.form.commentPassive': {
+    en: 'What is one thing you wish beanies could do? (optional)',
+    beanie: 'what is one thing you wish beanies could do? (optional)',
+  },
+  'feedback.form.commentPromoter': {
+    en: 'What do you love most? (and anything you wish it did?) (optional)',
+    beanie: 'what do you love most? (and anything you wish it did?) (optional)',
+  },
+  'feedback.form.contactToggle': {
+    en: 'Want a reply? Add your contact (optional)',
+    beanie: 'want a reply? add your contact (optional)',
+  },
+  'feedback.form.contactHelp': {
+    en: 'Only used if you want us to get back to you. Never shared.',
+    beanie: 'only used if you want us to get back to you. never shared.',
+  },
+  'feedback.form.contactNamePlaceholder': {
+    en: 'Your name (optional)',
+    beanie: 'your name (optional)',
+  },
+  'feedback.form.contactEmailPlaceholder': { en: 'Email (optional)', beanie: 'email (optional)' },
+  'feedback.form.privacyNote': {
+    en: 'No financial data is ever included — just your score and words.',
+    beanie: 'no financial data is ever included, just your score and words.',
+  },
+  'feedback.nps.question': {
+    en: 'How likely are you to recommend beanies.family to a friend?',
+    beanie: 'how likely are you to recommend beanies.family to a friend?',
+  },
+  'feedback.nps.low': { en: 'Not likely', beanie: 'not likely' },
+  'feedback.nps.high': { en: 'Very likely', beanie: 'very likely' },
+  'feedback.nps.scoreAria': { en: 'Score {score} out of 10', beanie: 'score {score} out of 10' },
+  'feedback.thanks.defaultTitle': { en: 'Thanks — we hear you', beanie: 'thanks, we hear you' },
+  'feedback.thanks.defaultBody': {
+    en: 'This is exactly the stuff that makes beanies better. If you would like to talk it through, the door is open.',
+    beanie:
+      'this is exactly the stuff that makes beanies better. if you want to talk it through, the door is open.',
+  },
+  'feedback.thanks.promoterTitle': { en: 'You made our day', beanie: 'you made our day' },
+  'feedback.thanks.promoterBody': {
+    en: 'Every bit of what you told us helps the beanies grow. Want to help shape what comes next?',
+    beanie:
+      'every bit of what you told us helps the beanies grow. want to help shape what comes next?',
+  },
+  'feedback.thanks.discordCta': { en: 'Join Us on Discord', beanie: 'join us on discord' },
+  'feedback.thanks.dismiss': { en: 'No thanks, maybe later', beanie: 'no thanks, maybe later' },
+  'feedback.settings.toggleLabel': {
+    en: 'Occasional Feedback Prompt',
+    beanie: 'occasional feedback prompt',
+  },
+  'feedback.settings.toggleHint': {
+    en: 'Once in a while, ask how likely you are to recommend beanies.family. You can turn this off any time.',
+    beanie:
+      'once in a while, ask how likely you are to recommend beanies.family. you can turn this off any time.',
+  },
   'installNudge.label': { en: 'Install the app', beanie: 'plant beanies on your home screen' },
   'installNudge.tagline': {
     en: 'Keep your family data reliably connected.',

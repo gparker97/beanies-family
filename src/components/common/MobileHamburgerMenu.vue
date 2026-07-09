@@ -10,6 +10,7 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
+import { useFeedbackModal } from '@/composables/useFeedbackModal';
 import { getProductVersionLabel } from '@/utils/diagnosticContext';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES } from '@/constants/languages';
@@ -115,6 +116,13 @@ function close() {
 function navigateTo(path: string) {
   router.push(path);
   close();
+}
+
+// #45: close the drawer, then open the feedback modal (not a route).
+const { openFeedback } = useFeedbackModal();
+function openFeedbackFromMenu() {
+  close();
+  openFeedback('nav');
 }
 
 function handlePrivacyToggle() {
@@ -453,6 +461,16 @@ const encryptionLabel = computed(() => {
               >
                 <span class="w-6 text-center text-base">{{ item.emoji }}</span>
                 <span>{{ item.label }}</span>
+              </button>
+
+              <!-- #45: Share feedback — opens the feedback modal (not a route). -->
+              <button
+                type="button"
+                class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl border-l-4 border-transparent px-3.5 py-2.5 text-left text-base font-medium text-white/40 transition-all duration-150 hover:bg-white/[0.05] hover:text-white/70"
+                @click="openFeedbackFromMenu"
+              >
+                <span class="w-6 text-center text-base" aria-hidden="true">💬</span>
+                <span>{{ t('feedback.shareEntry') }}</span>
               </button>
             </nav>
 
