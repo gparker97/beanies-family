@@ -78,6 +78,7 @@ export async function handler(event) {
     if (method === 'PUT') {
       const body = JSON.parse(event.body || '{}');
       const now = new Date().toISOString();
+      const today = now.slice(0, 10); // YYYY-MM-DD — date-only login stamp
 
       // Read existing row to preserve write-once fields (createdAt, ownerEmail,
       // subscribeNewsletter). registerFamily() fires on every sync-config change,
@@ -108,6 +109,21 @@ export async function handler(event) {
         // preserves — clearing country is a deliberate ops action, not a side
         // effect of registering.
         country: typeof body.country === 'string' ? body.country : (existing.country ?? null),
+        // Usage signals (metadata, never content). Same preserve-on-omit
+        // semantics as country/subscribeNewsletter above.
+        //
+        // lastLoginAt: server-stamped (never client-supplied — no clock trust)
+        // and moved ONLY when the client marks a genuine login/resume via the
+        // transient `isLoginEvent` flag. Every other PUT (country change, Drive
+        // connect, background sync) preserves it, so it stays a clean activity
+        // signal distinct from `updatedAt`. `isLoginEvent` itself is never stored.
+        lastLoginAt: body.isLoginEvent === true ? today : (existing.lastLoginAt ?? null),
+        // beanpodSizeKb: client-rounded approximate .beanpod size. Number-guarded
+        // so a malformed/negative value is ignored (preserve existing), never fatal.
+        beanpodSizeKb:
+          typeof body.beanpodSizeKb === 'number' && body.beanpodSizeKb >= 0
+            ? Math.round(body.beanpodSizeKb)
+            : (existing.beanpodSizeKb ?? null),
         updatedAt: now,
       };
       await client.send(

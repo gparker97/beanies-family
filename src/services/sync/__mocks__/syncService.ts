@@ -70,6 +70,10 @@ export const openAndLoadFile = vi.fn(async () => ({ success: true }));
 export const loadDroppedFile = vi.fn(async () => ({ success: true }));
 export const decryptAndImport = vi.fn(async () => ({ success: true }));
 
+// Persisted-size tracking (registry usage signal)
+export const recordPersistedBytes = vi.fn();
+export const getLastPersistedBytes = vi.fn<() => number | null>(() => null);
+
 // Encryption / session
 export const setEncryptionRequiredCallback = vi.fn();
 export const setSessionPassword = vi.fn();

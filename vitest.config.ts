@@ -10,8 +10,15 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: true,
     // `src/**` is the app suite; `scripts/**/*.mjs` picks up build-script helpers
-    // (e.g. derive-store-version) so their tests actually run in `npm run validate`.
-    include: ['src/**/*.{test,spec}.ts', 'scripts/**/*.{test,spec}.mjs'],
+    // (e.g. derive-store-version). The registry Lambda's handler logic (the PUT
+    // server-stamp / preserve-merge) is vitest-authored, so it runs in the gate;
+    // scoped to that dir because the other lambdas' tests use the `node:test`
+    // runner and would break under vitest.
+    include: [
+      'src/**/*.{test,spec}.ts',
+      'scripts/**/*.{test,spec}.mjs',
+      'infrastructure/lambda/registry/**/*.{test,spec}.mjs',
+    ],
   },
   resolve: {
     alias: {

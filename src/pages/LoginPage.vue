@@ -609,7 +609,9 @@ function handleSignedIn(destination: string) {
   // de-dup holds for all flows. `setupAutoSync` is idempotent; `ensureRegistered`
   // is a no-op when the pod is already registered (createNewFile registers it).
   syncStore.setupAutoSync();
-  syncStore.ensureRegistered();
+  // Sole genuine login/resume registration site → stamp lastLoginAt (see
+  // ensureRegistered). The country watcher's ensureRegistered() stays login-false.
+  syncStore.ensureRegistered(true);
   router.replace(destination);
 }
 
