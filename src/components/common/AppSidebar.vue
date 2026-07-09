@@ -71,6 +71,10 @@ type MappedNavItem = ReturnType<typeof mapItems>[number];
 const treehouseItems = computed(() => mapItems(TREEHOUSE_ITEMS));
 const piggyBankItems = computed(() => mapItems(PIGGY_BANK_ITEMS));
 const pinnedItems = computed(() => mapItems(PINNED_ITEMS));
+// #45: pinned footer is split into two groups — "connect with us" (Discord +
+// Share feedback) and "operate the app" (Help + Settings, Settings anchored last).
+const pinnedCommunity = computed(() => pinnedItems.value.filter((i) => i.path === '/discord'));
+const pinnedApp = computed(() => pinnedItems.value.filter((i) => i.path !== '/discord'));
 
 const currentMemberRef = computed(() => familyStore.currentMember ?? familyStore.owner ?? null);
 const { variant: memberVariant, color: memberColor } = useMemberAvatar(currentMemberRef);
@@ -242,9 +246,9 @@ function subItemsOf(item: MappedNavItem): NavSubItemDef[] {
       <!-- Divider -->
       <div class="mx-2 my-2 h-px bg-white/[0.08]" />
 
-      <!-- Pinned: Settings -->
+      <!-- Connect with us: Beanies Discord + Share feedback -->
       <button
-        v-for="item in pinnedItems"
+        v-for="item in pinnedCommunity"
         :key="item.path"
         class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2 text-left text-lg font-medium transition-all duration-150"
         :class="
@@ -264,8 +268,27 @@ function subItemsOf(item: MappedNavItem): NavSubItemDef[] {
         class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl border-l-4 border-transparent px-3.5 py-2 text-left text-lg font-medium text-white/40 transition-all duration-150 hover:bg-white/[0.05] hover:text-white/70"
         @click="openFeedback('nav')"
       >
-        <span class="w-6 text-center text-base" aria-hidden="true">💬</span>
+        <span class="w-6 text-center text-base" aria-hidden="true">📣</span>
         <span>{{ t('feedback.shareEntry') }}</span>
+      </button>
+
+      <!-- Divider -->
+      <div class="mx-2 my-2 h-px bg-white/[0.08]" />
+
+      <!-- Operate the app: Help + Settings (Settings anchored last) -->
+      <button
+        v-for="item in pinnedApp"
+        :key="item.path"
+        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2 text-left text-lg font-medium transition-all duration-150"
+        :class="
+          isActive(item.path)
+            ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
+            : 'border-l-4 border-transparent text-white/40 hover:bg-white/[0.05] hover:text-white/70'
+        "
+        @click="navigateTo(item)"
+      >
+        <span class="w-6 text-center text-base">{{ item.emoji }}</span>
+        <span>{{ item.label }}</span>
       </button>
     </nav>
 

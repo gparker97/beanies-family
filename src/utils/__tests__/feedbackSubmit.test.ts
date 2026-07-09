@@ -13,7 +13,10 @@ vi.mock('@/utils/diagnosticContext', () => ({
   getFullVersionLabel: () => 'v9.9 · abc123',
 }));
 vi.mock('@/stores/familyContextStore', () => ({
-  useFamilyContextStore: () => ({ activeFamilyId: 'fam-123' }),
+  useFamilyContextStore: () => ({
+    activeFamilyId: 'fam-123',
+    activeFamilyName: 'The Parker Beanies',
+  }),
 }));
 
 import { buildFeedbackText, submitFeedback } from '../feedbackSubmit';
@@ -43,6 +46,19 @@ describe('buildFeedbackText', () => {
     expect(text).toContain('3/10 (detractor)');
     expect(text).toContain('—');
     expect(text).not.toContain('Reply to:');
+  });
+
+  it('attaches the family name + id by default', () => {
+    const text = buildFeedbackText({ score: 7 });
+    expect(text).toContain('The Parker Beanies');
+    expect(text).toContain('fam-123');
+  });
+
+  it('omits the family name + id when anonymous', () => {
+    const text = buildFeedbackText({ score: 7, anonymous: true });
+    expect(text).not.toContain('The Parker Beanies');
+    expect(text).not.toContain('fam-123');
+    expect(text).toContain('(anonymous)');
   });
 
   it('never contains financial-data markers', () => {

@@ -1070,7 +1070,7 @@ const STRING_DEFS = {
   'contacts.action.call': { en: 'Call', beanie: 'call' },
   'contacts.action.email': { en: 'Email', beanie: 'email' },
   'nav.settings': { en: 'Settings', beanie: 'settings' },
-  'nav.community': { en: 'Discord Beanies', beanie: 'discord beanies' },
+  'nav.community': { en: 'Beanies Discord', beanie: 'beanies discord' },
   // ── Discord community (onboarding card, nudge, settings, open-failure) ──────
   'discord.openFailedTitle': { en: "Couldn't open Discord", beanie: "couldn't open discord" },
   'discord.openFailedBody': {
@@ -1118,6 +1118,12 @@ const STRING_DEFS = {
     en: 'Only used if you want us to get back to you. Never shared.',
     beanie: 'only used if you want us to get back to you. never shared.',
   },
+  'feedback.form.anonymousLabel': { en: 'Send anonymously', beanie: 'send anonymously' },
+  'feedback.form.anonymousHint': {
+    en: "If ticked, we won't include your family name in the submission. But you also won't be able to get a reply from us (well... me).",
+    beanie:
+      "if ticked, we won't include your family name in the submission. but you also won't be able to get a reply from us (well... me).",
+  },
   'feedback.form.contactNamePlaceholder': {
     en: 'Your name (optional)',
     beanie: 'your name (optional)',
@@ -1134,13 +1140,16 @@ const STRING_DEFS = {
   'feedback.nps.low': { en: 'Not likely', beanie: 'not likely' },
   'feedback.nps.high': { en: 'Very likely', beanie: 'very likely' },
   'feedback.nps.scoreAria': { en: 'Score {score} out of 10', beanie: 'score {score} out of 10' },
-  'feedback.thanks.defaultTitle': { en: 'Thanks — we hear you', beanie: 'thanks, we hear you' },
+  'feedback.thanks.defaultTitle': { en: 'Thanks - we hear you', beanie: 'thanks - we hear you' },
   'feedback.thanks.defaultBody': {
     en: 'This is exactly the stuff that makes beanies better. If you would like to talk it through, the door is open.',
     beanie:
       'this is exactly the stuff that makes beanies better. if you want to talk it through, the door is open.',
   },
-  'feedback.thanks.promoterTitle': { en: 'You made our day', beanie: 'you made our day' },
+  'feedback.thanks.promoterTitle': {
+    en: "Thanks - you've made our day!",
+    beanie: "thanks - you've made our day!",
+  },
   'feedback.thanks.promoterBody': {
     en: 'Every bit of what you told us helps the beanies grow. Want to help shape what comes next?',
     beanie:

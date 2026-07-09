@@ -48,6 +48,12 @@ const NpsScaleStub = {
   emits: ['update:modelValue'],
   template: `<button class="pick" @click="$emit('update:modelValue', 9)">pick</button>`,
 };
+// Passthrough so revealed content (checkbox, contact) is queryable; keeps `show` for assertions.
+const ConditionalSectionStub = {
+  name: 'ConditionalSection',
+  props: ['show'],
+  template: `<div class="cond" :data-show="show"><slot /></div>`,
+};
 
 function mountModal() {
   return mount(FeedbackModal, {
@@ -58,7 +64,8 @@ function mountModal() {
         NpsScale: NpsScaleStub,
         BaseTextarea: true,
         BaseInput: true,
-        ConditionalSection: true,
+        BeanieIcon: true,
+        ConditionalSection: ConditionalSectionStub,
       },
     },
   });
@@ -89,6 +96,29 @@ describe('FeedbackModal', () => {
     // Switched to the thank-you view.
     expect(w.find('.thanks-modal').exists()).toBe(true);
     expect(w.find('.form-modal').exists()).toBe(false);
+  });
+
+  it('keeps the comment/contact hidden until a score is picked', async () => {
+    const w = mountModal();
+    isOpen.value = true;
+    await nextTick();
+    // The first ConditionalSection wraps everything below the NPS scale.
+    const reveal = () => w.findAllComponents({ name: 'ConditionalSection' })[0];
+    expect(reveal().props('show')).toBe(false);
+    await w.find('.pick').trigger('click'); // score → 9
+    expect(reveal().props('show')).toBe(true);
+  });
+
+  it('sends anonymously when the checkbox is ticked', async () => {
+    const w = mountModal();
+    isOpen.value = true;
+    await nextTick();
+    await w.find('.pick').trigger('click'); // score → 9
+    const checkbox = w.find('input[type="checkbox"]');
+    expect(checkbox.exists()).toBe(true);
+    await checkbox.setValue(true);
+    await w.find('.do-save').trigger('click');
+    expect(submitMock.mock.calls[0][0]).toMatchObject({ anonymous: true });
   });
 
   it('the Discord CTA opens Discord with the feedback surface and closes', async () => {

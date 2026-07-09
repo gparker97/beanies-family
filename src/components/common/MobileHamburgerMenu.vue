@@ -108,6 +108,10 @@ const sections = computed(() =>
 );
 
 const pinnedItems = computed(() => mapItems(PINNED_ITEMS));
+// #45: split the pinned footer — "connect with us" (Discord + Share feedback)
+// above a divider, "operate the app" (Help + Settings) below it.
+const pinnedCommunity = computed(() => pinnedItems.value.filter((i) => i.path === '/discord'));
+const pinnedApp = computed(() => pinnedItems.value.filter((i) => i.path !== '/discord'));
 
 function close() {
   emit('close');
@@ -446,9 +450,9 @@ const encryptionLabel = computed(() => {
               <!-- Divider -->
               <div class="mx-2 my-2 h-px bg-white/[0.08]" />
 
-              <!-- Pinned: Settings -->
+              <!-- Connect with us: Beanies Discord + Share feedback -->
               <button
-                v-for="item in pinnedItems"
+                v-for="item in pinnedCommunity"
                 :key="item.path"
                 type="button"
                 class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-base font-medium transition-all duration-150"
@@ -469,8 +473,28 @@ const encryptionLabel = computed(() => {
                 class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl border-l-4 border-transparent px-3.5 py-2.5 text-left text-base font-medium text-white/40 transition-all duration-150 hover:bg-white/[0.05] hover:text-white/70"
                 @click="openFeedbackFromMenu"
               >
-                <span class="w-6 text-center text-base" aria-hidden="true">💬</span>
+                <span class="w-6 text-center text-base" aria-hidden="true">📣</span>
                 <span>{{ t('feedback.shareEntry') }}</span>
+              </button>
+
+              <!-- Divider -->
+              <div class="mx-2 my-2 h-px bg-white/[0.08]" />
+
+              <!-- Operate the app: Help + Settings (Settings anchored last) -->
+              <button
+                v-for="item in pinnedApp"
+                :key="item.path"
+                type="button"
+                class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-base font-medium transition-all duration-150"
+                :class="
+                  item.active
+                    ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
+                    : 'border-l-4 border-transparent text-white/40 hover:bg-white/[0.05] hover:text-white/70'
+                "
+                @click="navigateTo(item.path)"
+              >
+                <span class="w-6 text-center text-base">{{ item.emoji }}</span>
+                <span>{{ item.label }}</span>
               </button>
             </nav>
 
