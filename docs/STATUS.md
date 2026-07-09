@@ -85,9 +85,17 @@
 >
 > _(Below this block is the pre-migration STATUS from main, unchanged.)_
 >
-> ## 🔬 Drive reconnect loop — INSTRUMENTED, root cause NOT yet known (2026-07-09 session 4, committed not pushed)
+> ## 🔬 Drive reconnect loop — INSTRUMENTED + DEPLOYED (app `0.9.4R6`); root cause STRONGLY suspected, not yet confirmed
 >
-> **Symptom:** the orange "Google session expired" toast on almost every tab open / PWA resume, across all browsers, from ~2026-07-07 (coincident with, but **not caused by**, the `docWorker` prod-ON flip).
+> **DEPLOYED 2026-07-09 23:44 UTC** — commit `7e0e0b85`, deploy run `29058070034`. Telemetry Lambda applied via terraform (`module.telemetry` only; a single in-place `source_code_hash` update, zero other resource changes; deployed `CodeSha256` verified byte-for-byte against the local zip). Live bundle confirmed carrying `build_sha 7e0e0b85`, `APP_VERSION 0.9.4R6`, and the `silent-refresh:*` discriminator. No in-app release note, per greg.
+>
+> **⭐ LEADING HYPOTHESIS (2026-07-10): the OAuth consent-screen scopes were dropped.** Google Cloud audit logs show **two `UpdateClientWithMask` events by `gparker97@gmail.com` on 2026-07-06** (07:44:52Z, 08:31:39Z). The **first token failure is 2026-07-06 12:29:19Z** — hours later, the same day. That is **a full day BEFORE the `docWorker` prod-ON flip (2026-07-07)**, which exonerates the ADR-032 worker migration by clock rather than by argument. `drive.file` + `userinfo.email` were found missing from the consent screen on 2026-07-09 and re-added; **no toast on any device in the 6+ hours since**. Best-fit mechanism: while `drive.file` was unregistered, Google kept _issuing_ refresh tokens for the grant but invalidated them shortly after — which explains `invalid_grant` (rather than "no token"), the recurrence after every re-consent, and the recovery on re-adding the scopes.
+>
+> **NOT the mechanism Gemini proposed** ("Google refuses to issue a refresh token, leaving only a 1-hour access token"). Refuted by the logs: no `auth-no-refresh-token` alert ever fired despite repeated interactive reconnects, and the calendar errors read `Token has been expired or revoked` — a token that was issued, then killed.
+>
+> **⏳ CONFIRMATION PENDING — hold 2026-07-16/17.** greg re-consented 2026-07-09. If that token is still alive past the 7-day mark, no expiry clock is in play and the scope story stands. If a toast reappears, the now-deployed telemetry reports `refresh_token_age_ms` on the _first_ occurrence. Record the value here either way.
+>
+> **Symptom:** the orange "Google session expired" toast on almost every tab open / PWA resume, across all browsers, from ~2026-07-06.
 >
 > **What is proven.** Google returns `400 invalid_grant — "Token has been expired or revoked"` for the refresh token, while the grant **remains listed** in the user's linked apps. The client's behaviour is correct: it clears the dead token and stops retrying. The empty `beanies-file-handles/handles` store is a _consequence_ of Google's rejection, not a cause. Ruled out by evidence, not argument: the ADR-032 worker migration (different IndexedDB database, untouched since 2026-05-22); `googleAccountAssertion` (never fired — no `[accountAssertion]` line in the console log); Testing-mode 7-day expiry (app is `In production`, branding + data access verified, sensitive calendar scope approved); an unregistered `drive.file` scope (re-consent showed no unverified-app warning); a Google password change (greg confirms none).
 >
