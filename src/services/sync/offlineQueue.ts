@@ -28,7 +28,11 @@
  * (but not full browser restarts — session-scoped is appropriate).
  */
 import type { StorageProvider } from './storageProvider';
-import { onTokenAcquired, TokenExpiredError } from '@/services/google/googleAuth';
+import {
+  onTokenAcquired,
+  TokenExpiredError,
+  whenRedirectAuthSettled,
+} from '@/services/google/googleAuth';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
 
@@ -205,18 +209,41 @@ function reportFlushFailure(reason: FlushReason, err: unknown): void {
 }
 
 /**
+ * Triggers that can fire before the auth layer has finished settling.
+ *
+ * `startup` runs during boot, and `visible` fires on any tab return — including
+ * the one immediately following an OAuth redirect, while `completeRedirectAuth`
+ * is still exchanging the code for a token. Flushing then means
+ * `getValidTokenSilent()` observes a half-initialised auth layer, throws
+ * `TokenExpiredError`, and surfaces a reconnect prompt for a session that was
+ * about to become perfectly healthy.
+ *
+ * `online` and `token-acquired` are NOT gated: the former is orthogonal to auth,
+ * and the latter fires *because* a token was just acquired — gating it would
+ * deadlock recovery behind the very thing it is recovering.
+ */
+const AUTH_GATED_REASONS: ReadonlySet<FlushReason> = new Set<FlushReason>(['startup', 'visible']);
+
+/**
  * Single entry point for all flush triggers. No-ops when there's nothing
  * to flush, no provider yet, or another flush is already in flight.
  *
  * Coalescing matters on PWA cold-start where multiple recovery triggers
  * fire within milliseconds: the first wins, the rest piggy-back on its
- * outcome silently — no duplicate writes, no duplicate alerts.
+ * outcome silently — no duplicate writes, no duplicate alerts. The auth gate
+ * is inside `flushInFlight`, so a slow gate can't admit a second flush.
  */
 function tryFlush(reason: FlushReason): void {
   if (!pendingContent || !flushProvider) return;
   if (flushInFlight) return;
 
-  const p = flushQueue().then(
+  // `whenRedirectAuthSettled` is non-throwing and bounded (20s timeout), and
+  // resolves immediately when no redirect is in flight — so on the common path
+  // this costs nothing. `flushQueue` re-checks `pendingContent`/`flushProvider`,
+  // so a sign-out during the gate is handled.
+  const gate = AUTH_GATED_REASONS.has(reason) ? whenRedirectAuthSettled() : Promise.resolve();
+
+  const p = gate.then(flushQueue).then(
     () => {
       consecutiveFlushFailures = 0; // queue drained — streak resets
     },

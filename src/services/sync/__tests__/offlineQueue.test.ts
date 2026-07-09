@@ -2,10 +2,13 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
 // Capture the onTokenAcquired callback so tests can drive it directly,
 // simulating a silent refresh succeeding in the auth layer.
-const { tokenAcquiredCallbackHolder } = vi.hoisted(() => ({
+const { tokenAcquiredCallbackHolder, whenRedirectAuthSettledMock } = vi.hoisted(() => ({
   tokenAcquiredCallbackHolder: {
     cb: null as (() => void) | null,
   },
+  // Auth-readiness gate for the boot-adjacent flush triggers. Resolves
+  // immediately by default (the common path: no redirect in flight).
+  whenRedirectAuthSettledMock: vi.fn(async () => {}),
 }));
 
 vi.mock('@/services/google/googleAuth', () => {
@@ -26,6 +29,7 @@ vi.mock('@/services/google/googleAuth', () => {
       };
     }),
     TokenExpiredError: TokenExpiredErrorMock,
+    whenRedirectAuthSettled: whenRedirectAuthSettledMock,
   };
 });
 
@@ -61,6 +65,8 @@ describe('offlineQueue', () => {
     // Clear sessionStorage before each test
     sessionStorage.clear();
     tokenAcquiredCallbackHolder.cb = null;
+    whenRedirectAuthSettledMock.mockClear();
+    whenRedirectAuthSettledMock.mockImplementation(async () => {});
     // Fresh import to reset module state
     offlineQueue = await import('../offlineQueue');
   });
@@ -345,6 +351,81 @@ describe('offlineQueue', () => {
           })
         );
       });
+    });
+  });
+
+  // A `visible` flush fires on every tab return — including the one right after
+  // an OAuth redirect, while `completeRedirectAuth` is still exchanging the code.
+  // Writing then makes `getValidTokenSilent()` observe a half-initialised auth
+  // layer, throw TokenExpiredError, and surface a reconnect prompt for a session
+  // that was about to be healthy. See ADR-026 / commit ace9c417.
+  describe('auth-readiness gate', () => {
+    it('waits for redirect auth to settle before a `visible` flush', async () => {
+      const order: string[] = [];
+      let releaseGate!: () => void;
+      whenRedirectAuthSettledMock.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            order.push('gate');
+            releaseGate = () => resolve();
+          })
+      );
+      const mockWrite = vi.fn().mockImplementation(async () => {
+        order.push('write');
+      });
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      offlineQueue.enqueueOfflineSave('{"data":"gated"}');
+      await Promise.resolve();
+      mockWrite.mockClear();
+      offlineQueue.enqueueOfflineSave('{"data":"gated"}');
+
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      await Promise.resolve();
+
+      // The write must NOT have happened while auth was still settling.
+      expect(mockWrite).not.toHaveBeenCalled();
+
+      releaseGate();
+      await vi.waitFor(() => expect(mockWrite).toHaveBeenCalled());
+      expect(order).toEqual(['gate', 'write']);
+    });
+
+    it('does NOT gate a `token-acquired` flush (it would deadlock recovery)', async () => {
+      const mockWrite = vi.fn().mockResolvedValue(undefined);
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      offlineQueue.enqueueOfflineSave('{"data":"recovered"}');
+      await Promise.resolve();
+      mockWrite.mockClear();
+      whenRedirectAuthSettledMock.mockClear();
+      offlineQueue.enqueueOfflineSave('{"data":"recovered"}');
+
+      tokenAcquiredCallbackHolder.cb?.();
+
+      await vi.waitFor(() => expect(mockWrite).toHaveBeenCalled());
+      expect(whenRedirectAuthSettledMock).not.toHaveBeenCalled();
+    });
+
+    it('a slow gate cannot admit a duplicate flush', async () => {
+      let releaseGate!: () => void;
+      whenRedirectAuthSettledMock.mockImplementation(
+        () => new Promise<void>((resolve) => (releaseGate = () => resolve()))
+      );
+      const mockWrite = vi.fn().mockResolvedValue(undefined);
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      offlineQueue.enqueueOfflineSave('{"data":"once"}');
+      await Promise.resolve();
+      mockWrite.mockClear();
+      offlineQueue.enqueueOfflineSave('{"data":"once"}');
+
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      document.dispatchEvent(new Event('visibilitychange'));
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      releaseGate();
+      await vi.waitFor(() => expect(mockWrite).toHaveBeenCalled());
+      expect(mockWrite).toHaveBeenCalledTimes(1);
     });
   });
 
