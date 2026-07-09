@@ -8,6 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-10
+
+### Fixed
+
+- **Fewer "Google session expired" prompts when you come back to a tab.** Returning to a beanies tab moments after signing in with Google could ask you to reconnect a session that was, in fact, seconds from being ready. The app now waits for sign-in to finish before deciding your session has lapsed.
+- **Reconnecting Google Calendar takes effect straight away.** After reconnecting a calendar whose access had lapsed, syncing resumes immediately instead of waiting for the next page load.
+
+### Performance
+
+- **A lapsed Google connection no longer retries in a loop.** When Google ends a connection, the app used to ask it to renew the connection once per pending calendar change — hundreds of times on a busy calendar. It now asks once, then waits for you to reconnect.
+
 ## 2026-07-09
 
 ### Added
