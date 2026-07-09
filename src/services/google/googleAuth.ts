@@ -421,6 +421,10 @@ function getRedirectUri(): string {
  * Call this once after login, before any Drive operations.
  */
 export async function initializeAuth(familyId: string): Promise<void> {
+  // Binding a (possibly different) family starts a fresh auth identity. A
+  // revocation latch carried over from the previous family would mislabel this
+  // family's by-design "no token stored" state as a revocation incident.
+  if (currentFamilyId !== familyId) clearPermanentFailureFlag();
   currentFamilyId = familyId;
   const stored = await getGoogleRefreshToken(familyId);
   if (stored) {
@@ -910,10 +914,30 @@ export interface SilentRefreshAttemptDiagnostic {
   errorMessage: string;
 }
 
+/**
+ * Why a silent refresh could not produce a token.
+ *
+ * `hadRefreshToken` alone cannot distinguish these: the permanent branch CLEARS
+ * the stored token, so every refresh after the first one this session takes the
+ * `!currentRefreshToken` early return and reports `hadRefreshToken: false` —
+ * byte-for-byte identical to a user who never connected Drive. That ambiguity
+ * hid a week of real revocations behind a "by design" suppression in
+ * `syncStore.scheduleColdStartReconnectEscalation`.
+ */
+export type SilentRefreshReason =
+  /** No token has ever been stored — user never connected Drive. By design; not an incident. */
+  | 'no-token-stored'
+  /** Google rejected the refresh token (`invalid_grant`). A real incident. */
+  | 'revoked'
+  /** Every retry attempt failed without a permanent classification (network, 5xx, timeout). */
+  | 'exhausted';
+
 export interface SilentRefreshDiagnostics {
   attempts: SilentRefreshAttemptDiagnostic[];
   hadRefreshToken: boolean;
   consecutiveFailures: number;
+  /** Discriminates a genuine revocation from the by-design "never connected" state. */
+  reason?: SilentRefreshReason;
   // Age of the refresh token at the moment a permanent-failure (`invalid_grant`)
   // classification was recorded. Helps surface revocation patterns (Google
   // revoking after N days of disuse, password change, etc.). Null when the
@@ -924,6 +948,25 @@ export interface SilentRefreshDiagnostics {
 }
 
 let lastSilentRefreshDiagnostics: SilentRefreshDiagnostics | null = null;
+
+/**
+ * Set the moment Google rejects a refresh token as `invalid_grant`. Read by the
+ * `!currentRefreshToken` early return so that, once the permanent branch has
+ * cleared the token, later refreshes this session still report `'revoked'`
+ * instead of masquerading as the by-design `'no-token-stored'` state.
+ *
+ * MUST be cleared wherever the session identity changes, not only on success:
+ * a flag left set across a sign-out or a family switch would mislabel the NEXT
+ * family's genuinely by-design "never connected Drive" state as an incident and
+ * page Slack for it. Reset points: successful acquisition (`notifyTokenAcquired`),
+ * session teardown (`clearGoogleSessionState`, `revokeToken`), and family bind
+ * (`initializeAuth`).
+ */
+let sawPermanentFailureThisSession = false;
+
+function clearPermanentFailureFlag(): void {
+  sawPermanentFailureThisSession = false;
+}
 
 /** Returns diagnostics for the most recent failed silent refresh, or null
  *  if the most recent attempt succeeded (or none has happened this session). */
@@ -1018,10 +1061,16 @@ async function performSilentRefresh(): Promise<string | null> {
     // Capture this failure mode too — "no refresh token" means IDB read
     // returned nothing OR session is uninitialised. Useful diagnostic in
     // its own right (it would otherwise show up as a silent null).
+    //
+    // `reason` disambiguates the two very different states that both land here:
+    // a user who never connected Drive (by design), and a session whose token
+    // Google revoked moments ago (an incident — the permanent branch below
+    // already cleared the token, so we arrive here on every later attempt).
     lastSilentRefreshDiagnostics = {
       attempts: [],
       hadRefreshToken: !!currentRefreshToken,
       consecutiveFailures: consecutiveSilentRefreshFailures,
+      reason: sawPermanentFailureThisSession ? 'revoked' : 'no-token-stored',
     };
     return null;
   }
@@ -1085,6 +1134,9 @@ async function performSilentRefresh(): Promise<string | null> {
       console.warn('[googleAuth] Silent refresh succeeded');
       // Clear stale diagnostics so a later failure doesn't surface old data.
       lastSilentRefreshDiagnostics = null;
+      // A working token means any earlier revocation is history — otherwise a
+      // later no-token state would be misreported as `'revoked'`.
+      clearPermanentFailureFlag();
       return tokens.access_token;
     } catch (e) {
       const durationMs = Math.round(performance.now() - startMs);
@@ -1115,6 +1167,10 @@ async function performSilentRefresh(): Promise<string | null> {
         const refreshTokenAgeMs =
           currentRefreshToken?.issuedAt != null ? Date.now() - currentRefreshToken.issuedAt : null;
         currentRefreshToken = null;
+        // Latch BEFORE the await: every subsequent silent refresh this session
+        // hits the `!currentRefreshToken` early return above, which relies on
+        // this flag to report `'revoked'` rather than `'no-token-stored'`.
+        sawPermanentFailureThisSession = true;
         if (currentFamilyId) {
           await clearGoogleRefreshToken(currentFamilyId);
         }
@@ -1123,6 +1179,7 @@ async function performSilentRefresh(): Promise<string | null> {
           hadRefreshToken: true,
           consecutiveFailures: consecutiveSilentRefreshFailures,
           refreshTokenAgeMs,
+          reason: 'revoked',
         };
         firePermanentFailureCallbacks();
         return null;
@@ -1157,6 +1214,7 @@ async function performSilentRefresh(): Promise<string | null> {
         attempts: diagnosticAttempts,
         hadRefreshToken: true,
         consecutiveFailures: consecutiveSilentRefreshFailures,
+        reason: 'exhausted',
       };
       if (consecutiveSilentRefreshFailures >= SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD) {
         console.warn(
@@ -1272,6 +1330,8 @@ export async function revokeToken(): Promise<void> {
   // result, and clear any pending redirect-auth intent (Req 6).
   sessionEpoch++;
   clearRedirectIntent();
+  // Per-session revocation latch — see `sawPermanentFailureThisSession`.
+  clearPermanentFailureFlag();
 
   // Revoke access token via Google's endpoint
   if (accessToken) {
@@ -1324,6 +1384,10 @@ export async function clearGoogleSessionState(
   // its result, and clear any pending redirect-auth intent (Req 6).
   sessionEpoch++;
   clearRedirectIntent();
+  // The revocation latch is per-session. Leaving it set across a sign-out would
+  // make the NEXT family's by-design "never connected Drive" state report as a
+  // revocation incident and page Slack for it.
+  clearPermanentFailureFlag();
 
   const tokenSnapshot = accessToken;
   const familyIdSnapshot = currentFamilyId;
@@ -1448,6 +1512,9 @@ async function notifyTokenAcquired(
   // future refresh failure starts counting fresh from 0.
   consecutiveSilentRefreshFailures = 0;
   persistFailureCounter(0);
+  // Covers the interactive paths (popup / redirect reconnect) that never reach
+  // `performSilentRefresh`'s success branch.
+  clearPermanentFailureFlag();
 
   if (acquiredCallbacks.length === 0) return;
   const email = await fetchGoogleUserEmail(token);

@@ -68,6 +68,8 @@ const {
         attempts: unknown[];
         hadRefreshToken: boolean;
         consecutiveFailures: number;
+        reason?: 'no-token-stored' | 'revoked' | 'exhausted';
+        refreshTokenAgeMs?: number | null;
       }
   ),
 }));
@@ -526,11 +528,13 @@ describe('syncStore — save-failure banner visibility', () => {
     });
 
     // Closes the 2026-05-19 Lafleur (iPhone PWA) Slack noise — repeated
-    // `cold-start-reconnect-escalation` alerts with `hadRefreshToken: false`
-    // and `attempts: []` were the system working as designed (no refresh
-    // token to refresh with → banner is the correct UX) but polluted
-    // #beanies-errors with non-actionable events.
-    it('skips Slack alert (but still shows banner) when hadRefreshToken=false', async () => {
+    // `cold-start-reconnect-escalation` alerts for a user with no stored
+    // refresh token were the system working as designed (nothing to refresh
+    // with → banner is the correct UX) but polluted #beanies-errors.
+    //
+    // The suppression is keyed on `error_code`, NOT `hadRefreshToken` — see
+    // the `revoked` test below for why that distinction is load-bearing.
+    it('skips Slack alert (but still shows banner) when no token was ever stored', async () => {
       const store = useSyncStore();
       await store.initialize();
 
@@ -538,6 +542,7 @@ describe('syncStore — save-failure banner visibility', () => {
         attempts: [],
         hadRefreshToken: false,
         consecutiveFailures: 0,
+        reason: 'no-token-stored',
       });
 
       await triggerColdStartAuthTransient(store);
@@ -552,6 +557,39 @@ describe('syncStore — save-failure banner visibility', () => {
         (call) => (call[0] as { surface?: string })?.surface === 'cold-start-reconnect-escalation'
       );
       expect(coldStartCalls).toHaveLength(0);
+    });
+
+    // Regression guard for the 2026-07-09 blindness: after Google revokes the
+    // grant, `performSilentRefresh` clears the stored token, so EVERY later
+    // refresh this session reports `hadRefreshToken: false` — identical in shape
+    // to the by-design case above. Keying suppression on that flag silently
+    // swallowed a week of real revocations. Key on `error_code` instead.
+    it('STILL alerts when the token was revoked, even though hadRefreshToken=false', async () => {
+      const store = useSyncStore();
+      await store.initialize();
+
+      getLastSilentRefreshDiagnosticsMock.mockReturnValue({
+        attempts: [],
+        hadRefreshToken: false, // token already cleared by the permanent branch
+        consecutiveFailures: 0,
+        reason: 'revoked',
+        refreshTokenAgeMs: 604_800_000,
+      });
+
+      await triggerColdStartAuthTransient(store);
+
+      isTokenValidMock.mockReturnValue(false);
+      vi.advanceTimersByTime(4001);
+
+      expect(store.showGoogleReconnect).toBe(true);
+      const coldStartCalls = reportErrorMock.mock.calls.filter(
+        (call) => (call[0] as { surface?: string })?.surface === 'cold-start-reconnect-escalation'
+      );
+      expect(coldStartCalls).toHaveLength(1);
+      // The age at revocation is the payload that names the root cause.
+      const ctx = (coldStartCalls[0][0] as { context?: Record<string, unknown> }).context;
+      expect(ctx?.error_code).toBe('silent-refresh:revoked');
+      expect(ctx?.refresh_token_age_ms).toBe(604_800_000);
     });
 
     it('still emits Slack alert when hadRefreshToken=true (genuine silent-refresh failure)', async () => {
