@@ -19,6 +19,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **No more stacked pop-ups.** Only one attention pop-up (what's-new, install prompt, a security prompt, the new feedback prompt, etc.) can appear per visit now — they take turns instead of layering on top of each other.
 
+### Fixed
+
+- **The tagline now reads the same everywhere.** "every bean counts" in the mobile menu was hard-coded in English, so it never translated; it now uses the same wording as the rest of the app. The stray full stop after it (mobile menu and website footer) is gone.
+
 ## 2026-07-08
 
 ### Added
