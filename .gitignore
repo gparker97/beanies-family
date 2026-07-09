@@ -53,3 +53,6 @@ infrastructure/**/.terraform/
 tfplan
 tfplan.out
 infrastructure/*.plan
+
+# Promo-video recording artifacts (raw footage, traces) — never committed
+scripts/promo-video/.out/
