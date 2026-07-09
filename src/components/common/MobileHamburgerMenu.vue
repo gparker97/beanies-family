@@ -227,7 +227,7 @@ const encryptionLabel = computed(() => {
                 <p
                   class="font-outfit mt-0.5 text-[0.5rem] font-light tracking-[0.06em] text-white/25 italic"
                 >
-                  every bean counts.
+                  {{ t('app.tagline') }}
                 </p>
               </div>
             </div>
