@@ -48,6 +48,7 @@ import { buildDemoFamily } from './seed';
 /** A blocked click means an overlay is eating pointer events — fail fast, don't stall. */
 const CLICK_TIMEOUT = 5000;
 
+const DEMO_FAMILY_NAME = 'The Bean Family';
 const OUT = path.join(process.cwd(), 'scripts', 'promo-video', '.out');
 const beats: Array<{ name: string; atMs: number }> = [];
 let pageOpenedAt = 0;
@@ -182,7 +183,7 @@ test('record promo footage', async ({ page }) => {
 
   // ---- Setup (trimmed off the front in post) -------------------------------
   await page.goto('/');
-  await bypassLoginIfNeeded(page);
+  await bypassLoginIfNeeded(page, { familyName: DEMO_FAMILY_NAME });
 
   const db = new IndexedDBHelper(page);
   const pre = await db.exportData();
