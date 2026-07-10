@@ -16,6 +16,7 @@ import {
 } from '@/services/automerge/projection';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { bufferToBase64 } from '@/utils/encoding';
+import { COLLECTION_NAMES } from '@/types/automerge';
 import type { FamilyDocument, CollectionName, CollectionEntity } from '@/types/automerge';
 import type { MutationOp } from '@/services/automerge/worker/protocol';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
@@ -24,17 +25,16 @@ import { removeFamily } from '@/services/registry/registryService';
 /** sessionStorage key for the persisted Automerge binary */
 export const E2E_SEED_KEY = '__e2eSeedDoc';
 
-/** Collections stored as Record<string, Entity> in the Automerge doc */
-const COLLECTIONS: CollectionName[] = [
-  'familyMembers',
-  'accounts',
-  'transactions',
-  'assets',
-  'goals',
-  'recurringItems',
-  'todos',
-  'activities',
-];
+/**
+ * Collections stored as Record<string, Entity> in the Automerge doc.
+ *
+ * Derived from `COLLECTION_NAMES`, never hand-listed. A hand-maintained subset
+ * drifts silently: `seedData` skips any collection missing here, so seeding (say)
+ * a vacation would be dropped without an error and the page would render its
+ * empty state while the run still passed. Deriving it means a new collection in
+ * the document is seedable and exportable the moment it exists.
+ */
+const COLLECTIONS: readonly CollectionName[] = COLLECTION_NAMES;
 
 /** The most recent serialized doc binary (base64), pre-staged for a sync unload. */
 let stagedSnapshot: string | null = null;
