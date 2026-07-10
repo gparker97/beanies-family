@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **A trip you're currently on no longer says it's finished.** The travel plans page marked any trip "completed" the moment it started, so a family halfway through a holiday was told it was over. It now shows how far along you are — "day 3 of 7" — just like the nook does.
 - **The net worth card no longer shows an absurd percentage in your first month.** If every account was opened inside the period you're viewing, the card could report something like "+5222708551936642048.0% this month". There's no meaningful percentage to show when a period starts from nothing, so it now shows just the amount your beans grew by.
 - **Fewer "Google session expired" prompts when you come back to a tab.** Returning to a beanies tab moments after signing in with Google could ask you to reconnect a session that was, in fact, seconds from being ready. The app now waits for sign-in to finish before deciding your session has lapsed.
 - **Reconnecting Google Calendar takes effect straight away.** After reconnecting a calendar whose access had lapsed, syncing resumes immediately instead of waiting for the next page load.

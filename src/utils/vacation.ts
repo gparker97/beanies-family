@@ -414,6 +414,84 @@ export function tripDayProgress(
   return { day, total };
 }
 
+/**
+ * The ONE badge a trip card shows, by construction.
+ *
+ * Every surface that badges a trip (the nook card, the travel list card, the
+ * travel detail header) routes through this. Before it existed, `TravelPlansPage`
+ * decided from `daysUntilTrip(startDate) <= 0` — days until the trip *starts* —
+ * so the moment a trip began it read "completed" while the family was still on it.
+ *
+ * Pure: `todayStr` is injected, no clock read, matching `tripPhase` /
+ * `tripDayProgress`. Returns i18n KEYS (+ params), never copy — substitution
+ * stays in the component layer, as elsewhere in this file.
+ */
+export type TripBadge =
+  /** `labelKey` is `string`, not `UIStringKey`: `tripCountdownKey` returns `string`
+   *  and the render sites cast it into `t()`. Deliberate; don't "tidy" it. */
+  | { kind: 'countdown'; days: number; labelKey: string; emoji: string }
+  | { kind: 'status'; textKey: UIStringKey; params?: Record<string, string | number> }
+  /** Distinct from `status`: its copy and check-mark styling differ per surface,
+   *  and the nook never renders it. */
+  | { kind: 'completed' };
+
+export function tripBadge(
+  v: Pick<FamilyVacation, 'startDate' | 'endDate' | 'tripType' | 'tripPurpose'>,
+  todayStr: string
+): TripBadge | null {
+  const phase = tripPhase(v, todayStr);
+
+  switch (phase) {
+    case 'past':
+      return { kind: 'completed' };
+
+    case 'today':
+      return { kind: 'status', textKey: 'vacation.startsToday' };
+
+    case 'ongoing': {
+      const prog = tripDayProgress(v, todayStr);
+      return prog
+        ? {
+            kind: 'status',
+            textKey: 'vacation.dayOfTrip',
+            params: { n: prog.day, total: prog.total },
+          }
+        : { kind: 'status', textKey: 'vacation.onNow' }; // graceful: never a blank/NaN badge
+    }
+
+    case 'upcoming': {
+      // Load-bearing: without it `daysBetween` would call `extractDatePart(undefined)`
+      // and throw. `tripPhase` maps a falsy startDate to 'upcoming'.
+      if (!v.startDate) return null;
+
+      // Safe to use the absolute `daysBetween` here: phase 'upcoming' proves
+      // startDate > todayStr for a well-formed date, so the result is positive.
+      const days = daysBetween(todayStr, v.startDate);
+
+      // A MALFORMED startDate also lands in 'upcoming' (junk sorts after an ISO
+      // date), and `daysBetween` then returns NaN. `NaN <= 0` is false, so without
+      // this the chip would render the string "NaN" — where today it renders
+      // nothing. The finite check is what preserves that.
+      if (!Number.isFinite(days) || days <= 0) return null;
+
+      return {
+        kind: 'countdown',
+        days,
+        labelKey: tripCountdownKey(v.tripType, v.tripPurpose),
+        emoji: tripTypeEmoji(v.tripType, v.tripPurpose),
+      };
+    }
+
+    default: {
+      // A new TripPhase member fails to compile here rather than silently
+      // returning undefined.
+      const _exhaustive: never = phase;
+      void _exhaustive;
+      return null;
+    }
+  }
+}
+
 // ── Trip targeting for AI travel extraction (#30) ────────────────────────────
 
 export interface DateRange {
