@@ -125,6 +125,13 @@ async function goTab(page: Page, tabKey: UIStringKey, cardKey?: UIStringKey): Pr
   }
 }
 
+// A privacy/encryption screen was tried here (hamburger -> settings -> "family
+// data" card) and cut: the demo family runs on the DEV in-memory provider, so the
+// drawer renders its UNCONFIGURED state ("save your data to a file", "resume
+// setup") rather than the Family Key / "end-to-end encrypted" card. That reads as
+// a setup nag. The promo's privacy beat is a designed statement scene instead
+// (see promo/Promo.tsx), using the app's own privacy copy.
+
 test('capture store screenshots', async ({ page }) => {
   await mockRegistry(page);
   await page.goto('/');
