@@ -9,10 +9,23 @@ import type {
   TodoItem,
   FamilyActivity,
   FamilyVacation,
+  PhotoAttachment,
+  FavoriteItem,
+  SayingItem,
+  Recipe,
+  Medication,
+  Allergy,
+  Milestone,
   Settings,
 } from '@/types/models';
 
-/** Shape of data exported/seeded via the E2E IndexedDB helper. */
+/**
+ * Shape of data exported/seeded via the E2E IndexedDB helper.
+ *
+ * The runtime bridge (`src/services/e2e/dataBridge.ts`) seeds every collection in
+ * `COLLECTION_NAMES`, so anything in the document can be seeded. Only the
+ * collections we actually use are typed here; add a key when you need it.
+ */
 export interface ExportedData {
   familyMembers: FamilyMember[];
   accounts: Account[];
@@ -23,6 +36,13 @@ export interface ExportedData {
   todos: TodoItem[];
   activities: FamilyActivity[];
   vacations?: FamilyVacation[];
+  photos?: PhotoAttachment[];
+  favorites?: FavoriteItem[];
+  sayings?: SayingItem[];
+  recipes?: Recipe[];
+  medications?: Medication[];
+  allergies?: Allergy[];
+  milestones?: Milestone[];
   settings: Settings | undefined;
 }
 
