@@ -152,7 +152,7 @@ function driftX(local: number, length: number, dir: 1 | -1): number {
  */
 function reveal(local: number, delaySeconds: number): { opacity: number; translateY: number } {
   const start = SECONDS(delaySeconds);
-  const t = interpolate(local, [start, start + SECONDS(0.5)], [0, 1], {
+  const t = interpolate(local, [start, start + SECONDS(0.42)], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: EASE,
@@ -219,7 +219,7 @@ const Callout: React.FC<{ text: string; local: number; side: 'left' | 'right' }>
 }) => (
   <div
     style={{
-      ...revealStyle(local, 2.2),
+      ...revealStyle(local, 2.15),
       position: 'absolute',
       top: '52%',
       [side]: 18,
@@ -295,19 +295,39 @@ const Fact: React.FC<{ text: string; local: number; delay: number; centered: boo
   );
 };
 
+/**
+ * One continuous growth, not three timed events.
+ *
+ * The stem grows for GROW_SECONDS, and each element reveals as the stem reaches
+ * it. The reveals overlap the stem's travel deliberately: an element that waits
+ * for the stem to arrive before starting to fade reads as a hesitation, because
+ * the eye sees the stem stop, then a pause, then a pop. Starting each reveal
+ * slightly early means something is always in motion.
+ */
+const GROW_START = 0.55;
+const GROW_SECONDS = 1.5;
+/** Where along the stem's travel each element sits, 0..1. */
+const AT_FACT_1 = 0.0;
+const AT_FACT_2 = 0.3;
+const AT_SUMMARY = 0.56;
+
+const at = (t: number) => GROW_START + t * GROW_SECONDS;
+
 /** The payoff. Handwritten, Heritage Orange, on an orange-8 tint pill. */
-const Summary: React.FC<{ text: string; local: number; delay: number; centered: boolean }> = ({
+const Summary: React.FC<{ text: string; local: number; centered: boolean }> = ({
   text,
   local,
-  delay,
   centered,
 }) => {
-  const { opacity, translateY } = reveal(local, delay);
+  const { opacity, translateY } = reveal(local, at(AT_SUMMARY));
+  // Blooms rather than slides: it is the one element the stem does not carry.
+  const scale = interpolate(opacity, [0, 1], [0.94, 1]);
   return (
     <div
       style={{
         opacity,
-        transform: `translateY(${translateY}px)`,
+        transform: `translateY(${translateY}px) scale(${scale})`,
+        transformOrigin: centered ? 'center' : 'left center',
         display: 'flex',
         justifyContent: centered ? 'center' : 'flex-start',
       }}
@@ -330,22 +350,18 @@ const Summary: React.FC<{ text: string; local: number; delay: number; centered: 
   );
 };
 
-const FACT_DELAY = 0.7;
-const FACT_GAP = 0.5;
-const SUMMARY_DELAY = FACT_DELAY + 2 * FACT_GAP + 0.35;
-
 const Points: React.FC<{ scene: Scene; local: number; centered: boolean }> = ({
   scene,
   local,
   centered,
 }) => {
-  // The stem grows in step with the facts, then stops: the summary is where it
-  // blooms, not somewhere the stem reaches.
+  // Grows past the last fact and on toward the summary, so the eye is already
+  // travelling when the summary begins to bloom.
   const grow = interpolate(
     local,
-    [SECONDS(FACT_DELAY), SECONDS(FACT_DELAY + FACT_GAP + 0.5)],
+    [SECONDS(GROW_START), SECONDS(GROW_START + GROW_SECONDS * AT_SUMMARY)],
     [0, 1],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: EASE }
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.out(Easing.quad) }
   );
 
   return (
@@ -357,7 +373,7 @@ const Points: React.FC<{ scene: Scene; local: number; centered: boolean }> = ({
             left: 14,
             top: 6,
             width: 3,
-            height: 108,
+            height: 150,
             borderRadius: 999,
             background: `linear-gradient(${COLORS.heritageOrange}, ${COLORS.terracotta})`,
             transform: `scaleY(${grow})`,
@@ -379,12 +395,12 @@ const Points: React.FC<{ scene: Scene; local: number; centered: boolean }> = ({
             key={point}
             text={point}
             local={local}
-            delay={FACT_DELAY + i * FACT_GAP}
+            delay={at(i === 0 ? AT_FACT_1 : AT_FACT_2)}
             centered={centered}
           />
         ))}
-        <div style={{ marginTop: 12 }}>
-          <Summary text={scene.summary} local={local} delay={SUMMARY_DELAY} centered={centered} />
+        <div style={{ marginTop: 14 }}>
+          <Summary text={scene.summary} local={local} centered={centered} />
         </div>
       </div>
     </div>
