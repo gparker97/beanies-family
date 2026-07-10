@@ -59,6 +59,58 @@ export interface NetWorthChange {
   readonly delta: number;
 }
 
+/** Period-over-period change in base currency. */
+export interface PeriodComparison {
+  changeAmount: number;
+  changePercent: number;
+}
+
+/**
+ * A start value below this ABSOLUTE floor is treated as zero. Governs small
+ * portfolios and the `endValue ≈ 0` case. Far above the small-portfolio
+ * reconstruction residue (~1e-13), far below one minor unit of any supported
+ * currency (0.01, or 1 for zero-decimal currencies like JPY).
+ */
+const ZERO_BASELINE_ABS_FLOOR = 1e-6;
+
+/**
+ * A start value below `relEps × max(|start|, |end|)` is treated as zero.
+ *
+ * `replayNetWorthHistory` rebuilds the start value by subtracting float deltas
+ * backwards from the current net worth, so its residue scales with the MAGNITUDE
+ * of the portfolio (~N · ulp(netWorth)) and can exceed any fixed absolute epsilon
+ * on a large one. 1e-9 sits ~5 orders above the worst realistic accumulated
+ * relative error (~N · 2.2e-16) and well below the smallest genuine relative
+ * baseline on any normal portfolio.
+ */
+const ZERO_BASELINE_REL_EPSILON = 1e-9;
+
+/**
+ * Period-over-period change. `changePercent` is 0 when the baseline is
+ * effectively zero — either a near-zero reconstruction residue, or a value
+ * negligible relative to the magnitude being compared. No meaningful percentage
+ * can be derived from such a baseline, so consumers render only the absolute
+ * change. Without this guard a residue baseline divides into an astronomic
+ * figure (observed: +5222708551936642048.0%).
+ *
+ * The 0 is a deliberate "no percentage" sentinel. Do not switch it to a nullable
+ * without also updating every consumer's render gate.
+ *
+ * `changeAmount` is deliberately NOT epsilon-guarded: when the baseline is a
+ * residue, `changeAmount ≈ endValue`, which is correct.
+ */
+export function computePeriodChange(startValue: number, endValue: number): PeriodComparison {
+  const changeAmount = endValue - startValue;
+  const scale = Math.max(Math.abs(startValue), Math.abs(endValue));
+  const threshold = Math.max(ZERO_BASELINE_ABS_FLOOR, scale * ZERO_BASELINE_REL_EPSILON);
+  const hasBaseline = Math.abs(startValue) >= threshold;
+
+  return {
+    changeAmount,
+    changePercent: hasBaseline ? (changeAmount / Math.abs(startValue)) * 100 : 0,
+  };
+}
+
 /**
  * Walk chart points newest-first, subtracting each change whose date is
  * strictly after the chart point. Returns one number per chart point in

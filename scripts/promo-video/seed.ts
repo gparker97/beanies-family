@@ -60,10 +60,12 @@ export function buildDemoFamily(ownerId: string): Partial<ExportedData> {
 
   // Accounts are created FOUR MONTHS ago on purpose. `netWorthHistory` treats an
   // account's opening balance as a change on its `createdAt` date and reconstructs
-  // history by walking backwards from today — so an account created "today" makes
-  // net worth exactly 0 at the start of every chart window, and the hero card's
-  // percent change divides by that zero (the take showed "+5222708551936642048.0%
-  // this month"). Backdating gives the family a real baseline and a believable line.
+  // history by walking backwards from today, so an account created "today" makes net
+  // worth ~0 at the start of every chart window — a flat line and no percent change.
+  // Backdating gives the family a real baseline and a believable curve.
+  //
+  // (The card no longer renders a nonsense percentage in that case — see Notion #48,
+  // fixed by `computePeriodChange` — but a flat line still makes for poor footage.)
   const opened = iso(shift(-120));
   const checking = TestDataFactory.createAccount(john.id, {
     name: 'Everyday',
