@@ -78,7 +78,7 @@ The trust boundary — _who can read the document in transit_ — is what decide
 ## Gates
 
 1. **Extraction-quality gate — ✅ PASSED (2026-06-02).** `qwen3-vl-30b` ran on 6 real invitation images + 5 PDFs via both RedPill and Tinfoil: 6/6 + 5/5 clean, correct fields, correct `isEvent:false` on non-events. Gemma-3-27b weaker (chosen against). Model = `qwen3-vl-30b`.
-2. **DPA gate — OPEN (now targets Tinfoil).** Confirm Tinfoil's **zero-retention**, **no-training**, **GDPR Article 28** processor terms, **data residency** (EU/US), and children's-data suitability; and that the published enclave image (which the attestation measures) **bars logging request plaintext**. Must close before launch.
+2. **DPA gate — ✅ CLOSED (2026-07-10).** The Tinfoil DPA is signed (greg). Zero-retention, no-training, GDPR Article 28 processor terms and data residency are contractually established. Note what this does and does not buy: it governs what the **enclave operator** may do with the document _after_ it arrives. It says nothing about the hop to our own proxy — that is Gate 3, and until Gate 3 ships the honest claim stays "attested confidential compute + zero retention", never "no intermediary sees the document".
 3. **Verification-SDK gate — OPEN (implementation).** Before claiming "no intermediary sees the document," integrate Tinfoil's attestation-verification SDK + EHBP in our path and confirm the proxy genuinely forwards only ciphertext.
 
 If the DPA gate fails, the managed engine switches to **Gemini Flash-Lite (via Vertex)** behind the same abstraction; the rest of the architecture is unchanged.
