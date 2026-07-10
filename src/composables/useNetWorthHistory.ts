@@ -15,7 +15,12 @@ import { useAssetsStore } from '@/stores/assetsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useToday } from '@/composables/useToday';
-import { buildNetWorthChanges, replayNetWorthHistory } from '@/utils/netWorthHistory';
+import {
+  buildNetWorthChanges,
+  computePeriodChange,
+  replayNetWorthHistory,
+  type PeriodComparison,
+} from '@/utils/netWorthHistory';
 import {
   addDays,
   getStartOfDay,
@@ -30,11 +35,6 @@ export interface NetWorthDataPoint {
   date: Date;
   label: string;
   value: number;
-}
-
-export interface PeriodComparison {
-  changeAmount: number;
-  changePercent: number;
 }
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -190,17 +190,16 @@ export function useNetWorthHistory() {
   /** Period-over-period comparison: first vs last point in chronological order. */
   const periodComparison = computed<PeriodComparison>(() => {
     const data = chartData.value;
+    // No comparable data — not a zero baseline; intentionally not routed
+    // through computePeriodChange (there is no start/end value to pass).
     if (data.length < 2) return { changeAmount: 0, changePercent: 0 };
 
     const first = data[0];
     const last = data[data.length - 1];
+    // Same here: absence of data, not a zero baseline. Keep as a literal.
     if (!first || !last) return { changeAmount: 0, changePercent: 0 };
-    const startValue = first.value;
-    const endValue = last.value;
-    const changeAmount = endValue - startValue;
-    const changePercent = startValue !== 0 ? (changeAmount / Math.abs(startValue)) * 100 : 0;
 
-    return { changeAmount, changePercent };
+    return computePeriodChange(first.value, last.value);
   });
 
   return {

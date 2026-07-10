@@ -125,6 +125,23 @@ describe('useNetWorthHistory', () => {
     vi.restoreAllMocks();
   });
 
+  it('suppresses the % change when the whole family started inside the window (Notion #48)', () => {
+    // Both accounts created today, so the backward walk cancels the current net
+    // worth down to a float residue at the start of the 1M window rather than to
+    // an exact 0. The old exact `startValue !== 0` guard divided by that residue
+    // and rendered "+5222708551936642048.0% this month".
+    accountsState.filteredCombinedNetWorth = 7_850.03;
+    accountsState.filteredAccounts = [
+      account({ id: 'acc-1', balance: 4_820, createdAt: '2026-04-22' }),
+      account({ id: 'acc-2', balance: 3_030.03, createdAt: '2026-04-22' }),
+    ];
+
+    const { periodComparison } = useNetWorthHistory();
+
+    expect(periodComparison.value.changePercent).toBe(0);
+    expect(periodComparison.value.changeAmount).toBeCloseTo(7_850.03, 6);
+  });
+
   it('default period 1M produces 30 chronologically-ordered chart points', () => {
     accountsState.filteredCombinedNetWorth = 10_000;
     accountsState.filteredAccounts = [account({ id: 'acc-1', balance: 10_000 })];
