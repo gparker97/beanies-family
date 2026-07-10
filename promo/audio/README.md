@@ -35,11 +35,13 @@ At 30fps, from `Promo.tsx`:
 | Outro pill lands  | ~32.4s  |         |
 | Celebrating beans | ~32.9s  |         |
 
-Treatment (greg's call, 2026-07-10): **fade in over the intro, steady bed under the
-scenes, then a lift across the outro** as the hugging beanies and celebrating line land.
+Treatment (greg's call, 2026-07-10): **full level from the very first frame**, then a
+**gentle fall over the last 2.5s to a floor, never to silence.** Fading up at the start
+made the music sound like it wandered in late; fading out to zero at the end draws
+attention to the mix when the last thing the viewer should notice is the beanies.
 Implemented as `volume={(frame) => musicVolume(...)}` on `<Audio>`; Remotion muxes it
-into the H.264 render, no ffmpeg step. Measured on the rendered mp4: −57 dB at 0s,
-≈ −22 dB bed, peak −16.9 dB at 33s, silent by the final frame.
+into the H.264 render, no ffmpeg step. Measured on the rendered mp4: audible from 0s,
+≈ −22 dB bed, easing to ≈ −25.7 dB by the final frame.
 
 ## Licensing — read before choosing
 
