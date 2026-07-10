@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Audio,
   Easing,
   Img,
   interpolate,
@@ -16,6 +17,8 @@ import { COLORS, VIDEO } from './brand';
 import { ART } from './assets';
 import { Phone } from './Phone';
 import { RichText } from './RichText';
+import { musicVolume } from './audio';
+import track from './audio/track.mp3';
 
 const outfit = loadOutfit().fontFamily;
 const inter = loadInter().fontFamily;
@@ -555,6 +558,7 @@ const Statement: React.FC<{ scene: Scene; local: number }> = ({ scene, local }) 
 
 export const Promo: React.FC = () => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
   // The watermark rides the whole scene run, fading in with the first scene and
   // out with the last, so it never blinks at a cross-fade.
@@ -577,6 +581,20 @@ export const Promo: React.FC = () => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.cloudWhite }}>
+      {/* The track is 37s against a 35.95s cut, so it never loops or runs dry.
+          Level is a pure function of frame — see audio.ts. */}
+      <Audio
+        src={track}
+        volume={(f) =>
+          musicVolume(f, {
+            introFrames: INTRO_FRAMES,
+            outroStart: OUTRO_START,
+            totalFrames: TOTAL_FRAMES,
+            fps,
+          })
+        }
+      />
+
       <AbsoluteFill
         style={{
           background: `radial-gradient(circle at ${washX}% 30%, ${COLORS.skySilk}55, transparent 60%)`,
