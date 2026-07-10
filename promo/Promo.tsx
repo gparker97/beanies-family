@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Easing,
   Img,
   interpolate,
   spring,
@@ -20,26 +21,33 @@ const inter = loadInter().fontFamily;
 
 const SECONDS = (s: number) => Math.round(s * VIDEO.fps);
 
-export const INTRO_FRAMES = SECONDS(3.4);
-export const SCENE_FRAMES = SECONDS(4.2);
-export const OUTRO_FRAMES = SECONDS(4.5);
-/** Cross-fade length. Scenes overlap by this much at each boundary. */
-const FADE = SECONDS(0.5);
+export const INTRO_FRAMES = SECONDS(3.6);
+export const SCENE_FRAMES = SECONDS(5.6);
+export const OUTRO_FRAMES = SECONDS(5);
+/**
+ * Cross-fade length. Scenes overlap by this much, so one never fully clears
+ * before the next arrives — that overlap is what makes a cut read as a dissolve
+ * rather than a jump.
+ */
+const FADE = SECONDS(0.9);
 
 /**
- * Copy is greg's, verbatim, with two typo fixes ("stuf" -> "stuff",
- * "previous moments" -> "precious moments"). Inline markup per `RichText`:
+ * greg's copy, whittled to the core. A headline plus at most three snippets, so
+ * the eye lands, reads, and moves on inside one scene. Markers per `RichText`:
  * `**orange bold**` for the key idea, `*italic*` for tone.
  *
- * A scene with no `src` is a statement scene: no phone, brand art instead.
- * The privacy beat is one of these because the app has no screen that shows the
+ * Rule of thumb that keeps this readable: a snippet is a phrase, never a
+ * sentence. If it needs a comma and a clause, it is two snippets or none.
+ *
+ * A scene with no `src` is a statement scene: no phone, brand art instead. The
+ * privacy beat is one of these because the app has no screen that shows the
  * promise — the Family Data drawer renders its "resume setup" state under the
  * demo's in-memory provider. See the note in scripts/store-screenshots/capture.ts.
  */
 type Scene = {
   src?: string;
   headline: string;
-  sub: string;
+  points: string[];
   /** Optional pill that points back at the phone. Keep to at most one per video. */
   callout?: string;
 };
@@ -47,33 +55,49 @@ type Scene = {
 const SCENES: Scene[] = [
   {
     src: '01-nook.png',
-    headline: 'all your little beans, **together in one friendly place**',
-    sub: 'your family nook pulls today together: **no more worrying** about what is on, what needs to get done, or who is doing it',
+    headline: 'all your little beans,\n**in one place**',
+    points: ["what's on today", 'what needs doing', "who's doing it"],
   },
   {
     src: '02-planner.png',
-    headline: 'one calendar, **shared with everyone**',
-    sub: 'your lessons, appointments, dinners, travel plans, and anything else. no more asking *whose turn it is* to pick up joey.',
+    headline: 'one calendar,\n**shared with everyone**',
+    points: [
+      'lessons, dinners, appointments',
+      'travel plans, and everything else',
+      'no more *whose turn is it?*',
+    ],
   },
   {
     src: '03-todos.png',
-    headline: 'share the load and **get stuff done**',
-    sub: 'assign a task, tick it off, and watch the beanies **celebrate**.',
+    headline: 'share the load,\n**get stuff done**',
+    points: ['assign it to a bean', 'tick it off', 'watch the beanies **celebrate**'],
     callout: 'tick it off',
   },
   {
     src: '04-money.png',
     headline: 'know **where you stand**',
-    sub: 'track your accounts, spending, budget, goals, and your actual net worth - together and **fully private**.',
+    points: [
+      'accounts, spending, budgets',
+      'goals and your real net worth',
+      'together, and **fully private**',
+    ],
   },
   {
     src: '05-meet-the-beans.png',
-    headline: 'everything you need to know about **your beanies**',
-    sub: 'track their favorite foods, medications, even keep a scrapbook to preserve those *precious* moments. every bean gets a place, and **your data stays yours**.',
+    headline: 'everything about\n**your beanies**',
+    points: [
+      'favorite foods, medications',
+      'a scrapbook for *precious* moments',
+      'every bean gets a place',
+    ],
   },
   {
-    headline: 'fully secure, and fully private - **guaranteed**',
-    sub: 'your data is fully encrypted and stays with you. beanies *never* stores your data - so you can focus on your family.',
+    headline: 'fully private, **guaranteed**',
+    points: [
+      'encrypted, and stays with you',
+      'beanies *never* stores your data',
+      'so you can focus on your family',
+    ],
   },
 ];
 
@@ -82,25 +106,68 @@ const SCENES_START = INTRO_FRAMES - FADE;
 const OUTRO_START = SCENES_START + SCENES.length * STEP;
 export const TOTAL_FRAMES = OUTRO_START + OUTRO_FRAMES;
 
-/** Fade in over the first FADE frames, out over the last. */
+const EASE = Easing.inOut(Easing.cubic);
+
+/**
+ * A HANDOFF, not a true cross-fade.
+ *
+ * Consecutive scenes occupy opposite halves of the frame (the phone alternates),
+ * so overlapping them at 50/50 shows two phones and two headlines ghosting
+ * through each other. Instead the outgoing scene clears over the first half of
+ * the overlap and the incoming one arrives over the second half. The brief pass
+ * through the background is invisible at speed; the drift (see `driftX`) is what
+ * carries the eye across it.
+ */
+const HANDOFF = FADE / 2;
+
 function fadeOpacity(local: number, length: number): number {
   return Math.min(
-    interpolate(local, [0, FADE], [0, 1], { extrapolateRight: 'clamp' }),
-    interpolate(local, [length - FADE, length], [1, 0], { extrapolateLeft: 'clamp' })
+    interpolate(local, [HANDOFF, FADE], [0, 1], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+      easing: EASE,
+    }),
+    interpolate(local, [length - FADE, length - HANDOFF], [1, 0], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+      easing: EASE,
+    })
   );
+}
+
+/**
+ * A scene drifts in from `dir` and continues out the same way, so consecutive
+ * scenes move as one continuous pan instead of each arriving and leaving.
+ */
+function driftX(local: number, length: number, dir: 1 | -1): number {
+  const enter = interpolate(local, [0, FADE], [46 * dir, 0], {
+    extrapolateRight: 'clamp',
+    easing: EASE,
+  });
+  const exit = interpolate(local, [length - FADE, length], [0, -46 * dir], {
+    extrapolateLeft: 'clamp',
+    easing: EASE,
+  });
+  return enter + exit;
 }
 
 /**
  * Staggered reveal: each element fades up a beat after the one above it, so the
  * eye is led down the caption rather than hit with the whole block at once.
  */
-function reveal(local: number, delaySeconds: number): React.CSSProperties {
+function reveal(local: number, delaySeconds: number): { opacity: number; translateY: number } {
   const start = SECONDS(delaySeconds);
-  const t = interpolate(local, [start, start + SECONDS(0.55)], [0, 1], {
+  const t = interpolate(local, [start, start + SECONDS(0.5)], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
+    easing: EASE,
   });
-  return { opacity: t, transform: `translateY(${(1 - t) * 22}px)` };
+  return { opacity: t, translateY: (1 - t) * 18 };
+}
+
+function revealStyle(local: number, delaySeconds: number): React.CSSProperties {
+  const { opacity, translateY } = reveal(local, delaySeconds);
+  return { opacity, transform: `translateY(${translateY}px)` };
 }
 
 /** Wordmark with the `.family` in Heritage Orange, per the CIG. */
@@ -114,36 +181,32 @@ const Wordmark: React.FC<{ size: number }> = ({ size }) => (
 /** The tagline is always lowercase and always italic here, per greg. */
 const Tagline: React.FC<{ size: number }> = ({ size }) => (
   <div
-    style={{
-      fontFamily: inter,
-      fontStyle: 'italic',
-      fontSize: size,
-      color: COLORS.heritageOrange,
-    }}
+    style={{ fontFamily: inter, fontStyle: 'italic', fontSize: size, color: COLORS.heritageOrange }}
   >
     every bean counts
   </div>
 );
 
 /**
- * Persistent brand mark on every scene (never the bookends, where the wordmark is
- * already the hero). It sits on the CAPTION side: parked bottom-right on a
- * right-phone scene it clips the bezel.
+ * Persistent brand mark. Rendered ONCE for the whole scene run, not per scene:
+ * per-scene it would fade out and back in on every cross-fade, which is exactly
+ * the blink a watermark exists to avoid. It sits below the phone's bottom edge
+ * (see PHONE.height) so it clears the bezel on either side.
  */
-const Watermark: React.FC<{ side: 'left' | 'right' }> = ({ side }) => (
+const Watermark: React.FC<{ opacity: number }> = ({ opacity }) => (
   <div
     style={{
       position: 'absolute',
-      [side]: 56,
-      bottom: 44,
+      right: 56,
+      bottom: 38,
       display: 'flex',
       alignItems: 'center',
       gap: 12,
-      opacity: 0.55,
+      opacity: opacity * 0.5,
     }}
   >
-    <Img src={ART.logo} style={{ width: 40, height: 40 }} />
-    <div style={{ fontFamily: outfit, fontWeight: 600, fontSize: 26 }}>
+    <Img src={ART.logo} style={{ width: 36, height: 36 }} />
+    <div style={{ fontFamily: outfit, fontWeight: 600, fontSize: 24 }}>
       <span style={{ color: COLORS.deepSlate }}>beanies</span>
       <span style={{ color: COLORS.heritageOrange }}>.family</span>
     </div>
@@ -161,10 +224,10 @@ const Callout: React.FC<{ text: string; local: number; side: 'left' | 'right' }>
 }) => (
   <div
     style={{
-      ...reveal(local, 1.5),
+      ...revealStyle(local, 2.2),
       position: 'absolute',
       top: '52%',
-      [side]: 24,
+      [side]: 18,
       display: 'flex',
       // Arrow must sit between the pill and the phone.
       flexDirection: side === 'right' ? 'row-reverse' : 'row',
@@ -176,10 +239,10 @@ const Callout: React.FC<{ text: string; local: number; side: 'left' | 'right' }>
       style={{
         fontFamily: outfit,
         fontWeight: 600,
-        fontSize: 24,
+        fontSize: 22,
         color: COLORS.cloudWhite,
         background: COLORS.heritageOrange,
-        padding: '10px 22px',
+        padding: '9px 20px',
         borderRadius: 999,
         whiteSpace: 'nowrap',
         boxShadow: '0 8px 20px rgba(241, 93, 34, 0.28)',
@@ -187,44 +250,89 @@ const Callout: React.FC<{ text: string; local: number; side: 'left' | 'right' }>
     >
       {text}
     </div>
-    <div style={{ width: 48, height: 3, borderRadius: 999, background: COLORS.heritageOrange }} />
+    <div style={{ width: 44, height: 3, borderRadius: 999, background: COLORS.heritageOrange }} />
   </div>
 );
+
+const Bullet: React.FC<{ text: string; local: number; delay: number; centered: boolean }> = ({
+  text,
+  local,
+  delay,
+  centered,
+}) => {
+  const { opacity, translateY } = reveal(local, delay);
+  return (
+    <div
+      style={{
+        opacity,
+        transform: `translateY(${translateY}px)`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: centered ? 'center' : 'flex-start',
+        gap: 16,
+      }}
+    >
+      <div
+        style={{
+          width: 11,
+          height: 11,
+          borderRadius: 999,
+          background: COLORS.heritageOrange,
+          flexShrink: 0,
+        }}
+      />
+      <div
+        style={{
+          fontFamily: inter,
+          fontSize: centered ? 34 : 31,
+          lineHeight: 1.35,
+          color: COLORS.deepSlate,
+          opacity: 0.9,
+        }}
+      >
+        <RichText>{text}</RichText>
+      </div>
+    </div>
+  );
+};
 
 const Caption: React.FC<{ scene: Scene; local: number; centered?: boolean }> = ({
   scene,
   local,
   centered = false,
 }) => (
-  <div style={{ maxWidth: centered ? 1100 : 640, textAlign: centered ? 'center' : 'left' }}>
+  <div style={{ maxWidth: centered ? 900 : 640 }}>
     <h1
       style={{
-        ...reveal(local, 0.15),
+        ...revealStyle(local, 0.2),
         fontFamily: outfit,
         fontWeight: 700,
-        fontSize: centered ? 76 : 62,
+        fontSize: centered ? 72 : 58,
         lineHeight: 1.12,
         color: COLORS.deepSlate,
         margin: 0,
+        textAlign: centered ? 'center' : 'left',
+        // Headlines carry explicit \n so the highlighted run never dangles.
+        whiteSpace: 'pre-line',
       }}
     >
       <RichText>{scene.headline}</RichText>
     </h1>
-    <p
+    <div
       style={{
-        ...reveal(local, 0.55),
-        fontFamily: inter,
-        fontWeight: 400,
-        fontSize: centered ? 34 : 29,
-        lineHeight: 1.55,
-        color: COLORS.deepSlate,
-        marginTop: 26,
-        // Multiply, never assign: a constant here would clobber reveal()'s fade-in.
-        opacity: (reveal(local, 0.55).opacity as number) * 0.88,
+        marginTop: 34,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 20,
+        alignItems: centered ? 'center' : 'flex-start',
       }}
     >
-      <RichText>{scene.sub}</RichText>
-    </p>
+      {scene.points.map((point, i) => (
+        // 0.45s apart: slow enough to follow one line at a time, quick enough
+        // that the last still has ~2.5s on screen before the scene fades.
+        <Bullet key={point} text={point} local={local} delay={0.7 + i * 0.45} centered={centered} />
+      ))}
+    </div>
   </div>
 );
 
@@ -269,10 +377,10 @@ const Intro: React.FC<{ local: number; length: number }> = ({ local, length }) =
           src={ART.hugging}
           style={{ width: 300, height: 300, transform: `scale(${0.85 + pop * 0.15})` }}
         />
-        <div style={reveal(local, 0.5)}>
+        <div style={revealStyle(local, 0.5)}>
           <Wordmark size={104} />
         </div>
-        <div style={reveal(local, 0.9)}>
+        <div style={revealStyle(local, 0.95)}>
           <Tagline size={40} />
         </div>
       </AbsoluteFill>
@@ -298,15 +406,15 @@ const Outro: React.FC<{ local: number; length: number }> = ({ local, length }) =
         src={ART.hugging}
         style={{ width: 330, height: 330, transform: `scale(${0.85 + pop * 0.15})` }}
       />
-      <div style={reveal(local, 0.45)}>
+      <div style={revealStyle(local, 0.5)}>
         <Wordmark size={88} />
       </div>
-      <div style={reveal(local, 0.8)}>
+      <div style={revealStyle(local, 0.95)}>
         <Tagline size={38} />
       </div>
       <div
         style={{
-          ...reveal(local, 1.25),
+          ...revealStyle(local, 1.5),
           fontFamily: inter,
           fontWeight: 500,
           fontSize: 32,
@@ -320,7 +428,7 @@ const Outro: React.FC<{ local: number; length: number }> = ({ local, length }) =
       >
         fully private and secure
       </div>
-      <Img src={ART.celebrating} style={{ ...reveal(local, 1.7), width: 460, marginTop: 8 }} />
+      <Img src={ART.celebrating} style={{ ...revealStyle(local, 2.0), width: 460, marginTop: 8 }} />
     </AbsoluteFill>
   );
 };
@@ -332,23 +440,24 @@ const Statement: React.FC<{ scene: Scene; local: number }> = ({ scene, local }) 
 
   return (
     <AbsoluteFill
-      style={{ alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 30 }}
+      style={{ alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 34 }}
     >
       <div style={{ position: 'relative', transform: `scale(${0.9 + pop * 0.1})` }}>
-        <Img src={ART.hugging} style={{ width: 260, height: 260 }} />
+        <Img src={ART.hugging} style={{ width: 250, height: 250 }} />
         <div
           style={{
             position: 'absolute',
+            // Clear of the art: the beanies are never obscured (CIG golden rule).
             right: -54,
             bottom: 18,
-            width: 92,
-            height: 92,
+            width: 88,
+            height: 88,
             borderRadius: 999,
             background: COLORS.heritageOrange,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 46,
+            fontSize: 44,
             boxShadow: '0 12px 28px rgba(241, 93, 34, 0.35)',
           }}
         >
@@ -363,12 +472,30 @@ const Statement: React.FC<{ scene: Scene; local: number }> = ({ scene, local }) 
 export const Promo: React.FC = () => {
   const frame = useCurrentFrame();
 
+  // The watermark rides the whole scene run, fading in with the first scene and
+  // out with the last, so it never blinks at a cross-fade.
+  const watermark = Math.min(
+    interpolate(frame, [SCENES_START, SCENES_START + FADE], [0, 1], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+      easing: EASE,
+    }),
+    interpolate(frame, [OUTRO_START - FADE, OUTRO_START], [1, 0], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+      easing: EASE,
+    })
+  );
+
+  // Warm wash drifts slowly across the whole video. Small, but it is most of
+  // what makes six scenes feel like one piece rather than six.
+  const washX = interpolate(frame, [0, TOTAL_FRAMES], [64, 36]);
+
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.cloudWhite }}>
-      {/* Warm wash so the Cloud White backdrop is not clinical. */}
       <AbsoluteFill
         style={{
-          background: `radial-gradient(circle at 72% 30%, ${COLORS.skySilk}55, transparent 60%)`,
+          background: `radial-gradient(circle at ${washX}% 30%, ${COLORS.skySilk}55, transparent 60%)`,
         }}
       />
 
@@ -378,25 +505,30 @@ export const Promo: React.FC = () => {
         const local = frame - (SCENES_START + i * STEP);
         if (local < 0 || local > SCENE_FRAMES) return null;
 
+        // Alternate sides so the eye moves. Even scenes: phone left.
+        const phoneLeft = i % 2 === 0;
+        const x = driftX(local, SCENE_FRAMES, phoneLeft ? 1 : -1);
+
         if (!scene.src) {
           return (
             <AbsoluteFill
               key={scene.headline}
-              style={{ opacity: fadeOpacity(local, SCENE_FRAMES) }}
+              style={{
+                opacity: fadeOpacity(local, SCENE_FRAMES),
+                transform: `translateX(${x}px)`,
+              }}
             >
               <Statement scene={scene} local={local} />
             </AbsoluteFill>
           );
         }
 
-        // Alternate sides so the eye moves. Even scenes: phone left.
-        const phoneLeft = i % 2 === 0;
-
         return (
           <AbsoluteFill
             key={scene.src}
             style={{
               opacity: fadeOpacity(local, SCENE_FRAMES),
+              transform: `translateX(${x}px)`,
               flexDirection: phoneLeft ? 'row' : 'row-reverse',
               // Columns must STRETCH, not center: centering shrinks each flex
               // child to its content height, leaving the Phone's AbsoluteFill
@@ -423,10 +555,11 @@ export const Promo: React.FC = () => {
             >
               <Caption scene={scene} local={local} />
             </div>
-            <Watermark side={phoneLeft ? 'right' : 'left'} />
           </AbsoluteFill>
         );
       })}
+
+      {watermark > 0 ? <Watermark opacity={watermark} /> : null}
 
       {frame >= OUTRO_START ? <Outro local={frame - OUTRO_START} length={OUTRO_FRAMES} /> : null}
     </AbsoluteFill>

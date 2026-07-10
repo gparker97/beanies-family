@@ -22,11 +22,13 @@ export const VIDEO = {
 } as const;
 
 /**
- * A phone screen is 1080x1920 (9:16). At 0.86 of the canvas height it reads as
- * a phone held up beside the caption rather than a wall of screenshot.
+ * A phone screen is 1080x1920 (9:16). 0.78 of the canvas height reads as a phone
+ * held up beside the caption rather than a wall of screenshot — and, chosen
+ * deliberately, leaves the bottom strip clear so the fixed watermark never clips
+ * the bezel on either side of an alternating layout.
  */
 export const PHONE = {
-  height: Math.round(VIDEO.height * 0.86),
+  height: Math.round(VIDEO.height * 0.78),
   get width() {
     return Math.round((this.height * 1080) / 1920);
   },
