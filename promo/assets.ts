@@ -11,5 +11,9 @@
 import hugging from '../public/brand/beanies_family_hugging_transparent_1600x1600.png';
 import logo from '../public/brand/beanies_logo_transparent_logo_only_192x192.png';
 import celebrating from '../public/brand/beanies_celebrating_line_transparent_560x225.png';
+/** The CIG's designated asset for "data encrypted" — not a padlock. */
+import coveringEyes from '../public/brand/beanies_covering_eyes_transparent_512x512.png';
+/** The CIG's designated asset for feature bullet points. */
+import impactBullet from '../public/brand/beanies_impact_bullet_transparent_192x192.png';
 
-export const ART = { hugging, logo, celebrating } as const;
+export const ART = { hugging, logo, celebrating, coveringEyes, impactBullet } as const;

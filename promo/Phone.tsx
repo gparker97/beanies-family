@@ -31,7 +31,8 @@ export const Phone: React.FC<{
           // Squircle-ish. The bezel is Deep Slate, never pure black.
           borderRadius: 44,
           border: `10px solid ${COLORS.deepSlate}`,
-          boxShadow: '0 40px 80px rgba(44, 62, 80, 0.28)',
+          // CIG: shadows are diffused and subtle. Elevation is implied, never harsh.
+          boxShadow: '0 24px 60px rgba(44, 62, 80, 0.12)',
           overflow: 'hidden',
           background: COLORS.cloudWhite,
           transform: `scale(${scale})`,
