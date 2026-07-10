@@ -24,6 +24,8 @@
     "test:e2e:firefox": "playwright test --project=firefox",
     "test:e2e:webkit": "playwright test --project=webkit",
     "test:e2e:report": "playwright show-report",
+    "promo:record": "playwright test -c playwright.video.config.ts",
+    "promo:compose": "bash scripts/promo-video/compose.sh",
     "translate": "node scripts/updateTranslations.mjs --all",
     "translate:zh": "node scripts/updateTranslations.mjs zh",
     "update-airports": "node scripts/updateAirports.mjs",
