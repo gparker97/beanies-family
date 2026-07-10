@@ -582,18 +582,8 @@ export const Promo: React.FC = () => {
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.cloudWhite }}>
       {/* The track is 37s against a 35.95s cut, so it never loops or runs dry.
-          Level is a pure function of frame — see audio.ts. */}
-      <Audio
-        src={track}
-        volume={(f) =>
-          musicVolume(f, {
-            introFrames: INTRO_FRAMES,
-            outroStart: OUTRO_START,
-            totalFrames: TOTAL_FRAMES,
-            fps,
-          })
-        }
-      />
+          Full level from frame 0, gentle fall at the end — see audio.ts. */}
+      <Audio src={track} volume={(f) => musicVolume(f, { totalFrames: TOTAL_FRAMES, fps })} />
 
       <AbsoluteFill
         style={{
