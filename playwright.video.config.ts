@@ -16,6 +16,15 @@ import { defineConfig, devices } from '@playwright/test';
 
 const PHONE = devices['Pixel 5'];
 
+/**
+ * `video.size` is the recorded AREA in CSS pixels, not a supersample — setting it
+ * to 2x the viewport records a 2x-larger region and pads the empty space grey
+ * (verified on camera, 2026-07-10). It must therefore track the viewport. Render
+ * fidelity is raised with `deviceScaleFactor` instead.
+ */
+const SCALE = 2;
+const VIDEO_SIZE = PHONE.viewport;
+
 export default defineConfig({
   testDir: './scripts/promo-video',
   testMatch: /record\.ts/,
@@ -28,7 +37,8 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5173',
     ...PHONE,
-    video: { mode: 'on', size: PHONE.viewport },
+    deviceScaleFactor: SCALE,
+    video: { mode: 'on', size: VIDEO_SIZE },
     trace: 'off',
     screenshot: 'off',
     serviceWorkers: 'allow',
