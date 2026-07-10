@@ -56,3 +56,5 @@ infrastructure/*.plan
 
 # Promo-video recording artifacts (raw footage, traces) — never committed
 scripts/promo-video/.out/
+scripts/store-screenshots/.out/
+scripts/store-screenshots/.tmp/
