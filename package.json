@@ -26,6 +26,7 @@
     "test:e2e:report": "playwright show-report",
     "promo:record": "playwright test -c playwright.video.config.ts",
     "promo:compose": "bash scripts/promo-video/compose.sh",
+    "store:screenshots": "playwright test -c playwright.screenshots.config.ts",
     "translate": "node scripts/updateTranslations.mjs --all",
     "translate:zh": "node scripts/updateTranslations.mjs zh",
     "update-airports": "node scripts/updateAirports.mjs",

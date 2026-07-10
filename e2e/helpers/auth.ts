@@ -20,9 +20,9 @@ const E2E_FAMILY_NAME = 'E2E Test Family';
  * surface's single password entry. The password is collected ONCE here — not at
  * step 1 (those fields no longer exist).
  */
-async function createUpToMembers(page: Page): Promise<void> {
+async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Promise<void> {
   // Step 1 — identity only (no password; it moved to the finish surface).
-  await page.getByLabel(ui('auth.familyName')).fill(E2E_FAMILY_NAME);
+  await page.getByLabel(ui('auth.familyName')).fill(familyName);
   await page.getByLabel(ui('setup.yourName')).fill('John Doe');
   await page.getByLabel(ui('form.email')).fill('john@example.com');
   await page.getByRole('button', { name: ui('loginV6.createNext') }).click();
@@ -82,8 +82,16 @@ export async function navigateToAddMembers(page: Page): Promise<void> {
  *
  * On subsequent calls within the same test: the auto-auth flag is already set,
  * so the app skips login automatically.
+ *
+ * `familyName` defaults to `E2E_FAMILY_NAME` — do NOT change that default; it is
+ * the registry-scrub safety net. The store-listing / promo harnesses pass a
+ * presentable name instead ("E2E Test Family" on a Play screenshot is a bad look);
+ * they run against a memory provider + mocked registry, so nothing is persisted.
  */
-export async function bypassLoginIfNeeded(page: Page): Promise<void> {
+export async function bypassLoginIfNeeded(
+  page: Page,
+  opts: { familyName?: string } = {}
+): Promise<void> {
   const createPodButton = page.getByTestId('create-pod-button');
 
   const isOnWelcome = await createPodButton
@@ -99,7 +107,7 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
     });
 
     await createPodButton.click();
-    await createUpToMembers(page);
+    await createUpToMembers(page, opts.familyName);
 
     // Members step → finish (goes to /nook).
     await page.getByRole('button', { name: ui('loginV6.finish') }).click();
