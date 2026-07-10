@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-07-10
 
+### Changed
+
+- **Clearer wording about what happens to a document you send to the AI reader.** The consent note and the help article now say plainly that the document passes through a beanies server on its way to the AI service, and that the server stores nothing. Nothing about the app's behaviour changed - only how honestly it is described.
+
 ### Fixed
 
 - **A trip you're currently on no longer says it's finished.** The travel plans page marked any trip "completed" the moment it started, so a family halfway through a holiday was told it was over. It now shows how far along you are — "day 3 of 7" — just like the nook does.

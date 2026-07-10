@@ -7246,10 +7246,15 @@ const STRING_DEFS = {
       "only this one photo or document, never anything else, and never any of your family's data.",
   },
   'ai.consent.whereLabel': { en: 'Where it goes', beanie: 'where it goes' },
+  // Honesty (ADR-030 binding principle): today the document is encrypted in transit
+  // (TLS) on both hops, and it passes through our own server on the way. It is NOT
+  // yet end-to-end encrypted to the enclave — that is Gate 3 (Notion #49). No copy
+  // here may imply our server cannot see the document. Once Gate 3 ships, this can
+  // become "only the AI's secure hardware can read it, not even our own server".
   'ai.consent.whereManaged': {
-    en: 'beanies uses a private, safe, and secure AI service that processes the document and keeps nothing. Your document is fully encrypted while travelling to and from the service.',
+    en: 'To a private AI service that reads the document inside secure hardware its own operator cannot see into, then keeps nothing. It travels encrypted, by way of a beanies server that stores nothing.',
     beanie:
-      'beanies uses a private, safe, and secure ai service that processes the document and keeps nothing. your document is fully encrypted while travelling to and from the service.',
+      'to a private ai service that reads the document inside secure hardware its own operator cannot see into, then keeps nothing. it travels encrypted, by way of a beanies server that stores nothing.',
   },
   'ai.consent.whereByok': {
     en: "To your own AI provider, using the key you've provided.",
