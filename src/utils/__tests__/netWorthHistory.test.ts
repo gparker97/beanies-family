@@ -23,6 +23,7 @@ import {
   assetToCreationChange,
   deriveAccountInitialBalances,
   buildNetWorthChanges,
+  computePeriodChange,
 } from '../netWorthHistory';
 
 const USD_RATES: ExchangeRate[] = [];
@@ -643,5 +644,59 @@ describe('end-to-end Bug C regression: loan-payment principal handling', () => {
     // Before payment: -5_100 - (-100) = -5_000 (interest reversed only).
     expect(values[0]).toBe(-5_100);
     expect(values[1]).toBe(-5_000);
+  });
+});
+
+describe('computePeriodChange', () => {
+  it('computes a percentage against a genuine baseline', () => {
+    expect(computePeriodChange(1_000, 1_100)).toEqual({
+      changeAmount: 100,
+      changePercent: 10,
+    });
+  });
+
+  it('suppresses the percentage when the baseline is exactly zero', () => {
+    const { changeAmount, changePercent } = computePeriodChange(0, 100);
+    expect(changeAmount).toBe(100);
+    expect(changePercent).toBe(0);
+  });
+
+  it('suppresses the percentage when the baseline is a float residue (Notion #48)', () => {
+    // A family whose accounts were all created inside the chart window: the
+    // backward walk cancels to a residue, not to 0. The old exact `!== 0` guard
+    // divided by it and rendered +5222708551936642048.0%.
+    const { changeAmount, changePercent } = computePeriodChange(1.5e-13, 7_850.03);
+    expect(changePercent).toBe(0);
+    expect(changeAmount).toBeCloseTo(7_850.03, 6);
+  });
+
+  it('suppresses a large-portfolio residue that exceeds the absolute floor', () => {
+    // Residue scales with ulp(netWorth), so a ~$5M portfolio can land above
+    // 1e-6. A bare absolute epsilon would divide by this and reintroduce the bug.
+    expect(computePeriodChange(2e-6, 5_000_000).changePercent).toBe(0);
+  });
+
+  it('keeps the sign of the change on a negative baseline', () => {
+    // Denominator is |start|, so recovering from -1000 to -500 is a +50% move.
+    expect(computePeriodChange(-1_000, -500)).toEqual({
+      changeAmount: 500,
+      changePercent: 50,
+    });
+  });
+
+  it('preserves a genuine one-cent baseline on a normal portfolio', () => {
+    expect(computePeriodChange(0.01, 100).changePercent).toBeCloseTo(999_900, 0);
+  });
+
+  it('applies the absolute floor at small scale', () => {
+    // scale * relEps < 1e-6, so the 1e-6 floor governs.
+    expect(computePeriodChange(1e-6, 500).changePercent).not.toBe(0);
+    expect(computePeriodChange(9.99e-7, 500).changePercent).toBe(0);
+  });
+
+  it('applies the relative threshold at large scale', () => {
+    // endValue 1e9 => threshold = 1e9 * 1e-9 = 1, which beats the 1e-6 floor.
+    expect(computePeriodChange(0.5, 1e9).changePercent).toBe(0);
+    expect(computePeriodChange(2, 1e9).changePercent).not.toBe(0);
   });
 });
