@@ -11,6 +11,7 @@ import {
 } from 'remotion';
 import { loadFont as loadOutfit } from '@remotion/google-fonts/Outfit';
 import { loadFont as loadInter } from '@remotion/google-fonts/Inter';
+import { loadFont as loadCaveat } from '@remotion/google-fonts/Caveat';
 import { COLORS, VIDEO } from './brand';
 import { ART } from './assets';
 import { Phone } from './Phone';
@@ -18,6 +19,7 @@ import { RichText } from './RichText';
 
 const outfit = loadOutfit().fontFamily;
 const inter = loadInter().fontFamily;
+const caveat = loadCaveat().fontFamily;
 
 const SECONDS = (s: number) => Math.round(s * VIDEO.fps);
 
@@ -47,7 +49,10 @@ const FADE = SECONDS(0.9);
 type Scene = {
   src?: string;
   headline: string;
-  points: string[];
+  /** Two facts. They hang off the growing stem. */
+  points: [string, string];
+  /** The payoff. Handwritten, and the only Caveat on the screen. */
+  summary: string;
   /** Optional pill that points back at the phone. Keep to at most one per video. */
   callout?: string;
 };
@@ -56,48 +61,38 @@ const SCENES: Scene[] = [
   {
     src: '01-nook.png',
     headline: 'all your little beans,\n**in one place**',
-    points: ["what's on today", 'what needs doing', "who's doing it"],
+    points: ["what's on today", "who's doing it"],
+    summary: 'no more mental load',
   },
   {
     src: '02-planner.png',
     headline: 'one calendar,\n**shared with everyone**',
-    points: [
-      'lessons, dinners, appointments',
-      'travel plans, and everything else',
-      'no more *whose turn is it?*',
-    ],
+    points: ['lessons, dinners, appointments', 'travel plans, and everything else'],
+    summary: 'no more whose turn is it?',
   },
   {
     src: '03-todos.png',
     headline: 'share the load,\n**get stuff done**',
-    points: ['assign it to a bean', 'tick it off', 'watch the beanies **celebrate**'],
+    points: ['assign it to a bean', 'tick it off'],
+    summary: 'and the beanies celebrate with you',
     callout: 'tick it off',
   },
   {
     src: '04-money.png',
     headline: 'know **where you stand**',
-    points: [
-      'accounts, spending, budgets',
-      'goals and your real net worth',
-      'together, and **fully private**',
-    ],
+    points: ['accounts, spending, budgets', 'goals and your real net worth'],
+    summary: 'together, and fully private',
   },
   {
     src: '05-meet-the-beans.png',
     headline: 'everything about\n**your beanies**',
-    points: [
-      'favorite foods, medications',
-      'a scrapbook for *precious* moments',
-      'every bean gets a place',
-    ],
+    points: ['favorite foods, medications', 'a scrapbook for precious moments'],
+    summary: 'every bean gets a place',
   },
   {
     headline: 'fully private, **guaranteed**',
-    points: [
-      'encrypted, and stays with you',
-      'beanies *never* stores your data',
-      'so you can focus on your family',
-    ],
+    points: ['encrypted, and stays with you', 'beanies *never* stores your data'],
+    summary: 'so you can focus on your family',
   },
 ];
 
@@ -245,7 +240,7 @@ const Callout: React.FC<{ text: string; local: number; side: 'left' | 'right' }>
         padding: '9px 20px',
         borderRadius: 999,
         whiteSpace: 'nowrap',
-        boxShadow: '0 8px 20px rgba(241, 93, 34, 0.28)',
+        boxShadow: '0 8px 24px rgba(241, 93, 34, 0.18)',
       }}
     >
       {text}
@@ -254,7 +249,19 @@ const Callout: React.FC<{ text: string; local: number; side: 'left' | 'right' }>
   </div>
 );
 
-const Bullet: React.FC<{ text: string; local: number; delay: number; centered: boolean }> = ({
+/**
+ * "The sprout" — how a scene's three supporting points are laid out.
+ *
+ * They are not three peers, so three identical bullets misrepresent them: the
+ * first two are facts, the third is the payoff. A Heritage Orange -> Terracotta
+ * stem grows down beside the facts (each marked with the brand's own impact-bullet
+ * asset, the CIG's designated bullet), then detaches at the summary, which blooms
+ * as a handwritten Caveat line on an orange tint.
+ *
+ * That summary is the ONE Caveat element per scene. The CIG is explicit: reach
+ * for it more than once on a screen and you are using it wrong.
+ */
+const Fact: React.FC<{ text: string; local: number; delay: number; centered: boolean }> = ({
   text,
   local,
   delay,
@@ -269,22 +276,14 @@ const Bullet: React.FC<{ text: string; local: number; delay: number; centered: b
         display: 'flex',
         alignItems: 'center',
         justifyContent: centered ? 'center' : 'flex-start',
-        gap: 16,
+        gap: 18,
       }}
     >
-      <div
-        style={{
-          width: 11,
-          height: 11,
-          borderRadius: 999,
-          background: COLORS.heritageOrange,
-          flexShrink: 0,
-        }}
-      />
+      <Img src={ART.impactBullet} style={{ width: 30, height: 30, flexShrink: 0 }} />
       <div
         style={{
           fontFamily: inter,
-          fontSize: centered ? 34 : 31,
+          fontSize: centered ? 33 : 30,
           lineHeight: 1.35,
           color: COLORS.deepSlate,
           opacity: 0.9,
@@ -296,12 +295,108 @@ const Bullet: React.FC<{ text: string; local: number; delay: number; centered: b
   );
 };
 
+/** The payoff. Handwritten, Heritage Orange, on an orange-8 tint pill. */
+const Summary: React.FC<{ text: string; local: number; delay: number; centered: boolean }> = ({
+  text,
+  local,
+  delay,
+  centered,
+}) => {
+  const { opacity, translateY } = reveal(local, delay);
+  return (
+    <div
+      style={{
+        opacity,
+        transform: `translateY(${translateY}px)`,
+        display: 'flex',
+        justifyContent: centered ? 'center' : 'flex-start',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: caveat,
+          fontWeight: 700,
+          fontSize: centered ? 50 : 46,
+          lineHeight: 1.2,
+          color: COLORS.heritageOrange,
+          background: 'rgba(241, 93, 34, 0.08)',
+          padding: '12px 30px 8px',
+          borderRadius: 24,
+        }}
+      >
+        {text}
+      </div>
+    </div>
+  );
+};
+
+const FACT_DELAY = 0.7;
+const FACT_GAP = 0.5;
+const SUMMARY_DELAY = FACT_DELAY + 2 * FACT_GAP + 0.35;
+
+const Points: React.FC<{ scene: Scene; local: number; centered: boolean }> = ({
+  scene,
+  local,
+  centered,
+}) => {
+  // The stem grows in step with the facts, then stops: the summary is where it
+  // blooms, not somewhere the stem reaches.
+  const grow = interpolate(
+    local,
+    [SECONDS(FACT_DELAY), SECONDS(FACT_DELAY + FACT_GAP + 0.5)],
+    [0, 1],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: EASE }
+  );
+
+  return (
+    <div style={{ position: 'relative', marginTop: 34 }}>
+      {!centered ? (
+        <div
+          style={{
+            position: 'absolute',
+            left: 14,
+            top: 6,
+            width: 3,
+            height: 108,
+            borderRadius: 999,
+            background: `linear-gradient(${COLORS.heritageOrange}, ${COLORS.terracotta})`,
+            transform: `scaleY(${grow})`,
+            transformOrigin: 'top',
+          }}
+        />
+      ) : null}
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 22,
+          alignItems: centered ? 'center' : 'flex-start',
+        }}
+      >
+        {scene.points.map((point, i) => (
+          <Fact
+            key={point}
+            text={point}
+            local={local}
+            delay={FACT_DELAY + i * FACT_GAP}
+            centered={centered}
+          />
+        ))}
+        <div style={{ marginTop: 12 }}>
+          <Summary text={scene.summary} local={local} delay={SUMMARY_DELAY} centered={centered} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Caption: React.FC<{ scene: Scene; local: number; centered?: boolean }> = ({
   scene,
   local,
   centered = false,
 }) => (
-  <div style={{ maxWidth: centered ? 900 : 640 }}>
+  <div style={{ maxWidth: centered ? 900 : 660 }}>
     <h1
       style={{
         ...revealStyle(local, 0.2),
@@ -318,21 +413,7 @@ const Caption: React.FC<{ scene: Scene; local: number; centered?: boolean }> = (
     >
       <RichText>{scene.headline}</RichText>
     </h1>
-    <div
-      style={{
-        marginTop: 34,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 20,
-        alignItems: centered ? 'center' : 'flex-start',
-      }}
-    >
-      {scene.points.map((point, i) => (
-        // 0.45s apart: slow enough to follow one line at a time, quick enough
-        // that the last still has ~2.5s on screen before the scene fades.
-        <Bullet key={point} text={point} local={local} delay={0.7 + i * 0.45} centered={centered} />
-      ))}
-    </div>
+    <Points scene={scene} local={local} centered={centered} />
   </div>
 );
 
@@ -423,7 +504,7 @@ const Outro: React.FC<{ local: number; length: number }> = ({ local, length }) =
           padding: '18px 46px',
           borderRadius: 999,
           marginTop: 10,
-          boxShadow: '0 14px 34px rgba(241, 93, 34, 0.32)',
+          boxShadow: '0 10px 34px rgba(241, 93, 34, 0.20)',
         }}
       >
         fully private and secure
@@ -433,37 +514,24 @@ const Outro: React.FC<{ local: number; length: number }> = ({ local, length }) =
   );
 };
 
-/** The privacy beat: brand art carrying the promise, no phone. */
+/**
+ * The privacy beat: brand art carrying the promise, no phone.
+ *
+ * Uses `beanies_covering_eyes`, which the CIG designates for "data encrypted",
+ * rather than a padlock. Security should read as quiet confidence, not alarm.
+ */
 const Statement: React.FC<{ scene: Scene; local: number }> = ({ scene, local }) => {
   const { fps } = useVideoConfig();
   const pop = spring({ frame: local, fps, config: { damping: 16, mass: 0.8 } });
 
   return (
     <AbsoluteFill
-      style={{ alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 34 }}
+      style={{ alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 26 }}
     >
-      <div style={{ position: 'relative', transform: `scale(${0.9 + pop * 0.1})` }}>
-        <Img src={ART.hugging} style={{ width: 250, height: 250 }} />
-        <div
-          style={{
-            position: 'absolute',
-            // Clear of the art: the beanies are never obscured (CIG golden rule).
-            right: -54,
-            bottom: 18,
-            width: 88,
-            height: 88,
-            borderRadius: 999,
-            background: COLORS.heritageOrange,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 44,
-            boxShadow: '0 12px 28px rgba(241, 93, 34, 0.35)',
-          }}
-        >
-          🔒
-        </div>
-      </div>
+      <Img
+        src={ART.coveringEyes}
+        style={{ width: 250, height: 250, transform: `scale(${0.9 + pop * 0.1})` }}
+      />
       <Caption scene={scene} local={local} centered />
     </AbsoluteFill>
   );
