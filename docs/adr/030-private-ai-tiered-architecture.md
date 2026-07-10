@@ -1,7 +1,7 @@
 # ADR-030: Private AI capability via a tiered architecture (on-device → BYOK → verifiable-TEE managed → cloud fallback)
 
 > Date: 2026-06-02
-> Status: **Accepted** (2026-06-02). Architecture accepted; **managed provider chosen = Tinfoil-direct (`qwen3-vl-30b`)** after Gate 1 passed empirically (quality + attestation both verified). Gate 2 (Tinfoil DPA / residency / zero-retention) remains open before launch. First feature wedge (event/invitation image → prefilled calendar activity) planned in `docs/plans/2026-06-02-private-ai-tiered-architecture-and-invitation-wedge.md`.
+> Status: **Accepted** (2026-06-02). Architecture accepted; **managed provider chosen = Tinfoil-direct (`qwen3-vl-30b`)** after Gate 1 passed empirically (quality + attestation both verified). Gate 2 (Tinfoil DPA / residency / zero-retention) **CLOSED 2026-07-10** (signed). Gate 3 (EHBP + attestation verification) remains open and is the sole blocker to the "no intermediary sees the document" claim - tracked as Notion #49. First feature wedge (event/invitation image → prefilled calendar activity) planned in `docs/plans/2026-06-02-private-ai-tiered-architecture-and-invitation-wedge.md`.
 > Research basis: `docs/research/2026-06-02-private-ai-llm-capability.md` (three deep-research passes + a trust-boundary spike (Pass 4) + empirical provider validation (Pass 5 — RedPill routing non-determinism + Tinfoil-direct verification + the live extraction gate)).
 > Related: ADR-001 (local-first IndexedDB), ADR-003 (Web-Crypto encryption), ADR-011 (file-first architecture), ADR-019 (family-key encryption), ADR-013 (admin API Lambda), ADR-027 (diagnostic logging/telemetry). Supersedes the scope of GitHub #133 (LLM help chatbot).
 
