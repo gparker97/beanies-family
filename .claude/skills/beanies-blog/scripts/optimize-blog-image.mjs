@@ -58,10 +58,17 @@ function slugifyBasename(file) {
 }
 
 async function optimize(input, opts) {
+  // A CLI's whole job is to act on the path it was handed, so every fs call below is
+  // a "non-literal filename" by construction. The security config errors on that to
+  // protect SHIPPED code from path injection; this is a local dev tool run by hand,
+  // and the output dir is a fixed prefix under the repo. Same justification as
+  // web/src/lib/rehype-image-dims.mjs.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
   if (!fs.existsSync(input)) throw new Error(`input not found: ${input}`);
 
   const stem = opts.name ?? slugifyBasename(input);
   const outPath = path.join(OUT_DIR, `${stem}.webp`);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
   const src = sharp(input).rotate(); // honour EXIF orientation, then drop the EXIF
@@ -74,8 +81,10 @@ async function optimize(input, opts) {
     .webp({ quality: opts.quality })
     .toFile(outPath);
 
+  /* eslint-disable security/detect-non-literal-fs-filename -- see the note above */
   const before = fs.statSync(input).size;
   const after = fs.statSync(outPath).size;
+  /* eslint-enable security/detect-non-literal-fs-filename */
   const outMeta = await sharp(outPath).metadata();
 
   // Verify rather than assume: a silently-zero-byte or wrong-size output would
