@@ -297,14 +297,12 @@ export function buildDemoFamily(ownerId: string): Partial<ExportedData> {
   ];
 
   // ── Travel ────────────────────────────────────────────────────────────────
-  // The trip is UPCOMING (starts in three days), not in progress.
+  // The trip is IN PROGRESS: started two days ago, ends in four. `tripPhase`
+  // returns 'ongoing' and both the travel card and the nook show "day 3 of 7".
   //
-  // An in-progress trip would be the better story, but `TravelPlansPage` renders
-  // its status chip from `vacationCountdown(v) <= 0` and never consults
-  // `tripPhase`, so ANY trip that has already started is labelled "✓ completed"
-  // mid-trip. Only `NookVacationCard` knows about the ongoing phase. Filed as a
-  // bug; until it is fixed, an upcoming trip is the honest, and better-looking,
-  // screenshot: it shows the countdown chip and the booking progress.
+  // (It was briefly seeded as upcoming because TravelPlansPage derived its chip
+  // from days-until-START and labelled any started trip "✓ completed" mid-trip.
+  // Fixed by `tripBadge` — see docs/plans/2026-07-10-travel-trip-phase-badge.md.)
   //
   // A vacation is always paired with an all-day FamilyActivity (the store's
   // `createVacation` does this), and the calendar reads the trip through that
@@ -314,7 +312,7 @@ export function buildDemoFamily(ownerId: string): Partial<ExportedData> {
     id: 'activity-trip-japan',
     title: 'Japan family trip',
     icon: '✈️',
-    date: iso(shift(3)),
+    date: iso(shift(-2)),
     ...oneOff,
     category: 'other',
     vacationId: 'vacation-japan',
@@ -352,9 +350,9 @@ export function buildDemoFamily(ownerId: string): Partial<ExportedData> {
           flightNumber: 'BA 812',
           departureAirport: 'SIN',
           arrivalAirport: 'HND',
-          departureDate: iso(shift(3)),
+          departureDate: iso(shift(-2)),
           departureTime: '09:15',
-          arrivalDate: iso(shift(3)),
+          arrivalDate: iso(shift(-2)),
           arrivalTime: '17:05',
         },
         {
@@ -366,9 +364,9 @@ export function buildDemoFamily(ownerId: string): Partial<ExportedData> {
           flightNumber: 'BA 813',
           departureAirport: 'HND',
           arrivalAirport: 'SIN',
-          departureDate: iso(shift(10)),
+          departureDate: iso(shift(4)),
           departureTime: '11:40',
-          arrivalDate: iso(shift(10)),
+          arrivalDate: iso(shift(4)),
           arrivalTime: '18:20',
         },
       ],
@@ -379,8 +377,8 @@ export function buildDemoFamily(ownerId: string): Partial<ExportedData> {
           title: 'Tokyo Bean Hotel',
           status: 'booked',
           name: 'Tokyo Bean Hotel',
-          checkInDate: iso(shift(3)),
-          checkOutDate: iso(shift(10)),
+          checkInDate: iso(shift(-2)),
+          checkOutDate: iso(shift(4)),
           breakfastIncluded: true,
         },
       ],
@@ -404,8 +402,8 @@ export function buildDemoFamily(ownerId: string): Partial<ExportedData> {
           createdAt: now,
         },
       ],
-      startDate: iso(shift(3)),
-      endDate: iso(shift(10)),
+      startDate: iso(shift(-2)),
+      endDate: iso(shift(4)),
       createdBy: john.id,
       createdAt: now,
       updatedAt: now,

@@ -9,6 +9,7 @@ import VacationIdeaCard from '@/components/vacation/VacationIdeaCard.vue';
 import LinkedLists from '@/components/lists/LinkedLists.vue';
 import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
+import TripBadgeChip from '@/components/vacation/TripBadgeChip.vue';
 import TripDatesHeader from '@/components/travel/TripDatesHeader.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
@@ -46,8 +47,8 @@ import { useToday } from '@/composables/useToday';
 import {
   tripTypeEmoji,
   bookingProgress,
-  daysUntilTrip,
-  tripCountdownKey,
+  tripBadge,
+  tripPhase,
   computeAccommodationGaps,
   computeTimelineHints,
   classifyTripDay,
@@ -504,12 +505,18 @@ const groupDates = computed(
 
 const upcomingVacations = computed(() => vacationStore.upcomingVacations);
 
-const pastVacations = computed(() => {
-  const today = new Date().toISOString().slice(0, 10);
-  return vacationStore.vacations
-    .filter((v) => v.endDate && v.endDate < today)
-    .sort((a, b) => (b.endDate ?? '').localeCompare(a.endDate ?? ''));
-});
+/**
+ * The exact complement of the store's `upcomingVacations` (`tripPhase !== 'past'`).
+ * Previously this filtered on `new Date().toISOString().slice(0,10)` — a UTC day —
+ * which could disagree with the store's local-day phase around midnight, letting a
+ * trip fall into both lists or neither. `todayISO` is local and reactive to a
+ * day-roll; `tripPhase` is the single definition of "past".
+ */
+const pastVacations = computed(() =>
+  vacationStore.vacations
+    .filter((v) => tripPhase(v, todayISO.value) === 'past')
+    .sort((a, b) => (b.endDate ?? '').localeCompare(a.endDate ?? ''))
+);
 
 const hasTrips = computed(
   () => upcomingVacations.value.length > 0 || pastVacations.value.length > 0
@@ -519,9 +526,21 @@ function vacationProgress(v: FamilyVacation) {
   return bookingProgress(v);
 }
 
-function vacationCountdown(v: FamilyVacation) {
-  return v.startDate ? daysUntilTrip(v.startDate) : null;
-}
+/**
+ * One badge per trip, resolved once. `tripBadge` decides which — never a stale
+ * "completed" on a trip that is currently happening, which is what the old
+ * `daysUntilTrip(startDate) <= 0` test produced the moment a trip began.
+ *
+ * Keyed by id and computed in one pass so the `v-for` doesn't re-run `tripPhase`
+ * + `tripDayProgress` once per template branch.
+ */
+const badgesById = computed(
+  () => new Map(upcomingVacations.value.map((v) => [v.id, tripBadge(v, todayISO.value)]))
+);
+
+const selectedBadge = computed(() =>
+  selectedVacation.value ? tripBadge(selectedVacation.value, todayISO.value) : null
+);
 
 function vacationDateRange(v: FamilyVacation) {
   if (!v.startDate) return '';
@@ -867,24 +886,9 @@ function addQuickIdea() {
               📅 {{ vacationDateRange(vacation) }}
             </div>
 
-            <!-- Countdown + members -->
+            <!-- Status badge + members. One badge, resolved once (see badgesById). -->
             <div class="mt-2.5 flex flex-wrap items-center gap-2">
-              <span
-                v-if="vacationCountdown(vacation) !== null && vacationCountdown(vacation)! > 0"
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-3 py-1 text-[0.6875rem] font-bold text-white"
-              >
-                {{ tripTypeEmoji(vacation.tripType, vacation.tripPurpose) }}
-                {{ vacationCountdown(vacation) }}
-                {{ t(tripCountdownKey(vacation.tripType, vacation.tripPurpose) as any) }}!
-              </span>
-              <span
-                v-else-if="
-                  vacationCountdown(vacation) !== null && vacationCountdown(vacation)! <= 0
-                "
-                class="font-outfit inline-flex items-center gap-1 rounded-lg bg-[var(--tint-slate-5)] px-2.5 py-1 text-[0.6875rem] font-semibold text-gray-400"
-              >
-                ✓ {{ t('travel.completed') }}
-              </span>
+              <TripBadgeChip :badge="badgesById.get(vacation.id) ?? null" variant="card" />
             </div>
 
             <!-- Member chips -->
@@ -1108,32 +1112,7 @@ function addQuickIdea() {
 
           <!-- Row 3: countdown + members -->
           <div class="mt-3 flex flex-wrap items-center gap-2.5">
-            <div
-              v-if="vacationCountdown(selectedVacation) !== null"
-              class="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-white/10 bg-white/16 px-4 py-1.5 backdrop-blur"
-            >
-              <template v-if="vacationCountdown(selectedVacation)! > 0">
-                <span class="font-outfit text-xl leading-none font-extrabold text-[#FFD93D]">
-                  {{ vacationCountdown(selectedVacation) }}
-                </span>
-                <span class="font-outfit text-[0.6875rem] font-semibold text-white/70">
-                  {{
-                    t(
-                      tripCountdownKey(
-                        selectedVacation.tripType,
-                        selectedVacation.tripPurpose
-                      ) as any
-                    )
-                  }}!
-                  {{ tripTypeEmoji(selectedVacation.tripType, selectedVacation.tripPurpose) }}
-                </span>
-              </template>
-              <template v-else>
-                <span class="font-outfit text-[0.6875rem] font-semibold text-white/70">
-                  ✓ {{ t('travel.completed') }}
-                </span>
-              </template>
-            </div>
+            <TripBadgeChip :badge="selectedBadge" variant="header" />
 
             <div class="flex flex-wrap gap-1.5">
               <span
