@@ -7,6 +7,7 @@ import {
   validateSegmentTarget,
   tripPhase,
   tripDayProgress,
+  tripBadge,
   segmentDateRange,
   tripsOverlappingRange,
   resolveTripTarget,
@@ -445,5 +446,59 @@ describe('segmentDateRange / tripsOverlappingRange / resolveTripTarget (#30)', (
   it('overrideTripTarget: falls back when the pre-selected trip no longer exists', () => {
     const original = { kind: 'attach', vacationId: 'matched' } as const;
     expect(overrideTripTarget(original, 'deleted', [vac({ id: 'matched' })])).toEqual(original);
+  });
+});
+
+describe('tripBadge', () => {
+  const TODAY = '2026-06-10';
+  const trip = (startDate?: string, endDate?: string) =>
+    ({ startDate, endDate, tripType: 'fly_and_stay', tripPurpose: 'vacation' }) as never;
+
+  it('shows a countdown for an upcoming trip', () => {
+    expect(tripBadge(trip('2026-06-20', '2026-06-25'), TODAY)).toMatchObject({
+      kind: 'countdown',
+      days: 10,
+    });
+  });
+
+  it('says the trip starts today', () => {
+    expect(tripBadge(trip('2026-06-10', '2026-06-15'), TODAY)).toEqual({
+      kind: 'status',
+      textKey: 'vacation.startsToday',
+    });
+  });
+
+  it('shows day-of-trip progress for an ongoing trip, NOT "completed"', () => {
+    // The bug: the travel page derived "completed" from days-until-START, so a
+    // trip that had begun read as finished while the family was still on it.
+    expect(tripBadge(trip('2026-06-08', '2026-06-14'), TODAY)).toEqual({
+      kind: 'status',
+      textKey: 'vacation.dayOfTrip',
+      params: { n: 3, total: 7 },
+    });
+  });
+
+  it('falls back to "now" for an ongoing trip whose progress cannot be computed', () => {
+    // startDate in the past, no endDate -> phase 'ongoing', tripDayProgress null.
+    expect(tripBadge(trip('2026-06-08', undefined), TODAY)).toEqual({
+      kind: 'status',
+      textKey: 'vacation.onNow',
+    });
+  });
+
+  it('shows completed only once the trip has ended', () => {
+    expect(tripBadge(trip('2026-06-01', '2026-06-09'), TODAY)).toEqual({ kind: 'completed' });
+  });
+
+  it('shows no badge when there is no start date', () => {
+    // Load-bearing: without the guard, daysBetween would call
+    // extractDatePart(undefined) and throw.
+    expect(tripBadge(trip(undefined, undefined), TODAY)).toBeNull();
+  });
+
+  it('shows no badge for a malformed start date, never "NaN"', () => {
+    // Junk sorts after an ISO date, so tripPhase says 'upcoming' and daysBetween
+    // returns NaN. NaN <= 0 is false, so only the finite check stops a "NaN" chip.
+    expect(tripBadge(trip('garbage', undefined), TODAY)).toBeNull();
   });
 });
