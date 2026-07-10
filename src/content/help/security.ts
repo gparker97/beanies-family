@@ -509,12 +509,12 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'On the default setting, your photo or document is encrypted and sent to a private, secure AI service that processes it and keeps nothing. It is encrypted while it travels to and from that service. If you bring your own AI provider (BYOK), it goes to that provider instead, using your key.',
+          'On the default setting, your photo or document is encrypted in transit and sent to a private, secure AI service that processes it and keeps nothing. It passes through a beanies server on the way, which holds it only for the moment it takes to forward it, and stores nothing. If you bring your own AI provider (BYOK), it goes straight to that provider instead, using your key, and never touches a beanies server.',
       },
       {
         type: 'callout',
         content:
-          'The AI service processes your document in a secure, attested environment and retains nothing after it answers. It is encrypted in transit. Once your document or image arrives in the secure enclave, it is decrypted and processed to read, encrypt, and return the details back to beanies.family.',
+          'The AI service processes your document inside a secure, attested environment - hardware that the company running the servers cannot see into - and retains nothing after it answers. Your document is encrypted every time it crosses the network. We are working towards encrypting it so that <em>only</em> that secure hardware can open it, and not even our own server could read it in between.',
         title: 'Private and secure as can be',
         icon: '\u{1F512}',
       },

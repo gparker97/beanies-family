@@ -2,7 +2,7 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-09",
+    "lastUpdated": "2026-07-10",
     "translationCount": 3699
   },
   "translations": {
@@ -14922,9 +14922,9 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.whereManaged": {
-      "translation": "beanies使用私密、安全和安全的人工智能服务来处理文档，而不保留任何内容。在往返服务期间，您的文件已完全加密。",
-      "hash": "hsp7ey",
-      "lastUpdated": "2026-06-03"
+      "translation": "发送到私有 AI 服务：它在连运营商也无法窥视的安全硬件中读取文档，之后不保留任何内容。文档全程加密传输，途经 beanies 服务器，但服务器不会存储任何内容。",
+      "hash": "vez89n",
+      "lastUpdated": "2026-07-10"
     },
     "ai.consent.whereByok": {
       "translation": "使用您提供的密钥，提供给您自己的人工智能提供商。",
