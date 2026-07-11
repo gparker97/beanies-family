@@ -221,6 +221,21 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
 
   const isConnectSupported = computed(() => isCalendarConnectSupported());
 
+  // ── User-facing reconnect signal (single source of truth) ───────────────────
+  // Keyed on `needs_reconnect` ONLY — never `error`. `settleConnectionStatus`
+  // writes `error` unconditionally on the first non-auth reconcile failure (only
+  // Slack *paging* is sustained-gated), so keying on it would flap a re-consent
+  // CTA on a transient network/rate-limit blip — and re-auth can't fix a network
+  // error anyway. `needs_reconnect` is the dead-grant state a re-consent DOES
+  // fix. This is a pure computed off persisted CRDT status, so it fires once
+  // (independent of poll count) and self-heals to null when the status returns
+  // to `ok` — no transition-edge bookkeeping, no `settleConnectionStatus` change.
+  const reconnectNeededConnection = computed<CalendarConnection | null>(
+    () => connections.value.find((c) => c.status === 'needs_reconnect') ?? null
+  );
+  /** True while any connection needs re-consent. Drives the App-level toast. */
+  const showCalendarReconnect = computed(() => reconnectNeededConnection.value !== null);
+
   let pollHandle: PollWhileVisibleHandle | null = null;
   let stopActivityWatch: (() => void) | null = null;
   let editDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -729,6 +744,8 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
   return {
     connections,
     isConnectSupported,
+    reconnectNeededConnection,
+    showCalendarReconnect,
     connect,
     reconnect,
     disconnect,

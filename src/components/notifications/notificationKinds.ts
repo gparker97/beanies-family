@@ -24,6 +24,7 @@ export const NOTIFICATION_KIND_PRESENTATION: Record<NotificationKind, KindPresen
   'todo-assigned': { accent: 'assigned', icon: '📌' },
   'activity-reminder': { accent: 'activity', icon: '📅' },
   'list-completed': { accent: 'list', icon: '🧾' },
+  'calendar-reconnect': { accent: 'calendar-reconnect', icon: '📅' },
   'whats-new': { accent: 'whats-new', icon: '✨', detailBody: WhatsNewBody },
   announcement: { accent: 'announcement', icon: '📣', detailBody: AnnouncementBody },
   tip: { accent: 'tip', icon: '💡', detailBody: TipBody },
@@ -37,6 +38,7 @@ export const ACCENT_TINT_CLASS: Record<KindPresentation['accent'], string> = {
   assigned: 'bg-[var(--tint-purple-12,rgba(155,89,182,0.12))]',
   activity: 'bg-[var(--tint-silk-20,rgba(174,214,241,0.2))]',
   list: 'bg-[var(--tint-orange-8,rgba(241,93,34,0.08))]',
+  'calendar-reconnect': 'bg-[var(--tint-orange-8,rgba(241,93,34,0.08))]',
   'whats-new': 'bg-[var(--tint-orange-8,rgba(241,93,34,0.08))]',
   announcement: 'bg-[var(--tint-orange-8,rgba(241,93,34,0.08))]',
   tip: 'bg-[var(--tint-amber-10,rgba(245,188,80,0.10))]',
@@ -55,6 +57,8 @@ export function kindLabelKey(kind: NotificationKind, overdue?: boolean): UIStrin
       return 'notifications.kindActivityReminder';
     case 'list-completed':
       return 'notifications.kindListCompleted';
+    case 'calendar-reconnect':
+      return 'notifications.kindCalendarReconnect';
     case 'whats-new':
       return 'notifications.kindWhatsNew';
     case 'announcement':
@@ -75,6 +79,8 @@ export function notificationTitle(n: AppNotification, t: T): string {
   if (n.kind === 'tip') return t('notifications.kindTip');
   if (n.kind === 'communityNudge') return t('communityNudge.label');
   if (n.kind === 'installNudge') return t('installNudge.label');
+  // Calendar reconnect: the account email when known, else the kind label.
+  if (n.kind === 'calendar-reconnect') return n.title || t('notifications.kindCalendarReconnect');
   return n.title;
 }
 
@@ -95,6 +101,8 @@ export function notificationSummary(n: AppNotification, t: T): string {
       return fillTemplate(t('lists.notif.finishedBy'), {
         finisher: n.subtitle || t('medicationLog.someone'),
       });
+    case 'calendar-reconnect':
+      return t('notifications.calendarReconnectSummary');
     case 'whats-new':
       return n.title; // the release month (e.g. "may 2026")
     case 'announcement':
