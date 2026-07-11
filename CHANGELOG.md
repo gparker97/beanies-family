@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - When your Google Calendar connection drops and needs re-authorising, beanies now tells you right away — a reconnect prompt appears (and a notification in the bell) instead of sync silently stopping. Both clear themselves the moment the connection recovers.
+- **Connect and reconnect Google Calendar from any device.** Setting up or re-approving a calendar now works on your phone and the installed app, not just a desktop browser — it's the same one-tap flow everywhere, and syncing resumes on its own when you come back.
 
 ### Fixed
 

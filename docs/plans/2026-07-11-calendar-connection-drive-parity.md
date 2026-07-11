@@ -224,9 +224,22 @@ The behavior change lands in **P2** (reconnecting Google Calendar now works on p
 
 Commit `c651a6b9` on `main` (pushed to origin). Live-verified via Playwright: the reconnect toast surfaces once and self-heals, the bell badges and clears. Full suite 3728 passed, build compiles. Shipped: shared `ReconnectToast.vue` (Drive migrated onto it), `CalendarReconnectToast.vue`, `showCalendarReconnect` store computed (`needs_reconnect`-only), `calendar-reconnect` bell kind, `showToast` dedupe (actionFn-exempt), interim Settings/bell gate, deleted orphaned `SyncStatusIndicator.vue`. **Not deployed** (awaiting an explicit deploy).
 
-### P2 — 🚧 IN PROGRESS on branch `calendar-drive-parity-p2` (off `main` @ `c651a6b9`)
+### P2 — ✅ CODE-COMPLETE on branch `calendar-drive-parity-p2` (awaiting live Drive verify + greg approval before merge)
 
-**Done on the branch:** commit `f4554420` — grant-aware redirect state (`redirectState.ts` + tests). `grant` is additive-optional (Drive byte-identical, absent→`'drive'`, no version bump). 12 codec tests pass. **Zero behaviour change yet** — nothing passes `grant:'calendar'` until the items below land.
+**Shipped on the branch (2026-07-11):** the full redirect transport for calendar connect + reconnect on PWA/iOS/native. All 5 tasks (#10–#14) landed; +32 tests; full suite **3760 green**; type-check + lint + build clean.
+
+- **Start side** (`googleAuth.ts`): `startRedirectAuth(returnPath, loginHint, mode, {grant, scope})` — Drive callers omit opts → byte-identical (proven by test). `buildAuthUrl` takes an optional scope (default Drive; `DRIVE_SCOPES` extracted). `RedirectAuthState` carries `grant?` for native; web `state` carries grant via `encodeRedirectState`.
+- **Bounce** (`OAuthCallbackPage.vue`): writes the code to a grant-namespaced key — Drive → `REDIRECT_AUTH_CODE_KEY`, calendar → `REDIRECT_AUTH_CODE_KEY_CALENDAR` (`…:calendar`, co-defined in googleAuth). Structurally isolated (only one grant's code is ever in flight).
+- **Sibling completion** (`calendarAuth.ts`): `startCalendarRedirectAuth` (thin wrapper) + `completeCalendarRedirectAuth` (own memo; web no-verifier / native PKCE arms; returns a typed `CalendarConnectResult | null`; never touches a Drive stash). Native routing added to `handleNativeAuthRedirect` (grant='calendar' → stash under calendar key + navigate, never runs the Drive exchange). `redirect_unsupported` removed. Drive `completeRedirectAuth`/settlement memo untouched.
+- **Wire calendar** (`calendarSyncStore.ts`): `connect`/`reconnect` gate on `shouldUseRedirectAuth()` → hand off (return `{status:'redirecting'}`); shared `finalizeConnected` (create-or-update) reused by popup + resume; `resumeRedirectConnect(intent)` commits post-redirect. Intent rides in `returnPath` (`calResume=connect|<connectionId>`) — no secret/id in `state`. New `useCalendarRedirectResume` composable (App-level, reactive/SPA-safe, waits for doc-loaded, toasts, strips the query). Interim P1 gate removed from **both** Settings (buttons un-gated) and the bell toast. Dead `isConnectSupported`/`isCalendarConnectSupported` removed.
+- **Help Center**: `google-calendar-sync` article gained a "Reconnecting when access lapses" section (ships with P2).
+- **Tests**: `googleAuth.calendarGrant.test.ts` (start-side + Drive isolation), `.native.test.ts` (native routing), `calendarRedirect.test.ts` (completion arms), `calendarSyncStore.redirect.test.ts` (handoff + resume), `OAuthCallbackPage.grantRouting.test.ts` (bounce routing).
+
+**⚠️ BEFORE MERGE (R14 gate — greg):** live-verify Drive sign-in/load/reconnect is unchanged on desktop + PWA, and live-verify calendar connect+reconnect on a real installed PWA / iOS. The automated Drive-protection suite proves the Drive URL/state/scope/keys are byte-identical, but the real OAuth round-trip must be exercised on-device before merging to `main`.
+
+**Foundation (earlier):** commit `f4554420` — grant-aware redirect state (`redirectState.ts` + tests). `grant` additive-optional (Drive byte-identical, absent→`'drive'`, no version bump).
+
+<details><summary>Original remaining-items list (all now done — kept for reference)</summary>
 
 **Remaining P2 items (tasks #10–#14), in order. The seam: share the START side, sibling the COMPLETION side (see the P2 Approach above).**
 
@@ -237,6 +250,8 @@ Commit `c651a6b9` on `main` (pushed to origin). Live-verified via Playwright: th
 5. **Drive-protection tests + verify** (task #14): assert Drive's start scope/state/consent + settlement memo unchanged; the two code keys can't co-populate; native routes by grant; calendar connect+reconnect on web/PWA/native. Full suite + build + **live-verify Drive sign-in/load/reconnect is unchanged** before merging.
 
 **Do NOT merge P2 to `main` until task #14 is green and Drive auth is live-verified.**
+
+</details>
 
 ### How to resume
 

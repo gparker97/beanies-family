@@ -86,10 +86,14 @@ async function onConnect() {
         t('calendarSync.toast.connected.title'),
         t('calendarSync.toast.connected.message')
       );
+    } else if (result.status === 'redirecting') {
+      // Handed off to the redirect transport (PWA/iOS/native). The page is
+      // navigating away (web) or the system browser is open (native); the resume
+      // toasts the outcome post-redirect. Nothing to show here.
     } else if (result.code !== 'cancelled') {
       // missing_scope is user-recoverable input → silent (no Slack noise).
       showToast('error', t('calendarSync.toast.connectFailed.title'), result.message, {
-        silent: result.code === 'missing_scope' || result.code === 'redirect_unsupported',
+        silent: result.code === 'missing_scope',
       });
     }
   } finally {
@@ -107,6 +111,8 @@ async function onReconnect(connection: CalendarConnection) {
         t('calendarSync.toast.reconnected.title'),
         t('calendarSync.toast.reconnected.message')
       );
+    } else if (result.status === 'redirecting') {
+      // Redirect transport handed off — resume toasts post-redirect.
     } else if (result.code !== 'cancelled') {
       showToast('error', t('calendarSync.toast.connectFailed.title'), result.message, {
         silent: true,
@@ -269,11 +275,10 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
           />
 
           <div class="flex flex-wrap gap-2">
-            <!-- Reconnect via popup only exists on desktop until P2 adds the
-                 redirect transport. On a redirect surface (PWA/iOS/native) show
-                 the explanation below instead of a button that dead-ends. -->
+            <!-- Reconnect works on every surface (P2): desktop via popup, PWA/iOS/
+                 native via the redirect transport. No desktop-only gate. -->
             <BaseButton
-              v-if="connection.status === 'needs_reconnect' && store.isConnectSupported"
+              v-if="connection.status === 'needs_reconnect'"
               variant="primary"
               size="sm"
               :loading="busyId === connection.id"
@@ -293,12 +298,6 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
               {{ t('calendarSync.action.disconnect') }}
             </BaseButton>
           </div>
-          <p
-            v-if="connection.status === 'needs_reconnect' && !store.isConnectSupported"
-            class="rounded-2xl bg-[var(--tint-silk-20)] px-3 py-2.5 text-[0.8rem] leading-snug text-[var(--deep-slate)]/70 dark:bg-slate-800 dark:text-slate-300"
-          >
-            {{ t('calendarSync.connectOnDesktop') }}
-          </p>
         </div>
       </div>
 
@@ -316,21 +315,11 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
         />
       </div>
 
-      <!-- Connect a new calendar -->
-      <BaseButton
-        v-if="store.isConnectSupported"
-        variant="primary"
-        :loading="connecting"
-        @click="onConnect"
-      >
+      <!-- Connect a new calendar — works on every surface (popup on desktop,
+           redirect transport on PWA/iOS/native). -->
+      <BaseButton variant="primary" :loading="connecting" @click="onConnect">
         {{ t('calendarSync.action.connect') }}
       </BaseButton>
-      <p
-        v-else
-        class="rounded-2xl bg-[var(--tint-silk-20)] px-3 py-2.5 text-[0.8rem] leading-snug text-[var(--deep-slate)]/70 dark:bg-slate-800 dark:text-slate-300"
-      >
-        {{ t('calendarSync.connectOnDesktop') }}
-      </p>
     </div>
   </BeanieFormModal>
 </template>

@@ -13,7 +13,7 @@
 import { generateCodeVerifier, generateCodeChallenge } from './pkce';
 import { exchangeCodeForTokens, refreshAccessToken } from './oauthProxy';
 import { isPermanentRefreshFailure } from './refreshFailure';
-import { encodeRedirectState, type RedirectMode } from './redirectState';
+import { encodeRedirectState, type RedirectMode, type RedirectGrant } from './redirectState';
 import {
   storeGoogleRefreshToken,
   getGoogleRefreshToken,
@@ -31,6 +31,9 @@ import { isNative, isIosOrIpadOs, isStandalone } from '@/services/sync/capabilit
 
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
+// Default (Drive) scope set. buildAuthUrl uses this unless a caller passes an
+// explicit scope (the calendar grant passes its own — see startRedirectAuth).
+const DRIVE_SCOPES = `${DRIVE_FILE_SCOPE} ${USERINFO_EMAIL_SCOPE}`;
 const USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v2/userinfo';
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
@@ -48,6 +51,13 @@ const NATIVE_REDIRECT_URI = 'https://beanies.family/oauth/native';
 // callback (OAuthCallbackPage) AND the native deep-link handler, and read+cleared
 // by completeRedirectAuth. One named symbol so the two transports can't drift.
 export const REDIRECT_AUTH_CODE_KEY = 'beanies_redirect_auth_code';
+
+// Grant-namespaced code key for a pending CALENDAR redirect (P2). Co-located with
+// the Drive key so the two transports' slots are defined in one place and can
+// never drift into the same string. `calendarAuth` re-exports this as
+// `CALENDAR_REDIRECT_CODE_KEY`; the native deep-link handler writes it directly
+// (constructing it here avoids a googleAuth→calendarAuth import cycle).
+export const REDIRECT_AUTH_CODE_KEY_CALENDAR = `${REDIRECT_AUTH_CODE_KEY}:calendar`;
 
 // In-memory token state
 let accessToken: string | null = null;
@@ -1567,13 +1577,17 @@ function buildAuthUrl(
   codeChallenge: string | undefined,
   prompt: string,
   loginHint?: string,
-  state?: string
+  state?: string,
+  // OAuth scope string. Defaults to the Drive set; the calendar grant passes its
+  // own scopes in (kept as a param, not imported, so googleAuth never depends on
+  // calendarAuth — no import cycle). Pure URL construction; Drive default unchanged.
+  scope: string = DRIVE_SCOPES
 ): string {
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: getRedirectUri(),
     response_type: 'code',
-    scope: `${DRIVE_FILE_SCOPE} ${USERINFO_EMAIL_SCOPE}`,
+    scope,
     access_type: 'offline',
     prompt,
   });
@@ -1748,7 +1762,10 @@ export function setGoogleAccountEmail(email: string | null): void {
 
 // --- Redirect-based OAuth (mobile fallback) ---
 
-const REDIRECT_AUTH_KEY = 'beanies_redirect_auth';
+// Shared sessionStorage key for the pre-redirect stash (native PKCE verifier +
+// returnPath + CSRF state + grant). Exported so the calendar sibling completion
+// can read the native verifier + grant tag without duplicating the string.
+export const REDIRECT_AUTH_KEY = 'beanies_redirect_auth';
 
 /**
  * Clear any pending redirect-auth intent. Called on session teardown so an
@@ -1785,6 +1802,23 @@ interface RedirectAuthState {
   returnPath: string;
   /** CSRF state — present only for the native deep-link transport (absent on web). */
   state?: string;
+  /**
+   * Which Google grant this native redirect belongs to (P2). Absent ⇒ `'drive'`
+   * (byte-compatible with a pre-P2 stash). The native deep-link handler routes
+   * completion by this: `'calendar'` stashes the code for the calendar sibling
+   * completion instead of committing a Drive token.
+   */
+  grant?: RedirectGrant;
+}
+
+/** Options for a redirect-auth flow. Drive callers omit these (defaults preserve
+ *  the exact pre-P2 behavior); the calendar grant passes both. */
+export interface RedirectAuthOptions {
+  /** Which Google grant; default `'drive'`. Encoded into the web `state` and the
+   *  native stash so the completion routes to the right subsystem. */
+  grant?: RedirectGrant;
+  /** OAuth scope string; default the Drive set. Calendar passes its own scopes. */
+  scope?: string;
 }
 
 /**
@@ -1803,14 +1837,22 @@ interface RedirectAuthState {
  * @param mode       Which onboarding flow this is (create/join/reconnect).
  *                   REQUIRED so the compiler flags every call site; carried in
  *                   the web `state` payload (ignored for native routing).
+ * @param opts       Grant + scope (P2). Omitted by Drive callers → Drive default,
+ *                   byte-identical to pre-P2. Calendar passes `{grant:'calendar',
+ *                   scope}` so the URL carries calendar scopes and the completion
+ *                   routes to the calendar sibling, never the Drive token.
  */
 export async function startRedirectAuth(
   returnPath: string,
   loginHint: string | undefined,
-  mode: RedirectMode
+  mode: RedirectMode,
+  opts: RedirectAuthOptions = {}
 ): Promise<void> {
   const clientId = getClientId();
   if (!clientId) throw new Error('Google Client ID not configured');
+
+  const grant: RedirectGrant = opts.grant ?? 'drive';
+  const scope = opts.scope; // undefined ⇒ buildAuthUrl's Drive default
 
   if (isNative()) {
     // NATIVE: opens the system browser and returns via a verified App Link deep
@@ -1824,9 +1866,15 @@ export async function startRedirectAuth(
     const state = generateCodeVerifier();
     sessionStorage.setItem(
       REDIRECT_AUTH_KEY,
-      JSON.stringify({ codeVerifier, returnPath, state } satisfies RedirectAuthState)
+      JSON.stringify({
+        codeVerifier,
+        returnPath,
+        state,
+        // Omit for Drive so the stash stays byte-identical to pre-P2.
+        ...(grant === 'calendar' ? { grant } : {}),
+      } satisfies RedirectAuthState)
     );
-    const authUrl = buildAuthUrl(clientId, codeChallenge, 'consent', loginHint, state);
+    const authUrl = buildAuthUrl(clientId, codeChallenge, 'consent', loginHint, state, scope);
     // Resolves immediately; the redirect returns via the appUrlOpen listener.
     await Browser.open({ url: authUrl });
     return;
@@ -1841,8 +1889,8 @@ export async function startRedirectAuth(
   // because the confidential OAuth proxy adds `client_secret` server-side, so an
   // intercepted code can't be redeemed. If any token exchange ever bypasses that
   // proxy, PKCE MUST return here. See ADR-026 amendment (2026-06-20).
-  const stateParam = encodeRedirectState({ returnPath, mode });
-  const authUrl = buildAuthUrl(clientId, undefined, 'consent', loginHint, stateParam);
+  const stateParam = encodeRedirectState({ returnPath, mode, grant });
+  const authUrl = buildAuthUrl(clientId, undefined, 'consent', loginHint, stateParam, scope);
   window.location.href = authUrl;
 }
 
@@ -2102,6 +2150,17 @@ export async function handleNativeAuthRedirect(
       severity: 'error',
       message: 'native OAuth deep link had neither code nor error',
     });
+    return;
+  }
+
+  // CALENDAR grant (P2): do NOT run the Drive completion or commit a Drive token.
+  // Stash the code under the calendar key and navigate to returnPath; the calendar
+  // resume there runs `completeCalendarRedirectAuth` (which reads the PKCE verifier
+  // from THIS stash — so we leave REDIRECT_AUTH_KEY in place for it) and commits to
+  // the CalendarConnection. No exchange race: only the returnPath resume redeems.
+  if (stored.grant === 'calendar') {
+    sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY_CALENDAR, code);
+    onComplete(stored.returnPath);
     return;
   }
 
