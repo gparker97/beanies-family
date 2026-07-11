@@ -8,6 +8,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-11
+
+### Added
+
+- When your Google Calendar connection drops and needs re-authorising, beanies now tells you right away — a reconnect prompt appears (and a notification in the bell) instead of sync silently stopping. Both clear themselves the moment the connection recovers.
+
+### Fixed
+
+- Identical notification toasts no longer stack up when an action is retried.
+
+### Changed
+
+- New beanstalk post published: "I, for one, welcome our new AI overlords" — how beanies chose its privacy-preserving AI provider and what the first "magic beans" features do.
+
 ## 2026-07-10
 
 ### Changed
