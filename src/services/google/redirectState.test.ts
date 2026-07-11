@@ -7,13 +7,14 @@ import {
 } from './redirectState';
 
 describe('redirectState codec', () => {
-  it('round-trips routing for every mode', () => {
+  it('round-trips routing for every mode (grant defaults to drive)', () => {
     for (const mode of ['create', 'join', 'reconnect'] as RedirectMode[]) {
       const encoded = encodeRedirectState({ returnPath: '/welcome?resume=setup', mode });
       const decoded = decodeRedirectState(encoded);
       expect(decoded).toEqual({
         returnPath: '/welcome?resume=setup',
         mode,
+        grant: 'drive',
         v: REDIRECT_STATE_VERSION,
       });
     }
@@ -70,5 +71,52 @@ describe('redirectState codec', () => {
   it('accepts a normal same-origin relative returnPath', () => {
     const ok = encodeRedirectState({ returnPath: '/welcome?resume=setup', mode: 'create' });
     expect(decodeRedirectState(ok)?.returnPath).toBe('/welcome?resume=setup');
+  });
+});
+
+describe('redirectState grant (P2)', () => {
+  it('round-trips a calendar grant', () => {
+    const encoded = encodeRedirectState({
+      returnPath: '/settings',
+      mode: 'reconnect',
+      grant: 'calendar',
+    });
+    expect(decodeRedirectState(encoded)?.grant).toBe('calendar');
+  });
+
+  it("Drive is byte-identical whether grant is omitted or explicitly 'drive'", () => {
+    const omitted = encodeRedirectState({ returnPath: '/welcome', mode: 'create' });
+    const explicit = encodeRedirectState({
+      returnPath: '/welcome',
+      mode: 'create',
+      grant: 'drive',
+    });
+    expect(explicit).toBe(omitted); // grant:'drive' is NOT written to the wire
+  });
+
+  it("a pre-P2 state (no grant field) decodes as 'drive'", () => {
+    // Exactly what the pre-P2 build emitted: no `grant` key.
+    const preP2 = btoa(
+      JSON.stringify({ returnPath: '/welcome', mode: 'create', v: REDIRECT_STATE_VERSION })
+    )
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    expect(decodeRedirectState(preP2)?.grant).toBe('drive');
+  });
+
+  it("an unknown/malformed grant value decodes as 'drive' (never throws)", () => {
+    const weird = btoa(
+      JSON.stringify({
+        returnPath: '/x',
+        mode: 'create',
+        grant: 'dropbox',
+        v: REDIRECT_STATE_VERSION,
+      })
+    )
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    expect(decodeRedirectState(weird)?.grant).toBe('drive');
   });
 });
