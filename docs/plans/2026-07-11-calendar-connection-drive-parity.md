@@ -203,10 +203,10 @@ The behavior change lands in **P2** (reconnecting Google Calendar now works on p
 - [ ] Interim P1 button gate removed.
 - [ ] Help Center article updated/added and matches shipped behavior.
 
-**P3**
+**P3** (see the P3 evaluation under "Implementation Progress & Resume" for the evidence)
 
-- [ ] Calendar tokens refresh ~5 min before expiry and on wake events, single-flight per connection — matching Drive's aggressiveness (verified by test/instrumentation).
-- [ ] Beanpod token-mirror implemented or its deferral documented with rationale.
+- [x] Calendar tokens refresh on wake events + every 5 min while visible, single-flight per connection — matching (exceeding) Drive's aggressiveness. Met by the reconcile-on-visible (`fireImmediatelyOnVisible`) + on-demand mint + per-connection `inflight` coalescing; verified by `calendarSyncStore.keepWarm.test.ts` + the existing `googleCalendarClient.tokenProvider.test.ts`. The Drive-style `scheduleAutoRefresh`/`installAuthWakeListener` extraction is **deferred** (zero calendar benefit; would destabilize the recently-stabilized Drive auth path).
+- [x] Beanpod token-mirror **already satisfied** — the calendar refresh token lives in the shared CRDT, so cross-device self-heal is the existing family-wide design (documented, no code needed).
 
 ## Testing Plan
 
@@ -252,6 +252,23 @@ Commit `c651a6b9` on `main` (pushed to origin). Live-verified via Playwright: th
 **Do NOT merge P2 to `main` until task #14 is green and Drive auth is live-verified.**
 
 </details>
+
+### P3 — ✅ EVALUATED: refresh parity is already met by calendar's architecture (Drive extraction DEFERRED with rationale)
+
+**Conclusion (2026-07-11): R15's requirement — "no difference in refresh aggressiveness between calendar and Drive" — is already satisfied, through a different but equivalent mechanism. No risky Drive-auth refactor was performed.** Evidence:
+
+- **Wake refresh:** `calendarSyncStore.start()` registers the reconcile poll with `fireImmediatelyOnVisible: true` (`calendarSyncStore.ts:774-778`). Every hidden→visible transition (the exact trigger set Drive's `installAuthWakeListener` covers) runs a reconcile, and each reconcile calls `getAccessToken` → **mints a fresh per-connection token on demand** if the cached one is stale. Pinned by `calendarSyncStore.keepWarm.test.ts`.
+- **Periodic keep-warm:** the same poll re-mints every `RECONCILE_POLL_MS` (5 min) while visible. A Google access token lives ~60 min, so a visible calendar re-mints ~12× before expiry — **more aggressive than Drive's single "5 min before expiry" `scheduleAutoRefresh`**, not less.
+- **Single-flight per connection:** the token provider's `inflight` map coalesces concurrent mints per connection and never across connections — already covered by `googleCalendarClient.tokenProvider.test.ts` ("coalesces concurrent callers onto ONE refresh"; "does not coalesce across different connections"; "serves the cached token").
+- **No user-facing expiry race:** unlike Drive (user-triggered save/load surface `TokenExpiredError` visibly, which is _why_ Drive needs proactive scheduling), calendar's only consumer is the reconcile engine, which absorbs expiry transparently via on-demand mint. There is no surface where a stale calendar token bothers the user.
+
+**Why the shared-helper extraction (R15) is DEFERRED, not done:** extracting Drive's `scheduleAutoRefresh` + `installAuthWakeListener` (which coalesce through Drive's single-flight `pendingSilentRefresh`) would refactor the single most sensitive, most-recently-broken auth path (the 2026-07-06→09 Drive reconnect storm). The payoff for calendar is **zero** — it already keeps its token warm on the same triggers, and bolting a second Drive-style scheduler onto calendar would be a redundant refresh path (violates DRY / minimal blast radius). The extraction also can't be on-device-verified while greg is away (its own R14-style gate). If a shared helper is ever wanted for a _third_ grant, extract it then, behind the Drive-path-unchanged test.
+
+**R16 (beanpod token mirror) — already satisfied structurally.** The calendar refresh token lives in the shared CRDT (`.beanpod`) on the `CalendarConnection` record, so a connection made on one device is _already_ usable on every other device — any device reads the shared token and mints. The "connected on one device → self-heals on another" benefit R16 describes is the existing family-wide design; no per-device mirror is needed.
+
+**R11 (shared grant-parameterized reconnect-ladder extraction) — unneeded.** It was deferred to P3 pending a calendar silent-recovery step. That step doesn't exist and isn't needed: calendar's token is already shared via the CRDT, so recovery is either a transparent on-demand mint or an explicit re-consent (P1/P2) — there is no separate silent ladder to extract or parameterize.
+
+**Net P3 deliverable:** the `keepWarm` regression test + this documented evaluation. No production code change — the parity requirement was met by design, and the only _available_ implementation route (refactoring Drive's proven auth path) is higher-risk than its zero benefit justifies.
 
 ### How to resume
 
