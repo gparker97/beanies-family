@@ -32,23 +32,43 @@
 
 export type RedirectMode = 'create' | 'join' | 'reconnect';
 
+/**
+ * Which Google grant a redirect belongs to, so the completion routes to the
+ * right subsystem (Drive token commit vs. CalendarConnection update). ADDITIVE +
+ * OPTIONAL on the wire (P2): `'drive'` is omitted from the encoded payload so a
+ * Drive `state` is byte-identical to the pre-P2 build, and an absent `grant`
+ * decodes as `'drive'`. This is safe WITHOUT a version bump because decode
+ * ignores unknown fields and defaults absent→drive: a pre-P2 build reading a
+ * calendar state still parses returnPath/mode (and does drive-only, all it
+ * supports), and a P2 build reading a pre-P2 state defaults to drive correctly.
+ */
+export type RedirectGrant = 'drive' | 'calendar';
+
 export const REDIRECT_STATE_VERSION = 1 as const;
 
 export interface RedirectStatePayload {
   returnPath: string;
   mode: RedirectMode;
+  /** Always resolved (absent on the wire ⇒ `'drive'`). */
+  grant: RedirectGrant;
   v: typeof REDIRECT_STATE_VERSION;
 }
 
 const MODES: readonly RedirectMode[] = ['create', 'join', 'reconnect'];
 
 /** Encode routing into a URL-safe `state` string. Pure; never throws. */
-export function encodeRedirectState(payload: { returnPath: string; mode: RedirectMode }): string {
-  const full: RedirectStatePayload = {
+export function encodeRedirectState(payload: {
+  returnPath: string;
+  mode: RedirectMode;
+  grant?: RedirectGrant;
+}): string {
+  // Omit `grant` for Drive so the encoded state stays byte-identical to pre-P2.
+  const full: Record<string, unknown> = {
     returnPath: payload.returnPath,
     mode: payload.mode,
     v: REDIRECT_STATE_VERSION,
   };
+  if (payload.grant === 'calendar') full.grant = 'calendar';
   // btoa → URL-safe (canonical pattern, encoding.ts:31)
   return btoa(JSON.stringify(full)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -80,7 +100,10 @@ export function decodeRedirectState(raw: string | null | undefined): RedirectSta
     ) {
       return null;
     }
-    return { returnPath, mode: obj.mode as RedirectMode, v: REDIRECT_STATE_VERSION };
+    // `grant` is optional on the wire; anything other than an explicit
+    // 'calendar' (absent, unknown, malformed) resolves to the 'drive' default.
+    const grant: RedirectGrant = obj.grant === 'calendar' ? 'calendar' : 'drive';
+    return { returnPath, mode: obj.mode as RedirectMode, grant, v: REDIRECT_STATE_VERSION };
   } catch {
     return null;
   }
