@@ -8,6 +8,7 @@ import {
 } from '@/services/automerge/repositories/activityRepository';
 import {
   createCalendarConnection,
+  updateCalendarConnection,
   getCalendarConnectionById,
   getCalendarEventLink,
 } from '@/services/automerge/repositories/calendarRepository';
@@ -155,6 +156,42 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
 
     expect(invalidateSpy).toHaveBeenCalledWith(connection.id);
     expect((await getCalendarConnectionById(connection.id))?.status).toBe('ok');
+  });
+
+  // The App-level reconnect toast + bell entry are driven by these two computeds.
+  // They must key on `needs_reconnect` ONLY (a dead grant re-consent can fix) —
+  // never `error` (written on the first transient reconcile blip; re-auth can't
+  // fix a network failure). Pure computed off persisted status ⇒ self-heals.
+  it('showCalendarReconnect keys on needs_reconnect only, tracks the broken one, and self-heals', async () => {
+    const base = {
+      provider: 'google' as const,
+      destinationCalendarId: 'primary',
+      refreshToken: 'rt',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.owned'],
+    };
+    const store = useCalendarSyncStore();
+    expect(store.showCalendarReconnect).toBe(false);
+
+    await createCalendarConnection({ ...base, accountEmail: 'ok@example.com', status: 'ok' });
+    expect(store.showCalendarReconnect).toBe(false);
+
+    // Pass-4 guard: a transient `error` must NOT raise the signal.
+    await createCalendarConnection({ ...base, accountEmail: 'err@example.com', status: 'error' });
+    expect(store.showCalendarReconnect).toBe(false);
+
+    // A dead grant does — and reconnectNeededConnection points at it.
+    const broken = await createCalendarConnection({
+      ...base,
+      accountEmail: 'broken@example.com',
+      status: 'needs_reconnect',
+    });
+    expect(store.showCalendarReconnect).toBe(true);
+    expect(store.reconnectNeededConnection?.id).toBe(broken.id);
+
+    // Self-heal: back to ok → the signal clears with no extra bookkeeping.
+    await updateCalendarConnection(broken.id, { status: 'ok' });
+    expect(store.showCalendarReconnect).toBe(false);
+    expect(store.reconnectNeededConnection).toBeNull();
   });
 
   // Before the abort, every queued op independently re-asked Google about the

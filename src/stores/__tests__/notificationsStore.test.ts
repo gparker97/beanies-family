@@ -53,6 +53,9 @@ vi.mock('@/stores/todoStore', () => ({ useTodoStore: () => ({ todos: [] }) }));
 vi.mock('@/stores/activityStore', () => ({
   useActivityStore: () => ({ activeActivitiesForMonth: () => [] }),
 }));
+vi.mock('@/stores/calendarSyncStore', () => ({
+  useCalendarSyncStore: () => ({ connections: [] }),
+}));
 vi.mock('@/utils/errorReporter', () => ({ reportError: (i: unknown) => reportErrorSpy(i) }));
 
 import { useNotificationsStore } from '@/stores/notificationsStore';

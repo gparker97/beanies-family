@@ -6384,6 +6384,11 @@ const STRING_DEFS = {
   'notifications.kindTodoAssigned': { en: 'Assigned to you', beanie: 'assigned to you' },
   'notifications.kindActivityReminder': { en: 'Coming up', beanie: 'coming up' },
   'notifications.kindListCompleted': { en: 'List completed', beanie: 'list completed' },
+  'notifications.kindCalendarReconnect': { en: 'Calendar sync', beanie: 'calendar sync' },
+  'notifications.calendarReconnectSummary': {
+    en: 'Reconnect to resume syncing',
+    beanie: 'reconnect to resume syncing',
+  },
   'notifications.kindWhatsNew': { en: "What's new", beanie: "what's new" },
   'notifications.kindAnnouncement': { en: 'Announcement', beanie: 'announcement' },
   'notifications.kindTip': { en: "Today's tip", beanie: "today's tip" },
@@ -7368,6 +7373,23 @@ const STRING_DEFS = {
     beanie:
       'open beanies in a desktop browser to connect a calendar. once connected, it syncs on all your devices.',
   },
+  'calendarSync.reconnect.bannerTitle': {
+    en: 'Calendar sync paused',
+    beanie: 'calendar sync paused',
+  },
+  'calendarSync.reconnect.bannerSub': {
+    en: 'Google needs you to reconnect {account} before your activities can sync again.',
+    beanie: 'google needs you to reconnect {account} before your beans can sync again.',
+  },
+  'calendarSync.reconnect.bannerSubGeneric': {
+    en: 'Google needs you to reconnect this calendar before your activities can sync again.',
+    beanie: 'google needs you to reconnect this calendar before your beans can sync again.',
+  },
+  'calendarSync.reconnect.bannerError': {
+    en: "That didn't work. Please try again.",
+    beanie: "that didn't work. please try again.",
+  },
+  'calendarSync.reconnect.dismiss': { en: 'Dismiss', beanie: 'dismiss' },
   'calendarSync.status.ok': { en: 'Synced', beanie: 'synced' },
   'calendarSync.status.needsReconnect': { en: 'Reconnect needed', beanie: 'reconnect needed' },
   'calendarSync.status.error': { en: 'Sync error', beanie: 'sync error' },
