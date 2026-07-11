@@ -17,6 +17,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useListStore } from '@/stores/listStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
 import { useBeanTips } from '@/composables/useBeanTips';
 import { useCommunityNudge } from '@/composables/useCommunityNudge';
 import { useInstallNudge } from '@/composables/useInstallNudge';
@@ -63,6 +64,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const listStore = useListStore();
   const activityStore = useActivityStore();
   const familyStore = useFamilyStore();
+  const calendarSyncStore = useCalendarSyncStore();
   // Bound ONCE at store-setup scope (mirrors the other store bindings above);
   // the snapshot reads `issuedTips.value` on each recompute — no re-instantiation.
   const beanTips = useBeanTips();
@@ -118,6 +120,15 @@ export const useNotificationsStore = defineStore('notifications', () => {
       tipsById: TIPS_BY_ID,
       activeNudge: communityNudge.activeNudge.value,
       installNudge: installNudge.nudge.value,
+      // Minimal projection for the calendar-reconnect bell entry (deriver only
+      // reads id/email/status/timestamps). Empty until a calendar is connected.
+      calendarConnections: calendarSyncStore.connections.map((c) => ({
+        id: c.id,
+        accountEmail: c.accountEmail,
+        status: c.status,
+        lastReconciledAt: c.lastReconciledAt,
+        updatedAt: c.updatedAt,
+      })),
       readState,
       windowDays: WINDOW_DAYS,
       occurrencesByDate,

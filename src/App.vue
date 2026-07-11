@@ -27,6 +27,7 @@ import PwaReinstallModal from '@/components/common/PwaReinstallModal.vue';
 import FeedbackModal from '@/components/feedback/FeedbackModal.vue';
 import { claimInterruption } from '@/composables/useSessionInterruption';
 import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
+import CalendarReconnectToast from '@/components/common/CalendarReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
 import { formatDeviceInfo } from '@/utils/diagnostics';
@@ -1497,6 +1498,9 @@ watch(
         v-if="syncStore.showGoogleReconnect && !authStore.needsAuth"
         @reconnected="handleGoogleReconnected"
       />
+      <!-- Calendar reconnect toast self-gates on the store's needs_reconnect
+           computed (independent grant from Drive; both may show if both die). -->
+      <CalendarReconnectToast />
       <InstallPrompt />
     </div>
 

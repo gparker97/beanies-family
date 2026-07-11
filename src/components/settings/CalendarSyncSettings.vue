@@ -269,8 +269,11 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
           />
 
           <div class="flex flex-wrap gap-2">
+            <!-- Reconnect via popup only exists on desktop until P2 adds the
+                 redirect transport. On a redirect surface (PWA/iOS/native) show
+                 the explanation below instead of a button that dead-ends. -->
             <BaseButton
-              v-if="connection.status === 'needs_reconnect'"
+              v-if="connection.status === 'needs_reconnect' && store.isConnectSupported"
               variant="primary"
               size="sm"
               :loading="busyId === connection.id"
@@ -290,6 +293,12 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
               {{ t('calendarSync.action.disconnect') }}
             </BaseButton>
           </div>
+          <p
+            v-if="connection.status === 'needs_reconnect' && !store.isConnectSupported"
+            class="rounded-2xl bg-[var(--tint-silk-20)] px-3 py-2.5 text-[0.8rem] leading-snug text-[var(--deep-slate)]/70 dark:bg-slate-800 dark:text-slate-300"
+          >
+            {{ t('calendarSync.connectOnDesktop') }}
+          </p>
         </div>
       </div>
 

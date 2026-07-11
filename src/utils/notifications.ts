@@ -19,6 +19,16 @@ import type { AppNotification } from '@/types/notifications';
 import { normalizeAssignees } from '@/utils/assignees';
 import { classifyAudience } from '@/utils/audience';
 import { entityDeepLink } from '@/utils/entityDeepLink';
+import { CALENDAR_SYNC_OPEN } from '@/constants/settingsDeepLinks';
+
+/** Minimal calendar-connection shape the deriver needs (keeps it store-decoupled). */
+export interface CalendarConnectionHealth {
+  id: string;
+  accountEmail?: string;
+  status: string;
+  lastReconciledAt?: string;
+  updatedAt?: string;
+}
 
 const MS_PER_DAY = 86_400_000;
 /** Lead time before a timed todo's due moment that the `todo-due` fires. */
@@ -60,6 +70,9 @@ export interface DeriveInput {
   activeNudge: { messageIndex: number; issuedAt: number } | null;
   /** The one-time iOS install nudge, or null. Window-exempt; projected 1:1. */
   installNudge: { shownAt: number } | null;
+  /** Calendar connections — feeds the `calendar-reconnect` bell entry. Status-
+   *  based (not time-windowed); only `needs_reconnect` connections surface. */
+  calendarConnections: readonly CalendarConnectionHealth[];
   /** The current member's id→readAt slice of `notificationReads`. */
   readState: Record<string, string>;
   /** Rolling history window (days) for time-based kinds; whats-new is exempt. */
@@ -81,6 +94,11 @@ export const activityReminderId = (activityId: string, occurrenceDate: string): 
 // One per completion event (encodes completedAt so a re-completion is a new id).
 export const listCompletedId = (listId: string, completedAt: string): string =>
   `list-completed:${listId}:${completedAt}`;
+// One per broken connection. NOT prune-exempt: when the connection heals it
+// leaves the derived list and `pruneReadState` drops its read entry, so a later
+// re-break re-derives as unread (fresh alert) under the same id.
+export const calendarReconnectId = (connectionId: string): string =>
+  `calendar-reconnect:${connectionId}`;
 export const whatsNewId = (version: string): string => `${WHATS_NEW_PREFIX}${version}`;
 export const announcementId = (id: string): string => `${ANNOUNCEMENT_PREFIX}${id}`;
 export const tipId = (id: string): string => `${TIP_PREFIX}${id}`;
@@ -141,6 +159,7 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
     tipsById,
     activeNudge,
     installNudge,
+    calendarConnections,
     readState,
     windowDays,
     occurrencesByDate,
@@ -425,6 +444,35 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
       });
     } catch (err) {
       console.warn('[deriveNotifications] skipped install nudge:', err);
+    }
+  }
+
+  // ── calendar-reconnect (status-based, NOT window-gated) ──────────────────────
+  // A connection whose Google grant died and needs re-consent. `needs_reconnect`
+  // ONLY — never `error` (that is written on the first transient reconcile
+  // failure, so keying on it would flap a re-consent CTA on a network blip, and
+  // re-auth can't fix a network error). The App-level toast is the primary
+  // signal; this bell entry is the durable, dismiss-surviving backstop.
+  for (const conn of calendarConnections) {
+    try {
+      if (!conn?.id || conn.status !== 'needs_reconnect') continue;
+      const id = calendarReconnectId(conn.id);
+      const at = conn.lastReconciledAt ?? conn.updatedAt;
+      const atMs = at ? new Date(at).getTime() : NaN;
+      out.push({
+        id,
+        kind: 'calendar-reconnect',
+        // The account email lets a multi-calendar user tell which broke; the
+        // presentation layer falls back to the kind label when it's absent.
+        title: conn.accountEmail && conn.accountEmail !== 'unknown' ? conn.accountEmail : '',
+        occurredAt: Number.isNaN(atMs) ? now.toISOString() : new Date(atMs).toISOString(),
+        route: '/settings',
+        query: { open: CALENDAR_SYNC_OPEN },
+        sourceId: conn.id,
+        read: isRead(id),
+      });
+    } catch (err) {
+      console.warn(`[deriveNotifications] skipped calendar connection ${conn?.id ?? '?'}:`, err);
     }
   }
 

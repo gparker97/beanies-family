@@ -85,6 +85,7 @@ function derive(overrides: Partial<DeriveInput>, now: Date = NOW) {
     tipsById: new Map<string, BeanTip>(),
     activeNudge: null,
     installNudge: null,
+    calendarConnections: [],
     readState: {},
     windowDays: 30,
     occurrencesByDate: {},
@@ -106,6 +107,62 @@ describe('deriveNotifications — community nudge', () => {
   it('emits no nudge when activeNudge is null', () => {
     const out = derive({ activeNudge: null });
     expect(out.some((n) => n.kind === 'communityNudge')).toBe(false);
+  });
+});
+
+describe('deriveNotifications — calendar-reconnect', () => {
+  const conn = (over: Record<string, unknown> = {}) => ({
+    id: 'conn-1',
+    accountEmail: 'greg@example.com',
+    status: 'needs_reconnect',
+    lastReconciledAt: '2026-07-10T00:00:00.000Z',
+    ...over,
+  });
+
+  it('emits one entry for a needs_reconnect connection, routed to Settings', () => {
+    const out = derive({ calendarConnections: [conn()] });
+    const items = out.filter((n) => n.kind === 'calendar-reconnect');
+    expect(items).toHaveLength(1);
+    expect(items[0]?.id).toBe('calendar-reconnect:conn-1');
+    expect(items[0]?.title).toBe('greg@example.com');
+    expect(items[0]?.route).toBe('/settings');
+    expect(items[0]?.query).toEqual({ open: 'calendar-sync' });
+    expect(items[0]?.read).toBe(false);
+  });
+
+  it('Pass-4 guard: a status:"error" (transient) connection raises NOTHING', () => {
+    const out = derive({ calendarConnections: [conn({ status: 'error' })] });
+    expect(out.some((n) => n.kind === 'calendar-reconnect')).toBe(false);
+  });
+
+  it('a healthy (ok) connection raises nothing', () => {
+    const out = derive({ calendarConnections: [conn({ status: 'ok' })] });
+    expect(out.some((n) => n.kind === 'calendar-reconnect')).toBe(false);
+  });
+
+  it('multi-connection: only the broken one surfaces (one entry)', () => {
+    const out = derive({
+      calendarConnections: [
+        conn({ id: 'ok-1', status: 'ok' }),
+        conn({ id: 'bad-1', status: 'needs_reconnect' }),
+      ],
+    });
+    const items = out.filter((n) => n.kind === 'calendar-reconnect');
+    expect(items).toHaveLength(1);
+    expect(items[0]?.id).toBe('calendar-reconnect:bad-1');
+  });
+
+  it('resolves as read when its id is in readState', () => {
+    const out = derive({
+      calendarConnections: [conn()],
+      readState: { 'calendar-reconnect:conn-1': '2026-07-10T01:00:00.000Z' },
+    });
+    expect(out.find((n) => n.kind === 'calendar-reconnect')?.read).toBe(true);
+  });
+
+  it('falls back to empty title (→ kind label in presentation) when email is unknown', () => {
+    const out = derive({ calendarConnections: [conn({ accountEmail: 'unknown' })] });
+    expect(out.find((n) => n.kind === 'calendar-reconnect')?.title).toBe('');
   });
 });
 

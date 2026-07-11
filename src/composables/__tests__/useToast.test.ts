@@ -174,3 +174,52 @@ describe('useToast — auto-report on error', () => {
     );
   });
 });
+
+describe('useToast — dedupe', () => {
+  const { toasts } = useToast();
+  const reportErrorMock = vi.mocked(reportError);
+
+  beforeEach(() => {
+    while (toasts.value.length) dismissToast(toasts.value[0]!.id);
+    reportErrorMock.mockReset();
+    vi.useFakeTimers();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('ignores an identical live toast (same type+title+message) — no stacking', () => {
+    showToast('error', 'Reconnect needed', 'desktop only', { silent: true });
+    showToast('error', 'Reconnect needed', 'desktop only', { silent: true });
+    showToast('error', 'Reconnect needed', 'desktop only', { silent: true });
+    expect(toasts.value.filter((t) => t.title === 'Reconnect needed')).toHaveLength(1);
+  });
+
+  it('does NOT dedupe interactive toasts — two identical Undo toasts both survive', () => {
+    const undoA = vi.fn();
+    const undoB = vi.fn();
+    // Byte-identical title/message, distinct actions (e.g. two goal contributions).
+    showToast('success', 'Contribution added', undefined, {
+      actionLabel: 'Undo',
+      actionFn: undoA,
+    });
+    showToast('success', 'Contribution added', undefined, {
+      actionLabel: 'Undo',
+      actionFn: undoB,
+    });
+    const live = toasts.value.filter((t) => t.title === 'Contribution added');
+    expect(live).toHaveLength(2);
+    expect(live.map((t) => t.actionFn)).toEqual([undoA, undoB]);
+  });
+
+  it('pushes a toast with a different message', () => {
+    showToast('info', 'Heads up', 'one');
+    showToast('info', 'Heads up', 'two');
+    expect(toasts.value.filter((t) => t.title === 'Heads up')).toHaveLength(2);
+  });
+
+  it('a duplicated error toast reports only ONCE (no double-page)', () => {
+    showToast('error', 'Boom', 'again');
+    showToast('error', 'Boom', 'again');
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(toasts.value.filter((t) => t.title === 'Boom')).toHaveLength(1);
+  });
+});

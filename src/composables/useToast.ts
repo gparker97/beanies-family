@@ -95,6 +95,25 @@ export function showToast(
   message?: string,
   options?: ToastActionOptions
 ): void {
+  // Dedupe: if an identical toast is already live, ignore the duplicate so a
+  // repeated trigger (e.g. tapping a failing button) doesn't stack the same
+  // message. Runs BEFORE the reportError block below so a duplicated error
+  // toast never double-pages #beanies-errors. INTERACTIVE toasts are exempt —
+  // a toast carrying an `actionFn` (e.g. Undo) may pair an identical message
+  // with a DISTINCT action, and dropping it would silently lose that action.
+  // We therefore dedupe only when neither the incoming nor the live toast has
+  // an action. (`message` may be undefined on both — strict `===` handles it.)
+  if (!options?.actionFn) {
+    const duplicate = toasts.value.find(
+      (t) => t.type === type && t.title === title && t.message === message && !t.actionFn
+    );
+    if (duplicate) {
+      // Freshen the displayed timestamp; the original auto-dismiss timer stands.
+      duplicate.timestamp = Date.now();
+      return;
+    }
+  }
+
   // Auto-report system errors. Wrapped in try/catch — a reporter failure
   // must NEVER prevent the toast from rendering. The user always sees
   // their error, even if Slack is down or the reporter itself bugs out.

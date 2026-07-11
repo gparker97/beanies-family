@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Calendar reconnect surfaces — P1 mockup</title>
+    <style>
+      :root {
+        --orange: #f15d22;
+        --orange-hover: #d14d1a;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --slate-2: #1a252f;
+        --sky: #aed6f1;
+        --cloud: #f8f9fa;
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-14: rgba(241, 93, 34, 0.14);
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.12);
+        --font-head: 'Outfit', 'Segoe UI', system-ui, sans-serif;
+        --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: var(--font-body);
+        background: #eef1f4;
+        color: var(--slate);
+        line-height: 1.5;
+        padding: 32px 20px 80px;
+      }
+      h1 { font-family: var(--font-head); font-weight: 700; font-size: 1.6rem; margin: 0 0 4px; }
+      h2 { font-family: var(--font-head); font-weight: 600; font-size: 1.05rem; margin: 40px 0 4px; color: var(--slate); }
+      .lede { max-width: 760px; color: #52616b; margin: 0 auto 8px; }
+      .wrap { max-width: 1080px; margin: 0 auto; }
+      .center { text-align: center; }
+      .note { font-size: 0.82rem; color: #6b7a86; max-width: 760px; margin: 6px auto 0; }
+      .row { display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; align-items: flex-start; margin-top: 20px; }
+      .col-label { font-family: var(--font-head); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: #8a97a1; text-align: center; margin-bottom: 10px; }
+
+      /* ── phone frame ── */
+      .phone {
+        width: 300px;
+        border-radius: 40px;
+        background: #fff;
+        box-shadow: var(--soft-shadow);
+        border: 9px solid #12181d;
+        overflow: hidden;
+        position: relative;
+      }
+      .phone .statusbar {
+        height: 34px; background: var(--cloud); display: flex; align-items: center;
+        justify-content: space-between; padding: 0 18px; font-size: 0.72rem; font-weight: 600; color: var(--slate);
+      }
+      .app-canvas { background: var(--cloud); min-height: 470px; position: relative; padding: 14px; }
+      .app-header {
+        display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+      }
+      .wordmark { font-family: var(--font-head); font-weight: 700; font-size: 1.05rem; }
+      .wordmark .fam { color: var(--orange); }
+      .bell-wrap { position: relative; }
+      .bell {
+        width: 38px; height: 38px; border-radius: 12px; background: #fff; box-shadow: var(--card-shadow);
+        display: grid; place-items: center; font-size: 1.05rem;
+      }
+      .bell-badge {
+        position: absolute; top: -3px; right: -3px; min-width: 17px; height: 17px; padding: 0 4px;
+        border-radius: 9px; background: var(--orange); color: #fff; font-size: 0.66rem; font-weight: 700;
+        display: grid; place-items: center; border: 2px solid var(--cloud);
+      }
+      .skeleton-card { background: #fff; border-radius: 22px; box-shadow: var(--card-shadow); height: 84px; margin-bottom: 12px; }
+      .skeleton-line { height: 10px; border-radius: 6px; background: #e7ecf0; margin: 0 0 8px; }
+
+      /* ── the reconnect toast (App-level, mirrors GoogleReconnectToast structure, CIG orange) ── */
+      .toast {
+        position: absolute; left: 14px; right: 14px; bottom: 16px;
+        display: flex; align-items: center; gap: 12px;
+        background: #fff; border-radius: 20px; padding: 14px 16px;
+        box-shadow: var(--soft-shadow); border: 1px solid var(--tint-orange-14);
+        border-left: 4px solid var(--orange);
+      }
+      .toast .ic {
+        width: 34px; height: 34px; border-radius: 11px; flex: 0 0 auto;
+        background: var(--tint-orange-14); display: grid; place-items: center; font-size: 1rem;
+      }
+      .toast .body { flex: 1 1 auto; min-width: 0; }
+      .toast .title { font-family: var(--font-head); font-weight: 600; font-size: 0.86rem; color: var(--slate); }
+      .toast .sub { font-size: 0.76rem; color: #6b7a86; margin-top: 1px; }
+      .toast .sub.err { color: var(--orange); }
+      .btn-primary {
+        font-family: var(--font-head); font-weight: 600; font-size: 0.8rem; color: #fff;
+        background: var(--orange); border: none; border-radius: 13px; padding: 9px 15px; cursor: pointer; white-space: nowrap;
+      }
+      .btn-primary:hover { background: var(--orange-hover); }
+      .btn-primary.busy { opacity: 0.65; }
+      .toast .dismiss { background: none; border: none; color: #9aa7b0; font-size: 1rem; cursor: pointer; padding: 2px 4px; flex: 0 0 auto; }
+      .spinner {
+        width: 15px; height: 15px; border: 2.5px solid rgba(255,255,255,0.5); border-top-color: #fff;
+        border-radius: 50%; display: inline-block; vertical-align: -2px; animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* success flash */
+      .toast.ok { border-left-color: #27ae60; }
+      .toast.ok .ic { background: rgba(39,174,96,0.14); }
+
+      /* ── bell dropdown ── */
+      .dropdown {
+        position: absolute; top: 58px; right: 14px; width: 250px; background: #fff; border-radius: 20px;
+        box-shadow: var(--soft-shadow); overflow: hidden; z-index: 5;
+      }
+      .dd-head { padding: 12px 16px 6px; font-family: var(--font-head); font-weight: 700; font-size: 0.95rem; }
+      .dd-item { display: flex; gap: 11px; padding: 12px 16px; border-top: 1px solid #f0f3f5; align-items: flex-start; }
+      .dd-item .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); margin-top: 5px; flex: 0 0 auto; }
+      .dd-item .txt .t { font-weight: 600; font-size: 0.82rem; }
+      .dd-item .txt .s { font-size: 0.75rem; color: #6b7a86; }
+      .dd-item .go { margin-left: auto; align-self: center; color: var(--orange); font-weight: 600; font-size: 0.78rem; white-space: nowrap; }
+
+      /* ── desktop frame ── */
+      .desktop {
+        width: 640px; max-width: 100%; border-radius: 20px; overflow: hidden; box-shadow: var(--soft-shadow);
+        border: 1px solid #dbe2e8; background: var(--cloud);
+      }
+      .desktop .bar { height: 30px; background: #e3e9ee; display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+      .desktop .bar span { width: 10px; height: 10px; border-radius: 50%; background: #c3ccd4; }
+      .desktop .canvas { position: relative; min-height: 300px; padding: 20px; }
+      .desktop .toast { left: auto; right: 20px; bottom: 20px; width: 380px; }
+
+      .legend { max-width: 760px; margin: 14px auto 0; font-size: 0.8rem; color: #52616b; }
+      .legend li { margin-bottom: 4px; }
+      .pill { display: inline-block; background: var(--tint-orange-8); color: var(--orange); font-weight: 600;
+        border-radius: 999px; padding: 1px 9px; font-size: 0.72rem; }
+      .decision {
+        max-width: 760px; margin: 24px auto 0; background: #fff; border-radius: 18px; padding: 16px 20px;
+        box-shadow: var(--card-shadow); border-left: 4px solid var(--orange);
+      }
+      .decision h3 { font-family: var(--font-head); margin: 0 0 6px; font-size: 0.95rem; }
+      .decision p { margin: 0; font-size: 0.83rem; color: #52616b; }
+      @media (max-width: 560px) { .desktop { width: 100%; } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="center">
+        <h1>Calendar reconnect surfaces</h1>
+        <p class="lede">P1 mockup — the user-facing signal + one-tap recovery that turns the silent calendar
+          disconnect into something you can see and fix. Mirrors the Drive <code>GoogleReconnectToast</code>
+          pattern, restyled to the CIG (Heritage Orange, squircles, soft shadows).</p>
+        <p class="note">Fonts approximate Outfit / Inter. Every colour, radius and shadow is a CIG token.</p>
+      </div>
+
+      <h2 class="center">1 · The moment it stops syncing — App-level reconnect toast (mobile PWA)</h2>
+      <p class="note center">Fires <span class="pill">once</span> per transition to <code>needs_reconnect</code>,
+        not on every failed poll. Dismissible. Deduped — never stacks.</p>
+      <div class="row">
+        <div>
+          <div class="col-label">Idle — needs reconnect</div>
+          <div class="phone">
+            <div class="statusbar"><span>1:32</span><span>5G ▪▪▪ 83</span></div>
+            <div class="app-canvas">
+              <div class="app-header">
+                <div class="wordmark">beanies<span class="fam">.family</span></div>
+                <div class="bell-wrap"><div class="bell">🔔</div><div class="bell-badge">1</div></div>
+              </div>
+              <div class="skeleton-card"></div>
+              <div class="skeleton-card"></div>
+              <div class="toast">
+                <div class="ic">📅</div>
+                <div class="body">
+                  <div class="title">Calendar sync paused</div>
+                  <div class="sub">google needs you to reconnect</div>
+                </div>
+                <button class="btn-primary">reconnect</button>
+                <button class="dismiss">✕</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="col-label">Reconnecting</div>
+          <div class="phone">
+            <div class="statusbar"><span>1:32</span><span>5G ▪▪▪ 83</span></div>
+            <div class="app-canvas">
+              <div class="app-header">
+                <div class="wordmark">beanies<span class="fam">.family</span></div>
+                <div class="bell-wrap"><div class="bell">🔔</div><div class="bell-badge">1</div></div>
+              </div>
+              <div class="skeleton-card"></div>
+              <div class="skeleton-card"></div>
+              <div class="toast">
+                <div class="ic">📅</div>
+                <div class="body">
+                  <div class="title">Calendar sync paused</div>
+                  <div class="sub">reconnecting…</div>
+                </div>
+                <button class="btn-primary busy"><span class="spinner"></span></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="col-label">Reconnected — self-heals</div>
+          <div class="phone">
+            <div class="statusbar"><span>1:32</span><span>5G ▪▪▪ 83</span></div>
+            <div class="app-canvas">
+              <div class="app-header">
+                <div class="wordmark">beanies<span class="fam">.family</span></div>
+                <div class="bell-wrap"><div class="bell">🔔</div></div>
+              </div>
+              <div class="skeleton-card"></div>
+              <div class="skeleton-card"></div>
+              <div class="toast ok">
+                <div class="ic">🫘</div>
+                <div class="body">
+                  <div class="title">Calendar reconnected</div>
+                  <div class="sub">your beans are syncing again</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ul class="legend">
+        <li><b>Idle:</b> the signal that was missing — you now <i>see</i> that pushes stopped, without opening Settings.</li>
+        <li><b>Reconnect button</b> works right here on the PWA once P2 lands; in P1 it deep-links to the Settings flow.</li>
+        <li><b>Self-heal:</b> on success the toast flips to a brief confirmation then auto-dismisses; the bell badge clears. No lingering nag.</li>
+      </ul>
+
+      <h2 class="center">2 · The bell — a persistent, non-intrusive record</h2>
+      <p class="note center">If you dismiss the toast, the disconnect is still discoverable. Calendar health becomes a
+        <code>deriveNotifications</code> input so it badges the bell like any other item.</p>
+      <div class="row">
+        <div class="phone">
+          <div class="statusbar"><span>1:32</span><span>5G ▪▪▪ 83</span></div>
+          <div class="app-canvas">
+            <div class="app-header">
+              <div class="wordmark">beanies<span class="fam">.family</span></div>
+              <div class="bell-wrap"><div class="bell">🔔</div><div class="bell-badge">1</div></div>
+            </div>
+            <div class="skeleton-card"></div>
+            <div class="dropdown">
+              <div class="dd-head">Notifications</div>
+              <div class="dd-item">
+                <span class="dot"></span>
+                <div class="txt">
+                  <div class="t">Calendar needs reconnecting</div>
+                  <div class="s">gregsophia@gmail.com stopped syncing</div>
+                </div>
+                <span class="go">reconnect ›</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <ul class="legend" style="align-self:center">
+          <li>One entry per broken connection (not per failed poll).</li>
+          <li>Tapping it opens the same reconnect flow as the toast.</li>
+          <li>Clears automatically the instant the connection self-heals.</li>
+          <li>Heritage Orange dot + badge — the CIG alert colour, never red.</li>
+        </ul>
+      </div>
+
+      <h2 class="center">3 · Desktop — same toast, same words</h2>
+      <div class="row">
+        <div class="desktop">
+          <div class="bar"><span></span><span></span><span></span></div>
+          <div class="canvas">
+            <div class="app-header">
+              <div class="wordmark">beanies<span class="fam">.family</span></div>
+              <div class="bell-wrap"><div class="bell">🔔</div><div class="bell-badge">1</div></div>
+            </div>
+            <div class="skeleton-line" style="width:60%"></div>
+            <div class="skeleton-line" style="width:80%"></div>
+            <div class="skeleton-line" style="width:45%"></div>
+            <div class="toast">
+              <div class="ic">📅</div>
+              <div class="body">
+                <div class="title">Calendar sync paused</div>
+                <div class="sub">google needs you to reconnect gregsophia@gmail.com</div>
+              </div>
+              <button class="btn-primary">reconnect</button>
+              <button class="dismiss">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <h3>Decision to confirm — toast colour</h3>
+        <p>Drive's live reconnect toast is <b>amber</b>. The CIG designates <b>Heritage Orange</b> as the alert
+          colour (amber isn't a brand colour). This mockup uses Heritage Orange. Recommended: build one shared
+          reconnect-toast component in Heritage Orange and migrate Drive's amber toast onto it too — that gets both
+          <i>consistency</i> (your explicit ask) and CIG-compliance in one move. Alternative: leave Drive amber for now
+          and only the calendar toast is orange (a visible inconsistency). I'll follow your call in the plan.</p>
+      </div>
+    </div>
+  </body>
+</html>
