@@ -47,9 +47,13 @@ import {
 } from '@/services/automerge/repositories/calendarRepository';
 import {
   connectGoogleCalendar,
-  isCalendarConnectSupported,
+  startCalendarRedirectAuth,
+  completeCalendarRedirectAuth,
   type CalendarConnectResult,
+  type CalendarConnectSuccess,
 } from '@/services/calendar/calendarAuth';
+import { shouldUseRedirectAuth } from '@/services/google/googleAuth';
+import { CALENDAR_SYNC_OPEN } from '@/constants/settingsDeepLinks';
 import {
   getCalendarClient,
   setCalendarClientForTesting,
@@ -218,8 +222,6 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     if (!isDocLoaded()) return [];
     return projectionList('calendarConnections');
   });
-
-  const isConnectSupported = computed(() => isCalendarConnectSupported());
 
   // ── User-facing reconnect signal (single source of truth) ───────────────────
   // Keyed on `needs_reconnect` ONLY — never `error`. `settleConnectionStatus`
@@ -521,14 +523,49 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
 
   // ── Public actions ──────────────────────────────────────────────────────────
 
-  /** Run the consent flow + create a family-wide connection. Returns the auth result. */
-  async function connect(): Promise<CalendarConnectResult> {
-    if (!isFlagEnabled(FLAG)) {
-      return { status: 'failed', code: 'not_configured', message: 'Feature is not enabled.' };
-    }
-    const result = await connectGoogleCalendar({ loginHint: getGoogleAccountEmail() ?? undefined });
-    if (result.status !== 'connected') return result;
+  /**
+   * Build the same-origin returnPath a calendar redirect lands on. It reopens the
+   * Calendar settings drawer AND carries the resume intent in a `calResume` query
+   * (`connect` for a fresh connect, or a connectionId to reconnect) — so no secret
+   * and no id ever rides in the OAuth `state`. The App-level resume reads it.
+   */
+  function buildCalendarReturnPath(intent: 'connect' | string): string {
+    const params = new URLSearchParams({ open: CALENDAR_SYNC_OPEN, calResume: intent });
+    return `/settings?${params.toString()}`;
+  }
 
+  /**
+   * Commit a successful consent (create a new connection, or update an existing one
+   * in place) + kick a verify reconcile. Shared by the popup path (`connect`/
+   * `reconnect`) and the redirect resume so all three converge on one commit.
+   * `connectionId` present ⇒ reconnect that connection (falls back to create if it
+   * vanished — remotely healed/removed); absent ⇒ fresh connect.
+   */
+  async function finalizeConnected(
+    result: CalendarConnectSuccess,
+    connectionId?: string
+  ): Promise<void> {
+    if (connectionId) {
+      const existing = await getCalendarConnectionById(connectionId);
+      if (existing) {
+        await updateCalendarConnection(connectionId, {
+          accountEmail: result.email ?? existing.accountEmail ?? 'unknown',
+          refreshToken: result.refreshToken,
+          grantedScopes: result.grantedScopes,
+          status: 'ok',
+          lastError: undefined,
+        });
+        invalidGrantCounters.delete(connectionId);
+        // Clear the token provider's cached access token AND its latched
+        // permanent-failure state. Without this the provider keeps fast-failing
+        // every request with the pre-reconnect `invalid_grant`, so a user who
+        // re-consents sees calendar sync stay dead until they reload the page.
+        getCalendarClient().invalidateConnection(connectionId);
+        void reconcileConnection(connectionId, { verifyExisting: true, force: true });
+        return;
+      }
+      // connectionId gone (removed or remotely healed) — fall through to a create.
+    }
     const connection = await createCalendarConnection({
       provider: 'google',
       accountEmail: result.email ?? 'unknown',
@@ -540,32 +577,62 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     invalidGrantCounters.delete(connection.id);
     // Kick a full verify reconcile for the new connection (don't block the UI).
     void reconcileConnection(connection.id, { verifyExisting: true, force: true });
+  }
+
+  /** Run the consent flow + create a family-wide connection. Returns the auth result.
+   *  On a redirect surface (PWA/iOS/native) hands off to the redirect transport and
+   *  returns `{status:'redirecting'}` — the resume completes it post-redirect. */
+  async function connect(): Promise<CalendarConnectResult> {
+    if (!isFlagEnabled(FLAG)) {
+      return { status: 'failed', code: 'not_configured', message: 'Feature is not enabled.' };
+    }
+    const loginHint = getGoogleAccountEmail() ?? undefined;
+    if (shouldUseRedirectAuth()) {
+      await startCalendarRedirectAuth(buildCalendarReturnPath('connect'), loginHint, 'create');
+      return { status: 'redirecting' };
+    }
+    const result = await connectGoogleCalendar({ loginHint });
+    if (result.status !== 'connected') return result;
+    await finalizeConnected(result);
     return result;
   }
 
   /** Re-run consent for an EXISTING connection (e.g. after needs_reconnect): updates
-   *  its shared refresh token + scopes in place — never creates a duplicate. */
+   *  its shared refresh token + scopes in place — never creates a duplicate. On a
+   *  redirect surface hands off to the redirect transport (resume completes it). */
   async function reconnect(connectionId: string): Promise<CalendarConnectResult> {
     if (!isFlagEnabled(FLAG)) {
       return { status: 'failed', code: 'not_configured', message: 'Feature is not enabled.' };
     }
     const existing = await getCalendarConnectionById(connectionId);
-    const result = await connectGoogleCalendar({ loginHint: existing?.accountEmail });
+    const loginHint = existing?.accountEmail;
+    if (shouldUseRedirectAuth()) {
+      await startCalendarRedirectAuth(
+        buildCalendarReturnPath(connectionId),
+        loginHint,
+        'reconnect'
+      );
+      return { status: 'redirecting' };
+    }
+    const result = await connectGoogleCalendar({ loginHint });
     if (result.status !== 'connected') return result;
-    await updateCalendarConnection(connectionId, {
-      accountEmail: result.email ?? existing?.accountEmail ?? 'unknown',
-      refreshToken: result.refreshToken,
-      grantedScopes: result.grantedScopes,
-      status: 'ok',
-      lastError: undefined,
-    });
-    invalidGrantCounters.delete(connectionId);
-    // Clear the token provider's cached access token AND its latched
-    // permanent-failure state. Without this the provider keeps fast-failing
-    // every request with the pre-reconnect `invalid_grant`, so a user who
-    // re-consents sees calendar sync stay dead until they reload the page.
-    getCalendarClient().invalidateConnection(connectionId);
-    void reconcileConnection(connectionId, { verifyExisting: true, force: true });
+    await finalizeConnected(result, connectionId);
+    return result;
+  }
+
+  /**
+   * Resume a calendar connect/reconnect after a redirect round-trip. Called by the
+   * App-level resume when it sees a pending `calResume` intent. Redeems the
+   * one-time code (memoized), commits on success, and returns a typed result the
+   * caller toasts from. Returns `null` when there was no pending calendar code
+   * (a Drive redirect, or the user declined) — the caller shows nothing.
+   */
+  async function resumeRedirectConnect(intent: string): Promise<CalendarConnectResult | null> {
+    if (!isFlagEnabled(FLAG)) return null;
+    const result = await completeCalendarRedirectAuth();
+    if (!result || result.status !== 'connected') return result;
+    const connectionId = intent === 'connect' ? undefined : intent;
+    await finalizeConnected(result, connectionId);
     return result;
   }
 
@@ -743,11 +810,11 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
 
   return {
     connections,
-    isConnectSupported,
     reconnectNeededConnection,
     showCalendarReconnect,
     connect,
     reconnect,
+    resumeRedirectConnect,
     disconnect,
     setDestinationCalendar,
     listCalendarsFor,

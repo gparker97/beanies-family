@@ -12,6 +12,7 @@ import { installNativeAuthListener } from '@/services/google/googleAuth';
 import { isNative } from '@/services/sync/capabilities';
 import { useLocalNotifications } from '@/composables/useLocalNotifications';
 import { useNotifications } from '@/composables/useNotifications';
+import { useCalendarRedirectResume } from '@/composables/useCalendarRedirectResume';
 import { useNativeShell } from '@/composables/useNativeShell';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
@@ -1242,6 +1243,12 @@ useLocalNotifications();
 // In-app notifications: poll tick, app-badge sync, What's-New migration,
 // auto-open on login. Owns no business state — see useNotifications.
 useNotifications();
+
+// Calendar redirect-auth resume (P2): completes a PWA/iOS/native calendar
+// connect/reconnect after the redirect round-trip returns with a `calResume`
+// intent. Reactive + SPA-safe; instantiates the calendar store only when a
+// resume is actually pending (zero-cost when the feature is off). See ADR-032.
+useCalendarRedirectResume();
 
 // Native shell: hide the splash, set the status-bar style, and wire the Android
 // hardware back button (cooperates with the existing overlay-close mechanism).
