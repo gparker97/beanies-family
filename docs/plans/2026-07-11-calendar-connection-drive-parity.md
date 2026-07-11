@@ -216,6 +216,38 @@ The behavior change lands in **P2** (reconnecting Google Calendar now works on p
 4. **Regression** — full Drive sign-in/load/reconnect on desktop + PWA + native unchanged after P2.
 5. `npm run type-check`, `npm run lint`, unit suite, and the calendar + google auth test files green at each phase.
 
+## Implementation Progress & Resume
+
+> **Read this first when resuming.** Snapshot as of 2026-07-11.
+
+### P1 — ✅ DONE, merged to `main`, pushed, live-verified
+
+Commit `c651a6b9` on `main` (pushed to origin). Live-verified via Playwright: the reconnect toast surfaces once and self-heals, the bell badges and clears. Full suite 3728 passed, build compiles. Shipped: shared `ReconnectToast.vue` (Drive migrated onto it), `CalendarReconnectToast.vue`, `showCalendarReconnect` store computed (`needs_reconnect`-only), `calendar-reconnect` bell kind, `showToast` dedupe (actionFn-exempt), interim Settings/bell gate, deleted orphaned `SyncStatusIndicator.vue`. **Not deployed** (awaiting an explicit deploy).
+
+### P2 — 🚧 IN PROGRESS on branch `calendar-drive-parity-p2` (off `main` @ `c651a6b9`)
+
+**Done on the branch:** commit `f4554420` — grant-aware redirect state (`redirectState.ts` + tests). `grant` is additive-optional (Drive byte-identical, absent→`'drive'`, no version bump). 12 codec tests pass. **Zero behaviour change yet** — nothing passes `grant:'calendar'` until the items below land.
+
+**Remaining P2 items (tasks #10–#14), in order. The seam: share the START side, sibling the COMPLETION side (see the P2 Approach above).**
+
+1. **Start-side threading** (task #10): add optional `grant: RedirectGrant = 'drive'` to `startRedirectAuth` (`googleAuth.ts:1807`); scope-by-grant in `buildAuthUrl` (`:1565`, scope hardcoded at `:1576`) — pass the scope in (or select by grant) to avoid a `googleAuth`↔`calendarAuth` import cycle; encode `grant` into the web `state` (`:1844`) and add `grant` to the native `RedirectAuthState` stash (`:1783`, written `:1825`). Drive callers pass nothing → unchanged.
+2. **Bounce** (task #11): `OAuthCallbackPage.vue` `stashCode` (`:22`) currently writes the bare `REDIRECT_AUTH_CODE_KEY` (`googleAuth.ts:50`). Read `decoded.grant` (`:58`) and write the code into a **grant-namespaced key** (e.g. `${REDIRECT_AUTH_CODE_KEY}:calendar`) so the calendar code can't collide with a Drive code.
+3. **Sibling completion** (task #12): add `completeCalendarRedirectAuth` + its own memo, reading the calendar code key and committing to the `CalendarConnection` record (NOT the Drive token). Leave `completeRedirectAuth` (`:1854`) + `ensureRedirectAuthSettled` (`:1964`) / `whenRedirectAuthSettled` (`:1988`) Drive-only and byte-identical (≥6 Drive consumers await them). Route native `handleNativeAuthRedirect` (`:2041`) by the stash's `grant`.
+4. **Wire calendar** (task #13): in `calendarAuth.ts` remove the `redirect_unsupported` gate (`:168-173`); on a redirect surface route connect + reconnect through `startRedirectAuth({grant:'calendar'})` + `completeCalendarRedirectAuth`. Make the post-redirect resume reactive (SPA-safe). Remove the P1 interim gate in **both** the Settings button (`CalendarSyncSettings.vue`) **and** the bell action.
+5. **Drive-protection tests + verify** (task #14): assert Drive's start scope/state/consent + settlement memo unchanged; the two code keys can't co-populate; native routes by grant; calendar connect+reconnect on web/PWA/native. Full suite + build + **live-verify Drive sign-in/load/reconnect is unchanged** before merging.
+
+**Do NOT merge P2 to `main` until task #14 is green and Drive auth is live-verified.**
+
+### How to resume
+
+```bash
+git checkout calendar-drive-parity-p2      # foundation commit f4554420 is here
+# then: re-read this section + the "P2 — calendar grant on the redirect transport" Approach above,
+# and continue at item 1. Task list #10–#14 tracks the same steps.
+```
+
+Caveats that still bind (from Important Notes above): never weaken `forceConsent`; `prompt=consent` invariant holds for calendar; no UA-sniff pre-warns; the web no-PKCE path is safe ONLY via the confidential proxy `client_secret` (ADR-026).
+
 ## Review Passes
 
 - **Pass 1 (Initial draft)**: Drafted the phased P1/P2/P3 plan from the three-agent investigation + approved mockup + greg's three decisions (phased, generalize redirect infra, unify toast on Heritage Orange); corrected the reference surface from the orphaned `SyncStatusIndicator` to the live `GoogleReconnectToast`.
