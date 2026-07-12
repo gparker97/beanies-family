@@ -747,10 +747,28 @@ export interface CalendarEventLink {
   id: UUID; // composite `${connectionId}:${activityId}`
   connectionId: UUID;
   activityId: UUID;
+  /**
+   * OVERLOADED by link kind (disambiguated by `exceptionOf`):
+   *  - master link (`exceptionOf` absent): the Google **event** id of the activity's event.
+   *  - exception link (`exceptionOf` present): the Google **instance** id of the
+   *    master's recurring occurrence this override modifies/cancels.
+   */
   googleEventId: string;
   /** Hash of the pushed-relevant activity fields; skip reconcile when unchanged. */
   lastPushedHash: string;
   lastPushedAt: ISODateString;
+  /**
+   * Present only on an EXCEPTION link: the master (recurring parent) activity id
+   * whose Google instance this link excepts. Its presence marks the link as an
+   * exception (a per-occurrence override) rather than a normal master link.
+   */
+  exceptionOf?: UUID;
+  /**
+   * Present only on an EXCEPTION link: the ORIGINAL occurrence date (`YYYY-MM-DD`)
+   * the exception addresses. Survives the override child's deletion so the reconcile
+   * can restore the master's Google instance without the child record.
+   */
+  exceptionOriginalYmd?: ISODateString;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

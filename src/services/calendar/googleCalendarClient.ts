@@ -15,8 +15,10 @@ import {
   CalendarApiError,
   type CalendarClient,
   type CalendarErrorKind,
+  type CalendarInstance,
   type CalendarSummary,
   type EventTime,
+  type GoogleEventPatch,
   type TokenProvider,
 } from './CalendarClient';
 
@@ -315,6 +317,51 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
         method: 'PATCH',
         body: JSON.stringify(resource),
       });
+    },
+
+    async patchEventFields(connectionId, calendarId, eventId, patch: GoogleEventPatch) {
+      // Same wire call as patchEvent — a partial body with a widened `status`
+      // (cancel/restore a single recurring instance). `eventId` may be an instance id.
+      await authedFetch(connectionId, `/calendars/${enc(calendarId)}/events/${enc(eventId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      });
+    },
+
+    async listInstances(connectionId, calendarId, masterEventId, timeMinIso, timeMaxIso) {
+      const out: CalendarInstance[] = [];
+      let pageToken: string | undefined;
+      let pages = 0;
+      do {
+        const params = new URLSearchParams({
+          timeMin: timeMinIso,
+          timeMax: timeMaxIso,
+          // Belt-and-suspenders — discovery always runs while the instance is still
+          // confirmed, so cancelled instances are never load-bearing here.
+          showDeleted: 'true',
+          maxResults: '250',
+          fields: 'nextPageToken,items(id,status,start,end,originalStartTime)',
+        });
+        if (pageToken) params.set('pageToken', pageToken);
+        const res = await authedFetch(
+          connectionId,
+          `/calendars/${enc(calendarId)}/events/${enc(masterEventId)}/instances?${params.toString()}`,
+          { method: 'GET' }
+        );
+        const data = (await res.json()) as { nextPageToken?: string; items?: CalendarInstance[] };
+        for (const it of data.items ?? []) out.push(it);
+        pageToken = data.nextPageToken;
+        pages += 1;
+        if (pageToken && pages >= MAX_EVENT_PAGES) {
+          console.warn('[calendarSync] events.instances exceeded MAX_EVENT_PAGES; truncating', {
+            calendarId,
+            masterEventId,
+            pages,
+          });
+          break;
+        }
+      } while (pageToken);
+      return out;
     },
 
     async deleteEvent(connectionId, calendarId, eventId) {

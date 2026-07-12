@@ -7,6 +7,31 @@
 
 import type { GoogleEventResource } from '@/utils/calendar/activityToGoogleEvent';
 
+/**
+ * A partial-field patch for a single event/instance. Widens `GoogleEventResource`'s
+ * `status` (a `'confirmed'` literal) so a per-occurrence exception can `cancel` an
+ * instance (`{status:'cancelled'}`) without casting. All fields optional — send only
+ * what changes.
+ */
+export type GoogleEventPatch = Partial<Omit<GoogleEventResource, 'status'>> & {
+  status?: 'confirmed' | 'cancelled';
+};
+
+/**
+ * One expanded instance of a Google recurring event (from `events.instances`).
+ * `originalStartTime` anchors the instance to the master's generated slot (it does
+ * NOT move when the instance is rescheduled) — the reconcile matches on it to find
+ * the instance for a beanies override's occurrence date. `id` is the instance id
+ * (an event id in its own right — patchable/cancellable via `patchEventFields`).
+ */
+export interface CalendarInstance {
+  id: string;
+  status?: string;
+  start?: { date?: string; dateTime?: string };
+  end?: { date?: string; dateTime?: string };
+  originalStartTime?: { date?: string; dateTime?: string };
+}
+
 /** Classified failure kind — each drives a distinct reconcile path (#32 Layer 4). */
 export type CalendarErrorKind =
   | 'auth' // 401 / invalid_grant → needs_reconnect (NEVER auto-clears the shared token)
@@ -99,6 +124,32 @@ export interface CalendarClient {
     eventId: string,
     resource: GoogleEventResource
   ): Promise<void>;
+  /**
+   * Patch selected fields of an event/instance. Same wire call as `patchEvent`, but
+   * accepts a partial body with a widened `status` — used to CANCEL a single
+   * recurring instance (`{status:'cancelled'}`) or RESTORE it (`{status:'confirmed',
+   * …master body}`). `eventId` may be a Google instance id. Throws classified
+   * `CalendarApiError` (a caller treats `not_found` on a cancel/restore as already-gone).
+   */
+  patchEventFields(
+    connectionId: string,
+    calendarId: string,
+    eventId: string,
+    patch: GoogleEventPatch
+  ): Promise<void>;
+  /**
+   * List the concrete instances of a recurring MASTER event over `[timeMinIso,
+   * timeMaxIso)` (`events.instances`). Used to DISCOVER the instance id for a
+   * beanies override's occurrence (once — the id is then stored + reused). Throws
+   * `not_found` if the master isn't on Google yet (caller treats as benign-skip).
+   */
+  listInstances(
+    connectionId: string,
+    calendarId: string,
+    masterEventId: string,
+    timeMinIso: string,
+    timeMaxIso: string
+  ): Promise<CalendarInstance[]>;
   /** Delete an event. A missing event (404/410) resolves silently (idempotent). */
   deleteEvent(connectionId: string, calendarId: string, eventId: string): Promise<void>;
   /** Whether the event still exists remotely (404/410 → false) — remote-delete detection. */
