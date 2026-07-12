@@ -12,7 +12,7 @@ const CALENDAR_SYNC_ARTICLE: HelpArticle = {
     'Connect a Google calendar and your family activities appear there automatically — one-way, with beanies as the source of truth.',
   icon: '\u{1F4C5}',
   readTime: 5,
-  updatedDate: '2026-07-11',
+  updatedDate: '2026-07-12',
   sections: [
     { type: 'heading', content: 'How it works', level: 2, id: 'how-it-works' },
     {
@@ -38,9 +38,15 @@ const CALENDAR_SYNC_ARTICLE: HelpArticle = {
       content: '',
       items: [
         'Edit an activity in beanies and the change syncs to your calendar.',
+        'Change or remove just <strong>one session</strong> of a repeating activity — reschedule it, edit only that session, or delete only that session — and only that one event on your calendar updates; the rest of the series stays exactly as it was.',
         'If you edit a synced event directly in Google, beanies restores its own version on the next sync, so always edit in beanies.',
         'Disconnect a calendar any time in Settings; beanies removes the events it added and stops syncing. Your activities stay safe in beanies.',
       ],
+    },
+    {
+      type: 'paragraph',
+      content:
+        'One small difference for a <em>single session</em> of a repeating activity: beanies writes your change to your calendar once, but doesn’t keep re-asserting it. If you then hand-edit that one session directly in Google, beanies will put its version back the next time you change that session in the app — not automatically. (A whole activity, by contrast, is restored on every sync.) Either way, beanies stays the source of truth.',
     },
     { type: 'heading', content: 'When it syncs', level: 2, id: 'when' },
     {

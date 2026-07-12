@@ -21,7 +21,7 @@ import { defineStore } from 'pinia';
 import { computed, watch } from 'vue';
 import { docVersion, isDocLoaded } from '@/services/automerge/docService';
 import { list as projectionList } from '@/services/automerge/projection';
-import { toISODateString, localToday } from '@/utils/date';
+import { toISODateString, localToday, addDaysYmd } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
 import { reportError } from '@/utils/errorReporter';
 import { isFlagEnabled } from '@/config/flags';
@@ -68,11 +68,18 @@ import {
 import { runPooled } from '@/utils/calendar/runPooled';
 import {
   activityToGoogleEvent,
+  masterOccurrenceBody,
   type ActivityMapContext,
   type GoogleEventResource,
 } from '@/utils/calendar/activityToGoogleEvent';
-import { planReconcile, type ReconcileUpsert } from '@/utils/calendar/reconcilePlan';
-import type { CalendarConnection } from '@/types/models';
+import {
+  planReconcile,
+  type ReconcileUpsert,
+  type ReconcileExceptionUpsert,
+} from '@/utils/calendar/reconcilePlan';
+import { deterministicEventId } from '@/utils/calendar/deterministicEventId';
+import { matchInstanceForDate } from '@/utils/calendar/matchInstanceForDate';
+import type { CalendarConnection, CalendarEventLink, FamilyActivity } from '@/types/models';
 
 const FLAG = 'googleCalendarSync';
 
@@ -136,6 +143,16 @@ function nowIso(): string {
 
 function todayYmd(): string {
   return localToday(); // LOCAL date — the push window must reflect the user's day, not UTC (F8)
+}
+
+/** A ±1-day UTC window around an occurrence date, for `listInstances` discovery.
+ *  Padded so an exact local-midnight→UTC conversion is never needed — the pure
+ *  `matchInstanceForDate` picks the exact instance by its original-start date slice. */
+function paddedDayWindow(occurrenceYmd: string): [string, string] {
+  return [
+    `${addDaysYmd(occurrenceYmd, -1)}T00:00:00Z`,
+    `${addDaysYmd(occurrenceYmd, 2)}T00:00:00Z`,
+  ];
 }
 
 function getDeviceId(): string {
@@ -252,12 +269,15 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     return age >= 0 && age < FRESHNESS_WINDOW_MS;
   }
 
-  /** Upsert (insert/patch) the link record for an activity↔event mapping. */
+  /** Upsert (insert/patch) the link record for an activity↔event mapping. `extra`
+   *  carries the exception fields (`exceptionOf`/`exceptionOriginalYmd`) for a
+   *  per-occurrence exception link; omitted for a normal master link. */
   async function recordLink(
     connectionId: string,
     activityId: string,
     googleEventId: string,
-    hash: string
+    hash: string,
+    extra?: { exceptionOf?: string; exceptionOriginalYmd?: string }
   ): Promise<void> {
     const existing = await getCalendarEventLink(connectionId, activityId);
     const lastPushedAt = nowIso();
@@ -266,6 +286,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         googleEventId,
         lastPushedHash: hash,
         lastPushedAt,
+        ...extra,
       });
     } else {
       await createCalendarEventLink({
@@ -274,6 +295,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         googleEventId,
         lastPushedHash: hash,
         lastPushedAt,
+        ...extra,
       });
     }
   }
@@ -323,6 +345,124 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       }
     }
     return false;
+  }
+
+  /** Apply one per-occurrence override as a Google recurring-instance EXCEPTION.
+   *  Discovers the instance id once (via `listInstances`) then reuses the stored id;
+   *  patches the instance (modify) or cancels it (delete-one). Returns true iff it
+   *  wrote to Google. Exceptions do NOT re-assert on a verify pass (v1 — they self-
+   *  heal on the next override change). Throws only on a real API error the caller
+   *  should record; benign convergence cases (`not_found`, no instance) return false. */
+  async function applyExceptionUpsert(
+    client: CalendarClient,
+    connectionId: string,
+    calendarId: string,
+    e: ReconcileExceptionUpsert,
+    ctx: ActivityMapContext
+  ): Promise<boolean> {
+    // Unchanged → no-op (independent of verify pass).
+    if (e.existingHash === e.hash) return false;
+
+    // Invariant guard: an override child is always `recurrence:'none'`. A recurring
+    // "child" is malformed data — never stamp an RRULE onto a single instance.
+    if (e.child.recurrence !== 'none') {
+      console.warn(
+        `[calendarSync] skipping exception for ${e.child.id}: override child has recurrence ` +
+          `'${e.child.recurrence}' (expected 'none') — refusing to write an RRULE onto an instance`
+      );
+      return false;
+    }
+
+    // Discover the instance id ONCE; reuse the stored id thereafter (a moved instance
+    // would fall outside an original-date re-window, so we must not re-discover).
+    let instanceId = e.existingInstanceId;
+    if (!instanceId) {
+      const masterEventId = deterministicEventId(e.master.id);
+      const [timeMin, timeMax] = paddedDayWindow(e.occurrenceYmd);
+      let instances;
+      try {
+        instances = await client.listInstances(
+          connectionId,
+          calendarId,
+          masterEventId,
+          timeMin,
+          timeMax
+        );
+      } catch (err) {
+        // Master not on Google yet → converge on the next reconcile (not an error).
+        if (err instanceof CalendarApiError && err.kind === 'not_found') {
+          console.debug(
+            `[calendarSync] exception deferred: master ${e.master.id} not yet on Google`
+          );
+          return false;
+        }
+        throw err;
+      }
+      const inst = matchInstanceForDate(instances, e.occurrenceYmd);
+      if (!inst) {
+        console.debug(
+          `[calendarSync] exception deferred: no Google instance for ${e.occurrenceYmd} ` +
+            `of master ${e.master.id}`
+        );
+        return false;
+      }
+      instanceId = inst.id;
+    }
+
+    if (e.mode === 'cancel') {
+      await client.patchEventFields(connectionId, calendarId, instanceId, { status: 'cancelled' });
+    } else {
+      await client.patchEvent(
+        connectionId,
+        calendarId,
+        instanceId,
+        activityToGoogleEvent(e.child, ctx)
+      );
+    }
+    await recordLink(connectionId, e.child.id, instanceId, e.hash, {
+      exceptionOf: e.master.id,
+      exceptionOriginalYmd: e.occurrenceYmd,
+    });
+    return true;
+  }
+
+  /** Restore or drop an exception link whose override child is gone. If the master is
+   *  still pushable, patch the stored instance back to the master's generated value
+   *  (un-cancels / moves back). If the master is null (being series-deleted or not
+   *  synced), just drop the stale link — never patch an instance of a deleted master.
+   *  Returns true iff it changed remote/link state. */
+  async function applyExceptionRestore(
+    client: CalendarClient,
+    connectionId: string,
+    calendarId: string,
+    link: CalendarEventLink,
+    master: FamilyActivity | null,
+    ctx: ActivityMapContext
+  ): Promise<boolean> {
+    if (!master || !link.exceptionOriginalYmd) {
+      // No master to restore to (series being deleted / unsynced) or a malformed link
+      // with no occurrence date → drop the stale exception link.
+      await removeCalendarEventLinkById(connectionId, link.activityId);
+      return true;
+    }
+    const occurrenceYmd = link.exceptionOriginalYmd;
+    try {
+      await client.patchEventFields(
+        connectionId,
+        calendarId,
+        link.googleEventId,
+        masterOccurrenceBody(master, occurrenceYmd, ctx)
+      );
+    } catch (err) {
+      // Instance already gone → already converged; drop the link and move on.
+      if (err instanceof CalendarApiError && err.kind === 'not_found') {
+        await removeCalendarEventLinkById(connectionId, link.activityId);
+        return true;
+      }
+      throw err;
+    }
+    await removeCalendarEventLinkById(connectionId, link.activityId);
+    return true;
   }
 
   /**
@@ -397,6 +537,36 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
             `${errors.length} of ${tasks.length} task(s) attempted before stopping.`
         );
       }
+
+      // Phase B: per-occurrence recurring-instance exceptions (reschedule / edit-one /
+      // delete-one) + restores — run AFTER Phase A so every master event exists first.
+      // Shares the same record/errors/changed/authAborted accounting + single settle.
+      const exceptionTasks: Array<() => Promise<void>> = [
+        ...plan.exceptionUpserts.map((e) => async () => {
+          try {
+            if (await applyExceptionUpsert(client, connectionId, calendarId, e, ctx)) {
+              changed = true;
+            }
+          } catch (err) {
+            record(err);
+          }
+        }),
+        ...plan.exceptionRestores.map((r) => async () => {
+          try {
+            if (
+              await applyExceptionRestore(client, connectionId, calendarId, r.link, r.master, ctx)
+            ) {
+              changed = true;
+            }
+          } catch (err) {
+            record(err);
+          }
+        }),
+      ];
+      if (exceptionTasks.length > 0) {
+        await runPooled(exceptionTasks, MAX_INFLIGHT, () => authAborted);
+      }
+
       outcome = await settleConnectionStatus(connection, errors, changed);
 
       // Dev-only diagnostic — surfaces what each connection actually did so a
@@ -406,7 +576,9 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         const kinds = errors.length ? [...new Set(errors.map((e) => e.kind))].join(',') : 'none';
         console.debug(
           `[calendarSync] reconciled ${connection.id} (cal=${calendarId}): ` +
-            `${plan.upserts.length} activities, ${plan.deletes.length} deletes, ${errors.length} errors [${kinds}]`
+            `${plan.upserts.length} activities, ${plan.deletes.length} deletes, ` +
+            `${plan.exceptionUpserts.length} exceptions, ${plan.exceptionRestores.length} restores, ` +
+            `${errors.length} errors [${kinds}]`
         );
       }
     });
