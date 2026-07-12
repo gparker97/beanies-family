@@ -4,6 +4,7 @@ import { installInlineBackend } from '@/services/automerge/worker/__tests__/inli
 import { createCalendarConnection } from '@/services/automerge/repositories/calendarRepository';
 import { setCalendarClientForTesting } from '@/services/calendar/clientInstance';
 import { CalendarApiError, type CalendarClient } from '@/services/calendar/CalendarClient';
+import { makeCalendarClientStub } from '@/services/calendar/__tests__/fakeCalendarClient';
 import type { ActivityOccurrence } from '@/utils/calendar/clashDetection';
 import { deterministicEventId } from '@/utils/calendar/deterministicEventId';
 import { useCalendarClashStore } from '../calendarClashStore';
@@ -47,19 +48,12 @@ function timedOcc(
 }
 
 function makeClient(listEventTimes: CalendarClient['listEventTimes']): CalendarClient {
-  return {
-    invalidateConnection() {},
-    async insertEvent() {},
-    async patchEvent() {},
-    async deleteEvent() {},
-    async eventExists() {
-      return true;
-    },
+  return makeCalendarClientStub({
+    listEventTimes,
     async listCalendars() {
       return [];
     },
-    listEventTimes,
-  };
+  });
 }
 
 async function makeConnection() {
