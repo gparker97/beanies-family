@@ -10,18 +10,20 @@
  */
 import { onMounted } from 'vue';
 import { REDIRECT_AUTH_CODE_KEY } from '@/services/google/googleAuth';
+import { CALENDAR_REDIRECT_CODE_KEY } from '@/services/calendar/calendarAuth';
 import { decodeRedirectState } from '@/services/google/redirectState';
 import { reportError } from '@/utils/errorReporter';
 import { useTranslation } from '@/composables/useTranslation';
 
 const { t } = useTranslation();
 
-/** Stash the auth code for `completeRedirectAuth()` on the returnPath load.
- *  This post-bounce, same-origin write reliably survives (it's not a tracking
- *  bounce). Returns false if storage throws — caller treats that as "lost". */
-function stashCode(code: string): boolean {
+/** Stash the auth code under a grant-scoped key for the matching completion on the
+ *  returnPath load (Drive → `completeRedirectAuth`, calendar → the calendar
+ *  sibling). This post-bounce, same-origin write reliably survives (it's not a
+ *  tracking bounce). Returns false if storage throws — caller treats that as "lost". */
+function stashCode(code: string, key: string): boolean {
   try {
-    sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY, code);
+    sessionStorage.setItem(key, code);
     return true;
   } catch (e) {
     console.warn('[OAuthCallback] failed to stash auth code', e);
@@ -57,7 +59,12 @@ onMounted(() => {
   // returnPath (open-redirect guard) and returns null on anything malformed.
   const decoded = decodeRedirectState(stateParam);
   if (decoded && code) {
-    if (stashCode(code)) {
+    // Route the code to the grant's own key so a calendar code can never collide
+    // with (or be consumed as) a Drive code. A full-page redirect makes only one
+    // grant's code pending at a time — the keys are structurally isolated.
+    const codeKey =
+      decoded.grant === 'calendar' ? CALENDAR_REDIRECT_CODE_KEY : REDIRECT_AUTH_CODE_KEY;
+    if (stashCode(code, codeKey)) {
       window.location.href = decoded.returnPath;
       return;
     }

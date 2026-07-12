@@ -7,16 +7,17 @@
 // so this layer owns its own auth URL, its own PKCE state, and routes the resulting
 // refresh token to the CalendarConnection record (Layer 2), never to googleAuth.
 //
-// V1 TRANSPORT SCOPE (deliberate — see #32 plan, Layer 1):
-//   - Desktop (popup-capable) browsers: full consent flow here.
+// TRANSPORT SCOPE:
+//   - Desktop (popup-capable) browsers: full consent flow here (popup).
 //   - Redirect surfaces (iOS / installed PWA / native, i.e. shouldUseRedirectAuth()):
-//     connect is DEFERRED. OAuth redirect uses ONE Drive-bound sessionStorage slot
-//     + the shared OAuthCallbackPage; multiplexing a calendar redirect through them
-//     risks the live Drive auth, so v1 returns `redirect_unsupported`. This is not a
-//     dead-end: connections are FAMILY-WIDE and the token lives in the shared
-//     .beanpod, so a one-time connect on any desktop browser makes the calendar sync
-//     on ALL the family's devices (the reconcile engine runs everywhere off the
-//     shared token). Redirect-surface connect is a tracked follow-up.
+//     go through the SHARED redirect transport (P2). We share the START side of
+//     googleAuth's redirect flow (`startRedirectAuth({grant:'calendar'})` — a
+//     `grant` arg + calendar scopes, Drive default unchanged) and SIBLING the
+//     COMPLETION side here (`completeCalendarRedirectAuth`, reading a
+//     grant-namespaced code key and committing to a CalendarConnection, never the
+//     Drive token). A full-page redirect makes only one grant's code pending at a
+//     time, so the two code keys can never co-populate — isolation is structural.
+//     Connections are still FAMILY-WIDE: a connect on any device syncs everywhere.
 
 import { generateCodeVerifier, generateCodeChallenge } from '@/services/google/pkce';
 import {
@@ -24,7 +25,13 @@ import {
   refreshAccessToken,
   type TokenResponse,
 } from '@/services/google/oauthProxy';
-import { shouldUseRedirectAuth } from '@/services/google/googleAuth';
+import {
+  startRedirectAuth,
+  REDIRECT_AUTH_CODE_KEY_CALENDAR,
+  REDIRECT_AUTH_KEY,
+} from '@/services/google/googleAuth';
+import type { RedirectMode } from '@/services/google/redirectState';
+import { reportError } from '@/utils/errorReporter';
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v2/userinfo';
@@ -39,6 +46,15 @@ export const CALENDAR_SCOPES = [
 /** The one scope without which the feature cannot function — validated post-consent. */
 const REQUIRED_SCOPE = 'https://www.googleapis.com/auth/calendar.events.owned';
 
+/**
+ * Grant-namespaced sessionStorage key for a pending CALENDAR redirect code (P2).
+ * Written by OAuthCallbackPage (web bounce) / the native deep-link handler, read +
+ * cleared by `completeCalendarRedirectAuth`. Defined in googleAuth alongside the
+ * Drive key (single source of truth) and re-exported here as the calendar layer's
+ * public name — a Drive code and a calendar code can never share a slot.
+ */
+export const CALENDAR_REDIRECT_CODE_KEY = REDIRECT_AUTH_CODE_KEY_CALENDAR;
+
 const POPUP_AUTH_TIMEOUT_MS = 120_000;
 
 export type CalendarAuthErrorCode =
@@ -47,8 +63,7 @@ export type CalendarAuthErrorCode =
   | 'cancelled' // user closed the window / declined
   | 'missing_scope' // granular consent dropped calendar.events.owned
   | 'no_refresh_token' // no offline access granted (should not happen with prompt=consent)
-  | 'exchange_failed' // token exchange / network error
-  | 'redirect_unsupported'; // this surface can't connect in v1 (see header)
+  | 'exchange_failed'; // token exchange / network error
 
 export interface CalendarConnectSuccess {
   status: 'connected';
@@ -61,12 +76,18 @@ export interface CalendarConnectFailure {
   code: CalendarAuthErrorCode;
   message: string;
 }
-export type CalendarConnectResult = CalendarConnectSuccess | CalendarConnectFailure;
-
-/** Whether the current surface can run the connect flow (false on redirect surfaces). */
-export function isCalendarConnectSupported(): boolean {
-  return !shouldUseRedirectAuth();
+/**
+ * The consent flow handed off to a full-page/system-browser redirect (P2). The
+ * page is navigating away (web) or the system browser is open (native); there is
+ * no synchronous result — completion resumes post-redirect via
+ * `completeCalendarRedirectAuth` + the store's resume. Callers must treat this as
+ * "in flight": no success toast, no error toast.
+ */
+export interface CalendarConnectRedirecting {
+  status: 'redirecting';
 }
+export type CalendarConnectResult =
+  CalendarConnectSuccess | CalendarConnectFailure | CalendarConnectRedirecting;
 
 function getClientId(): string {
   return import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
@@ -165,13 +186,9 @@ const fail = (code: CalendarAuthErrorCode, message: string): CalendarConnectFail
 export async function connectGoogleCalendar(
   opts: { loginHint?: string } = {}
 ): Promise<CalendarConnectResult> {
-  if (shouldUseRedirectAuth()) {
-    return fail(
-      'redirect_unsupported',
-      'Connecting a calendar is available in a desktop browser. Once connected it syncs on all your devices.'
-    );
-  }
-
+  // POPUP transport only. Redirect surfaces (PWA/iOS/native) go through
+  // `startCalendarRedirectAuth` + `completeCalendarRedirectAuth` instead — the
+  // store gates on `shouldUseRedirectAuth()` and never calls this there (P2).
   const clientId = getClientId();
   if (!clientId) {
     return fail('not_configured', 'Google Client ID not configured (VITE_GOOGLE_CLIENT_ID).');
@@ -230,4 +247,147 @@ export async function connectGoogleCalendar(
  */
 export function refreshCalendarToken(refreshToken: string): Promise<TokenResponse> {
   return refreshAccessToken({ refreshToken, clientId: getClientId() });
+}
+
+// ─── Redirect transport (P2 — PWA / iOS / native connect + reconnect) ─────────
+//
+// The SHARED start side lives in googleAuth (`startRedirectAuth` with a `grant`
+// arg + calendar scopes). This SIBLING completion reads the grant-namespaced
+// calendar code key and returns a CalendarConnectResult — pure auth, no CRDT
+// knowledge (the store commits, mirroring the popup path). See the file header.
+
+/**
+ * Begin a calendar redirect-auth flow on a redirect surface. Web navigates away
+ * (this never resolves); native opens the system browser and resolves (the
+ * deep-link handler routes completion back). `mode` is a calendar-appropriate
+ * routing tag ('create' for a fresh connect, 'reconnect' for an existing one) —
+ * behaviourally inert (the `grant='calendar'` discriminator does the real
+ * routing), it just keeps the required redirect-state field honest.
+ *
+ * The real intent (connect vs which connection to reconnect) rides in
+ * `returnPath` (a `calResume` query the store builds), so no secret and no
+ * connection id ever touches the OAuth `state`.
+ */
+export function startCalendarRedirectAuth(
+  returnPath: string,
+  loginHint: string | undefined,
+  mode: RedirectMode
+): Promise<void> {
+  return startRedirectAuth(returnPath, loginHint, mode, {
+    grant: 'calendar',
+    scope: CALENDAR_SCOPES.join(' '),
+  });
+}
+
+// Per-page-load memo. REJECT/RESOLVE-STICKY BY DESIGN: the one-time code is
+// removed on entry, so a failed exchange is unrecoverable without a fresh
+// redirect (= a new page load, which resets this module state). Mirrors
+// googleAuth's `redirectSettlePromise`.
+let calendarSettlePromise: Promise<CalendarConnectResult | null> | null = null;
+
+/**
+ * Complete a pending calendar redirect: redeem the grant-namespaced code and
+ * return a CalendarConnectResult for the store to commit (create/update a
+ * CalendarConnection). Returns `null` when there is NO pending calendar code
+ * (the common no-op — e.g. a Drive redirect, or the user declined and no code
+ * was stashed). Never throws — every failure is a classified `CalendarConnectFailure`.
+ *
+ * Memoized per page load so a boot check + a reactive resume redeem the one-time
+ * code exactly once. Two exchange arms mirror the Drive completion:
+ *  - NATIVE: the shared redirect stash carries `{grant:'calendar', codeVerifier}`
+ *    → exchange WITH the PKCE verifier.
+ *  - WEB (iOS/PWA): no stash → exchange WITHOUT a verifier (the confidential
+ *    proxy secures the code via client_secret; ADR-026).
+ */
+export function completeCalendarRedirectAuth(): Promise<CalendarConnectResult | null> {
+  if (!calendarSettlePromise) {
+    calendarSettlePromise = doCompleteCalendarRedirectAuth();
+  }
+  return calendarSettlePromise;
+}
+
+async function doCompleteCalendarRedirectAuth(): Promise<CalendarConnectResult | null> {
+  let code: string | null = null;
+  try {
+    code = sessionStorage.getItem(CALENDAR_REDIRECT_CODE_KEY);
+  } catch (e) {
+    console.warn('[calendarAuth] could not read pending calendar redirect code', e);
+    return null;
+  }
+  if (!code) return null; // no pending calendar redirect — the common no-op
+
+  // Consume immediately so a re-entrant call (boot + reactive resume) can't
+  // redeem the same one-time code twice.
+  try {
+    sessionStorage.removeItem(CALENDAR_REDIRECT_CODE_KEY);
+  } catch {
+    // best-effort; the memo already guards double-redemption within a page load
+  }
+
+  // Native PKCE verifier rides in the shared stash tagged grant='calendar'. Web
+  // has no stash (no verifier). Only consume the stash when it is OURS (calendar)
+  // — never disturb a Drive stash.
+  let codeVerifier: string | undefined;
+  try {
+    const stashJson = sessionStorage.getItem(REDIRECT_AUTH_KEY);
+    if (stashJson) {
+      const stash = JSON.parse(stashJson) as { grant?: string; codeVerifier?: string };
+      if (stash?.grant === 'calendar' && typeof stash.codeVerifier === 'string') {
+        codeVerifier = stash.codeVerifier;
+        sessionStorage.removeItem(REDIRECT_AUTH_KEY);
+      }
+    }
+  } catch (e) {
+    // A corrupt/foreign stash must not strand the user — fall through to the
+    // no-verifier exchange (the confidential proxy still secures the code).
+    console.warn(
+      '[calendarAuth] calendar redirect stash unreadable; exchanging without verifier',
+      e
+    );
+  }
+
+  const clientId = getClientId();
+  if (!clientId) {
+    return fail('not_configured', 'Google Client ID not configured (VITE_GOOGLE_CLIENT_ID).');
+  }
+
+  try {
+    const tokens = await exchangeCodeForTokens({
+      code,
+      codeVerifier,
+      redirectUri: getRedirectUri(),
+      clientId,
+    });
+    const grantedScopes = tokens.scope ? tokens.scope.split(' ').filter(Boolean) : [];
+    if (!grantedScopes.includes(REQUIRED_SCOPE)) {
+      return fail(
+        'missing_scope',
+        'Calendar access wasn’t granted. Please allow beanies to manage its own events when prompted.'
+      );
+    }
+    if (!tokens.refresh_token) {
+      return fail(
+        'no_refresh_token',
+        'Google didn’t grant offline access. Please try connecting again.'
+      );
+    }
+    const email = await fetchEmail(tokens.access_token);
+    return { status: 'connected', email, refreshToken: tokens.refresh_token, grantedScopes };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // A redirect that returned a code but failed to exchange is a real recovery
+    // failure — surface it (the store shows the error), and breadcrumb it.
+    reportError({
+      surface: 'calendar-redirect-complete',
+      severity: 'warning',
+      message: `Calendar redirect code exchange failed: ${msg}`,
+      error: e instanceof Error ? e : new Error(msg),
+    });
+    return fail('exchange_failed', `Could not complete the calendar connection: ${msg}`);
+  }
+}
+
+/** Test-only — reset the calendar redirect-settle memo. Production never calls this. */
+export function __resetCalendarRedirectSettleForTesting(): void {
+  calendarSettlePromise = null;
 }
