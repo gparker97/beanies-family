@@ -14,6 +14,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Changing a single session of a repeating activity now syncs to your Google Calendar.** Rescheduling, editing, or deleting just one occurrence of a recurring activity previously did nothing on your connected calendar (it kept showing the original) — now that one event moves, updates, or is removed, while the rest of the series stays put.
 - **Deleting a single session now deletes it — for good.** Removing a rescheduled or edited occurrence used to quietly bring the original back. It no longer does: delete means the session is gone.
+- **Lists can now link to activities further in the future.** The list link picker only reached activities in the current few weeks, so you couldn't attach a list to a next-month (or later) activity. It now finds any upcoming activity, however far ahead it is.
 
 ### Added
 
