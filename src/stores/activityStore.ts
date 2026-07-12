@@ -16,6 +16,7 @@ import {
 } from '@/utils/date';
 import { useToday } from '@/composables/useToday';
 import { normalizeAssignees } from '@/utils/assignees';
+import { overrideOccurrenceYmd } from '@/utils/calendar/overrideOccurrenceYmd';
 import { ACTIVITY_COLORS, getActivityCategoryColor } from '@/constants/activityCategories';
 import { reportError } from '@/utils/errorReporter';
 import type {
@@ -57,7 +58,7 @@ export const useActivityStore = defineStore('activities', () => {
           dates = new Set();
           map.set(a.parentActivityId, dates);
         }
-        dates.add(a.originalOccurrenceDate ?? a.date);
+        dates.add(overrideOccurrenceYmd(a));
       }
     }
     return map;

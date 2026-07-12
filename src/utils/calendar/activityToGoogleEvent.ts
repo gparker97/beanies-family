@@ -1,7 +1,9 @@
 // Pure mapper: a beanies activity → a Google Calendar event resource (the subset
-// of fields beanies sets). No I/O — exhaustively unit-tested. The reconcile engine
-// (Layer 5) sets the deterministic id and handles recurring-override *exceptions*
-// using the parent link; this mapper produces the base event + native RRULE.
+// of fields beanies sets). No I/O — exhaustively unit-tested. This mapper produces
+// a base event + native RRULE for a whole activity; the reconcile engine (Layer 5)
+// also uses `startEndForDate` / `masterOccurrenceBody` here to emit per-occurrence
+// recurring-instance EXCEPTIONS (reschedule / edit-one / delete-one) and restore
+// them, keyed by the master's deterministic id + the occurrence instance.
 
 import type { FamilyActivity } from '@/types/models';
 import { normalizeAssignees } from '@/utils/assignees';
@@ -35,21 +37,38 @@ export interface ActivityMapContext extends EventDescriptionContext {
   timeZone: string;
 }
 
+/**
+ * Google start/end for an activity anchored to ONE date (`ymd`). The single
+ * formatter for both the whole-activity event (`buildStartEnd` delegates here with
+ * the activity's own start day) and a re-anchored recurring occurrence
+ * (`masterOccurrenceBody`, which passes the occurrence date). The end day is the
+ * occurrence date shifted by the activity's own `endDayOffset` (overnight / multi-
+ * day preserved). Pure.
+ */
+export function startEndForDate(
+  activity: FamilyActivity,
+  ymd: string,
+  timeZone: string
+): { start: GoogleEventDateTime; end: GoogleEventDateTime } {
+  const days = resolveActivityDays(activity);
+  const endYmd = addDaysYmd(ymd, days.endDayOffset);
+
+  if (days.allDay) {
+    // Google all-day end.date is EXCLUSIVE → add one day past the (inclusive) last day.
+    return { start: { date: ymd }, end: { date: addDaysYmd(endYmd, 1) } };
+  }
+
+  return {
+    start: { dateTime: `${ymd}T${days.startTime}:00`, timeZone },
+    end: { dateTime: `${endYmd}T${days.endTime}:00`, timeZone },
+  };
+}
+
 function buildStartEnd(
   activity: FamilyActivity,
   timeZone: string
 ): { start: GoogleEventDateTime; end: GoogleEventDateTime } {
-  const days = resolveActivityDays(activity);
-
-  if (days.allDay) {
-    // Google all-day end.date is EXCLUSIVE → add one day past the (inclusive) last day.
-    return { start: { date: days.startYmd }, end: { date: addDaysYmd(days.endYmd, 1) } };
-  }
-
-  return {
-    start: { dateTime: `${days.startYmd}T${days.startTime}:00`, timeZone },
-    end: { dateTime: `${days.endYmd}T${days.endTime}:00`, timeZone },
-  };
+  return startEndForDate(activity, resolveActivityDays(activity).startYmd, timeZone);
 }
 
 function buildReminders(activity: FamilyActivity): GoogleEventResource['reminders'] {
@@ -59,7 +78,33 @@ function buildReminders(activity: FamilyActivity): GoogleEventResource['reminder
     : { useDefault: false, overrides: [] };
 }
 
-/** Map an activity to the Google event resource beanies will insert/patch. Pure. */
+/** Assemble the shared event body (summary/description/reminders/status/location)
+ *  around a resolved start/end + recurrence. The one place these fields are set,
+ *  reused by `activityToGoogleEvent` (whole event) and `masterOccurrenceBody`
+ *  (restore body). Pure. */
+function assembleEvent(
+  activity: FamilyActivity,
+  start: GoogleEventDateTime,
+  end: GoogleEventDateTime,
+  recurrence: string[],
+  ctx: ActivityMapContext
+): GoogleEventResource {
+  const resource: GoogleEventResource = {
+    summary: activity.title,
+    description: buildEventDescription(activity, ctx),
+    start,
+    end,
+    recurrence,
+    reminders: buildReminders(activity),
+    status: 'confirmed',
+  };
+  if (activity.location && activity.location.trim()) resource.location = activity.location;
+  return resource;
+}
+
+/** Map an activity to the Google event resource beanies will insert/patch. Pure.
+ *  A `recurrence:'none'` activity (incl. every override child) yields `recurrence:[]`,
+ *  so patching an instance id with this body keeps it a single instance (no RRULE). */
 export function activityToGoogleEvent(
   activity: FamilyActivity,
   ctx: ActivityMapContext
@@ -72,18 +117,23 @@ export function activityToGoogleEvent(
     recurrenceEndDate: activity.recurrenceEndDate,
     isAllDay: isAllDayActivity(activity),
   });
+  return assembleEvent(activity, start, end, recurrence, ctx);
+}
 
-  const resource: GoogleEventResource = {
-    summary: activity.title,
-    description: buildEventDescription(activity, ctx),
-    start,
-    end,
-    recurrence,
-    reminders: buildReminders(activity),
-    status: 'confirmed',
-  };
-  if (activity.location && activity.location.trim()) resource.location = activity.location;
-  return resource;
+/**
+ * The Google body for a recurring MASTER's occurrence on `occurrenceYmd`, as a
+ * single instance (`recurrence:[]`, `status:'confirmed'`). Used to RESTORE a Google
+ * instance to the master's generated value after an override is deleted — patched
+ * onto the stored instance id (un-cancels a cancelled instance / moves a moved one
+ * back). Pure.
+ */
+export function masterOccurrenceBody(
+  master: FamilyActivity,
+  occurrenceYmd: string,
+  ctx: ActivityMapContext
+): GoogleEventResource {
+  const { start, end } = startEndForDate(master, occurrenceYmd, ctx.timeZone);
+  return assembleEvent(master, start, end, [], ctx);
 }
 
 /**
@@ -138,4 +188,20 @@ export function computePushHash(
   }
   // Unsigned hex.
   return (hash >>> 0).toString(16);
+}
+
+/**
+ * Change-detection token for a recurring-occurrence EXCEPTION link. Reuses
+ * `computePushHash` for the override child's content, then folds in the occurrence
+ * date + mode so a delete↔edit↔reschedule transition on the same occurrence (or a
+ * different original occurrence) re-pushes. Stored on the exception link's
+ * `lastPushedHash`; opaque + stable (not security). Pure.
+ */
+export function computeExceptionHash(
+  child: FamilyActivity,
+  occurrenceYmd: string,
+  mode: 'modify' | 'cancel',
+  memberName?: (id: string) => string | undefined
+): string {
+  return `${computePushHash(child, memberName)}|${occurrenceYmd}|${mode}`;
 }

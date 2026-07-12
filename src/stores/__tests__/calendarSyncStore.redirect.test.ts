@@ -6,7 +6,7 @@ import {
   getCalendarConnectionById,
 } from '@/services/automerge/repositories/calendarRepository';
 import { useCalendarSyncStore, setCalendarClientForTesting } from '../calendarSyncStore';
-import type { CalendarClient } from '@/services/calendar/CalendarClient';
+import { makeCalendarClientStub } from '@/services/calendar/__tests__/fakeCalendarClient';
 
 // P2 — the store's redirect handoff (connect/reconnect → 'redirecting') + the
 // post-redirect resume (`resumeRedirectConnect` → CRDT commit via finalizeConnected).
@@ -37,21 +37,7 @@ vi.mock('@/services/google/googleAuth', () => ({
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
-const noopClient: CalendarClient = {
-  invalidateConnection() {},
-  async insertEvent() {},
-  async patchEvent() {},
-  async deleteEvent() {},
-  async eventExists() {
-    return true;
-  },
-  async listCalendars() {
-    return [{ id: 'primary', summary: 'Primary', primary: true }];
-  },
-  async listEventTimes() {
-    return [];
-  },
-};
+const noopClient = makeCalendarClientStub();
 
 const connected = {
   status: 'connected' as const,
