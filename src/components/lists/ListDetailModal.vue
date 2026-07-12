@@ -197,21 +197,26 @@ const linkSearch = ref('');
 const upcomingTrips = computed(() =>
   vacationStore.upcomingVacations.map((v) => ({ id: v.id, name: v.name, date: v.startDate }))
 );
-const upcomingActivities = computed(() => {
-  const seen = new Set<string>();
-  const out: { id: string; title: string; date: string }[] = [];
-  // upcomingActivities is date-sorted (soonest first) — keep the first occurrence.
-  for (const { activity, date } of activityStore.upcomingActivities) {
-    if (seen.has(activity.id)) continue;
-    seen.add(activity.id);
-    out.push({ id: activity.id, title: activity.title, date });
-  }
-  return out;
-});
+// Each linkable activity once, by its next occurrence ≥ today (indefinite
+// future for one-offs) — distinct by construction in the store, so no de-dupe.
+const linkableActivityOptions = computed(() =>
+  activityStore.linkableActivities.map(({ activity, date }) => ({
+    id: activity.id,
+    title: activity.title,
+    date,
+  }))
+);
 const matches = (text: string) =>
   text.toLowerCase().includes(linkSearch.value.trim().toLowerCase());
 const filteredTrips = computed(() => upcomingTrips.value.filter((tr) => matches(tr.name)));
-const filteredActivities = computed(() => upcomingActivities.value.filter((a) => matches(a.title)));
+// Trips (filteredTrips) are naturally few and stay uncapped; activities can be
+// many, so we bound the rendered rows — but AFTER the search filter, so search
+// always reaches the full list (never re-creating a milder version of the bug
+// this picker was fixed for).
+const LINK_PICKER_MAX_ACTIVITIES = 50;
+const filteredActivities = computed(() =>
+  linkableActivityOptions.value.filter((a) => matches(a.title)).slice(0, LINK_PICKER_MAX_ACTIVITIES)
+);
 // Resolve the linked entity's name from the FULL store collections (not the
 // windowed `upcoming*` pickers), so a link to a past / far-future / filtered
 // trip or activity still shows its name instead of a blank chip.
@@ -493,7 +498,7 @@ async function handleDelete(): Promise<void> {
             :placeholder="t('lists.detail.linkSearch')"
             class="mb-1.5"
           />
-          <p v-if="!upcomingActivities.length" class="text-xs text-[var(--color-text-muted)]">
+          <p v-if="!linkableActivityOptions.length" class="text-xs text-[var(--color-text-muted)]">
             {{ t('lists.detail.noUpcomingActivities') }}
           </p>
           <p v-else-if="!filteredActivities.length" class="text-xs text-[var(--color-text-muted)]">

@@ -294,6 +294,11 @@ export const useActivityStore = defineStore('activities', () => {
     month: number,
     endDate: Date | null
   ): { activity: FamilyActivity; date: string }[] {
+    // INVARIANT: `month` must be a normalized 0-11 value. This guard compares it
+    // raw against `startDate.getMonth()` (0-11), so any caller passing an
+    // un-normalized month (e.g. `baseMonth + i`, which can exceed 11) silently
+    // excludes every yearly activity. Callers that walk months forward MUST
+    // normalize each step through a `Date` first (see `linkableActivities`).
     if (startDate.getMonth() !== month) return [];
     const candidate = new Date(year, month, startDate.getDate());
     if (candidate >= startDate && (!endDate || candidate <= endDate)) {
@@ -366,6 +371,100 @@ export const useActivityStore = defineStore('activities', () => {
     });
 
     return results.slice(0, 30);
+  });
+
+  /** True when an activity has a usable start date. ONE source of truth for the
+   *  one-off branch of `linkableActivities` (which reads `activity.date` directly,
+   *  bypassing `expandRecurring`'s own validation). */
+  function isValidActivityDate(activity: FamilyActivity): boolean {
+    return !!activity.date && !Number.isNaN(parseLocalDate(activity.date).getTime());
+  }
+
+  /**
+   * Candidate list for the Beanie List → activity link picker: each active
+   * activity ONCE, keyed by its next occurrence on-or-after today, sorted
+   * soonest-first. UNCAPPED — the picker applies its own display bound AFTER
+   * search (so search always reaches every activity). This differs from
+   * `upcomingActivities` (a near-term, occurrence-capped widget source) which
+   * must stay unchanged. Member-filter-independent: uses `activeActivities` so
+   * any family activity is linkable regardless of the global member chip.
+   *
+   * A one-off appears indefinitely into the future (by its own date); a recurring
+   * appears by its soonest upcoming occurrence, found by walking months forward
+   * through `expandRecurring` (yearly can be up to ~12 months out → 13-month bound).
+   */
+  const linkableActivities = computed<{ activity: FamilyActivity; date: string }[]>(() => {
+    const todayStr = todayRef.value;
+    const base = parseLocalDate(todayStr);
+    const surface = 'activityStore.linkableActivities';
+
+    /** Next occurrence YMD ≥ today, or null if none / entirely past / ended. */
+    function nextOccurrenceYmd(activity: FamilyActivity): string | null {
+      if (activity.recurrence === 'none') {
+        if (!isValidActivityDate(activity)) {
+          reportError({
+            surface,
+            message: `Activity ${activity.id} has invalid date "${activity.date}" — excluded from link picker`,
+            severity: 'warning',
+            context: { activity_id: activity.id, raw_date: activity.date ?? null },
+          });
+          return null;
+        }
+        const startYmd = activity.date.slice(0, 10);
+        // Multi-day relevance intentionally mirrors `expandOneOff` (gates on
+        // isAllDay && endDate — keep in sync). An ongoing multi-day activity
+        // (start past, end future) surfaces on today, honouring the ≥-today
+        // contract rather than sorting under a past start date.
+        const lastRelevant =
+          activity.isAllDay && activity.endDate ? activity.endDate.slice(0, 10) : startYmd;
+        if (lastRelevant < todayStr) return null; // past-only
+        return startYmd < todayStr ? todayStr : startYmd;
+      }
+
+      // Recurring: skip if the series has already ended.
+      if (activity.recurrenceEndDate && activity.recurrenceEndDate.slice(0, 10) < todayStr) {
+        return null;
+      }
+      // Walk months forward (normalized through a Date so `expandYearly`'s raw
+      // month guard never trips — see its INVARIANT comment). 13 months covers
+      // a yearly whose anniversary month is the current month but whose day has
+      // already passed (found next year at i=12).
+      for (let i = 0; i <= 12; i++) {
+        const step = new Date(base.getFullYear(), base.getMonth() + i, 1);
+        const occs = expandRecurring(activity, step.getFullYear(), step.getMonth());
+        // expandRecurring is NOT globally sorted (multi-day-of-week interleaves),
+        // so take the MIN matching date; drop `< today` in the current month.
+        let min: string | null = null;
+        for (const occ of occs) {
+          if (occ.date >= todayStr && (min === null || occ.date < min)) min = occ.date;
+        }
+        if (min !== null) return min;
+      }
+      return null;
+    }
+
+    const results: { activity: FamilyActivity; date: string }[] = [];
+    for (const activity of activeActivities.value) {
+      try {
+        const date = nextOccurrenceYmd(activity);
+        if (date !== null) results.push({ activity, date });
+      } catch (err) {
+        // Backstop: one corrupt record must never break the whole picker.
+        reportError({
+          surface,
+          message: `Failed to compute next occurrence for activity ${activity.id} — excluded from link picker`,
+          severity: 'warning',
+          context: { activity_id: activity.id, error: String(err) },
+        });
+      }
+    }
+
+    results.sort((a, b) => {
+      const dateCmp = a.date.localeCompare(b.date);
+      if (dateCmp !== 0) return dateCmp;
+      return (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? '');
+    });
+    return results;
   });
 
   // ── Linked recurring payment sync ──────────────────────────────────────────
@@ -598,6 +697,7 @@ export const useActivityStore = defineStore('activities', () => {
     inactiveActivities,
     filteredActivities,
     upcomingActivities,
+    linkableActivities,
     // Methods
     monthActivities,
     activeActivitiesForMonth,

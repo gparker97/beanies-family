@@ -19,6 +19,21 @@ vi.mock('@/services/automerge/repositories/activityRepository', () => ({
 
 import * as activityRepo from '@/services/automerge/repositories/activityRepository';
 
+// Deterministic "today" for date-relative getters (linkableActivities). The real
+// `useToday` seeds a module singleton from the wall clock at import, which would
+// make these tests drift day-to-day; pin it to a known Sunday.
+const FIXED_TODAY = '2026-07-12'; // a Sunday
+const { mockToday } = vi.hoisted(() => ({ mockToday: { value: '2026-07-12' } }));
+vi.mock('@/composables/useToday', () => ({
+  useToday: () => ({
+    today: mockToday,
+    startOfToday: { value: new Date(2026, 6, 12) },
+    isVisible: { value: true },
+    lastVisibleAt: { value: 0 },
+    lastHiddenAt: { value: 0 },
+  }),
+}));
+
 const NOW = '2026-02-28T00:00:00.000Z';
 
 function makeActivity(overrides?: Partial<FamilyActivity>): FamilyActivity {
@@ -1730,6 +1745,180 @@ describe('activityStore', () => {
         expect.objectContaining({
           surface: 'activityStore.unknownRecurrence',
           severity: 'error',
+        })
+      );
+
+      reportSpy.mockRestore();
+    });
+  });
+
+  // ── linkableActivities (list → activity link picker candidate list) ──────
+
+  describe('linkableActivities', () => {
+    // today (mocked) = 2026-07-12, a Sunday.
+    it('includes a far-future one-off even amid a flood of near-term recurring occurrences, distinct', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        // Daily recurring → ~20 occurrences in July from the 12th, but ONE entry.
+        makeActivity({ id: 'daily', title: 'Daily', date: '2026-07-01', recurrence: 'daily' }),
+        // One-off three months out.
+        makeActivity({
+          id: 'future',
+          title: 'Future',
+          date: '2026-10-20',
+          recurrence: 'none',
+        })
+      );
+
+      const list = store.linkableActivities;
+      const daily = list.filter((e) => e.activity.id === 'daily');
+      expect(daily).toHaveLength(1); // distinct by construction
+      expect(daily[0]!.date).toBe('2026-07-12'); // soonest ≥ today
+      const future = list.find((e) => e.activity.id === 'future');
+      expect(future).toBeDefined();
+      expect(future!.date).toBe('2026-10-20');
+    });
+
+    it('includes a yearly activity whose anniversary is many months out (normalized-month walk)', () => {
+      const store = useActivityStore();
+      // Anniversary March 10; today is July → next occurrence 2027-03-10 (~8mo).
+      // Without normalizing month+i through a Date, expandYearly's raw-month
+      // guard silently excludes it — this is the regression guard.
+      store.activities.push(
+        makeActivity({
+          id: 'yearly',
+          title: 'Anniversary',
+          date: '2024-03-10',
+          recurrence: 'yearly',
+        })
+      );
+
+      const hit = store.linkableActivities.find((e) => e.activity.id === 'yearly');
+      expect(hit).toBeDefined();
+      expect(hit!.date).toBe('2027-03-10');
+    });
+
+    it('excludes an ended recurring series, a past-only one-off; keeps distinct sort order', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({
+          id: 'ended',
+          title: 'Ended',
+          date: '2026-01-05',
+          recurrence: 'weekly',
+          daysOfWeek: [1],
+          recurrenceEndDate: '2026-06-01', // before today
+        }),
+        makeActivity({ id: 'past', title: 'Past', date: '2026-01-01', recurrence: 'none' }),
+        makeActivity({
+          id: 'soon',
+          title: 'Soon',
+          date: '2026-07-01',
+          recurrence: 'weekly',
+          daysOfWeek: [1],
+        })
+      );
+
+      const ids = store.linkableActivities.map((e) => e.activity.id);
+      expect(ids).not.toContain('ended');
+      expect(ids).not.toContain('past');
+      expect(ids).toContain('soon');
+    });
+
+    it('surfaces an ongoing multi-day all-day activity keyed on today (not its past start)', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({
+          id: 'ongoing',
+          title: 'School Camp',
+          date: '2026-07-05',
+          endDate: '2026-07-20',
+          isAllDay: true,
+          recurrence: 'none',
+        })
+      );
+
+      const hit = store.linkableActivities.find((e) => e.activity.id === 'ongoing');
+      expect(hit).toBeDefined();
+      expect(hit!.date).toBe(FIXED_TODAY); // clamped to today, honouring ≥-today
+    });
+
+    it('returns the MIN upcoming occurrence for a multi-day-of-week weekly (not array order)', () => {
+      const store = useActivityStore();
+      // daysOfWeek [5,1] pushes Friday occurrences BEFORE Monday in the array,
+      // but the soonest upcoming from Sunday 2026-07-12 is Monday 2026-07-13.
+      store.activities.push(
+        makeActivity({
+          id: 'multi',
+          title: 'Multi',
+          date: '2026-07-01',
+          recurrence: 'weekly',
+          daysOfWeek: [5, 1],
+        })
+      );
+
+      const hit = store.linkableActivities.find((e) => e.activity.id === 'multi');
+      expect(hit!.date).toBe('2026-07-13'); // Monday, not Friday 2026-07-17
+    });
+
+    it('is independent of the global member filter', () => {
+      const store = useActivityStore();
+      const familyStore = useFamilyStore();
+      familyStore.members.push({
+        id: 'parent-1',
+        name: 'Dad',
+        email: 'dad@test.com',
+        role: 'member',
+        gender: 'male',
+        ageGroup: 'adult',
+        color: '#3b82f6',
+        requiresPassword: false,
+        createdAt: NOW,
+        updatedAt: NOW,
+      });
+      const memberFilter = useMemberFilterStore();
+      memberFilter.initialize();
+
+      store.activities.push(
+        makeActivity({
+          id: 'a',
+          title: 'A',
+          date: '2026-07-20',
+          recurrence: 'none',
+          assigneeId: 'parent-1',
+        }),
+        makeActivity({
+          id: 'b',
+          title: 'B',
+          date: '2026-07-21',
+          recurrence: 'none',
+          assigneeId: 'someone-else',
+        })
+      );
+
+      const before = store.linkableActivities.map((e) => e.activity.id).sort();
+      memberFilter.toggleMember('parent-1'); // filter out parent-1
+      const after = store.linkableActivities.map((e) => e.activity.id).sort();
+      expect(after).toEqual(before);
+      expect(after).toEqual(['a', 'b']);
+    });
+
+    it('skips a malformed activity via reportError without throwing', async () => {
+      const errorReporter = await import('@/utils/errorReporter');
+      const reportSpy = vi.spyOn(errorReporter, 'reportError').mockImplementation(() => {});
+
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({ id: 'bad', title: 'Bad', date: 'not-a-date', recurrence: 'none' }),
+        makeActivity({ id: 'good', title: 'Good', date: '2026-07-20', recurrence: 'none' })
+      );
+
+      const ids = store.linkableActivities.map((e) => e.activity.id);
+      expect(ids).toEqual(['good']); // bad skipped, good still returned
+      expect(reportSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'activityStore.linkableActivities',
+          severity: 'warning',
         })
       );
 
