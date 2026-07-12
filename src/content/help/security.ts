@@ -11,8 +11,8 @@ const CALENDAR_SYNC_ARTICLE: HelpArticle = {
   excerpt:
     'Connect a Google calendar and your family activities appear there automatically — one-way, with beanies as the source of truth.',
   icon: '\u{1F4C5}',
-  readTime: 4,
-  updatedDate: '2026-06-10',
+  readTime: 5,
+  updatedDate: '2026-07-11',
   sections: [
     { type: 'heading', content: 'How it works', level: 2, id: 'how-it-works' },
     {
@@ -53,6 +53,22 @@ const CALENDAR_SYNC_ARTICLE: HelpArticle = {
       type: 'paragraph',
       content:
         'beanies only ever creates and updates <strong>its own</strong> events; it never reads or changes anything else in your calendar. Events go from your device straight to your own Google account and never pass through a beanies server.',
+    },
+    { type: 'heading', content: 'Reconnecting when access lapses', level: 2, id: 'reconnecting' },
+    {
+      type: 'paragraph',
+      content:
+        'Every so often Google asks you to re-approve access — after a password change, a long gap, or one of Google’s periodic security refreshes. When that happens, beanies tells you right away: a <strong>reconnect prompt</strong> appears and a notification lands in the bell, so a lapsed connection is never silent. Until you reconnect, new activities simply wait; nothing is lost.',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'Reconnecting is <strong>one tap on any device</strong> — your phone, the installed app, or a desktop browser all work the same way. Tap <strong>Reconnect</strong> on the prompt (or open <strong>Settings → Google Calendar</strong> and tap Reconnect there), approve access with Google, and syncing resumes on its own. The prompt and the notification clear themselves the moment the connection recovers.',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'Reconnecting is completely safe: beanies stays the single source of truth, nothing in your calendar is deleted, and your family’s activities are untouched. It simply hands beanies a fresh key to keep pushing your schedule out.',
     },
     {
       type: 'infoBox',
