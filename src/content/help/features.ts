@@ -1032,7 +1032,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Schedule lessons, appointments, and recurring activities for your family with calendar views and smart recurrence.',
     icon: '\u{1F4C5}',
     readTime: 4,
-    updatedDate: '2026-05-26',
+    updatedDate: '2026-07-12',
     sections: [
       {
         type: 'heading',
@@ -1112,6 +1112,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'The same options appear when deleting a recurring activity occurrence. You can remove just one date, end the schedule from a certain point, or delete the entire series.',
         title: 'Tip',
         icon: '\u{1F4A1}',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Once a single session has been rescheduled or edited, opening it shows a small note (e.g. “Moved from Wed, 6 Mar”). From there you can <strong>Delete</strong> that session — which removes just it and leaves the rest of the series alone, and it won’t reappear — or tap <strong>Reset to series</strong> to put it back to its original recurring time. Delete means gone; reset means back to the series default.',
       },
       {
         type: 'heading',

@@ -487,6 +487,20 @@ export const useActivityStore = defineStore('activities', () => {
   }
 
   /**
+   * Reset a rescheduled/edited single occurrence back to the recurring series default.
+   *
+   * IMPORTANT — this is the ONE intentional "restore": removing the one-off override
+   * child lifts `overridesByParent`'s suppression, so the master's original occurrence
+   * reappears (in-app + on Google via the recurring-exception restore path). Deleting a
+   * session must NEVER restore — that is a `cancelOccurrence` (isActive:false). Do not
+   * "simplify" this to `updateActivity({isActive:false})`: that would silently break
+   * reset. Named so the surprising `deleteActivity = restore-series` mapping is explicit.
+   */
+  function resetOccurrenceToSeries(childId: string): Promise<boolean> {
+    return deleteActivity(childId);
+  }
+
+  /**
    * Split a recurring activity at a given date.
    * End-dates the original at the day before, creates a new template from the split date.
    */
@@ -595,6 +609,7 @@ export const useActivityStore = defineStore('activities', () => {
     deleteActivity,
     splitActivity,
     materializeOverride,
+    resetOccurrenceToSeries,
     removeFromMemory,
     resetState,
   };
