@@ -21,12 +21,16 @@ import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import CreatedMeta from '@/components/common/CreatedMeta.vue';
 import {
   formatDate,
+  formatDateWithDay,
   addHourToTime,
   toDateInputValue,
   addDays,
   parseLocalDate,
   formatTime12,
 } from '@/utils/date';
+import { fillTemplate } from '@/utils/fillTemplate';
+import { showToast } from '@/composables/useToast';
+import { BaseButton } from '@/components/ui';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -467,6 +471,27 @@ const viewIsAllDay = computed(() => activity.value?.isAllDay ?? false);
 
 const isRecurring = computed(() => activity.value?.recurrence !== 'none');
 
+// A one-off override child (a rescheduled/edited single occurrence of a recurring
+// series). Only ACTIVE overrides are ever shown here (a cancelled one renders
+// nothing), so `parentActivityId` alone is sufficient.
+const isOverrideInstance = computed(() => !!activity.value?.parentActivityId);
+// One source of truth for the "moved from" date string: present only for a
+// rescheduled override (`originalOccurrenceDate`), null for an edited-only one.
+// Best-effort — an edited-then-rescheduled override won't carry it (see plan).
+const movedFromLabel = computed(() =>
+  activity.value?.originalOccurrenceDate
+    ? formatDateWithDay(activity.value.originalOccurrenceDate)
+    : null
+);
+const overrideBannerText = computed(() =>
+  movedFromLabel.value
+    ? fillTemplate(t('planner.override.movedFrom'), { date: movedFromLabel.value })
+    : t('planner.override.editedOnly')
+);
+const resetLabel = computed(() =>
+  movedFromLabel.value ? t('planner.reset.labelMoved') : t('planner.reset.label')
+);
+
 // Both the short label (chip-style) and the longer schedule summary now go
 // through the single shared formatter `formatActivityRecurrence`. Old per-
 // kind inline branching is gone — adding a new recurrence kind only requires
@@ -581,12 +606,23 @@ function handleOpenEdit() {
   }
 }
 
+function reportSessionActionFailed() {
+  // Surface a non-throw store failure (record-not-found → null; vacation-linked →
+  // deleteActivity false) — never fail silently. Grouped for telemetry.
+  showToast(
+    'error',
+    t('planner.sessionActionFailed.title'),
+    t('planner.sessionActionFailed.message'),
+    { surface: 'activity-session-action' }
+  );
+}
+
 async function handleDelete() {
   if (!activity.value) return;
   const act = activity.value;
-  emit('close');
 
-  // Recurring activity with occurrence date — scope-aware delete
+  // Recurring MASTER occurrence with a date — scope-aware delete (unchanged path).
+  // `emit('close')` fires only on a confirmed action so cancelling keeps the drawer open.
   if (act.recurrence !== 'none' && props.occurrenceDate) {
     const scope = await chooseScope();
     if (!scope) return;
@@ -597,6 +633,7 @@ async function handleDelete() {
       });
       playWhoosh();
       emit('deleted', act.id);
+      emit('close');
       return;
     }
 
@@ -607,22 +644,81 @@ async function handleDelete() {
       });
       playWhoosh();
       emit('deleted', act.id);
+      emit('close');
       return;
     }
 
-    // 'all' — fall through to standard delete with confirm
+    // 'all' — fall through to the plain delete-with-confirm below.
   }
 
+  // Override child (a moved/edited single session) → CANCEL this occurrence; NEVER
+  // restore the original (Reset-to-series is the only intentional restore). We emit
+  // 'deleted' although the record is only marked inactive — no consumer listens to
+  // '@deleted' today; do not couple new behaviour to it.
+  if (act.parentActivityId) {
+    if (
+      !(await showConfirm({
+        title: 'planner.deleteSession.title',
+        message: 'planner.deleteSession.message',
+        variant: 'danger',
+      }))
+    ) {
+      return;
+    }
+    const updated = await activityStore.updateActivity(act.id, { isActive: false });
+    if (updated) {
+      playWhoosh();
+      emit('deleted', act.id);
+      emit('close');
+    } else {
+      reportSessionActionFailed();
+    }
+    return;
+  }
+
+  // True one-off (or a whole recurring series via the 'all' scope) → delete outright.
   if (
-    await showConfirm({
+    !(await showConfirm({
       title: 'planner.deleteActivity',
       message: 'planner.deleteConfirm',
       variant: 'danger',
-    })
+    }))
   ) {
-    await activityStore.deleteActivity(act.id);
+    return;
+  }
+  const removed = await activityStore.deleteActivity(act.id);
+  if (removed) {
     playWhoosh();
     emit('deleted', act.id);
+    emit('close');
+  } else {
+    reportSessionActionFailed();
+  }
+}
+
+// Reset a moved/edited single occurrence back to the recurring series default. This
+// is the ONLY intentional restore (removes the one-off override → original reappears
+// in-app + on Google). Non-danger confirm; clearly messaged.
+async function handleReset() {
+  const act = activity.value;
+  if (!act) return;
+  const detail = movedFromLabel.value
+    ? fillTemplate(t('planner.reset.detailMoved'), { date: movedFromLabel.value })
+    : t('planner.reset.detailEdited');
+  const ok = await showConfirm({
+    title: 'planner.reset.title',
+    message: 'planner.reset.message',
+    detail,
+    variant: 'info',
+    confirmLabel: 'planner.reset.confirm',
+  });
+  if (!ok) return;
+  const restored = await activityStore.resetOccurrenceToSeries(act.id);
+  if (restored) {
+    playWhoosh();
+    emit('close');
+  } else {
+    reportSessionActionFailed();
   }
 }
 
@@ -722,6 +818,16 @@ async function confirmReschedule() {
     @delete="handleDelete"
   >
     <div class="space-y-4">
+      <!-- One-off override context + reset-to-series (moved/edited single session).
+           Quiet, reversible: Sky Silk, never the orange CTA, never red. -->
+      <div
+        v-if="isOverrideInstance && !showReschedule"
+        class="flex items-center justify-between gap-2 rounded-2xl bg-[var(--tint-silk-20)] px-3 py-2 text-xs text-[var(--deep-slate)]/80 dark:bg-slate-800 dark:text-slate-300"
+      >
+        <span>{{ overrideBannerText }}</span>
+        <BaseButton variant="ghost" size="sm" @click="handleReset">{{ resetLabel }}</BaseButton>
+      </div>
+
       <!-- Title — inline editable -->
       <InlineEditField
         :editing="editingField === 'title'"

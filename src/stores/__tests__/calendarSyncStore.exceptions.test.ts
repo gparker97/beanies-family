@@ -5,6 +5,7 @@ import { addDaysYmd, localToday } from '@/utils/date';
 import {
   createActivity,
   deleteActivity,
+  updateActivity,
 } from '@/services/automerge/repositories/activityRepository';
 import { createCalendarConnection } from '@/services/automerge/repositories/calendarRepository';
 import { useCalendarSyncStore, setCalendarClientForTesting } from '../calendarSyncStore';
@@ -158,6 +159,30 @@ describe('calendarSyncStore — recurring-instance exceptions', () => {
     expect(calls.listInstances.length).toBe(listCallsBefore);
     const restore = calls.patchFields.at(-1)!;
     expect(restore.eventId).toContain('__inst'); // the stored instance id, un-cancelled/moved back
+  });
+
+  it('deleting a session (active override → isActive:false) flips the exception to a cancel', async () => {
+    // Mirrors the modal delete path: an edited/moved session is CANCELLED, not restored.
+    const { client, calls } = makeExceptionClient();
+    setCalendarClientForTesting(client);
+    await seedConnection();
+    const master = await createActivity(
+      base({ recurrence: 'daily', date: addDaysYmd(localToday(), -1) })
+    );
+    const child = await createActivity(base({ parentActivityId: master!.id, date: OCC }));
+
+    const store = useCalendarSyncStore();
+    await store.syncNow(); // first sync → modify exception
+    expect(calls.patch).toHaveLength(1);
+    expect(calls.patchFields).toHaveLength(0);
+
+    // "Delete this session" = mark the override inactive.
+    await updateActivity(child!.id, { isActive: false });
+    await store.syncNow();
+
+    // The exception flips to a cancel (by the stored instance id).
+    expect(calls.patchFields.at(-1)!.patch).toEqual({ status: 'cancelled' });
+    expect(calls.patchFields.at(-1)!.eventId).toContain('__inst');
   });
 
   it('a child whose master is NOT synced is skipped — no listInstances, no patch, no orphan event', async () => {
