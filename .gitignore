@@ -58,3 +58,13 @@ infrastructure/*.plan
 scripts/promo-video/.out/
 scripts/store-screenshots/.out/
 scripts/store-screenshots/.tmp/
+
+# Native release signing + build artifacts — NEVER commit. The upload keystore is
+# a private signing key; AABs/IPAs are regenerable via the release lanes. The
+# debug keystore is intentionally tracked (fixed App Link fingerprint) — excepted.
+*.keystore
+!android/app/beanies-debug.keystore
+*.jks
+*.aab
+*.p8
+*.p12
