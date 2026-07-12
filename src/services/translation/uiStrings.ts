@@ -5412,6 +5412,39 @@ const STRING_DEFS = {
     en: 'Are you sure you want to delete this activity?',
     beanie: 'are you sure you want to delete this activity?',
   },
+  // Delete a single session of a recurring activity (cancel this occurrence — never restore).
+  'planner.deleteSession.title': { en: 'Delete this session?', beanie: 'delete this session?' },
+  'planner.deleteSession.message': {
+    en: 'Only this one is removed; the rest of the series stays.',
+    beanie: 'only this one is removed; the rest of the series stays.',
+  },
+  // Context banner + reset-to-series action on a moved/edited single occurrence.
+  'planner.override.movedFrom': { en: 'Moved from {date}.', beanie: 'moved from {date}.' },
+  'planner.override.editedOnly': {
+    en: 'Edited just for this session.',
+    beanie: 'edited just for this session.',
+  },
+  'planner.reset.label': { en: 'Reset to series', beanie: 'reset to series' },
+  'planner.reset.labelMoved': { en: 'Reset to series time', beanie: 'reset to series time' },
+  'planner.reset.title': { en: 'Reset this session?', beanie: 'reset this session?' },
+  'planner.reset.message': { en: 'Undo this one-off change.', beanie: 'undo this one-off change.' },
+  'planner.reset.detailMoved': {
+    en: 'It goes back to {date} and your one-off change is removed.',
+    beanie: 'it goes back to {date} and your one-off change is removed.',
+  },
+  'planner.reset.detailEdited': {
+    en: 'It goes back to the series default and your changes to it are removed.',
+    beanie: 'it goes back to the series default and your changes to it are removed.',
+  },
+  'planner.reset.confirm': { en: 'Reset', beanie: 'reset' },
+  'planner.sessionActionFailed.title': {
+    en: 'Couldn’t update this session',
+    beanie: 'couldn’t update this session',
+  },
+  'planner.sessionActionFailed.message': {
+    en: 'Something went wrong — please try again.',
+    beanie: 'something went wrong — please try again.',
+  },
   'planner.addAnotherActivity': {
     en: '+ add another activity',
     beanie: '+ add another activity',
