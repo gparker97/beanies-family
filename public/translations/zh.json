@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-10",
-    "translationCount": 3699
+    "lastUpdated": "2026-07-12",
+    "translationCount": 3719
   },
   "translations": {
     "app.name": {
@@ -18500,6 +18500,106 @@
       "translation": "如果选中此选项，我们将不会在提交内容中包含您的姓氏。但您也无法收到我们的回复（嗯……我）。",
       "hash": "hs3ddq",
       "lastUpdated": "2026-07-09"
+    },
+    "planner.deleteSession.title": {
+      "translation": "删除此会话？",
+      "hash": "d9e7fa",
+      "lastUpdated": "2026-07-12"
+    },
+    "planner.deleteSession.message": {
+      "translation": "只有这一个被删除；其余的系列保持不变。",
+      "hash": "xrbga3",
+      "lastUpdated": "2026-07-12"
+    },
+    "planner.override.movedFrom": {
+      "translation": "已从{date}移动。",
+      "hash": "5iwkhd",
+      "lastUpdated": "2026-07-12"
+    },
+    "planner.override.editedOnly": {
+      "translation": "仅为此会话编辑。",
+      "hash": "hfdure",
+      "lastUpdated": "2026-07-12"
+    },
+    "planner.reset.label": {
+      "translation": "重置为系列",
+      "hash": "l3gbn9",
+      "lastUpdated": "2026-07-12"
+    },
+    "planner.reset.labelMoved": {
+      "translation": "重置为序列时间",
+      "hash": "c9vide",
+      "lastUpdated": "2026-07-12"
+    },
+    "planner.reset.title": {
+      "translation": "重置此会话？",
+      "hash": "y2bb0a",
+      "lastUpdated": "2026-07-12"
+    },
+    "planner.reset.message": {
+      "translation": "撤消此一次性更改。",
+      "hash": "fcvk74",
+      "lastUpdated": "2026-07-12"
+    },
+    "planner.reset.detailMoved": {
+      "translation": "该日期可追溯至{date} ，您的一次性更改将被删除。",
+      "hash": "ll9csb",
+      "lastUpdated": "2026-07-12"
+    },
+    "planner.reset.detailEdited": {
+      "translation": "它将返回到系列默认值，您对其所做的更改将被删除。",
+      "hash": "e6wxjn",
+      "lastUpdated": "2026-07-12"
+    },
+    "planner.reset.confirm": {
+      "translation": "一键复原",
+      "hash": "1ay23z",
+      "lastUpdated": "2026-07-12"
+    },
+    "planner.sessionActionFailed.title": {
+      "translation": "无法更新此会话",
+      "hash": "bl2vir",
+      "lastUpdated": "2026-07-12"
+    },
+    "planner.sessionActionFailed.message": {
+      "translation": "出了点问题！请再试一次",
+      "hash": "9gbz5o",
+      "lastUpdated": "2026-07-12"
+    },
+    "notifications.kindCalendarReconnect": {
+      "translation": "谷歌日历同步",
+      "hash": "qb9lur",
+      "lastUpdated": "2026-07-12"
+    },
+    "notifications.calendarReconnectSummary": {
+      "translation": "重新连接以恢复同步",
+      "hash": "nmy7tc",
+      "lastUpdated": "2026-07-12"
+    },
+    "calendarSync.reconnect.bannerTitle": {
+      "translation": "日历同步已暂停",
+      "hash": "loq9nz",
+      "lastUpdated": "2026-07-12"
+    },
+    "calendarSync.reconnect.bannerSub": {
+      "translation": "在您的活动可以再次同步之前， Google需要您重新连接{account}。",
+      "hash": "ld2qxg",
+      "lastUpdated": "2026-07-12"
+    },
+    "calendarSync.reconnect.bannerSubGeneric": {
+      "translation": "在您的活动可以再次同步之前， Google需要您重新连接此日历。",
+      "hash": "8d03fl",
+      "lastUpdated": "2026-07-12"
+    },
+    "calendarSync.reconnect.bannerError": {
+      "translation": "这行不通。请重试。",
+      "hash": "ggxp23",
+      "lastUpdated": "2026-07-12"
+    },
+    "calendarSync.reconnect.dismiss": {
+      "translation": "解散",
+      "hash": "fur0k6",
+      "lastUpdated": "2026-07-12"
     }
   }
 }
