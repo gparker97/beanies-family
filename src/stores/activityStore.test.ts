@@ -240,6 +240,22 @@ describe('activityStore', () => {
     });
   });
 
+  describe('resetOccurrenceToSeries', () => {
+    it('removes the override child (delegates to deleteActivity) → returns its result', async () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({ id: 'override-1', recurrence: 'none', parentActivityId: 'template-1' })
+      );
+      vi.mocked(activityRepo.deleteActivity).mockResolvedValue(true);
+
+      const result = await store.resetOccurrenceToSeries('override-1');
+
+      expect(result).toBe(true);
+      expect(activityRepo.deleteActivity).toHaveBeenCalledWith('override-1');
+      expect(store.activities).toHaveLength(0); // override removed → original occurrence returns on expand
+    });
+  });
+
   // ── Getters ──
 
   describe('activeActivities', () => {
@@ -1355,7 +1371,10 @@ describe('activityStore', () => {
       expect(templateDates).toEqual(['2026-03-04', '2026-03-18', '2026-03-25']);
     });
 
-    it('should restore original occurrence when rescheduled override is deleted', () => {
+    // RESET semantics: REMOVING the override child (resetOccurrenceToSeries →
+    // deleteActivity) lifts the suppression, so the original occurrence returns. This
+    // is the ONLY intentional restore. (Exercises the expansion logic, not a handler.)
+    it('reset (removing the override child) restores the original occurrence', () => {
       const store = useActivityStore();
       store.activities.push(
         makeActivity({
@@ -1383,7 +1402,7 @@ describe('activityStore', () => {
       occurrences = store.monthActivities(2026, 2);
       expect(occurrences).toHaveLength(4); // 3 template + 1 override
 
-      // Remove override (simulates delete)
+      // Reset = remove the override child (what resetOccurrenceToSeries does).
       store.activities.splice(store.activities.indexOf(override), 1);
 
       // Original occurrence should reappear
@@ -1395,6 +1414,35 @@ describe('activityStore', () => {
         '2026-03-18',
         '2026-03-25',
       ]);
+    });
+
+    // CANCEL semantics (delete a session): marking the override INACTIVE keeps the
+    // original suppressed AND renders nothing — the session is gone, NOT restored.
+    it('cancel (inactive override) keeps the original suppressed and renders nothing', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({
+          id: 'template-1',
+          date: '2026-03-04',
+          recurrence: 'weekly',
+          daysOfWeek: [3],
+        })
+      );
+      // A delete-one / cancelled override for Mar 11 (isActive:false).
+      store.activities.push(
+        makeActivity({
+          id: 'cancel-1',
+          date: '2026-03-11',
+          recurrence: 'none',
+          parentActivityId: 'template-1',
+          isActive: false,
+        })
+      );
+
+      const occurrences = store.monthActivities(2026, 2);
+      // Mar 11 suppressed; the inactive override renders nothing → 3 Wednesdays, no restore.
+      expect(occurrences.map((o) => o.date)).toEqual(['2026-03-04', '2026-03-18', '2026-03-25']);
+      expect(occurrences.find((o) => o.activity.id === 'cancel-1')).toBeUndefined();
     });
   });
 
