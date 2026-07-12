@@ -47,6 +47,9 @@ signing-key event** — debug keystore rotation, adding the release/upload key,
 Play App Signing re-sign, or a second native app — **both files must be updated
 together**, or native auth breaks silently on the un-updated origin (App Links on
 one, biometrics on the other). Treat the fingerprint list as one logical value
-maintained in two places. Both currently list only the **debug** fingerprint
-(`19:E4:…`); add the **release** fingerprint to **both** when the Play release
-lane (A6) is activated. Get fingerprints per `web/public/.well-known/README.md`.
+maintained in two places. Both list the **debug** fingerprint (`19:E4:…`) and,
+as of the first Play upload (2026-07-12), the **Play App Signing** fingerprint
+(`18:76:CB:…`, the app signing key certificate SHA-256 from Play Console →
+Protected with Play → App signing). Add any further **release** fingerprints to
+**both** on any future signing-key event. Get fingerprints per
+`web/public/.well-known/README.md`.
