@@ -203,10 +203,10 @@ The behavior change lands in **P2** (reconnecting Google Calendar now works on p
 - [ ] Interim P1 button gate removed.
 - [ ] Help Center article updated/added and matches shipped behavior.
 
-**P3**
+**P3** (see the P3 evaluation under "Implementation Progress & Resume" for the evidence)
 
-- [ ] Calendar tokens refresh ~5 min before expiry and on wake events, single-flight per connection — matching Drive's aggressiveness (verified by test/instrumentation).
-- [ ] Beanpod token-mirror implemented or its deferral documented with rationale.
+- [x] Calendar tokens refresh on wake events + every 5 min while visible, single-flight per connection — matching (exceeding) Drive's aggressiveness. Met by the reconcile-on-visible (`fireImmediatelyOnVisible`) + on-demand mint + per-connection `inflight` coalescing; verified by `calendarSyncStore.keepWarm.test.ts` + the existing `googleCalendarClient.tokenProvider.test.ts`. The Drive-style `scheduleAutoRefresh`/`installAuthWakeListener` extraction is **deferred** (zero calendar benefit; would destabilize the recently-stabilized Drive auth path).
+- [x] Beanpod token-mirror **already satisfied** — the calendar refresh token lives in the shared CRDT, so cross-device self-heal is the existing family-wide design (documented, no code needed).
 
 ## Testing Plan
 
@@ -215,6 +215,70 @@ The behavior change lands in **P2** (reconnecting Google Calendar now works on p
 3. **Manual (dev + installed PWA + iOS)** — force a `needs_reconnect` (revoke grant or seed status): confirm toast + bell appear once, reconnect completes on PWA (P2), self-heal clears both, and no toast stacking on repeated taps.
 4. **Regression** — full Drive sign-in/load/reconnect on desktop + PWA + native unchanged after P2.
 5. `npm run type-check`, `npm run lint`, unit suite, and the calendar + google auth test files green at each phase.
+
+## Implementation Progress & Resume
+
+> **Read this first when resuming.** Snapshot as of 2026-07-11.
+
+### P1 — ✅ DONE, merged to `main`, pushed, live-verified
+
+Commit `c651a6b9` on `main` (pushed to origin). Live-verified via Playwright: the reconnect toast surfaces once and self-heals, the bell badges and clears. Full suite 3728 passed, build compiles. Shipped: shared `ReconnectToast.vue` (Drive migrated onto it), `CalendarReconnectToast.vue`, `showCalendarReconnect` store computed (`needs_reconnect`-only), `calendar-reconnect` bell kind, `showToast` dedupe (actionFn-exempt), interim Settings/bell gate, deleted orphaned `SyncStatusIndicator.vue`. **Not deployed** (awaiting an explicit deploy).
+
+### P2 — ✅ CODE-COMPLETE on branch `calendar-drive-parity-p2` (awaiting live Drive verify + greg approval before merge)
+
+**Shipped on the branch (2026-07-11):** the full redirect transport for calendar connect + reconnect on PWA/iOS/native. All 5 tasks (#10–#14) landed; +32 tests; full suite **3760 green**; type-check + lint + build clean.
+
+- **Start side** (`googleAuth.ts`): `startRedirectAuth(returnPath, loginHint, mode, {grant, scope})` — Drive callers omit opts → byte-identical (proven by test). `buildAuthUrl` takes an optional scope (default Drive; `DRIVE_SCOPES` extracted). `RedirectAuthState` carries `grant?` for native; web `state` carries grant via `encodeRedirectState`.
+- **Bounce** (`OAuthCallbackPage.vue`): writes the code to a grant-namespaced key — Drive → `REDIRECT_AUTH_CODE_KEY`, calendar → `REDIRECT_AUTH_CODE_KEY_CALENDAR` (`…:calendar`, co-defined in googleAuth). Structurally isolated (only one grant's code is ever in flight).
+- **Sibling completion** (`calendarAuth.ts`): `startCalendarRedirectAuth` (thin wrapper) + `completeCalendarRedirectAuth` (own memo; web no-verifier / native PKCE arms; returns a typed `CalendarConnectResult | null`; never touches a Drive stash). Native routing added to `handleNativeAuthRedirect` (grant='calendar' → stash under calendar key + navigate, never runs the Drive exchange). `redirect_unsupported` removed. Drive `completeRedirectAuth`/settlement memo untouched.
+- **Wire calendar** (`calendarSyncStore.ts`): `connect`/`reconnect` gate on `shouldUseRedirectAuth()` → hand off (return `{status:'redirecting'}`); shared `finalizeConnected` (create-or-update) reused by popup + resume; `resumeRedirectConnect(intent)` commits post-redirect. Intent rides in `returnPath` (`calResume=connect|<connectionId>`) — no secret/id in `state`. New `useCalendarRedirectResume` composable (App-level, reactive/SPA-safe, waits for doc-loaded, toasts, strips the query). Interim P1 gate removed from **both** Settings (buttons un-gated) and the bell toast. Dead `isConnectSupported`/`isCalendarConnectSupported` removed.
+- **Help Center**: `google-calendar-sync` article gained a "Reconnecting when access lapses" section (ships with P2).
+- **Tests**: `googleAuth.calendarGrant.test.ts` (start-side + Drive isolation), `.native.test.ts` (native routing), `calendarRedirect.test.ts` (completion arms), `calendarSyncStore.redirect.test.ts` (handoff + resume), `OAuthCallbackPage.grantRouting.test.ts` (bounce routing).
+
+**⚠️ BEFORE MERGE (R14 gate — greg):** live-verify Drive sign-in/load/reconnect is unchanged on desktop + PWA, and live-verify calendar connect+reconnect on a real installed PWA / iOS. The automated Drive-protection suite proves the Drive URL/state/scope/keys are byte-identical, but the real OAuth round-trip must be exercised on-device before merging to `main`.
+
+**Foundation (earlier):** commit `f4554420` — grant-aware redirect state (`redirectState.ts` + tests). `grant` additive-optional (Drive byte-identical, absent→`'drive'`, no version bump).
+
+<details><summary>Original remaining-items list (all now done — kept for reference)</summary>
+
+**Remaining P2 items (tasks #10–#14), in order. The seam: share the START side, sibling the COMPLETION side (see the P2 Approach above).**
+
+1. **Start-side threading** (task #10): add optional `grant: RedirectGrant = 'drive'` to `startRedirectAuth` (`googleAuth.ts:1807`); scope-by-grant in `buildAuthUrl` (`:1565`, scope hardcoded at `:1576`) — pass the scope in (or select by grant) to avoid a `googleAuth`↔`calendarAuth` import cycle; encode `grant` into the web `state` (`:1844`) and add `grant` to the native `RedirectAuthState` stash (`:1783`, written `:1825`). Drive callers pass nothing → unchanged.
+2. **Bounce** (task #11): `OAuthCallbackPage.vue` `stashCode` (`:22`) currently writes the bare `REDIRECT_AUTH_CODE_KEY` (`googleAuth.ts:50`). Read `decoded.grant` (`:58`) and write the code into a **grant-namespaced key** (e.g. `${REDIRECT_AUTH_CODE_KEY}:calendar`) so the calendar code can't collide with a Drive code.
+3. **Sibling completion** (task #12): add `completeCalendarRedirectAuth` + its own memo, reading the calendar code key and committing to the `CalendarConnection` record (NOT the Drive token). Leave `completeRedirectAuth` (`:1854`) + `ensureRedirectAuthSettled` (`:1964`) / `whenRedirectAuthSettled` (`:1988`) Drive-only and byte-identical (≥6 Drive consumers await them). Route native `handleNativeAuthRedirect` (`:2041`) by the stash's `grant`.
+4. **Wire calendar** (task #13): in `calendarAuth.ts` remove the `redirect_unsupported` gate (`:168-173`); on a redirect surface route connect + reconnect through `startRedirectAuth({grant:'calendar'})` + `completeCalendarRedirectAuth`. Make the post-redirect resume reactive (SPA-safe). Remove the P1 interim gate in **both** the Settings button (`CalendarSyncSettings.vue`) **and** the bell action.
+5. **Drive-protection tests + verify** (task #14): assert Drive's start scope/state/consent + settlement memo unchanged; the two code keys can't co-populate; native routes by grant; calendar connect+reconnect on web/PWA/native. Full suite + build + **live-verify Drive sign-in/load/reconnect is unchanged** before merging.
+
+**Do NOT merge P2 to `main` until task #14 is green and Drive auth is live-verified.**
+
+</details>
+
+### P3 — ✅ EVALUATED: refresh parity is already met by calendar's architecture (Drive extraction DEFERRED with rationale)
+
+**Conclusion (2026-07-11): R15's requirement — "no difference in refresh aggressiveness between calendar and Drive" — is already satisfied, through a different but equivalent mechanism. No risky Drive-auth refactor was performed.** Evidence:
+
+- **Wake refresh:** `calendarSyncStore.start()` registers the reconcile poll with `fireImmediatelyOnVisible: true` (`calendarSyncStore.ts:774-778`). Every hidden→visible transition (the exact trigger set Drive's `installAuthWakeListener` covers) runs a reconcile, and each reconcile calls `getAccessToken` → **mints a fresh per-connection token on demand** if the cached one is stale. Pinned by `calendarSyncStore.keepWarm.test.ts`.
+- **Periodic keep-warm:** the same poll re-mints every `RECONCILE_POLL_MS` (5 min) while visible. A Google access token lives ~60 min, so a visible calendar re-mints ~12× before expiry — **more aggressive than Drive's single "5 min before expiry" `scheduleAutoRefresh`**, not less.
+- **Single-flight per connection:** the token provider's `inflight` map coalesces concurrent mints per connection and never across connections — already covered by `googleCalendarClient.tokenProvider.test.ts` ("coalesces concurrent callers onto ONE refresh"; "does not coalesce across different connections"; "serves the cached token").
+- **No user-facing expiry race:** unlike Drive (user-triggered save/load surface `TokenExpiredError` visibly, which is _why_ Drive needs proactive scheduling), calendar's only consumer is the reconcile engine, which absorbs expiry transparently via on-demand mint. There is no surface where a stale calendar token bothers the user.
+
+**Why the shared-helper extraction (R15) is DEFERRED, not done:** extracting Drive's `scheduleAutoRefresh` + `installAuthWakeListener` (which coalesce through Drive's single-flight `pendingSilentRefresh`) would refactor the single most sensitive, most-recently-broken auth path (the 2026-07-06→09 Drive reconnect storm). The payoff for calendar is **zero** — it already keeps its token warm on the same triggers, and bolting a second Drive-style scheduler onto calendar would be a redundant refresh path (violates DRY / minimal blast radius). The extraction also can't be on-device-verified while greg is away (its own R14-style gate). If a shared helper is ever wanted for a _third_ grant, extract it then, behind the Drive-path-unchanged test.
+
+**R16 (beanpod token mirror) — already satisfied structurally.** The calendar refresh token lives in the shared CRDT (`.beanpod`) on the `CalendarConnection` record, so a connection made on one device is _already_ usable on every other device — any device reads the shared token and mints. The "connected on one device → self-heals on another" benefit R16 describes is the existing family-wide design; no per-device mirror is needed.
+
+**R11 (shared grant-parameterized reconnect-ladder extraction) — unneeded.** It was deferred to P3 pending a calendar silent-recovery step. That step doesn't exist and isn't needed: calendar's token is already shared via the CRDT, so recovery is either a transparent on-demand mint or an explicit re-consent (P1/P2) — there is no separate silent ladder to extract or parameterize.
+
+**Net P3 deliverable:** the `keepWarm` regression test + this documented evaluation. No production code change — the parity requirement was met by design, and the only _available_ implementation route (refactoring Drive's proven auth path) is higher-risk than its zero benefit justifies.
+
+### How to resume
+
+```bash
+git checkout calendar-drive-parity-p2      # foundation commit f4554420 is here
+# then: re-read this section + the "P2 — calendar grant on the redirect transport" Approach above,
+# and continue at item 1. Task list #10–#14 tracks the same steps.
+```
+
+Caveats that still bind (from Important Notes above): never weaken `forceConsent`; `prompt=consent` invariant holds for calendar; no UA-sniff pre-warns; the web no-PKCE path is safe ONLY via the confidential proxy `client_secret` (ADR-026).
 
 ## Review Passes
 
