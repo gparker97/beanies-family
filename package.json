@@ -74,6 +74,7 @@
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1076.0",
     "@aws-sdk/util-dynamodb": "^3.996.5",
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.4.1",
     "@eslint/js": "^9.39.2",
     "@heroicons/vue": "^2.2.0",

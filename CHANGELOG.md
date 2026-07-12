@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-13
+
+### Changed
+
+- **The Android and iOS apps now show the beanies.family icon and splash screen.** The native builds were still shipping the default placeholder logo on the home screen and during launch — both are now the beanie family artwork on a Cloud White background (with a dark-mode splash variant).
+
+---
+
 ## 2026-07-12
 
 ### Fixed
