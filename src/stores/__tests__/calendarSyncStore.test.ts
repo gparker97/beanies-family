@@ -14,7 +14,8 @@ import {
 } from '@/services/automerge/repositories/calendarRepository';
 import { deterministicEventId } from '@/utils/calendar/deterministicEventId';
 import { useCalendarSyncStore, setCalendarClientForTesting } from '../calendarSyncStore';
-import { CalendarApiError, type CalendarClient } from '@/services/calendar/CalendarClient';
+import { CalendarApiError } from '@/services/calendar/CalendarClient';
+import { makeCalendarClientStub } from '@/services/calendar/__tests__/fakeCalendarClient';
 import { getCalendarEventLinksForConnection } from '@/services/automerge/repositories/calendarRepository';
 import type { CreateFamilyActivityInput } from '@/types/models';
 
@@ -32,8 +33,7 @@ vi.mock('@/services/calendar/calendarAuth', () => ({
 function makeFakeClient() {
   const calls = { insert: [] as string[], patch: [] as string[], delete: [] as string[] };
   const existing = new Set<string>();
-  const client: CalendarClient = {
-    invalidateConnection() {},
+  const client = makeCalendarClientStub({
     async insertEvent(_c, _cal, eventId) {
       calls.insert.push(eventId);
       existing.add(eventId);
@@ -48,13 +48,7 @@ function makeFakeClient() {
     async eventExists(_c, _cal, eventId) {
       return existing.has(eventId);
     },
-    async listCalendars() {
-      return [{ id: 'primary', summary: 'Primary', primary: true }];
-    },
-    async listEventTimes() {
-      return [];
-    },
-  };
+  });
   return { client, calls };
 }
 
@@ -198,24 +192,18 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
   // same dead token — hundreds of `POST /oauth/google/refresh` 400s per load.
   it('aborts the reconcile run on the first auth failure instead of running every task', async () => {
     const attempted: string[] = [];
-    const deadToken: CalendarClient = {
-      invalidateConnection() {},
+    const deadToken = makeCalendarClientStub({
       async insertEvent(_c: string, _cal: string, eventId: string) {
         attempted.push(eventId);
         throw new CalendarApiError('auth', 'token refresh failed: invalid_grant');
       },
-      async patchEvent() {},
-      async deleteEvent() {},
       async eventExists() {
         return false;
       },
       async listCalendars() {
         return [];
       },
-      async listEventTimes() {
-        return [];
-      },
-    };
+    });
     setCalendarClientForTesting(deadToken);
 
     await createCalendarConnection({
@@ -249,23 +237,14 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
     mockReport.mockClear();
 
     // insertEvent always 403s → every reconcile ends in a non-auth error.
-    const failing: CalendarClient = {
-      invalidateConnection() {},
+    const failing = makeCalendarClientStub({
       async insertEvent() {
         throw new CalendarApiError('forbidden', 'Google Calendar HTTP 403', 403);
       },
-      async patchEvent() {},
-      async deleteEvent() {},
       async eventExists() {
         return false;
       },
-      async listCalendars() {
-        return [{ id: 'primary', summary: 'Primary', primary: true }];
-      },
-      async listEventTimes() {
-        return [];
-      },
-    };
+    });
     setCalendarClientForTesting(failing);
 
     await createCalendarConnection({
@@ -307,26 +286,17 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
     const mockReport = vi.mocked(reportError);
     mockReport.mockClear();
 
-    const deadToken: CalendarClient = {
-      invalidateConnection() {},
+    const deadToken = makeCalendarClientStub({
       async insertEvent() {
         throw new CalendarApiError(
           'auth',
           'token refresh failed: Token has been expired or revoked.'
         );
       },
-      async patchEvent() {},
-      async deleteEvent() {},
       async eventExists() {
         return false;
       },
-      async listCalendars() {
-        return [{ id: 'primary', summary: 'Primary', primary: true }];
-      },
-      async listEventTimes() {
-        return [];
-      },
-    };
+    });
     setCalendarClientForTesting(deadToken);
 
     const connection = await createCalendarConnection({
@@ -384,12 +354,10 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
     // Client inserts fine but every delete throws — the old-calendar cleanup can
     // never complete, so the switch must abort with the destination + links intact.
     const existing = new Set<string>();
-    const client: CalendarClient = {
-      invalidateConnection() {},
+    const client = makeCalendarClientStub({
       async insertEvent(_c, _cal, eventId) {
         existing.add(eventId);
       },
-      async patchEvent() {},
       async deleteEvent() {
         throw new CalendarApiError('transient', 'boom');
       },
@@ -399,10 +367,7 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
       async listCalendars() {
         return [{ id: 'cal-old', summary: 'Old', primary: true }];
       },
-      async listEventTimes() {
-        return [];
-      },
-    };
+    });
     setCalendarClientForTesting(client);
 
     const connection = await createCalendarConnection({
@@ -431,24 +396,14 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
   });
 
   it('normalizes a "primary" destination to the concrete calendar id for the picker', async () => {
-    const client: CalendarClient = {
-      invalidateConnection() {},
-      async insertEvent() {},
-      async patchEvent() {},
-      async deleteEvent() {},
-      async eventExists() {
-        return true;
-      },
+    const client = makeCalendarClientStub({
       async listCalendars() {
         return [
           { id: 'owner@example.com', summary: 'owner@example.com', primary: true },
           { id: 'work', summary: 'Work', primary: false },
         ];
       },
-      async listEventTimes() {
-        return [];
-      },
-    };
+    });
     setCalendarClientForTesting(client);
 
     const connection = await createCalendarConnection({
