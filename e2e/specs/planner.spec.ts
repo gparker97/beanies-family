@@ -170,23 +170,25 @@ test.describe('Family Planner', () => {
     // Click the delete button in the view modal footer
     await page.getByLabel(/delete/i).click();
 
-    // View modal closes first, then confirmation dialog appears
-    await expect(page.getByText('Are you sure you want to delete this activity?')).toBeVisible({
-      timeout: 10000,
-    });
-
-    // Wait for the view modal to fully close before clicking confirm
-    await expect(page.getByText(/activity details/i)).not.toBeVisible({ timeout: 5000 });
+    // Confirmation dialog appears ON TOP of the view drawer, which stays open behind
+    // it. Post 9b0d467b the drawer's `emit('close')` fires only after a *confirmed*
+    // delete (so cancelling keeps the drawer open) — the drawer no longer closes up
+    // front. Scope the confirm click to the confirm dialog: the drawer's own delete
+    // button shares the same "Delete" accessible name, so an unscoped getByRole would
+    // hit a strict-mode violation now that both are mounted.
+    const deleteConfirmDialog = page
+      .locator('div[role="dialog"]')
+      .filter({ hasText: 'Are you sure you want to delete this activity?' });
+    await expect(deleteConfirmDialog).toBeVisible({ timeout: 10000 });
 
     // Confirm deletion
-    await page.getByRole('button', { name: /^delete$/i }).click();
+    await deleteConfirmDialog.getByRole('button', { name: /^delete$/i }).click();
 
-    // Wait for confirm dialog to close
-    await expect(page.getByText('Are you sure you want to delete this activity?')).not.toBeVisible({
-      timeout: 5000,
-    });
+    // A confirmed delete closes both the confirm dialog and the view drawer
+    await expect(deleteConfirmDialog).toHaveCount(0);
+    await expect(page.getByText(/activity details/i)).not.toBeVisible({ timeout: 5000 });
 
-    // Activity should be removed from the upcoming list
+    // Activity should be removed from the calendar grid
     await expect(page.getByText('Updated Visit', { exact: true })).not.toBeVisible({
       timeout: 5000,
     });
