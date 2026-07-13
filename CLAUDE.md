@@ -287,6 +287,27 @@ npm run lint
   - **Constants and config**: Shared values (colors, options, validation rules) belong in constants files, not scattered across components.
   - **When unsure**: If it's unclear whether to extract or inline, ask the user before proceeding.
 
+## Observability & Diagnostic Logging (MANDATORY for every feature)
+
+Observability is a **first-class deliverable**, not an afterthought. Every feature, workflow, and failure path must emit enough **structured diagnostic logging to the cloud firehose (AWS CloudWatch)** that an issue can be **triaged and root-caused without reproducing it locally** — and so precise, real-time alerting can be built on top later. Treat "could I diagnose a report of this breaking from the logs alone?" as an acceptance criterion, not a nice-to-have.
+
+**The pipeline — all client diagnostics flow to AWS CloudWatch:**
+
+- **`logEvent({ level, surface, message, context?, error?, flush? })`** (`src/services/telemetry/logEvent.ts`) — the diagnostic **firehose**. Offline-aware queue (`logQueue.ts`) → AWS ingest endpoint → CloudWatch. Every level (`debug`/`info`/`warn`/`error`) is recorded (client-side rate-limited to 50/surface/min). Use for lifecycle, decision, fallback, and outcome events — not just errors.
+- **`reportError({ surface, message, severity, error?, context? })`** (`src/utils/errorReporter.ts`) — for failures. **All** severities land in the CloudWatch firehose; **only `severity: 'critical'` also pages Slack `#beanies-errors`** (+ immediate flush) and must be reserved for "a user action failed or data is at risk." Use `'error'`/`'warning'` for caught-and-handled failures (firehose + console, no page).
+- **`perfTiming.record(label, ms, ctx?)`** (`src/utils/perfTiming.ts`) — durations, correlated by `family_id` in CloudWatch. Note the `TELEMETRY_FLOOR_MS = 250` floor: sub-floor events are dropped unless you count them explicitly.
+
+**Rules:**
+
+1. **Log the decision, not just the crash.** Every non-trivial branch, fallback, retry, and degradation emits a structured event carrying enough `context` to explain _why_ it happened (which path, which input class, what state). The bar is "diagnose from the logs alone."
+2. **No silent failures** (reinforces the existing rule): every `catch` classifies + logs. Critical (user action failed / data at risk) → `reportError({ severity: 'critical' })` (Slack + toast). Non-critical → `reportError`/`logEvent` at `warning`/`error` with a documented fallback. Never a bare `catch {}`.
+3. **`surface` is kebab-case and greppable** — name it so one CloudWatch filter isolates this feature's events (e.g. `'calendar-sync'`, `'doc-worker-recovery'`).
+4. **Structured `context`, never string-interpolated data.** Put queryable fields in `context: { ... }` so CloudWatch (and future alerts) can filter on them — do not bake them into `message`.
+5. **Privacy + store-declaration gate.** The firehose context is **allowlisted** (`ALLOWED_CONTEXT_KEYS` in `logEvent.ts`) and redacted, and the shipped fields are **declared to Apple & Google as collected Diagnostics**. Adding a new context key means: add it to the allowlist AND update the data-collection table in `docs/runbooks/native-store-submission.md` + its consumers (`PrivacyInfo.xcprivacy`, the store Data-Safety/App-Privacy answers, `privacy.astro`). NEVER log secrets, tokens, `.beanpod` contents, or PII beyond the allowlist.
+6. **Design for alerting.** Emit the counter/outcome on the **success** path too (below the perf floor if needed) so _rates_ are measurable — an event that only fires on failure can't tell you the failure rate.
+
+Every `/beanies-plan` plan must include an **Observability Coverage** section naming the diagnostic events the feature emits and why they suffice to triage its failure modes blind. This is an acceptance criterion, not a follow-up.
+
 ## Marketing Site Structure & Content Workflow
 
 Post-Phase-C cutover (#167), the marketing surface is a separate Astro site, not the Vue app. Understand this split before touching any public-facing content.
