@@ -215,7 +215,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
     icon: '\u{1F4E6}',
     readTime: 4,
     popular: true,
-    updatedDate: '2026-03-09',
+    updatedDate: '2026-07-13',
     sections: [
       {
         type: 'heading',
@@ -269,6 +269,29 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'By default, your pod data lives in IndexedDB (an encrypted cache in your browser). If you connect Google Drive, the <code>.beanpod</code> file is also saved there \u2014 but always encrypted before upload.',
+      },
+      {
+        type: 'heading',
+        content: 'Opening your file from any account or device',
+        level: 2,
+        id: 'open-from-anywhere',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Because the file is yours, you can open it from anywhere you can reach it \u2014 not just the Google account that first created it. On the sign-in screen, under <strong>\u201cLoad a saved family file\u201d</strong>, you can pick a <code>.beanpod</code> from another Google account, from a different device, or from a backup you\u2019ve restored. This works on the web, on Android, and on iOS.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On a phone, the system file picker can reach files stored in Google Drive, iCloud, or on the device itself. On a desktop Chrome or Edge browser, opening a file that lives only in a <em>different</em> Google account means downloading it to your computer first, then choosing it.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'The file is still encrypted \u2014 opening it always asks for your family password, so a copied <code>.beanpod</code> is useless to anyone who doesn\u2019t know it. Once you open a restored backup, your currently signed-in Google Drive becomes its new home, so you\u2019re no longer tied to the old account.',
+        title: 'Still needs your password',
+        icon: '\u{1F510}',
       },
     ],
   },

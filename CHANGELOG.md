@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **You can now open your family file from any account or device — including a restored backup.** The sign-in screen has a new "Load a saved family file" option that opens a `.beanpod` even if it was created by a different Google account, and it works on the web, Android, and iOS (previously the local-file option silently failed everywhere except desktop Chrome/Edge). Opening a restored backup makes your currently signed-in Google Drive its new home. Your file is still encrypted, so it always asks for your family password.
 - **A clear warning now appears across the top of the app if your device can't save your data locally.** Previously this durability warning was tucked inside Settings, where you might never notice it. It links to an explanation and clears itself automatically once saving recovers. (Your data on Google Drive is always the safe copy.)
 
 ### Changed
