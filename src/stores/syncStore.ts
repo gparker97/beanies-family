@@ -27,7 +27,11 @@ import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import { getSyncCapabilities, canAutoSync, isNative } from '@/services/sync/capabilities';
-import { beginDriveAuthRedirectIfNeeded, RESUME_SETUP_PATH } from '@/services/sync/connectStorage';
+import {
+  beginDriveAuthRedirectIfNeeded,
+  RESUME_SETUP_PATH,
+  resolveExistingBeanpod,
+} from '@/services/sync/connectStorage';
 import type { RedirectMode } from '@/services/google/redirectState';
 import { markFamilyJustCreated } from '@/utils/newFamilyFlag';
 import { features } from '@/config/features';
@@ -54,12 +58,14 @@ import {
 } from '@/services/google/driveTokenRecovery';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { slackNotify } from '@/utils/slackNotify';
 import type { SaveFailureLevel } from '@/services/sync/syncService';
 import {
   searchBeanpodFilesGlobal,
   clearFolderCache,
   getAppFolderId,
+  getFileMetadata,
   DriveApiError,
 } from '@/services/google/driveService';
 import { clearQueue } from '@/services/sync/offlineQueue';
@@ -90,6 +96,8 @@ import {
   type ResumeFromRegistryResult,
   type CompleteAutoLoadResult,
   CorruptPayloadError,
+  FileNameCollisionError,
+  CollisionCheckUnavailableError,
 } from '@/types/sync';
 
 /**
@@ -2113,14 +2121,71 @@ export const useSyncStore = defineStore('sync', () => {
 
   // --- Google Drive actions ---
 
+  /** Mint a brand-new app-owned `.beanpod` on the signed-in account's Drive and
+   * install it as the home. B6: `forceConsent:false` so a valid cached token is
+   * REUSED (never a full-page OAuth redirect mid-restore). Throws on failure
+   * (createNew's collision/error, or the installProvider write) — callers map the
+   * throw to an outcome; `configureSyncFileGoogleDrive` wraps it as a boolean. */
+  async function mintFreshOwnDrive(uniqueName: string): Promise<void> {
+    const provider = await GoogleDriveProvider.createNew(uniqueName, { forceConsent: false });
+    await installProvider(provider, 'google_drive');
+  }
+
+  /** Thin boolean wrapper over `mintFreshOwnDrive` — the shared install sequence
+   * (persist → setProvider → syncNow → saveSettings → registerFamily). Retained as
+   * the seam the migrate test exercises; B6 `forceConsent:false` flows through. */
   async function configureSyncFileGoogleDrive(podFileName: string): Promise<boolean> {
     try {
-      const provider = await GoogleDriveProvider.createNew(podFileName);
-      await installProvider(provider, 'google_drive');
+      await mintFreshOwnDrive(podFileName);
       return true;
     } catch (e) {
       error.value = (e as Error).message;
       return false;
+    }
+  }
+
+  /** Outcome of `reHomeToOwnDrive` — the caller owns the outcome→telemetry mapping. */
+  type ReHomeOutcome =
+    | { action: 're-homed' } // minted a fresh own-account file (or a distinct one on foreign collision)
+    | { action: 'adopted-existing' } // adopted the caller's OWN same-named file (no split-brain)
+    | { action: 'collision-check-unavailable' } // couldn't verify the collision — retryable, do NOT guess
+    | { action: 'failed' }; // create/install failed for another reason — fall through to native/critical
+
+  /** B4/B6: re-home the just-loaded doc onto the signed-in account's OWN Drive.
+   * Happy path mints a fresh app-owned file; on a same-name collision it ADOPTS the
+   * existing OWNED file (never a divergent local split-brain) or mints a distinct
+   * familyId-namespaced name when the colliding file is foreign. One try / one typed
+   * catch / one flat dispatch. NOT strictly total by design: an `installProvider`
+   * write-failure inside an adopt/reject arm PROPAGATES OUT (rather than a tag) to the
+   * caller's own try/catch → its loud `critical` no-durable-save-target report. */
+  async function reHomeToOwnDrive(name: string): Promise<ReHomeOutcome> {
+    try {
+      await mintFreshOwnDrive(name);
+      return { action: 're-homed' };
+    } catch (e) {
+      if (e instanceof FileNameCollisionError) {
+        const res = await resolveExistingBeanpod({
+          fileId: e.existingFileId,
+          ownedByCurrentAccount: e.ownedByCurrentAccount,
+        });
+        if (res.kind === 'adopt-stub' || res.kind === 'adopt-existing') {
+          // Our OWN same-named file — adopt it (installProvider re-persists the config,
+          // overwriting the foreign one decrypt installed, and flushes the loaded doc).
+          await installProvider(GoogleDriveProvider.fromExisting(res.fileId, name), 'google_drive');
+          return { action: 'adopted-existing' };
+        }
+        // reject-different-account: the same-named file is foreign → mint a DISTINCT,
+        // familyId-namespaced own file (matches B3). Never write into a file we don't own.
+        const ctx = useFamilyContextStore();
+        const suffix = ctx.activeFamilyId ? `-${ctx.activeFamilyId}` : '';
+        const base = name.replace(/\.beanpod$/, '');
+        await mintFreshOwnDrive(`${base}${suffix}.beanpod`);
+        return { action: 're-homed' };
+      }
+      if (e instanceof CollisionCheckUnavailableError) {
+        return { action: 'collision-check-unavailable' }; // retryable — never guess a home
+      }
+      return { action: 'failed' };
     }
   }
 
@@ -2156,37 +2221,136 @@ export const useSyncStore = defineStore('sync', () => {
   async function establishDurableHomeAfterLoad(): Promise<void> {
     const ctx = useFamilyContextStore();
     const activeFamilyId = ctx.activeFamilyId;
-
-    // (1) Idempotent skip — only when the installed provider belongs to the
-    // just-loaded family (family-scoped, not a bare non-null check).
-    if (syncService.getProvider() && syncService.getProviderFamilyId() === activeFamilyId) {
-      return;
-    }
-
     const podBaseName = (ctx.activeFamilyName ?? 'my-family').trim() || 'my-family';
 
+    // ─── Guard (B5): is the installed provider already OUR OWN durable home for
+    // this family, or a foreign/absent one we must re-home? A bare "provider is for
+    // this family" check is NOT enough — a Picker-load installs
+    // `fromExisting(pickedFileId)` unconditionally (so `providerFamilyId` matches even
+    // for a file owned by ANOTHER account). We derive ownership at this one decision
+    // point from the authoritative source (Drive), off the installed provider — never
+    // captured/threaded (a threaded snapshot re-introduces the stale-cross-family bug
+    // this guard exists to kill). `useJoinFlow` never reaches this function, so the
+    // inviter's shared file stays installed there. ───
+    const provider = syncService.getProvider();
+    if (provider && syncService.getProviderFamilyId() === activeFamilyId) {
+      const providerType = syncService.getProviderType();
+      if (providerType !== 'google_drive') {
+        // A local FSA / native provider WE installed for this family → genuine own home.
+        logEvent({
+          level: 'info',
+          surface: 'load-existing-family',
+          message: 'kept own local home',
+          context: { action: 'kept-own-home', provider_type: providerType ?? undefined },
+        });
+        return;
+      }
+      // Drive provider for this family — verify it's OURS before keeping it.
+      const fileId = provider.getFileId();
+      if (fileId && isTokenValid()) {
+        try {
+          const token = await requestAccessToken(); // silent (token already valid here)
+          const meta = await getFileMetadata(token, fileId, 'ownedByMe');
+          if (meta.ownedByMe === true) {
+            logEvent({
+              level: 'info',
+              surface: 'load-existing-family',
+              message: 'kept own Drive home',
+              context: { action: 'kept-own-home', provider_type: 'google_drive' },
+            });
+            return;
+          }
+          // Owned by another account → re-home (never keep writing cross-account).
+          logEvent({
+            level: 'warn',
+            surface: 'load-existing-family',
+            message: 'loaded a Drive file owned by another account — re-homing to own Drive',
+            context: { action: 'foreign-file-load', provider_type: 'google_drive' },
+          });
+        } catch (e) {
+          // Ownership unknown → conservative re-home (never assume ours). WARNING (not
+          // info) so the rare same-account transient-blip residual is countable.
+          console.warn(
+            '[syncStore.establishDurableHomeAfterLoad] Drive ownership check failed — re-homing conservatively:',
+            e
+          );
+          logEvent({
+            level: 'warn',
+            surface: 'load-existing-family',
+            message: 'could not verify Drive file ownership — re-homing conservatively',
+            context: { action: 'ownership-unknown', provider_type: 'google_drive' },
+            error: e,
+          });
+        }
+        // fall through to re-home
+      } else {
+        // No fileId or no valid token to verify → unknown → conservative re-home.
+        logEvent({
+          level: 'warn',
+          surface: 'load-existing-family',
+          message: 'no token/fileId to verify Drive ownership — re-homing conservatively',
+          context: { action: 'ownership-unknown', provider_type: 'google_drive' },
+        });
+      }
+    }
+
+    // ─── Establish (re-home): no verified own home for this family. ───
     try {
-      // (2) Prefer re-homing to the signed-in account's own Drive.
+      // (1) Prefer the signed-in account's own Drive. Collision-aware (B4): adopts an
+      // existing owned same-named file instead of dropping to a local split-brain.
       if (isGoogleDriveAvailable.value && isTokenValid()) {
-        const ok = await configureSyncFileGoogleDrive(`${podBaseName}.beanpod`);
-        if (ok) return;
-        // else fall through — Drive create/write failed; try native or page.
+        const outcome = await reHomeToOwnDrive(`${podBaseName}.beanpod`);
+        if (outcome.action === 're-homed' || outcome.action === 'adopted-existing') {
+          logEvent({
+            level: 'info',
+            surface: 'load-existing-family',
+            message: `re-home ${outcome.action}`,
+            context: { action: outcome.action, provider_type: 'google_drive' },
+          });
+          return;
+        }
+        if (outcome.action === 'collision-check-unavailable') {
+          // Couldn't verify a name collision — do NOT guess a home. Retryable: page
+          // loudly and let the user retry rather than risk a wrong/foreign target.
+          reportError({
+            surface: 'load-existing-family',
+            severity: 'critical',
+            message: 're-home could not verify a Drive name collision (retryable)',
+            context: {
+              action: 'collision-check-unavailable',
+              provider_type: storageProviderType.value ?? undefined,
+            },
+          });
+          return;
+        }
+        // outcome.action === 'failed' → fall through to native / provider-less.
       }
 
-      // (3) Native app-managed local file (no writable web handle exists here).
+      // (2) Native app-managed local file (no writable web handle exists here).
       if (isNative()) {
         const selected = await syncService.selectNativeLocalFile(podBaseName);
-        if (selected && (await syncNow(true))) return;
+        if (selected && (await syncNow(true))) {
+          logEvent({
+            level: 'info',
+            surface: 'load-existing-family',
+            message: 're-homed to native local file',
+            context: {
+              action: 're-homed',
+              provider_type: syncService.getProviderType() ?? undefined,
+            },
+          });
+          return;
+        }
       }
     } catch (e) {
-      // Fall through to the critical report below — never let an unexpected
-      // throw leave a loaded-but-unsaveable family without a loud signal.
+      // Fall through to the critical report below — never let an unexpected throw
+      // (incl. an installProvider write-failure from reHomeToOwnDrive) leave a
+      // loaded-but-unsaveable family without a loud signal.
       console.error('[syncStore.establishDurableHomeAfterLoad] failed:', e);
     }
 
-    // (4) No durable home could be established. The family is loaded and visible
-    // but cannot be saved — data at risk. Page loudly; SaveFailureBanner handles
-    // the user-facing recovery affordance.
+    // (3) No durable home could be established. The family is loaded and visible but
+    // cannot be saved — data at risk. Page loudly; SaveFailureBanner guides recovery.
     reportError({
       surface: 'load-existing-family',
       severity: 'critical',

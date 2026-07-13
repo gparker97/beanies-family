@@ -712,8 +712,15 @@ export async function selectSyncFile(): Promise<boolean> {
  */
 export async function selectNativeLocalFile(baseName = 'my-family'): Promise<boolean> {
   try {
-    const provider = new CapacitorFileProvider(`${baseName}.beanpod`);
+    // B3: namespace the app-managed filename by familyId so a restored backup of
+    // family B (named identically to an existing local family A) can NEVER clobber
+    // A's local pod. Cold-boot restore is config-based (`initialize` reads the exact
+    // persisted `localPath`), so existing pods keep working via their stored config —
+    // this only changes the name minted for a NEW file. Fall back to the bare name
+    // when familyId is unknown (no regression).
     const familyId = getActiveFamilyId();
+    const fileName = familyId ? `${baseName}-${familyId}.beanpod` : `${baseName}.beanpod`;
+    const provider = new CapacitorFileProvider(fileName);
     if (familyId) {
       await provider.persist(familyId);
     }
