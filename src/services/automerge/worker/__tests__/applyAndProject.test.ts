@@ -18,6 +18,7 @@ import {
 import * as cache from '../cache';
 import {
   configure,
+  dispatch,
   setKey,
   initDoc,
   initAndLoadCache,
@@ -83,6 +84,13 @@ describe('worker/applyAndProject', () => {
 
   afterEach(async () => {
     await cache.clearCache(FAMILY_ID).catch(() => {});
+  });
+
+  it('dispatch(ping) returns { ok: true } with no doc loaded and no key set', async () => {
+    // beforeEach resets all state — no doc, no key. Ping must still answer (it is a
+    // pure liveness probe, so docClient can use it before/without unlock).
+    expect(__hasDocForTesting()).toBe(false);
+    await expect(dispatch('ping', undefined)).resolves.toEqual({ result: { ok: true } });
   });
 
   it('initDoc pushes a full projection with exactly one final chunk, all bulks reset', () => {
