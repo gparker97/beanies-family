@@ -206,6 +206,8 @@ describe('Telemetry Lambda handler', () => {
         'breadcrumbs',
         'browser',
         'build_sha',
+        'cache_persist_error',
+        'cache_persist_kind',
         'component',
         'connection_type',
         'context_build_error',

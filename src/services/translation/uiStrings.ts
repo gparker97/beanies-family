@@ -2309,6 +2309,18 @@ const STRING_DEFS = {
     en: 'Local cache is not updating — your data may not survive a page refresh',
     beanie: "local cache isn't saving — your beans might not survive a refresh",
   },
+  'sync.durabilityBannerTitle': {
+    en: "This device can't save locally right now",
+    beanie: "this device can't save locally right now",
+  },
+  'sync.durabilityBanner': {
+    en: 'Recent changes might not survive a refresh on this device. Your saved copy is safe.',
+    beanie: 'recent changes might not survive a refresh on this device. your saved beans are safe.',
+  },
+  'sync.durabilityBannerCta': {
+    en: "What's This?",
+    beanie: "what's this?",
+  },
   'settings.about': { en: 'About', beanie: 'about' },
   'settings.appName': { en: 'beanies.family', beanie: 'beanies.family' },
   'settings.noRatesWarning': {

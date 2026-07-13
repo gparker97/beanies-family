@@ -1,6 +1,6 @@
 // @vitest-environment node
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as Automerge from '@automerge/automerge';
 import type { FamilyDocument } from '@/types/automerge';
 import { generateFamilyKey } from '@/services/crypto/familyKeyService';
@@ -60,6 +60,7 @@ describe('worker/applyAndProject', () => {
   let chunks: Array<{ delta: ProjectionDelta; final: boolean }>;
   let perf: string[];
   let failed: boolean[];
+  let failedDetails: Array<unknown>;
 
   const bulkFor = (collection: string) =>
     chunks
@@ -73,10 +74,14 @@ describe('worker/applyAndProject', () => {
     chunks = [];
     perf = [];
     failed = [];
+    failedDetails = [];
     const sink: WorkerSink = {
       pushChunk: (delta, final) => chunks.push({ delta, final }),
       perf: (label) => perf.push(label),
-      cachePersistFailed: (f) => failed.push(f),
+      cachePersistFailed: (f, detail) => {
+        failed.push(f);
+        failedDetails.push(detail);
+      },
     };
     configure(sink);
     key = await generateFamilyKey();
@@ -128,6 +133,50 @@ describe('worker/applyAndProject', () => {
     expect(reloaded!.doc.accounts.a1).toEqual({ id: 'a1', balance: 7 });
     // First persist of a fresh doc writes a whole-doc base (B1); timing relayed.
     expect(perf).toContain('automerge.saveBase');
+  });
+
+  it('#50: a cache-persist WRITE failure signals cachePersistFailed(true, {kind, errorName}) and recovers', async () => {
+    setKey(key);
+    await initAndLoadCache(FAMILY_ID);
+    initDoc();
+    mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 1 } });
+
+    // First flush = a whole-doc BASE write (lastPersistedHeads === null) → force it to fail.
+    const quota = new Error('quota'); // name it like a real IDB quota error
+    quota.name = 'QuotaExceededError';
+    const spy = vi.spyOn(cache, 'persistDocBinary').mockRejectedValueOnce(quota);
+
+    await flush();
+
+    expect(failed).toEqual([true]);
+    // `kind` is 'base' via the explicit writeKind — proves it is NOT inferred wrong.
+    expect(failedDetails[0]).toEqual({ kind: 'base', errorName: 'QuotaExceededError' });
+    spy.mockRestore();
+
+    // The next successful persist emits the recovery signal (false) on the edge.
+    mutate({ op: 'set', collection: 'accounts', id: 'a2', entity: { id: 'a2', balance: 2 } });
+    await flush();
+    expect(failed).toEqual([true, false]);
+  });
+
+  it('#50: an INCREMENT write failure reports kind:"increment"', async () => {
+    setKey(key);
+    await initAndLoadCache(FAMILY_ID);
+    initDoc();
+    // A successful base first so lastPersistedHeads is set → the next write is an increment.
+    mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 1 } });
+    await flush();
+    expect(failed).toEqual([]);
+
+    mutate({ op: 'set', collection: 'accounts', id: 'a2', entity: { id: 'a2', balance: 2 } });
+    const err = new Error('boom');
+    err.name = 'InvalidStateError';
+    const spy = vi.spyOn(cache, 'persistIncrement').mockRejectedValueOnce(err);
+    await flush();
+
+    expect(failed).toEqual([true]);
+    expect(failedDetails[0]).toEqual({ kind: 'increment', errorName: 'InvalidStateError' });
+    spy.mockRestore();
   });
 
   it('initAndLoadCache streams a large collection as multiple bulk chunks (chunking)', async () => {
