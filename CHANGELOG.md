@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-07-13
 
+### Changed
+
+- **Internal:** the background incremental-sync path now reports structured diagnostics to our monitoring (previously invisible) — no user-facing change, but it lets us catch and fix sync issues without needing to reproduce them. Also stamps each saved family-data file with the app version that wrote it.
+
 ### Fixed
 
 - **The app now recovers on its own if your data ever stops loading.** On some devices — especially phones after the app has been in the background — the behind-the-scenes engine that loads your family data could go quiet and leave the app stuck, so the only fix was to force-quit and reopen. It now detects that situation, restarts the engine automatically, and retries loading your data, so opening the app just works.

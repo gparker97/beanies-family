@@ -59,4 +59,12 @@ export interface BeanpodFileV4 {
 
   /** base64( IV || AES-GCM(FK, automerge_binary) ) */
   encryptedPayload: string;
+
+  /**
+   * App version (`APP_VERSION`) of the client that last WROTE this file. Optional:
+   * files written before 2026-07-13 lack it. Nothing gates on it yet — it exists so
+   * #44 (retire the dual-publish base write) can later prove no whole-doc-only client
+   * still writes. Stamped on every write path (createBeanpodV4 + reEncryptEnvelope).
+   */
+  writerVersion?: string;
 }
