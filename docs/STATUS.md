@@ -74,13 +74,15 @@
 > > 4. **`cache-persist` surface (#50)** — confirm no unexpected durability-failure rate on real devices.
 > > 5. **Drive `refresh_token_age_ms` watch** (carried from earlier sessions) — same **2026-07-16/17** checkpoint.
 > >
-> > **RESUME NEXT SESSION (in priority order):**
+> > **⭐⭐ RESUME NEXT SESSION — PRIORITY ORDER (set by greg, 2026-07-13 session 5) ⭐⭐**
 > >
-> > - **(a)** If it's ≥ 2026-07-16 and the telemetry above is healthy → start the data-serial track: `/beanies-pre-plan #46` → then #44 → #43.
-> > - **(b)** `/beanies-pre-plan #41` is pickable ANY time (not telemetry-gated) — but it's a high-blast-radius create-flow refactor; plan it carefully and gate its "Done" on a live-PWA iOS create-flow verification by greg.
-> > - **(c)** #51 stays deferred until scale (~30K+ records).
+> > - **(1) FIRST — implement the data-integrity review-fixes plan.** A max-effort `/code-review` of `6c76e088^..HEAD` found **10 verified defects** (several LIVE data-loss / app-freeze) in the worker-recovery (`0.9.4R11`) + #47 re-home (`0.9.4R13`). Full 4-pass plan: **`docs/plans/2026-07-13-data-integrity-review-fixes.md`** (approved, default B5 scope = re-home only foreign-owned files). Implement as 3 bisectable commits in ONE batch, **A-group first** (A1 worker deadlock is a live all-users freeze): A-worker (A1 deadlock / A7 false-teardown / A9 telemetry) → B-re-home (B5 guard → B2 single-member data-loss → B3/B4/B6) → C/D login-surface. Then deploy the batch (web) + fold native bits into the next mobile build. `/beanies-plan` already done — go straight to implementation.
+> > - **(2) THEN — remaining data-serial track (#46 → #44 → #43).** Still telemetry-gated: needs a few days of the `incremental-sync` + `cache-persist` surfaces (live since `0.9.4R12`) — checkpoint **2026-07-16/17** (see the prerequisites list above). `/beanies-pre-plan #46` → #44 → #43 once healthy. (#41 create-flow refactor + #51 viz-perf remain as noted.)
+> > - **(3) THEN — native app fixes (`0.9.4` mobile build).** `/beanies-pre-plan #52` (biometric passkey "no create options available" — PRF-eval-at-create + capgo shim salt-serialization) and **#53** (Android black status-bar band — SDK-36 edge-to-edge window-background paint). Both native-only, verify on greg's device via the next mobile build; batch them together.
 > >
 > > **Also pending greg-side (non-blocking):** iOS-verify #47's live-PWA Picker branch on iPhone (`0.9.4R13`); native #47 + native #41 validate when the next mobile store build ships.
+> >
+> > **Tracker change (2026-07-13):** greg added a **`Category`** multi-select column to the Beanies Main Issue Tracker (`data / app / UI / auth / security / new feature / feature update / permissions / android / iOS / PWA / AI`) to categorise issues. `/beanies-new-issue` + `/beanies-pre-plan`'s Canonical Field Table were updated to set it (Required, all-that-apply). Existing rows (#47/#50/#51/#52/#53) are un-categorised — backfill opportunistically.
 > >
 > > **Observability is now a MANDATORY project convention** (`CLAUDE.md` § Observability & Diagnostic Logging + `/beanies-plan`'s `## Observability Coverage` section) — every feature emits structured diagnostics to the CloudWatch firehose. Item 1, #50, and #47 (`load-existing-family`) are the exemplars.
 > >

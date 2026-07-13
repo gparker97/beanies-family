@@ -48,7 +48,7 @@ Beanies Main Issue Tracker
 
 **Connected MCP namespace.** The tracker is shared with the **`mcp__notion-beanies__*`** integration (the plain `mcp__notion__*` integration returns `object_not_found` for this DB). Use `notion-beanies`. If only `notion` is connected, try it as a fallback and tell the user which one worked; if neither is present, the MCP isn't connected (see step 1).
 
-**Never hardcode select/multi-select options** (Priority, Issue Type, Device Type, View, the control selects). They drift — `View` alone has ~30 options and grows. Always read the **live** options from `API-retrieve-a-data-source` on the `data_source_id` at runtime (step 2) and map onto those. (For reference only, at time of writing: Priority = `Critical / High / Normal / Low / Future`; Device Type = `Desktop / Mobile (Browser) / Mobile (PWA) / iOS App / Android App / All`. Verify live — do not trust this line.)
+**Never hardcode select/multi-select options** (Priority, Issue Type, Device Type, View, Category, the control selects). They drift — `View` alone has ~30 options and grows. Always read the **live** options from `API-retrieve-a-data-source` on the `data_source_id` at runtime (step 2) and map onto those. (For reference only, at time of writing: Priority = `Critical / High / Normal / Low / Future`; Device Type = `Desktop / Mobile (Browser) / Mobile (PWA) / iOS App / Android App / All`; Category = `data / app / UI / auth / security / new feature / feature update / permissions / android / iOS / PWA / AI`. Verify live — do not trust this line.)
 
 ---
 
@@ -64,7 +64,7 @@ Then confirm the Notion MCP is connected (same availability pattern as `start-se
 
 ### 2. Read the live schema
 
-`API-retrieve-a-data-source` on the `data_source_id`. Capture the current property set and — critically — the live option lists for every select/multi-select (`Issue Type`, `Priority`, `Device Type`, `View`, `generate mockup?`, `github issue`, `Feature gated?`, `Status`, `Assignee`, `Raised By`). Everything you write in step 8 must use option names that exist in this response. If a property you expect from pre-plan's Canonical Field Table is missing here, the schema changed — stop and tell the user rather than guessing.
+`API-retrieve-a-data-source` on the `data_source_id`. Capture the current property set and — critically — the live option lists for every select/multi-select (`Issue Type`, `Priority`, `Device Type`, `View`, `Category`, `generate mockup?`, `github issue`, `Feature gated?`, `Status`, `Assignee`, `Raised By`). Everything you write in step 8 must use option names that exist in this response. If a property you expect from pre-plan's Canonical Field Table is missing here, the schema changed — stop and tell the user rather than guessing.
 
 ### 3. Classify the issue
 
@@ -82,6 +82,7 @@ This is what makes the issue _good_. Scale the effort to the issue: a one-line c
 - **Codebase** — where does this live? Which components/stores/composables/pages are involved? This feeds _Surfaces (View)_, _Reuse Hints / Affected Files_, and grounds _Objective_ and _Scope_ in real structure. (MVO: pages/components = View, stores/composables = Orchestrator.)
 - **Recent commits & docs** — `git log` around the area, `docs/STATUS.md`, `docs/plans/`, `docs/adr/`, `CHANGELOG.md`. Has this been touched, planned, or decided already? Surface related work into _References_ and _Dependencies / Related Issues_.
 - **Surfaces** — which platforms (`Device Type`) and which app area(s) (`View`) does it affect? Map to the **live** options from step 2.
+- **Category** — the issue's nature (`data / app / UI / auth / security / new feature / feature update / permissions / android / iOS / PWA / AI` — read live). A **Required** multi-select (per pre-plan's Canonical Field Table): pick **all** that genuinely apply (e.g. a cross-account save bug is `data` + `auth`; a native chrome bug is `app` + `UI` + `android`). Derive it from the issue's own nature — don't interrogate the user unless it's genuinely ambiguous.
 - **Web search** — only when external facts genuinely help (a library's capability, a platform constraint, an accessibility/standard norm). Don't pad with web results that don't change the issue.
 
 Fill every field you can **confidently** justify from this research. Leave a field unfilled only when research genuinely can't determine it and it's a real gap for step 7. Track, for the step-9 summary, what you filled from research vs. what the user told you vs. what was intentionally left blank — so nothing is silently invented or dropped.
@@ -122,6 +123,7 @@ Render the complete issue in an easy-to-read format (template below) — every f
   Type:         <Bug | Feature>
   Priority:     <…>
   Surfaces:     platforms: <Device Type, …>  •  area: <View, …>
+  Category:     <data / auth / UI / … — all that apply>
 
   Objective:    <Objective / Goal>
   Scope (do):
@@ -180,7 +182,8 @@ Only run `/beanies-pre-plan` if the user says yes.
 - **Research before asking.** Use subagents liberally, proportional to the issue, to fill fields from the codebase/commits/docs (+ web when it genuinely helps). Ask the user only about real gaps and the control-field decisions — present researched answers for confirmation rather than asking cold.
 - **Never interrogate Optional fields.** Fill from research or leave blank (`—`). Keep intake light; a form people abandon captures nothing.
 - **Always dedupe.** Check the tracker for similar rows before creating, and offer merge/proceed/cancel. Never silently create a near-duplicate.
-- **Live options only.** Read select/multi-select options from the data source at runtime; never hardcode `Priority`/`View`/`Device Type`/etc. — they drift.
+- **Live options only.** Read select/multi-select options from the data source at runtime; never hardcode `Priority`/`View`/`Device Type`/`Category`/etc. — they drift.
+- **Always set Category.** `Category` (multi-select — the issue's nature: `data / app / UI / auth / security / new feature / feature update / permissions / android / iOS / PWA / AI`) is a Required field; derive it from the issue and select all that apply. It maps to the `Category` Notion property (write it in step 9 like any other multi-select).
 - **Show, then write.** Render the full proposed issue with provenance and get explicit approval before any write. Let the user edit any field first.
 - **Create as `Not started`, Raised By greg.** This is exactly what makes the row consumable by `/beanies-pre-plan`'s default filter. Don't advance Status here — that's pre-plan's job at handoff.
 - **Never fail silently.** Every Notion call (schema read, dedupe query, page create) has an explicit user-facing outcome. Surface the exact property + value on a write failure so it can be fixed.
