@@ -18,18 +18,29 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 
-const { listFilesMock, loadFromNewFileMock, establishHomeMock, pickMock, capState } = vi.hoisted(
-  () => ({
-    listFilesMock: vi.fn(
-      async () => [] as Array<{ fileId: string; name: string; modifiedTime: string }>
-    ),
-    loadFromNewFileMock: vi.fn(async () => ({ success: false, needsPassword: false })),
-    establishHomeMock: vi.fn(async () => {}),
-    pickMock: vi.fn(async () => ({ kind: 'cancelled' as const })),
-    // Mutable capability state the tests flip per-case.
-    capState: { native: false, fsa: false, localFiles: false },
-  })
-);
+const {
+  listFilesMock,
+  loadFromNewFileMock,
+  establishHomeMock,
+  decryptPendingFileMock,
+  signInMock,
+  pickMock,
+  capState,
+  storeFlags,
+} = vi.hoisted(() => ({
+  listFilesMock: vi.fn(
+    async () => [] as Array<{ fileId: string; name: string; modifiedTime: string }>
+  ),
+  loadFromNewFileMock: vi.fn(async () => ({ success: false, needsPassword: false })),
+  establishHomeMock: vi.fn(async () => {}),
+  decryptPendingFileMock: vi.fn(async () => ({ success: false }) as Record<string, unknown>),
+  signInMock: vi.fn(async () => ({ success: true }) as Record<string, unknown>),
+  pickMock: vi.fn(async () => ({ kind: 'cancelled' as const })),
+  // Mutable capability state the tests flip per-case.
+  capState: { native: false, fsa: false, localFiles: false },
+  // Mutable syncStore flags the tests flip per-case.
+  storeFlags: { hasPendingEncryptedFile: false, isGoogleDriveAvailable: true },
+}));
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -37,9 +48,13 @@ vi.mock('@/composables/useTranslation', () => ({
 
 vi.mock('@/stores/syncStore', () => ({
   useSyncStore: () => ({
-    isGoogleDriveAvailable: true,
+    get isGoogleDriveAvailable() {
+      return storeFlags.isGoogleDriveAvailable;
+    },
     pendingEncryptedFile: null,
-    hasPendingEncryptedFile: false,
+    get hasPendingEncryptedFile() {
+      return storeFlags.hasPendingEncryptedFile;
+    },
     fileName: null,
     error: null,
     providerAccountEmail: null,
@@ -51,8 +66,8 @@ vi.mock('@/stores/syncStore', () => ({
     loadFromFile: vi.fn(),
     loadFromNewFile: loadFromNewFileMock,
     loadFromDroppedFile: vi.fn(),
-    decryptPendingFile: vi.fn(),
-    decryptPendingFileWithKey: vi.fn(),
+    decryptPendingFile: decryptPendingFileMock,
+    decryptPendingFileWithKey: vi.fn(async () => ({ success: false })),
     establishDurableHomeAfterLoad: establishHomeMock,
     requestPermission: vi.fn(),
     addPasskeySecret: vi.fn(),
@@ -85,7 +100,7 @@ vi.mock('@/stores/settingsStore', () => ({
 vi.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({
     currentUser: null,
-    signIn: vi.fn(),
+    signIn: signInMock,
   }),
 }));
 
@@ -126,7 +141,12 @@ vi.mock('@/components/ui/BaseButton.vue', () => ({
 }));
 
 vi.mock('@/components/ui/BaseInput.vue', () => ({
-  default: { template: '<input />' },
+  default: {
+    props: ['modelValue'],
+    emits: ['update:modelValue'],
+    template:
+      '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+  },
 }));
 
 import LoadPodView from '../LoadPodView.vue';
@@ -138,11 +158,18 @@ describe('LoadPodView — onboarding loop fix', () => {
     loadFromNewFileMock.mockReset();
     loadFromNewFileMock.mockResolvedValue({ success: false, needsPassword: false });
     establishHomeMock.mockReset();
+    establishHomeMock.mockResolvedValue(undefined);
+    decryptPendingFileMock.mockReset();
+    decryptPendingFileMock.mockResolvedValue({ success: false });
+    signInMock.mockReset();
+    signInMock.mockResolvedValue({ success: true });
     pickMock.mockReset();
     pickMock.mockResolvedValue({ kind: 'cancelled' });
     capState.native = false;
     capState.fsa = false;
     capState.localFiles = false;
+    storeFlags.hasPendingEncryptedFile = false;
+    storeFlags.isGoogleDriveAvailable = true;
   });
 
   describe('empty-state replaces storage cards', () => {
@@ -243,6 +270,27 @@ describe('LoadPodView — onboarding loop fix', () => {
       // capState all false → canUseLocalFiles() false, but Drive is available.
       const wrapper = mount(LoadPodView);
       expect(wrapper.find(aside).exists()).toBe(true);
+      expect(wrapper.find(aside).attributes('disabled')).toBeUndefined(); // enabled
+    });
+
+    it('C8: still RENDERS the aside (disabled + guidance) when no backend can run', async () => {
+      // Self-host + Firefox/Safari: no local files, no Drive → canOpenSavedFile false.
+      capState.localFiles = false;
+      capState.fsa = false;
+      capState.native = false;
+      storeFlags.isGoogleDriveAvailable = false;
+
+      const wrapper = mount(LoadPodView);
+
+      const el = wrapper.find(aside);
+      expect(el.exists()).toBe(true); // never silently hidden
+      expect(el.attributes('disabled')).toBeDefined(); // disabled, not a dead click
+      expect(wrapper.text()).toContain('loginV6.openSavedFileUnavailableHint'); // guidance shown
+
+      await el.trigger('click');
+      await flushPromises();
+      expect(pickMock).not.toHaveBeenCalled(); // a disabled affordance never opens a backend
+      expect(loadFromNewFileMock).not.toHaveBeenCalled();
     });
 
     it('routes native clicks to the OS file picker (loadFromNewFile)', async () => {
@@ -278,6 +326,32 @@ describe('LoadPodView — onboarding loop fix', () => {
 
       expect(pickMock).toHaveBeenCalledTimes(1);
       expect(loadFromNewFileMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('B2: single-member auto-sign-in establishes a durable home', () => {
+    async function driveSingleMemberDecrypt() {
+      // autoLoad + a pending encrypted file → the decrypt modal opens (no cached key,
+      // no biometric) so we can submit the password and exercise handleDecrypt.
+      storeFlags.hasPendingEncryptedFile = true;
+      decryptPendingFileMock.mockResolvedValue({ success: true, memberIds: ['m1'] });
+      signInMock.mockResolvedValue({ success: true });
+
+      const wrapper = mount(LoadPodView, { props: { autoLoad: true } });
+      await flushPromises();
+      await wrapper.find('input').setValue('pw');
+      await wrapper.find('form').trigger('submit.prevent');
+      await flushPromises();
+      return wrapper;
+    }
+
+    it('calls establishDurableHomeAfterLoad before emitting signed-in (single unambiguous member)', async () => {
+      const wrapper = await driveSingleMemberDecrypt();
+
+      expect(signInMock).toHaveBeenCalledWith('m1', 'pw');
+      // B2: the branch that emits `signed-in` (bypassing finishLoaded) still re-homes.
+      expect(establishHomeMock).toHaveBeenCalledTimes(1);
+      expect(wrapper.emitted('signed-in')?.[0]).toEqual(['/nook']);
     });
   });
 });
