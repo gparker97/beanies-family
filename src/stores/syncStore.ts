@@ -26,7 +26,7 @@ import { useAuthStore, DEFERRED_PASSWORD_HASH } from './authStore';
 import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
-import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
+import { getSyncCapabilities, canAutoSync, isNative } from '@/services/sync/capabilities';
 import { beginDriveAuthRedirectIfNeeded, RESUME_SETUP_PATH } from '@/services/sync/connectStorage';
 import type { RedirectMode } from '@/services/google/redirectState';
 import { markFamilyJustCreated } from '@/utils/newFamilyFlag';
@@ -2124,6 +2124,80 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
+  /**
+   * Ensure a just-loaded (cross-account / restored-backup) family has a durable,
+   * writable save target. Called ONCE by `LoadPodView` after a successful decrypt
+   * from the "Load a saved family file" aside (#47).
+   *
+   * The web-Picker and web-FSA load paths already install a provider inside
+   * `decryptPendingFile` (a Drive provider from `driveFileId`, or a writable
+   * `LocalStorageProvider` handle). The native `<input type=file>` fallback
+   * (`openAndLoadFileFallback`) does NOT — it stages an envelope with no provider
+   * and no handle — so without this the adopted family would have no writable home
+   * (a read-only dead-end, the exact concern the old `supportsFileSystemAccess()`
+   * gate was protecting against).
+   *
+   * Idempotent: a no-op when a provider is already installed FOR THE JUST-LOADED
+   * FAMILY (the common Picker/FSA case). The family-scoped check (not a bare
+   * non-null) guards against a stale provider from a previously-active family
+   * causing a wrong skip. Otherwise it establishes a durable home in precedence:
+   *   1. Drive available + valid token -> re-home to the signed-in account's own
+   *      Drive (a fresh app-owned `.beanpod`) via `configureSyncFileGoogleDrive`.
+   *   2. Native -> a `CapacitorFileProvider` app-managed file, then a forced write.
+   *   3. Neither -> leave the load successful but provider-less and page loudly
+   *      (data-at-risk); the existing `SaveFailureBanner` guides recovery. Never
+   *      silent.
+   *
+   * Deliberately NOT reusing `createNewFile` — its brand-new-family preconditions
+   * (owner-member presence, deferred-password sentinel refusal, and a refusal when
+   * the registry already holds a pod for the familyId) all misfire for an
+   * already-adopted, just-loaded family.
+   */
+  async function establishDurableHomeAfterLoad(): Promise<void> {
+    const ctx = useFamilyContextStore();
+    const activeFamilyId = ctx.activeFamilyId;
+
+    // (1) Idempotent skip — only when the installed provider belongs to the
+    // just-loaded family (family-scoped, not a bare non-null check).
+    if (syncService.getProvider() && syncService.getProviderFamilyId() === activeFamilyId) {
+      return;
+    }
+
+    const podBaseName = (ctx.activeFamilyName ?? 'my-family').trim() || 'my-family';
+
+    try {
+      // (2) Prefer re-homing to the signed-in account's own Drive.
+      if (isGoogleDriveAvailable.value && isTokenValid()) {
+        const ok = await configureSyncFileGoogleDrive(`${podBaseName}.beanpod`);
+        if (ok) return;
+        // else fall through — Drive create/write failed; try native or page.
+      }
+
+      // (3) Native app-managed local file (no writable web handle exists here).
+      if (isNative()) {
+        const selected = await syncService.selectNativeLocalFile(podBaseName);
+        if (selected && (await syncNow(true))) return;
+      }
+    } catch (e) {
+      // Fall through to the critical report below — never let an unexpected
+      // throw leave a loaded-but-unsaveable family without a loud signal.
+      console.error('[syncStore.establishDurableHomeAfterLoad] failed:', e);
+    }
+
+    // (4) No durable home could be established. The family is loaded and visible
+    // but cannot be saved — data at risk. Page loudly; SaveFailureBanner handles
+    // the user-facing recovery affordance.
+    reportError({
+      surface: 'load-existing-family',
+      severity: 'critical',
+      message: 'loaded a family but could not establish a durable save target',
+      context: {
+        action: 'no-backend',
+        provider_type: storageProviderType.value ?? undefined,
+      },
+    });
+  }
+
   // --- Storage migration: move the active pod between local file and Google Drive ---
 
   /**
@@ -2875,6 +2949,7 @@ export const useSyncStore = defineStore('sync', () => {
     initialize,
     requestPermission,
     configureSyncFileGoogleDrive,
+    establishDurableHomeAfterLoad,
     migrateStorage,
     syncNow,
     forceSyncNow,

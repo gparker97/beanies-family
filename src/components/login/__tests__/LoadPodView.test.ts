@@ -18,11 +18,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 
-const { listFilesMock } = vi.hoisted(() => ({
-  listFilesMock: vi.fn(
-    async () => [] as Array<{ fileId: string; name: string; modifiedTime: string }>
-  ),
-}));
+const { listFilesMock, loadFromNewFileMock, establishHomeMock, pickMock, capState } = vi.hoisted(
+  () => ({
+    listFilesMock: vi.fn(
+      async () => [] as Array<{ fileId: string; name: string; modifiedTime: string }>
+    ),
+    loadFromNewFileMock: vi.fn(async () => ({ success: false, needsPassword: false })),
+    establishHomeMock: vi.fn(async () => {}),
+    pickMock: vi.fn(async () => ({ kind: 'cancelled' as const })),
+    // Mutable capability state the tests flip per-case.
+    capState: { native: false, fsa: false, localFiles: false },
+  })
+);
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -42,10 +49,11 @@ vi.mock('@/stores/syncStore', () => ({
     beginDriveAuthRedirect: vi.fn(async () => false),
     loadFromGoogleDrive: vi.fn(),
     loadFromFile: vi.fn(),
-    loadFromNewFile: vi.fn(),
+    loadFromNewFile: loadFromNewFileMock,
     loadFromDroppedFile: vi.fn(),
     decryptPendingFile: vi.fn(),
     decryptPendingFileWithKey: vi.fn(),
+    establishDurableHomeAfterLoad: establishHomeMock,
     requestPermission: vi.fn(),
     addPasskeySecret: vi.fn(),
     syncNow: vi.fn(),
@@ -53,6 +61,19 @@ vi.mock('@/stores/syncStore', () => ({
     familyKey: null,
   }),
 }));
+
+vi.mock('@/services/sync/capabilities', () => ({
+  supportsFileSystemAccess: () => capState.fsa,
+  canUseLocalFiles: () => capState.localFiles,
+  isNative: () => capState.native,
+}));
+
+vi.mock('@/composables/usePickBeanpodFile', () => ({
+  usePickBeanpodFile: () => ({ pick: pickMock }),
+}));
+
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
 vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: () => ({
@@ -114,13 +135,21 @@ describe('LoadPodView — onboarding loop fix', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     listFilesMock.mockReset();
+    loadFromNewFileMock.mockReset();
+    loadFromNewFileMock.mockResolvedValue({ success: false, needsPassword: false });
+    establishHomeMock.mockReset();
+    pickMock.mockReset();
+    pickMock.mockResolvedValue({ kind: 'cancelled' });
+    capState.native = false;
+    capState.fsa = false;
+    capState.localFiles = false;
   });
 
   describe('empty-state replaces storage cards', () => {
     it('renders the storage cards by default (no empty state)', () => {
       const wrapper = mount(LoadPodView);
       expect(wrapper.find('[data-testid="drive-storage-card"]').exists()).toBe(true);
-      expect(wrapper.find('[data-testid="local-storage-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="open-saved-file-aside"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="no-pod-create-cta"]').exists()).toBe(false);
     });
 
@@ -140,7 +169,7 @@ describe('LoadPodView — onboarding loop fix', () => {
       // the fix, the empty state was appended below the still-prominent
       // Drive card and users re-clicked it in a loop.
       expect(wrapper.find('[data-testid="drive-storage-card"]').exists()).toBe(false);
-      expect(wrapper.find('[data-testid="local-storage-card"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="open-saved-file-aside"]').exists()).toBe(false);
     });
 
     it('propagates account email from getGoogleAccountEmail into the empty state', async () => {
@@ -203,6 +232,52 @@ describe('LoadPodView — onboarding loop fix', () => {
       expect(wrapper.find('[data-testid="no-pod-create-cta"]').exists()).toBe(false);
       // Drive card back at full strength — no "checked" badge.
       expect(wrapper.find('[data-testid="drive-checked-badge"]').exists()).toBe(false);
+    });
+  });
+
+  // #47 — "Load a saved family file" aside: honest gating + per-platform dispatch.
+  describe('open-saved-file aside (#47)', () => {
+    const aside = '[data-testid="open-saved-file-aside"]';
+
+    it('shows the aside when the Google Picker is available even without local files', () => {
+      // capState all false → canUseLocalFiles() false, but Drive is available.
+      const wrapper = mount(LoadPodView);
+      expect(wrapper.find(aside).exists()).toBe(true);
+    });
+
+    it('routes native clicks to the OS file picker (loadFromNewFile)', async () => {
+      capState.native = true;
+      const wrapper = mount(LoadPodView);
+
+      await wrapper.find(aside).trigger('click');
+      await flushPromises();
+
+      expect(loadFromNewFileMock).toHaveBeenCalledTimes(1);
+      expect(pickMock).not.toHaveBeenCalled();
+    });
+
+    it('reveals the FSA browse zone on Chromium without loading directly', async () => {
+      capState.fsa = true; // supportsFileSystemAccess() → true, not native
+      const wrapper = mount(LoadPodView);
+
+      await wrapper.find(aside).trigger('click');
+      await flushPromises();
+
+      // Chromium reveals the writable drag/browse zone; it does NOT open a
+      // picker or the Google Picker on the aside click itself.
+      expect(loadFromNewFileMock).not.toHaveBeenCalled();
+      expect(pickMock).not.toHaveBeenCalled();
+    });
+
+    it('opens the Google Picker on web without File System Access', async () => {
+      // Not native, no FSA → the Firefox/Safari branch.
+      const wrapper = mount(LoadPodView);
+
+      await wrapper.find(aside).trigger('click');
+      await flushPromises();
+
+      expect(pickMock).toHaveBeenCalledTimes(1);
+      expect(loadFromNewFileMock).not.toHaveBeenCalled();
     });
   });
 });

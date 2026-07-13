@@ -25,7 +25,9 @@ export const onSaveFailureChange = vi.fn(() => () => {});
 // Provider accessors
 export const getProviderType = vi.fn(() => null);
 export const getProvider = vi.fn(() => null);
+export const getProviderFamilyId = vi.fn<() => string | null>(() => null);
 export const setProvider = vi.fn();
+export const selectNativeLocalFile = vi.fn(async () => true);
 
 // Family key / envelope (V4)
 export const setFamilyKey = vi.fn();

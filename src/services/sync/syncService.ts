@@ -393,6 +393,17 @@ export function getProvider(): StorageProvider | null {
 }
 
 /**
+ * The family id the current provider was installed for, or `null` when no
+ * provider is set. Lets callers distinguish "a provider is set for THIS family"
+ * from "a stale provider from a previously-active family is still around" —
+ * used by `syncStore.establishDurableHomeAfterLoad`'s idempotency guard so a
+ * just-loaded family is never skipped because of a leftover provider.
+ */
+export function getProviderFamilyId(): string | null {
+  return currentProvider ? currentProviderFamilyId : null;
+}
+
+/**
  * Set the storage provider directly (used by Google Drive flow)
  */
 export function setProvider(provider: StorageProvider): void {

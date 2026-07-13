@@ -21,7 +21,10 @@ import {
 } from '@/services/google/googleAuth';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
-import { supportsFileSystemAccess } from '@/services/sync/capabilities';
+import { supportsFileSystemAccess, canUseLocalFiles, isNative } from '@/services/sync/capabilities';
+import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
+import { logEvent } from '@/services/telemetry/logEvent';
+import { reportError } from '@/utils/errorReporter';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { LOAD_DRIVE_PATH } from './resumePaths';
 import {
@@ -81,6 +84,19 @@ const loadedFileName = ref<string | null>(null);
 const isDragging = ref(false);
 const selectedSource = ref<'google_drive' | 'dropbox' | 'icloud' | 'local' | null>(null);
 let dragCounter = 0;
+
+const { pick: pickBeanpodFromDrive } = usePickBeanpodFile();
+
+/**
+ * Whether to show the "Load a saved family file" aside at all. True when the
+ * platform can service *some* backend — a local file (`canUseLocalFiles()`:
+ * web File System Access on Chromium, or native @capacitor/filesystem) OR the
+ * Google Picker (available whenever Drive is configured). It is hidden only
+ * where neither can run, which never happens on a Google-configured build (a
+ * signed-in user always has the Picker). Gates on `canUseLocalFiles()`, never
+ * the narrower `supportsFileSystemAccess()` — that was the #47 honesty bug.
+ */
+const canOpenSavedFile = computed(() => canUseLocalFiles() || syncStore.isGoogleDriveAvailable);
 
 /**
  * Sticky "we already checked Drive and it was empty" flag. Drives both:
@@ -174,12 +190,35 @@ function getPendingFamilyInfo(): { familyId?: string; familyName?: string } {
  * pass `tryAuto: false`; the rest default to `true` (and emit `file-loaded` if
  * the cached key opens it).
  */
+/**
+ * Single "a family finished loading" chokepoint. Every successful load path
+ * routes through here instead of emitting `file-loaded` directly, so the
+ * invariant "a loaded family always has a durable, writable save target" holds
+ * universally (#47).
+ *
+ * `establishDurableHomeAfterLoad()` is idempotent and family-scoped: a no-op on
+ * the Google-Drive-listing and File-System-Access paths (which already installed
+ * a provider during decrypt), so this is a guaranteed no-op for the common
+ * same-account login. It only actually re-homes the native `<input type=file>`
+ * fallback, which stages an envelope with no provider. A throw here must never
+ * block the user reaching their already-decrypted, visible data — the store
+ * action already pages loudly on a hard no-target case.
+ */
+async function finishLoaded() {
+  try {
+    await syncStore.establishDurableHomeAfterLoad();
+  } catch (e) {
+    console.error('[LoadPodView] establishDurableHomeAfterLoad failed:', e);
+  }
+  emit('file-loaded');
+}
+
 async function handlePendingPassword(
   fileName: string | null,
   opts: { tryAuto?: boolean } = {}
 ): Promise<void> {
   if ((opts.tryAuto ?? true) && (await tryAutoDecrypt())) {
-    emit('file-loaded');
+    await finishLoaded();
     return;
   }
   const { familyId, familyName } = getPendingFamilyInfo();
@@ -221,7 +260,7 @@ async function autoLoadFile() {
     if (!loadResult.success && loadResult.needsPassword) {
       await handlePendingPassword(syncStore.fileName);
     } else if (loadResult.success) {
-      emit('file-loaded');
+      await finishLoaded();
     }
   } catch (e) {
     // File load failed — surface to the user (previously this was a bare
@@ -242,7 +281,7 @@ async function handleGrantPermission() {
       if (syncStore.hasPendingEncryptedFile) {
         await handlePendingPassword(syncStore.fileName);
       } else {
-        emit('file-loaded');
+        await finishLoaded();
       }
     } else {
       formError.value = t('auth.fileLoadFailed');
@@ -254,26 +293,88 @@ async function handleGrantPermission() {
   }
 }
 
-async function handleLoadFile() {
+/**
+ * Entry point for the "Load a saved family file" aside (#47). Dispatches by
+ * capability at click time; every arm converges on the shared decrypt flow
+ * (`handlePendingPassword` / `handleDriveFileSelected`), and every successful
+ * load routes through `finishLoaded()` which re-homes as needed.
+ *
+ * - Native (iOS/Android): the OS file picker (`<input type=file>` →
+ *   `openAndLoadFileFallback`), which also reaches Drive/iCloud via the system
+ *   sheet. Never the in-WebView Google Picker (fragile on iOS WebKit).
+ * - Web with FSA (Chromium): reveal the drag-drop / browse zone, whose click
+ *   uses the writable File System Access picker (`handleLoadFile`).
+ * - Web without FSA (Firefox/Safari): the Google Picker — reaches the signed-in
+ *   account's own non-app-created + shared files and grants access.
+ */
+async function handleOpenSavedFile() {
   formError.value = null;
 
-  // Local files need the File System Access API (Chromium-only). In Firefox/
-  // Safari there's no writable handle, so even if we read the file via the
-  // input fallback, edits could never save back to it — a silent dead-end.
-  // Block here at the onboarding entry and steer to Drive / Chrome / Edge,
-  // matching the create flow. (Settings → manual import keeps its own fallback
-  // for advanced recovery, where the user already has a pod open.)
-  if (!supportsFileSystemAccess()) {
-    formError.value = t('auth.localFileUnsupported');
+  if (!isNative() && supportsFileSystemAccess()) {
+    // Chromium desktop: reveal the writable-handle drop/browse zone. Toggles so
+    // a second tap collapses it (matches the previous local-card affordance).
+    selectedSource.value = selectedSource.value === 'local' ? null : 'local';
+    logEvent({
+      level: 'info',
+      surface: 'load-existing-family',
+      message: 'open saved file: FSA browse zone',
+      context: { action: 'needs-password', provider_type: 'local' },
+    });
     return;
   }
 
+  if (isNative()) {
+    await handleLoadFile();
+    return;
+  }
+
+  await loadSavedFileViaPicker();
+}
+
+/**
+ * Web-without-FSA branch: open the Google Picker so the user can grant access
+ * to a `.beanpod` in their own Drive that the app didn't create (restored
+ * backup / different account). Reuses the exact primitive the join flow uses
+ * (`usePickBeanpodFile().pick()`), then the existing `handleDriveFileSelected`
+ * handoff. Never throws — `pick()` returns a structured result.
+ */
+async function loadSavedFileViaPicker() {
+  const email = getGoogleAccountEmail() ?? undefined;
+  const picked = await pickBeanpodFromDrive({ forceConsent: false, loginHint: email });
+
+  if (picked.kind === 'picked') {
+    await handleDriveFileSelected({ fileId: picked.fileId, fileName: picked.fileName });
+    return;
+  }
+  if (picked.kind === 'cancelled') {
+    // Either the user backed out, or a full-page redirect kicked off (PWA/iOS)
+    // and this session is navigating away. Nothing to surface.
+    logEvent({
+      level: 'info',
+      surface: 'load-existing-family',
+      message: 'open saved file via picker cancelled',
+      context: { action: 'cancelled', provider_type: 'google_drive' },
+    });
+    return;
+  }
+  // picked.kind === 'failed'
+  formError.value = picked.message || t('auth.fileLoadFailed');
+  reportError({
+    surface: 'load-existing-family',
+    severity: 'warning',
+    message: `open saved file via picker failed: ${picked.reason}`,
+    context: { action: 'no-backend', error_code: picked.reason, provider_type: 'google_drive' },
+  });
+}
+
+async function handleLoadFile() {
+  formError.value = null;
   isLoadingFile.value = true;
 
   try {
     const result = await syncStore.loadFromNewFile();
     if (result.success) {
-      emit('file-loaded');
+      await finishLoaded();
     } else if (result.needsPassword) {
       await handlePendingPassword(syncStore.fileName, { tryAuto: false });
     } else if (syncStore.error) {
@@ -360,7 +461,7 @@ async function handleDecrypt() {
       }
 
       decryptPassword.value = '';
-      emit('file-loaded');
+      await finishLoaded();
     } else {
       formError.value = result.error ?? t('password.decryptionError');
     }
@@ -433,7 +534,7 @@ async function handleDrop(e: DragEvent) {
   try {
     const result = await syncStore.loadFromDroppedFile(file, fileHandle);
     if (result.success) {
-      emit('file-loaded');
+      await finishLoaded();
     } else if (result.needsPassword) {
       await handlePendingPassword(file.name, { tryAuto: false });
     } else if (syncStore.error) {
@@ -698,7 +799,7 @@ async function handleDriveFileSelected(payload: { fileId: string; fileName: stri
   try {
     const result = await syncStore.loadFromGoogleDrive(payload.fileId, payload.fileName);
     if (result.success) {
-      emit('file-loaded');
+      await finishLoaded();
     } else if (result.needsPassword) {
       await handlePendingPassword(payload.fileName);
     } else if (syncStore.error) {
@@ -977,7 +1078,7 @@ async function handleDriveRefresh() {
 
       <!-- Storage source cards -->
       <template v-else>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid gap-3">
           <!-- Google Drive card — disabled when Drive isn't available in this
                build (Path-A self-host or missing OAuth proxy on Path-B).
                Dimmed (but still clickable) when lastDriveCheckEmpty is true,
@@ -1054,53 +1155,70 @@ async function handleDriveRefresh() {
               {{ t('loginV6.googleDriveCardDesc') }}
             </p>
           </LoginChoiceCard>
+        </div>
 
-          <!-- Local File card -->
-          <LoginChoiceCard
-            class="relative rounded-2xl border-2 p-5"
-            :class="
-              selectedSource === 'local'
-                ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md hover:shadow-lg'
-                : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white hover:shadow-lg dark:border-slate-600 dark:bg-slate-700/50'
-            "
-            :aria-label="t('storage.localFile')"
-            :testid="'local-storage-card'"
-            @click="selectedSource = selectedSource === 'local' ? null : 'local'"
+        <!-- "Load a saved family file" — the quiet cross-account / restored-backup
+             path (#47). One affordance; the backend is chosen per platform in
+             handleOpenSavedFile (native OS picker / web FSA browse zone / web
+             Google Picker). Shown only where a backend exists (canOpenSavedFile),
+             so it never presents a source the platform can't service. -->
+        <div v-if="canOpenSavedFile" class="mt-4">
+          <div class="mb-3 flex items-center gap-2.5" aria-hidden="true">
+            <span class="h-px flex-1 bg-gray-200 dark:bg-slate-600"></span>
+            <span
+              class="font-outfit text-secondary-500/50 text-xs font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+              >{{ t('loginV6.orDivider') }}</span
+            >
+            <span class="h-px flex-1 bg-gray-200 dark:bg-slate-600"></span>
+          </div>
+          <button
+            type="button"
+            class="group focus-visible:ring-primary-500 hover:border-primary-500/40 dark:hover:border-primary-500/30 flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-3.5 text-left transition-all hover:-translate-y-0.5 hover:bg-[#FEF0E8]/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:border-slate-600 dark:bg-slate-700/50 dark:focus-visible:ring-offset-slate-900"
+            :aria-label="t('loginV6.openSavedFileLabel')"
+            data-testid="open-saved-file-aside"
+            @click="handleOpenSavedFile"
           >
-            <div
-              class="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl"
-              :class="
-                selectedSource === 'local'
-                  ? 'bg-primary-500/15 dark:bg-primary-500/20'
-                  : 'bg-gray-100 dark:bg-slate-700'
-              "
+            <span
+              class="bg-sky-silk-300/20 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
             >
               <svg
-                class="h-5 w-5"
-                :class="
-                  selectedSource === 'local'
-                    ? 'text-primary-500'
-                    : 'text-gray-400 dark:text-gray-500'
-                "
+                class="text-secondary-500/70 group-hover:text-primary-500 h-5 w-5 transition-colors dark:text-gray-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-            </div>
-            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {{ t('storage.localFile') }}
-            </p>
-            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              {{ t('loginV6.localFileCardDesc') }}
-            </p>
-          </LoginChoiceCard>
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block text-sm font-semibold text-gray-900 dark:text-gray-100">{{
+                t('loginV6.openSavedFileLabel')
+              }}</span>
+              <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{{
+                t('loginV6.openSavedFileDesc')
+              }}</span>
+            </span>
+            <svg
+              class="group-hover:text-primary-500 h-4 w-4 shrink-0 text-gray-400 transition-colors dark:text-gray-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </button>
         </div>
 
         <!-- Coming-soon providers — collapsed into a disclosure with compact chips
