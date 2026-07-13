@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-07-13",
-    "translationCount": 3722
+    "translationCount": 3723
   },
   "translations": {
     "app.name": {
@@ -14581,11 +14581,6 @@
       "hash": "r7b4lb",
       "lastUpdated": "2026-06-15"
     },
-    "auth.localFileUnsupported": {
-      "translation": "此浏览器无法加载本地文件。请改用Google云端硬盘（在此处工作并同步到您的家人） ，或在Chrome或Edge中打开beanies.family。",
-      "hash": "1585a5",
-      "lastUpdated": "2026-05-21"
-    },
     "settings.adminOnly": {
       "translation": "只有家庭管理员可以更改此设置。询问是否需要更新。",
       "hash": "x4lok",
@@ -18614,6 +18609,16 @@
     "sync.durabilityBannerCta": {
       "translation": "这是什么？",
       "hash": "nidu4v",
+      "lastUpdated": "2026-07-13"
+    },
+    "loginV6.openSavedFileLabel": {
+      "translation": "加载已保存的家庭文件",
+      "hash": "vwv4hy",
+      "lastUpdated": "2026-07-13"
+    },
+    "loginV6.openSavedFileDesc": {
+      "translation": "从另一个账号或您已还原的备份",
+      "hash": "xnpy8h",
       "lastUpdated": "2026-07-13"
     }
   }
