@@ -31,8 +31,8 @@ const workerSink: WorkerSink = {
   perf(label, durationMs, ctx) {
     post({ signal: 'perf', label, durationMs, ctx });
   },
-  cachePersistFailed(failed) {
-    post({ signal: 'cache-persist-failed', failed });
+  cachePersistFailed(failed, detail) {
+    post({ signal: 'cache-persist-failed', failed, detail });
   },
 };
 configure(workerSink);

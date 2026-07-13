@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-12",
-    "translationCount": 3719
+    "lastUpdated": "2026-07-13",
+    "translationCount": 3722
   },
   "translations": {
     "app.name": {
@@ -18600,6 +18600,21 @@
       "translation": "解散",
       "hash": "fur0k6",
       "lastUpdated": "2026-07-12"
+    },
+    "sync.durabilityBannerTitle": {
+      "translation": "此设备目前无法在本地保存",
+      "hash": "le028e",
+      "lastUpdated": "2026-07-13"
+    },
+    "sync.durabilityBanner": {
+      "translation": "最近的更改可能无法在此设备上的刷新中存活。您保存的副本是安全的。",
+      "hash": "ediwl9",
+      "lastUpdated": "2026-07-13"
+    },
+    "sync.durabilityBannerCta": {
+      "translation": "这是什么？",
+      "hash": "nidu4v",
+      "lastUpdated": "2026-07-13"
     }
   }
 }

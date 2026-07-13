@@ -30,6 +30,7 @@ import { claimInterruption } from '@/composables/useSessionInterruption';
 import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import CalendarReconnectToast from '@/components/common/CalendarReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
+import DurabilityBanner from '@/components/common/DurabilityBanner.vue';
 import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
 import { formatDeviceInfo } from '@/utils/diagnostics';
 import { reportError } from '@/utils/errorReporter';
@@ -1779,6 +1780,10 @@ watch(
           :file-not-found="syncStore.driveFileNotFound"
           @reconnected="handleGoogleReconnected"
         />
+
+        <!-- Local-durability-cache failure — inline (pushes the header down), bound to
+             syncStore.cachePersistFailed. See #50. -->
+        <DurabilityBanner />
 
         <AppHeader v-if="!headerReclaimed" />
 

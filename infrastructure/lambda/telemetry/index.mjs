@@ -88,6 +88,10 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'incr_chunk_count',
   'incr_seq',
   'incr_dirty',
+  // Cache-persist durability failure (added 2026-07-13, #50). PII-free: write kind +
+  // IDB error-class name.
+  'cache_persist_kind',
+  'cache_persist_error',
 ]);
 
 function getHeaders(event) {

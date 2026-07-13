@@ -13,13 +13,15 @@
  * chrome to fall back to.
  *
  * Severity tokens:
- *   - `critical` — red (blocks user flow; data loss risk)
- *   - `warning`  — amber (degraded state; user can continue)
+ *   - `critical` — red (blocks user flow; data loss risk) — role="alert"
+ *   - `warning`  — amber (degraded state; user can continue) — role="alert"
+ *   - `notice`   — Heritage Orange (routine, self-recovering status, e.g. the local
+ *                  durability warning) — role="status" (not an urgent alert)
  */
 
 interface Props {
   show: boolean;
-  severity?: 'critical' | 'warning';
+  severity?: 'critical' | 'warning' | 'notice';
 }
 
 const props = withDefaults(defineProps<Props>(), { severity: 'critical' });
@@ -37,12 +39,12 @@ const props = withDefaults(defineProps<Props>(), { severity: 'critical' });
     <div
       v-if="props.show"
       class="w-full px-4 py-3 text-white shadow-lg"
-      :class="
-        props.severity === 'critical'
-          ? 'bg-red-600 dark:bg-red-800'
-          : 'bg-amber-600 dark:bg-amber-700'
-      "
-      role="alert"
+      :class="{
+        'bg-red-600 dark:bg-red-800': props.severity === 'critical',
+        'bg-amber-600 dark:bg-amber-700': props.severity === 'warning',
+        'bg-primary-500 dark:bg-primary-600': props.severity === 'notice',
+      }"
+      :role="props.severity === 'notice' ? 'status' : 'alert'"
       :aria-live="props.severity === 'critical' ? 'assertive' : 'polite'"
     >
       <div class="mx-auto flex max-w-3xl flex-col items-start gap-2 sm:flex-row sm:items-center">
@@ -65,7 +67,11 @@ const props = withDefaults(defineProps<Props>(), { severity: 'critical' });
             <p class="text-sm font-semibold"><slot name="title" /></p>
             <p
               class="text-xs"
-              :class="props.severity === 'critical' ? 'text-red-100' : 'text-amber-100'"
+              :class="{
+                'text-red-100': props.severity === 'critical',
+                'text-amber-100': props.severity === 'warning',
+                'text-white/90': props.severity === 'notice',
+              }"
             >
               <slot name="message" />
             </p>
