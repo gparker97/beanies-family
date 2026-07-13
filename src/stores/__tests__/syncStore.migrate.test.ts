@@ -437,7 +437,7 @@ describe('syncStore.configureSyncFileGoogleDrive (exercises the shared installPr
     const ok = await store.configureSyncFileGoogleDrive('pod.beanpod');
 
     expect(ok).toBe(true);
-    expect(mockCreateNew).toHaveBeenCalledWith('pod.beanpod'); // onboarding caller → default forceConsent
+    expect(mockCreateNew).toHaveBeenCalledWith('pod.beanpod', { forceConsent: false }); // B6: never force an interactive redirect
     expect(driveProvider.persist).toHaveBeenCalledWith('family-123');
     expect(mockSetProvider).toHaveBeenCalledWith(driveProvider);
     expect(mockSave).toHaveBeenCalled();
