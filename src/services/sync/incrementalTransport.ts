@@ -19,6 +19,30 @@
  *    the caller runs the UNCHANGED whole-doc `mergeRemoteEnvelope(base)` path.
  */
 import type { AuxStore } from './storageProvider';
+import { logEvent } from '@/services/telemetry';
+
+/** Structured phases for the incremental-sync diagnostic firehose. One surface
+ * (`incremental-sync`), discriminated by `incr_phase` — see the observability
+ * convention in CLAUDE.md and docs/plans/2026-07-13-instrument-incremental-sync.md. */
+type IncrPhase = 'pull-applied' | 'pull-noop' | 'pull-fallback' | 'publish-ok' | 'publish-failed';
+
+/** One structured event for the whole incremental path. Fire-and-forget (logEvent
+ * never throws). `warn` for handled degradations (fallback / publish-failed — the
+ * whole-doc base is authoritative, so these never page Slack), `info` for successes.
+ * The message embeds the phase so logEvent's per-(surface,message) rate limiter gives
+ * each phase its own bucket (a fallback flood can't starve the success counters).
+ * NOTE: keep every `context` value passed in in-scope + side-effect-free — the caller
+ * evaluates it before logEvent runs, and pullIncremental must never throw. */
+function logIncremental(phase: IncrPhase, context: Record<string, unknown>, error?: unknown): void {
+  const level = phase === 'pull-fallback' || phase === 'publish-failed' ? 'warn' : 'info';
+  logEvent({
+    level,
+    surface: 'incremental-sync',
+    message: `incremental ${phase}`,
+    context: { incr_phase: phase, ...context },
+    error,
+  });
+}
 
 const CHANGES_PREFIX = 'changes/';
 const CHANGES_SUFFIX = '.beanchanges';
@@ -103,10 +127,17 @@ export async function pullIncremental(
   try {
     names = (await aux.list()).filter(isChunkName);
   } catch {
+    // NB: `fresh` is not yet declared here — emit WITHOUT incr_chunk_count (the
+    // list itself failed, so there is no count, and referencing `fresh` would throw
+    // a TDZ error out of this never-throws function).
+    logIncremental('pull-fallback', { incr_reason: 'list-failed' });
     return { outcome: 'fallback', reason: 'list-failed' };
   }
   const fresh = names.filter((n) => !session.fetched.has(n));
-  if (fresh.length === 0) return { outcome: 'noop' };
+  if (fresh.length === 0) {
+    logIncremental('pull-noop', {});
+    return { outcome: 'noop' };
+  }
 
   const payloads: string[] = [];
   for (const name of fresh) {
@@ -115,9 +146,19 @@ export async function pullIncremental(
       body = await aux.read(name);
     } catch {
       // A read error (e.g. a chunk pruned mid-poll) → whole-doc reconcile.
+      logIncremental('pull-fallback', {
+        incr_reason: 'read-failed',
+        incr_chunk_count: fresh.length,
+      });
       return { outcome: 'fallback', reason: 'read-failed' };
     }
-    if (body == null) return { outcome: 'fallback', reason: 'chunk-missing' };
+    if (body == null) {
+      logIncremental('pull-fallback', {
+        incr_reason: 'chunk-missing',
+        incr_chunk_count: fresh.length,
+      });
+      return { outcome: 'fallback', reason: 'chunk-missing' };
+    }
     payloads.push(body);
   }
 
@@ -125,13 +166,21 @@ export async function pullIncremental(
   try {
     res = await deps.applyRemoteChunks(payloads);
   } catch {
+    logIncremental('pull-fallback', { incr_reason: 'apply-error', incr_chunk_count: fresh.length });
     return { outcome: 'fallback', reason: 'apply-error' };
   }
   // A non-landed batch left changes buffered on a missing dep → whole-doc adopt
   // carries the deps. Do NOT mark these fetched (re-tried after the base merge).
-  if (!res.landed) return { outcome: 'fallback', reason: 'missing-deps' };
+  if (!res.landed) {
+    logIncremental('pull-fallback', {
+      incr_reason: 'missing-deps',
+      incr_chunk_count: fresh.length,
+    });
+    return { outcome: 'fallback', reason: 'missing-deps' };
+  }
 
   for (const name of fresh) session.fetched.add(name);
+  logIncremental('pull-applied', { incr_chunk_count: payloads.length, incr_dirty: res.dirty });
   return { outcome: 'applied', dirty: res.dirty };
 }
 
@@ -161,10 +210,17 @@ export async function publishIncremental(
       await aux.write(name, payload);
       session.fetched.add(name); // our own chunk — never re-fetch/apply it
       session.lastPublishedHeads = heads;
+      // Emit BEFORE pruneOwnChunks (which is non-throwing) so publish-ok and
+      // publish-failed are mutually exclusive per publish. `publishSeq++` above
+      // post-incremented, so the seq just written is `publishSeq - 1`.
+      logIncremental('publish-ok', { incr_seq: session.publishSeq - 1 });
     }
 
     await pruneOwnChunks(aux, session);
   } catch (e) {
+    // Firehose + console (no longer a silent swallow). The base write already
+    // succeeded, so this is a handled degradation, not a user-facing failure.
+    logIncremental('publish-failed', {}, e);
     console.warn(
       '[incrementalTransport] publish chunk failed (non-fatal; base is authoritative):',
       e

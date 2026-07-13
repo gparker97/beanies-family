@@ -486,7 +486,9 @@ export async function applyRemoteChunks(
 ): Promise<{ heads: Heads; landed: boolean; dirty: boolean }> {
   requireDoc('applyRemoteChunks');
   const key = requireKey('applyRemoteChunks');
-  const chunks = await time2('automerge.remoteLoad', () =>
+  // Split from the whole-doc `automerge.remoteLoad` (base adopt at :355) so the
+  // delta-chunk decrypt is distinguishable in CloudWatch — see #44 instrumentation.
+  const chunks = await time2('automerge.remoteChunkDecrypt', () =>
     Promise.all(payloads.map((p) => decryptChunk(p, key)))
   );
   const allChanges: Uint8Array[] = [];

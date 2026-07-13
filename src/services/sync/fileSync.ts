@@ -16,6 +16,7 @@ import * as Automerge from '@automerge/automerge';
 import { base64ToBuffer } from '@/utils/encoding';
 import { generateUUID } from '@/utils/id';
 import { measureSync } from '@/utils/perfTiming';
+import { APP_VERSION } from '@/constants/appVersion';
 import type {
   BeanpodFileV4,
   WrappedMemberKey,
@@ -50,6 +51,7 @@ export function createBeanpodV4(
     passkeyWrappedKeys,
     inviteKeys,
     encryptedPayload,
+    writerVersion: APP_VERSION, // #44: which app version wrote this file
   };
 
   return JSON.stringify(envelope, null, 2);
@@ -232,7 +234,10 @@ export async function tryUnwrapFamilyKey(
  */
 export function reEncryptEnvelope(envelope: BeanpodFileV4, encryptedPayload: string): string {
   // ADR-032: `encryptedPayload` comes from docClient.exportEncryptedPayload().
-  const updated: BeanpodFileV4 = { ...envelope, encryptedPayload };
+  // Re-stamp writerVersion so the re-written file reflects the version that re-wrote
+  // it (not a stale/absent one) — otherwise the #44 "no old writer remains" check is
+  // misinformed by a key-rotation / member-change re-encrypt.
+  const updated: BeanpodFileV4 = { ...envelope, encryptedPayload, writerVersion: APP_VERSION };
   return JSON.stringify(updated, null, 2);
 }
 

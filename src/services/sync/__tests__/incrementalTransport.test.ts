@@ -1,6 +1,11 @@
 // @vitest-environment node
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Neutralize the diagnostic firehose so the diagnostics describe can assert on it
+// (pattern: googleAuth.native.test.ts). The real backend under test doesn't need it.
+vi.mock('@/services/telemetry', () => ({ logEvent: vi.fn() }));
+import { logEvent } from '@/services/telemetry';
 import * as Automerge from '@automerge/automerge';
 import type { FamilyDocument } from '@/types/automerge';
 import { generateFamilyKey } from '@/services/crypto/familyKeyService';
@@ -275,3 +280,180 @@ async function decryptChunkRaw(aux: AuxStore, name: string, key: CryptoKey): Pro
   const { decryptChunk } = await import('@/services/automerge/worker/docOps');
   return (await decryptChunk(body, key)).changes;
 }
+
+describe('incrementalTransport — diagnostics (surface incremental-sync)', () => {
+  const mockLog = vi.mocked(logEvent);
+  const A_CHUNK = chunkName('deviceZ', 0);
+
+  beforeEach(() => mockLog.mockClear());
+
+  /** The last logEvent call, for concise assertions. */
+  const lastEvent = () => mockLog.mock.calls[mockLog.mock.calls.length - 1]![0];
+  const eventsWith = (phase: string) =>
+    mockLog.mock.calls.map((c) => c[0]).filter((e) => e.context?.incr_phase === phase);
+
+  // A deps stub whose applyRemoteChunks outcome the test controls; the pull-fallback
+  // read/list paths never reach it.
+  const stubDeps = (over: Partial<TransportDeps> = {}): TransportDeps => ({
+    applyRemoteChunks: async () => ({ heads: [], landed: true, dirty: false }),
+    exportIncrementalPayload: async () => ({ payload: 'p' }),
+    getHeads: async () => ({ heads: ['h1'] }),
+    getActorId: async () => ({ actorId: 'deviceZ' }),
+    ...over,
+  });
+
+  it('list-failed emits pull-fallback WITHOUT incr_chunk_count and never throws (TDZ guard)', async () => {
+    const aux = fakeAux();
+    aux.list = async () => {
+      throw new Error('list boom');
+    };
+    const res = await pullIncremental(aux, stubDeps(), newTransportSession());
+    expect(res).toEqual({ outcome: 'fallback', reason: 'list-failed' }); // resolved, not thrown
+    const ev = lastEvent();
+    expect(ev).toMatchObject({
+      surface: 'incremental-sync',
+      level: 'warn',
+      context: { incr_phase: 'pull-fallback', incr_reason: 'list-failed' },
+    });
+    expect(ev.context).not.toHaveProperty('incr_chunk_count');
+  });
+
+  it('read-failed / chunk-missing / apply-error / missing-deps emit pull-fallback WITH incr_chunk_count', async () => {
+    const cases: Array<[string, () => Promise<unknown>]> = [
+      [
+        'read-failed',
+        async () => {
+          const aux = fakeAux();
+          aux.map.set(A_CHUNK, 'body');
+          aux.read = async () => {
+            throw new Error('read boom');
+          };
+          return pullIncremental(aux, stubDeps(), newTransportSession());
+        },
+      ],
+      [
+        'chunk-missing',
+        async () => {
+          const aux = fakeAux();
+          aux.map.set(A_CHUNK, 'body');
+          aux.read = async () => null;
+          return pullIncremental(aux, stubDeps(), newTransportSession());
+        },
+      ],
+      [
+        'apply-error',
+        async () => {
+          const aux = fakeAux();
+          aux.map.set(A_CHUNK, 'body');
+          return pullIncremental(
+            aux,
+            stubDeps({
+              applyRemoteChunks: async () => {
+                throw new Error('apply boom');
+              },
+            }),
+            newTransportSession()
+          );
+        },
+      ],
+      [
+        'missing-deps',
+        async () => {
+          const aux = fakeAux();
+          aux.map.set(A_CHUNK, 'body');
+          return pullIncremental(
+            aux,
+            stubDeps({
+              applyRemoteChunks: async () => ({ heads: [], landed: false, dirty: false }),
+            }),
+            newTransportSession()
+          );
+        },
+      ],
+    ];
+    for (const [reason, run] of cases) {
+      mockLog.mockClear();
+      await run();
+      const ev = lastEvent();
+      expect(ev).toMatchObject({
+        surface: 'incremental-sync',
+        level: 'warn',
+        context: { incr_phase: 'pull-fallback', incr_reason: reason, incr_chunk_count: 1 },
+      });
+    }
+  });
+
+  it('pull-noop fires when there is nothing fresh; pull-applied carries chunk count + dirty', async () => {
+    // noop
+    await pullIncremental(fakeAux(), stubDeps(), newTransportSession());
+    expect(eventsWith('pull-noop')).toHaveLength(1);
+
+    // applied
+    mockLog.mockClear();
+    const aux = fakeAux();
+    aux.map.set(A_CHUNK, 'body');
+    await pullIncremental(
+      aux,
+      stubDeps({ applyRemoteChunks: async () => ({ heads: [], landed: true, dirty: true }) }),
+      newTransportSession()
+    );
+    expect(lastEvent()).toMatchObject({
+      level: 'info',
+      context: { incr_phase: 'pull-applied', incr_chunk_count: 1, incr_dirty: true },
+    });
+  });
+
+  it('publish-ok fires on a real chunk write (floor-free, level info); first publish is silent', async () => {
+    const aux = fakeAux();
+    const session = newTransportSession();
+    // First publish this session writes no chunk (base carries all) → no publish-ok.
+    await publishIncremental(aux, stubDeps({ getHeads: async () => ({ heads: ['h0'] }) }), session);
+    expect(eventsWith('publish-ok')).toHaveLength(0);
+
+    // Heads move → a delta chunk is written → publish-ok with the seq just consumed.
+    mockLog.mockClear();
+    await publishIncremental(aux, stubDeps({ getHeads: async () => ({ heads: ['h1'] }) }), session);
+    expect(lastEvent()).toMatchObject({
+      level: 'info',
+      context: { incr_phase: 'publish-ok', incr_seq: 0 },
+    });
+  });
+
+  it('publish-failed emits (not swallowed) on a write error, and prune-after-write does NOT double-emit', async () => {
+    // write throws → the catch emits publish-failed. lastPublishedHeads is pre-set so
+    // the publish takes the delta-write branch (not the silent first-publish branch).
+    const aux = fakeAux();
+    aux.write = async () => {
+      throw new Error('write boom');
+    };
+    const failSession = newTransportSession();
+    failSession.actorId = 'deviceZ';
+    failSession.lastPublishedHeads = ['h0'];
+    await publishIncremental(
+      aux,
+      stubDeps({ getHeads: async () => ({ heads: ['h1'] }) }),
+      failSession
+    );
+    expect(eventsWith('publish-failed')).toHaveLength(1);
+    expect(eventsWith('publish-ok')).toHaveLength(0);
+
+    // A successful write whose subsequent prune list() fails must NOT emit publish-failed
+    // (pruneOwnChunks catches its own list() error) — exactly one publish-ok, zero failed.
+    mockLog.mockClear();
+    const aux2 = fakeAux();
+    aux2.list = async () => {
+      throw new Error('prune list boom');
+    };
+    const session = newTransportSession();
+    session.actorId = 'deviceZ';
+    session.lastPublishedHeads = ['h0'];
+    session.publishSeq = 100; // force pruneOwnChunks past its `cutoff <= 0` guard so it lists
+    await publishIncremental(
+      aux2,
+      stubDeps({ getHeads: async () => ({ heads: ['h1'] }) }),
+      session
+    );
+    expect(eventsWith('publish-ok')).toHaveLength(1);
+    expect(eventsWith('publish-failed')).toHaveLength(0);
+  });
+});

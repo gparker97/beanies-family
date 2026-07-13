@@ -413,11 +413,16 @@ describe('worker/applyAndProject', () => {
     await adopt(shared);
     const peer = acct(copy(shared), 'a2', 2);
     chunks.length = 0;
+    perf.length = 0; // isolate this call's perf labels from the base adopt()
 
     const r = await applyRemoteChunks([await chunkFrom(shared, peer, key)]);
 
     expect(r.landed).toBe(true);
     expect(r.dirty).toBe(false); // worker had no changes the peer lacked
+    // The delta-chunk decrypt is labelled distinctly from the whole-doc base adopt
+    // (which is `automerge.remoteLoad`) so CloudWatch can tell them apart (#44).
+    expect(perf).toContain('automerge.remoteChunkDecrypt');
+    expect(perf).not.toContain('automerge.remoteLoad');
     // Delta projection (not a 27-collection full reset): an upsert for a2.
     const upserts = chunks
       .map((c) => c.delta)
