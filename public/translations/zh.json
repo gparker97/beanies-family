@@ -3611,11 +3611,6 @@
       "hash": "cqtri9",
       "lastUpdated": "2026-03-03"
     },
-    "loginV6.localFileCardDesc": {
-      "translation": "从您的设备打开.beanpod",
-      "hash": "x0q1ht",
-      "lastUpdated": "2026-03-03"
-    },
     "googleDrive.connecting": {
       "translation": "正在连接到 Google 云端硬盘...",
       "hash": "tl246q",
@@ -18619,6 +18614,11 @@
     "loginV6.openSavedFileDesc": {
       "translation": "从另一个账号或您已还原的备份",
       "hash": "xnpy8h",
+      "lastUpdated": "2026-07-13"
+    },
+    "loginV6.openSavedFileUnavailableHint": {
+      "translation": "要在此处打开保存的文件，请使用Chrome或Edge ，或设置Google云端硬盘",
+      "hash": "8rdlub",
       "lastUpdated": "2026-07-13"
     }
   }

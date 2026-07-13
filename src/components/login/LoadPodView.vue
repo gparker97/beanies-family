@@ -204,12 +204,24 @@ function getPendingFamilyInfo(): { familyId?: string; familyName?: string } {
  * block the user reaching their already-decrypted, visible data — the store
  * action already pages loudly on a hard no-target case.
  */
-async function finishLoaded() {
+/**
+ * The idempotent, never-blocking "establish a durable writable home for the
+ * just-loaded family" step. Extracted so BOTH `finishLoaded` (every `file-loaded`
+ * path) AND the single-member auto-sign-in branch (which emits `signed-in` without
+ * routing through `finishLoaded`) share ONE implementation (B2). A throw must never
+ * block the user reaching their already-decrypted, visible data — the store action
+ * already pages loudly on a hard no-target case.
+ */
+async function ensureDurableHome() {
   try {
     await syncStore.establishDurableHomeAfterLoad();
   } catch (e) {
     console.error('[LoadPodView] establishDurableHomeAfterLoad failed:', e);
   }
+}
+
+async function finishLoaded() {
+  await ensureDurableHome();
   emit('file-loaded');
 }
 
@@ -454,6 +466,11 @@ async function handleDecrypt() {
           if (props.crossDeviceContext) {
             await registerCrossDevicePasskey(unambiguousMemberId);
           }
+          // B2: this branch returns WITHOUT reaching finishLoaded(), so it must
+          // establish the durable home itself — otherwise a single-member file opened
+          // via the native picker (no provider installed by decrypt) is left with no
+          // writable save target.
+          await ensureDurableHome();
           emit('signed-in', '/nook');
           return;
         }
@@ -1160,9 +1177,10 @@ async function handleDriveRefresh() {
         <!-- "Load a saved family file" — the quiet cross-account / restored-backup
              path (#47). One affordance; the backend is chosen per platform in
              handleOpenSavedFile (native OS picker / web FSA browse zone / web
-             Google Picker). Shown only where a backend exists (canOpenSavedFile),
-             so it never presents a source the platform can't service. -->
-        <div v-if="canOpenSavedFile" class="mt-4">
+             Google Picker). C8: ALWAYS rendered — when no backend can run (a
+             self-hosted build on Firefox/Safari) it is shown DISABLED with clear
+             guidance, never silently hidden (which read as a dead-end). -->
+        <div class="mt-4">
           <div class="mb-3 flex items-center gap-2.5" aria-hidden="true">
             <span class="h-px flex-1 bg-gray-200 dark:bg-slate-600"></span>
             <span
@@ -1173,7 +1191,8 @@ async function handleDriveRefresh() {
           </div>
           <button
             type="button"
-            class="group focus-visible:ring-primary-500 hover:border-primary-500/40 dark:hover:border-primary-500/30 flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-3.5 text-left transition-all hover:-translate-y-0.5 hover:bg-[#FEF0E8]/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:border-slate-600 dark:bg-slate-700/50 dark:focus-visible:ring-offset-slate-900"
+            class="group focus-visible:ring-primary-500 hover:border-primary-500/40 dark:hover:border-primary-500/30 flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-3.5 text-left transition-all hover:-translate-y-0.5 hover:bg-[#FEF0E8]/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60 dark:border-slate-600 dark:bg-slate-700/50 dark:focus-visible:ring-offset-slate-900"
+            :disabled="!canOpenSavedFile"
             :aria-label="t('loginV6.openSavedFileLabel')"
             data-testid="open-saved-file-aside"
             @click="handleOpenSavedFile"
@@ -1201,7 +1220,9 @@ async function handleDriveRefresh() {
                 t('loginV6.openSavedFileLabel')
               }}</span>
               <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{{
-                t('loginV6.openSavedFileDesc')
+                canOpenSavedFile
+                  ? t('loginV6.openSavedFileDesc')
+                  : t('loginV6.openSavedFileUnavailableHint')
               }}</span>
             </span>
             <svg

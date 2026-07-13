@@ -3462,6 +3462,13 @@ const STRING_DEFS = {
     en: "From another account, or a backup you've restored",
     beanie: "from another account, or a backup you've restored",
   },
+  // C8: shown as the disabled reason when neither a local-file backend nor the Google
+  // Picker can run here (a self-hosted build on Firefox/Safari). Honestly-scoped
+  // guidance instead of silently hiding the affordance.
+  'loginV6.openSavedFileUnavailableHint': {
+    en: 'To open a saved file here, use Chrome or Edge, or set up Google Drive',
+    beanie: 'to open a saved file here, use chrome or edge, or set up google drive',
+  },
   'loginV6.signInTitle': { en: 'Welcome back', beanie: 'welcome back' },
   'loginV6.signInSubtitle': {
     en: 'Sign in with your .beanpod file',
@@ -3696,10 +3703,6 @@ const STRING_DEFS = {
   'loginV6.googleDriveCardDesc': {
     en: 'Load from your cloud storage',
     beanie: 'load from your cloud storage',
-  },
-  'loginV6.localFileCardDesc': {
-    en: 'Open a .beanpod from your device',
-    beanie: 'open a .beanpod from your device',
   },
   'loginV6.securityYourDataDesc': {
     en: 'Your pod file lives in your cloud storage. We never see it.',
