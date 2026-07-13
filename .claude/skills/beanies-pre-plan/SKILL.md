@@ -34,6 +34,7 @@ This table is the ONE authoritative definition of the intake fields. The copy/pa
 | Priority                       | Required        | all        | Priority (select — vocab-mapped, see binding block)                      | labeling                        |
 | Surfaces — platforms           | Required        | all        | Device Type (multi-select)                                               | Approach + DRY targeting + labeling |
 | Surfaces — area                | Required        | all        | View (multi-select)                                                      | Approach + labeling             |
+| Category                       | Required        | all        | Category (multi-select)                                                  | Context + labeling              |
 | Objective                      | Required        | all        | Objective / Goal (rich text)                                             | Context                         |
 | Scope-do                       | Required        | all        | Main Requirements / Scope (rich text)                                    | Requirements                    |
 | User story                     | Conditional     | feature    | User Story (if feature) (rich text)                                      | User Story                      |
@@ -60,7 +61,7 @@ This table is the ONE authoritative definition of the intake fields. The copy/pa
 - **Review every field on the row — not just the mapped ones.** Read all intake columns before assembling, and flag for the clarify loop (step 5) anything that is blank-but-needed, marked `TBC`, internally contradictory, or that you do not fully understand.
 - A property value of `"n/a"` (case-insensitive) or blank means **deliberately not provided** — treat it as empty (carried as `—`), never as literal content. This is the ONLY acceptable "empty" state, and only for Optional fields.
 - A value of `"TBC"` / `"TBD"` / `"to be confirmed"` (case-insensitive) is a **placeholder that MUST be resolved before the prompt is built** — never carried through and never silently treated as empty. Resolve it from your own research and/or targeted user questions (step 5), then **write the resolved value back into that Notion property** (the pre-assembly write-back, see binding block) so the row itself is complete and matches the prompt.
-- `Device Type` / `View` are carried into the Surfaces lines **verbatim** (lossless); `Priority` is vocab-mapped to the canonical scale (binding block) so `beanies-plan` labeling is direct.
+- `Device Type` / `View` / `Category` are carried **verbatim** (lossless — `Device Type`/`View` into the Surfaces lines, `Category` into its own line); `Priority` is vocab-mapped to the canonical scale (binding block) so `beanies-plan` labeling is direct. `Category` (multi-select: `data / app / UI / auth / security / new feature / feature update / permissions / android / iOS / PWA / AI` — read live) tags the issue's nature; pick all that genuinely apply.
 - Several Notion fields concatenate into one canonical field (e.g. References = `References / Supporting Materials` + `Dependencies / Related Issues`). Drop any sub-part that is empty/`n/a`.
 
 Notion-only properties (workflow/meta state — NOT intake intent, NOT in the template) live in the binding block below: **Status**, **beanies-plan prompt** (immediate write-back target), **plan file url** (deferred write-back target), **generate mockup?** (control — triggers the step-6 mockup loop), **mockup file url** (step-6 write-back target), **github issue** (passthrough), **Feature gated?** (passthrough — the build-behind-a-feature-gate preference). The `ID`, `Assignee`, `Raised By`, and `Date` properties are read-only metadata the skill ignores (except `ID`, usable to reference the issue back to the user).
@@ -78,6 +79,7 @@ Title:        <short imperative title>
 Type:         feature | bug | refactor | chore | other
 Priority:     critical | high | medium | low
 Surfaces:     platforms: [web / PWA / iOS / Android / tooling]  •  area: <page / feature / component>
+Category:     [data / app / UI / auth / security / new feature / feature update / permissions / android / iOS / PWA / AI]  (all that apply)
 Objective:    <1–2 sentences: the problem and the win — the "why">
 
 # Feature only
@@ -218,7 +220,7 @@ Feature gated? (select) → passthrough directive to beanies-plan (gating is BY 
 ```
 Priority:  Critical → critical · High Priority → high · Normal → medium · Low / Future → low
 Issue Type: Bug → bug · Feature → feature
-Device Type / View: carried verbatim into the Surfaces line (no remap)
+Device Type / View / Category: carried verbatim (no remap)
 ```
 
 **Schema.** Intake properties = the _Notion property_ column of the Canonical Field Table (one property per row — not re-listed here, to avoid a second copy that can drift). Plus the workflow/meta properties:
