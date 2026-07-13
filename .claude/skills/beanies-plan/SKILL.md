@@ -49,6 +49,8 @@ Key principles:
 
 If yes, the plan **must** include a `## Help Center Coverage` section (see format below) that specifies which article(s) are affected and follows the `/beanies-help-docs` skill's article-type conventions. The corresponding article work is part of the implementation acceptance criteria — not a follow-up.
 
+**Observability coverage assessment (ALWAYS — every plan).** While drafting, work out the diagnostic logging the change must emit so its failure modes are triageable from CloudWatch without a local repro, and capture it in the mandatory `## Observability Coverage` section (see format below). This is per the "Observability & Diagnostic Logging" convention in `CLAUDE.md` and applies to **every** plan — feature, fix, or refactor. Unlike Help Center Coverage it is never omitted (a refactor states what signal it preserves, or why none is needed). Route events through `logEvent`/`reportError`/`perfTiming`; reserve `severity: 'critical'` (Slack page) for "user action failed / data at risk"; put queryable data in structured `context`; and if a new context key ships, flag the `ALLOWED_CONTEXT_KEYS` + store-declaration update.
+
 **Mockup-driven drafting (only when an approved mockup informs this work).** When Phase 1 surfaced a mockup (a `Mockup:` line or a `docs/mockups/…` file), Pass 1 must translate that design faithfully into a CIG-compliant plan rather than re-inventing the UI. Read the mockup file, then draft under this instruction (the canonical mockup→plan directive — edit it here if it needs to change):
 
 > This plan implements an approved mockup. Read the mockup file in full before drafting. Strive for simplicity and elegance in both the plan and the implementation, and follow all DRY conventions. Reproduce the mockup's design intent faithfully — its layout, visual hierarchy, spacing rhythm, component structure, tone, and the specific interactions it demonstrates — so the shipped UI is recognizably the same design. At the same time, every concrete style token (colors, typography and font sizes, radii, shadows, spacing, modal/component patterns) MUST come from the beanies theme + CIG (`.claude/skills/beanies-theme/SKILL.md`), not from whatever aesthetic the mockup's generator happened to choose. Where the mockup and the beanies UI theme / CIG disagree, the CIG ALWAYS wins — translate the mockup's intent into CIG-compliant equivalents rather than copying its raw values. Map each region of the mockup to existing components, composables, and utilities first (DRY) before proposing anything new. Call out any place where faithfully reproducing the mockup would violate the CIG, accessibility, i18n, or the rem-based text rule, and resolve it in favour of the rule. Ask any clarifying questions before drafting; once everything is clear, prepare the plan.
@@ -201,11 +203,24 @@ For each affected article:
 
 The article work is written following `.claude/skills/beanies-help-docs/SKILL.md` and lands **in the same change** as the feature — not as a follow-up. Treat it as a first-class acceptance criterion.
 
+## Observability Coverage
+
+> **MANDATORY for every plan** (per the "Observability & Diagnostic Logging" convention in `CLAUDE.md`). Observability is a first-class deliverable — never a follow-up. Unlike Help Center Coverage, this section is never omitted: even a pure refactor states what diagnostic signal it preserves or why none is needed.
+
+State, concretely, the diagnostic logging this work emits so any failure can be **triaged from CloudWatch alone, without a local repro**:
+
+- **Events**: each `logEvent`/`reportError`/`perfTiming` call the work adds or changes — the `surface` (kebab-case, greppable), `level`/`severity`, and the key `context` fields (queryable, structured — not string-interpolated).
+- **Failure modes covered**: for each way this feature can fail or degrade, the event that would let you diagnose it blind (which branch, which input class, what state). Confirm no bare `catch {}` / silent fallback.
+- **Success-path signal**: the counter/outcome emitted on success too (so _rates_ are measurable for future alerting), noting the `TELEMETRY_FLOOR_MS = 250` floor where relevant.
+- **Critical vs. telemetry**: which events (if any) warrant `severity: 'critical'` (Slack page — reserve for "user action failed / data at risk") vs. firehose-only `warning`/`error`.
+- **Privacy/store gate**: if any **new** `context` key ships, it MUST be added to `ALLOWED_CONTEXT_KEYS` (`logEvent.ts`) and the store data-collection declarations updated (`docs/runbooks/native-store-submission.md` + consumers) — call this out here.
+
 ## Acceptance Criteria
 
 - [ ] ...
 - [ ] ...
 - [ ] Help Center article(s) listed in **Help Center Coverage** added/updated and verified to match the shipped behavior (omit this row if the section was omitted)
+- [ ] Diagnostic logging in **Observability Coverage** implemented and verified (events fire with the stated `surface`/`context`; failure modes are triageable from CloudWatch without a local repro; any new context key is allowlisted + declared)
 
 ## Testing Plan
 
@@ -334,6 +349,7 @@ Follow the project's labeling conventions from `CLAUDE.md`:
 - **ALWAYS include acceptance criteria and testing plan.** These define "done".
 - **Mockups inform Pass 1; the CIG always wins; stay Notion-agnostic.** When an approved mockup is present (via a `Mockup:` line or a `docs/mockups/…` path in the prompt), read it and draft to it using the _Mockup-driven drafting_ directive in Phase 2.1 — faithfully reproducing its design intent but sourcing every concrete style token from `.claude/skills/beanies-theme/SKILL.md` + the CIG (the CIG wins on any conflict). The mockup reaches this skill ONLY through the prompt + the repo file — never read the Notion tracker for it (writing `mockup file url` back is `beanies-pre-plan`'s job). If invoked standalone where a mockup is expected but absent, generate one first via `/frontend-design:frontend-design` (CIG-clamped), get approval, commit only the approved file, then draft.
 - **ALWAYS assess Help Center coverage.** If the work introduces a distinct user-facing feature (or meaningfully changes behavior an existing article documents), include the `## Help Center Coverage` section in the plan AND treat the article as part of the same change — not a follow-up. Skip the section entirely for bug fixes, refactors, polish, and similar work.
+- **ALWAYS include Observability Coverage.** Every plan carries the `## Observability Coverage` section (per the `CLAUDE.md` convention) — feature, fix, or refactor, never omitted. State the diagnostic events emitted (`logEvent`/`reportError`/`perfTiming`, kebab-case `surface`, structured `context`), how they make each failure mode triageable from CloudWatch without a local repro, the success-path signal for future alerting, and any `ALLOWED_CONTEXT_KEYS` + store-declaration update a new context key requires. The logging lands in the same change — an acceptance criterion, not a follow-up.
 - **ALWAYS create 2-way links** between the plan file and the GitHub issue (if one was created).
 - **ALWAYS add labels** to GitHub issues per the project conventions (when one is created).
 - Plans are saved to `docs/plans/YYYY-MM-DD-<short-slug>.md` — this is a permanent historical record.
