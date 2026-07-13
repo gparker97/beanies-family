@@ -24,10 +24,18 @@ export function bootstrapDocClient(): void {
   // (dev default) spawns the real worker lazily on first use.
   if (!isFlagEnabled('docWorker')) docClient.forceInlineMode();
 
-  // Backgrounding cache flush — narrows the ≤debounce last-edit-loss window.
+  // Backgrounding cache flush — narrows the ≤debounce last-edit-loss window. On
+  // FOREGROUND, probe the worker: a backgrounded mobile PWA may have had its worker
+  // OS-reaped without firing `onerror`, so proactively recover it here (the internal
+  // guards in checkWorkerLiveness make this a no-op when there's nothing to probe)
+  // rather than letting the user's first real RPC hit a 45 s timeout.
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) void docClient.flush();
+      if (document.hidden) {
+        void docClient.flush();
+        return;
+      }
+      void docClient.checkWorkerLiveness();
     });
   }
 }

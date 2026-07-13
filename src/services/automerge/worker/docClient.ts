@@ -185,23 +185,24 @@ function handleSignal(sig: WorkerSignal): void {
   }
 }
 
-function onWorkerError(err: unknown): void {
-  const message = err instanceof Error ? err.message : 'worker crashed';
-  console.error('[docClient] worker error — rejecting pending + scheduling recovery', err);
-  // Surface the crash ONCE here (only when calls were actually awaiting — a crash
-  // with no in-flight work self-heals on the next request's re-spawn). Every
-  // drained pending call below rejects with WorkerCrashError, which `surface()`
-  // classifies as expected → quiet: N in-flight RPCs produce ONE toast, not N.
-  if (pending.size > 0) {
-    showToast('error', "We couldn't update your data", message, {
-      surface: 'doc-worker',
-      error: err instanceof Error ? err : new DocWorkerError(message),
-      critical: true,
-    });
-  }
-  // Reject every in-flight call so awaiting stores get a definite failure.
+/** Tear down a dead/wedged worker so the next `ensureReady()` re-spawns. Drains
+ * every in-flight call to a definite (quiet) `WorkerCrashError` rejection,
+ * terminates the worker, and (for an active session) flags a rehydrate so the
+ * fresh worker reloads the doc from cache before serving reads.
+ *
+ * Does NOT toast — the toast decision stays with each caller, which has the
+ * context: `onWorkerError` (crash: toast iff there were in-flight calls) and the
+ * `requestCore` timeout path (sibling/trigger toast per its accounting). Keeping
+ * UI policy out of this lifecycle primitive is what lets both paths — and any
+ * future one — share it. Idempotent (a second call with no worker is a no-op). */
+function recoverDeadWorker(reason: string): void {
+  if (mode === 'inline') return; // nothing to recover
+  console.error(`[docClient] recovering dead worker — ${reason}`);
+  // Reject every in-flight call so awaiting stores get a definite failure. The
+  // WorkerCrashError class is `surface()`-quiet, so N drained calls never each
+  // toast — the caller fires at most ONE consolidating toast for them.
   for (const [cid, p] of pending) {
-    p.resolve({ cid, ok: false, error: { name: 'WorkerCrashError', message } });
+    p.resolve({ cid, ok: false, error: { name: 'WorkerCrashError', message: reason } });
   }
   pending.clear();
   try {
@@ -213,6 +214,23 @@ function onWorkerError(err: unknown): void {
   readyPromise = null;
   // Recover lazily on the next request: re-spawn + re-post key + re-hydrate.
   if (currentFamilyId) needsRehydrate = true;
+}
+
+function onWorkerError(err: unknown): void {
+  const message = err instanceof Error ? err.message : 'worker crashed';
+  console.error('[docClient] worker error — rejecting pending + scheduling recovery', err);
+  // Surface the crash ONCE here (only when calls were actually awaiting — a crash
+  // with no in-flight work self-heals on the next request's re-spawn). Fired
+  // BEFORE the drain, since `recoverDeadWorker` empties `pending`. Every drained
+  // call rejects with a quiet WorkerCrashError, so N in-flight RPCs → ONE toast.
+  if (pending.size > 0) {
+    showToast('error', "We couldn't update your data", message, {
+      surface: 'doc-worker',
+      error: err instanceof Error ? err : new DocWorkerError(message),
+      critical: true,
+    });
+  }
+  recoverDeadWorker(message);
 }
 
 // ─── Spawn + handshake ───────────────────────────────────────────────────────
@@ -331,6 +349,42 @@ const HEAVY_METHODS = new Set([
 // NOT here — its small entity payload needs full proxy-stripping.
 const ENVELOPE_METHODS = new Set(['mergeRemoteEnvelope', 'verifyEnvelope', 'persistEnvelope']);
 
+// Methods that are safe to transparently re-issue after a worker respawn: pure
+// reads, idempotent CRDT merges, idempotent re-persists/teardowns. This is an
+// ALLOWLIST, not a denylist, on purpose — a method must be affirmatively known-
+// idempotent to auto-retry. `mutate` and `initDoc` are absent (a re-issue could
+// double-apply a financial op); any FUTURE method is likewise non-retryable until
+// explicitly vetted and added here. Forgetting to add a safe method costs a missed
+// auto-heal (visible, recoverable); the opposite default would risk silent data
+// corruption. Kept SEPARATE from HEAVY_METHODS/JSON_SAFE_METHODS — retry-safety,
+// timeout tier, and clone-safety are orthogonal and change for independent reasons.
+const RETRYABLE_METHODS = new Set([
+  'initAndLoadCache',
+  'openCache',
+  'getHeads',
+  'getActorId',
+  'getChangesSince',
+  'applyChanges',
+  'exportEncryptedPayload',
+  'exportIncrementalPayload',
+  'mergeRemoteEnvelope',
+  'applyRemoteChunks',
+  'verifyEnvelope',
+  'flush',
+  'dropDoc',
+  'reset',
+  'clearCache',
+  'persistEnvelope',
+  'readEnvelope',
+  'setKey',
+  'collectReferencedPhotoIds',
+  'ping',
+]);
+
+// A liveness ping does no compute, so a live worker answers near-instantly — a
+// short ceiling turns a reaped/wedged worker into a fast recovery on resume.
+const PING_TIMEOUT_MS = 5_000;
+
 const plainify = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
 
 function postRaw(req: RpcRequest): void {
@@ -362,7 +416,8 @@ interface RequestOpts {
 async function requestCore(
   method: string,
   args: unknown,
-  opts: RequestOpts
+  opts: RequestOpts,
+  attempt = 1
 ): Promise<{ result: unknown; changed?: boolean }> {
   const via = await ensureReady();
   if (via === 'inline') {
@@ -391,7 +446,43 @@ async function requestCore(
   try {
     res = await withTimeout(responsePromise, timeoutMs, `doc-worker '${method}' timed out`);
   } catch (timeoutErr) {
-    pending.delete(cid); // discard by cid — a late reply now finds no pending entry
+    // A timeout means the worker went silent WITHOUT firing `onerror` (an OS-reaped
+    // mobile worker, or a FIFO wedged behind a hung whole-doc op). Nothing else tears
+    // it down, so without this the client re-posts to the corpse forever until the
+    // user force-quits. Treat it as a death signal: recover, then heal or surface.
+    pending.delete(cid); // drop THIS call first…
+    // A LIGHT op can legitimately time out (45 s) while a HEAVY whole-doc op is still
+    // progressing toward its 120 s ceiling — the light one is queued behind it in the
+    // worker's serial FIFO, which is NOT proof the worker is dead. Tearing the worker
+    // down here would abort (and, with retry, restart) a slow-but-progressing large-doc
+    // load — the exact case the 120 s ceiling exists to protect. So only treat a timeout
+    // as worker-death when the timed-out op is ITSELF heavy (it hit 120 s → genuinely
+    // wedged) or no heavy op is in flight to still be progressing. A truly-dead worker
+    // still recovers: its pending heavy op hits 120 s and recovers on that timeout.
+    const heavyStillInFlight = [...pending.values()].some((p) => HEAVY_METHODS.has(p.method));
+    if (!HEAVY_METHODS.has(method) && heavyStillInFlight) {
+      throw surface(timeoutErr, method, opts.quiet); // reject just this call; leave the worker to finish
+    }
+    const lostSiblings = pending.size > 0; // …so this counts only OTHER in-flight calls
+    recoverDeadWorker(`rpc-timeout:${method}`); // drains siblings (quiet) + tears down → next request re-spawns
+    reportError({
+      surface: 'doc-worker-recovery',
+      message: `doc-worker '${method}' timed out — worker recovered; next request re-spawns a fresh worker`,
+      severity: 'warning', // telemetry + console only — never pages, never toasts
+      context: { method, attempt, lostSiblings },
+    });
+    if (attempt === 1 && RETRYABLE_METHODS.has(method)) {
+      // This idempotent call heals transparently on the fresh worker. But any SIBLING
+      // calls just drained can't be re-issued (we don't own their args/idempotency) and
+      // a drained WorkerCrashError is quiet — so a concurrently-in-flight `mutate` would
+      // otherwise vanish toast-less. Fire the ONE consolidating toast for them by reusing
+      // surface() for its toast side-effect (timeoutErr is not an expected/quiet class);
+      // ignore the returned error and do NOT throw, because THIS call still heals.
+      if (lostSiblings) surface(timeoutErr, method, false);
+      return requestCore(method, args, opts, 2); // fresh ensureReady() re-spawns + rehydrates
+    }
+    // Non-retryable (or retry exhausted): surface() throws AND fires the single toast,
+    // which already covers any drained siblings — no separate sibling toast needed.
     throw surface(timeoutErr, method, opts.quiet);
   }
   if (res.ok) return { result: res.result, changed: res.changed };
@@ -566,6 +657,25 @@ export function readEnvelope(): Promise<{ envelope: BeanpodFileV4 | null }> {
 /** Force an immediate cache persist (backgrounding flush). */
 export function flush(): Promise<void> {
   return request('flush');
+}
+
+/** Probe worker liveness; recover if it doesn't answer promptly. A no-op unless
+ * we're in worker mode, a worker is actually spawned, AND there's an active session
+ * (`currentFamilyId` set) — so it never spawns a worker just to ping, and never fires
+ * signed-out or in tests without a worker. Called on foreground (`visibilitychange`
+ * → visible) so a backgrounded mobile PWA whose worker the OS reaped self-heals on
+ * resume instead of stranding the user's first tap on a 45 s timeout. */
+export async function checkWorkerLiveness(): Promise<void> {
+  if (mode === 'inline' || !worker || !currentFamilyId) return;
+  try {
+    await request('ping', undefined, { quiet: true, timeoutMs: PING_TIMEOUT_MS });
+  } catch (err) {
+    // A ping timeout already ran recoverDeadWorker AND telemetered the recovery
+    // (severity 'warning') inside requestCore, so we do NOT re-report it here (that
+    // would double-count). A non-timeout probe failure isn't expected (dispatch
+    // 'ping' can't throw), but log it so it can never be fully silent.
+    console.warn('[docClient] liveness probe failed — worker recovered on next request', err);
+  }
 }
 /** Drop the current doc but keep the key + cache (replace-load: the next merge
  * adopts remote fresh). Does NOT clear the projection (the merge repopulates it). */

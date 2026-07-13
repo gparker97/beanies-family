@@ -644,6 +644,10 @@ export async function dispatch(
     case 'clearCache':
       await clearCache(a.familyId as string);
       return {};
+    case 'ping':
+      // Liveness probe — confirms the worker's message loop is alive. Touches no
+      // doc/key state, so it answers even before unlock (docClient.checkWorkerLiveness).
+      return { result: { ok: true } };
     default:
       throw new Error(`applyAndProject: unknown method '${method}'`);
   }
