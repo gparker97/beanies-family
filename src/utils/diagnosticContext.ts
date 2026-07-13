@@ -142,6 +142,16 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   // + its pinned test.
   'cache_persist_kind',
   'cache_persist_error',
+  // Doc-worker death-recovery diagnostics (surface `doc-worker-recovery`, see
+  // services/automerge/worker/docClient.ts). PII-free: the timed-out method name,
+  // the recovery attempt count, and whether sibling calls were drained. Added
+  // 2026-07-13 (A9 data-integrity review-fix) — these were previously sent as
+  // `method`/`attempt`/`lostSiblings`, which are NOT allowlisted and so were
+  // silently stripped from every recovery event. MIRROR in the Lambda allowlist
+  // + its pinned test.
+  'recovery_method',
+  'recovery_attempt',
+  'lost_siblings',
 ]);
 
 export const MAX_STRING_LEN = 200;
