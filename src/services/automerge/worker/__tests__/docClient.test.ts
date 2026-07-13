@@ -7,13 +7,16 @@ vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
 vi.mock('@/utils/perfTiming', () => ({ record: vi.fn() }));
 vi.mock('../../projection', () => ({ applyDelta: vi.fn() }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 
 import { showToast } from '@/composables/useToast';
 import { record } from '@/utils/perfTiming';
 import { applyDelta } from '../../projection';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
 import {
   setWorkerFactory,
+  setRehydrator,
   __resetDocClientForTesting,
   getHeads,
   mutate,
@@ -146,20 +149,33 @@ describe('docClient', () => {
   });
 
   it('times out, rejects, and discards the late reply by cid', async () => {
-    const fw = useWorker(() => null); // never responds
-    await expect(
-      mutate({ op: 'delete', collection: 'todos', id: 'x' }, { timeoutMs: 20 })
-    ).rejects.toThrow(/timed out/);
-    // A late reply to the timed-out cid must be ignored (pending already deleted).
-    const req = fw.posted.find((m) => m.method === 'mutate')!;
-    fw.emit({
-      cid: req.cid,
-      ok: true,
-      result: {},
-      delta: { kind: 'remove', collection: 'todos', id: 'x' },
-    });
-    await tick();
-    expect(applyDelta).not.toHaveBeenCalled();
+    vi.useFakeTimers();
+    try {
+      const fw = useWorker(() => null); // never responds (mutate + probe ping)
+      const outcome = mutate(
+        { op: 'delete', collection: 'todos', id: 'x' },
+        { timeoutMs: 20 }
+      ).then(
+        () => 'resolved',
+        (e: Error) => e.message
+      );
+      await vi.advanceTimersByTimeAsync(0); // handshake
+      await vi.advanceTimersByTimeAsync(20); // mutate timeout → corroboration probe ping
+      await vi.advanceTimersByTimeAsync(5_000); // probe ceiling → death confirmed → reject
+      expect(await outcome).toMatch(/timed out/);
+      // A late reply to the timed-out cid must be ignored (pending already deleted).
+      const req = fw.posted.find((m) => m.method === 'mutate')!;
+      fw.emit({
+        cid: req.cid,
+        ok: true,
+        result: {},
+        delta: { kind: 'remove', collection: 'todos', id: 'x' },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(applyDelta).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reconstructs a generic error, rejects, and surfaces a toast', async () => {
@@ -340,22 +356,29 @@ describe('docClient — worker-death recovery on RPC timeout', () => {
   it('a timed-out RETRYABLE method recovers the worker and heals on a fresh respawn (no toast, no siblings)', async () => {
     vi.useFakeTimers();
     try {
-      const { created } = useWorkers([never, okHeads]); // #1 wedges, #2 answers
+      const { created } = useWorkers([never, okHeads]); // #1 wedges (getHeads + ping), #2 answers
       const outcome = getHeads().then(
         (r) => r,
         (e: Error) => e.message
       );
 
       await vi.advanceTimersByTimeAsync(0); // handshake #1
-      await vi.advanceTimersByTimeAsync(45_000); // attempt-1 timeout → recover → retry → spawn #2 → heal
+      await vi.advanceTimersByTimeAsync(45_000); // attempt-1 timeout → corroboration probe ping posted
+      await vi.advanceTimersByTimeAsync(5_000); // probe ping ceiling → death confirmed → recover → retry → spawn #2 → heal
 
       expect(await outcome).toEqual({ heads: ['h'] });
       expect(created).toHaveLength(2); // proves a fresh worker was spawned
       expect(showToast).not.toHaveBeenCalled(); // silent auto-heal, no siblings
+      // A9: the recovery report carries the REAL triggering method (not 'ping') in the
+      // renamed, now-allowlisted keys.
       expect(reportError).toHaveBeenCalledWith(
         expect.objectContaining({
           surface: 'doc-worker-recovery',
-          context: expect.objectContaining({ method: 'getHeads', attempt: 1, lostSiblings: false }),
+          context: expect.objectContaining({
+            recovery_method: 'getHeads',
+            recovery_attempt: 1,
+            lost_siblings: false,
+          }),
         })
       );
     } finally {
@@ -373,7 +396,8 @@ describe('docClient — worker-death recovery on RPC timeout', () => {
       );
 
       await vi.advanceTimersByTimeAsync(0); // handshake
-      await vi.advanceTimersByTimeAsync(45_000); // mutation-budget timeout → recover, no retry
+      await vi.advanceTimersByTimeAsync(45_000); // mutation-budget timeout → corroboration probe ping
+      await vi.advanceTimersByTimeAsync(5_000); // probe ceiling → death confirmed → recover, no retry
 
       expect(await outcome).toContain("'mutate' timed out");
       expect(created).toHaveLength(1); // NO re-issue — a mutate must never auto-retry
@@ -383,30 +407,36 @@ describe('docClient — worker-death recovery on RPC timeout', () => {
     }
   });
 
-  it('a retryable timeout that drains a concurrent mutate fires exactly ONE consolidating toast', async () => {
+  it('A7: a sibling light-op timeout does NOT tear down the worker while a mutate is in flight', async () => {
     vi.useFakeTimers();
     try {
-      const { created } = useWorkers([never, okHeads]); // #1 wedges (both calls), #2 answers getHeads
+      const fw = useWorker(never); // auto-answers nothing; we emit the mutate reply by hand
       const headsOutcome = getHeads().then(
         (r) => r,
         (e: Error) => e.message
       );
-      const mutateOutcome = mutate({ op: 'delete', collection: 'todos', id: 'z' }).then(
-        () => 'resolved',
+      // A generous explicit budget keeps the mutate in flight past getHeads' 45s timeout.
+      const mutateOutcome = mutate(
+        { op: 'delete', collection: 'todos', id: 'z' },
+        { timeoutMs: 100_000 }
+      ).then(
+        (r) => r,
         (e: Error) => e.message
       );
 
-      await vi.advanceTimersByTimeAsync(0); // handshake #1 — both calls now in flight
-      await vi.advanceTimersByTimeAsync(45_000); // both 45s timers fire; getHeads (posted first) drives recovery
+      await vi.advanceTimersByTimeAsync(0); // handshake — both in flight
+      await vi.advanceTimersByTimeAsync(45_000); // getHeads hits 45s; mutate (100s budget) still in flight
 
-      // getHeads heals on #2; the drained mutate cannot be re-issued (rejects).
-      expect(await headsOutcome).toEqual({ heads: ['h'] });
-      expect(await mutateOutcome).not.toBe('resolved');
-      expect(created).toHaveLength(2);
-      // The healing getHeads is silent, but its drained mutate sibling would vanish —
-      // so EXACTLY ONE consolidating toast fires for the lost concurrent work.
-      expect(showToast).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(showToast).mock.calls[0]![3]).toMatchObject({ surface: 'doc-worker' });
+      // The mutate in flight is real work → the worker is NOT declared dead. getHeads
+      // rejects itself only; no corroboration ping, no recovery, worker intact.
+      expect(await headsOutcome).toContain("'getHeads' timed out");
+      expect(reportError).not.toHaveBeenCalled(); // worker never torn down → no recovery telemetry
+      expect(fw.posted.some((m) => m.method === 'ping')).toBe(false); // mutate-spare short-circuits before any probe
+
+      // The mutate was never dropped — it's still live and now completes normally.
+      const mutateReq = fw.posted.find((m) => m.method === 'mutate')!;
+      fw.emit({ cid: mutateReq.cid, ok: true, result: { id: 'z' } });
+      expect(await mutateOutcome).toEqual({ id: 'z' });
     } finally {
       vi.useRealTimers();
     }
@@ -415,15 +445,15 @@ describe('docClient — worker-death recovery on RPC timeout', () => {
   it('a retryable method whose respawn ALSO times out surfaces once and does not loop', async () => {
     vi.useFakeTimers();
     try {
-      const { created } = useWorkers([never, never]); // both wedge
+      const { created } = useWorkers([never, never]); // both wedge (getHeads + ping)
       const outcome = getHeads().then(
         () => 'resolved',
         (e: Error) => e.message
       );
 
       await vi.advanceTimersByTimeAsync(0); // handshake #1
-      await vi.advanceTimersByTimeAsync(45_000); // attempt-1 timeout → retry → spawn #2
-      await vi.advanceTimersByTimeAsync(45_000); // attempt-2 timeout → surface, no third spawn
+      await vi.advanceTimersByTimeAsync(50_000); // attempt-1 45s timeout + 5s probe → recover → retry → spawn #2
+      await vi.advanceTimersByTimeAsync(50_000); // attempt-2 45s timeout + 5s probe → surface, no third spawn
 
       expect(await outcome).toContain("'getHeads' timed out");
       expect(created).toHaveLength(2); // bounded: exactly two attempts
@@ -478,5 +508,171 @@ describe('docClient — worker-death recovery on RPC timeout', () => {
     await checkWorkerLiveness();
     await tick();
     expect(created).toHaveLength(0); // never spawns a worker just to ping
+  });
+});
+
+describe('docClient — A1 recovery-rehydrate re-entrancy', () => {
+  beforeEach(() => {
+    __resetDocClientForTesting();
+    vi.clearAllMocks();
+  });
+
+  it('recovery whose rehydrator issues its own RPC completes instead of deadlocking', async () => {
+    vi.useFakeTimers();
+    try {
+      // #1 answers the session load then wedges (getHeads + ping); #2 answers everything.
+      const loadWedge: Responder = (req) =>
+        req.method === 'initAndLoadCache'
+          ? { cid: req.cid, ok: true, result: { loaded: true } }
+          : null;
+      const answersAll: Responder = (req) => {
+        if (req.method === 'getHeads') return { cid: req.cid, ok: true, result: { heads: ['h'] } };
+        if (req.method === 'ping') return { cid: req.cid, ok: true, result: { ok: true } };
+        if (req.method === 'initAndLoadCache')
+          return { cid: req.cid, ok: true, result: { loaded: true } };
+        return null;
+      };
+      useWorkers([loadWedge, answersAll]);
+
+      // A REALISTIC rehydrator that routes back through the client (production's does
+      // initAndLoadCache → request → ensureReady). Without the A1 flag this RPC awaits
+      // the very readyPromise spawn() is still resolving → circular deadlock.
+      setRehydrator(async () => {
+        await getHeads();
+      });
+
+      const load = initAndLoadCache('fam-a1'); // sets currentFamilyId → recovery will rehydrate
+      await vi.advanceTimersByTimeAsync(0);
+      await load;
+
+      const outcome = getHeads().then(
+        (r) => r,
+        (e: Error) => e.message
+      );
+      await vi.advanceTimersByTimeAsync(50_000); // 45s timeout + 5s probe → recover → respawn #2 → rehydrate → retry
+
+      // If the bypass were missing this would still be pending (deadlocked) here.
+      expect(await outcome).toEqual({ heads: ['h'] });
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'doc-worker-recovery',
+          context: expect.objectContaining({ recovery_method: 'getHeads' }),
+        })
+      );
+    } finally {
+      setRehydrator(null);
+      vi.useRealTimers();
+    }
+  });
+
+  it('reset invariant: a throwing rehydrator does not leak the bypass flag (a later death still recovers)', async () => {
+    vi.useFakeTimers();
+    try {
+      // #1 wedges getHeads + ping; #2+ answer getHeads/load but wedge ping + mutate.
+      const loadWedge: Responder = (req) =>
+        req.method === 'initAndLoadCache'
+          ? { cid: req.cid, ok: true, result: { loaded: true } }
+          : null;
+      const readsNoPing: Responder = (req) => {
+        if (req.method === 'getHeads') return { cid: req.cid, ok: true, result: { heads: ['h'] } };
+        if (req.method === 'initAndLoadCache')
+          return { cid: req.cid, ok: true, result: { loaded: true } };
+        return null; // ping + mutate wedge
+      };
+      useWorkers([loadWedge, readsNoPing]);
+
+      // Rehydrator THROWS — spawn()'s finally must still clear `rehydrating`; if it
+      // leaked `true`, the next timeout would hit the A1 reject-self branch and SKIP
+      // recovery/telemetry entirely.
+      setRehydrator(async () => {
+        throw new Error('rehydrate boom');
+      });
+
+      const load = initAndLoadCache('fam-a1-reset');
+      await vi.advanceTimersByTimeAsync(0);
+      await load;
+
+      // Death #1 (getHeads on #1) → recover → respawn #2 (throwing rehydrate, caught) → retry heals on #2.
+      const g = getHeads().then(
+        (r) => r,
+        (e: Error) => e.message
+      );
+      await vi.advanceTimersByTimeAsync(50_000);
+      expect(await g).toEqual({ heads: ['h'] });
+
+      // Death #2 (mutate on #2, non-retryable) → corroboration probe (unanswered) → recover.
+      const m = mutate({ op: 'delete', collection: 'todos', id: 'x' }).then(
+        () => 'resolved',
+        (e: Error) => e.message
+      );
+      await vi.advanceTimersByTimeAsync(50_000);
+      expect(await m).toContain("'mutate' timed out");
+
+      // TWO recoveries reported ⇒ the flag was reset after the throw (else death #2's
+      // timeout would have reject-self'd without recovering).
+      expect(reportError).toHaveBeenCalledTimes(2);
+    } finally {
+      setRehydrator(null);
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('docClient — A7 liveness corroboration', () => {
+  beforeEach(() => {
+    __resetDocClientForTesting();
+    vi.clearAllMocks();
+  });
+
+  it('a false-positive timeout (worker answers the probe) rejects the call but does NOT tear down', async () => {
+    vi.useFakeTimers();
+    try {
+      // The worker never answers getHeads but DOES answer the corroboration ping → alive.
+      const wedgeHeadsLivePing: Responder = (req) =>
+        req.method === 'ping' ? { cid: req.cid, ok: true, result: { ok: true } } : null;
+      const { created } = useWorkers([wedgeHeadsLivePing]);
+
+      const outcome = getHeads().then(
+        () => 'resolved',
+        (e: Error) => e.message
+      );
+      await vi.advanceTimersByTimeAsync(0); // handshake
+      await vi.advanceTimersByTimeAsync(45_000); // getHeads times out → probe ping sent
+      await vi.advanceTimersByTimeAsync(0); // probe answers immediately → false positive
+
+      expect(await outcome).toContain("'getHeads' timed out"); // this call rejects…
+      expect(created).toHaveLength(1); // …but the worker is NOT re-spawned
+      expect(reportError).not.toHaveBeenCalled(); // no recovery — worker is alive
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'doc-worker-recovery',
+          context: expect.objectContaining({ recovery_method: 'liveness-false-positive' }),
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a timed-out corroboration probe does NOT recurse into another ping', async () => {
+    vi.useFakeTimers();
+    try {
+      // A non-retryable mutate isolates ONE death detection (no attempt-2 → no 2nd probe).
+      const fw = useWorker(never); // wedges mutate AND ping → genuine death
+      const outcome = mutate({ op: 'delete', collection: 'todos', id: 'x' }).then(
+        () => 'resolved',
+        (e: Error) => e.message
+      );
+      await vi.advanceTimersByTimeAsync(0); // handshake
+      await vi.advanceTimersByTimeAsync(45_000); // mutate times out → ONE probe ping
+      await vi.advanceTimersByTimeAsync(5_000); // probe ceiling → death; mutate non-retryable → reject
+
+      expect(await outcome).toContain("'mutate' timed out");
+      // Exactly ONE ping was ever posted — the probe never corroborated itself with a
+      // second ping (the `opts.probe` throw-through prevents the recursion).
+      expect(fw.posted.filter((m) => m.method === 'ping')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
