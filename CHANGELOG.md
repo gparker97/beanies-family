@@ -23,6 +23,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Fixed
 
 - **The app now recovers on its own if your data ever stops loading.** On some devices — especially phones after the app has been in the background — the behind-the-scenes engine that loads your family data could go quiet and leave the app stuck, so the only fix was to force-quit and reopen. It now detects that situation, restarts the engine automatically, and retries loading your data, so opening the app just works.
+- **Reliability hardening for loading and saving your data.** A batch of behind-the-scenes fixes to how the app recovers a stalled data engine and to where it saves after you open a saved family file. Opening a file from another account or a restored backup now always re-homes to your own Google Drive (it never writes back into someone else's file), and a single-member file opened via the device picker now reliably gets a proper save location. The "Load a saved family file" option also now stays visible with clear guidance even on browsers that can't open local files, instead of quietly disappearing.
 
 ### Changed
 
