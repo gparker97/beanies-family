@@ -20,6 +20,8 @@ import {
   fireAndForgetMutate,
   mergeRemoteEnvelope,
   setLocalChangeHandler,
+  checkWorkerLiveness,
+  initAndLoadCache,
   type DocWorkerLike,
 } from '../docClient';
 
@@ -57,6 +59,27 @@ function useWorker(responder: Responder): FakeWorker {
   setWorkerFactory(() => fw);
   return fw;
 }
+
+/** Factory that hands out a FRESH worker per spawn (recovery re-spawns), so a
+ * test can make the first worker die and the second heal. `created` records every
+ * worker the client actually spawned. The last responder is reused if the client
+ * spawns more than provided. */
+function useWorkers(responders: Responder[]): { created: FakeWorker[] } {
+  const created: FakeWorker[] = [];
+  let i = 0;
+  setWorkerFactory(() => {
+    const fw = new FakeWorker();
+    fw.responder = responders[Math.min(i, responders.length - 1)]!;
+    i += 1;
+    created.push(fw);
+    return fw;
+  });
+  return { created };
+}
+
+const okHeads: Responder = (req) =>
+  req.method === 'getHeads' ? { cid: req.cid, ok: true, result: { heads: ['h'] } } : null;
+const never: Responder = () => null;
 
 describe('docClient', () => {
   beforeEach(() => {
@@ -287,13 +310,173 @@ describe('docClient — Set-driven two-tier RPC timeout', () => {
       await vi.advanceTimersByTimeAsync(0); // flush the ready handshake
       await vi.advanceTimersByTimeAsync(46_000); // past 45s: mutation budget fires, 120s heavy ceiling does not
 
+      // The light mutate times out at 45s. Because a HEAVY op (merge) is still in
+      // flight — legitimately progressing toward its own 120s ceiling — the mutate
+      // timeout does NOT tear the worker down; it just rejects this one call.
       await expect(mutateOutcome).resolves.toContain("'mutate' timed out");
       expect(await Promise.race([mergeOutcome, Promise.resolve('pending')])).toBe('pending');
 
-      await vi.advanceTimersByTimeAsync(80_000); // past 120s total
+      // The merge hits its 120s heavy ceiling → NOW it's worker-death (a heavy op that
+      // itself timed out). It recovers + auto-retries once (merge is idempotent/retryable),
+      // so it stays pending on the fresh worker rather than rejecting immediately.
+      await vi.advanceTimersByTimeAsync(80_000); // past 120s: attempt-1 heavy timeout → recover + retry
+      expect(await Promise.race([mergeOutcome, Promise.resolve('pending')])).toBe('pending');
+
+      // The retried merge also hits 120s → terminal failure surfaces (no third attempt).
+      await vi.advanceTimersByTimeAsync(125_000);
       await expect(mergeOutcome).resolves.toContain("'mergeRemoteEnvelope' timed out");
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('docClient — worker-death recovery on RPC timeout', () => {
+  beforeEach(() => {
+    __resetDocClientForTesting();
+    vi.clearAllMocks();
+  });
+
+  it('a timed-out RETRYABLE method recovers the worker and heals on a fresh respawn (no toast, no siblings)', async () => {
+    vi.useFakeTimers();
+    try {
+      const { created } = useWorkers([never, okHeads]); // #1 wedges, #2 answers
+      const outcome = getHeads().then(
+        (r) => r,
+        (e: Error) => e.message
+      );
+
+      await vi.advanceTimersByTimeAsync(0); // handshake #1
+      await vi.advanceTimersByTimeAsync(45_000); // attempt-1 timeout → recover → retry → spawn #2 → heal
+
+      expect(await outcome).toEqual({ heads: ['h'] });
+      expect(created).toHaveLength(2); // proves a fresh worker was spawned
+      expect(showToast).not.toHaveBeenCalled(); // silent auto-heal, no siblings
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'doc-worker-recovery',
+          context: expect.objectContaining({ method: 'getHeads', attempt: 1, lostSiblings: false }),
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a timed-out NON-retryable method (mutate) recovers but does NOT retry — surfaces one toast', async () => {
+    vi.useFakeTimers();
+    try {
+      const { created } = useWorkers([never]);
+      const outcome = mutate({ op: 'delete', collection: 'todos', id: 'x' }).then(
+        () => 'resolved',
+        (e: Error) => e.message
+      );
+
+      await vi.advanceTimersByTimeAsync(0); // handshake
+      await vi.advanceTimersByTimeAsync(45_000); // mutation-budget timeout → recover, no retry
+
+      expect(await outcome).toContain("'mutate' timed out");
+      expect(created).toHaveLength(1); // NO re-issue — a mutate must never auto-retry
+      expect(showToast).toHaveBeenCalledTimes(1); // terminal failure surfaced
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a retryable timeout that drains a concurrent mutate fires exactly ONE consolidating toast', async () => {
+    vi.useFakeTimers();
+    try {
+      const { created } = useWorkers([never, okHeads]); // #1 wedges (both calls), #2 answers getHeads
+      const headsOutcome = getHeads().then(
+        (r) => r,
+        (e: Error) => e.message
+      );
+      const mutateOutcome = mutate({ op: 'delete', collection: 'todos', id: 'z' }).then(
+        () => 'resolved',
+        (e: Error) => e.message
+      );
+
+      await vi.advanceTimersByTimeAsync(0); // handshake #1 — both calls now in flight
+      await vi.advanceTimersByTimeAsync(45_000); // both 45s timers fire; getHeads (posted first) drives recovery
+
+      // getHeads heals on #2; the drained mutate cannot be re-issued (rejects).
+      expect(await headsOutcome).toEqual({ heads: ['h'] });
+      expect(await mutateOutcome).not.toBe('resolved');
+      expect(created).toHaveLength(2);
+      // The healing getHeads is silent, but its drained mutate sibling would vanish —
+      // so EXACTLY ONE consolidating toast fires for the lost concurrent work.
+      expect(showToast).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(showToast).mock.calls[0]![3]).toMatchObject({ surface: 'doc-worker' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a retryable method whose respawn ALSO times out surfaces once and does not loop', async () => {
+    vi.useFakeTimers();
+    try {
+      const { created } = useWorkers([never, never]); // both wedge
+      const outcome = getHeads().then(
+        () => 'resolved',
+        (e: Error) => e.message
+      );
+
+      await vi.advanceTimersByTimeAsync(0); // handshake #1
+      await vi.advanceTimersByTimeAsync(45_000); // attempt-1 timeout → retry → spawn #2
+      await vi.advanceTimersByTimeAsync(45_000); // attempt-2 timeout → surface, no third spawn
+
+      expect(await outcome).toContain("'getHeads' timed out");
+      expect(created).toHaveLength(2); // bounded: exactly two attempts
+      expect(showToast).toHaveBeenCalledTimes(1); // single terminal toast (getHeads is non-quiet)
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('checkWorkerLiveness recovers a wedged worker on resume without a toast', async () => {
+    vi.useFakeTimers();
+    try {
+      // #1 answers the session-establishing load but then wedges on ping; #2 answers ping.
+      const loadThenWedge: Responder = (req) =>
+        req.method === 'initAndLoadCache'
+          ? { cid: req.cid, ok: true, result: { loaded: true } }
+          : null;
+      const okPing: Responder = (req) =>
+        req.method === 'ping' ? { cid: req.cid, ok: true, result: { ok: true } } : null;
+      const { created } = useWorkers([loadThenWedge, okPing]);
+
+      const load = initAndLoadCache('fam-1'); // sets currentFamilyId + spawns #1
+      await vi.advanceTimersByTimeAsync(0);
+      await load;
+
+      const probe = checkWorkerLiveness();
+      await vi.advanceTimersByTimeAsync(5_000); // ping ceiling → recover → retry pings #2
+
+      await probe;
+      expect(created).toHaveLength(2); // #1 torn down, #2 spawned
+      expect(showToast).not.toHaveBeenCalled(); // ping is quiet + no siblings
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'doc-worker-recovery' })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('checkWorkerLiveness is a NO-OP when signed out (no currentFamilyId) even with a live worker', async () => {
+    const fw = useWorker(okHeads);
+    await getHeads(); // spawns a live worker, but leaves currentFamilyId null
+    expect(fw.posted.some((m) => m.method === 'getHeads')).toBe(true);
+
+    await checkWorkerLiveness();
+    await tick();
+    expect(fw.posted.some((m) => m.method === 'ping')).toBe(false); // never probed
+  });
+
+  it('checkWorkerLiveness is a NO-OP when no worker was ever spawned', async () => {
+    const { created } = useWorkers([okHeads]);
+    await checkWorkerLiveness();
+    await tick();
+    expect(created).toHaveLength(0); // never spawns a worker just to ping
   });
 });
