@@ -36,6 +36,7 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
   setCachePersistFailedHandler: vi.fn(),
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
+vi.mock('@/services/telemetry', () => ({ logEvent: vi.fn() }));
 
 // Fake CryptoKey for tests (never actually used for encryption because reEncryptEnvelope is mocked)
 const fakeFamilyKey = {} as CryptoKey;
@@ -57,6 +58,7 @@ describe('syncService — save failure tracking', () => {
   // correct, just CPU-contended, not a hang.
   beforeEach(async () => {
     vi.resetModules();
+    vi.clearAllMocks(); // resetModules doesn't clear vi.fn call history — isolate counts
     syncService = await import('../syncService');
     // V4 save() requires family key and envelope to be set
     syncService.setFamilyKey(fakeFamilyKey, fakeEnvelope);
@@ -274,6 +276,77 @@ describe('syncService — save failure tracking', () => {
     it('reset() clears cache failure state', () => {
       syncService.reset();
       expect(syncService.isCachePersistFailed()).toBe(false);
+    });
+  });
+
+  describe('cache-persist telemetry (#50)', () => {
+    // Grab the `setCachePersistFailed` function syncService wires into the worker
+    // handler, so we can drive a failure/recovery edge exactly as the worker would.
+    async function wiredHandler() {
+      syncService.registerDocPersistCallback();
+      const docClient = await import('@/services/automerge/worker/docClient');
+      const calls = vi.mocked(docClient.setCachePersistFailedHandler).mock.calls;
+      const fn = calls.at(-1)?.[0];
+      if (!fn) throw new Error('setCachePersistFailedHandler was not wired');
+      return fn;
+    }
+
+    it('a failure edge fires reportError(warning) once with kind + error context', async () => {
+      const handler = await wiredHandler();
+      const { reportError } = await import('@/utils/errorReporter');
+      const { logEvent } = await import('@/services/telemetry');
+
+      handler(true, { kind: 'increment', errorName: 'QuotaExceededError' });
+
+      expect(reportError).toHaveBeenCalledTimes(1);
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'cache-persist',
+          severity: 'warning',
+          context: { cache_persist_kind: 'increment', cache_persist_error: 'QuotaExceededError' },
+        })
+      );
+      expect(logEvent).not.toHaveBeenCalled();
+      expect(syncService.isCachePersistFailed()).toBe(true);
+    });
+
+    it('is edge-triggered: a second failure in the same episode does not re-report', async () => {
+      const handler = await wiredHandler();
+      const { reportError } = await import('@/utils/errorReporter');
+
+      handler(true, { kind: 'base', errorName: 'InvalidStateError' });
+      handler(true, { kind: 'increment', errorName: 'QuotaExceededError' }); // still failed → no new edge
+
+      expect(reportError).toHaveBeenCalledTimes(1);
+    });
+
+    it('a recovery edge fires logEvent(info) once, not reportError', async () => {
+      const handler = await wiredHandler();
+      const { reportError } = await import('@/utils/errorReporter');
+      const { logEvent } = await import('@/services/telemetry');
+
+      handler(true, { kind: 'base', errorName: 'InvalidStateError' });
+      vi.mocked(reportError).mockClear();
+      handler(false); // recovery
+
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'cache-persist', level: 'info' })
+      );
+      expect(reportError).not.toHaveBeenCalled();
+      expect(syncService.isCachePersistFailed()).toBe(false);
+    });
+
+    it('reset() during a failure clears the flag SILENTLY (no false recovery event)', async () => {
+      const handler = await wiredHandler();
+      const { logEvent } = await import('@/services/telemetry');
+
+      handler(true, { kind: 'base', errorName: 'QuotaExceededError' });
+      vi.mocked(logEvent).mockClear();
+
+      syncService.reset();
+
+      expect(syncService.isCachePersistFailed()).toBe(false); // banner clears
+      expect(logEvent).not.toHaveBeenCalled(); // but NO 'cache-persist recovered'
     });
   });
 

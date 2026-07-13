@@ -15,12 +15,15 @@
 import { applyChunk, bumpDocVersion } from '../projection';
 import { record as recordPerf } from '@/utils/perfTiming';
 import { configure, dispatch, type WorkerSink } from './applyAndProject';
-import type { ProjectionDelta } from './protocol';
+import type { ProjectionDelta, CachePersistFailureDetail } from './protocol';
 
-let cachePersistFailedHandler: ((failed: boolean) => void) | null = null;
+let cachePersistFailedHandler:
+  ((failed: boolean, detail?: CachePersistFailureDetail) => void) | null = null;
 
 /** Task #5: observe worker/inline cache-persist failures (durability banner). */
-export function setInlineCachePersistFailedHandler(fn: ((failed: boolean) => void) | null): void {
+export function setInlineCachePersistFailedHandler(
+  fn: ((failed: boolean, detail?: CachePersistFailureDetail) => void) | null
+): void {
   cachePersistFailedHandler = fn;
 }
 
@@ -32,8 +35,8 @@ const mainSink: WorkerSink = {
   perf(label, durationMs, ctx) {
     recordPerf(label, durationMs, ctx);
   },
-  cachePersistFailed(failed) {
-    cachePersistFailedHandler?.(failed);
+  cachePersistFailed(failed, detail) {
+    cachePersistFailedHandler?.(failed, detail);
   },
 };
 

@@ -37,6 +37,7 @@ import {
   type ProjectionDelta,
   type MutationOp,
   type Heads,
+  type CachePersistFailureDetail,
 } from './protocol';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 
@@ -89,7 +90,8 @@ let needsRehydrate = false;
 
 /** Notified when the worker's debounced cache persist fails (or recovers) — Task
  * #5 wires this to the persistent "local durability broken" banner. */
-let cachePersistFailedHandler: ((failed: boolean) => void) | null = null;
+let cachePersistFailedHandler:
+  ((failed: boolean, detail?: CachePersistFailureDetail) => void) | null = null;
 
 /** Notified after every successful local `mutate` — syncService maps it to a
  * debounced Drive save (replaces the old `onDocPersistNeeded` fan-out; the worker
@@ -117,7 +119,9 @@ export function setRehydrator(fn: ((familyId: string) => Promise<void>) | null):
   rehydrator = fn;
 }
 /** Task #5: observe worker cache-persist failures (durability banner). */
-export function setCachePersistFailedHandler(fn: ((failed: boolean) => void) | null): void {
+export function setCachePersistFailedHandler(
+  fn: ((failed: boolean, detail?: CachePersistFailureDetail) => void) | null
+): void {
   cachePersistFailedHandler = fn;
 }
 /** Task #5: called after every successful local mutate (→ debounced Drive save). */
@@ -180,7 +184,7 @@ function handleSignal(sig: WorkerSignal): void {
       }
       break;
     case 'cache-persist-failed':
-      cachePersistFailedHandler?.(sig.failed);
+      cachePersistFailedHandler?.(sig.failed, sig.detail);
       break;
   }
 }

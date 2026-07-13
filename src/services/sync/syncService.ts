@@ -15,6 +15,8 @@ import { GoogleDriveProvider } from './providers/googleDriveProvider';
 import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, detectFileVersion } from './fileSync';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { setInlineCachePersistFailedHandler } from '@/services/automerge/worker/inlineBridge';
+import type { CachePersistFailureDetail } from '@/services/automerge/worker/protocol';
+import { logEvent } from '@/services/telemetry';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
 import type { StorageProvider, StorageProviderType } from './storageProvider';
@@ -264,10 +266,38 @@ let cachePersistFailed = false;
 type CacheFailureCallback = (failed: boolean) => void;
 const cacheFailureCallbacks: CacheFailureCallback[] = [];
 
-function setCachePersistFailed(failed: boolean): void {
+function setCachePersistFailed(
+  failed: boolean,
+  detail?: CachePersistFailureDetail,
+  opts?: { silent?: boolean }
+): void {
   if (cachePersistFailed !== failed) {
     cachePersistFailed = failed;
-    cacheFailureCallbacks.forEach((cb) => cb(failed));
+    cacheFailureCallbacks.forEach((cb) => cb(failed)); // subscribers see the boolean only
+    // Telemetry is edge-triggered (once per episode/recovery) and covers both the
+    // worker + inline paths at this one site. `silent` lets a lifecycle reset() clear
+    // the banner WITHOUT firehosing a false "recovered" event for an abandoned episode.
+    if (!opts?.silent) emitCachePersistTelemetry(failed, detail);
+  }
+}
+
+/** Single home for the cache-persist telemetry policy. Reached only on an edge
+ * transition (see the `!==` guard above), so it fires once per real episode/recovery.
+ * `reportError({severity:'warning'})` mirrors into the CloudWatch firehose at `warn`
+ * with NO Slack page (errorReporter.ts) — that IS the failure event, so we do NOT add
+ * a second logEvent for it. The recovery is an `info` event, so it uses logEvent.
+ * family_id / web_storage / provider_type / browser ride along automatically via
+ * enrichAndRedact. See docs/plans/2026-07-13-cache-persist-durability-signal.md. */
+function emitCachePersistTelemetry(failed: boolean, detail?: CachePersistFailureDetail): void {
+  if (failed) {
+    reportError({
+      surface: 'cache-persist',
+      message: 'Local durability cache write failed (persistent)',
+      severity: 'warning',
+      context: { cache_persist_kind: detail?.kind, cache_persist_error: detail?.errorName },
+    });
+  } else {
+    logEvent({ level: 'info', surface: 'cache-persist', message: 'cache-persist recovered' });
   }
 }
 
@@ -480,7 +510,9 @@ export function reset(): void {
   lastKnownFileTimestamp = null;
   lastPersistedBytes = null;
   resetSaveFailures();
-  setCachePersistFailed(false);
+  // Clear the durability banner on teardown, but SILENTLY — a logout / family-switch
+  // is not a recovery; emitting "cache-persist recovered" here would corrupt the metric.
+  setCachePersistFailed(false, undefined, { silent: true });
   updateState({
     isInitialized: false,
     isConfigured: false,

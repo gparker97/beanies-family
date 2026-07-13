@@ -10,9 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-07-13
 
+### Added
+
+- **A clear warning now appears across the top of the app if your device can't save your data locally.** Previously this durability warning was tucked inside Settings, where you might never notice it. It links to an explanation and clears itself automatically once saving recovers. (Your data on Google Drive is always the safe copy.)
+
 ### Changed
 
 - **Internal:** the background incremental-sync path now reports structured diagnostics to our monitoring (previously invisible) — no user-facing change, but it lets us catch and fix sync issues without needing to reproduce them. Also stamps each saved family-data file with the app version that wrote it.
+- **Internal:** a failed local-save (cache-persist) now reports to our monitoring with which write failed and why, so we can detect and diagnose durability issues without needing to reproduce them.
 
 ### Fixed
 

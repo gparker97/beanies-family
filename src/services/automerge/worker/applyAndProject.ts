@@ -40,7 +40,7 @@ import {
 } from './docOps';
 import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
 import * as cache from './cache';
-import type { MutationOp, ProjectionDelta, Heads } from './protocol';
+import type { MutationOp, ProjectionDelta, Heads, CachePersistFailureDetail } from './protocol';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 type PerfCtx = Record<string, number>;
@@ -52,8 +52,9 @@ export interface WorkerSink {
   pushChunk(delta: ProjectionDelta, final: boolean): void;
   /** Relay a heavy-op timing sample (replayed through main-thread telemetry). */
   perf(label: string, durationMs: number, ctx?: PerfCtx): void;
-  /** The debounced cache persist failed (or recovered) → durability banner. */
-  cachePersistFailed(failed: boolean): void;
+  /** The debounced cache persist failed (or recovered) → durability banner. On a
+   * failure, `detail` names which write failed + its error class (triage). */
+  cachePersistFailed(failed: boolean, detail?: CachePersistFailureDetail): void;
 }
 
 const NOOP_SINK: WorkerSink = { pushChunk() {}, perf() {}, cachePersistFailed() {} };
@@ -164,8 +165,13 @@ async function persistOnce(): Promise<void> {
   if (!currentDoc || !familyKey || !cache.isCacheReady()) return;
   const doc = currentDoc;
   const key = familyKey;
+  // Track which write is in flight so the failure signal can carry `kind` — MUST be
+  // explicit, not inferred from lastPersistedHeads (the re-compaction writeBase below
+  // runs with a non-null lastPersistedHeads and would be mislabeled 'increment').
+  let writeKind: 'base' | 'increment' = 'base';
   try {
     if (lastPersistedHeads === null) {
+      writeKind = 'base';
       await writeBase(key, doc);
     } else {
       const captureHeads = headsOf(doc);
@@ -176,22 +182,27 @@ async function persistOnce(): Promise<void> {
       }
       const framed = frameChanges(changes);
       const start = performance.now();
+      writeKind = 'increment';
       await cache.persistIncrement(key, framed);
       sink.perf('automerge.saveIncremental', performance.now() - start, {
         perf_chunk_bytes: framed.byteLength,
       });
       if (currentDoc === doc) lastPersistedHeads = captureHeads;
       if (cache.incrementCount() >= INCREMENT_COMPACTION_THRESHOLD) {
+        writeKind = 'base';
         await writeBase(key, doc); // re-compaction: fresh base drops the increments
       }
     }
     markPersistOk();
   } catch (e) {
     // A durable-cache write failure is the "local durability broken" signal —
-    // surface it (persistent banner on main), don't swallow it. `lastPersistedHeads`
-    // is NOT advanced on failure → the delta is re-captured next tick.
+    // surface it (persistent banner on main + telemetry), don't swallow it.
+    // `lastPersistedHeads` is NOT advanced on failure → the delta is re-captured
+    // next tick. The console.error is the worker's only local channel (it can't
+    // reach logEvent/reportError) — keep it; the signal carries triage detail.
     cachePersistFailed = true;
-    sink.cachePersistFailed(true);
+    const errorName = e instanceof Error ? e.name : 'UnknownError';
+    sink.cachePersistFailed(true, { kind: writeKind, errorName });
     console.error('[applyAndProject] cache persist failed', e);
   }
 }

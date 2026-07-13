@@ -136,6 +136,12 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'incr_chunk_count',
   'incr_seq',
   'incr_dirty',
+  // Local-durability cache-persist failure (surface `cache-persist`, see
+  // services/sync/syncService.ts). PII-free: which write failed (base/increment) +
+  // the IDB error class name. Added 2026-07-13 (#50). MIRROR in the Lambda allowlist
+  // + its pinned test.
+  'cache_persist_kind',
+  'cache_persist_error',
 ]);
 
 export const MAX_STRING_LEN = 200;

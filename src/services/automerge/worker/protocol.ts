@@ -105,6 +105,15 @@ export interface RpcErr {
 
 export type RpcResponse = RpcOk | RpcErr;
 
+/** Which cache write failed + its error class — small triage detail carried on a
+ * `cache-persist-failed: true` signal so a durability failure is diagnosable blind
+ * (see docs/plans/2026-07-13-cache-persist-durability-signal.md). Only `e.name`
+ * crosses the postMessage boundary (PII-free; no stack/message). */
+export interface CachePersistFailureDetail {
+  kind: 'base' | 'increment';
+  errorName: string;
+}
+
 /** Unsolicited worker → main messages (no correlation id). */
 export type WorkerSignal =
   | { signal: 'ready' }
@@ -125,7 +134,7 @@ export type WorkerSignal =
    * cache post-migration, so this replaces the old main-thread
    * `setCachePersistFailed` coupling. See ADR-032 (Persist/Drive split).
    */
-  | { signal: 'cache-persist-failed'; failed: boolean };
+  | { signal: 'cache-persist-failed'; failed: boolean; detail?: CachePersistFailureDetail };
 
 /** Type guards for routing an inbound worker message. */
 export function isRpcResponse(m: unknown): m is RpcResponse {

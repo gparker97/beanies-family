@@ -47,6 +47,19 @@ describe('ErrorBanner', () => {
     expect(banner.classes().some((c) => c.startsWith('bg-amber'))).toBe(true);
   });
 
+  it('uses Heritage-Orange styling + role=status + polite for notice severity (#50)', () => {
+    const wrapper = mount(ErrorBanner, {
+      props: { show: true, severity: 'notice' },
+      slots: { title: 't', message: 'm' },
+    });
+    // notice is a self-recovering status, not an urgent alert.
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    const banner = wrapper.find('[role="status"]');
+    expect(banner.exists()).toBe(true);
+    expect(banner.attributes('aria-live')).toBe('polite');
+    expect(banner.classes().some((c) => c.startsWith('bg-primary'))).toBe(true);
+  });
+
   it('defaults severity to critical when omitted', () => {
     const wrapper = mount(ErrorBanner, {
       props: { show: true },
