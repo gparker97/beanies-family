@@ -152,5 +152,17 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: family.beanies.app
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
-          track: ${{ inputs.track }}
+          # `tracks` (plural) is the current input; `track` (singular) is deprecated.
+          # A single track name is accepted here.
+          tracks: ${{ inputs.track }}
+          # status: completed + changesNotSentForReview: false → the release is
+          # published to the track AND auto-submitted for Google review, so there is
+          # no manual "Submit for review" click-through in Play Console. (Uploading
+          # straight to the target track this way also avoids the draft that a manual
+          # internal→closed promotion creates.)
+          # Caveat: until this app has had its FIRST production release approved, the
+          # Play API can reject auto-submit and demand a one-time manual review
+          # submission — if a run fails with that error, set this to `true` for that
+          # run, submit once in the console, then flip it back.
           status: completed
+          changesNotSentForReview: false
