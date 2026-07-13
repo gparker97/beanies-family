@@ -17,6 +17,15 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.13',
+    date: '2026-07-13',
+    month: '13 july 2026',
+    summary: {
+      en: "Reliability improvements so your family's data loads and saves more dependably.",
+      beanie: "reliability improvements so your family's data loads and saves more dependably.",
+    },
+  },
+  {
     version: '2026.07.09',
     date: '2026-07-09',
     month: '9 july 2026',
