@@ -22,6 +22,7 @@
 import { withTimeout } from '@/utils/timing';
 import { record as recordPerf } from '@/utils/perfTiming';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { showToast } from '@/composables/useToast';
 import { CorruptPayloadError } from '@/types/sync';
 import { applyDelta, applyChunk, bumpDocVersion, resetProjection } from '../projection';
@@ -87,6 +88,18 @@ let familyKey: CryptoKey | null = null;
 let currentFamilyId: string | null = null;
 let rehydrator: ((familyId: string) => Promise<void>) | null = null;
 let needsRehydrate = false;
+
+// A1: true ONLY while `spawn()` awaits the rehydrator (set/cleared in spawn()'s
+// try/finally — toggled NOWHERE else). `readyPromise` deliberately conflates
+// "worker ready" with "rehydrate complete" so every OTHER in-flight RPC blocks
+// until the doc is reloaded from cache (the read-after-respawn barrier). But the
+// rehydrator itself routes back through `requestCore → ensureReady()`, which would
+// await that same still-pending `readyPromise` → circular deadlock. This flag lets
+// ONLY the rehydrate RPC bypass `ensureReady()` and post directly, keeping every
+// other caller blocked. Invariant: a leaked `true` would wedge every future RPC
+// into the bypass, so it is confined to spawn()'s try/finally and asserted false
+// by the reset-invariant test.
+let rehydrating = false;
 
 /** Notified when the worker's debounced cache persist fails (or recovers) — Task
  * #5 wires this to the persistent "local durability broken" banner. */
@@ -300,10 +313,18 @@ async function spawn(): Promise<'worker' | 'inline'> {
   if (familyKey) postRaw({ cid: nextCid++, method: 'setKey', args: { key: familyKey } });
   if (needsRehydrate && currentFamilyId && rehydrator) {
     needsRehydrate = false;
+    // A1: the rehydrator routes back through requestCore → ensureReady(), which
+    // would await this still-pending `readyPromise` → deadlock. `rehydrating`
+    // lets its RPCs bypass ensureReady() and post directly. Set here, cleared in
+    // `finally` on BOTH the success and throw paths (the invariant the reset test
+    // guards) — toggled nowhere else.
+    rehydrating = true;
     try {
       await rehydrator(currentFamilyId);
     } catch (e) {
       console.error('[docClient] re-hydrate after respawn failed', e);
+    } finally {
+      rehydrating = false;
     }
   }
   return 'worker';
@@ -411,6 +432,11 @@ interface RequestOpts {
   /** Suppress the auto-toast; the caller classifies (expected-degradation paths). */
   quiet?: boolean;
   timeoutMs?: number;
+  /** A7: mark this call a pure liveness probe. On timeout it does NOT recover the
+   * worker, report telemetry, or auto-retry — it just throws. Used ONLY by the
+   * corroboration ping so the *outer* op that triggered it owns the recover+report
+   * (with the real method, not 'ping') and the probe can't recurse into another ping. */
+  probe?: boolean;
 }
 
 /** Send one RPC (worker or inline) and return its `{result, changed}`. Applies the
@@ -423,7 +449,13 @@ async function requestCore(
   opts: RequestOpts,
   attempt = 1
 ): Promise<{ result: unknown; changed?: boolean }> {
-  const via = await ensureReady();
+  // A1: the rehydrate RPCs are issued from INSIDE spawn()'s awaited rehydrator, so
+  // they must NOT await `ensureReady()` — that awaits the very `readyPromise`
+  // spawn() is still resolving → circular deadlock. Bypass the barrier for exactly
+  // those calls and post directly (at this point mode==='worker' and worker is
+  // non-null — spawn() is past its handshake). Every OTHER caller still blocks on
+  // ensureReady() until rehydrate lands (the read-after-respawn barrier).
+  const via = rehydrating && mode === 'worker' && worker ? 'worker' : await ensureReady();
   if (via === 'inline') {
     if (!inlineExecutor) {
       throw new DocWorkerError(
@@ -455,25 +487,74 @@ async function requestCore(
     // it down, so without this the client re-posts to the corpse forever until the
     // user force-quits. Treat it as a death signal: recover, then heal or surface.
     pending.delete(cid); // drop THIS call first…
-    // A LIGHT op can legitimately time out (45 s) while a HEAVY whole-doc op is still
-    // progressing toward its 120 s ceiling — the light one is queued behind it in the
-    // worker's serial FIFO, which is NOT proof the worker is dead. Tearing the worker
-    // down here would abort (and, with retry, restart) a slow-but-progressing large-doc
-    // load — the exact case the 120 s ceiling exists to protect. So only treat a timeout
-    // as worker-death when the timed-out op is ITSELF heavy (it hit 120 s → genuinely
-    // wedged) or no heavy op is in flight to still be progressing. A truly-dead worker
-    // still recovers: its pending heavy op hits 120 s and recovers on that timeout.
-    const heavyStillInFlight = [...pending.values()].some((p) => HEAVY_METHODS.has(p.method));
-    if (!HEAVY_METHODS.has(method) && heavyStillInFlight) {
-      throw surface(timeoutErr, method, opts.quiet); // reject just this call; leave the worker to finish
+
+    // A1: a rehydrate RPC that times out must reject ONLY itself. Calling
+    // recoverDeadWorker mid-spawn would reset `readyPromise` / tear down the worker
+    // we're still rehydrating and re-enter. spawn()'s own catch then logs + continues
+    // (a genuinely wedged worker is caught by the next real RPC's normal timeout path).
+    if (rehydrating) {
+      throw surface(timeoutErr, method, opts.quiet);
     }
-    const lostSiblings = pending.size > 0; // …so this counts only OTHER in-flight calls
+
+    // A7: a pure liveness probe (the corroboration ping below) never recovers, reports,
+    // or retries — it just throws so its caller learns "worker dead" and owns the
+    // recovery. This is also what stops a probe from recursing into another probe.
+    if (opts.probe) {
+      throw surface(timeoutErr, method, opts.quiet);
+    }
+
+    // A7: before declaring the worker dead, corroborate — UNLESS this IS a ping
+    // (`checkWorkerLiveness`'s own probe; a ping timeout is already the death signal,
+    // and re-pinging would recurse).
+    if (method !== 'ping') {
+      // A LIGHT op can legitimately time out (45 s) while a HEAVY whole-doc op is still
+      // progressing toward its 120 s ceiling — the light one is queued behind it in the
+      // worker's serial FIFO, which is NOT proof the worker is dead. Likewise, a live
+      // in-flight `mutate` means the worker has real work in hand. Tearing the worker
+      // down here would abort a slow-but-progressing large-doc load / drop the mutate —
+      // the exact cases we must protect. So spare the worker (reject only this call)
+      // whenever a heavy op OR a mutate is still in flight.
+      const heavyStillInFlight = [...pending.values()].some((p) => HEAVY_METHODS.has(p.method));
+      const mutateStillInFlight = [...pending.values()].some((p) => p.method === 'mutate');
+      if (!HEAVY_METHODS.has(method) && (heavyStillInFlight || mutateStillInFlight)) {
+        throw surface(timeoutErr, method, opts.quiet); // reject just this call; leave the worker to finish
+      }
+
+      // Corroborate death with a fast liveness PROBE (a ping that never recovers/reports
+      // on its own — see `opts.probe` above). If it answers, the worker is alive-but-busy
+      // → false positive → reject only this call, worker untouched. If it times out, the
+      // worker is confirmed dead → fall through to the shared teardown below (which owns
+      // the recover + report with THIS real method, so telemetry isn't reduced to 'ping').
+      let pingAnswered = false;
+      try {
+        await request('ping', undefined, { quiet: true, timeoutMs: PING_TIMEOUT_MS, probe: true });
+        pingAnswered = true;
+      } catch {
+        /* probe timed out → worker confirmed dead → fall through to teardown */
+      }
+      if (pingAnswered) {
+        logEvent({
+          level: 'info',
+          surface: 'doc-worker-recovery',
+          message: `doc-worker '${method}' timed out but a liveness ping answered — worker alive, not torn down`,
+          context: { recovery_method: 'liveness-false-positive', recovery_attempt: attempt },
+        });
+        throw surface(timeoutErr, method, opts.quiet);
+      }
+      // else: fall through to the shared teardown path.
+    }
+
+    // Teardown path — reached by a genuine ping timeout (`checkWorkerLiveness`) OR a
+    // non-ping op whose corroboration probe confirmed death. Tear the worker down
+    // (idempotent), report once with the renamed A9 keys (no longer stripped) carrying
+    // the REAL method, then retry-or-reject.
+    const lostSiblings = pending.size > 0; // counts OTHER in-flight calls drained by recovery
     recoverDeadWorker(`rpc-timeout:${method}`); // drains siblings (quiet) + tears down → next request re-spawns
     reportError({
       surface: 'doc-worker-recovery',
       message: `doc-worker '${method}' timed out — worker recovered; next request re-spawns a fresh worker`,
       severity: 'warning', // telemetry + console only — never pages, never toasts
-      context: { method, attempt, lostSiblings },
+      context: { recovery_method: method, recovery_attempt: attempt, lost_siblings: lostSiblings },
     });
     if (attempt === 1 && RETRYABLE_METHODS.has(method)) {
       // This idempotent call heals transparently on the fresh worker. But any SIBLING
@@ -485,7 +566,7 @@ async function requestCore(
       if (lostSiblings) surface(timeoutErr, method, false);
       return requestCore(method, args, opts, 2); // fresh ensureReady() re-spawns + rehydrates
     }
-    // Non-retryable (or retry exhausted): surface() throws AND fires the single toast,
+    // Non-retryable or retry exhausted: surface() throws AND fires the single toast,
     // which already covers any drained siblings — no separate sibling toast needed.
     throw surface(timeoutErr, method, opts.quiet);
   }
@@ -717,6 +798,7 @@ export function __resetDocClientForTesting(): void {
   familyKey = null;
   currentFamilyId = null;
   needsRehydrate = false;
+  rehydrating = false;
   inlineExecutor = null;
   rehydrator = null;
   cachePersistFailedHandler = null;

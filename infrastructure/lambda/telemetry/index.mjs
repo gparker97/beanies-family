@@ -92,6 +92,12 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   // IDB error-class name.
   'cache_persist_kind',
   'cache_persist_error',
+  // Doc-worker death-recovery diagnostics (added 2026-07-13, A9 review-fix; mirror
+  // of the client allowlist). PII-free: timed-out method name, recovery attempt
+  // count, drained-siblings bool.
+  'recovery_method',
+  'recovery_attempt',
+  'lost_siblings',
 ]);
 
 function getHeaders(event) {
