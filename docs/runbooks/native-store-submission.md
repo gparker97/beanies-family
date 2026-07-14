@@ -114,6 +114,19 @@ The two-files-must-sync table and `keytool` commands live in `public/.well-known
 the authority; follow it. Because this step can't be caught by grep, it's guarded by the on-device
 verification in §5 (App Links won't verify if either origin was missed).
 
+> **⚠️ Also list the Upload key SHA-256 if you test via Internal App Sharing or sideload.** Only builds
+> installed from a Play **testing track** are re-signed with the **App signing key** (`18:76…`). Builds
+> installed via **Internal App Sharing** (the "copy a link from Play Console and follow it" flow) or a
+> sideloaded APK/bundletool keep your **Upload key** signature (`D1:E7…`). If the upload-key fingerprint
+> is absent from `assetlinks.json`, on-device passkey `create()` fails RP-ID validation with
+> **"RP ID cannot be validated."** (and native OAuth App Links silently fall back to the browser) — even
+> though Google's DAL check API reports `linked: true` for the App-signing key. Symptom is immune to
+> GMS cache-clear/reboot because the rejection is _correct_ for an unauthorized cert. Diagnose with:
+> `curl "https://digitalassetlinks.googleapis.com/v1/assetlinks:check?source.web.site=https://app.beanies.family&relation=delegate_permission/common.get_login_creds&target.android_app.package_name=family.beanies.app&target.android_app.certificate.sha256_fingerprint=<FP>"`.
+> The three currently-authorized fingerprints (debug `19:E4`, App-signing `18:76`, Upload `D1:E7`) are all
+> greg-controlled; the upload key can be dropped before public GA (end users only ever get the Play-signed
+> build). All three live in **both** files.
+
 **3c. Repo secrets.** Android release lane (`mobile-android-release.yml` preflight enforces the first
 two): `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
 `ANDROID_KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`. iOS lane (`mobile-ios-release.yml` header lists

@@ -4,6 +4,15 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## "RP ID cannot be validated" on native passkeys = signing-cert not in assetlinks, and the install method decides which cert
+
+**Date:** 2026-07-14
+**Context:** 0.9.5 shipped a large PRF rebuild for native biometric (#52), but greg's Pixel still failed enable with the friendly "something went wrong with biometric unlock." The `passkey-prf` telemetry the plan added surfaced the real error to CloudWatch: `create()` throwing **"RP ID cannot be validated."** with **zero** `prf_enable_result` events — i.e. it dies at RP-ID validation, entirely upstream of every line the PRF fix touched. The whole PRF rebuild was downstream of a step that never succeeded. Two cheap discriminators nailed it: (1) Google's **Digital Asset Links check API** (`digitalassetlinks.googleapis.com/v1/assetlinks:check`) reported `linked: true` for the App-signing key (`18:76`) and debug key (`19:E4`) but had no statement for the **Upload key** (`D1:E7`); (2) greg's install method — "copied a link from Play Console and followed it" = **Internal App Sharing**, which ships the build **upload-key-signed**, NOT re-signed by Play App Signing. The upload-key cert wasn't authorized in `assetlinks.json`, so GMS was _correctly_ rejecting it. Cache-clear + reboot did nothing (the rejection was correct for that cert), which is itself a tell.
+
+**Rule:** When native WebAuthn `create()`/`get()` fails "RP ID cannot be validated" (Android) — don't reach for the PRF/crypto layer; it's a **Digital Asset Links / signing-cert** problem. Confirm the site→app association from the outside with the DAL check API (it validates per-fingerprint, so you learn _which_ certs are authorized), then ask **how the build was installed**, because that decides the on-device signing cert: a Play **testing track** re-signs with the **App signing key** (`18:76`); **Internal App Sharing** or a **sideloaded APK/bundletool** keep the **Upload key** (`D1:E7`); local debug uses the debug key (`19:E4`). List every cert you actually test with in **both** `assetlinks.json` files (`public/` = app.beanies.family passkeys, `web/public/` = beanies.family OAuth App Links). A green DAL check for one cert + a device that keeps failing = you're testing a build signed with a _different_ cert. This is the [[get-cheapest-discriminating-observation]] rule applied: the telemetry error + the DAL API + the install-method question each cost seconds and each ruled out a whole branch.
+
+---
+
 ## Get the cheapest discriminating observation before proposing a mechanism
 
 **Date:** 2026-07-09
