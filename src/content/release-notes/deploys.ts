@@ -17,6 +17,15 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.14',
+    date: '2026-07-14',
+    month: '14 july 2026',
+    summary: {
+      en: 'Behind-the-scenes improvements to biometric sign-in, and polish for the app.',
+      beanie: 'behind-the-scenes improvements to biometric sign-in, and polish for the app.',
+    },
+  },
+  {
     version: '2026.07.13',
     date: '2026-07-13',
     month: '13 july 2026',
