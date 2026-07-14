@@ -21,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **The biometric list now shows the correct unlock type** ("Full unlock" for passwordless biometric vs "Cached password"), instead of always showing "Cached password." _(web/PWA)_
 - **Biometric (Face ID / fingerprint) unlock on native now fails gracefully instead of showing a raw error.** If a device can't complete biometric setup, the app falls back to password sign-in with a friendly message instead of a confusing error.
 - **Android: the black band across the top status-bar area is gone** — the app background now fills the screen edge-to-edge, in both light and dark mode, matching the web app. _(Reaches installed apps with the next mobile build.)_
+- **Signing in with biometrics no longer gets stuck on "verifying."** After a successful fingerprint/Face unlock, a slow or unavailable cloud save could leave the button spinning indefinitely. The save is now time-bounded, so you're taken straight into the app and it finishes saving in the background. The same guard now covers biometric sign-in, password sign-in, and cross-device setup. _(Reaches the installed Android/iOS apps with the next mobile build.)_
 
 ## 2026-07-13
 

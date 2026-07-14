@@ -7,6 +7,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { raceTimeout } from '@/utils/timing';
 
 const props = defineProps<{
   familyId: string;
@@ -96,7 +97,11 @@ async function handleBiometricLogin() {
       }
 
       syncStore.setupAutoSync();
-      await syncStore.syncNow(true);
+      // Best-effort Drive push — never hang the "verifying" spinner on it. A slow/
+      // offline/token-rejected save would otherwise freeze the button indefinitely
+      // (the biometric unlock has already succeeded and the doc is decrypted in
+      // memory + cache; the push rides the next auto-sync). Mirrors register. (2026-07-14)
+      await raceTimeout(syncStore.syncNow(true), 5000);
       emit('signed-in', '/nook');
     }
   } catch (err) {
