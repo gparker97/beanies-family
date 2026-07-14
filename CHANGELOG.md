@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-14
+
+### Fixed
+
+- **Biometric (Face ID / fingerprint) unlock can now be turned on in the installed iOS and Android apps.** Enabling it previously failed with a raw error on native — it now works the first time and every time, matching the web app. If a device genuinely can't support it, the app falls back to password sign-in with a friendly message instead of offering something that won't work. _(Reaches installed apps with the next mobile build.)_
+- **Android: the black band across the top status-bar area is gone** — the app background now fills the screen edge-to-edge, in both light and dark mode, matching the web app. _(Reaches installed apps with the next mobile build.)_
+
 ## 2026-07-13
 
 ### Added
