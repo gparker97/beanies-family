@@ -9,7 +9,6 @@
 
 import {
   getPRFOutput,
-  buildPRFEnableExtension,
   buildPRFEvalExtension,
   deriveWrappingKey,
   generateHKDFSalt,
@@ -17,6 +16,7 @@ import {
   unwrapDEK,
 } from './passkeyCrypto';
 import * as passkeyRepo from '@/services/indexeddb/repositories/passkeyRepository';
+import * as nativeBiometric from './nativeBiometric';
 import type { PasskeyRegistration, PasskeySecret } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 import { getGlobalSettings } from '@/services/indexeddb/repositories/globalSettingsRepository';
@@ -24,31 +24,30 @@ import { importFamilyKey } from '@/services/crypto/familyKeyService';
 import { isNative, getPlatform } from '@/services/sync/capabilities';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { useTranslationStore } from '@/stores/translationStore';
+import {
+  isBiometricOfferSuppressed,
+  suppressBiometricOffer,
+  clearBiometricSuppression,
+  describeAuthError,
+  guessAuthenticatorLabel,
+  tr,
+} from './biometricShared';
+
+// Re-exported for back-compat: `guessAuthenticatorLabel` now lives in the leaf
+// `biometricShared` module (so the native Keystore path can reuse it without an
+// import cycle), but existing callers import it from here.
+export { guessAuthenticatorLabel };
 
 const RP_NAME = 'beanies.family';
 
-// Fixed WebAuthn Relying Party ID for native apps. The native WebView serves
-// from `https://localhost`, which is NOT a usable RP ID and doesn't match the
-// PWA's credentials — so on native we assert against the production app domain,
-// authorized by the Digital-Asset-Links (Android) / AASA (iOS) association we
-// host at `https://app.beanies.family/.well-known/`. This MUST equal the host
-// the existing PWA passkeys were registered under (`window.location.hostname`
-// on the live PWA) or those credentials would be orphaned. It is fixed product
-// infrastructure tied to the hosted association files — not a per-deploy knob,
-// and deliberately NOT sourced from `features.ts` (deployment-mode gating). See
-// ADR-029 and docs/plans/2026-05-23-native-pwa-biometric-login.md.
-const WEBAUTHN_RP_ID = 'app.beanies.family';
-
 /**
- * Resolve the WebAuthn Relying Party ID for the current surface.
- * - Web/PWA/dev/self-host: the current origin's hostname (unchanged behavior —
- *   `app.beanies.family` in prod, `localhost` in dev, the self-hoster's domain).
- * - Native (Capacitor): the fixed `WEBAUTHN_RP_ID`, since the WebView origin
- *   (`localhost`) is not the RP ID — the platform association supplies the trust.
+ * Resolve the WebAuthn Relying Party ID. WEB/PWA ONLY — native biometric no longer
+ * uses WebAuthn (it uses the hardware Keystore via `nativeBiometric.ts`; ADR-029
+ * 2026-07-14), so this is always the current origin's hostname (`app.beanies.family`
+ * in prod, `localhost` in dev, the self-hoster's domain).
  */
 export function getRpId(): string {
-  return isNative() ? WEBAUTHN_RP_ID : window.location.hostname;
+  return window.location.hostname;
 }
 
 // --- Feature detection ---
@@ -71,88 +70,15 @@ export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
 }
 
 /**
- * Whether the current surface can actually deliver a PRF-backed passkey. Biometric
- * unlock wraps the family key via the WebAuthn PRF extension, so a device that
- * can't do PRF must never be OFFERED biometric (it would fail after enabling).
- * - Web/PWA: the real browser WebAuthn API handles PRF → true.
- * - Android: Google Password Manager supports enable-at-create + eval-at-assertion → true.
- * - iOS: only 18.4+ (PRF APIs land in 18.0 but a data-loss bug spans 18.0–18.3;
- *   the native @capgo Swift PRF wiring is `#available(iOS 18.4)`-gated to match).
- * This is the ONLY home of the platform/version rule — keep it matched to the
- * Swift `#available(iOS 18.4)` gate in the plugin patch.
- */
-export function platformSupportsPRF(): boolean {
-  if (!isNative()) return true;
-  const os = getPlatform();
-  if (os === 'android') return true;
-  if (os === 'ios') return iosVersionAtLeast(18, 4);
-  return false;
-}
-
-// True unless the UA reports an iOS version strictly BELOW the threshold. On
-// iPadOS the WebView can report a desktop "Intel Mac OS X 10_15" UA with no
-// parseable iOS-version token — we return true there (permissive) rather than
-// silently withholding biometric on a capable iPad. The native Swift PRF wiring
-// is `#available(iOS 18.4)`-gated, and a genuinely-too-old OS simply yields no PRF
-// output, which the enable flow then handles as a clean "not available" decline.
-function iosVersionAtLeast(major: number, minor: number): boolean {
-  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-  const m = /OS (\d+)_(\d+)/.exec(ua);
-  if (!m) return true;
-  const maj = Number(m[1]);
-  const min = Number(m[2]);
-  return maj > major || (maj === major && min >= minor);
-}
-
-// Per-device, self-healing suppression of the PROACTIVE biometric offer (the
-// App.vue post-sign-in nag) after a decline/failure. Stored as an expiry timestamp
-// (ms) in localStorage — NOT synced, and it can only HIDE the proactive nag (never
-// grants access, and never gates the deliberate Settings enroll surface, which uses
-// `canEnrollBiometric()`), so it carries no security surface. Time-boxed so a
-// transient cause self-heals; a successful enable clears it.
-const BIOMETRIC_SUPPRESS_KEY = 'beanies.biometricOfferSuppressedUntil';
-const BIOMETRIC_SUPPRESS_MS = 24 * 60 * 60 * 1000; // 24h cool-off
-
-function isBiometricOfferSuppressed(): boolean {
-  try {
-    const raw = localStorage.getItem(BIOMETRIC_SUPPRESS_KEY);
-    if (!raw) return false;
-    const until = Number(raw);
-    if (!Number.isFinite(until)) return false;
-    if (Date.now() >= until) {
-      localStorage.removeItem(BIOMETRIC_SUPPRESS_KEY);
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function suppressBiometricOffer(): void {
-  try {
-    localStorage.setItem(BIOMETRIC_SUPPRESS_KEY, String(Date.now() + BIOMETRIC_SUPPRESS_MS));
-  } catch {
-    /* localStorage unavailable — offer simply isn't suppressed */
-  }
-}
-
-function clearBiometricSuppression(): void {
-  try {
-    localStorage.removeItem(BIOMETRIC_SUPPRESS_KEY);
-  } catch {
-    /* no-op */
-  }
-}
-
-/**
- * Whether the user CAN enroll biometric on this surface — platform PRF capability
- * plus an actual platform authenticator. Deliberately does NOT consult the
- * proactive-offer suppression, so the deliberate management surface (Settings) and
- * explicit enroll flows are never locked out by a prior transient decline.
+ * Whether the user CAN enroll biometric on this surface. Deliberately does NOT
+ * consult the proactive-offer suppression, so the deliberate management surface
+ * (Settings) and explicit enroll flows are never locked out by a prior transient
+ * decline.
+ * - Native: delegates to the hardware Keystore path (biometric hardware + enrolled).
+ * - Web/PWA: a real platform authenticator is available (WebAuthn-PRF path).
  */
 export async function canEnrollBiometric(): Promise<boolean> {
-  if (!platformSupportsPRF()) return false;
+  if (isNative()) return nativeBiometric.nativeCanEnroll();
   return isPlatformAuthenticatorAvailable();
 }
 
@@ -163,20 +89,9 @@ export async function canEnrollBiometric(): Promise<boolean> {
  * enroll surfaces (Settings) use `canEnrollBiometric()` so they always work.
  */
 export async function canOfferBiometric(): Promise<boolean> {
+  if (isNative()) return nativeBiometric.nativeCanOffer();
   if (isBiometricOfferSuppressed()) return false;
   return canEnrollBiometric();
-}
-
-/** Translate a key with an English fallback (Pinia may be pre-init in edge flows). */
-function tr(key: string, fallback: string): string {
-  try {
-    // `t` is typed to the literal key union; these keys are added to uiStrings.ts
-    // but the cast keeps this helper key-agnostic (and pre-Pinia safe via catch).
-    const s = (useTranslationStore().t as (k: string) => string)(key);
-    return s && s !== key ? s : fallback;
-  } catch {
-    return fallback;
-  }
 }
 
 // --- Registration ---
@@ -208,47 +123,26 @@ export interface RegisterPasskeyResult {
 export async function registerPasskeyForMember(
   params: RegisterPasskeyParams
 ): Promise<RegisterPasskeyResult> {
+  // Native (installed app): the hardware Keystore path, NOT WebAuthn. Delegate BEFORE
+  // the `isWebAuthnSupported()` gate below (which can be false on the native WebView).
+  if (isNative()) return nativeBiometric.nativeEnable(params);
+
   if (!isWebAuthnSupported()) {
     return { success: false, error: 'WebAuthn is not supported in this browser' };
   }
 
   const { memberId, memberName, memberEmail, familyId, familyKey } = params;
 
-  // Clean decline BEFORE any prompt on platforms that provably can't deliver a
-  // PRF-backed passkey (e.g. iOS < 18.4). We never show a doomed biometric prompt
-  // or register a passkey we can't unlock with — the user keeps password sign-in.
-  if (!platformSupportsPRF()) {
-    logEvent({
-      level: 'info',
-      surface: 'passkey-prf',
-      message: 'enroll_declined',
-      context: { os: getPlatform(), action: 'unsupported' },
-    });
-    return { success: false, error: biometricUnavailableMessage() };
-  }
-
   // Generate client-side challenge
   const challenge = crypto.getRandomValues(new Uint8Array(32));
 
   const rpId = getRpId();
-  // Web/PWA: request PRF eval at create. Safari 18+ returns the output there (single
-  // prompt); Chromium ENABLES PRF but does not evaluate at create, so those browsers
-  // fall through to the immediate second assertion in `establishPasskeyWrap` (a
-  // second prompt at enable — expected). Native: enable-only at create (GMS /
-  // ASAuthorization don't reliably eval at create), then eval at the immediate
-  // assertion. Either way the wrap is established during enable so biometric unlock
-  // works on the first unlock.
-  const createPrfExtension = isNative() ? buildPRFEnableExtension() : buildPRFEvalExtension();
-
-  // Discoverable (resident) credentials let the assertion flow omit
-  // `allowCredentials` (see authenticateWithPasskey). Web requires them and works
-  // fine. On native, the Android WebView Credential Manager has been observed to
-  // reject discoverable-credential CREATION with a generic NotReadableError ("an
-  // unknown error occurred while talking to the credential manager"), so we
-  // request 'preferred' there — modern platform authenticators (Google Password
-  // Manager / iCloud Keychain) still create a discoverable passkey in practice,
-  // so the discoverable-mode assertion keeps working. See ADR-029.
-  const requireDiscoverable = !isNative();
+  // Request PRF eval at create. Safari 18+ returns the output there (single prompt);
+  // Chromium ENABLES PRF but does not evaluate at create, so those browsers fall
+  // through to the immediate second assertion in `establishPasskeyWrap` (a second
+  // prompt at enable — expected). Either way the wrap is established during enable so
+  // biometric unlock works on the first unlock.
+  const createPrfExtension = buildPRFEvalExtension();
 
   const publicKeyOptions: PublicKeyCredentialCreationOptions = {
     challenge,
@@ -265,8 +159,10 @@ export async function registerPasskeyForMember(
     authenticatorSelection: {
       authenticatorAttachment: 'platform',
       userVerification: 'required',
-      residentKey: requireDiscoverable ? 'required' : 'preferred',
-      requireResidentKey: requireDiscoverable,
+      // Discoverable (resident) credentials let the assertion flow omit
+      // `allowCredentials` (see authenticateWithPasskey). Web requires them.
+      residentKey: 'required',
+      requireResidentKey: true,
     },
     timeout: 60000,
     attestation: 'none',
@@ -522,6 +418,10 @@ export interface AuthenticatePasskeyResult {
 export async function authenticateWithPasskey(
   params: AuthenticatePasskeyParams
 ): Promise<AuthenticatePasskeyResult> {
+  // Native (installed app): the hardware Keystore path. `passkeySecrets` is unused on
+  // native (device-local blob, no envelope). Delegate before the WebAuthn gate.
+  if (isNative()) return nativeBiometric.nativeUnlock(params.familyId);
+
   if (!isWebAuthnSupported()) {
     return { success: false, error: 'WebAuthn is not supported' };
   }
@@ -749,11 +649,19 @@ export async function listRegisteredPasskeys(memberId?: string): Promise<Passkey
 }
 
 export async function hasRegisteredPasskeys(familyId: string): Promise<boolean> {
+  // Native: only a `native-keystore` record counts (and stale WebAuthn records are
+  // cleaned up here so they neither drive an unlock nor suppress the enroll offer).
+  if (isNative()) return nativeBiometric.nativeHasRegistered(familyId);
   const passkeys = await passkeyRepo.getPasskeysByFamily(familyId);
   return passkeys.length > 0;
 }
 
 export async function removePasskey(credentialId: string): Promise<void> {
+  const record = await passkeyRepo.getPasskeyByCredentialId(credentialId);
+  if (record?.mechanism === 'native-keystore') {
+    await nativeBiometric.nativeDisable(record.familyId, credentialId);
+    return;
+  }
   await passkeyRepo.removePasskeyRegistration(credentialId);
   await signalCredentialsRemoved([credentialId]);
 }
@@ -829,12 +737,6 @@ async function retryRegistrationWithFallbacks(
   return null;
 }
 
-/** Compact raw-error descriptor for diagnostics — `Name: message` (no PII). */
-function describeAuthError(e: unknown): string {
-  if (e instanceof DOMException || e instanceof Error) return `${e.name}: ${e.message}`;
-  return String(e);
-}
-
 // --- Helpers ---
 
 /**
@@ -854,41 +756,6 @@ async function getCachedFamilyKeyForFamily(familyId: string): Promise<CryptoKey 
 }
 
 // --- Utility ---
-
-function guessBrowser(ua: string): string {
-  // Order matters — check more specific strings first
-  if (/Edg\//.test(ua)) return 'Edge';
-  if (/OPR\/|Opera/.test(ua)) return 'Opera';
-  if (/Chrome\//.test(ua)) return 'Chrome';
-  if (/Safari\//.test(ua) && !/Chrome/.test(ua)) return 'Safari';
-  if (/Firefox\//.test(ua)) return 'Firefox';
-  return 'Browser';
-}
-
-function guessOS(ua: string): string {
-  if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
-  if (/Mac/.test(ua)) return 'macOS';
-  if (/Android/.test(ua)) return 'Android';
-  if (/Windows/.test(ua)) return 'Windows';
-  if (/Linux/.test(ua)) return 'Linux';
-  if (/CrOS/.test(ua)) return 'ChromeOS';
-  return '';
-}
-
-export function guessAuthenticatorLabel(): string {
-  const ua = navigator.userAgent;
-  let base: string;
-  if (/iPhone|iPad|iPod/.test(ua)) base = 'Face ID';
-  else if (/Mac/.test(ua)) base = 'Touch ID';
-  else if (/Windows/.test(ua)) base = 'Windows Hello';
-  else if (/Android/.test(ua)) base = 'Fingerprint';
-  else base = 'Biometric';
-
-  const browser = guessBrowser(ua);
-  const os = guessOS(ua);
-  const context = os ? `${browser}, ${os}` : browser;
-  return `${base} · ${context}`;
-}
 
 export function bufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);

@@ -22,6 +22,7 @@ import {
   hasRegisteredPasskeys,
   isWebAuthnSupported,
 } from '@/services/auth/passkeyService';
+import { isNative } from '@/services/sync/capabilities';
 import { verifyPassword } from '@/services/auth/passwordService';
 import { useTranslation } from '@/composables/useTranslation';
 import { useAuthStore } from '@/stores/authStore';
@@ -55,7 +56,9 @@ const hasPassword = computed(() => !!props.member.passwordHash);
 const noCredential = computed(() => !passkeyAvailable.value && !hasPassword.value);
 
 async function detectPasskey() {
-  if (!isWebAuthnSupported() || !authStore.currentUser?.familyId) {
+  // Native (installed app) uses the hardware Keystore, not WebAuthn — so don't gate
+  // on `isWebAuthnSupported()` there (it can be false on the native WebView).
+  if ((!isNative() && !isWebAuthnSupported()) || !authStore.currentUser?.familyId) {
     passkeyAvailable.value = false;
     return;
   }
@@ -113,12 +116,18 @@ async function tryPasskey() {
     }
     if (result.success && result.memberId !== props.member.id) {
       inlineError.value = t('transferOwnership.reauthWrongMember');
-      reportError({
-        surface: 'reauthChallenge.tryPasskey',
-        message: 'Passkey authenticated a different member than expected',
-        severity: 'warning',
-        context: { expected: props.member.id, got: result.memberId },
-      });
+      // Native biometric is DEVICE-scoped: it unlocks as the member who enrolled on
+      // this device, so a mismatch with the target member is EXPECTED, not an
+      // anomaly. Don't page/telemetry it — just guide to password. (Web WebAuthn can
+      // pick a specific credential, so a mismatch there IS worth a warning.)
+      if (!isNative()) {
+        reportError({
+          surface: 'reauthChallenge.tryPasskey',
+          message: 'Passkey authenticated a different member than expected',
+          severity: 'warning',
+          context: { expected: props.member.id, got: result.memberId },
+        });
+      }
       return;
     }
     // Generic failure — surface the message inline.

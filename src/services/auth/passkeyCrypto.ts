@@ -5,22 +5,13 @@
  *
  * All key material stays in Web Crypto (non-extractable where possible).
  *
- * PRF extension shape differs by surface. The real browser WebAuthn API (web/PWA)
- * takes the eval salt as a `BufferSource`; the native `@capgo/capacitor-passkey`
- * shim JSON-serializes the extensions and forwards them to Credential Manager /
- * ASAuthorization, so on native the salt MUST be a base64url STRING (a raw
- * Uint8Array is mangled into an index-keyed object by `JSON.stringify`). Likewise
- * the PRF *output* comes back as an `ArrayBuffer` on web but a base64url string on
- * native — `normalizePRFOutput` is the single place that reconciles both.
+ * WEB/PWA ONLY. Native biometric no longer uses WebAuthn/PRF — it uses the hardware
+ * Keystore via `nativeBiometric.ts` (ADR-029, 2026-07-14). So the real browser
+ * WebAuthn API is the only consumer here: the PRF eval salt is a `BufferSource` and
+ * the PRF output comes back as an `ArrayBuffer`.
  */
 
-import { isNative } from '@/services/sync/capabilities';
-import {
-  bufferToBase64,
-  base64ToBuffer,
-  bufferToBase64url,
-  base64urlToBuffer,
-} from '@/utils/encoding';
+import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 
 const HKDF_HASH = 'SHA-256';
 const WRAPPING_ALGO = 'AES-KW';
@@ -41,24 +32,12 @@ function prfSaltBytes(): Uint8Array {
 }
 
 /**
- * Normalize a PRF `results.first` value to an ArrayBuffer.
- * - Web (real WebAuthn): already an ArrayBuffer / typed-array view.
- * - Native (@capgo shim → Credential Manager / ASAuthorization): a base64url string.
- * Returns null for empty / absent / unrecognized values. This is the ONE place
- * the string↔buffer distinction is handled — `getPRFOutput` and `isPRFSupported`
- * both route through it.
+ * Normalize a PRF `results.first` value to an ArrayBuffer (real WebAuthn returns an
+ * ArrayBuffer / typed-array view). Returns null for empty / absent / unrecognized
+ * values. Single "was PRF usable?" predicate feeder for `getPRFOutput`.
  */
 function normalizePRFOutput(raw: unknown): ArrayBuffer | null {
   if (raw == null) return null;
-  if (typeof raw === 'string') {
-    if (raw.length === 0) return null;
-    try {
-      const buf = base64urlToBuffer(raw);
-      return buf.byteLength > 0 ? buf : null;
-    } catch {
-      return null;
-    }
-  }
   if (raw instanceof ArrayBuffer) {
     return raw.byteLength > 0 ? raw : null;
   }
@@ -153,29 +132,9 @@ export async function unwrapDEK(wrappedBase64: string, wrappingKey: CryptoKey): 
 }
 
 /**
- * PRF extension input to ENABLE PRF at credential creation (no eval).
- * This is the reliable, spec-endorsed pattern: enable at create (then check
- * `getClientExtensionResults().prf.enabled`), evaluate at assertion. Evaluating
- * PRF at creation is not reliably supported by Google Password Manager.
+ * PRF extension input to EVALUATE PRF (at create for Safari 18+, and at assertion).
+ * The real WebAuthn API decodes the `BufferSource` salt directly.
  */
-export function buildPRFEnableExtension(): { prf: Record<string, never> } {
-  return { prf: {} };
-}
-
-/**
- * PRF extension input to EVALUATE PRF (at assertion, and at the enable-time
- * immediate assertion). The eval salt is a base64url STRING on native (so it
- * survives the shim's JSON serialization into the Credential Manager /
- * ASAuthorization request) and a `Uint8Array` `BufferSource` on web (the real
- * WebAuthn API decodes it directly). This platform branch lives ONLY here.
- */
-export function buildPRFEvalExtension(): { prf: { eval: { first: BufferSource | string } } } {
-  const salt = prfSaltBytes();
-  return {
-    prf: {
-      eval: {
-        first: isNative() ? bufferToBase64url(salt) : (salt as BufferSource),
-      },
-    },
-  };
+export function buildPRFEvalExtension(): { prf: { eval: { first: BufferSource } } } {
+  return { prf: { eval: { first: prfSaltBytes() as BufferSource } } };
 }

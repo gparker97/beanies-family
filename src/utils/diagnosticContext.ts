@@ -164,6 +164,12 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'credential_source',
   'unwrap_ok',
   'detail',
+  // Native hardware-Keystore biometric (surface `native-biometric`, see
+  // services/auth/nativeBiometric.ts). `key_backing` is a bounded enum
+  // (strongbox|tee|keychain|secureEnclave) reporting which OS key backing was used —
+  // PII-free. Outcome rides the existing `action` key; the rest reuse os/error_code/
+  // detail. Added 2026-07-14 (#52 Keystore pivot). MIRROR in the Lambda allowlist + test.
+  'key_backing',
 ]);
 
 export const MAX_STRING_LEN = 200;

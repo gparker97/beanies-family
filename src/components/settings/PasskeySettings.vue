@@ -9,6 +9,7 @@ import {
   removePasskey,
   renamePasskey,
 } from '@/services/auth/passkeyService';
+import { isNative } from '@/services/sync/capabilities';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { confirm as showConfirm } from '@/composables/useConfirm';
@@ -29,7 +30,11 @@ const editingId = ref<string | null>(null);
 const editLabel = ref('');
 
 onMounted(async () => {
-  supported.value = isWebAuthnSupported();
+  // Native (installed app) uses the hardware Keystore, not WebAuthn — so the raw
+  // `isWebAuthnSupported()` (which the retired shim used to prop up) must NOT gate
+  // the panel on native, or shim removal would dead-render the deliberate enroll
+  // surface. Capability is decided by `canEnrollBiometric()` below either way.
+  supported.value = isNative() || isWebAuthnSupported();
   if (supported.value) {
     // Settings is the deliberate management surface: gate on capability only
     // (canEnrollBiometric), NOT canOfferBiometric — the latter folds in the

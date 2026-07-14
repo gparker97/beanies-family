@@ -3362,6 +3362,29 @@ const STRING_DEFS = {
     en: 'Something went wrong with biometric unlock. You can sign in with your password.',
     beanie: 'something went wrong with biometric unlock. you can sign in with your password.',
   },
+  // Native (installed app) hardware-Keystore biometric copy. See nativeBiometric.ts.
+  'biometric.cancelled': {
+    en: 'Biometric was cancelled. You can sign in with your password.',
+    beanie: 'biometric was cancelled. you can sign in with your password.',
+  },
+  'biometric.reEnroll': {
+    en: 'Biometric unlock was turned off because your device biometrics changed. Sign in with your password, then turn it back on in Settings.',
+    beanie:
+      'biometric unlock was turned off because your device biometrics changed. sign in with your password, then turn it back on in settings.',
+  },
+  'biometric.lockout': {
+    en: 'Too many attempts. Please sign in with your password and try biometric again later.',
+    beanie: 'too many attempts. please sign in with your password and try biometric again later.',
+  },
+  'biometric.notEnrolled': {
+    en: "Set up your device's fingerprint or face unlock first, then you can enable biometric unlock.",
+    beanie:
+      "set up your device's fingerprint or face unlock first, then you can enable biometric unlock.",
+  },
+  'biometric.errGeneric': {
+    en: 'Something went wrong with biometric unlock. You can sign in with your password.',
+    beanie: 'something went wrong with biometric unlock. you can sign in with your password.',
+  },
   'passkey.prfFull': { en: 'Full unlock', beanie: 'full unlock' },
   'passkey.prfCached': { en: 'Cached password', beanie: 'cached password' },
   'passkey.lastUsed': { en: 'Last used', beanie: 'last used' },

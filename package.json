@@ -45,7 +45,6 @@
     "security:lint": "eslint . --config eslint.security.config.js",
     "security:full": "npm run security:lint && npm run type-check",
     "prepare": "husky",
-    "postinstall": "patch-package",
     "promo:studio": "remotion studio promo/index.ts",
     "promo:render": "remotion render promo/index.ts promo scripts/promo-video/.out/promo.mp4"
   },
@@ -61,7 +60,6 @@
     "@capacitor/local-notifications": "^8.2.0",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
-    "@capgo/capacitor-passkey": "8.3.9",
     "chart.js": "^4.5.1",
     "idb": "^8.0.3",
     "pdfjs-dist": "^4.10.38",
@@ -105,7 +103,6 @@
     "happy-dom": "^20.10.6",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
-    "patch-package": "^8.0.1",
     "postcss": "^8.5.19",
     "prettier": "^3.9.5",
     "prettier-plugin-tailwindcss": "^0.8.0",

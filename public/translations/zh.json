@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-07-14",
-    "translationCount": 3728
+    "translationCount": 3733
   },
   "translations": {
     "app.name": {
@@ -18642,6 +18642,31 @@
       "lastUpdated": "2026-07-14"
     },
     "passkey.errGeneric": {
+      "translation": "生物识别解锁出错。您可以使用密码登录。",
+      "hash": "wrhqqw",
+      "lastUpdated": "2026-07-14"
+    },
+    "biometric.cancelled": {
+      "translation": "生物识别已取消。您可以使用密码登录。",
+      "hash": "6pscdv",
+      "lastUpdated": "2026-07-14"
+    },
+    "biometric.reEnroll": {
+      "translation": "由于您的设备生物识别信息已更改，生物识别解锁已关闭。请使用密码登录，然后在“设置”中重新开启生物识别解锁。",
+      "hash": "majh0x",
+      "lastUpdated": "2026-07-14"
+    },
+    "biometric.lockout": {
+      "translation": "尝试次数过多。请使用您的密码登录，稍后再尝试生物识别。",
+      "hash": "juvcuv",
+      "lastUpdated": "2026-07-14"
+    },
+    "biometric.notEnrolled": {
+      "translation": "首先设置设备的指纹或面部解锁，然后您可以启用生物识别解锁。",
+      "hash": "p9suaf",
+      "lastUpdated": "2026-07-14"
+    },
+    "biometric.errGeneric": {
       "translation": "生物识别解锁出错。您可以使用密码登录。",
       "hash": "wrhqqw",
       "lastUpdated": "2026-07-14"

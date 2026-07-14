@@ -1,10 +1,15 @@
-# `app.beanies.family` well-known files — native biometric (passkey) association
+# `app.beanies.family` well-known files
 
-These files associate the native beanies.family app with the **`app.beanies.family`**
-Relying Party so device biometrics (passkeys) registered on the PWA can be used
-inside the native WebView. Served from the Vue app's S3 bucket / CloudFront
-(`app.beanies.family`), deployed by `.github/workflows/deploy.yml`. See ADR-029
-and `docs/plans/2026-05-23-native-pwa-biometric-login.md`.
+Served from the Vue app's S3 bucket / CloudFront (`app.beanies.family`), deployed by
+`.github/workflows/deploy.yml`.
+
+> **Native biometric no longer uses WebAuthn (ADR-029, 2026-07-14).** The installed
+> apps now unlock via the hardware Keystore (`BiometricKeystorePlugin`), which has no
+> RP-ID / assetlinks / `webcredentials` dependency. The passkey-only association files
+> here were retired: the app-origin `apple-app-site-association` (`webcredentials`) was
+> deleted, and the `get_login_creds` relation was removed from `assetlinks.json`. Only
+> the OAuth-relevant `handle_all_urls` relation remains. Web/PWA still uses WebAuthn-PRF
+> (its RP ID is the origin host — no association file needed).
 
 > **Deploy note:** `deploy.yml` sets `include-hidden-files: true` on the
 > build-artifact upload so `dist/.well-known/` survives the artifact round-trip
@@ -13,24 +18,12 @@ and `docs/plans/2026-05-23-native-pwa-biometric-login.md`.
 > fails. Verify after deploy:
 > `curl -sI https://app.beanies.family/.well-known/assetlinks.json` → 200, JSON.
 
-## `assetlinks.json` — Android (WebAuthn `get_login_creds`)
+## `assetlinks.json` — Android (`handle_all_urls`)
 
-Authorizes the Android app to assert WebAuthn credentials for RP ID
-`app.beanies.family` (RP ID is set in `src/services/auth/passkeyService.ts`
-`getRpId()`). Routed through the Android Credential Manager once the WebView
-enables WebAuthn (`MainActivity.enableWebAuthnIfSupported`).
-
-## `apple-app-site-association` — iOS (`webcredentials`)
-
-Authorizes the iOS app to use passkeys for `app.beanies.family` in WKWebView
-(iOS 16+), paired with the `webcredentials:app.beanies.family` Associated
-Domains entitlement.
-
-> **`<APPLE_TEAM_ID>` is a placeholder.** No iOS build exists yet. A placeholder
-> AASA on the live origin is harmless (iOS won't match it), but iOS biometric
-> association silently never works until the real Apple Team ID replaces the
-> placeholder when the iOS app is built. Serve with `Content-Type: application/json`
-> and **no `.json` extension** (already the filename).
+Retains only the `handle_all_urls` relation for package `family.beanies.app`. The
+former `get_login_creds` relation (WebAuthn / Credential Manager) was removed with the
+native-biometric Keystore pivot (ADR-029, 2026-07-14). There is no longer an
+`apple-app-site-association` on this origin (it was `webcredentials`-only).
 
 ## ⚠️ Two assetlinks files exist — keep their fingerprints in sync
 
@@ -40,7 +33,7 @@ package `family.beanies.app`:
 | File | Origin | Relation | Purpose |
 | --- | --- | --- | --- |
 | `web/public/.well-known/assetlinks.json` | `beanies.family` (Astro, `deploy-web.yml`) | `handle_all_urls` | OAuth App Link (`/oauth/native`) |
-| `public/.well-known/assetlinks.json` (this dir) | `app.beanies.family` (Vue app, `deploy.yml`) | `get_login_creds` | WebAuthn / biometric |
+| `public/.well-known/assetlinks.json` (this dir) | `app.beanies.family` (Vue app, `deploy.yml`) | `handle_all_urls` | App-origin deep-link association |
 
 They share the **same package + SHA-256 cert fingerprint(s)**. At **every
 signing-key event** — debug keystore rotation, adding the release/upload key,
