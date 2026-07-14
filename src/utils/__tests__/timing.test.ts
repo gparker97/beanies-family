@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { delay, withTimeout } from '@/utils/timing';
+import { delay, withTimeout, raceTimeout } from '@/utils/timing';
 
 describe('utils/timing', () => {
   describe('delay', () => {
@@ -42,6 +42,34 @@ describe('utils/timing', () => {
       vi.useFakeTimers();
       const clearSpy = vi.spyOn(globalThis, 'clearTimeout');
       await withTimeout(Promise.resolve(42), 9999, 'too slow');
+      expect(clearSpy).toHaveBeenCalled();
+      clearSpy.mockRestore();
+      vi.useRealTimers();
+    });
+  });
+
+  describe('raceTimeout', () => {
+    it('resolves with the promise value when it settles in time', async () => {
+      await expect(raceTimeout(Promise.resolve('ok'), 1000)).resolves.toBe('ok');
+    });
+
+    it('resolves with undefined (not an error) when the promise never settles', async () => {
+      vi.useFakeTimers();
+      const never = new Promise<string>(() => {});
+      const p = raceTimeout(never, 5000);
+      await vi.advanceTimersByTimeAsync(5000);
+      await expect(p).resolves.toBeUndefined();
+      vi.useRealTimers();
+    });
+
+    it('still propagates a genuine rejection that beats the timeout', async () => {
+      await expect(raceTimeout(Promise.reject(new Error('boom')), 1000)).rejects.toThrow('boom');
+    });
+
+    it('clears its timer once the promise settles (no dangling timeout)', async () => {
+      vi.useFakeTimers();
+      const clearSpy = vi.spyOn(globalThis, 'clearTimeout');
+      await raceTimeout(Promise.resolve(42), 9999);
       expect(clearSpy).toHaveBeenCalled();
       clearSpy.mockRestore();
       vi.useRealTimers();

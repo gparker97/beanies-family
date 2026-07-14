@@ -26,6 +26,7 @@ import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { raceTimeout } from '@/utils/timing';
 import { LOAD_DRIVE_PATH } from './resumePaths';
 import {
   isPlatformAuthenticatorAvailable,
@@ -435,7 +436,9 @@ async function registerCrossDevicePasskey(memberId: string) {
 
     if (result.success && result.passkeySecret) {
       syncStore.addPasskeySecret(result.passkeySecret);
-      await syncStore.syncNow(true);
+      // Best-effort — the secret is in the in-memory envelope and rides the next
+      // save; never block login on a slow/offline Drive push. (2026-07-14)
+      await raceTimeout(syncStore.syncNow(true), 5000);
     }
   } catch (e) {
     // Non-critical — passkey registration failure shouldn't block login
