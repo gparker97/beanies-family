@@ -19,16 +19,26 @@ name: Mobile — iOS simulator build
 # on-device sideload on iOS; running on a real iPhone or TestFlight comes later,
 # once the paid Apple account + Fastlane signing exist (see ADR-029).
 #
-# Mirrors mobile-android-build.yml: runs on pushes to main (docs-only changes
-# skipped) + manual dispatch.
+# Runs on pushes to main that touch iOS-relevant files only, plus manual dispatch.
+# This is a Swift/native-wrapper COMPILE canary — a change to `src/**` (the web
+# bundle) is already validated by Main CI's build step and does NOT affect whether
+# the iOS wrapper compiles, so triggering on every src/docs push just produces noise
+# (and, while the iOS PRF Swift patch is a known-broken WIP, a red build + email on
+# every unrelated push). Scope to the files that actually change the iOS build:
+# the native project, the @capgo patch, the Capacitor config, dependency manifests,
+# the native-asset generator, and this workflow itself. Fold `src/**` back in once
+# the iOS lane ships (Apple enrolment + a compiling Swift patch).
 
 on:
   push:
     branches: ['main']
-    # Docs-only changes don't change the build — skip them so doc edits don't rebuild.
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
+    paths:
+      - 'ios/**'
+      - 'patches/**'
+      - 'capacitor.config.*'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/build-native-app-assets.mjs'
   workflow_dispatch:
 
 permissions:
