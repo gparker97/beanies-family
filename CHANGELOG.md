@@ -10,9 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-07-14
 
+### Changed
+
+- **Biometric unlock on the installed Android and iOS apps now uses your device's own Face ID / fingerprint and secure hardware key store**, instead of a passkey. It works offline, unlocks with a single gesture, and never leaves your device. Because it's tied to this device, a new device asks for your family password once and then you turn biometric back on there; changing your device's fingerprints/face turns it off until you re-enable it. Your family password always still works, and web/PWA biometric is unchanged. _(Reaches the installed apps with the next mobile build; iOS ships once the app is on the App Store.)_
+
 ### Fixed
 
-- **Biometric (Face ID / fingerprint) unlock on native now fails gracefully instead of showing a raw error.** If a device can't complete biometric setup, the app falls back to password sign-in with a friendly message instead of a confusing error. _(Note: full native biometric enable is still in progress — on-device testing found the underlying mechanism needs reworking, so it is not yet available in the installed apps; password sign-in works everywhere and web/PWA biometric is unaffected.)_
+- **Biometric (Face ID / fingerprint) unlock on native now fails gracefully instead of showing a raw error.** If a device can't complete biometric setup, the app falls back to password sign-in with a friendly message instead of a confusing error.
 - **Android: the black band across the top status-bar area is gone** — the app background now fills the screen edge-to-edge, in both light and dark mode, matching the web app. _(Reaches installed apps with the next mobile build.)_
 
 ## 2026-07-13

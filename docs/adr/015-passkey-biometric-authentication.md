@@ -1,6 +1,8 @@
 # ADR-015: Passkey / Biometric Authentication
 
 > **Updated by [ADR-019](019-family-key-encryption.md)** — passkey PRF now unwraps the family key directly via AES-KW instead of caching a file password.
+>
+> **Scope note (ADR-029, 2026-07-14):** this ADR describes the **web/PWA** biometric path, which is unchanged. On the **installed native apps** biometric unlock no longer uses WebAuthn/PRF at all — it uses the hardware Keystore (`BiometricPrompt`/`AndroidKeyStore` CryptoObject on Android; `LocalAuthentication` + a biometric-gated Keychain item on iOS) via the custom `BiometricKeystore` plugin, with a device-local blob (never synced). See ADR-029 → "IMPLEMENTED (2026-07-14)".
 
 **Status:** Accepted
 **Date:** 2026-02-24

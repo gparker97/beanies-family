@@ -106,6 +106,8 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'credential_source',
   'unwrap_ok',
   'detail',
+  // Native hardware-Keystore biometric backing enum (added 2026-07-14, #52 pivot).
+  'key_backing',
 ]);
 
 function getHeaders(event) {

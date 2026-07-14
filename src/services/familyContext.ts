@@ -162,6 +162,18 @@ export async function deleteLocalFamily(familyId: string): Promise<void> {
     const { signalCredentialsRemoved } = await import('@/services/auth/passkeyService');
     await signalCredentialsRemoved(credentialIds);
   }
+  // Native (installed app): reclaim the device-local hardware-Keystore biometric blob
+  // for this family. Idempotent + best-effort — the orphaned OS alias is inert without
+  // its registry record, but this is the deliberate place to clean it up. (ADR-029.)
+  const { isNative } = await import('@/services/sync/capabilities');
+  if (isNative()) {
+    try {
+      const { BiometricKeystore } = await import('@/services/auth/biometricKeystorePlugin');
+      await BiometricKeystore.deleteKey({ account: familyId });
+    } catch {
+      /* best-effort */
+    }
+  }
 
   // 3. Clear file handle and provider config
   const { clearFileHandleForFamily, clearProviderConfig } =
