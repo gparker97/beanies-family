@@ -15,6 +15,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatDate as formatDateUtil } from '@/utils/date';
+import { raceTimeout } from '@/utils/timing';
 import type { PasskeyRegistration } from '@/types/models';
 
 const { t } = useTranslation();
@@ -65,12 +66,8 @@ async function handleRegister() {
         // Persist to the provider best-effort, but NEVER hang the button on it: a
         // Drive save can stall indefinitely (rejected token, deleted file, offline),
         // which left the button stuck on "verifying". The secret is already in the
-        // in-memory envelope and rides the next successful save. Mirror the sign-out
-        // forceSaveWithTimeout guard. (2026-07-14)
-        await Promise.race([
-          syncStore.syncNow(true),
-          new Promise((resolve) => setTimeout(resolve, 5000)),
-        ]);
+        // in-memory envelope and rides the next successful save. (2026-07-14)
+        await raceTimeout(syncStore.syncNow(true), 5000);
       }
       statusMessage.value = { text: t('passkey.registerSuccess'), type: 'success' };
       await loadPasskeys();

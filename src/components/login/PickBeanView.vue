@@ -8,6 +8,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import { isTemporaryEmail } from '@/utils/email';
+import { raceTimeout } from '@/utils/timing';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
@@ -88,7 +89,9 @@ async function handleSignIn() {
     const result = await authStore.setPassword(selectedMember.value.id, password.value);
     if (result.success) {
       syncStore.setupAutoSync();
-      await syncStore.syncNow(true);
+      // Best-effort Drive push — never hang on it (data is in memory + cache and
+      // rides the next auto-sync). Mirrors biometric login / register. (2026-07-14)
+      await raceTimeout(syncStore.syncNow(true), 5000);
       emit('signed-in', '/nook');
     } else {
       formError.value = result.error ?? t('auth.signInFailed');
