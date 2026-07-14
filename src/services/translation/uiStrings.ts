@@ -3339,6 +3339,29 @@ const STRING_DEFS = {
     en: 'Could not load your data file. Please sign in with your password.',
     beanie: 'could not load your data file. please sign in with your password.',
   },
+  'passkey.errEnableFailed': {
+    en: "Biometric unlock couldn't be set up on this device right now. You can still sign in with your password.",
+    beanie:
+      "biometric unlock couldn't be set up on this device right now. you can still sign in with your password.",
+  },
+  'passkey.errNotReadable': {
+    en: 'Your device could not complete this request. Please make sure your device biometrics (fingerprint or face unlock) are set up, then try again.',
+    beanie:
+      'your device could not complete this request. please make sure your device biometrics (fingerprint or face unlock) are set up, then try again.',
+  },
+  'passkey.errNotSupported': {
+    en: "Biometric unlock isn't available on this device right now. You can sign in with your password.",
+    beanie:
+      "biometric unlock isn't available on this device right now. you can sign in with your password.",
+  },
+  'passkey.errSecurity': {
+    en: 'A security error occurred. Please make sure you are on a secure (HTTPS) connection.',
+    beanie: 'a security error occurred. please make sure you are on a secure (https) connection.',
+  },
+  'passkey.errGeneric': {
+    en: 'Something went wrong with biometric unlock. You can sign in with your password.',
+    beanie: 'something went wrong with biometric unlock. you can sign in with your password.',
+  },
   'passkey.prfFull': { en: 'Full unlock', beanie: 'full unlock' },
   'passkey.prfCached': { en: 'Cached password', beanie: 'cached password' },
   'passkey.lastUsed': { en: 'Last used', beanie: 'last used' },

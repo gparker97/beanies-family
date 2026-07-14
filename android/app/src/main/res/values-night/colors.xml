@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dark-mode native window background (DayNight auto-selects this in system dark
+  mode). MUST match the app root's dark paint — keep in sync with the App.vue root
+  class `dark:bg-slate-900` (Tailwind slate-900 = #0F172A). See values/colors.xml.
+-->
+<resources>
+    <color name="windowBackground">#0F172A</color>
+</resources>

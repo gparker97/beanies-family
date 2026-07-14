@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Native window background painted behind the status-bar / notch strip. On SDK 36
+  the WebView draws edge-to-edge (MainActivity.setDecorFitsSystemWindows(false)),
+  but the strip behind the safe-area inset showed the window/splash background as a
+  black band (#53). This paints it with the app's own background colour instead.
+
+  MUST equal the app root's painted colour to avoid a seam — keep in sync with the
+  App.vue root class `bg-gray-50` (Tailwind gray-50 = #F9FAFB). Dark variant lives in
+  values-night/colors.xml. See docs/plans/2026-07-14-native-biometric-prf-and-android-statusbar.md.
+-->
+<resources>
+    <color name="windowBackground">#F9FAFB</color>
+</resources>

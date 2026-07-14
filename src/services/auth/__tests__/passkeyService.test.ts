@@ -15,10 +15,15 @@ vi.mock('@/services/indexeddb/repositories/passkeyRepository', () => ({
 }));
 
 // --- Mock passkeyCrypto ---
+// getPRFOutput returns a buffer by default so the enable→assert→wrap happy path
+// succeeds; individual tests override it to null to exercise the no-PRF paths.
+const { getPRFOutputMock } = vi.hoisted(() => ({
+  getPRFOutputMock: vi.fn(() => new ArrayBuffer(32) as ArrayBuffer | null),
+}));
 vi.mock('../passkeyCrypto', () => ({
-  isPRFSupported: vi.fn(() => false),
-  getPRFOutput: vi.fn(() => null),
-  buildPRFExtension: vi.fn(() => ({ prf: { eval: { first: new Uint8Array(32) } } })),
+  getPRFOutput: getPRFOutputMock,
+  buildPRFEnableExtension: vi.fn(() => ({ prf: {} })),
+  buildPRFEvalExtension: vi.fn(() => ({ prf: { eval: { first: new Uint8Array(32) } } })),
   deriveWrappingKey: vi.fn(async () => ({}) as CryptoKey),
   generateHKDFSalt: vi.fn(() => new Uint8Array(32)),
   wrapDEK: vi.fn(async () => 'wrapped-base64'),
@@ -39,13 +44,22 @@ vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
   getGlobalSettings: vi.fn(async () => mockGlobalSettings),
 }));
 
-// --- Mock capabilities (native seam) + errorReporter ---
-const { isNativeMock } = vi.hoisted(() => ({ isNativeMock: vi.fn(() => false) }));
+// --- Mock capabilities (native seam) + errorReporter + telemetry + i18n ---
+const { isNativeMock, getPlatformMock } = vi.hoisted(() => ({
+  isNativeMock: vi.fn(() => false),
+  getPlatformMock: vi.fn(() => 'web' as 'web' | 'ios' | 'android'),
+}));
 vi.mock('@/services/sync/capabilities', () => ({
   isNative: isNativeMock,
-  getPlatform: vi.fn(() => 'web'),
+  getPlatform: getPlatformMock,
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+// Translation store: return the KEY so `tr()` uses its English fallback (the
+// fallback is what a user sees when no translation is loaded — what we assert on).
+vi.mock('@/stores/translationStore', () => ({
+  useTranslationStore: () => ({ t: (k: string) => k }),
+}));
 
 // Imports must come after vi.mock calls
 import {
@@ -57,6 +71,9 @@ import {
   authenticateWithPasskey,
   registerPasskeyForMember,
   getRpId,
+  platformSupportsPRF,
+  canOfferBiometric,
+  canEnrollBiometric,
 } from '../passkeyService';
 import * as passkeyRepo from '@/services/indexeddb/repositories/passkeyRepository';
 
@@ -143,6 +160,7 @@ describe('registerPasskeyForMember', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRegistrations.length = 0;
+    getPRFOutputMock.mockReturnValue(new ArrayBuffer(32)); // default: PRF available
 
     // Mock navigator.credentials.create
     const fakeCredential = {
@@ -178,6 +196,12 @@ describe('registerPasskeyForMember', () => {
     });
 
     expect(result.success).toBe(true);
+    // Enable→assert→wrap: a working PRF wrap is returned and prfSupported is true
+    // (sourced from wrap success, not a create-response results check).
+    expect(result.prfSupported).toBe(true);
+    expect(result.passkeySecret).toBeTruthy();
+    expect(result.passkeySecret?.wrappedFamilyKey).toBe('wrapped-base64');
+    // Persisted only AFTER the wrap succeeds.
     expect(passkeyRepo.savePasskeyRegistration).toHaveBeenCalledTimes(1);
 
     const saved = vi.mocked(passkeyRepo.savePasskeyRegistration).mock.calls[0]![0];
@@ -186,8 +210,166 @@ describe('registerPasskeyForMember', () => {
     expect(saved.transports).toEqual(['internal']);
     expect(saved.label).toBe('My Device');
     expect(saved.credentialId).toBeTruthy();
+    expect(saved.prfSupported).toBe(true);
     // V4: no cachedPassword field on registration
     expect('cachedPassword' in saved).toBe(false);
+  });
+
+  it('cleanly declines (no persist, not cancelled) when PRF cannot be established', async () => {
+    // No PRF output on either create or the immediate assertion → clean decline.
+    getPRFOutputMock.mockReturnValue(null);
+    const getMock = vi.fn(async () => null); // immediate assertion yields nothing
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: {
+        create: vi.fn(async () => ({
+          rawId: new TextEncoder().encode('new-cred-id').buffer,
+          response: {
+            getPublicKey: () => new ArrayBuffer(65),
+            getTransports: () => ['internal'],
+          } as unknown as AuthenticatorAttestationResponse,
+          getClientExtensionResults: () => ({}),
+        })),
+        get: getMock,
+      },
+      userAgent: navigator.userAgent,
+    });
+
+    const result = await registerPasskeyForMember({
+      memberId: 'member-1',
+      memberName: 'Test User',
+      memberEmail: 'test@example.com',
+      familyId: 'family-1',
+      familyKey: {} as CryptoKey,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.cancelled).toBeFalsy(); // a capability decline, not a cancellation
+    expect(result.passkeySecret).toBeUndefined();
+    // Never persisted an unusable passkey, and never returned success silently.
+    expect(passkeyRepo.savePasskeyRegistration).not.toHaveBeenCalled();
+    // Friendly copy, not a raw string.
+    expect(result.error).toContain('password');
+
+    getPRFOutputMock.mockReturnValue(new ArrayBuffer(32));
+  });
+
+  it('treats cancelling the second (PRF-eval) prompt as cancellation, not failure', async () => {
+    // Create succeeds with no create-time PRF output → immediate assertion runs and
+    // the user dismisses it (NotAllowedError). Must be cancelled:true, no persist,
+    // no suppression — exactly like the create-cancel path.
+    getPRFOutputMock.mockReturnValue(null);
+    localStorage.clear();
+    const cancelError = Object.assign(new Error('cancelled'), { name: 'NotAllowedError' });
+    Object.setPrototypeOf(cancelError, DOMException.prototype);
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: {
+        create: vi.fn(async () => ({
+          rawId: new TextEncoder().encode('new-cred-id').buffer,
+          response: {
+            getPublicKey: () => new ArrayBuffer(65),
+            getTransports: () => ['internal'],
+          } as unknown as AuthenticatorAttestationResponse,
+          getClientExtensionResults: () => ({}),
+        })),
+        get: vi.fn(async () => {
+          throw cancelError;
+        }),
+      },
+      userAgent: navigator.userAgent,
+    });
+
+    const result = await registerPasskeyForMember({
+      memberId: 'member-1',
+      memberName: 'Test User',
+      memberEmail: 'test@example.com',
+      familyId: 'family-1',
+      familyKey: {} as CryptoKey,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.cancelled).toBe(true);
+    expect(passkeyRepo.savePasskeyRegistration).not.toHaveBeenCalled();
+    // Cancellation must NOT arm the proactive-offer suppression.
+    expect(localStorage.getItem('beanies.biometricOfferSuppressedUntil')).toBeNull();
+
+    getPRFOutputMock.mockReturnValue(new ArrayBuffer(32));
+  });
+
+  it('assert-success native path: no PRF at create, immediate assertion yields PRF → wrap + persist', async () => {
+    // The core native mechanism: create returns no results.first, the immediate
+    // restricted assertion returns the PRF output, wrap + persist run.
+    getPRFOutputMock.mockReturnValueOnce(null); // create ext → no output
+    getPRFOutputMock.mockReturnValue(new ArrayBuffer(32)); // assertion ext → output
+    const getMock = vi.fn(async () =>
+      makeFakeAssertion({ rawId: new TextEncoder().encode('new-cred-id').buffer })
+    );
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: {
+        create: vi.fn(async () => ({
+          rawId: new TextEncoder().encode('new-cred-id').buffer,
+          response: {
+            getPublicKey: () => new ArrayBuffer(65),
+            getTransports: () => ['internal'],
+          } as unknown as AuthenticatorAttestationResponse,
+          getClientExtensionResults: () => ({ prf: { enabled: true } }),
+        })),
+        get: getMock,
+      },
+      userAgent: navigator.userAgent,
+    });
+
+    const result = await registerPasskeyForMember({
+      memberId: 'member-1',
+      memberName: 'Test User',
+      memberEmail: 'test@example.com',
+      familyId: 'family-1',
+      familyKey: {} as CryptoKey,
+    });
+
+    // The immediate assertion (evaluatePRFForCredential) actually ran and was
+    // restricted to the just-created credential.
+    expect(getMock).toHaveBeenCalledTimes(1);
+    const getArgs = getMock.mock.calls[0] as unknown as [
+      { publicKey: PublicKeyCredentialRequestOptions },
+    ];
+    expect(getArgs[0].publicKey.allowCredentials).toHaveLength(1);
+    expect(result.success).toBe(true);
+    expect(result.prfSupported).toBe(true);
+    expect(result.passkeySecret).toBeTruthy();
+    expect(passkeyRepo.savePasskeyRegistration).toHaveBeenCalledTimes(1);
+
+    getPRFOutputMock.mockReturnValue(new ArrayBuffer(32));
+  });
+
+  it('short-circuits (no prompt) on a platform that cannot deliver PRF (iOS < 18.4)', async () => {
+    isNativeMock.mockReturnValue(true);
+    getPlatformMock.mockReturnValue('ios');
+    const createMock = vi.fn();
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: { create: createMock, get: vi.fn() },
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15',
+    });
+
+    const result = await registerPasskeyForMember({
+      memberId: 'member-1',
+      memberName: 'Test User',
+      memberEmail: 'test@example.com',
+      familyId: 'family-1',
+      familyKey: {} as CryptoKey,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('password');
+    // Never prompted — declined before any credential ceremony.
+    expect(createMock).not.toHaveBeenCalled();
+    expect(passkeyRepo.savePasskeyRegistration).not.toHaveBeenCalled();
+
+    isNativeMock.mockReturnValue(false);
+    getPlatformMock.mockReturnValue('web');
   });
 
   it('flags result.cancelled when the user dismisses the platform-authenticator prompt', async () => {
@@ -474,5 +656,140 @@ describe('guessAuthenticatorLabel', () => {
     );
     expect(label).toContain('Touch ID');
     expect(label).toContain('macOS');
+  });
+});
+
+describe('platformSupportsPRF — biometric offer capability gate (#52)', () => {
+  const realUA = navigator.userAgent;
+  afterEach(() => {
+    isNativeMock.mockReturnValue(false);
+    getPlatformMock.mockReturnValue('web');
+    vi.stubGlobal('navigator', { ...navigator, userAgent: realUA });
+  });
+
+  it('web/PWA → true (browser WebAuthn handles PRF)', () => {
+    isNativeMock.mockReturnValue(false);
+    expect(platformSupportsPRF()).toBe(true);
+  });
+
+  it('Android native → true', () => {
+    isNativeMock.mockReturnValue(true);
+    getPlatformMock.mockReturnValue('android');
+    expect(platformSupportsPRF()).toBe(true);
+  });
+
+  it('iOS native < 18.4 → false (data-loss bug / no reliable PRF)', () => {
+    isNativeMock.mockReturnValue(true);
+    getPlatformMock.mockReturnValue('ios');
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15',
+    });
+    expect(platformSupportsPRF()).toBe(false);
+  });
+
+  it('iOS native >= 18.4 → true', () => {
+    isNativeMock.mockReturnValue(true);
+    getPlatformMock.mockReturnValue('ios');
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15',
+    });
+    expect(platformSupportsPRF()).toBe(true);
+  });
+
+  it('iOS native 19_0 → true (future major)', () => {
+    isNativeMock.mockReturnValue(true);
+    getPlatformMock.mockReturnValue('ios');
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15',
+    });
+    expect(platformSupportsPRF()).toBe(true);
+  });
+
+  it('iPadOS desktop-class UA (no parseable OS token) → true (permissive, not silently withheld)', () => {
+    isNativeMock.mockReturnValue(true);
+    getPlatformMock.mockReturnValue('ios');
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15',
+    });
+    expect(platformSupportsPRF()).toBe(true);
+  });
+});
+
+describe('canOfferBiometric — self-healing per-device suppression (#52)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    isNativeMock.mockReturnValue(false);
+    getPlatformMock.mockReturnValue('web');
+    vi.stubGlobal('PublicKeyCredential', {
+      isUserVerifyingPlatformAuthenticatorAvailable: async () => true,
+    });
+  });
+  afterEach(() => localStorage.clear());
+
+  it('offers when platform supports PRF, an authenticator exists, and no suppression', async () => {
+    expect(await canOfferBiometric()).toBe(true);
+  });
+
+  it('does not offer while a suppression window is active', async () => {
+    localStorage.setItem('beanies.biometricOfferSuppressedUntil', String(Date.now() + 60_000));
+    expect(await canOfferBiometric()).toBe(false);
+  });
+
+  it('re-offers (and clears the record) once the cool-off has elapsed', async () => {
+    localStorage.setItem('beanies.biometricOfferSuppressedUntil', String(Date.now() - 1_000));
+    expect(await canOfferBiometric()).toBe(true);
+    expect(localStorage.getItem('beanies.biometricOfferSuppressedUntil')).toBeNull();
+  });
+
+  it('does not offer when no platform authenticator is available', async () => {
+    vi.stubGlobal('PublicKeyCredential', {
+      isUserVerifyingPlatformAuthenticatorAvailable: async () => false,
+    });
+    expect(await canOfferBiometric()).toBe(false);
+  });
+
+  it('canEnrollBiometric ignores suppression — the Settings retry surface never self-locks', async () => {
+    // Suppression that hides the PROACTIVE offer must NOT block the deliberate
+    // enroll surface (Settings), which gates on canEnrollBiometric.
+    localStorage.setItem('beanies.biometricOfferSuppressedUntil', String(Date.now() + 60_000));
+    expect(await canOfferBiometric()).toBe(false); // proactive nag suppressed
+    expect(await canEnrollBiometric()).toBe(true); // but the user can still enroll
+  });
+});
+
+describe('formatCredentialManagerError — friendly copy, never the raw string (#52)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegistrations.push(makeRegistration());
+    getPlatformMock.mockReturnValue('android');
+  });
+  afterEach(() => {
+    mockRegistrations.length = 0;
+    getPlatformMock.mockReturnValue('web');
+  });
+
+  it('maps a "no create options available" assertion failure to friendly password-fallback copy', async () => {
+    const rawMessage = 'NoCreateCredentialException: No create options available.';
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: {
+        get: vi.fn(async () => {
+          throw new Error(rawMessage);
+        }),
+        create: vi.fn(),
+      },
+      userAgent: navigator.userAgent,
+    });
+
+    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    expect(result.success).toBe(false);
+    // Friendly copy (the tr() fallback), never the raw platform string.
+    expect(result.error).not.toContain('NoCreateCredentialException');
+    expect(result.error).toContain('password');
   });
 });

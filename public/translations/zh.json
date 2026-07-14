@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-13",
-    "translationCount": 3723
+    "lastUpdated": "2026-07-14",
+    "translationCount": 3728
   },
   "translations": {
     "app.name": {
@@ -18620,6 +18620,31 @@
       "translation": "要在此处打开保存的文件，请使用Chrome或Edge ，或设置Google云端硬盘",
       "hash": "8rdlub",
       "lastUpdated": "2026-07-13"
+    },
+    "passkey.errEnableFailed": {
+      "translation": "目前无法在此设备上设置生物识别解锁。您仍然可以使用密码登录。",
+      "hash": "xqtx4o",
+      "lastUpdated": "2026-07-14"
+    },
+    "passkey.errNotReadable": {
+      "translation": "您的设备无法完成此请求。请确保已设置设备生物识别（指纹或面部解锁） ，然后重试。",
+      "hash": "71aeia",
+      "lastUpdated": "2026-07-14"
+    },
+    "passkey.errNotSupported": {
+      "translation": "此设备目前无法使用生物识别解锁。您可以使用密码登录。",
+      "hash": "xtfoou",
+      "lastUpdated": "2026-07-14"
+    },
+    "passkey.errSecurity": {
+      "translation": "发生安全错误。请确保您使用的是安全(HTTPS)连接。",
+      "hash": "8h63j",
+      "lastUpdated": "2026-07-14"
+    },
+    "passkey.errGeneric": {
+      "translation": "生物识别解锁出错。您可以使用密码登录。",
+      "hash": "wrhqqw",
+      "lastUpdated": "2026-07-14"
     }
   }
 }

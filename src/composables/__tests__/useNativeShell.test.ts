@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { isNativePlatform } = vi.hoisted(() => ({ isNativePlatform: vi.fn(() => true) }));
+const { isNativePlatform, setColor } = vi.hoisted(() => ({
+  isNativePlatform: vi.fn(() => true),
+  setColor: vi.fn(),
+}));
 vi.mock('@capacitor/core', () => ({
   Capacitor: { isNativePlatform, getPlatform: () => 'android' },
+  // Custom WindowBackground plugin (#53) — return our spy for `setColor`.
+  registerPlugin: () => ({ setColor }),
 }));
 
 const { hide, setStyle, setOverlaysWebView, addListener, exitApp } = vi.hoisted(() => ({
@@ -27,6 +32,7 @@ describe('useNativeShell (ADR-029 A5)', () => {
     isNativePlatform.mockReturnValue(true);
     hide.mockResolvedValue(undefined);
     setStyle.mockResolvedValue(undefined);
+    setColor.mockResolvedValue(undefined);
     setOverlaysWebView.mockResolvedValue(undefined);
     addListener.mockResolvedValue({ remove: vi.fn() });
     exitApp.mockResolvedValue(undefined);
@@ -46,15 +52,18 @@ describe('useNativeShell (ADR-029 A5)', () => {
     useNativeShell();
     expect(hide).toHaveBeenCalled();
     expect(setOverlaysWebView).toHaveBeenCalledWith({ overlay: true });
-    // Light mode (no `dark` class): dark icons.
+    // Light mode (no `dark` class): dark icons + light window background (#53).
     expect(setStyle).toHaveBeenCalledWith({ style: 'LIGHT' });
+    expect(setColor).toHaveBeenCalledWith({ color: '#F9FAFB' });
     expect(addListener).toHaveBeenCalledWith('backButton', expect.any(Function));
   });
 
-  it('on native: dark mode uses light status-bar icons (Style.Dark)', () => {
+  it('on native: dark mode uses light status-bar icons + dark window background (#53)', () => {
     document.documentElement.classList.add('dark');
     useNativeShell();
     expect(setStyle).toHaveBeenCalledWith({ style: 'DARK' });
+    // #53: window background tracks the IN-APP theme, not OS DayNight.
+    expect(setColor).toHaveBeenCalledWith({ color: '#0F172A' });
     document.documentElement.classList.remove('dark');
   });
 
