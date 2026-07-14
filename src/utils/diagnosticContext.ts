@@ -152,6 +152,18 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'recovery_method',
   'recovery_attempt',
   'lost_siblings',
+  // Native biometric passkey PRF diagnostics (surface `passkey-prf` + the
+  // `passkey-register`/`passkey-assertion` warnings, see services/auth/passkeyService.ts).
+  // PII-free by construction: booleans + a small enum + a bounded `Name: message`
+  // error descriptor (no user-typed content; redactContext caps it at MAX_STRING_LEN).
+  // Added 2026-07-14 (#52). `detail` supersedes the previously-passed-but-stripped
+  // raw error string; platform ships in the existing `os` key. MIRROR every key here
+  // in the Lambda allowlist + its pinned test.
+  'prf_enabled',
+  'has_prf_output',
+  'credential_source',
+  'unwrap_ok',
+  'detail',
 ]);
 
 export const MAX_STRING_LEN = 200;

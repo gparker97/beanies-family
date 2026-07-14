@@ -51,7 +51,7 @@ import { breadcrumbsForReport } from '@/utils/diagnosticContext';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
 import ContentSkeleton from '@/components/ui/ContentSkeleton.vue';
 import BackgroundSyncBar from '@/components/common/BackgroundSyncBar.vue';
-import { isPlatformAuthenticatorAvailable } from '@/services/auth/passkeyService';
+import { canOfferBiometric } from '@/services/auth/passkeyService';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useMobileMenu, useHeaderReclaimed } from '@/composables/useMobileMenu';
 import { updateRatesIfStale, forceUpdateRates } from '@/services/exchangeRate';
@@ -1355,7 +1355,7 @@ watch(
       if (familyId) {
         const hasPasskeys = await authStore.checkHasRegisteredPasskeys(familyId);
         if (!hasPasskeys) {
-          const hasPlatform = await isPlatformAuthenticatorAvailable();
+          const hasPlatform = await canOfferBiometric();
           // #45: claim the session's single interruption slot only at the true
           // show-site (a no-show branch above never wastes it). If another surface
           // won this load, defer — passkey re-fires on the next fresh sign-in and
@@ -1377,6 +1377,10 @@ watch(
 </script>
 
 <template>
+  <!-- #53: this root background paints edge-to-edge behind the native Android
+       status bar. Keep bg-gray-50 / dark:bg-slate-900 in sync with the native
+       @color/windowBackground (android/app/src/main/res/values{,-night}/colors.xml)
+       so the pre-paint strip and the WebView show one colour (no seam). -->
   <div class="min-h-screen bg-gray-50 dark:bg-slate-900">
     <!-- Loading overlay with pod spinner -->
     <Transition

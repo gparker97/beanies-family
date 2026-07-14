@@ -13,6 +13,12 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- #53: theme-aware window background so the edge-to-edge status-bar strip
+             shows the app colour, not a black band. DayNight picks values-night in
+             dark mode. Keep @color/windowBackground in sync with the App.vue root
+             bg-gray-50 / dark:bg-slate-900. This is the theme BridgeActivity switches
+             to post-splash (setTheme(R.style.AppTheme_NoActionBar)). -->
+        <item name="android:windowBackground">@color/windowBackground</item>
     </style>
 
 

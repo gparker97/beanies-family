@@ -4,7 +4,7 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import {
   isWebAuthnSupported,
-  isPlatformAuthenticatorAvailable,
+  canEnrollBiometric,
   listRegisteredPasskeys,
   removePasskey,
   renamePasskey,
@@ -31,7 +31,11 @@ const editLabel = ref('');
 onMounted(async () => {
   supported.value = isWebAuthnSupported();
   if (supported.value) {
-    platformAvailable.value = await isPlatformAuthenticatorAvailable();
+    // Settings is the deliberate management surface: gate on capability only
+    // (canEnrollBiometric), NOT canOfferBiometric — the latter folds in the
+    // proactive-nag suppression, which would lock the retry button after a
+    // transient decline. See passkeyService canOfferBiometric/canEnrollBiometric.
+    platformAvailable.value = await canEnrollBiometric();
   }
   await loadPasskeys();
 });

@@ -8,9 +8,9 @@
  */
 
 import {
-  isPRFSupported,
   getPRFOutput,
-  buildPRFExtension,
+  buildPRFEnableExtension,
+  buildPRFEvalExtension,
   deriveWrappingKey,
   generateHKDFSalt,
   wrapDEK,
@@ -23,6 +23,8 @@ import { getGlobalSettings } from '@/services/indexeddb/repositories/globalSetti
 import { importFamilyKey } from '@/services/crypto/familyKeyService';
 import { isNative, getPlatform } from '@/services/sync/capabilities';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
+import { useTranslationStore } from '@/stores/translationStore';
 
 const RP_NAME = 'beanies.family';
 
@@ -68,6 +70,115 @@ export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
   }
 }
 
+/**
+ * Whether the current surface can actually deliver a PRF-backed passkey. Biometric
+ * unlock wraps the family key via the WebAuthn PRF extension, so a device that
+ * can't do PRF must never be OFFERED biometric (it would fail after enabling).
+ * - Web/PWA: the real browser WebAuthn API handles PRF → true.
+ * - Android: Google Password Manager supports enable-at-create + eval-at-assertion → true.
+ * - iOS: only 18.4+ (PRF APIs land in 18.0 but a data-loss bug spans 18.0–18.3;
+ *   the native @capgo Swift PRF wiring is `#available(iOS 18.4)`-gated to match).
+ * This is the ONLY home of the platform/version rule — keep it matched to the
+ * Swift `#available(iOS 18.4)` gate in the plugin patch.
+ */
+export function platformSupportsPRF(): boolean {
+  if (!isNative()) return true;
+  const os = getPlatform();
+  if (os === 'android') return true;
+  if (os === 'ios') return iosVersionAtLeast(18, 4);
+  return false;
+}
+
+// True unless the UA reports an iOS version strictly BELOW the threshold. On
+// iPadOS the WebView can report a desktop "Intel Mac OS X 10_15" UA with no
+// parseable iOS-version token — we return true there (permissive) rather than
+// silently withholding biometric on a capable iPad. The native Swift PRF wiring
+// is `#available(iOS 18.4)`-gated, and a genuinely-too-old OS simply yields no PRF
+// output, which the enable flow then handles as a clean "not available" decline.
+function iosVersionAtLeast(major: number, minor: number): boolean {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const m = /OS (\d+)_(\d+)/.exec(ua);
+  if (!m) return true;
+  const maj = Number(m[1]);
+  const min = Number(m[2]);
+  return maj > major || (maj === major && min >= minor);
+}
+
+// Per-device, self-healing suppression of the PROACTIVE biometric offer (the
+// App.vue post-sign-in nag) after a decline/failure. Stored as an expiry timestamp
+// (ms) in localStorage — NOT synced, and it can only HIDE the proactive nag (never
+// grants access, and never gates the deliberate Settings enroll surface, which uses
+// `canEnrollBiometric()`), so it carries no security surface. Time-boxed so a
+// transient cause self-heals; a successful enable clears it.
+const BIOMETRIC_SUPPRESS_KEY = 'beanies.biometricOfferSuppressedUntil';
+const BIOMETRIC_SUPPRESS_MS = 24 * 60 * 60 * 1000; // 24h cool-off
+
+function isBiometricOfferSuppressed(): boolean {
+  try {
+    const raw = localStorage.getItem(BIOMETRIC_SUPPRESS_KEY);
+    if (!raw) return false;
+    const until = Number(raw);
+    if (!Number.isFinite(until)) return false;
+    if (Date.now() >= until) {
+      localStorage.removeItem(BIOMETRIC_SUPPRESS_KEY);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function suppressBiometricOffer(): void {
+  try {
+    localStorage.setItem(BIOMETRIC_SUPPRESS_KEY, String(Date.now() + BIOMETRIC_SUPPRESS_MS));
+  } catch {
+    /* localStorage unavailable — offer simply isn't suppressed */
+  }
+}
+
+function clearBiometricSuppression(): void {
+  try {
+    localStorage.removeItem(BIOMETRIC_SUPPRESS_KEY);
+  } catch {
+    /* no-op */
+  }
+}
+
+/**
+ * Whether the user CAN enroll biometric on this surface — platform PRF capability
+ * plus an actual platform authenticator. Deliberately does NOT consult the
+ * proactive-offer suppression, so the deliberate management surface (Settings) and
+ * explicit enroll flows are never locked out by a prior transient decline.
+ */
+export async function canEnrollBiometric(): Promise<boolean> {
+  if (!platformSupportsPRF()) return false;
+  return isPlatformAuthenticatorAvailable();
+}
+
+/**
+ * Whether to PROACTIVELY offer biometric enrollment (App.vue's post-sign-in nag).
+ * Same capability as `canEnrollBiometric()` but also respects the self-healing
+ * per-device suppression so we don't re-nag on a device that just declined. Explicit
+ * enroll surfaces (Settings) use `canEnrollBiometric()` so they always work.
+ */
+export async function canOfferBiometric(): Promise<boolean> {
+  if (isBiometricOfferSuppressed()) return false;
+  return canEnrollBiometric();
+}
+
+/** Translate a key with an English fallback (Pinia may be pre-init in edge flows). */
+function tr(key: string, fallback: string): string {
+  try {
+    // `t` is typed to the literal key union; these keys are added to uiStrings.ts
+    // but the cast keeps this helper key-agnostic (and pre-Pinia safe via catch).
+    const s = (useTranslationStore().t as (k: string) => string)(key);
+    return s && s !== key ? s : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 // --- Registration ---
 
 export interface RegisterPasskeyParams {
@@ -103,11 +214,31 @@ export async function registerPasskeyForMember(
 
   const { memberId, memberName, memberEmail, familyId, familyKey } = params;
 
+  // Clean decline BEFORE any prompt on platforms that provably can't deliver a
+  // PRF-backed passkey (e.g. iOS < 18.4). We never show a doomed biometric prompt
+  // or register a passkey we can't unlock with — the user keeps password sign-in.
+  if (!platformSupportsPRF()) {
+    logEvent({
+      level: 'info',
+      surface: 'passkey-prf',
+      message: 'enroll_declined',
+      context: { os: getPlatform(), action: 'unsupported' },
+    });
+    return { success: false, error: biometricUnavailableMessage() };
+  }
+
   // Generate client-side challenge
   const challenge = crypto.getRandomValues(new Uint8Array(32));
 
   const rpId = getRpId();
-  const prfExtension = buildPRFExtension();
+  // Web/PWA: request PRF eval at create. Safari 18+ returns the output there (single
+  // prompt); Chromium ENABLES PRF but does not evaluate at create, so those browsers
+  // fall through to the immediate second assertion in `establishPasskeyWrap` (a
+  // second prompt at enable — expected). Native: enable-only at create (GMS /
+  // ASAuthorization don't reliably eval at create), then eval at the immediate
+  // assertion. Either way the wrap is established during enable so biometric unlock
+  // works on the first unlock.
+  const createPrfExtension = isNative() ? buildPRFEnableExtension() : buildPRFEvalExtension();
 
   // Discoverable (resident) credentials let the assertion flow omit
   // `allowCredentials` (see authenticateWithPasskey). Web requires them and works
@@ -139,7 +270,7 @@ export async function registerPasskeyForMember(
     },
     timeout: 60000,
     attestation: 'none',
-    extensions: prfExtension as AuthenticationExtensionsClientInputs,
+    extensions: createPrfExtension as AuthenticationExtensionsClientInputs,
   };
 
   const createOptions: CredentialCreationOptions = { publicKey: publicKeyOptions };
@@ -172,11 +303,16 @@ export async function registerPasskeyForMember(
       // `warning`, not `error`: the user can still sign in with their password.
       reportError({
         surface: 'passkey-register',
-        message: `passkey registration failed (all attempts): ${attemptErrors.join(' || ').slice(0, 600)}`,
+        message: 'passkey registration failed (all attempts)',
         error: err,
         severity: 'warning',
-        context: { platform: getPlatform() },
+        context: {
+          os: getPlatform(),
+          action: 'create',
+          detail: attemptErrors.join(' || '),
+        },
       });
+      suppressBiometricOffer();
       return { success: false, error: formatCredentialManagerError(err) };
     }
   }
@@ -185,51 +321,180 @@ export async function registerPasskeyForMember(
     return { success: false, error: 'No credential returned' };
   }
 
-  const response = credential.response as AuthenticatorAttestationResponse;
-  const extensionResults = credential.getClientExtensionResults();
-  const prfAvailable = isPRFSupported(extensionResults);
+  const os = getPlatform();
+  const credentialId = bufferToBase64url(credential.rawId);
+  const prfEnabled =
+    (credential.getClientExtensionResults() as { prf?: { enabled?: boolean } }).prf?.enabled ===
+    true;
+  logEvent({
+    level: 'info',
+    surface: 'passkey-prf',
+    message: 'prf_enable_result',
+    context: { os, prf_enabled: prfEnabled },
+  });
 
-  // Build registration record
+  // Establish the PRF-based family-key wrap DURING enable (immediate assertion on
+  // native + Chromium; create-time output on Safari 18+) so biometric unlock works
+  // on the first unlock.
+  const result = await establishPasskeyWrap(credential, memberId, familyKey);
+  if (result === 'cancelled') {
+    // User dismissed the second (PRF-eval) prompt — a deliberate gesture, not a
+    // failure. Silent, exactly like the create-cancel path: no persist, no
+    // suppression, no report. The just-created credential is left benign + unused.
+    return { success: false, cancelled: true, error: 'Registration was cancelled' };
+  }
+  if (result === null) {
+    // Reached a passkey but PRF couldn't be established (browser/device lacks usable
+    // PRF, or a transient wrap error). Clean decline — no scary error, no credential
+    // destruction; suppress only the PROACTIVE nag (Settings retry still works).
+    return declineEnable(os);
+  }
+  const passkeySecret = result;
+
+  // Persist the registration ONLY after the wrap succeeds — so a declined/cancelled
+  // enable leaves no local record. `prfSupported` is true by construction: we hold
+  // a working wrap.
+  const response = credential.response as AuthenticatorAttestationResponse;
   const registration: PasskeyRegistration = {
-    credentialId: bufferToBase64url(credential.rawId),
+    credentialId,
     memberId,
     familyId,
     publicKey: bufferToBase64(response.getPublicKey()!),
     transports: response.getTransports?.() ?? [],
-    prfSupported: prfAvailable,
+    prfSupported: true,
     label: params.label || guessAuthenticatorLabel(),
     createdAt: toISODateString(new Date()),
   };
-
   await passkeyRepo.savePasskeyRegistration(registration);
-
-  // If PRF is available, wrap the family key for cross-device access
-  let passkeySecret: PasskeySecret | undefined;
-  if (prfAvailable) {
-    const prfOutput = getPRFOutput(extensionResults);
-    if (prfOutput) {
-      try {
-        const hkdfSalt = generateHKDFSalt();
-        const wrappingKey = await deriveWrappingKey(prfOutput, hkdfSalt);
-        const wrappedFamilyKey = await wrapDEK(familyKey, wrappingKey);
-        passkeySecret = {
-          credentialId: registration.credentialId,
-          memberId,
-          wrappedFamilyKey,
-          hkdfSalt: bufferToBase64(hkdfSalt.buffer as ArrayBuffer),
-          createdAt: toISODateString(new Date()),
-        };
-      } catch {
-        // PRF wrap failed — non-critical, fall back to password-based unlock
-      }
-    }
-  }
+  clearBiometricSuppression();
 
   return {
     success: true,
-    prfSupported: registration.prfSupported,
+    prfSupported: true,
     passkeySecret,
   };
+}
+
+/**
+ * Obtain a PRF output for the just-created credential and wrap the family key into
+ * a `PasskeySecret`. Safari 18+ already evaluated PRF at create (output in hand);
+ * native + Chromium run an immediate assertion RESTRICTED to this credential to
+ * evaluate PRF. Returns:
+ *   - a `PasskeySecret` on success,
+ *   - `'cancelled'` when the user dismissed the immediate assertion prompt (a
+ *     deliberate gesture the caller must treat as cancellation, not failure),
+ *   - `null` when PRF genuinely couldn't be established (no PRF output or a wrap
+ *     error) — the caller cleanly declines.
+ * Logs the eval outcome either way; never swallows a decision silently.
+ */
+async function establishPasskeyWrap(
+  credential: PublicKeyCredential,
+  memberId: string,
+  familyKey: CryptoKey
+): Promise<PasskeySecret | 'cancelled' | null> {
+  const os = getPlatform();
+  let prfOutput = getPRFOutput(credential.getClientExtensionResults());
+  let credentialSource: 'create' | 'assert' = 'create';
+  if (!prfOutput) {
+    credentialSource = 'assert';
+    const evaluated = await evaluatePRFForCredential(credential.rawId);
+    if (evaluated === 'cancelled') {
+      logEvent({
+        level: 'info',
+        surface: 'passkey-prf',
+        message: 'prf_eval_result',
+        context: { os, has_prf_output: false, credential_source: 'assert' },
+      });
+      return 'cancelled';
+    }
+    prfOutput = evaluated;
+  }
+  logEvent({
+    level: 'info',
+    surface: 'passkey-prf',
+    message: 'prf_eval_result',
+    context: { os, has_prf_output: prfOutput !== null, credential_source: credentialSource },
+  });
+  if (!prfOutput) return null;
+
+  try {
+    const hkdfSalt = generateHKDFSalt();
+    const wrappingKey = await deriveWrappingKey(prfOutput, hkdfSalt);
+    const wrappedFamilyKey = await wrapDEK(familyKey, wrappingKey);
+    logEvent({
+      level: 'info',
+      surface: 'passkey-prf',
+      message: 'wrap_established',
+      context: { os },
+    });
+    return {
+      credentialId: bufferToBase64url(credential.rawId),
+      memberId,
+      wrappedFamilyKey,
+      hkdfSalt: bufferToBase64(hkdfSalt.buffer as ArrayBuffer),
+      createdAt: toISODateString(new Date()),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Immediate assertion restricted to the just-created credential, to evaluate PRF
+ * during the enable ceremony. Returns the normalized PRF output, `'cancelled'` when
+ * the user dismisses the prompt (`NotAllowedError`), or `null` (no PRF / other error).
+ */
+async function evaluatePRFForCredential(
+  rawId: ArrayBuffer
+): Promise<ArrayBuffer | 'cancelled' | null> {
+  const publicKeyOptions: PublicKeyCredentialRequestOptions = {
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    rpId: getRpId(),
+    userVerification: 'required',
+    timeout: 60000,
+    // Restrict to THIS credential so the wrap is keyed to the passkey we just
+    // created (the PRF output is per-credential); a discoverable get could match
+    // a different existing passkey and produce an unusable wrap.
+    allowCredentials: [{ id: rawId, type: 'public-key' }],
+    extensions: buildPRFEvalExtension() as AuthenticationExtensionsClientInputs,
+  };
+  try {
+    const assertion = (await navigator.credentials.get({
+      publicKey: publicKeyOptions,
+    })) as PublicKeyCredential | null;
+    if (!assertion) return null;
+    return getPRFOutput(assertion.getClientExtensionResults());
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'NotAllowedError') return 'cancelled';
+    return null;
+  }
+}
+
+/**
+ * Clean decline of a biometric enable that reached a passkey but couldn't establish
+ * a PRF wrap (device/browser lacks usable PRF, or a transient wrap error). We do NOT
+ * remove/signal the just-created platform credential — `signalUnknownCredential`
+ * would ask the platform to DELETE it; it's instead left as a benign unused passkey.
+ * We surface a gentle "not available" message (not a failure/error toast), suppress
+ * only the PROACTIVE nag (Settings retry is unaffected via `canEnrollBiometric`), and
+ * log to the firehose (warn, no Slack page) so the decline rate stays measurable.
+ */
+function declineEnable(os: string): RegisterPasskeyResult {
+  logEvent({
+    level: 'warn',
+    surface: 'passkey-prf',
+    message: 'enroll_declined',
+    context: { os, action: 'no-prf' },
+  });
+  suppressBiometricOffer();
+  return { success: false, error: biometricUnavailableMessage() };
+}
+
+function biometricUnavailableMessage(): string {
+  return tr(
+    'passkey.errNotSupported',
+    "Biometric unlock isn't available on this device right now. You can sign in with your password."
+  );
 }
 
 // --- Authentication ---
@@ -269,7 +534,7 @@ export async function authenticateWithPasskey(
 
   const challenge = crypto.getRandomValues(new Uint8Array(32));
   const rpId = getRpId();
-  const prfExtension = buildPRFExtension();
+  const prfExtension = buildPRFEvalExtension();
 
   // Discoverable credential mode: omit allowCredentials entirely.
   const publicKeyOptions: PublicKeyCredentialRequestOptions = {
@@ -421,16 +686,32 @@ async function tryUnwrapFamilyKeyFromPRF(
 
   // Try member-specific secrets first, then any without a memberId (from envelope)
   const memberSecrets = passkeySecrets.filter((s) => s.memberId === memberId || s.memberId === '');
+  if (memberSecrets.length === 0) return null;
+  const os = getPlatform();
   for (const secret of memberSecrets) {
     try {
       const hkdfSalt = new Uint8Array(base64ToBuffer(secret.hkdfSalt));
       const wrappingKey = await deriveWrappingKey(prfOutput, hkdfSalt);
       const fk = await unwrapDEK(secret.wrappedFamilyKey, wrappingKey);
+      logEvent({
+        level: 'info',
+        surface: 'passkey-prf',
+        message: 'unwrap_result',
+        context: { os, unwrap_ok: true },
+      });
       return fk;
     } catch {
       // Wrong PRF output or corrupt secret — try next
     }
   }
+  // We had a PRF output + candidate secrets but none unwrapped — a real anomaly
+  // worth a rate signal (the caller still falls back to cache/password).
+  logEvent({
+    level: 'info',
+    surface: 'passkey-prf',
+    message: 'unwrap_result',
+    context: { os, unwrap_ok: false },
+  });
   return null;
 }
 
@@ -517,19 +798,21 @@ export async function renamePasskey(credentialId: string, label: string): Promis
 // --- Registration retry logic ---
 
 /**
- * Progressive fallback for credential creation:
- * 1. Remove authenticatorAttachment, add hints: ['client-device'] (Chrome 128+)
- * 2. If that still fails, also remove the PRF extension
+ * Progressive fallback for credential creation: drop `authenticatorAttachment`
+ * and use `hints: ['client-device']` instead (Chrome 128+ / Android OEMs that
+ * can't handle the platform constraint). The enable-only PRF extension (`{prf:{}}`)
+ * is tiny and GMS-friendly, so we deliberately DO NOT retry without PRF: a passkey
+ * with no PRF can't unlock the family key, so dropping it would just create a
+ * useless credential. If this attempt fails, the caller degrades to password.
  *
- * Returns the credential on success, or null if user cancelled / all retries failed.
- * Throws only on unrecoverable errors.
+ * Returns the credential on success, or null if user cancelled / the retry failed.
  */
 async function retryRegistrationWithFallbacks(
   createOptions: CredentialCreationOptions,
   publicKeyOptions: PublicKeyCredentialCreationOptions,
   attemptErrors: string[]
 ): Promise<PublicKeyCredential | null> {
-  // Fallback 1: drop authenticatorAttachment, use hints instead
+  // Fallback: drop authenticatorAttachment, use hints instead
   delete publicKeyOptions.authenticatorSelection!.authenticatorAttachment;
   applyCredentialHints(createOptions, ['client-device']);
 
@@ -540,20 +823,7 @@ async function retryRegistrationWithFallbacks(
       return null; // User cancelled
     }
     attemptErrors.push(`2·hints+prf: ${describeAuthError(err1)}`);
-
-    // Fallback 2: also remove PRF extension (some credential managers choke on it)
-    if (publicKeyOptions.extensions) {
-      delete publicKeyOptions.extensions;
-      try {
-        return (await navigator.credentials.create(createOptions)) as PublicKeyCredential | null;
-      } catch (err2) {
-        if (err2 instanceof DOMException && err2.name === 'NotAllowedError') {
-          return null; // User cancelled
-        }
-        attemptErrors.push(`3·no-prf: ${describeAuthError(err2)}`);
-        // All retries exhausted — return null, caller will use originalError for message
-      }
-    }
+    // No PRF-drop retry — a non-PRF passkey is useless for unlock. Caller degrades.
   }
 
   return null;
@@ -669,33 +939,52 @@ function applyCredentialHints(
  * Android's credential manager can return opaque NotReadableError messages.
  */
 function formatCredentialManagerError(err: unknown): string {
-  if (err instanceof DOMException) {
-    if (err.name === 'NotReadableError') {
-      return 'Your device credential manager could not complete this request. Please ensure your device biometrics (fingerprint or face unlock) are set up and try again.';
-    }
-    if (err.name === 'NotSupportedError') {
-      return 'Passkeys are not supported on this device. Please use password sign-in instead.';
-    }
-    if (err.name === 'SecurityError') {
-      return 'A security error occurred. Please make sure you are using a secure (HTTPS) connection.';
-    }
+  const name = err instanceof DOMException ? err.name : '';
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (name === 'NotReadableError') {
+    return tr(
+      'passkey.errNotReadable',
+      'Your device could not complete this request. Please make sure your device biometrics (fingerprint or face unlock) are set up, then try again.'
+    );
   }
-  // Unrecognized passkey failure — surface a friendly string to the user AND a
-  // developer breadcrumb (the only reportError in this service). `warning`, not
-  // `error`: the caller still falls back to password, so it's not user-blocking.
-  // Known/cancelled cases never reach here (handled upstream + de-noised,
-  // triage 2026-05-02). errorReporter's reentry-guard + 60s dedup cover floods.
+  // "No create options available" / NoCreateCredentialException: Android Credential
+  // Manager found no provider that can satisfy the request (and NotSupportedError):
+  // biometric can't be set up here — degrade to password cleanly, never the raw string.
+  if (
+    name === 'NotSupportedError' ||
+    /no create options available|NoCreateCredentialException/i.test(message)
+  ) {
+    return tr(
+      'passkey.errNotSupported',
+      "Biometric unlock isn't available on this device right now. You can sign in with your password."
+    );
+  }
+  if (name === 'SecurityError') {
+    return tr(
+      'passkey.errSecurity',
+      'A security error occurred. Please make sure you are on a secure (HTTPS) connection.'
+    );
+  }
+
+  // Unrecognized passkey failure — surface a FRIENDLY string to the user (never
+  // the raw platform message) AND a developer breadcrumb. `warning`, not `error`:
+  // the caller still falls back to password, so it's not user-blocking. Known/
+  // cancelled cases never reach here (handled upstream + de-noised, triage
+  // 2026-05-02). errorReporter's reentry-guard + 60s dedup cover floods.
   reportError({
     surface: 'passkey-assertion',
-    message: err instanceof Error ? err.message : 'unknown passkey error',
+    message: message || 'unknown passkey error',
     error: err,
     severity: 'warning',
     context: {
-      domException: err instanceof DOMException ? err.name : null,
-      platform: getPlatform(),
+      os: getPlatform(),
+      error_code: name || null,
+      detail: describeAuthError(err),
     },
   });
-  return err instanceof Error
-    ? err.message
-    : 'An unexpected error occurred during passkey operation';
+  return tr(
+    'passkey.errGeneric',
+    'Something went wrong with biometric unlock. You can sign in with your password.'
+  );
 }

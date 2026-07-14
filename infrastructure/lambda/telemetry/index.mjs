@@ -98,6 +98,14 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'recovery_method',
   'recovery_attempt',
   'lost_siblings',
+  // Native biometric passkey PRF diagnostics (added 2026-07-14, #52; mirror of the
+  // client allowlist). PII-free: booleans + a small enum + a bounded `Name: message`
+  // error descriptor. `detail` replaces the raw error string; platform ships in `os`.
+  'prf_enabled',
+  'has_prf_output',
+  'credential_source',
+  'unwrap_ok',
+  'detail',
 ]);
 
 function getHeaders(event) {

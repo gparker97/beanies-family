@@ -1,0 +1,137 @@
+diff --git a/node_modules/@capgo/capacitor-passkey/ios/Sources/CapacitorPasskeyPlugin/CapacitorPasskeyPlugin.swift b/node_modules/@capgo/capacitor-passkey/ios/Sources/CapacitorPasskeyPlugin/CapacitorPasskeyPlugin.swift
+index be067b3..d9af4db 100644
+--- a/node_modules/@capgo/capacitor-passkey/ios/Sources/CapacitorPasskeyPlugin/CapacitorPasskeyPlugin.swift
++++ b/node_modules/@capgo/capacitor-passkey/ios/Sources/CapacitorPasskeyPlugin/CapacitorPasskeyPlugin.swift
+@@ -21,6 +21,24 @@ private struct PasskeyAuthenticatorSelection: Decodable {
+     let userVerification: String?
+ }
+ 
++// beanies.family patch — WebAuthn PRF extension passthrough. The upstream plugin
++// (8.3.9) does not decode `extensions`, so PRF never reaches ASAuthorization and
++// `clientExtensionResults` ships empty. These types decode the `extensions.prf`
++// sub-object: `{}` (enable, at registration) or `{ eval: { first: <base64url> } }`
++// (evaluate, at assertion). See patches/@capgo+capacitor-passkey+8.3.9.patch and
++// docs/plans/2026-07-14-native-biometric-prf-and-android-statusbar.md (#52).
++private struct PasskeyPRFEvalJSON: Decodable {
++    let first: String?
++}
++
++private struct PasskeyPRFInputJSON: Decodable {
++    let eval: PasskeyPRFEvalJSON?
++}
++
++private struct PasskeyExtensionsJSON: Decodable {
++    let prf: PasskeyPRFInputJSON?
++}
++
+ private struct PasskeyRegistrationRequestJSON: Decodable {
+     let challenge: String
+     let relyingParty: PasskeyRelyingParty
+@@ -28,12 +46,14 @@ private struct PasskeyRegistrationRequestJSON: Decodable {
+     let excludeCredentials: [PasskeyCredentialDescriptor]?
+     let authenticatorSelection: PasskeyAuthenticatorSelection?
+     let attestation: String?
++    let extensions: PasskeyExtensionsJSON?
+ 
+     private enum CodingKeys: String, CodingKey {
+         case attestation
+         case authenticatorSelection
+         case challenge
+         case excludeCredentials
++        case extensions
+         case relyingParty = "rp"
+         case user
+     }
+@@ -44,6 +64,7 @@ private struct PasskeyAssertionRequestJSON: Decodable {
+     let rpId: String?
+     let allowCredentials: [PasskeyCredentialDescriptor]?
+     let userVerification: String?
++    let extensions: PasskeyExtensionsJSON?
+ }
+ 
+ private enum PasskeyOperation {
+@@ -296,6 +317,14 @@ public class CapacitorPasskeyPlugin: CAPPlugin,
+         credentialRequest.userVerificationPreference = userVerificationPreference(request.authenticatorSelection?.userVerification)
+         credentialRequest.attestationPreference = attestationPreference(request.attestation)
+ 
++        // beanies.family patch (#52): ENABLE PRF at creation when requested
++        // (`extensions.prf` present). Enable-only — evaluation happens at the
++        // immediate assertion. Gated to iOS 18.4+ to avoid the PRF data-loss bug
++        // in 18.0–18.3; must match `platformSupportsPRF()` in passkeyService.ts.
++        if #available(iOS 18.4, *), request.extensions?.prf != nil {
++            credentialRequest.prf = ASAuthorizationPublicKeyCredentialPRFRegistrationInput.checkForSupport
++        }
++
+         return credentialRequest
+     }
+ 
+@@ -325,6 +354,19 @@ public class CapacitorPasskeyPlugin: CAPPlugin,
+             }
+         }
+ 
++        // beanies.family patch (#52): EVALUATE PRF at assertion when a base64url
++        // eval salt is supplied (`extensions.prf.eval.first`). Gated to iOS 18.4+
++        // (matches the registration gate + passkeyService.ts `platformSupportsPRF()`).
++        if #available(iOS 18.4, *),
++            let firstSalt = request.extensions?.prf?.eval?.first,
++            let saltData = try? CapacitorPasskey.decodeBase64URL(firstSalt) {
++            let inputValues = ASAuthorizationPublicKeyCredentialPRFAssertionInputValues(
++                saltInput1: saltData,
++                saltInput2: nil
++            )
++            credentialRequest.prf = ASAuthorizationPublicKeyCredentialPRFAssertionInput(inputValues: inputValues)
++        }
++
+         return credentialRequest
+     }
+ 
+@@ -341,12 +383,20 @@ public class CapacitorPasskeyPlugin: CAPPlugin,
+     }
+ 
+     private func serializeRegistration(_ credential: ASAuthorizationPlatformPublicKeyCredentialRegistration) -> JSObject {
+-        [
++        // beanies.family patch (#52): surface `clientExtensionResults.prf.enabled`
++        // so the JS layer knows PRF was enabled on this credential (upstream 8.3.9
++        // hard-codes an empty object here).
++        var clientExtensionResults = JSObject()
++        if #available(iOS 18.4, *), let prf = credential.prf {
++            clientExtensionResults["prf"] = ["enabled": prf.isSupported] as JSObject
++        }
++
++        return [
+             "id": CapacitorPasskey.encodeBase64URL(credential.credentialID),
+             "rawId": CapacitorPasskey.encodeBase64URL(credential.credentialID),
+             "type": "public-key",
+             "authenticatorAttachment": "platform",
+-            "clientExtensionResults": JSObject(),
++            "clientExtensionResults": clientExtensionResults,
+             "response": [
+                 "clientDataJSON": CapacitorPasskey.encodeBase64URL(credential.rawClientDataJSON),
+                 "attestationObject": CapacitorPasskey.encodeBase64URL(credential.rawAttestationObject ?? Data())
+@@ -362,12 +412,25 @@ public class CapacitorPasskeyPlugin: CAPPlugin,
+             "userHandle": credential.userID.isEmpty ? NSNull() : CapacitorPasskey.encodeBase64URL(credential.userID)
+         ]
+ 
++        // beanies.family patch (#52): surface the evaluated PRF output as
++        // `clientExtensionResults.prf.results.first` (base64url) so the JS layer can
++        // derive the family-key wrapping key (upstream 8.3.9 ships an empty object).
++        var clientExtensionResults = JSObject()
++        if #available(iOS 18.4, *), let prf = credential.prf, let first = prf.first {
++            var results = JSObject()
++            results["first"] = CapacitorPasskey.encodeBase64URL(first)
++            if let second = prf.second {
++                results["second"] = CapacitorPasskey.encodeBase64URL(second)
++            }
++            clientExtensionResults["prf"] = ["results": results] as JSObject
++        }
++
+         return [
+             "id": CapacitorPasskey.encodeBase64URL(credential.credentialID),
+             "rawId": CapacitorPasskey.encodeBase64URL(credential.credentialID),
+             "type": "public-key",
+             "authenticatorAttachment": "platform",
+-            "clientExtensionResults": JSObject(),
++            "clientExtensionResults": clientExtensionResults,
+             "response": response
+         ]
+     }

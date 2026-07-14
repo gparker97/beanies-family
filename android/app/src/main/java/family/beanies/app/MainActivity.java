@@ -17,6 +17,10 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // #53: register the custom WindowBackground plugin BEFORE super.onCreate()
+        // (Capacitor's plugin-registration contract) so useNativeShell can paint the
+        // status-bar strip to match the in-app theme rather than the OS DayNight one.
+        registerPlugin(WindowBackgroundPlugin.class);
         super.onCreate(savedInstanceState);
         // Edge-to-edge system bars, done natively. The @capacitor/status-bar plugin
         // only uses deprecated APIs (setSystemUiVisibility / setStatusBarColor) that

@@ -1,7 +1,24 @@
 import { App as CapacitorApp } from '@capacitor/app';
+import { registerPlugin } from '@capacitor/core';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { isNative } from '@/services/sync/capabilities';
+
+/**
+ * Custom Android-only plugin (#53): paints the Activity window background so the
+ * edge-to-edge status-bar / notch strip matches the IN-APP theme, not the OS
+ * DayNight resource. Unimplemented on iOS/web → the `.catch` at the call site
+ * swallows the rejection. Native impl: `WindowBackgroundPlugin.java`.
+ */
+interface WindowBackgroundPlugin {
+  setColor(options: { color: string }): Promise<void>;
+}
+const WindowBackground = registerPlugin<WindowBackgroundPlugin>('WindowBackground');
+
+// #53 keep-in-sync: these MUST equal the App.vue root `bg-gray-50` / `dark:bg-slate-900`
+// and the native android .../colors.xml `windowBackground` (Tailwind gray-50 / slate-900).
+const APP_BG_LIGHT = '#F9FAFB';
+const APP_BG_DARK = '#0F172A';
 
 /**
  * Native (Capacitor) shell wiring — ADR-029 A5. The single home for runtime
@@ -20,18 +37,21 @@ let initialized = false;
 let themeObserver: MutationObserver | null = null;
 
 /**
- * Status-bar ICON contrast, tracking the theme. We do NOT paint the bar a
- * colour: the app targets Android 16 (SDK 36), where edge-to-edge is enforced
- * and `setBackgroundColor` is a deprecated no-op — so instead we go edge-to-edge
- * (see `useNativeShell`), let the page background paint behind a transparent bar
- * (the root `bg-gray-50 dark:bg-slate-900` blends + tracks the theme for free),
- * and only set icon contrast here. Capacitor `Style`: Light = dark icons (light
- * background), Dark = light icons (dark background). Keyed off the same `dark`
- * class the settings store toggles.
+ * Native theme application, tracking the in-app `dark` class. Two parts:
+ *  1. Status-bar ICON contrast (`StatusBar.setStyle`) — Light = dark icons (light
+ *     background), Dark = light icons (dark background).
+ *  2. #53: the Activity window background (`WindowBackground.setColor`, Android-only)
+ *     so the edge-to-edge status-bar / notch strip shows the IN-APP theme colour
+ *     even when it diverges from the OS DayNight setting (the static
+ *     values-night/colors.xml default only follows the OS). Without this the strip
+ *     and the WebView content could show two different colours (a seam).
+ * Both keyed off the same `dark` class the settings store toggles, so icon contrast
+ * and strip colour always agree.
  */
-function applyStatusBarStyle(): void {
+function applyNativeTheme(): void {
   const isDark = document.documentElement.classList.contains('dark');
   void StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light }).catch(() => {});
+  void WindowBackground.setColor({ color: isDark ? APP_BG_DARK : APP_BG_LIGHT }).catch(() => {});
 }
 
 export function useNativeShell(): void {
@@ -61,8 +81,8 @@ export function useNativeShell(): void {
   // the `dark` class on <html>; observing that class keeps all StatusBar plugin
   // usage inside this module (mirrors useChartScale, which observes
   // `data-text-size` mutations) rather than coupling the store to Capacitor.
-  applyStatusBarStyle();
-  themeObserver = new MutationObserver(() => applyStatusBarStyle());
+  applyNativeTheme();
+  themeObserver = new MutationObserver(() => applyNativeTheme());
   themeObserver.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ['class'],
