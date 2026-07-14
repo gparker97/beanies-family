@@ -227,6 +227,7 @@ describe('Telemetry Lambda handler', () => {
         'incr_reason',
         'incr_seq',
         'invite_token_tail',
+        'key_backing',
         'lost_siblings',
         'member_id_tail',
         'online',

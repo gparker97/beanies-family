@@ -1,11 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
-// Native seam — flip per test to exercise the platform-aware salt encoding.
-const { isNativeMock } = vi.hoisted(() => ({ isNativeMock: vi.fn(() => false) }));
-vi.mock('@/services/sync/capabilities', () => ({ isNative: isNativeMock }));
+// passkeyCrypto is WEB/PWA ONLY since the native-biometric Keystore pivot (ADR-029,
+// 2026-07-14) — no `isNative()` branch remains, so no capabilities mock is needed.
 
 import {
-  buildPRFEnableExtension,
   buildPRFEvalExtension,
   getPRFOutput,
   generateHKDFSalt,
@@ -13,52 +11,23 @@ import {
   wrapDEK,
   unwrapDEK,
 } from '../passkeyCrypto';
-import { base64urlToBuffer } from '@/utils/encoding';
 
-beforeEach(() => isNativeMock.mockReturnValue(false));
-
-describe('buildPRFEnableExtension', () => {
-  it('returns an enable-only PRF input ({ prf: {} }) with no eval', () => {
-    expect(buildPRFEnableExtension()).toEqual({ prf: {} });
-  });
-});
-
-describe('buildPRFEvalExtension — platform-aware salt encoding', () => {
-  it('web: eval salt is a 32-byte Uint8Array (BufferSource for the real WebAuthn API)', () => {
-    isNativeMock.mockReturnValue(false);
-    const ext = buildPRFEvalExtension();
-    const first = ext.prf.eval.first;
+describe('buildPRFEvalExtension — web BufferSource salt', () => {
+  it('eval salt is a 32-byte Uint8Array (BufferSource for the real WebAuthn API)', () => {
+    const first = buildPRFEvalExtension().prf.eval.first;
     expect(first).toBeInstanceOf(Uint8Array);
     expect((first as Uint8Array).byteLength).toBe(32);
   });
 
-  it('native: eval salt is a base64url STRING (survives the shim JSON serialization)', () => {
-    isNativeMock.mockReturnValue(true);
-    const first = buildPRFEvalExtension().prf.eval.first;
-    expect(typeof first).toBe('string');
-    // URL-safe, unpadded
-    expect(first as string).not.toMatch(/[+/=]/);
-  });
-
-  it('the native string decodes to the SAME 32 fixed bytes as the web Uint8Array', () => {
-    isNativeMock.mockReturnValue(false);
-    const webSalt = new Uint8Array(buildPRFEvalExtension().prf.eval.first as Uint8Array);
-    isNativeMock.mockReturnValue(true);
-    const nativeSalt = new Uint8Array(
-      base64urlToBuffer(buildPRFEvalExtension().prf.eval.first as string)
-    );
-    expect(nativeSalt).toEqual(webSalt);
-    expect(nativeSalt.byteLength).toBe(32);
-  });
-
-  it('the salt is stable across calls (fixed, deterministic)', () => {
-    isNativeMock.mockReturnValue(true);
-    expect(buildPRFEvalExtension().prf.eval.first).toBe(buildPRFEvalExtension().prf.eval.first);
+  it('the salt is fixed/deterministic across calls', () => {
+    const a = new Uint8Array(buildPRFEvalExtension().prf.eval.first as Uint8Array);
+    const b = new Uint8Array(buildPRFEvalExtension().prf.eval.first as Uint8Array);
+    expect(a).toEqual(b);
   });
 });
 
-describe('getPRFOutput — normalize native string vs web buffer', () => {
-  it('web ArrayBuffer results.first passes through unchanged', () => {
+describe('getPRFOutput — normalize the WebAuthn ArrayBuffer', () => {
+  it('ArrayBuffer results.first passes through unchanged', () => {
     const buf = crypto.getRandomValues(new Uint8Array(32)).buffer;
     const ext = {
       prf: { results: { first: buf } },
@@ -68,23 +37,20 @@ describe('getPRFOutput — normalize native string vs web buffer', () => {
     expect(new Uint8Array(out!)).toEqual(new Uint8Array(buf));
   });
 
-  it('native base64url-string results.first decodes to the same bytes', () => {
+  it('a typed-array view is normalized to its bytes', () => {
     const bytes = crypto.getRandomValues(new Uint8Array(32));
-    const b64url = Buffer.from(bytes).toString('base64url');
     const ext = {
-      prf: { results: { first: b64url } },
+      prf: { results: { first: bytes } },
     } as unknown as AuthenticationExtensionsClientOutputs;
-    const out = getPRFOutput(ext);
-    expect(out).not.toBeNull();
-    expect(new Uint8Array(out!)).toEqual(bytes);
+    expect(new Uint8Array(getPRFOutput(ext)!)).toEqual(bytes);
   });
 
   it('absent / empty PRF → null (the "PRF unusable" signal)', () => {
     expect(getPRFOutput({} as AuthenticationExtensionsClientOutputs)).toBeNull();
-    const emptyString = {
-      prf: { results: { first: '' } },
+    const emptyBuf = {
+      prf: { results: { first: new ArrayBuffer(0) } },
     } as unknown as AuthenticationExtensionsClientOutputs;
-    expect(getPRFOutput(emptyString)).toBeNull();
+    expect(getPRFOutput(emptyBuf)).toBeNull();
   });
 });
 

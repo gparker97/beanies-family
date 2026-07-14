@@ -14,18 +14,9 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
     hostname: 'app.beanies.family',
   },
-  // Native biometric/passkeys go through the native Credential Manager (Android)
-  // / ASAuthorization (iOS) via @capgo/capacitor-passkey's WebAuthn shim — NOT
-  // the WebView's own WebAuthn (which dead-ended: FOR_APP errored, FOR_BROWSER
-  // crashed). `origin` is the WebAuthn origin the native call presents; `domains`
-  // is the RP-ID allowlist. The shim is installed only on native (main.ts), so
-  // web/PWA use the real browser WebAuthn untouched. See ADR-029.
-  plugins: {
-    CapacitorPasskey: {
-      origin: 'https://app.beanies.family',
-      domains: ['app.beanies.family'],
-    },
-  },
+  // Native biometric uses the hardware Keystore via the custom `BiometricKeystore`
+  // plugin (no WebAuthn/RP-ID/assetlinks). The retired @capgo/capacitor-passkey shim
+  // config was removed with it (ADR-029, 2026-07-14). Web/PWA keeps WebAuthn-PRF.
 };
 
 export default config;

@@ -6,21 +6,19 @@ import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
 /**
- * WebView-based WebAuthn (WebSettingsCompat.setWebAuthenticationSupport) is a dead
- * end on this stack and is intentionally NOT enabled (ADR-029): FOR_APP returned an
- * opaque CreateCredentialUnknownException and FOR_BROWSER hard-crashed the Chromium
- * WebView. Native biometric instead goes through the @capgo/capacitor-passkey plugin
- * (its own Credential Manager calls, shimmed in main.ts), so this Activity stays a
- * plain BridgeActivity for auth. The device creates passkeys fine via Chrome/PWA —
- * the limitation was specifically the WebView ↔ Credential Manager bridge.
+ * Native biometric unlock uses the hardware Keystore via the custom
+ * `BiometricKeystorePlugin` (BiometricPrompt + AndroidKeyStore CryptoObject), NOT
+ * WebAuthn — the WebView↔Credential Manager bridge (and WebAuthn-PRF over it) was a
+ * dead end on this stack (ADR-029, 2026-07-14). Web/PWA keeps WebAuthn-PRF.
  */
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // #53: register the custom WindowBackground plugin BEFORE super.onCreate()
-        // (Capacitor's plugin-registration contract) so useNativeShell can paint the
-        // status-bar strip to match the in-app theme rather than the OS DayNight one.
+        // Register custom plugins BEFORE super.onCreate() (Capacitor's plugin-
+        // registration contract). #53 WindowBackground paints the status-bar strip to
+        // match the in-app theme; #52 BiometricKeystore does hardware biometric unlock.
         registerPlugin(WindowBackgroundPlugin.class);
+        registerPlugin(BiometricKeystorePlugin.class);
         super.onCreate(savedInstanceState);
         // Edge-to-edge system bars, done natively. The @capacitor/status-bar plugin
         // only uses deprecated APIs (setSystemUiVisibility / setStatusBarColor) that

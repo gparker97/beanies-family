@@ -56,6 +56,13 @@ export interface PasskeyRegistration {
   publicKey: string; // base64 public key
   transports?: string[]; // AuthenticatorTransport hints
   prfSupported: boolean; // PRF available during registration?
+  /**
+   * Which biometric mechanism backs this record. Absent = 'webauthn-prf' (all
+   * existing web records — back-compat). 'native-keystore' = the installed app's
+   * hardware Keystore/Keychain path (device-local blob, no WebAuthn/PRF/envelope);
+   * such records set publicKey='' and prfSupported=false. See ADR-029 (2026-07-14).
+   */
+  mechanism?: 'webauthn-prf' | 'native-keystore';
   label: string; // e.g. "MacBook Touch ID"
   createdAt: ISODateString;
   lastUsedAt?: ISODateString;

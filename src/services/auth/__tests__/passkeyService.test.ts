@@ -53,6 +53,19 @@ vi.mock('@/services/sync/capabilities', () => ({
   isNative: isNativeMock,
   getPlatform: getPlatformMock,
 }));
+// Native Keystore path is a separate module (ADR-029) — mock it so the web tests
+// never pull in the Capacitor plugin, and so we can assert the isNative() delegation.
+const { nativeMocks } = vi.hoisted(() => ({
+  nativeMocks: {
+    nativeEnable: vi.fn(async () => ({ success: true, prfSupported: false })),
+    nativeUnlock: vi.fn(async () => ({ success: true, memberId: 'member-1' })),
+    nativeCanEnroll: vi.fn(async () => true),
+    nativeCanOffer: vi.fn(async () => true),
+    nativeHasRegistered: vi.fn(async () => false),
+    nativeDisable: vi.fn(async () => {}),
+  },
+}));
+vi.mock('../nativeBiometric', () => nativeMocks);
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 // Translation store: return the KEY so `tr()` uses its English fallback (the
@@ -71,7 +84,7 @@ import {
   authenticateWithPasskey,
   registerPasskeyForMember,
   getRpId,
-  platformSupportsPRF,
+  hasRegisteredPasskeys,
   canOfferBiometric,
   canEnrollBiometric,
 } from '../passkeyService';
@@ -117,17 +130,59 @@ function makeFakeAssertion(opts: {
 
 // --- Tests ---
 
-describe('getRpId — WebAuthn Relying Party ID (ADR-029)', () => {
+describe('getRpId — WebAuthn Relying Party ID (web/PWA only, ADR-029 2026-07-14)', () => {
+  it('returns the current origin hostname (native no longer uses WebAuthn)', () => {
+    expect(getRpId()).toBe(window.location.hostname);
+  });
+});
+
+describe('native delegation — passkeyService routes to the Keystore path on native (#52)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isNativeMock.mockReturnValue(true);
+  });
   afterEach(() => isNativeMock.mockReturnValue(false));
 
-  it('returns the fixed app domain on native (WebView origin is localhost; association supplies trust)', () => {
-    isNativeMock.mockReturnValue(true);
-    expect(getRpId()).toBe('app.beanies.family');
+  it('registerPasskeyForMember delegates to nativeEnable (WebAuthn create never runs)', async () => {
+    const createMock = vi.fn();
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: { create: createMock, get: vi.fn() },
+      userAgent: navigator.userAgent,
+    });
+    const params = {
+      memberId: 'member-1',
+      memberName: 'A',
+      memberEmail: 'a@b.c',
+      familyId: 'family-1',
+      familyKey: {} as CryptoKey,
+    };
+    const result = await registerPasskeyForMember(params);
+    expect(nativeMocks.nativeEnable).toHaveBeenCalledWith(params);
+    expect(createMock).not.toHaveBeenCalled();
+    expect(result.success).toBe(true);
   });
 
-  it('returns the current origin hostname on web/PWA — unchanged behavior, so existing passkeys are not orphaned', () => {
-    isNativeMock.mockReturnValue(false);
-    expect(getRpId()).toBe(window.location.hostname);
+  it('authenticateWithPasskey delegates to nativeUnlock (WebAuthn get never runs)', async () => {
+    const getMock = vi.fn();
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: { create: vi.fn(), get: getMock },
+      userAgent: navigator.userAgent,
+    });
+    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    expect(nativeMocks.nativeUnlock).toHaveBeenCalledWith('family-1');
+    expect(getMock).not.toHaveBeenCalled();
+    expect(result.memberId).toBe('member-1');
+  });
+
+  it('canEnrollBiometric / canOfferBiometric / hasRegisteredPasskeys delegate to the native helpers', async () => {
+    await canEnrollBiometric();
+    await canOfferBiometric();
+    await hasRegisteredPasskeys('family-1');
+    expect(nativeMocks.nativeCanEnroll).toHaveBeenCalled();
+    expect(nativeMocks.nativeCanOffer).toHaveBeenCalled();
+    expect(nativeMocks.nativeHasRegistered).toHaveBeenCalledWith('family-1');
   });
 });
 
@@ -297,9 +352,9 @@ describe('registerPasskeyForMember', () => {
     getPRFOutputMock.mockReturnValue(new ArrayBuffer(32));
   });
 
-  it('assert-success native path: no PRF at create, immediate assertion yields PRF → wrap + persist', async () => {
-    // The core native mechanism: create returns no results.first, the immediate
-    // restricted assertion returns the PRF output, wrap + persist run.
+  it('Chromium two-prompt path: no PRF at create, immediate assertion yields PRF → wrap + persist', async () => {
+    // Web Chromium enables PRF at create but does not evaluate there; the immediate
+    // restricted assertion returns the PRF output, then wrap + persist run.
     getPRFOutputMock.mockReturnValueOnce(null); // create ext → no output
     getPRFOutputMock.mockReturnValue(new ArrayBuffer(32)); // assertion ext → output
     const getMock = vi.fn(async () =>
@@ -342,34 +397,6 @@ describe('registerPasskeyForMember', () => {
     expect(passkeyRepo.savePasskeyRegistration).toHaveBeenCalledTimes(1);
 
     getPRFOutputMock.mockReturnValue(new ArrayBuffer(32));
-  });
-
-  it('short-circuits (no prompt) on a platform that cannot deliver PRF (iOS < 18.4)', async () => {
-    isNativeMock.mockReturnValue(true);
-    getPlatformMock.mockReturnValue('ios');
-    const createMock = vi.fn();
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      credentials: { create: createMock, get: vi.fn() },
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15',
-    });
-
-    const result = await registerPasskeyForMember({
-      memberId: 'member-1',
-      memberName: 'Test User',
-      memberEmail: 'test@example.com',
-      familyId: 'family-1',
-      familyKey: {} as CryptoKey,
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('password');
-    // Never prompted — declined before any credential ceremony.
-    expect(createMock).not.toHaveBeenCalled();
-    expect(passkeyRepo.savePasskeyRegistration).not.toHaveBeenCalled();
-
-    isNativeMock.mockReturnValue(false);
-    getPlatformMock.mockReturnValue('web');
   });
 
   it('flags result.cancelled when the user dismisses the platform-authenticator prompt', async () => {
@@ -656,67 +683,6 @@ describe('guessAuthenticatorLabel', () => {
     );
     expect(label).toContain('Touch ID');
     expect(label).toContain('macOS');
-  });
-});
-
-describe('platformSupportsPRF — biometric offer capability gate (#52)', () => {
-  const realUA = navigator.userAgent;
-  afterEach(() => {
-    isNativeMock.mockReturnValue(false);
-    getPlatformMock.mockReturnValue('web');
-    vi.stubGlobal('navigator', { ...navigator, userAgent: realUA });
-  });
-
-  it('web/PWA → true (browser WebAuthn handles PRF)', () => {
-    isNativeMock.mockReturnValue(false);
-    expect(platformSupportsPRF()).toBe(true);
-  });
-
-  it('Android native → true', () => {
-    isNativeMock.mockReturnValue(true);
-    getPlatformMock.mockReturnValue('android');
-    expect(platformSupportsPRF()).toBe(true);
-  });
-
-  it('iOS native < 18.4 → false (data-loss bug / no reliable PRF)', () => {
-    isNativeMock.mockReturnValue(true);
-    getPlatformMock.mockReturnValue('ios');
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15',
-    });
-    expect(platformSupportsPRF()).toBe(false);
-  });
-
-  it('iOS native >= 18.4 → true', () => {
-    isNativeMock.mockReturnValue(true);
-    getPlatformMock.mockReturnValue('ios');
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15',
-    });
-    expect(platformSupportsPRF()).toBe(true);
-  });
-
-  it('iOS native 19_0 → true (future major)', () => {
-    isNativeMock.mockReturnValue(true);
-    getPlatformMock.mockReturnValue('ios');
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15',
-    });
-    expect(platformSupportsPRF()).toBe(true);
-  });
-
-  it('iPadOS desktop-class UA (no parseable OS token) → true (permissive, not silently withheld)', () => {
-    isNativeMock.mockReturnValue(true);
-    getPlatformMock.mockReturnValue('ios');
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      userAgent:
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15',
-    });
-    expect(platformSupportsPRF()).toBe(true);
   });
 });
 
