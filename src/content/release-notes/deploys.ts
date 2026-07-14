@@ -17,6 +17,16 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.14.2',
+    date: '2026-07-14',
+    month: '14 july 2026',
+    summary: {
+      en: "Biometric sign-in is smoother: it's offered as soon as you reach your family when you've set it up, and turning it on no longer hangs. The installed app can now unlock with your device's own Face ID or fingerprint too.",
+      beanie:
+        "biometric sign-in is smoother: it's offered as soon as you reach your family when you've set it up, and turning it on no longer hangs. the installed app can now unlock with your device's own face id or fingerprint too.",
+    },
+  },
+  {
     version: '2026.07.14',
     date: '2026-07-14',
     month: '14 july 2026',
