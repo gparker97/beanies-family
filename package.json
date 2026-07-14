@@ -84,7 +84,7 @@
     "@remotion/cli": "^4.0.489",
     "@remotion/google-fonts": "^4.0.489",
     "@tailwindcss/postcss": "^4.3.2",
-    "@types/node": "^25.9.2",
+    "@types/node": "^26.1.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
