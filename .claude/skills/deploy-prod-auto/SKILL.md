@@ -80,17 +80,25 @@ MOBILE: yes|no
 
 Record `VUE`, `WEB`, and `MOBILE` flags.
 
-**`MOBILE` is the native Capacitor wrapper** (`android/**`, `ios/**`, `capacitor.config.*`). These files are NOT in the deployed web app or the Astro site, so **neither web deploy ships them** — a native-only change reaches users only through a mobile app build + store release. This skill deploys the **web targets only**; it never builds or releases the mobile app. So:
+**`MOBILE` is the native Capacitor wrapper + build inputs** (`android/**`, `ios/**`, `capacitor.config.*`, `patches/**`, `scripts/build-native-app-assets*`). These files are NOT in the deployed web app or the Astro site, so **neither web deploy ships them** — a native change reaches users only through a signed mobile app build + store release. This skill **does** release the mobile app when `MOBILE: yes` (Step 7b), so the one command ships everything required. So:
 
-- **If `MOBILE: yes`** — note it in your report and tell greg how it actually ships: the **free unsigned debug APK auto-builds on every push** to `main` (`mobile-android-build.yml`, published to the `spike-android-latest` rolling prerelease for on-device testing); a **signed store release is manual** (`mobile-android-release.yml` / `mobile-ios-release.yml`, currently DUNS-gated until ~early July). Do **not** dispatch those workflows from this skill unless greg explicitly asks. The push you already made (Step 3) triggers the debug-APK build automatically.
+- **If `MOBILE: yes`** — a signed mobile release runs in **Step 7b** (after the web targets). It is a **deliberate pause**: greg picks the Android track per-deploy (internal vs closed testing), and iOS is attempted only when Apple enrolment is ready. The free unsigned debug APK still auto-builds on every push (`mobile-android-build.yml`) independent of this.
 - **If `VUE: no` and `WEB: no` and `MOBILE: no`** — report "no runtime changes since last deploy — nothing to ship" and stop.
-- **If `VUE: no` and `WEB: no` but `MOBILE: yes`** — there is nothing for this skill to deploy (it's native-only). Report that the change ships via the mobile lane (per the note above), confirm the auto-triggered APK build, and stop — do NOT run `deploy.yml` or `deploy-web.yml` (they would be no-ops that mislead).
+- **If `VUE: no` and `WEB: no` but `MOBILE: yes`** — there are no **web** targets to deploy, so skip Steps 5–7 (do NOT run `deploy.yml` / `deploy-web.yml` — they would be misleading no-ops), but **still run Step 4b (version bump) and Step 7b (mobile release)**. This is the native-only path — the whole point is that this skill now ships it.
 
-## Step 4b: Author the release note + bump the product version (only if `VUE: yes`)
+## Step 4b: Author the release note + bump the product version (if `VUE: yes` or `MOBILE: yes`)
 
 Every Vue-app deploy ships a brief, user-facing release note — it becomes the
 in-app `whats-new` notification (the bell) when clients update — **and** bumps
-the in-app product version (`APP_VERSION`). **Follow
+the in-app product version (`APP_VERSION`). A mobile release ALSO needs the
+`APP_VERSION` bump: the Android `versionName` and the iOS marketing version both
+track `APP_VERSION`, so a build with a stale version is indistinguishable on-device.
+
+- **`VUE: yes`** — full flow below (release note + `APP_VERSION` bump).
+- **`MOBILE: yes` but `VUE: no`** (native-only) — still bump `APP_VERSION` so the
+  Step 7b build is identifiable; author a release note too **if** the native change
+  is user-facing (judge per the guide — e.g. a visible fix like a status-bar paint
+  qualifies; a manifest/entitlement-only change does not). Same approval pause. **Follow
 `scripts/deploy/release-note-guide.md` in full**: judge significance, draft the
 message in greg's voice (no em-dashes; en + lowercase beanie), compute the
 `YYYY.MM.DD[.N]` note version, propose the next `APP_VERSION` (§3b — patch by
@@ -116,7 +124,9 @@ git commit -m "docs(release): note <version> (app v<APP_VERSION>) for prod deplo
 git push
 ```
 This re-triggers CI; Step 6 below watches the latest run (this commit), and the
-Step 7 deploy gate re-verifies CI for HEAD. Skip this entire step if `VUE: no`.
+Step 7 deploy gate re-verifies CI for HEAD. Skip this entire step only if `VUE: no`
+**and** `MOBILE: no`. (Native-only: commit + push the version bump so Step 7b builds
+from a HEAD that carries it.)
 
 ## Step 5: Deploy the Astro site (fires immediately)
 
@@ -195,14 +205,72 @@ gh run watch <deploy-run-id> --exit-status
 
 The deploy workflow has its own gate that re-verifies CI/Security passed for the commit. If it fails, report logs — do not auto-retry.
 
+## Step 7b: Release the mobile app (only if `MOBILE: yes`)
+
+A native change ships to users through a signed store release, not the web deploys.
+This is the **second deliberate pause** (native releases go to Google/Apple review and
+burn a version, so the target is a per-deploy decision, not a fixed policy).
+
+**Ask greg (do not assume):**
+
+1. **Android track** — `internal` (no review; installs on your test devices for the
+   live-only on-device verification) **or** `closed` testing (`alpha` track — goes to
+   Google review) — or `beta` / `production`, or **skip Android** this time. Present
+   `internal` as the default for an unverified native change.
+2. **iOS** — attempt the iOS TestFlight release **only if Apple enrolment + the App
+   Store Connect secrets are ready**. If greg confirms ready → include it; otherwise
+   report "iOS skipped — Apple enrolment pending" and do not dispatch (the workflow's
+   preflight would just hard-fail on the missing secrets).
+
+Map the chosen closed-testing answer to the `alpha` track (the workflow's `track`
+choice list is `internal | alpha | beta | production`).
+
+**Dispatch Android** (with greg's chosen `<track>`):
+```
+gh workflow run mobile-android-release.yml --ref main -f track=<track> -f upload_to_play=true
+```
+```
+sleep 10
+```
+```
+gh run list --workflow=mobile-android-release.yml --limit=1
+```
+```
+gh run watch <android-run-id> --exit-status
+```
+
+**Dispatch iOS** (only if greg confirmed enrolment is ready):
+```
+gh workflow run mobile-ios-release.yml --ref main
+```
+```
+sleep 10
+```
+```
+gh run list --workflow=mobile-ios-release.yml --limit=1
+```
+```
+gh run watch <ios-run-id> --exit-status
+```
+
+On a release failure, fetch logs (`gh run view <id> --log-failed`) and report — do
+not auto-retry a store upload (a partial upload can consume a version code). Note
+that a successful Android upload to a review track (`alpha`/`beta`/`production`) is
+**auto-submitted for Google review**; `internal` is not. Remind greg that on-device
+verification happens on this build, and that promoting internal → a review track (or
+review → production) is his manual step in the consoles.
+
 ## Step 8: Report
 
 Summarise:
 - Deployed commit SHA
-- Which workflows ran (Main CI, Security, Vue Deploy, Astro Deploy)
+- Which workflows ran (Main CI, Security, Vue Deploy, Astro Deploy, Mobile Android/iOS Release)
 - Deploy durations (from `gh run view --json startedAt,updatedAt`)
-- The release note that shipped (if `VUE: yes`) — the `en` line + version
+- The release note that shipped (if authored) — the `en` line + version
 - Production URL(s) — `https://app.beanies.family` (Vue) and/or `https://beanies.family` (Astro)
+- **Mobile (if `MOBILE: yes`)** — which track the Android build went to (and whether it
+  auto-submitted for review), whether iOS was released or skipped, and the on-device
+  verify + promote-in-console next steps that are greg's.
 
 ---
 
@@ -212,7 +280,9 @@ Summarise:
 - **Never skip or silence CI failures** — always fix the root cause.
 - **Never amend published commits** — always create new fix commits.
 - **Never inline `$(...)` / `$?` / `;` / `&&` / heredocs** in Bash commands run through the tool — they trigger permission prompts. If you need compound logic, add a script under `scripts/deploy/` and invoke it.
-- **Stop and ask the user only** if there is an unrecoverable failure after 3 fix attempts, or something truly unexpected (merge conflicts, unknown infrastructure failures) — **plus the one deliberate pause in Step 4b** to get greg's approval of the release-note wording + the `APP_VERSION` bump before they ship.
-- **Release note + version bump on every Vue deploy.** When `VUE: yes`, author + ship a release note AND bump `APP_VERSION` per `scripts/deploy/release-note-guide.md` (Step 4b). The deploy emoji is always ✨.
-- The Vue deploy workflow name is exactly `deploy.yml` (display name: "Deploy beanies PROD").
+- **Stop and ask the user only** if there is an unrecoverable failure after 3 fix attempts, or something truly unexpected (merge conflicts, unknown infrastructure failures) — **plus the two deliberate pauses**: Step 4b (approve the release-note wording + `APP_VERSION` bump) and Step 7b (choose the Android release track, and confirm whether to include iOS).
+- **Release note + version bump on every Vue deploy, version bump on every mobile release.** When `VUE: yes`, author + ship a release note AND bump `APP_VERSION` (Step 4b). When `MOBILE: yes`, bump `APP_VERSION` too (native `versionName` / iOS marketing version track it). The deploy emoji is always ✨.
+- **This skill ships everything the change requires** — Vue, Astro, AND the signed mobile app — based on the `VUE`/`WEB`/`MOBILE` flags. A native change is released via Step 7b (never silently left for a manual follow-up).
+- **Mobile releases are review-gated + irreversible-ish.** Never auto-retry a failed store upload, never pick the track yourself (always the Step 7b pause), and never dispatch iOS when Apple enrolment/secrets aren't ready.
+- The Vue deploy workflow is exactly `deploy.yml` ("Deploy beanies PROD"); the mobile ones are `mobile-android-release.yml` and `mobile-ios-release.yml`.
 - The Astro deploy workflow name is exactly `deploy-web.yml`.

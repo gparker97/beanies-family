@@ -17,8 +17,10 @@
 #   Web-triggering:    web/**, packages/**, content/blog/**, src/content/help/**
 #   Vue-triggering:    src/**, public/**, root build files — minus the paths
 #                      below that are docs/infra/tooling/native-only
-#   Mobile-triggering: android/**, ios/**, capacitor.config.* — native wrapper
-#                      config that NEITHER web workflow ships. Reaches users only
+#   Mobile-triggering: android/**, ios/**, capacitor.config.*, patches/** (native
+#                      plugin patch-package diffs, e.g. the @capgo iOS PRF patch),
+#                      scripts/build-native-app-assets* (icon/splash generator) —
+#                      native inputs NEITHER web workflow ships. Reaches users only
 #                      via a native app build + store release (mobile-* workflows).
 #   Skipped-all:       .claude/**, .github/**, docs/**, tasks/**, scripts/**,
 #                      infrastructure/**, README, CHANGELOG, LICENSE, SECURITY,
@@ -62,10 +64,10 @@ WEB_CHANGES=$(diff_since "$LAST_WEB_SHA" || true)
 MOBILE_CHANGES=$(diff_since "$LAST_MOBILE_SHA" || true)
 
 WEB_PATTERNS='^(web/|packages/|content/blog/|src/content/help/)'
-NATIVE_PATTERNS='^(android/|ios/|capacitor\.config\.)'
+NATIVE_PATTERNS='^(android/|ios/|capacitor\.config\.|patches/|scripts/build-native-app-assets)'
 # Native paths are excluded from VUE so a native-only change doesn't trigger a
 # no-op web redeploy — it's a MOBILE change, classified below.
-VUE_EXCLUDE='^(web/|content/blog/|src/content/help/|android/|ios/|capacitor\.config\.|\.claude/|\.github/|docs/|tasks/|scripts/|infrastructure/|README|CHANGELOG|LICENSE|SECURITY|TRADEMARK|POSTMORTEM)'
+VUE_EXCLUDE='^(web/|content/blog/|src/content/help/|android/|ios/|capacitor\.config\.|patches/|\.claude/|\.github/|docs/|tasks/|scripts/|infrastructure/|README|CHANGELOG|LICENSE|SECURITY|TRADEMARK|POSTMORTEM)'
 
 WEB_HITS=$(printf '%s\n' "$WEB_CHANGES" | grep -E "$WEB_PATTERNS" || true)
 VUE_HITS=$(printf '%s\n' "$VUE_CHANGES" | grep -Ev "$VUE_EXCLUDE" || true)
