@@ -229,13 +229,22 @@ async function handlePendingPassword(
   fileName: string | null,
   opts: { tryAuto?: boolean } = {}
 ): Promise<void> {
-  if ((opts.tryAuto ?? true) && (await tryAutoDecrypt())) {
-    await finishLoaded();
-    return;
-  }
+  // Prefer biometric when this family has registered passkeys. A passkey unlock
+  // authenticates the member AND yields the family key in one gesture, replacing
+  // BOTH the cached-key auto-decrypt and the member-password picker. This must run
+  // BEFORE the cached-key auto-decrypt below: a cached family key survives a
+  // logout-without-clearing, so if we auto-decrypted first we'd silently open the
+  // file and route to the member-password picker — never offering biometric even
+  // though it was set up. `checkBiometricForFamily` only emits when a passkey is
+  // actually registered (and a platform authenticator exists), so users WITHOUT a
+  // passkey still fall through to the silent cached-key path unchanged. (2026-07-14)
   const { familyId, familyName } = getPendingFamilyInfo();
   if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
-    // Biometric flow will handle decryption — don't show the password modal.
+    // Biometric flow will handle decryption — don't auto-decrypt or show password.
+    return;
+  }
+  if ((opts.tryAuto ?? true) && (await tryAutoDecrypt())) {
+    await finishLoaded();
     return;
   }
   loadedFileName.value = fileName;

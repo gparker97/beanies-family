@@ -16,6 +16,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Biometric unlock is now offered on sign-in when you've set it up.** If you'd registered a biometric on a device, a leftover cached key could silently decrypt your file and drop you straight on the member-password screen — so biometric was never offered even though it was enabled. Sign-in now prefers your biometric when one is registered. _(web/PWA)_
+- **Registering a biometric no longer leaves the button stuck on "verifying."** Saving the new biometric to your cloud file is now time-bounded, so a slow or unavailable sync can't hang the button. _(web/PWA)_
+- **The biometric list now shows the correct unlock type** ("Full unlock" for passwordless biometric vs "Cached password"), instead of always showing "Cached password." _(web/PWA)_
 - **Biometric (Face ID / fingerprint) unlock on native now fails gracefully instead of showing a raw error.** If a device can't complete biometric setup, the app falls back to password sign-in with a friendly message instead of a confusing error.
 - **Android: the black band across the top status-bar area is gone** — the app background now fills the screen edge-to-edge, in both light and dark mode, matching the web app. _(Reaches installed apps with the next mobile build.)_
 

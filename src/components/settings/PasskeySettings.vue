@@ -62,7 +62,15 @@ async function handleRegister() {
       // Store PRF-wrapped family key in the .beanpod envelope for cross-device access
       if (result.passkeySecret) {
         syncStore.addPasskeySecret(result.passkeySecret);
-        await syncStore.syncNow(true);
+        // Persist to the provider best-effort, but NEVER hang the button on it: a
+        // Drive save can stall indefinitely (rejected token, deleted file, offline),
+        // which left the button stuck on "verifying". The secret is already in the
+        // in-memory envelope and rides the next successful save. Mirror the sign-out
+        // forceSaveWithTimeout guard. (2026-07-14)
+        await Promise.race([
+          syncStore.syncNow(true),
+          new Promise((resolve) => setTimeout(resolve, 5000)),
+        ]);
       }
       statusMessage.value = { text: t('passkey.registerSuccess'), type: 'success' };
       await loadPasskeys();
@@ -246,7 +254,7 @@ function formatDate(dateStr: string): string {
             <span
               class="mt-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400"
             >
-              {{ t('passkey.prfCached') }}
+              {{ passkey.prfSupported ? t('passkey.prfFull') : t('passkey.prfCached') }}
             </span>
           </div>
           <button
