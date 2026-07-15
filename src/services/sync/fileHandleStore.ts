@@ -138,9 +138,26 @@ export async function hasValidFileHandle(): Promise<boolean> {
 }
 
 // --- Provider config persistence ---
+// Dual-write: IndexedDB (primary) + localStorage (fallback), mirroring the
+// refresh-token durability strategy below. On PWA/mobile the `beanies-file-handles`
+// IndexedDB origin can be evicted under storage pressure / iOS's eviction policy,
+// which used to strand an established owner on the "unconfigured" card because
+// `syncService.initialize()` had nothing else to restore from. The localStorage
+// mirror lets a same-origin IDB eviction that spares localStorage self-heal with
+// no network round-trip; the durable remote registry is the deeper fallback (see
+// syncStore.attemptSilentConfigHeal). All provider-config writes/deletes flow
+// through storeProviderConfig/clearProviderConfig, so the mirror stays in lockstep
+// automatically (incl. resurrection-safety: localProvider.persist + deleteLocalFamily
+// both call clearProviderConfig). See docs/plans/2026-07-15-native-data-connection-resilience.md.
+const LS_PROVIDER_CONFIG_PREFIX = 'beanies_pcfg_';
+
+function isPersistedProviderConfig(v: unknown): v is PersistedProviderConfig {
+  return !!v && typeof v === 'object' && 'type' in v;
+}
 
 /**
- * Store provider config for a family (e.g. google_drive with fileId)
+ * Store provider config for a family (e.g. google_drive with fileId).
+ * Writes to IndexedDB (primary) and a JSON mirror in localStorage (fallback).
  */
 export async function storeProviderConfig(
   familyId: string,
@@ -152,30 +169,64 @@ export async function storeProviderConfig(
     config as unknown as FileSystemFileHandle,
     `providerConfig-${familyId}`
   );
+  // localStorage mirror — best-effort (private browsing / quota may reject).
+  try {
+    localStorage.setItem(`${LS_PROVIDER_CONFIG_PREFIX}${familyId}`, JSON.stringify(config));
+  } catch (e) {
+    console.warn('[fileHandleStore] localStorage provider-config write failed', e);
+  }
 }
 
 /**
- * Retrieve the stored provider config for a family
+ * Retrieve the stored provider config for a family. Tries IndexedDB first, then
+ * the localStorage mirror if IndexedDB was evicted or the read throws.
+ *
+ * A thrown IDB read is reported (not swallowed) so an eviction is distinguishable
+ * from a genuine absence — the silent bare-`catch` this replaces made the two
+ * indistinguishable, which masked the native data-connection-loss incident.
  */
 export async function getProviderConfig(familyId: string): Promise<PersistedProviderConfig | null> {
   try {
     const db = await getHandleDatabase();
     const config = await db.get(HANDLE_STORE, `providerConfig-${familyId}`);
-    if (config && typeof config === 'object' && 'type' in config) {
+    if (isPersistedProviderConfig(config)) {
       return config as unknown as PersistedProviderConfig;
     }
-    return null;
-  } catch {
+    // Present but unknown shape, or genuinely absent → try the mirror below.
+  } catch (e) {
+    console.error('[fileHandleStore] Failed to read provider config from IndexedDB:', e);
+    reportError({
+      surface: 'provider-config-idb-read',
+      message: 'Failed to read provider config from IndexedDB',
+      error: e instanceof Error ? e : new Error(String(e)),
+      context: { family_id: familyId },
+    });
+  }
+  // Fallback: the localStorage mirror. Never swallow a parse/read error silently.
+  try {
+    const raw = localStorage.getItem(`${LS_PROVIDER_CONFIG_PREFIX}${familyId}`);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return isPersistedProviderConfig(parsed) ? (parsed as PersistedProviderConfig) : null;
+  } catch (e) {
+    console.warn('[fileHandleStore] localStorage provider-config read failed', e);
     return null;
   }
 }
 
 /**
- * Clear the stored provider config for a family
+ * Clear the stored provider config for a family — from both IndexedDB and the
+ * localStorage mirror, so a disconnected/deleted pod can never resurrect from a
+ * stale mirror on the next boot.
  */
 export async function clearProviderConfig(familyId: string): Promise<void> {
   const db = await getHandleDatabase();
   await db.delete(HANDLE_STORE, `providerConfig-${familyId}`);
+  try {
+    localStorage.removeItem(`${LS_PROVIDER_CONFIG_PREFIX}${familyId}`);
+  } catch (e) {
+    console.warn('[fileHandleStore] localStorage provider-config clear failed', e);
+  }
 }
 
 // --- Google OAuth refresh token persistence ---

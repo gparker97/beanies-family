@@ -12,6 +12,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 import { MARKETING_URL } from '@/utils/marketing';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry';
 import { QUICK_ADD_CONTEXT_KEYS } from '@/constants/quickAddItems';
 import { isFlagEnabled, type DevFlag } from '@/config/flags';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
@@ -362,6 +363,23 @@ router.beforeEach((to) => {
     // returning-but-podless user on resume-setup instead of the picker.
     if (isPodlessRecoveryQuery(to.query.resume)) return;
     return { name: 'Welcome', query: { resume: 'setup' } };
+  }
+  // Un-strand an established owner (`podCreated`) whose provider config was lost
+  // (IDB eviction) and who is genuinely on the resume-setup recovery screen: let
+  // them reach `ResumePodSetup` (registry-resume) instead of bouncing to /nook.
+  // Gate on the DURABLE `podCreated` + the resume query ONLY — never on the
+  // transient `syncStore.isConfigured` (false during every cold boot before the
+  // silent heal completes; branching on it would cause intermittent mis-routing).
+  // A configured owner who reaches this URL just harmlessly re-loads their pod;
+  // one on bare `/welcome` still falls through to /nook below.
+  if (authStore.podCreated && isPodlessRecoveryQuery(to.query.resume)) {
+    logEvent({
+      level: 'warn',
+      surface: 'app-podcreated-unconfigured',
+      message: 'podCreated owner routed to resume-setup recovery',
+      context: { route_path: to.path },
+    });
+    return;
   }
   return { name: 'Nook' };
 });

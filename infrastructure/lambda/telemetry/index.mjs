@@ -108,6 +108,12 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'detail',
   // Native hardware-Keystore biometric backing enum (added 2026-07-14, #52 pivot).
   'key_backing',
+  // Silent data-connection config-heal booleans (added 2026-07-15, native data-
+  // connection resilience). PII-free. Mirror of src/utils/diagnosticContext.ts.
+  'had_config',
+  'has_session',
+  'registry_had_file_id',
+  'token_valid',
 ]);
 
 function getHeaders(event) {

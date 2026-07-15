@@ -486,13 +486,19 @@ async function loadFamilyData() {
           return;
         }
 
-        // Can't auto-decrypt — redirect to login page for password/biometric entry.
+        // Can't auto-decrypt — route to the resume-setup recovery screen for
+        // password/biometric entry. Use `?resume=setup` (not bare `/welcome`):
+        // this branch only fires when the cached key is gone (the happy path
+        // decrypts + returns above), which for a `podCreated` owner is the
+        // provider-config-lost recovery case — and bare `/welcome` bounces a
+        // podCreated owner to `/nook` (the reload-loop hazard below). The
+        // resume-setup route is let through by the already-auth guard.
         // Awaited so `route.path` updates before the post-init health check at the
         // bottom of init() reads it — otherwise the check sees the pre-replace
         // path and false-fires `app.postInitNoData` with the recovery overlay.
-        initBreadcrumbs.push('path1b: needsPassword but no cached key — redirecting to login');
-        console.warn('[loadFamilyData] Cannot auto-decrypt — redirecting to login');
-        await safeRouterReplace('/welcome', 'path1b-needs-password');
+        initBreadcrumbs.push('path1b: needsPassword but no cached key — routing to resume-setup');
+        console.warn('[loadFamilyData] Cannot auto-decrypt — routing to resume-setup');
+        await safeRouterReplace('/welcome?resume=setup', 'path1b-needs-password');
         return;
       }
 
@@ -1038,8 +1044,11 @@ onMounted(async () => {
       // before the doc can load (e.g. an expired token returned a Drive 404
       // masked as not-found). Showing the "data missing" recovery overlay on
       // top of that misrepresents an expired session as data loss — suppress it,
-      // exactly as we do on the login-flow routes.
-      const awaitingReconnect = syncStore.showGoogleReconnect;
+      // exactly as we do on the login-flow routes. `reconnecting` covers the
+      // silent-config-heal retry window (a lost provider config being re-derived
+      // from the registry) — same reasoning: don't flash the data-loss overlay
+      // while a background heal is still in flight.
+      const awaitingReconnect = syncStore.showGoogleReconnect || syncStore.reconnecting;
       if (!onLoginFlowRoute && !awaitingReconnect) {
         initError.value = 'Initialization completed but no data was loaded';
         initErrorDetail.value = breadcrumbLog;

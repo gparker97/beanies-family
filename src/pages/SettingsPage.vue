@@ -29,6 +29,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getFullVersionLabel } from '@/utils/diagnosticContext';
 import { alert as showAlert, confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
+import { logEvent } from '@/services/telemetry';
 import type { StorageProviderType } from '@/services/sync/storageProvider';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 import { usePermissions } from '@/composables/usePermissions';
@@ -370,6 +371,31 @@ async function handleForceSave() {
 async function handleResumeSetup() {
   showFamilyData.value = false;
   await router.push({ path: '/welcome', query: { resume: 'setup' } });
+}
+
+/**
+ * Recover an established owner's lost Drive data-file connection: re-derive the
+ * provider config from the durable registry (silent), and if that can't fully
+ * restore (token/registry unavailable), fall through to the interactive
+ * resume-setup recovery. Replaces the dead "resume setup" button for a
+ * `podCreated` owner (which the router bounces to /nook).
+ */
+async function handleDriveReconnect() {
+  const familyId = useFamilyContextStore().activeFamilyId;
+  if (!familyId) return;
+  logEvent({
+    level: 'info',
+    surface: 'settings-drive-reconnect',
+    message: 'user-initiated reconnect from unconfigured card',
+    context: { action: 'unconfigured-card' },
+  });
+  await syncStore.attemptSilentConfigHeal(familyId);
+  if (!syncStore.isConfigured) {
+    // Silent heal couldn't complete (token/registry) — hand to the interactive
+    // registry-resume recovery (fetch envelope + password).
+    showFamilyData.value = false;
+    await router.push({ path: '/welcome', query: { resume: 'setup' } });
+  }
 }
 
 async function handleRequestPermission() {
@@ -1201,20 +1227,39 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             alt=""
             class="mx-auto mb-4 h-12 w-12"
           />
-          <p class="mb-2 font-medium text-gray-900 dark:text-gray-100">
-            {{ t('settings.saveDataToFile') }}
-          </p>
-          <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-            {{ t('settings.createOrLoadDataFile') }}
-          </p>
-          <div class="flex flex-col gap-3">
-            <BaseButton @click="handleResumeSetup">
-              {{ t('settings.resumeSetup') }}
-            </BaseButton>
-            <BaseButton variant="secondary" @click="handleLoadFromFileClick">
-              {{ t('settings.loadExistingDataFile') }}
-            </BaseButton>
-          </div>
+
+          <!-- Reconnecting: a lost data-file connection is being re-established
+               silently from the registry (never flash the "save your data" copy). -->
+          <template v-if="syncStore.reconnecting">
+            <p class="mb-2 font-medium text-gray-900 dark:text-gray-100">
+              {{ t('settings.dataReconnecting') }}
+            </p>
+            <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('settings.dataReconnectingDesc') }}
+            </p>
+          </template>
+
+          <template v-else>
+            <p class="mb-2 font-medium text-gray-900 dark:text-gray-100">
+              {{ t('settings.saveDataToFile') }}
+            </p>
+            <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('settings.createOrLoadDataFile') }}
+            </p>
+            <div class="flex flex-col gap-3">
+              <!-- Established owner whose Drive connection was lost: reconnect +
+                   reload their existing pod (NOT the dead resume-setup button). -->
+              <BaseButton v-if="authStore.podCreated" @click="handleDriveReconnect">
+                {{ t('settings.reconnectAndReload') }}
+              </BaseButton>
+              <BaseButton v-else @click="handleResumeSetup">
+                {{ t('settings.resumeSetup') }}
+              </BaseButton>
+              <BaseButton variant="secondary" @click="handleLoadFromFileClick">
+                {{ t('settings.loadExistingDataFile') }}
+              </BaseButton>
+            </div>
+          </template>
 
           <div
             v-if="showLoadFileConfirm"
