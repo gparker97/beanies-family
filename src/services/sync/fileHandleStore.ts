@@ -220,12 +220,19 @@ export async function getProviderConfig(familyId: string): Promise<PersistedProv
  * stale mirror on the next boot.
  */
 export async function clearProviderConfig(familyId: string): Promise<void> {
-  const db = await getHandleDatabase();
-  await db.delete(HANDLE_STORE, `providerConfig-${familyId}`);
   try {
-    localStorage.removeItem(`${LS_PROVIDER_CONFIG_PREFIX}${familyId}`);
-  } catch (e) {
-    console.warn('[fileHandleStore] localStorage provider-config clear failed', e);
+    const db = await getHandleDatabase();
+    await db.delete(HANDLE_STORE, `providerConfig-${familyId}`);
+  } finally {
+    // ALWAYS remove the localStorage mirror, even if the IndexedDB delete threw
+    // (blocked/quota/corrupt IDB — the exact failure class the mirror defends
+    // against). Otherwise a broken IDB leaves a stale mirror that resurrects the
+    // disconnected/deleted pod on the next boot (getProviderConfig falls back to it).
+    try {
+      localStorage.removeItem(`${LS_PROVIDER_CONFIG_PREFIX}${familyId}`);
+    } catch (e) {
+      console.warn('[fileHandleStore] localStorage provider-config clear failed', e);
+    }
   }
 }
 

@@ -1048,7 +1048,14 @@ onMounted(async () => {
       // silent-config-heal retry window (a lost provider config being re-derived
       // from the registry) — same reasoning: don't flash the data-loss overlay
       // while a background heal is still in flight.
-      const awaitingReconnect = syncStore.showGoogleReconnect || syncStore.reconnecting;
+      // `reconnectEscalationPending` covers the ~4s window between scheduling the
+      // reconnect banner (on an auth-masked cold-start 404) and it actually showing —
+      // set synchronously so this check doesn't false-fire the data-loss overlay +
+      // critical page before the deferred banner lands.
+      const awaitingReconnect =
+        syncStore.showGoogleReconnect ||
+        syncStore.reconnecting ||
+        syncStore.reconnectEscalationPending;
       if (!onLoginFlowRoute && !awaitingReconnect) {
         initError.value = 'Initialization completed but no data was loaded';
         initErrorDetail.value = breadcrumbLog;

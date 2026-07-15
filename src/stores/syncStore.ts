@@ -87,6 +87,7 @@ import { bufferToBase64 } from '@/utils/encoding';
 import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
 import type { StorageProvider, StorageProviderType } from '@/services/sync/storageProvider';
 import { toISODateString } from '@/utils/date';
+import { raceTimeout } from '@/utils/timing';
 import { measureAsync } from '@/utils/perfTiming';
 import { deduplicateRecurringTransactions } from '@/services/recurring/recurringProcessor';
 import {
@@ -204,6 +205,12 @@ export const useSyncStore = defineStore('sync', () => {
   const driveFileId = ref<string | null>(null);
   const driveFolderId = computed(() => getAppFolderId());
   const showGoogleReconnect = ref(false);
+  // Set SYNCHRONOUSLY the moment a cold-start reconnect escalation is scheduled (the
+  // banner itself is on a ~4s defer to let wake events recover first). The post-init
+  // health check reads this immediately, so an auth-masked cold-start 404 doesn't
+  // false-fire the "your data is missing" recovery overlay + a critical page during
+  // the defer window. Cleared when the banner shows, the token recovers, or on reset.
+  const reconnectEscalationPending = ref(false);
   const driveFileNotFound = ref(false);
 
   // Save failure state
@@ -443,7 +450,9 @@ export const useSyncStore = defineStore('sync', () => {
     const ctx = useFamilyContextStore();
     const familyId = ctx.activeFamilyId;
     if (familyId && useAuthStore().podCreated) {
-      await attemptSilentConfigHeal(familyId);
+      // boot=true: App.vue's path-1b load runs right after this returns and owns the
+      // load + resume-setup navigation, so the heal must not also load (double-fetch).
+      await attemptSilentConfigHeal(familyId, true);
     }
   }
 
@@ -543,6 +552,16 @@ export const useSyncStore = defineStore('sync', () => {
 
     const hasConflict = new Date(fileTimestamp).getTime() > new Date(localTimestamp).getTime();
     return { hasConflict, fileTimestamp, localTimestamp };
+  }
+
+  /** Bounded post-auth save: `syncNow(true)` raced against a timeout so a slow/offline
+   * Drive push can't wedge a login/rotation spinner. Returns true if it synced within
+   * the bound; false (deferred) on timeout — the push rides the next auto-sync. The
+   * single home for the `raceTimeout(syncNow(true), …)` pattern (was duplicated across
+   * the login-completion sites + password rotation). */
+  const POST_AUTH_SAVE_TIMEOUT_MS = 5000;
+  async function syncNowBounded(timeoutMs = POST_AUTH_SAVE_TIMEOUT_MS): Promise<boolean> {
+    return !!(await raceTimeout(syncNow(true), timeoutMs));
   }
 
   /**
@@ -1865,7 +1884,12 @@ export const useSyncStore = defineStore('sync', () => {
   function scheduleColdStartReconnectEscalation(lastErr: string | null): void {
     if (storageProviderType.value !== 'google_drive') return;
     if (showGoogleReconnect.value) return;
+    // Synchronous signal for the post-init health check (suppresses the false
+    // data-loss overlay/page during the defer window). Cleared when the defer
+    // resolves (below) or the token recovers (onTokenAcquired).
+    reconnectEscalationPending.value = true;
     coldStartReconnectDefer.schedule(() => {
+      reconnectEscalationPending.value = false;
       if (isTokenValid()) return; // recovered via wake event; nothing to do
       if (showGoogleReconnect.value) return; // raced with the auth-layer escalation
       showGoogleReconnect.value = true;
@@ -2132,6 +2156,7 @@ export const useSyncStore = defineStore('sync', () => {
     stopFilePolling();
     saveFailureBannerDefer.cancel();
     coldStartReconnectDefer.cancel();
+    reconnectEscalationPending.value = false;
     // Silent-config-heal teardown — cancel the retry timer, drop its dedicated
     // token subscriber, reset the budget/flags + the once-per-family total-failure
     // guard so a different family can heal (and page) cleanly on next sign-in.
@@ -2459,10 +2484,14 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
-  /** Success terminal: config re-derived + persisted. Hand off to the existing
-   *  load pipeline (idempotent — its `isBackgroundSyncing` guard prevents a
-   *  double-invoke against App.vue's own path-1a). */
-  function configHealSucceeded(source: 'registry' | 'drive-search'): void {
+  /** Success terminal: config re-derived + persisted. On the BOOT path the caller
+   *  (App.vue `loadFamilyData` path-1b, which runs right after `initialize()` returns)
+   *  owns the load + the needsPassword→resume-setup navigation, so we must NOT also
+   *  load here (that double-fetches Drive — path-1b's load is not covered by the
+   *  `isBackgroundSyncing` guard). On a DEFERRED heal (a retry/Settings reconnect,
+   *  after init) nothing else loads, so we load AND drive the resume-setup nav
+   *  ourselves when the key was evicted too (needsPassword, no doc). */
+  function configHealSucceeded(source: 'registry' | 'drive-search', boot: boolean): void {
     reconnecting.value = false;
     configHealFailed.value = false;
     configHealAttempts = 0;
@@ -2472,9 +2501,24 @@ export const useSyncStore = defineStore('sync', () => {
       message: 're-derived and re-persisted provider config',
       context: { action: source, provider_type: 'google_drive' },
     });
-    // Load the doc through the existing silent-recovery pipeline (decrypt with
-    // cached key, else surface needsPassword → App.vue routes to resume-setup).
-    void backgroundSyncFromFile();
+    if (boot) return; // App.vue path-1b loads + navigates on the boot path.
+    void loadAfterDeferredHeal();
+  }
+
+  /** Deferred-heal load: decrypt with the cached key if present; if the key was
+   *  evicted too (needsPassword, no doc), route to the resume-setup password
+   *  recovery — the boot path's App.vue navigation isn't running here. */
+  async function loadAfterDeferredHeal(): Promise<void> {
+    try {
+      await backgroundSyncFromFile();
+      const { isLoaded } = await import('@/services/automerge/projection');
+      if (!isLoaded()) {
+        const router = (await import('@/router')).default;
+        await router.push({ path: '/welcome', query: { resume: 'setup' } });
+      }
+    } catch (e) {
+      console.warn('[syncStore] deferred-heal load failed', e);
+    }
   }
 
   /** Non-retryable / budget-exhausted terminal: surface the reconnect affordance
@@ -2536,11 +2580,19 @@ export const useSyncStore = defineStore('sync', () => {
    * `getProviderConfig`, so reaching here means BOTH the IDB record and the mirror
    * were gone; only the network (registry/Drive) tier remains.
    */
-  async function attemptSilentConfigHeal(familyId: string): Promise<boolean> {
+  async function attemptSilentConfigHeal(familyId: string, boot = false): Promise<boolean> {
     // Idempotent: a valid provider for this family is already installed.
     if (syncService.getProviderFamilyId() === familyId && syncService.getProviderType()) {
       reconnecting.value = false;
       return true;
+    }
+    // Family-switch safety: a deferred retry / token-acquired poke captured `familyId`
+    // in its closure, but installProviderPersistOnly binds via the CURRENT active
+    // family. If the user switched families since the heal was armed, abort — never
+    // bind family A's pod into family B's live session.
+    if (useFamilyContextStore().activeFamilyId !== familyId) {
+      reconnecting.value = false;
+      return false;
     }
     if (configHealInFlight) return false;
     configHealInFlight = true;
@@ -2574,7 +2626,7 @@ export const useSyncStore = defineStore('sync', () => {
             GoogleDriveProvider.fromExisting(entry.fileId, name),
             'google_drive'
           );
-          configHealSucceeded('registry');
+          configHealSucceeded('registry', boot);
           return true;
         } catch (e) {
           console.warn(
@@ -2586,31 +2638,14 @@ export const useSyncStore = defineStore('sync', () => {
         }
       }
 
-      // No fileId in the registry (rare) → resolve the `.beanpod` by name, adopting
-      // only an OWNED match (ownership discipline). Needs a valid token.
-      if (!isGoogleDriveAvailable.value || !isTokenValid()) {
-        scheduleConfigHealRetry(familyId, 'no-token-for-search');
-        return false;
-      }
-      try {
-        const token = await requestAccessToken();
-        const files = await searchBeanpodFilesGlobal(token);
-        const owned = files.find((f) => f.ownedByMe === true);
-        if (!owned) {
-          configHealTotalFailure('google_drive', false);
-          return false;
-        }
-        await installProviderPersistOnly(
-          GoogleDriveProvider.fromExisting(owned.fileId, owned.name),
-          'google_drive'
-        );
-        configHealSucceeded('drive-search');
-        return true;
-      } catch (e) {
-        console.warn('[syncStore.attemptSilentConfigHeal] name-resolve failed', e);
-        scheduleConfigHealRetry(familyId, 'search-failed');
-        return false;
-      }
+      // Drive-backed in the registry but NO fileId (anomalous — an established Drive
+      // pod always has one via registerCurrentFamily). We must NOT guess a pod: a
+      // Drive-wide `.beanpod` search + "first owned file" adopt could bind a DIFFERENT
+      // family's pod as this family's storage, and the next save would overwrite it
+      // (a multi-family user's other pod). Surface reconnect/total-failure and let the
+      // user re-establish it explicitly — never auto-adopt an unverified file.
+      configHealTotalFailure('google_drive', false);
+      return false;
     } finally {
       configHealInFlight = false;
     }
@@ -3162,6 +3197,7 @@ export const useSyncStore = defineStore('sync', () => {
         // Recovery via any path (wake event, popup, redirect) — cancel any
         // in-flight cold-start escalation before the banner ever appears.
         coldStartReconnectDefer.cancel();
+        reconnectEscalationPending.value = false;
 
         if (showGoogleReconnect.value) {
           handleGoogleReconnected().catch((e) => {
@@ -3352,6 +3388,7 @@ export const useSyncStore = defineStore('sync', () => {
     driveFolderId,
     isGoogleDriveAvailable,
     showGoogleReconnect,
+    reconnectEscalationPending,
     driveFileNotFound,
     reconnecting,
     configHealFailed,
@@ -3373,6 +3410,7 @@ export const useSyncStore = defineStore('sync', () => {
     establishDurableHomeAfterLoad,
     migrateStorage,
     syncNow,
+    syncNowBounded,
     forceSyncNow,
     checkForConflicts,
     loadFromFile,

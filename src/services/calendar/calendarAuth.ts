@@ -34,6 +34,20 @@ import {
 import { isNative } from '@/services/sync/capabilities';
 import type { RedirectMode } from '@/services/google/redirectState';
 import { reportError } from '@/utils/errorReporter';
+import { useTranslationStore } from '@/stores/translationStore';
+
+/** Translate a key, falling back to English if Pinia isn't ready (this runs during
+ * OAuth flows where the store is normally initialized, but never throw over copy). */
+function tr(key: string, fallback: string): string {
+  try {
+    return useTranslationStore().t(key as never) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+const CONNECT_RETRY_FALLBACK =
+  'We couldn’t finish connecting your calendar. Please tap Connect and try again.';
+const connectRetryMsg = (): string => tr('calendar.error.connectRetry', CONNECT_RETRY_FALLBACK);
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v2/userinfo';
@@ -246,10 +260,7 @@ export async function connectGoogleCalendar(
       message: `Calendar popup code exchange failed: ${msg}`,
       error: e instanceof Error ? e : new Error(msg),
     });
-    return fail(
-      'exchange_failed',
-      'We couldn’t finish connecting your calendar. Please try connecting again.'
-    );
+    return fail('exchange_failed', connectRetryMsg());
   }
 }
 
@@ -377,10 +388,7 @@ async function doCompleteCalendarRedirectAuth(): Promise<CalendarConnectResult |
       severity: 'warning',
       message: 'Calendar native exchange aborted: PKCE verifier missing from redirect stash',
     });
-    return fail(
-      'exchange_failed',
-      'The calendar connection didn’t finish. Please tap Connect and try once more.'
-    );
+    return fail('exchange_failed', connectRetryMsg());
   }
 
   try {
@@ -418,10 +426,7 @@ async function doCompleteCalendarRedirectAuth(): Promise<CalendarConnectResult |
     // Friendly, actionable user copy — the raw provider error (e.g. "Token
     // exchange failed: Bad Request") is captured in the breadcrumb above, not
     // shown to the user.
-    return fail(
-      'exchange_failed',
-      'We couldn’t finish connecting your calendar. Please tap Connect and try again.'
-    );
+    return fail('exchange_failed', connectRetryMsg());
   }
 }
 

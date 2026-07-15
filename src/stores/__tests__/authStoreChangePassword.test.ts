@@ -1,5 +1,6 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { raceTimeout } from '@/utils/timing';
 import { hashPassword } from '@/services/auth/passwordService';
 
 // ── Mocks for authStore's transitive deps ──────────────────────────────────
@@ -29,7 +30,7 @@ const syncStoreState = {
   familyKey: null as CryptoKey | null,
 };
 const wrapForMemberMock = vi.fn(async () => {});
-const syncNowMock = vi.fn(async () => true);
+const syncNowMock = vi.fn<(force?: boolean) => Promise<boolean>>(async () => true);
 
 vi.mock('@/stores/syncStore', () => ({
   useSyncStore: () => ({
@@ -38,6 +39,7 @@ vi.mock('@/stores/syncStore', () => ({
     },
     wrapFamilyKeyForMember: wrapForMemberMock,
     syncNow: syncNowMock,
+    syncNowBounded: async (ms = 5000) => !!(await raceTimeout(syncNowMock(true), ms)),
     resetState: vi.fn(),
   }),
 }));
