@@ -418,10 +418,17 @@ function getClientId(): string {
   return import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 }
 
-function getRedirectUri(): string {
-  // Native uses the verified App Link (registered on the Web OAuth client);
-  // both buildAuthUrl and the token exchange call this, so they always agree
-  // (a mismatch ⇒ redirect_uri_mismatch). See ADR-029.
+/**
+ * The single source of truth for the OAuth `redirect_uri`, native-aware. Both
+ * `buildAuthUrl` and the token exchange MUST call this so the authorize request
+ * and the code→token exchange always agree (a mismatch ⇒ HTTP 400
+ * `redirect_uri_mismatch`). Exported so the calendar auth layer reuses the SAME
+ * resolution instead of duplicating a web-only variant — a duplicate that
+ * silently 400'd every native calendar exchange (authorize used `/oauth/native`,
+ * the exchange used `/oauth/callback`). See ADR-029.
+ */
+export function getRedirectUri(): string {
+  // Native uses the verified App Link (registered on the Web OAuth client).
   if (isNative()) return NATIVE_REDIRECT_URI;
   return `${window.location.origin}/oauth/callback`;
 }
