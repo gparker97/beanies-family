@@ -78,6 +78,17 @@ vi.mock('@/services/sync/fileSync', () => ({
 // Shared auto-mock — we override load/getState/getProviderType per test.
 vi.mock('@/services/sync/syncService');
 
+// Only `isTokenValid` is overridden; everything else in googleAuth (notably
+// `whenRedirectAuthSettled`, awaited by loadFromFile) stays real. A Drive 404 is
+// classified 'not-found' ONLY when the token is valid; an invalid token means
+// the 404 is auth-masked ("not accessible to this caller") → 'auth'. Default
+// true so the pre-existing 404 test keeps its 'not-found' meaning.
+const { isTokenValidMock } = vi.hoisted(() => ({ isTokenValidMock: vi.fn(() => true) }));
+vi.mock('@/services/google/googleAuth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/google/googleAuth')>()),
+  isTokenValid: isTokenValidMock,
+}));
+
 function setDriveFailure(lastError: string | null) {
   vi.mocked(syncService.load).mockResolvedValue(null);
   vi.mocked(syncService.getProviderType).mockReturnValue('google_drive');
@@ -95,6 +106,9 @@ describe('syncStore.loadFromFile — failure reason classification', () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     savedGlobalSettings = { ...mockGlobalSettings };
+    // clearAllMocks wipes call history but not queued return values; re-assert
+    // the valid-token default so a prior test's mockReturnValue(false) can't leak.
+    isTokenValidMock.mockReturnValue(true);
   });
 
   it("classifies the default TokenExpiredError message (post-sign-out) as 'auth'", async () => {
@@ -109,10 +123,34 @@ describe('syncStore.loadFromFile — failure reason classification', () => {
     expect(r).toEqual({ success: false, reason: 'auth' });
   });
 
-  it("classifies a DriveApiError:404 as 'not-found'", async () => {
+  it("classifies a DriveApiError:404 with a VALID token as 'not-found' (file truly gone)", async () => {
     setDriveFailure('DriveApiError:404: File not found');
-    const r = await useSyncStore().loadFromFile();
+    isTokenValidMock.mockReturnValue(true);
+    const store = useSyncStore();
+    const r = await store.loadFromFile();
     expect(r).toEqual({ success: false, reason: 'not-found' });
+    expect(store.driveFileNotFound).toBe(true);
+  });
+
+  it("classifies a DriveApiError:404 with an INVALID token as 'auth' (not a missing file)", async () => {
+    // Regression (2026-07-15): a long-idle iPhone lost its refresh token, so a
+    // cold-load 404 (Google masking permission-denied as not-found) was shown as
+    // the scary "your data is missing" recovery overlay. An invalid token must
+    // route to reconnect ('auth') and NEVER set driveFileNotFound.
+    setDriveFailure('DriveApiError:404: File not found');
+    isTokenValidMock.mockReturnValue(false);
+    // Fake timers so the deferred (4s) reconnect-escalation queued by loadFromFile
+    // doesn't leak past the test; we only assert the synchronous classification.
+    vi.useFakeTimers();
+    try {
+      const store = useSyncStore();
+      const r = await store.loadFromFile();
+      expect(r).toEqual({ success: false, reason: 'auth' });
+      expect(store.driveFileNotFound).toBe(false);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
   it("classifies any other failure as 'error' (no focused reconnect)", async () => {

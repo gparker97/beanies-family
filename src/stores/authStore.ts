@@ -11,6 +11,7 @@ import type { PasskeySecret } from '@/types/models';
 import { getRegistryDatabase, isStorageBlockedError } from '@/services/indexeddb/registryDatabase';
 import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
+import { raceTimeout } from '@/utils/timing';
 import { useFamilyContextStore } from './familyContextStore';
 import { useFamilyStore } from './familyStore';
 import { useSettingsStore } from './settingsStore';
@@ -69,6 +70,12 @@ export const DEFERRED_PASSWORD_HASH = '';
 // The discriminated-union return type forces each caller to check `success`
 // before reading any other field.
 // ─────────────────────────────────────────────────────────────────────────
+
+// Ceiling on the post-rotation Drive push. Matches the 5s login-completion
+// bound (raceTimeout) — long enough for a healthy save, short enough that a
+// degraded sync can't wedge the reset/change-password spinner. On timeout the
+// rotation still succeeds (already cached) and reports as syncDeferred.
+const SYNC_AFTER_ROTATION_TIMEOUT_MS = 5000;
 
 export type RotateError = 'familyKeyMissing' | 'wrapFailed' | 'updateFailed';
 export type RotateResult =
@@ -140,9 +147,18 @@ async function rotateMemberPassword(
     return { success: false, error: 'updateFailed' };
   }
 
-  const synced = await syncStore.syncNow(true);
-  // syncNow failure already raises SaveFailureBanner. We expose syncDeferred
-  // so callers can include "will sync when online" in their success toast.
+  // Bound the Drive push so the caller's spinner can't wedge forever. The
+  // rotation is already committed to the in-memory doc + IndexedDB cache above
+  // (wrapFamilyKeyForMember + updateMember), so a slow/offline/token-rejected
+  // syncNow must resolve-and-proceed — the push rides the next auto-sync. A
+  // timeout surfaces as syncDeferred (callers show "will sync when online"),
+  // exactly like the biometric/login-completion saves. See src/utils/timing.ts
+  // raceTimeout + docs/plans/2026-07-14 login-freeze fix (register/sign-in hang
+  // was the same unbounded-syncNow shape, at a different call site).
+  const synced = await raceTimeout(syncStore.syncNow(true), SYNC_AFTER_ROTATION_TIMEOUT_MS);
+  // syncNow failure/timeout already raises SaveFailureBanner (on failure) or
+  // will retry on next auto-sync (on timeout). We expose syncDeferred so callers
+  // can include "will sync when online" in their success toast.
   return { success: true, syncDeferred: !synced };
 }
 

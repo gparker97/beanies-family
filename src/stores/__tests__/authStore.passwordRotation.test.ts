@@ -466,4 +466,26 @@ describe('authStore.resetMemberPassword', () => {
     const result = await store.resetMemberPassword('m2', 'temp-pw');
     expect(result).toEqual({ success: true, syncDeferred: true });
   });
+
+  // Regression (2026-07-15): a degraded Drive sync made syncNow(true) hang
+  // forever, so rotateMemberPassword never resolved → the reset modal's spinner
+  // spun indefinitely. raceTimeout now bounds the post-rotation push: the
+  // rotation still succeeds (already cached) and reports syncDeferred:true.
+  it('still resolves (syncDeferred:true) when syncNow never settles — spinner-hang fix', async () => {
+    const me = await memberWithPassword('admin', 'pw', { canManagePod: true });
+    const target = await memberWithPassword('m2', 'oldpw');
+    membersRef.value = [me, target];
+    // Never-settling push simulates a wedged worker / offline Drive. Real timers
+    // here (rotateMemberPassword awaits real PBKDF2 before the raceTimeout, which
+    // doesn't flush under fake timers); the raceTimeout ceiling is 5s, so the
+    // test timeout is raised to give it headroom. Pre-fix this hung forever.
+    syncNowMock.mockImplementationOnce(() => new Promise<boolean>(() => {}));
+    const store = useAuthStore();
+    store.currentUser = { memberId: 'admin', email: 'a@x.com', familyId: 'fam-1' };
+    store.isAuthenticated = true;
+
+    const result = await store.resetMemberPassword('m2', 'temp-pw');
+    expect(result).toEqual({ success: true, syncDeferred: true });
+    expect(syncNowMock).toHaveBeenCalledWith(true);
+  }, 10000);
 });
