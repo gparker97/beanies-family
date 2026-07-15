@@ -4,6 +4,19 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## `type-check` + unit tests can be green while the production `vite build` is broken — run `npm run build` before pushing import-graph changes
+
+**Date:** 2026-07-15
+**Context:** The 0.9.5R8 resilience fix added a deferred-heal resume-setup navigation that imported `@/router` from `syncStore` (first time syncStore ever pulled the router). `npm run type-check` (vue-tsc) and the full 3881-test Vitest suite both passed, so I committed + pushed to `main`. The **production rollup build** then failed on the pushed SHA: `[vite:build-import-analysis] src/pages/LoginPage.vue (624:9): Failed to parse source... install @vitejs/plugin-vue`. The real cause was a module-graph cycle — `router/index.ts` statically imports `useSyncStore`, and the router lazy-loads pages (`() => import('@/pages/LoginPage.vue')`); adding a syncStore→router edge (dynamic **or** static) tipped vite's import-analysis into parsing a lazy `.vue` as raw JS. The error's reported location (`LoginPage.vue:624`, the `</script>`) and its named file (`docClient.ts`) were both **red herrings** — bisecting by reverting files to the last-good commit and rebuilding is what actually located it (in `syncStore.ts`). Fixed MVO-style: syncStore raises a reactive `needsResumeSetupNav` flag, App.vue watches it and owns `router.replace(...)` — the store never imports the router. Cost: a broken build shipped to `main` + a red Android-APK CI check, caught only because I checked CI before deploying.
+
+**Rules:**
+
+1. **Before pushing any change that touches the import graph — new cross-module imports, dynamic `import()`, store↔router/page edges, barrel re-exports — run the full `npm run build` locally, not just `npm run type-check` + tests.** vue-tsc and Vitest (esbuild transform, per-file) do **not** run rollup's whole-graph import-analysis; only `vite build` does. The deploy gate and the Android-APK job run `vite build`, so a graph break passes every local check and only surfaces in CI (or prod).
+2. **Never import the router (`@/router`) into a widely-imported hub module** (`syncStore`, other core stores/services). It creates a cycle with the router's lazy-loaded pages. This is also the MVO-correct boundary: stores orchestrate reactive state, **views navigate**. Hand off via a reactive flag the view watches (mirror `reconnectEscalationPending` / `needsResumeSetupNav`), exactly as App.vue already does. Composables like `usePwaUpdater`/`useQuickAdd` can static-import `router` because they're leaves, not hubs.
+3. **When a `vite:build-import-analysis` "Failed to parse... install @vitejs/plugin-vue" error names a `.vue` file at its `</script>` line, treat the location as a symptom, not the cause.** Bisect by `git checkout <last-good-commit> -- <file>` and rebuilding until the break clears — the offending module is the one whose reversion fixes it, not the `.vue` in the message.
+
+---
+
 ## Android passkey `[50152] "RP ID cannot be validated"` = the assetlinks needs BOTH relations, not the signing cert — and get device ground-truth before guessing
 
 **Date:** 2026-07-14
