@@ -496,6 +496,24 @@ async function loadFamilyData() {
         return;
       }
 
+      // Auth-masked failure: an expired/absent Google token surfaces as a Drive
+      // 404 (permission masked as not-found). syncStore.loadFromFile has already
+      // surfaced the reconnect banner. This is a reconnect situation, NOT data
+      // loss — do not fall through to the "your data is missing" recovery
+      // overlay. The post-init health check below also defers to
+      // `showGoogleReconnect`. (Root-caused 2026-07-15 from a long-idle iPhone
+      // whose lost refresh token turned a cold-load 404 into a false data-loss
+      // overlay.)
+      if (loadResult.reason === 'auth') {
+        initBreadcrumbs.push(
+          'path1b: loadFromFile auth-transient — reconnect banner, skipping overlay'
+        );
+        console.warn(
+          '[loadFamilyData] Token expired (Drive 404 masked as not-found) — surfacing reconnect, no overlay'
+        );
+        return;
+      }
+
       // File load failed for non-password reasons (file unreadable, missing,
       // permission revoked, etc.). DO NOT redirect to /welcome — the router's
       // `ALREADY_AUTH_REDIRECT_FROM` guard at `src/router/index.ts:309-319`
@@ -1016,7 +1034,13 @@ onMounted(async () => {
       initBreadcrumbs.push('health: NO automerge doc loaded');
       const breadcrumbLog = initBreadcrumbs.join('\n');
       const onLoginFlowRoute = route.path === '/welcome' || route.path === '/login';
-      if (!onLoginFlowRoute) {
+      // A surfaced Google-reconnect banner means the user must re-authenticate
+      // before the doc can load (e.g. an expired token returned a Drive 404
+      // masked as not-found). Showing the "data missing" recovery overlay on
+      // top of that misrepresents an expired session as data loss — suppress it,
+      // exactly as we do on the login-flow routes.
+      const awaitingReconnect = syncStore.showGoogleReconnect;
+      if (!onLoginFlowRoute && !awaitingReconnect) {
         initError.value = 'Initialization completed but no data was loaded';
         initErrorDetail.value = breadcrumbLog;
         console.error('[App] Post-init health check failed — no Automerge doc\n' + breadcrumbLog);
@@ -1037,7 +1061,8 @@ onMounted(async () => {
         });
       } else {
         console.warn(
-          '[App] Post-init health check: no doc, but redirected to login — suppressing recovery UI\n' +
+          '[App] Post-init health check: no doc, but on a login-flow route or awaiting ' +
+            `Google reconnect (reconnect=${awaitingReconnect}) — suppressing recovery UI\n` +
             breadcrumbLog
         );
       }
