@@ -14,7 +14,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Resetting or changing a family member's password no longer gets stuck on a spinner.** If the cloud save was slow, offline, or your session had gone quiet, the button could spin forever even though the new password was already applied. The password change now saves locally right away and the cloud copy catches up in the background.
 - **After a while away, the app now asks you to reconnect instead of falsely warning your data is missing.** When your Google session quietly expires (common on iPhone after the app's been in the background a long time), your cloud file can briefly look "not found." The app was misreading that as lost data and showing a scary recovery screen; it now recognizes it as an expired session and offers to reconnect your Google account. Your data was never actually gone.
-- **Both fixes above now also reach the installed Android app** (revision bump, no other changes).
+- **Connecting Google Calendar now works on the installed Android app.** Reconnecting failed with a "Token exchange failed: Bad Request" error because the app asked Google for the sign-in and the token using two slightly different return addresses. They now always match, so the calendar connects and reconnects normally. If a connection attempt is interrupted, you now get a clear "please tap Connect and try again" message instead of a raw error.
+- **The two fixes above (password-reset spinner, expired-session message) also reach the installed Android app** with this build.
 
 ## 2026-07-14
 
