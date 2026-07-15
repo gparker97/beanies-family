@@ -81,13 +81,6 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   // allowlist; both are PII-free (breadcrumbs redacted client-side).
   'web_storage',
   'breadcrumbs',
-  // Incremental delta-sync diagnostics (added 2026-07-13, mirror of the client
-  // allowlist). PII-free: phase enum, fallback-reason enum, chunk counts, seq, bool.
-  'incr_phase',
-  'incr_reason',
-  'incr_chunk_count',
-  'incr_seq',
-  'incr_dirty',
   // Cache-persist durability failure (added 2026-07-13, #50). PII-free: write kind +
   // IDB error-class name.
   'cache_persist_kind',

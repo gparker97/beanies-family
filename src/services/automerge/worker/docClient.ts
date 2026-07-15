@@ -339,7 +339,7 @@ function ensureReady(): Promise<'worker' | 'inline'> {
 // Methods whose `args` carry ONLY plain-JSON doc data (mutation ops, envelopes).
 // We deep-plainify these before `postMessage` so a Vue reactive proxy (or any
 // non-structured-cloneable wrapper) that slipped in can't crash the clone. NOT
-// applied to setKey (CryptoKey) / loadSnapshot / getChangesSince / applyChanges,
+// applied to setKey (CryptoKey) / loadSnapshot / applyChanges,
 // whose args carry a CryptoKey or Uint8Array that must survive intact and are
 // already clone-safe. Inline mode skips postMessage entirely, so this is
 // worker-mode-only hardening.
@@ -359,12 +359,7 @@ const HEAVY_METHODS = new Set([
   'initAndLoadCache',
   'verifyEnvelope',
   'exportEncryptedPayload',
-  // Plan B incremental transport — a large first chunk / catch-up apply must get
-  // the generous ceiling too, not the tight 45 s mutation budget.
-  'applyRemoteChunks',
-  'exportIncrementalPayload',
   'applyChanges',
-  'getChangesSince',
 ]);
 
 // Of the JSON-safe methods, these carry a `.envelope` whose `encryptedPayload` is
@@ -387,13 +382,9 @@ const RETRYABLE_METHODS = new Set([
   'initAndLoadCache',
   'openCache',
   'getHeads',
-  'getActorId',
-  'getChangesSince',
   'applyChanges',
   'exportEncryptedPayload',
-  'exportIncrementalPayload',
   'mergeRemoteEnvelope',
-  'applyRemoteChunks',
   'verifyEnvelope',
   'flush',
   'dropDoc',
@@ -690,13 +681,11 @@ export function exportSnapshot(): Promise<{ binary: Uint8Array }> {
   return request('exportSnapshot');
 }
 
+/** Kept as the canonical read-RPC probe the worker-death/recovery test-suite drives
+ * (`docClient.test.ts`); no production caller after the change-chunk transport was
+ * retired 2026-07-15. */
 export function getHeads(): Promise<{ heads: Heads }> {
   return request('getHeads');
-}
-
-/** This device's stable Automerge actor id (names its own change-log chunks). */
-export function getActorId(): Promise<{ actorId: string }> {
-  return request('getActorId');
 }
 
 /** Gather every photoId referenced across registered collections (for `gcOrphans`).
@@ -704,27 +693,8 @@ export function getActorId(): Promise<{ actorId: string }> {
 export function collectReferencedPhotoIds(opts?: RequestOpts): Promise<{ ids: string[] }> {
   return request('collectReferencedPhotoIds', undefined, opts);
 }
-export function getChangesSince(heads: Heads): Promise<{ changes: Uint8Array[] }> {
-  return request('getChangesSince', { heads });
-}
 export function applyChanges(changes: Uint8Array[]): Promise<{ heads: Heads; landed: boolean }> {
   return request('applyChanges', { changes });
-}
-
-/** Plan B publish: export local changes since `sinceHeads` as an encrypted,
- * self-describing `.beanchanges` chunk body (base64) for the caller to `writeAux`. */
-export function exportIncrementalPayload(sinceHeads: Heads): Promise<{ payload: string }> {
-  return request('exportIncrementalPayload', { sinceHeads });
-}
-
-/** Plan B poll: decrypt + apply a batch of remote `.beanchanges` chunk ciphertexts.
- * `landed:false` means a chunk's causal deps are absent (silently buffered) — the
- * caller MUST fall back to a whole-doc base adopt. `dirty` (landed only) drives the
- * re-publish decision. */
-export function applyRemoteChunks(
-  payloads: string[]
-): Promise<{ heads: Heads; landed: boolean; dirty: boolean }> {
-  return request('applyRemoteChunks', { payloads });
 }
 
 /** Re-persist the envelope cache after a main-thread `currentEnvelope` change.

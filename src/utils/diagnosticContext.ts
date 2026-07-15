@@ -126,16 +126,6 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'perf_duration_ms',
   'perf_doc_bytes',
   'perf_entity_count',
-  // Incremental delta-sync diagnostics (surface `incremental-sync`, see
-  // services/sync/incrementalTransport.ts). PII-free by construction: a phase enum,
-  // a fallback-reason enum, chunk counts, a publish seq, a dirty boolean. Added
-  // 2026-07-13 to make the delta path observable (unblocks #44). MIRROR this in the
-  // Lambda allowlist + its pinned test when adding a key here.
-  'incr_phase',
-  'incr_reason',
-  'incr_chunk_count',
-  'incr_seq',
-  'incr_dirty',
   // Local-durability cache-persist failure (surface `cache-persist`, see
   // services/sync/syncService.ts). PII-free: which write failed (base/increment) +
   // the IDB error class name. Added 2026-07-13 (#50). MIRROR in the Lambda allowlist

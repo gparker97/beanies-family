@@ -31,8 +31,6 @@ import {
   applyChanges as applyChangesOp,
   decryptToDoc,
   encryptDocPayload,
-  encryptChunk,
-  decryptChunk,
   buildFullProjection,
   projectionDeltasBetween,
   frameChanges,
@@ -66,8 +64,18 @@ const PROJECTION_CHUNK = 1000;
  * valve, not zero (batches a rapid burst of mutations into one increment write). */
 const PERSIST_DEBOUNCE_MS = 120;
 /** Re-compact (rewrite a fresh whole-doc base, clearing increments) once this many
- * increments sit on top of the base — bounds both cache size and cold-reload cost. */
-const INCREMENT_COMPACTION_THRESHOLD = 200;
+ * increments sit on top of the base — bounds both cache size and cold-reload cost.
+ *
+ * Lowered 200 → 50 (2026-07-15) after prod CloudWatch showed `automerge.cacheLoad`
+ * p50 ~21s: a cold load replays EVERY increment (`cache.loadCachedDoc`), so ≤200 was
+ * ~19s of decrypt+apply over the ~2s base floor. `cacheLoad` cost scales ~linearly
+ * with this value; base-rewrite frequency scales as ~(200/N) (each rewrite = a full
+ * `saveDoc`+encrypt+IDB-put of the whole doc). N=50 cuts cold-load ~4× at half the
+ * write-amplification of 25. The rewrite runs behind the single-flight `persistInFlight`
+ * chain, debounced (`PERSIST_DEBOUNCE_MS`) off the RPC path, so it does not slow a
+ * `mutate` response — but do NOT lower this further without re-checking `automerge.saveBase`
+ * p95 for a save-side regression. See docs/plans/2026-07-15-compaction-primary-retire-change-chunks.md. */
+const INCREMENT_COMPACTION_THRESHOLD = 50;
 
 // ─── Module state (one instance per realm — worker OR inline main) ───────────
 
@@ -314,9 +322,22 @@ export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }>
   currentDoc = migrateDoc(loaded.doc);
   if (loaded.recovered) {
     // A corrupt increment was skipped on load — rewrite a clean base to drop the
-    // corrupt tail rows (base-write clears all increments).
+    // corrupt tail rows (base-write clears all increments). Immediate: dropping
+    // corrupt rows ASAP matters here.
     lastPersistedHeads = null;
     void enqueuePersist();
+  } else if (cache.incrementCount() > INCREMENT_COMPACTION_THRESHOLD) {
+    // Over-threshold on a clean load — e.g. a device that accumulated many
+    // increments before this build lowered the threshold. `persistOnce`'s
+    // re-compaction only fires on a `mutate`, so without this a read-heavy
+    // session would replay all of them on EVERY hard-refresh until the user
+    // happens to edit. Compact once to a fresh base so this and every later cold
+    // load replays few increments — self-heals already-deployed devices on first
+    // load. Debounced (`schedulePersist`, NOT the recovered path's immediate
+    // `enqueuePersist`) so the ~2MB saveDoc+encrypt runs AFTER the projection
+    // push below, not competing with it for the worker's single thread.
+    lastPersistedHeads = null;
+    schedulePersist();
   } else {
     lastPersistedHeads = preHeads;
   }
@@ -430,16 +451,6 @@ export function getHeads(): { heads: Heads } {
   return { heads: headsOf(requireDoc('getHeads')) };
 }
 
-/** This device's stable Automerge actor id — used to name its own change-log
- * chunks (`changes/<actorId>-<seq>.beanchanges`). Stable per device since Layer 1
- * merges in place (one actor per device, no per-poll actor churn). */
-export function getActorId(): { actorId: string } {
-  return { actorId: Automerge.getActorId(requireDoc('getActorId')) };
-}
-export function getChangesSince(heads: Heads): { changes: Uint8Array[] } {
-  return { changes: changesSince(requireDoc('getChangesSince'), heads) };
-}
-
 /**
  * Apply changes to the live doc in place, then report whether they LANDED. Plan B
  * MUST NOT assume `applyChanges` threw on a missing dependency — Automerge 3.2.6
@@ -468,51 +479,6 @@ function applyChangesInternal(changes: Uint8Array[]): { heads: Heads; landed: bo
 /** Apply plaintext changes (DEV/E2E + inline symmetry). Returns `landed`. */
 export function applyChanges(changes: Uint8Array[]): { heads: Heads; landed: boolean } {
   return applyChangesInternal(changes);
-}
-
-/**
- * Export the local changes since `sinceHeads` as an encrypted, self-describing
- * `.beanchanges` chunk (Plan B publish). Crypto stays in the worker — main gets
- * only ciphertext to upload. `frontierHeads` lets any reader apply idempotently
- * and derive `dirty` without a shared manifest.
- */
-export async function exportIncrementalPayload(sinceHeads: Heads): Promise<{ payload: string }> {
-  const doc = requireDoc('exportIncrementalPayload');
-  const key = requireKey('exportIncrementalPayload');
-  const chunk = { frontierHeads: headsOf(doc), changes: changesSince(doc, sinceHeads) };
-  const payload = await time2('automerge.saveIncremental', () => encryptChunk(chunk, key));
-  return { payload };
-}
-
-/**
- * Decrypt + apply a batch of remote `.beanchanges` chunk ciphertexts (Plan B poll).
- * All chunks apply in ONE `applyChanges` so intra-batch deps resolve in a single
- * pass. Returns `landed` (see `applyChangesInternal`) and, only when landed,
- * `dirty` = did the merged doc advance beyond the remote frontier (local carried
- * unsynced changes → the caller re-publishes). A non-landed batch returns
- * `dirty:false` and the caller reconciles via the whole-doc base.
- */
-export async function applyRemoteChunks(
-  payloads: string[]
-): Promise<{ heads: Heads; landed: boolean; dirty: boolean }> {
-  requireDoc('applyRemoteChunks');
-  const key = requireKey('applyRemoteChunks');
-  // Split from the whole-doc `automerge.remoteLoad` (base adopt at :355) so the
-  // delta-chunk decrypt is distinguishable in CloudWatch — see #44 instrumentation.
-  const chunks = await time2('automerge.remoteChunkDecrypt', () =>
-    Promise.all(payloads.map((p) => decryptChunk(p, key)))
-  );
-  const allChanges: Uint8Array[] = [];
-  const remoteFrontier: Heads = [];
-  for (const c of chunks) {
-    allChanges.push(...c.changes);
-    remoteFrontier.push(...c.frontierHeads);
-  }
-  const { heads, landed } = applyChangesInternal(allChanges);
-  if (!landed) return { heads, landed, dirty: false };
-  // Landed → every remote frontier hash is materialized, so getChangesSince is safe.
-  const dirty = changesSince(requireDoc('applyRemoteChunks'), remoteFrontier).length > 0;
-  return { heads, landed, dirty };
 }
 
 /** Gather every referenced photoId (runs the collect hooks on the worker doc).
@@ -624,16 +590,8 @@ export async function dispatch(
       return { result: await verifyEnvelope(a.envelope as BeanpodFileV4) };
     case 'getHeads':
       return { result: getHeads() };
-    case 'getActorId':
-      return { result: getActorId() };
-    case 'getChangesSince':
-      return { result: getChangesSince(a.heads as Heads) };
     case 'applyChanges':
       return { result: applyChanges(a.changes as Uint8Array[]) };
-    case 'exportIncrementalPayload':
-      return { result: await exportIncrementalPayload(a.sinceHeads as Heads) };
-    case 'applyRemoteChunks':
-      return { result: await applyRemoteChunks(a.payloads as string[]) };
     case 'collectReferencedPhotoIds':
       return { result: collectReferencedPhotoIds() };
     case 'persistEnvelope':

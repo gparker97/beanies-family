@@ -15,8 +15,6 @@ import {
   applyChanges,
   frameChanges,
   unframeChanges,
-  frameChunk,
-  unframeChunk,
   registerNamedOp,
   __resetNamedOpsForTesting,
 } from '../docOps';
@@ -64,19 +62,6 @@ describe('docOps — change primitives (B1/B2 incremental)', () => {
   it('unframeChanges throws on a truncated buffer (→ caught by cache recovery)', () => {
     const framed = frameChanges([new Uint8Array([1, 2, 3, 4])]);
     expect(() => unframeChanges(framed.subarray(0, framed.length - 2))).toThrow();
-  });
-
-  it('frameChunk / unframeChunk round-trips changes + frontierHeads (B2 chunk codec)', () => {
-    const chunk = {
-      frontierHeads: ['abc123', 'def456'],
-      changes: [new Uint8Array([1, 2]), new Uint8Array([3, 4, 5])],
-    };
-    const back = unframeChunk(frameChunk(chunk));
-    expect(back.frontierHeads).toEqual(['abc123', 'def456']);
-    expect(back.changes.map((c) => Array.from(c))).toEqual([
-      [1, 2],
-      [3, 4, 5],
-    ]);
   });
 
   it('getChangesSince → frame → unframe → applyChanges reconstructs the same state', () => {

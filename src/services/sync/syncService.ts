@@ -21,14 +21,7 @@ import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
 import type { StorageProvider, StorageProviderType } from './storageProvider';
 import { getAuxStore } from './storageProvider';
-import {
-  pullIncremental,
-  publishIncremental,
-  newTransportSession,
-  type TransportDeps,
-  type TransportSession,
-} from './incrementalTransport';
-import { isFlagEnabled } from '@/config/flags';
+import { isChunkName } from './chunkNames';
 import { LocalStorageProvider } from './providers/localProvider';
 import { CapacitorFileProvider } from './providers/capacitorFileProvider';
 import { DriveApiError } from '@/services/google/driveService';
@@ -86,27 +79,62 @@ let lastKnownFileTimestamp: string | null = null;
 // content — the string is an encrypted envelope. Populated by recordPersistedBytes().
 let lastPersistedBytes: number | null = null;
 
-// ADR-032 Plan B — incremental change-log transport state (in-memory, per provider).
-// Reset whenever the provider changes (setProvider). Deps route to the worker/inline
-// backend via docClient, so incremental sync works in both modes.
-let transportSession: TransportSession = newTransportSession();
-const transportDeps: TransportDeps = {
-  applyRemoteChunks: (payloads) => docClient.applyRemoteChunks(payloads),
-  exportIncrementalPayload: (sinceHeads) => docClient.exportIncrementalPayload(sinceHeads),
-  getHeads: () => docClient.getHeads(),
-  getActorId: () => docClient.getActorId(),
-};
+// Change-log chunk transport (ADR-032 Plan B) was RETIRED 2026-07-15 — the
+// compacted base is authoritative on every save (see the compaction-primary pivot,
+// docs/plans/2026-07-15-compaction-primary-retire-change-chunks.md). Residue of old
+// `changes/` chunk files is cleaned up best-effort once per session (see doPull).
+// `residueCleanedFamilies` gates that to one attempt per family per session.
+// NOTE: never cleared on family-switch/sign-out — "once per session" must survive a
+// family switch, or every switch re-triggers a Drive-list storm.
+const residueCleanedFamilies = new Set<string>();
 
-/** The provider's aux change-log store IFF incremental sync is active — gated on
- * the `docWorker` kill-switch so flipping the flag OFF reverts to pure whole-doc
- * transport (writes no chunks, reads only the base). Returns null otherwise. */
-function activeAuxStore(): ReturnType<typeof getAuxStore> {
-  if (!currentProvider || !isFlagEnabled('docWorker')) return null;
-  return getAuxStore(currentProvider);
-}
-
-function resetTransportSession(): void {
-  transportSession = newTransportSession();
+/**
+ * Best-effort one-time cleanup of retired change-log chunk residue
+ * (`changes/*.beanchanges`) from a family's Drive folder. Fired detached from the
+ * first read of a session, once per family, UNGATED by the docWorker flag (residue
+ * exists regardless of the kill-switch). Never blocks or fails a save/load — a Drive
+ * error is swallowed + logged. TEMPORARY: remove with `chunkNames.ts` once the
+ * `chunk-residue-cleanup` `deleted` breadcrumb has drained fleet-wide.
+ */
+async function cleanupChunkResidueOnce(): Promise<void> {
+  const familyId = getActiveFamilyId();
+  const provider = currentProvider;
+  if (!familyId || !provider) return;
+  if (residueCleanedFamilies.has(familyId)) return;
+  residueCleanedFamilies.add(familyId); // claim the slot SYNCHRONOUSLY (pre-await)
+  const aux = getAuxStore(provider); // capture the handle SYNCHRONOUSLY (pre-await)
+  if (!aux) return;
+  try {
+    const chunks = (await aux.list()).filter(isChunkName);
+    if (chunks.length === 0) {
+      logEvent({
+        level: 'info',
+        surface: 'chunk-residue-cleanup',
+        message: 'no chunk residue to clean',
+        context: { action: 'skipped' },
+      });
+      return;
+    }
+    for (const name of chunks) await aux.delete(name);
+    logEvent({
+      level: 'info',
+      surface: 'chunk-residue-cleanup',
+      message: `deleted ${chunks.length} retired chunk file(s)`,
+      context: { action: 'deleted' },
+    });
+  } catch (e) {
+    // Non-fatal: the base is authoritative; residue is inert and retried next session.
+    console.warn(
+      '[syncService] chunk-residue cleanup failed (non-fatal; base is authoritative; residue retried next session):',
+      e
+    );
+    logEvent({
+      level: 'info',
+      surface: 'chunk-residue-cleanup',
+      message: 'chunk residue cleanup failed',
+      context: { action: 'failed', error_code: e instanceof Error ? e.name : 'unknown' },
+    });
+  }
 }
 
 // Poll-while-visible watcher for providers that opt in via
@@ -409,7 +437,6 @@ export function getProviderFamilyId(): string | null {
 export function setProvider(provider: StorageProvider): void {
   currentProvider = provider;
   currentProviderFamilyId = getActiveFamilyId();
-  resetTransportSession(); // a new provider → a fresh change-log cursor
   // This is the single write-intent install seam, so it OWNS offline-queue
   // flush registration (2026-06-19, finding 11). Provider builds (createNew /
   // fromExisting) no longer self-register, so read-only resume/recovery paths
@@ -793,23 +820,11 @@ async function fetchAndMergeRemote(): Promise<void> {
   if (!isDrive && !opts) return;
   if (!currentFamilyKey || !currentEnvelope) return;
 
-  // ADR-032 Plan B: try the incremental change-log first (docWorker-gated aux).
-  //  • applied → we ingested KB of peer deltas; re-publish if we carried unsynced
-  //    local changes, then we're done (no whole-doc read needed).
-  //  • noop / fallback → fall through to the whole-doc fast-path + merge below: a
-  //    whole-doc peer (or a docWorker-off device) may have advanced the base
-  //    WITHOUT writing a chunk, and a fallback needs the base to carry missing deps.
-  const aux = activeAuxStore();
-  if (aux) {
-    const pull = await pullIncremental(aux, transportDeps, transportSession);
-    if (pull.outcome === 'applied') {
-      if (pull.dirty) triggerDebouncedSave();
-      return;
-    }
-    if (pull.outcome === 'fallback') {
-      console.warn(`[syncService] incremental pull fell back (${pull.reason}) → whole-doc merge`);
-    }
-  }
+  // Change-log chunk transport was RETIRED 2026-07-15 — every save writes the full
+  // compacted base, so it already carries every peer's edits; we go straight to the
+  // whole-doc fast-path + merge below (no chunk read). Best-effort cleanup of any
+  // old `changes/` residue rides this once-per-session first-read seam (detached).
+  void cleanupChunkResidueOnce();
 
   // Fast path: check if remote has changed since we last read/wrote
   const remoteTimestamp = await currentProvider.getLastModified();
@@ -821,7 +836,10 @@ async function fetchAndMergeRemote(): Promise<void> {
     return; // No change — skip the full read
   }
 
-  // Remote has newer data — fetch, decrypt, and merge
+  // Remote has newer data — fetch, decrypt, and merge. INVARIANT (ADR-032 addendum):
+  // the base is the sole source of a peer's edits (change-chunks retired 2026-07-15).
+  // This whole-doc read + merge is how every peer's changes reach us — do not gate or
+  // skip it on the assumption a delta layer will carry them.
   const text = await currentProvider.read();
   if (!text) return;
 
@@ -907,16 +925,14 @@ async function doSave(): Promise<boolean> {
     const { payload } = await docClient.exportEncryptedPayload();
     const fileContent = reEncryptEnvelope(currentEnvelope, payload);
 
-    // Write via the storage provider abstraction
+    // INVARIANT (ADR-032 addendum, 2026-07-15): every save writes the FULL compacted
+    // base. Change-log/delta chunks were retired on the strength of this — the base
+    // is the sole authoritative, always-current copy every peer reads. Do NOT
+    // coalesce, skip, or reduce the frequency of this write without first
+    // re-introducing a delta mechanism AND re-deriving the convergence argument,
+    // or a peer can silently miss another device's edits.
     await currentProvider.write(fileContent);
     recordPersistedBytes(fileContent); // capture size for the registry usage signal
-
-    // ADR-032 Plan B: dual-publish — after the whole-doc base write, append the
-    // delta chunk so incremental peers apply KB instead of re-loading the base.
-    // Best-effort (publishIncremental swallows + logs): the base is authoritative,
-    // so a chunk-write failure never risks data — peers just fall back to the base.
-    const auxOut = activeAuxStore();
-    if (auxOut) await publishIncremental(auxOut, transportDeps, transportSession);
 
     // Update timestamp after successful write
     try {
