@@ -9,13 +9,24 @@ const CALENDAR_CODE_KEY = 'beanies_redirect_auth_code:calendar';
 const STATE_KEY = 'beanies_redirect_auth';
 const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events.owned';
 
-const { startRedirectAuth } = vi.hoisted(() => ({ startRedirectAuth: vi.fn(async () => {}) }));
+// The single native-aware redirect_uri both the authorize AND the exchange must
+// use. calendarAuth imports getRedirectUri from googleAuth (the fix); a
+// regression that reintroduces a local `/oauth/callback` copy would make the
+// exchange NOT use this sentinel and the assertions below would fail.
+const REDIRECT_URI = 'https://beanies.family/oauth/native';
+
+const { startRedirectAuth, isNativeMock } = vi.hoisted(() => ({
+  startRedirectAuth: vi.fn(async () => {}),
+  isNativeMock: vi.fn(() => false),
+}));
 
 vi.mock('@/services/google/googleAuth', () => ({
   startRedirectAuth,
+  getRedirectUri: () => REDIRECT_URI,
   REDIRECT_AUTH_CODE_KEY_CALENDAR: 'beanies_redirect_auth_code:calendar',
   REDIRECT_AUTH_KEY: 'beanies_redirect_auth',
 }));
+vi.mock('@/services/sync/capabilities', () => ({ isNative: isNativeMock }));
 vi.mock('@/services/google/pkce', () => ({
   generateCodeVerifier: vi.fn(() => 'v'),
   generateCodeChallenge: vi.fn(async () => 'c'),
@@ -43,6 +54,7 @@ describe('calendarAuth — redirect transport (P2)', () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.resetAllMocks();
+    isNativeMock.mockReturnValue(false); // re-assert web default (resetAllMocks cleared it)
     sessionStorage.clear();
     vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'cid.apps.googleusercontent.com');
     // fetchEmail's userinfo call.
@@ -94,9 +106,15 @@ describe('calendarAuth — redirect transport (P2)', () => {
         refreshToken: 'rt',
         grantedScopes: expect.arrayContaining([CALENDAR_SCOPE]),
       });
-      // No verifier on the web arm (confidential proxy secures the code).
+      // No verifier on the web arm (confidential proxy secures the code), and
+      // the exchange uses the SHARED native-aware redirect_uri (regression: a
+      // local `/oauth/callback` copy is what 400'd every native exchange).
       expect(exchangeCodeForTokens).toHaveBeenCalledWith(
-        expect.objectContaining({ code: 'web-code', codeVerifier: undefined })
+        expect.objectContaining({
+          code: 'web-code',
+          codeVerifier: undefined,
+          redirectUri: REDIRECT_URI,
+        })
       );
       // One-time code consumed.
       expect(sessionStorage.getItem(CALENDAR_CODE_KEY)).toBeNull();
@@ -111,13 +129,35 @@ describe('calendarAuth — redirect transport (P2)', () => {
         JSON.stringify({ codeVerifier: 'nat-verifier', returnPath: '/settings', grant: 'calendar' })
       );
 
+      isNativeMock.mockReturnValue(true);
       await cal.completeCalendarRedirectAuth();
 
+      // Native sends the verifier AND the shared native redirect_uri — the two
+      // sides (authorize + exchange) now agree (was the redirect_uri_mismatch bug).
       expect(exchangeCodeForTokens).toHaveBeenCalledWith(
-        expect.objectContaining({ code: 'nat-code', codeVerifier: 'nat-verifier' })
+        expect.objectContaining({
+          code: 'nat-code',
+          codeVerifier: 'nat-verifier',
+          redirectUri: REDIRECT_URI,
+        })
       );
       // The calendar-owned stash is consumed.
       expect(sessionStorage.getItem(STATE_KEY)).toBeNull();
+    });
+
+    it('native arm: aborts with a friendly error (no doomed exchange) when the PKCE verifier is missing', async () => {
+      const { exchangeCodeForTokens } = await import('@/services/google/oauthProxy');
+      isNativeMock.mockReturnValue(true);
+      sessionStorage.setItem(CALENDAR_CODE_KEY, 'nat-code-no-verifier');
+      // No stash → no verifier. On native this would 400 (challenge sent, no
+      // verifier), so we must NOT fire the exchange; fail clearly instead.
+
+      const result = await cal.completeCalendarRedirectAuth();
+
+      expect(exchangeCodeForTokens).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ status: 'failed', code: 'exchange_failed' });
+      // The one-time code is still consumed (can't be reused).
+      expect(sessionStorage.getItem(CALENDAR_CODE_KEY)).toBeNull();
     });
 
     it('does NOT consume a Drive stash (grant!=calendar) — leaves it for the Drive completion', async () => {

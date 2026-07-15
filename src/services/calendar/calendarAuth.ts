@@ -27,9 +27,11 @@ import {
 } from '@/services/google/oauthProxy';
 import {
   startRedirectAuth,
+  getRedirectUri,
   REDIRECT_AUTH_CODE_KEY_CALENDAR,
   REDIRECT_AUTH_KEY,
 } from '@/services/google/googleAuth';
+import { isNative } from '@/services/sync/capabilities';
 import type { RedirectMode } from '@/services/google/redirectState';
 import { reportError } from '@/utils/errorReporter';
 
@@ -93,9 +95,11 @@ function getClientId(): string {
   return import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 }
 
-function getRedirectUri(): string {
-  return `${window.location.origin}/oauth/callback`;
-}
+// `getRedirectUri` is imported from googleAuth (native-aware, single source of
+// truth) — this layer used to duplicate a web-only variant that resolved to
+// `/oauth/callback` on native while the authorize request (delegated to
+// googleAuth.startRedirectAuth) used `/oauth/native`, so every native calendar
+// token exchange 400'd (`redirect_uri_mismatch`). See ADR-029.
 
 /** Open a centered blank popup synchronously (must precede any await to keep the user-gesture). */
 function openBlankPopup(): Window | null {
@@ -235,7 +239,17 @@ export async function connectGoogleCalendar(
     if (msg.startsWith('cancelled:')) {
       return fail('cancelled', 'Calendar connection was cancelled.');
     }
-    return fail('exchange_failed', `Could not complete the calendar connection: ${msg}`);
+    // Breadcrumb the raw provider error; show the user friendly, actionable copy.
+    reportError({
+      surface: 'calendar-popup-connect',
+      severity: 'warning',
+      message: `Calendar popup code exchange failed: ${msg}`,
+      error: e instanceof Error ? e : new Error(msg),
+    });
+    return fail(
+      'exchange_failed',
+      'We couldn’t finish connecting your calendar. Please try connecting again.'
+    );
   }
 }
 
@@ -351,6 +365,24 @@ async function doCompleteCalendarRedirectAuth(): Promise<CalendarConnectResult |
     return fail('not_configured', 'Google Client ID not configured (VITE_GOOGLE_CLIENT_ID).');
   }
 
+  // On native the authorize request always includes a PKCE challenge, so the
+  // exchange MUST send the matching verifier. If the stash was lost, exchanging
+  // without it is doomed (Google 400s) — fail clearly and ask for a fresh
+  // consent rather than firing a request we know will fail with a raw error.
+  // (Web/iOS/PWA legitimately exchange without a verifier via the confidential
+  // proxy, so this guard is native-only.)
+  if (isNative() && !codeVerifier) {
+    reportError({
+      surface: 'calendar-redirect-complete',
+      severity: 'warning',
+      message: 'Calendar native exchange aborted: PKCE verifier missing from redirect stash',
+    });
+    return fail(
+      'exchange_failed',
+      'The calendar connection didn’t finish. Please tap Connect and try once more.'
+    );
+  }
+
   try {
     const tokens = await exchangeCodeForTokens({
       code,
@@ -383,7 +415,13 @@ async function doCompleteCalendarRedirectAuth(): Promise<CalendarConnectResult |
       message: `Calendar redirect code exchange failed: ${msg}`,
       error: e instanceof Error ? e : new Error(msg),
     });
-    return fail('exchange_failed', `Could not complete the calendar connection: ${msg}`);
+    // Friendly, actionable user copy — the raw provider error (e.g. "Token
+    // exchange failed: Bad Request") is captured in the breadcrumb above, not
+    // shown to the user.
+    return fail(
+      'exchange_failed',
+      'We couldn’t finish connecting your calendar. Please tap Connect and try again.'
+    );
   }
 }
 
