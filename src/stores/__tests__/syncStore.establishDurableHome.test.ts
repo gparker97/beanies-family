@@ -612,6 +612,9 @@ describe('syncStore.attemptSilentConfigHeal', () => {
         context: expect.objectContaining({ action: 'rearm' }),
       })
     );
+    // Cancel the armed 4s configHealDefer timer + token subscriber so the bounded
+    // retry chain doesn't fire the shared reportError/logEvent spies after this test.
+    store.resetState();
   });
 
   it('pages total-failure only ONCE across repeated failures, and resetState re-arms it', async () => {

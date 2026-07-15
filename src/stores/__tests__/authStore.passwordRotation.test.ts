@@ -9,6 +9,7 @@
  */
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { raceTimeout } from '@/utils/timing';
 import { hashPassword } from '@/services/auth/passwordService';
 import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
 
@@ -50,6 +51,9 @@ vi.mock('@/stores/syncStore', () => ({
     },
     wrapFamilyKeyForMember: wrapForMemberMock,
     syncNow: syncNowMock,
+    // Mirror the real syncNowBounded: race syncNow(true) against the timeout so the
+    // 'syncNow called with true' + syncDeferred + never-settles assertions still hold.
+    syncNowBounded: async (ms = 5000) => !!(await raceTimeout(syncNowMock(true), ms)),
     resetState: vi.fn(),
   }),
 }));

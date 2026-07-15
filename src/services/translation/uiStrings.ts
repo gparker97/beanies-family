@@ -7502,6 +7502,10 @@ const STRING_DEFS = {
   'calendarSync.status.ok': { en: 'Synced', beanie: 'synced' },
   'calendarSync.status.needsReconnect': { en: 'Reconnect needed', beanie: 'reconnect needed' },
   'calendarSync.status.error': { en: 'Sync error', beanie: 'sync error' },
+  'calendar.error.connectRetry': {
+    en: 'We couldn’t finish connecting your calendar. Please tap Connect and try again.',
+    beanie: 'we couldn’t finish connecting your calendar. please tap connect and try again.',
+  },
   'calendarSync.status.disconnecting': { en: 'Removing…', beanie: 'removing…' },
   'calendarSync.action.connect': {
     en: 'Connect a Google calendar',

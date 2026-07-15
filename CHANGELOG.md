@@ -10,8 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-07-15
 
+### Performance
+
+- **Loading your family data is fast again — no more 30-second spins after signing in or hard-refreshing.** A recent change had the app replaying a growing pile of small update files every time it opened your data, which got slower and slower as the pile built up. The app now keeps a single, fully-compacted copy of your data and refreshes it in place, so opening the app is quick no matter how long you've used it or how much history you have. Nothing is lost — the compacted copy contains everything.
+
 ### Fixed
 
+- **Hardened the self-healing data-connection and reconnect logic** shipped earlier today. Follow-up review closed several edge cases: the reconnect flow can no longer briefly attach to the wrong family's file, a quietly-expiring session no longer flashes a false "data missing" screen while reconnecting, and clearing the local connection record now always keeps its backup copy consistent. No change to everyday behavior — these make the recovery paths more reliable.
 - **Resetting or changing a family member's password no longer gets stuck on a spinner.** If the cloud save was slow, offline, or your session had gone quiet, the button could spin forever even though the new password was already applied. The password change now saves locally right away and the cloud copy catches up in the background.
 - **After a while away, the app now asks you to reconnect instead of falsely warning your data is missing.** When your Google session quietly expires (common on iPhone after the app's been in the background a long time), your cloud file can briefly look "not found." The app was misreading that as lost data and showing a scary recovery screen; it now recognizes it as an expired session and offers to reconnect your Google account. Your data was never actually gone.
 - **Connecting Google Calendar now works on the installed Android app.** Reconnecting failed with a "Token exchange failed: Bad Request" error because the app asked Google for the sign-in and the token using two slightly different return addresses. They now always match, so the calendar connects and reconnects normally. If a connection attempt is interrupted, you now get a clear "please tap Connect and try again" message instead of a raw error.
