@@ -115,39 +115,6 @@ export function unframeChanges(buf: Uint8Array): Uint8Array[] {
 }
 
 /**
- * A self-describing Drive change-log chunk (B2): the changes it carries plus the
- * author's post-apply heads (`frontierHeads`). Discovery, cursor, and `dirty` all
- * derive from these immutable chunks — there is no shared mutable manifest. Wire
- * format: `[uint32 headsJsonLen][headsJson utf8][frameChanges(changes)]`.
- */
-export interface ChangeChunk {
-  frontierHeads: Heads;
-  changes: Uint8Array[];
-}
-
-export function frameChunk(chunk: ChangeChunk): Uint8Array {
-  const headsJson = new TextEncoder().encode(JSON.stringify(chunk.frontierHeads));
-  const body = frameChanges(chunk.changes);
-  const buf = new Uint8Array(4 + headsJson.length + body.length);
-  new DataView(buf.buffer).setUint32(0, headsJson.length, true);
-  buf.set(headsJson, 4);
-  buf.set(body, 4 + headsJson.length);
-  return buf;
-}
-
-export function unframeChunk(buf: Uint8Array): ChangeChunk {
-  if (buf.byteLength < 4) throw new Error('unframeChunk: buffer too short for heads length');
-  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-  const headsLen = view.getUint32(0, true);
-  if (4 + headsLen > buf.byteLength) throw new Error('unframeChunk: truncated heads');
-  const frontierHeads = JSON.parse(
-    new TextDecoder().decode(buf.subarray(4, 4 + headsLen))
-  ) as Heads;
-  const changes = unframeChanges(buf.subarray(4 + headsLen));
-  return { frontierHeads, changes };
-}
-
-/**
  * CRDT-merge `remote` into `local`. `dirty` = did the merged doc advance beyond
  * remote (i.e. local carried unsynced changes remote lacks) → must be re-uploaded.
  * Computed on the MERGED doc vs remote (a pre-merge heads compare would falsely
@@ -292,19 +259,6 @@ export async function encryptDocPayload(doc: Doc, familyKey: CryptoKey): Promise
   const binary = saveDoc(doc);
   const encrypted = await encryptPayload(familyKey, binary);
   return bufferToBase64(encrypted);
-}
-
-/** Encrypt a self-describing change-log chunk → base64 (the `.beanchanges` body). */
-export async function encryptChunk(chunk: ChangeChunk, familyKey: CryptoKey): Promise<string> {
-  const encrypted = await encryptPayload(familyKey, frameChunk(chunk));
-  return bufferToBase64(encrypted);
-}
-
-/** Decrypt + unframe a `.beanchanges` chunk body. Throws on a bad payload/frame
- * (the caller treats a decrypt/unframe failure as a whole-doc fallback trigger). */
-export async function decryptChunk(payload: string, familyKey: CryptoKey): Promise<ChangeChunk> {
-  const framed = await decryptPayload(familyKey, new Uint8Array(base64ToBuffer(payload)));
-  return unframeChunk(framed);
 }
 
 // ─── Materialization → projection ────────────────────────────────────────────
