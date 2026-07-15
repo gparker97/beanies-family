@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-07-15",
-    "translationCount": 3736
+    "translationCount": 3737
   },
   "translations": {
     "app.name": {
@@ -18684,6 +18684,11 @@
     "settings.dataReconnectingDesc": {
       "translation": "正在重新建立与家庭数据文件的连接。您的数据是安全的。",
       "hash": "hz7wcm",
+      "lastUpdated": "2026-07-15"
+    },
+    "calendar.error.connectRetry": {
+      "translation": "我们无法完成关联您的日历。请轻触“关联” ，然后重试。",
+      "hash": "uj5m1",
       "lastUpdated": "2026-07-15"
     }
   }

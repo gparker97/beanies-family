@@ -17,6 +17,16 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.15',
+    date: '2026-07-15',
+    month: '15 july 2026',
+    summary: {
+      en: 'Your family data loads fast again - no more long waits after signing in or refreshing, however much history you have.',
+      beanie:
+        'your family data loads fast again - no more long waits after signing in or refreshing, however much history you have.',
+    },
+  },
+  {
     version: '2026.07.14.2',
     date: '2026-07-14',
     month: '14 july 2026',
