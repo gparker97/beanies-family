@@ -1262,6 +1262,20 @@ watch(isTabVisible, (visible) => {
 
 useStaleTabRefresh();
 
+// A DEFERRED config-heal (post-init retry / Settings reconnect) recovered the pod,
+// but the family key was evicted too (needsPassword, no doc). The syncStore raised
+// `needsResumeSetupNav` instead of navigating itself (MVO — the store never imports
+// the router, which would create a build-breaking cycle with the router's lazy pages).
+// Route to the resume-setup password recovery here, then clear the flag.
+watch(
+  () => syncStore.needsResumeSetupNav,
+  (needs) => {
+    if (!needs) return;
+    syncStore.needsResumeSetupNav = false;
+    void safeRouterReplace('/welcome?resume=setup', 'deferred-heal-needs-password');
+  }
+);
+
 // Auto-apply PWA updates (no prompt) and, after the reload, show a one-time
 // confirmation toast. usePwaUpdater drives the update on a quiet moment and
 // sets PWA_POST_UPDATE_ROUTE_KEY; onMounted reads it into `pendingUpdateToast`.

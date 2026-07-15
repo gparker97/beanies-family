@@ -25,6 +25,7 @@ import { useFamilyContextStore } from './familyContextStore';
 import { useAuthStore, DEFERRED_PASSWORD_HASH } from './authStore';
 import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
+import { isLoaded as isProjectionLoaded } from '@/services/automerge/projection';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import { getSyncCapabilities, canAutoSync, isNative } from '@/services/sync/capabilities';
 import {
@@ -211,6 +212,11 @@ export const useSyncStore = defineStore('sync', () => {
   // false-fire the "your data is missing" recovery overlay + a critical page during
   // the defer window. Cleared when the banner shows, the token recovers, or on reset.
   const reconnectEscalationPending = ref(false);
+  // Raised by a DEFERRED config-heal (post-init retry / Settings reconnect) when the
+  // pod was re-homed but the family key was evicted too (needsPassword, no doc). App.vue
+  // watches this and routes to the resume-setup password recovery — the store never
+  // imports the router (MVO + avoids a build-breaking syncStore↔router lazy-page cycle).
+  const needsResumeSetupNav = ref(false);
   const driveFileNotFound = ref(false);
 
   // Save failure state
@@ -2157,6 +2163,7 @@ export const useSyncStore = defineStore('sync', () => {
     saveFailureBannerDefer.cancel();
     coldStartReconnectDefer.cancel();
     reconnectEscalationPending.value = false;
+    needsResumeSetupNav.value = false;
     // Silent-config-heal teardown — cancel the retry timer, drop its dedicated
     // token subscriber, reset the budget/flags + the once-per-family total-failure
     // guard so a different family can heal (and page) cleanly on next sign-in.
@@ -2506,16 +2513,15 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /** Deferred-heal load: decrypt with the cached key if present; if the key was
-   *  evicted too (needsPassword, no doc), route to the resume-setup password
-   *  recovery — the boot path's App.vue navigation isn't running here. */
+   *  evicted too (needsPassword, no doc), raise `needsResumeSetupNav` — App.vue
+   *  owns the actual `router.replace('/welcome?resume=setup')` (MVO: the store
+   *  orchestrates state, the view navigates; syncStore never imports the router,
+   *  which would create a build-breaking cycle with the router's lazy pages). The
+   *  boot path's App.vue navigation isn't running here, hence the reactive hand-off. */
   async function loadAfterDeferredHeal(): Promise<void> {
     try {
       await backgroundSyncFromFile();
-      const { isLoaded } = await import('@/services/automerge/projection');
-      if (!isLoaded()) {
-        const router = (await import('@/router')).default;
-        await router.push({ path: '/welcome', query: { resume: 'setup' } });
-      }
+      if (!isProjectionLoaded()) needsResumeSetupNav.value = true;
     } catch (e) {
       console.warn('[syncStore] deferred-heal load failed', e);
     }
@@ -3389,6 +3395,7 @@ export const useSyncStore = defineStore('sync', () => {
     isGoogleDriveAvailable,
     showGoogleReconnect,
     reconnectEscalationPending,
+    needsResumeSetupNav,
     driveFileNotFound,
     reconnecting,
     configHealFailed,
