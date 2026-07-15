@@ -631,6 +631,21 @@ export const useSyncStore = defineStore('sync', () => {
         const lastError = syncService.getState().lastError;
         if (lastError?.startsWith('DriveApiError:404:')) {
           if (syncService.getProviderType() === 'google_drive') {
+            // A Drive 404/403 means "not accessible to THIS caller" — an
+            // expired/unauthenticated token yields the SAME 404 as a genuinely
+            // missing file (Google masks permission-denied as not-found,
+            // driveService.ts). When our token is invalid this is
+            // auth-masked-as-404: surface the reconnect banner and return
+            // 'auth', never the alarming `driveFileNotFound` "your data is
+            // missing" state. Only flag a true missing file when the token IS
+            // valid — self-correcting, since after reconnect a genuinely-gone
+            // file 404s again WITH a valid token and is then flagged not-found.
+            // (Root-caused 2026-07-15: a wife's long-idle iPhone lost its
+            // refresh token, so a cold-load 404 showed the data-loss overlay.)
+            if (!isTokenValid()) {
+              scheduleColdStartReconnectEscalation(lastError);
+              return { success: false, reason: 'auth' };
+            }
             driveFileNotFound.value = true;
             showSaveFailureBanner.value = true;
             stopFilePolling();
@@ -1990,9 +2005,16 @@ export const useSyncStore = defineStore('sync', () => {
       }
     } catch (e) {
       if (e instanceof DriveApiError && e.status === 404) {
-        driveFileNotFound.value = true;
-        showSaveFailureBanner.value = true;
-        stopFilePolling();
+        // Auth-masked-as-404 on the background poll: an expired token yields the
+        // same 404 as a missing file. Only flag `driveFileNotFound` when the
+        // token is genuinely valid; an auth-transient is owned by the
+        // reconnect/expiry path, not the "your file is missing" banner. Mirrors
+        // the loadFromFile 404 guard above.
+        if (isTokenValid()) {
+          driveFileNotFound.value = true;
+          showSaveFailureBanner.value = true;
+          stopFilePolling();
+        }
         return false;
       }
       console.warn('[syncStore] reloadIfFileChanged failed:', e);
