@@ -552,6 +552,11 @@ export async function initialize(): Promise<boolean> {
 
   if (!getActiveFamilyId()) {
     console.warn('[syncService] No active family — skipping sync initialization');
+    logEvent({
+      level: 'warn',
+      surface: 'sync-init-no-family',
+      message: 'No active family at sync init — provider restore skipped',
+    });
     updateState({
       isInitialized: true,
       isConfigured: false,
@@ -566,6 +571,12 @@ export async function initialize(): Promise<boolean> {
     try {
       const config = await getProviderConfig(familyId);
       console.warn('[syncService] Provider config for', familyId, ':', config?.type ?? 'none');
+      logEvent({
+        level: 'info',
+        surface: 'sync-init-restore',
+        message: 'Provider-config restore at sync init',
+        context: { provider_type: config?.type ?? null, had_config: !!config },
+      });
       if (config?.type === 'google_drive' && config.driveFileId && config.driveFileName) {
         currentProvider = GoogleDriveProvider.fromExisting(
           config.driveFileId,

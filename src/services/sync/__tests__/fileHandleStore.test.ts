@@ -136,3 +136,60 @@ describe('fileHandleStore — refresh token storage shape (2026-05-20)', () => {
     });
   });
 });
+
+describe('fileHandleStore — provider config localStorage mirror (2026-07-15)', () => {
+  let testIdCounter = 1000;
+  let famKey: string;
+  const LS_PREFIX = 'beanies_pcfg_';
+  const driveConfig = {
+    type: 'google_drive' as const,
+    driveFileId: 'file-123',
+    driveFileName: 'my-family.beanpod',
+  };
+
+  beforeEach(async () => {
+    vi.resetModules();
+    localStorage.clear();
+    testIdCounter += 1;
+    famKey = `pcfg-fam-${testIdCounter}`;
+    reportErrorMock.mockClear();
+    store = await import('../fileHandleStore');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('dual-writes to IndexedDB + localStorage and reads back', async () => {
+    await store.storeProviderConfig(famKey, driveConfig);
+    expect(localStorage.getItem(`${LS_PREFIX}${famKey}`)).toBe(JSON.stringify(driveConfig));
+    expect(await store.getProviderConfig(famKey)).toEqual(driveConfig);
+  });
+
+  it('self-heals from the localStorage mirror when the IDB record is gone (eviction)', async () => {
+    // Simulate: IDB record evicted, but the localStorage mirror survived.
+    localStorage.setItem(`${LS_PREFIX}${famKey}`, JSON.stringify(driveConfig));
+    // (no storeProviderConfig call → nothing in IDB for this family)
+    expect(await store.getProviderConfig(famKey)).toEqual(driveConfig);
+  });
+
+  it('resurrection safety: clearProviderConfig wipes the mirror so a deleted pod cannot restore', async () => {
+    await store.storeProviderConfig(famKey, driveConfig);
+    await store.clearProviderConfig(famKey);
+    expect(localStorage.getItem(`${LS_PREFIX}${famKey}`)).toBeNull();
+    expect(await store.getProviderConfig(famKey)).toBeNull();
+  });
+
+  it('returns null (not a throw) for a corrupt localStorage mirror entry', async () => {
+    localStorage.setItem(`${LS_PREFIX}${famKey}`, '{not valid json');
+    expect(await store.getProviderConfig(famKey)).toBeNull();
+  });
+
+  it('localStorage write failure logs but does not throw', async () => {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    await expect(store.storeProviderConfig(famKey, driveConfig)).resolves.toBeUndefined();
+    spy.mockRestore();
+  });
+});

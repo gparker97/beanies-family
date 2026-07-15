@@ -116,6 +116,14 @@ export const useSyncStore = defineStore('sync', () => {
   // State
   const isInitialized = ref(false);
   const isConfigured = ref(false);
+  // Silent-config-heal state (self-healing provider restore after IDB eviction).
+  // `reconnecting` drives the Settings "reconnecting…" card + suppresses the
+  // recovery overlay while a background heal is in flight; `configHealFailed`
+  // flips true only on TOTAL failure (retries exhausted / no Drive home in the
+  // registry), which surfaces the reconnect affordance. Both are reset in
+  // `resetState`. See docs/plans/2026-07-15-native-data-connection-resilience.md.
+  const reconnecting = ref(false);
+  const configHealFailed = ref(false);
   const fileName = ref<string | null>(null);
   const isSyncing = ref(false);
   const error = ref<string | null>(null);
@@ -270,6 +278,19 @@ export const useSyncStore = defineStore('sync', () => {
   const COLD_START_RECONNECT_DEFER_MS = 4000;
   const coldStartReconnectDefer = createDeferredAction(COLD_START_RECONNECT_DEFER_MS);
 
+  // Silent-config-heal retry (Layer 2). Bounded budget is the terminus — the
+  // single-shot `configHealDefer` has no counter of its own. Re-armed on a
+  // transient failure and poked by a dedicated `onTokenAcquired` subscriber
+  // (`configHealTokenUnsub`) so a token that lands mid-retry unblocks the
+  // Drive re-derivation. All of this is torn down in `resetState`.
+  const CONFIG_HEAL_RETRY_BUDGET = 4;
+  const CONFIG_HEAL_DEFER_MS = 4000;
+  const configHealDefer = createDeferredAction(CONFIG_HEAL_DEFER_MS);
+  let configHealAttempts = 0;
+  let configHealInFlight = false;
+  let configHealTotalFailureReported = false;
+  let configHealTokenUnsub: (() => void) | null = null;
+
   function showBannerWithTelemetry(deferred: boolean): void {
     showSaveFailureBanner.value = true;
     reportError({
@@ -410,6 +431,19 @@ export const useSyncStore = defineStore('sync', () => {
         const hasPermission = await syncService.hasPermission();
         needsPermission.value = !hasPermission;
       }
+      return;
+    }
+
+    // Not restored — `syncService.initialize()` found no provider config in
+    // IndexedDB OR the localStorage mirror (getProviderConfig reads both). If this
+    // is an ESTABLISHED Drive-backed pod (`podCreated`), self-heal from the durable
+    // remote registry instead of dropping the owner onto the unconfigured card.
+    // The first attempt is awaited inline so a healthy heal completes before
+    // App.vue's load pipeline runs; a transient failure re-arms silently (Layer 2).
+    const ctx = useFamilyContextStore();
+    const familyId = ctx.activeFamilyId;
+    if (familyId && useAuthStore().podCreated) {
+      await attemptSilentConfigHeal(familyId);
     }
   }
 
@@ -2098,6 +2132,19 @@ export const useSyncStore = defineStore('sync', () => {
     stopFilePolling();
     saveFailureBannerDefer.cancel();
     coldStartReconnectDefer.cancel();
+    // Silent-config-heal teardown — cancel the retry timer, drop its dedicated
+    // token subscriber, reset the budget/flags + the once-per-family total-failure
+    // guard so a different family can heal (and page) cleanly on next sign-in.
+    configHealDefer.cancel();
+    if (configHealTokenUnsub) {
+      configHealTokenUnsub();
+      configHealTokenUnsub = null;
+    }
+    configHealAttempts = 0;
+    configHealInFlight = false;
+    configHealTotalFailureReported = false;
+    reconnecting.value = false;
+    configHealFailed.value = false;
     syncService.reset();
     useSyncHighlightStore().clearHighlights();
     isInitialized.value = false;
@@ -2382,6 +2429,191 @@ export const useSyncStore = defineStore('sync', () => {
         provider_type: storageProviderType.value ?? undefined,
       },
     });
+  }
+
+  // --- Silent config heal: self-heal a lost provider config (Layer 1/2) ---
+
+  /**
+   * Install a provider WITHOUT the blind `syncNow()` upload that `installProvider`
+   * does — used by the silent config heal, where the doc may not be loaded yet and
+   * an upload would overwrite the real `.beanpod` with an empty envelope. Persist
+   * + install + wire token/auto-sync only; the family is ALREADY registered (this
+   * is a re-derivation, not a create), so `registerCurrentFamily` is intentionally
+   * omitted. Mirrors `installProvider`'s leaf steps but never uploads. Keep in sync
+   * with `installProvider` if its persist/setProvider wiring changes.
+   */
+  async function installProviderPersistOnly(
+    provider: StorageProvider,
+    type: StorageProviderType
+  ): Promise<void> {
+    needsPermission.value = false;
+    const ctx = useFamilyContextStore();
+    if (ctx.activeFamilyId) {
+      await provider.persist(ctx.activeFamilyId);
+    }
+    syncService.setProvider(provider);
+    if (type === 'google_drive') {
+      setupTokenExpiryHandler();
+    } else {
+      setupAutoSync();
+    }
+  }
+
+  /** Success terminal: config re-derived + persisted. Hand off to the existing
+   *  load pipeline (idempotent — its `isBackgroundSyncing` guard prevents a
+   *  double-invoke against App.vue's own path-1a). */
+  function configHealSucceeded(source: 'registry' | 'drive-search'): void {
+    reconnecting.value = false;
+    configHealFailed.value = false;
+    configHealAttempts = 0;
+    logEvent({
+      level: 'warn',
+      surface: 'sync-init-config-heal',
+      message: 're-derived and re-persisted provider config',
+      context: { action: source, provider_type: 'google_drive' },
+    });
+    // Load the doc through the existing silent-recovery pipeline (decrypt with
+    // cached key, else surface needsPassword → App.vue routes to resume-setup).
+    void backgroundSyncFromFile();
+  }
+
+  /** Non-retryable / budget-exhausted terminal: surface the reconnect affordance
+   *  (Layer 3) and page ONCE (mirrors the `zombieStateReported` once-guard). */
+  function configHealTotalFailure(registryProvider: string | null, hadFileId: boolean): void {
+    reconnecting.value = false;
+    configHealFailed.value = true;
+    if (!configHealTotalFailureReported) {
+      configHealTotalFailureReported = true;
+      reportError({
+        surface: 'sync-config-total-failure',
+        severity: 'critical',
+        message: 'could not re-establish the data connection — user must reconnect',
+        context: {
+          provider_type: registryProvider ?? undefined,
+          registry_had_file_id: hadFileId,
+          token_valid: isTokenValid(),
+        },
+      });
+    }
+  }
+
+  /** Re-arm the heal while the budget is unspent; otherwise it's a total failure. */
+  function scheduleConfigHealRetry(familyId: string, errorCode: string): void {
+    if (configHealAttempts >= CONFIG_HEAL_RETRY_BUDGET) {
+      configHealTotalFailure('google_drive', true);
+      return;
+    }
+    configHealAttempts += 1;
+    reconnecting.value = true;
+    logEvent({
+      level: 'info',
+      surface: 'sync-config-reconnect',
+      message: 'config-heal re-arm',
+      context: { action: 'rearm', error_code: errorCode },
+    });
+    // Poke on the next token acquisition (wake event → silent refresh) too.
+    ensureConfigHealTokenSubscriber(familyId);
+    configHealDefer.schedule(() => {
+      void attemptSilentConfigHeal(familyId);
+    });
+  }
+
+  function ensureConfigHealTokenSubscriber(familyId: string): void {
+    if (configHealTokenUnsub) return;
+    configHealTokenUnsub = onTokenAcquired(() => {
+      if (reconnecting.value && configHealAttempts < CONFIG_HEAL_RETRY_BUDGET) {
+        void attemptSilentConfigHeal(familyId);
+      }
+    });
+  }
+
+  /**
+   * Self-heal a missing provider config for a Drive-backed family from the durable
+   * remote registry — the core of the resilience fix. Returns true when a provider
+   * was (re)installed this call. Idempotent, single in-flight, and NEVER calls
+   * `createNewFile` (re-derivation is read/adopt only — the Shaun-class data-loss
+   * guard). The inline localStorage-mirror tier is handled transparently inside
+   * `getProviderConfig`, so reaching here means BOTH the IDB record and the mirror
+   * were gone; only the network (registry/Drive) tier remains.
+   */
+  async function attemptSilentConfigHeal(familyId: string): Promise<boolean> {
+    // Idempotent: a valid provider for this family is already installed.
+    if (syncService.getProviderFamilyId() === familyId && syncService.getProviderType()) {
+      reconnecting.value = false;
+      return true;
+    }
+    if (configHealInFlight) return false;
+    configHealInFlight = true;
+    try {
+      let entry: RegistryEntry | null;
+      try {
+        entry = await registry.lookupFamily(familyId);
+      } catch (e) {
+        // Transient (offline / registry 5xx) → retry on a wake event.
+        console.warn('[syncStore.attemptSilentConfigHeal] registry lookup failed', e);
+        scheduleConfigHealRetry(familyId, 'registry-error');
+        return false;
+      }
+
+      if (!entry || entry.provider !== 'google_drive') {
+        // Registry has no Drive home for this family (unknown, or a local pod we
+        // can't re-derive remotely) → non-retryable. The user reconnects/loads
+        // manually via the Layer-3 affordance.
+        configHealTotalFailure(entry?.provider ?? null, !!entry?.fileId);
+        return false;
+      }
+
+      // Drive-backed. The registry fileId IS our registered home (written by
+      // registerCurrentFamily) — rebuild + persist WITHOUT an upload. No token
+      // needed to install; the subsequent load handles auth via the normal
+      // auth-transient path.
+      if (entry.fileId) {
+        try {
+          const name = entry.displayPath ?? `${entry.familyName ?? 'pod'}.beanpod`;
+          await installProviderPersistOnly(
+            GoogleDriveProvider.fromExisting(entry.fileId, name),
+            'google_drive'
+          );
+          configHealSucceeded('registry');
+          return true;
+        } catch (e) {
+          console.warn(
+            '[syncStore.attemptSilentConfigHeal] install from registry fileId failed',
+            e
+          );
+          scheduleConfigHealRetry(familyId, 'install-failed');
+          return false;
+        }
+      }
+
+      // No fileId in the registry (rare) → resolve the `.beanpod` by name, adopting
+      // only an OWNED match (ownership discipline). Needs a valid token.
+      if (!isGoogleDriveAvailable.value || !isTokenValid()) {
+        scheduleConfigHealRetry(familyId, 'no-token-for-search');
+        return false;
+      }
+      try {
+        const token = await requestAccessToken();
+        const files = await searchBeanpodFilesGlobal(token);
+        const owned = files.find((f) => f.ownedByMe === true);
+        if (!owned) {
+          configHealTotalFailure('google_drive', false);
+          return false;
+        }
+        await installProviderPersistOnly(
+          GoogleDriveProvider.fromExisting(owned.fileId, owned.name),
+          'google_drive'
+        );
+        configHealSucceeded('drive-search');
+        return true;
+      } catch (e) {
+        console.warn('[syncStore.attemptSilentConfigHeal] name-resolve failed', e);
+        scheduleConfigHealRetry(familyId, 'search-failed');
+        return false;
+      }
+    } finally {
+      configHealInFlight = false;
+    }
   }
 
   // --- Storage migration: move the active pod between local file and Google Drive ---
@@ -3121,6 +3353,9 @@ export const useSyncStore = defineStore('sync', () => {
     isGoogleDriveAvailable,
     showGoogleReconnect,
     driveFileNotFound,
+    reconnecting,
+    configHealFailed,
+    attemptSilentConfigHeal,
     criticalWriteState,
     membersStepActive,
     saveFailureLevel,

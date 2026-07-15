@@ -2922,6 +2922,18 @@ const STRING_DEFS = {
     en: 'Load Existing Family Data File',
     beanie: 'load existing family data file',
   },
+  'settings.reconnectAndReload': {
+    en: 'Reconnect and Reload My Data',
+    beanie: 'reconnect and reload my data',
+  },
+  'settings.dataReconnecting': {
+    en: 'Reconnecting your data…',
+    beanie: 'reconnecting your data…',
+  },
+  'settings.dataReconnectingDesc': {
+    en: 'Re-establishing the connection to your family data file. Your data is safe.',
+    beanie: 're-establishing the connection to your family data file. your data is safe.',
+  },
   'settings.loadFileConfirmation': {
     en: 'This will replace all local data with the contents of the selected file and set it as your data file. Continue?',
     beanie:

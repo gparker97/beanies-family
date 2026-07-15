@@ -170,6 +170,19 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   // PII-free. Outcome rides the existing `action` key; the rest reuse os/error_code/
   // detail. Added 2026-07-14 (#52 Keystore pivot). MIRROR in the Lambda allowlist + test.
   'key_backing',
+  // Silent data-connection config-heal (surfaces `sync-init-restore`,
+  // `sync-init-config-heal`, `sync-config-reconnect`, `sync-config-total-failure`,
+  // see stores/syncStore.ts + services/sync/syncService.ts). PII-free booleans:
+  // whether a provider config was found at boot, whether a session existed, whether
+  // the registry entry carried a fileId, and whether the token was valid at total
+  // failure. Heal source/outcome ride the existing `action` key; transient cause
+  // rides `error_code`; provider type rides `provider_type`. Added 2026-07-15
+  // (native data-connection resilience). MIRROR every key here in the Lambda
+  // allowlist + its pinned test.
+  'had_config',
+  'has_session',
+  'registry_had_file_id',
+  'token_valid',
 ]);
 
 export const MAX_STRING_LEN = 200;
