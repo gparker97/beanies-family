@@ -42,6 +42,8 @@ const {
   mockIsTokenValid,
   mockGetFileMetadata,
   mockResolveExistingBeanpod,
+  mockLookupFamily,
+  mockSearchBeanpodFilesGlobal,
 } = vi.hoisted(() => ({
   mockSave: vi.fn(async () => true),
   mockSetProvider: vi.fn(),
@@ -58,6 +60,8 @@ const {
   mockIsTokenValid: vi.fn(() => false),
   mockGetFileMetadata: vi.fn(async () => ({ ownedByMe: true })),
   mockResolveExistingBeanpod: vi.fn(),
+  mockLookupFamily: vi.fn(),
+  mockSearchBeanpodFilesGlobal: vi.fn(async () => [] as unknown[]),
 }));
 
 // Mutable Drive-availability flags (isGoogleDriveAvailable = drive && oauthProxy).
@@ -203,7 +207,8 @@ vi.mock('@/services/google/googleAuth', () => ({
 }));
 
 vi.mock('@/services/google/driveService', () => ({
-  searchBeanpodFilesGlobal: vi.fn(async () => []),
+  searchBeanpodFilesGlobal: (...a: unknown[]) =>
+    (mockSearchBeanpodFilesGlobal as (...x: unknown[]) => Promise<unknown[]>)(...a),
   clearFolderCache: vi.fn(),
   getAppFolderId: vi.fn(() => null),
   getFileMetadata: (...a: unknown[]) =>
@@ -230,6 +235,8 @@ vi.mock('@/services/registry/registryService', () => ({
   registerFamily: (...a: unknown[]) =>
     (mockRegisterFamily as (...x: unknown[]) => Promise<void>)(...a),
   removeFamily: vi.fn(async () => {}),
+  lookupFamily: (...a: unknown[]) =>
+    (mockLookupFamily as (...x: unknown[]) => Promise<unknown>)(...a),
 }));
 vi.mock('@/services/auth/passkeyService', () => ({}));
 vi.mock('@/utils/errorReporter', () => ({
@@ -302,6 +309,8 @@ describe('syncStore.establishDurableHomeAfterLoad', () => {
     mockGetFileMetadata.mockResolvedValue({ ownedByMe: true });
     mockFromExisting.mockReturnValue(makeDriveProvider());
     mockResolveExistingBeanpod.mockResolvedValue({ kind: 'adopt-existing', fileId: 'own-file' });
+    mockLookupFamily.mockResolvedValue(null);
+    mockSearchBeanpodFilesGlobal.mockResolvedValue([]);
   });
 
   // ─── B5: ownership-aware idempotency guard ─────────────────────────────────
@@ -515,5 +524,109 @@ describe('syncStore.establishDurableHomeAfterLoad', () => {
     await store.establishDurableHomeAfterLoad();
 
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Silent config heal (2026-07-15 native data-connection resilience) ────────
+describe('syncStore.attemptSilentConfigHeal', () => {
+  let pinia: Pinia;
+
+  beforeEach(() => {
+    pinia = createPinia();
+    setActivePinia(pinia);
+    vi.clearAllMocks();
+    featuresState.drive = true;
+    featuresState.oauthProxy = true;
+    mockGetProviderFamilyId.mockReturnValue(null);
+    mockGetProviderType.mockReturnValue(null);
+    mockIsTokenValid.mockReturnValue(true);
+    mockFromExisting.mockReturnValue(makeDriveProvider());
+    mockLookupFamily.mockResolvedValue(null);
+    mockSearchBeanpodFilesGlobal.mockResolvedValue([]);
+  });
+
+  it('self-heals from the registry: rebuilds + persist-only installs the Drive provider', async () => {
+    const store = useSyncStore();
+    mockLookupFamily.mockResolvedValue({
+      provider: 'google_drive',
+      fileId: 'reg-file-1',
+      displayPath: 'my-family.beanpod',
+      familyName: 'Test Family',
+    });
+
+    const healed = await store.attemptSilentConfigHeal('family-123');
+
+    expect(healed).toBe(true);
+    expect(mockFromExisting).toHaveBeenCalledWith('reg-file-1', 'my-family.beanpod');
+    expect(mockSetProvider).toHaveBeenCalled(); // installed (persist-only)
+    expect(mockSave).not.toHaveBeenCalled(); // NEVER a blind syncNow upload on heal
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'sync-init-config-heal',
+        context: expect.objectContaining({ action: 'registry' }),
+      })
+    );
+    expect(store.reconnecting).toBe(false);
+  });
+
+  it('idempotent no-op when a provider for this family is already installed', async () => {
+    const store = useSyncStore();
+    mockGetProviderFamilyId.mockReturnValue('family-123');
+    mockGetProviderType.mockReturnValue('google_drive');
+
+    const healed = await store.attemptSilentConfigHeal('family-123');
+
+    expect(healed).toBe(true);
+    expect(mockLookupFamily).not.toHaveBeenCalled();
+    expect(mockSetProvider).not.toHaveBeenCalled();
+  });
+
+  it('non-retryable total failure when the registry has no Drive home', async () => {
+    const store = useSyncStore();
+    mockLookupFamily.mockResolvedValue({ provider: 'local' });
+
+    const healed = await store.attemptSilentConfigHeal('family-123');
+
+    expect(healed).toBe(false);
+    expect(store.configHealFailed).toBe(true);
+    expect(store.reconnecting).toBe(false);
+    expect(mockReportError).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'sync-config-total-failure', severity: 'critical' })
+    );
+    expect(mockSetProvider).not.toHaveBeenCalled();
+  });
+
+  it('retries silently (reconnecting=true) on a transient registry error — no page', async () => {
+    const store = useSyncStore();
+    mockLookupFamily.mockRejectedValue(new Error('network down'));
+
+    const healed = await store.attemptSilentConfigHeal('family-123');
+
+    expect(healed).toBe(false);
+    expect(store.reconnecting).toBe(true);
+    expect(store.configHealFailed).toBe(false);
+    expect(mockReportError).not.toHaveBeenCalled(); // silent — no total-failure page
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'sync-config-reconnect',
+        context: expect.objectContaining({ action: 'rearm' }),
+      })
+    );
+  });
+
+  it('pages total-failure only ONCE across repeated failures, and resetState re-arms it', async () => {
+    const store = useSyncStore();
+    mockLookupFamily.mockResolvedValue({ provider: 'local' });
+
+    await store.attemptSilentConfigHeal('family-123');
+    await store.attemptSilentConfigHeal('family-123');
+    expect(mockReportError).toHaveBeenCalledTimes(1); // once-guard holds
+
+    store.resetState();
+    expect(store.configHealFailed).toBe(false);
+    expect(store.reconnecting).toBe(false);
+
+    await store.attemptSilentConfigHeal('family-123');
+    expect(mockReportError).toHaveBeenCalledTimes(2); // a fresh family can page again
   });
 });

@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-14",
-    "translationCount": 3733
+    "lastUpdated": "2026-07-15",
+    "translationCount": 3736
   },
   "translations": {
     "app.name": {
@@ -18670,6 +18670,21 @@
       "translation": "生物识别解锁出错。您可以使用密码登录。",
       "hash": "wrhqqw",
       "lastUpdated": "2026-07-14"
+    },
+    "settings.reconnectAndReload": {
+      "translation": "重新连接并重新加载我的数据",
+      "hash": "yhfgo9",
+      "lastUpdated": "2026-07-15"
+    },
+    "settings.dataReconnecting": {
+      "translation": "正在重新连接您的数据……",
+      "hash": "rza8vw",
+      "lastUpdated": "2026-07-15"
+    },
+    "settings.dataReconnectingDesc": {
+      "translation": "正在重新建立与家庭数据文件的连接。您的数据是安全的。",
+      "hash": "hz7wcm",
+      "lastUpdated": "2026-07-15"
     }
   }
 }
