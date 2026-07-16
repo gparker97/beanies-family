@@ -112,7 +112,7 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
       </svg>
     </div>
 
-    <span class="climber docked" id="climber" aria-hidden="true"><span class="glyph">🌱</span></span>
+    <span class="climber docked" id="climber" aria-hidden="true"><img class="glyph" src="/brand/beanies_small_bean_favicon_512x512.webp" alt="" width="512" height="512" loading="lazy" decoding="async" /></span>
 
     <span class="vine-leaf" data-frac="0.03" data-side="l" style="--r:-8deg"><span class="t">activities</span></span>
     <span class="vine-leaf" data-frac="0.06" data-side="r" style="--r:6deg"><span class="t">travel plans</span></span>
@@ -241,7 +241,9 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
   .intro h2 { font-family: 'Outfit Variable', Outfit, sans-serif; font-size: clamp(1.9rem, 5vw, 3rem); font-weight: 800; letter-spacing: -0.03em; margin: 0.6rem 0 0.35rem; line-height: 1.05; text-wrap: balance; }
   .intro h2 .pop { color: var(--heritage-orange); }
   .intro .lede { color: var(--muted-text); font-size: 1rem; line-height: 1.5; text-wrap: balance; }
-  .seed-slot { display: inline-block; width: 1.5em; height: 1em; vertical-align: -0.15em; }
+  /* reserves the leading-bullet space so the docked beanie mascot (34px, centered
+     on this slot) sits to the LEFT of the copy with a gap before "reduce…" */
+  .seed-slot { display: inline-block; width: 3em; height: 1em; vertical-align: -0.15em; }
   .grow-hint { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 0.6rem; color: var(--muted-text); font-size: 0.74rem; transition: opacity 0.4s ease; }
   .grow-hint .chev { font-size: 1.1rem; color: var(--vine-green); animation: bob 1.6s ease-in-out infinite; }
   @keyframes bob { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(4px);} }
@@ -254,9 +256,25 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
   .vine-wrap path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 
   .climber { position: absolute; width: 36px; height: 36px; margin-left: -18px; margin-top: -18px; display: grid; place-items: center; z-index: 4; pointer-events: none; transition: transform 0.75s cubic-bezier(0.5,-0.15,0.25,1.3); }
-  .climber .glyph { font-size: 26px; line-height: 1; filter: drop-shadow(0 0 10px rgba(241,93,34,0.5)); animation: climberBob 2.1s ease-in-out infinite; }
+  .climber .glyph { width: 34px; height: 34px; object-fit: contain; filter: drop-shadow(0 0 10px rgba(241,93,34,0.5)); animation: climberBob 2.1s ease-in-out infinite; }
   @keyframes climberBob { 0%,100%{ transform: rotate(-8deg); } 50%{ transform: rotate(8deg) translateY(-2px); } }
   .climber.docked { transform: translate(var(--bx, 0), var(--by, 0)); }
+  /* launch hop — the beanie springs UP from its docked spot next to the copy and
+     lands on the TOP of the beanstalk (transform:none = the stalk-top base position). */
+  /* launch hop — a smooth, tall SEMI-CIRCULAR arc from the docked slot up and over
+     onto the stalk top. The straight line (slot → stalk top) is bulged upward by a
+     sine curve traced across several stops, so there is no corner at the apex; linear
+     time lets it float naturally at the top. Raise/lower the arc via the −px lifts. */
+  .climber.launching { animation: climberHop 0.85s linear both; }
+  @keyframes climberHop {
+    0%   { transform: translate(var(--bx, 0), var(--by, 0)); }
+    15%  { transform: translate(calc(var(--bx, 0) * 0.85), calc(var(--by, 0) * 0.85 - 73px)); }
+    30%  { transform: translate(calc(var(--bx, 0) * 0.70), calc(var(--by, 0) * 0.70 - 129px)); }
+    50%  { transform: translate(calc(var(--bx, 0) * 0.50), calc(var(--by, 0) * 0.50 - 160px)); }
+    70%  { transform: translate(calc(var(--bx, 0) * 0.30), calc(var(--by, 0) * 0.30 - 129px)); }
+    85%  { transform: translate(calc(var(--bx, 0) * 0.15), calc(var(--by, 0) * 0.15 - 73px)); }
+    100% { transform: none; }
+  }
 
   /* ---- feature leaves ---- */
   .vine-leaf { position: absolute; width: 158px; height: 62px; display: grid; place-items: center; z-index: 7; --r: 0deg; }
@@ -433,7 +451,14 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
 
     var VBW = 1080, VBH = 2400;
     var cLen = 0;
-    var docked = true, celebrated = false, ticking = false;
+    var docked = true, celebrated = false, launchedState = false, hopping = false, rafPending = false;
+    // gVisual is the EASED position the beanie + stalk actually render at; gTarget is
+    // where the scroll says they should be. Easing gVisual toward gTarget means the
+    // seed ALWAYS travels from the top downward — even on a fast scroll that jumps
+    // gTarget straight to the bottom, gVisual sweeps through the whole stalk.
+    var gVisual = 0, gTarget = 0;
+    var EASE = 0.11;      // per-frame catch-up (higher = snappier, lower = smoother/slower)
+    var MAXSTEP = 0.02;   // cap per-frame travel so a big scroll jump GLIDES down instead of lurching
 
     function buildBraid() {
       cLen = center!.getTotalLength();
@@ -501,22 +526,56 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
       (climber as HTMLElement).style.setProperty('--by', ((sl.top + sl.height / 2) - homeY).toFixed(1) + 'px');
     }
 
-    function update() {
-      ticking = false;
+    // Read the scroll → gTarget, and manage the docked ↔ launched transition +
+    // the one-shot "hop up onto the stalk top" when the seed first launches.
+    function readScroll() {
       var r = stage!.getBoundingClientRect(), vh = window.innerHeight, H = r.height || 1;
       var pRaw = (vh * 0.5 - r.top) / H;      // center-based scroll position (unclamped)
-      var P0 = 0.08 * vh / H;                 // launch anchor — seed jumps here, growth starts at 0
+      // launch anchor — the seed jumps to the stalk TOP here (growth starts at g=0).
+      // Negative fires it EARLIER, as the section enters the viewport (~60% down the
+      // screen), so the seed lands at the top and climbs the full stalk. Tune this:
+      // more negative = launches sooner / lower on screen.
+      var P0 = -0.15 * vh / H;
       var launched = pRaw >= P0;
-      // growth is REMAPPED so g=0 at the launch point: the seed lands at the very TOP
-      // of the stalk (nothing grown yet), then the beanstalk grows down as you scroll.
-      var g = launched ? Math.max(0, Math.min(1, (pRaw - P0) / (1 - P0))) : 0;
-
-      grows.forEach(function (path: any) { path.style.strokeDashoffset = path._len * (1 - g); });
+      // growth is REMAPPED so g=0 at the launch point.
+      gTarget = launched ? Math.max(0, Math.min(1, (pRaw - P0) / (1 - P0))) : 0;
 
       if (!launched) {
-        if (!docked) { dockOffset(); climber!.classList.add('docked'); docked = true; }
-      } else {
-        if (docked) { climber!.classList.remove('docked'); docked = false; }
+        // Below the launch point: re-dock over the copy and reset to the top so the
+        // NEXT launch always starts the descent from g=0.
+        launchedState = false; hopping = false;
+        gVisual = 0;
+        if (!docked) {
+          dockOffset();
+          climber!.classList.add('docked');
+          climber!.classList.remove('launching');
+          docked = true;
+        }
+      } else if (!launchedState) {
+        // First frame past the launch point: pin to the TOP (gVisual=0) and hop the
+        // beanie UP from its docked spot onto the stalk top. The descent only begins
+        // once the hop lands (hopping cleared on animationend), so no matter how fast
+        // the user scrolled, it visibly starts at the top and travels down.
+        launchedState = true;
+        gVisual = 0;
+        if (docked) {
+          docked = false;
+          climber!.classList.remove('docked');
+          hopping = true;
+          climber!.classList.remove('launching');
+          void (climber as HTMLElement).offsetWidth; // restart the keyframe if re-launching
+          climber!.classList.add('launching');
+        }
+      }
+      if (hint) hint.style.opacity = launched ? '0' : '0.95';
+    }
+
+    // Draw everything at the EASED position gVisual (never straight from scroll).
+    function render() {
+      var g = gVisual;
+      grows.forEach(function (path: any) { path.style.strokeDashoffset = path._len * (1 - g); });
+
+      if (launchedState) {
         var pt = frontierPoint(g);   // the braids' leading tip — the seed leads the stalk down
         (climber as HTMLElement).style.left = (pt.x / VBW * 100) + '%';
         (climber as HTMLElement).style.top = (pt.y / VBH * 100) + '%';
@@ -536,13 +595,34 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
       });
       if (g > 0.95 && !celebrated) { celebrated = true; root!.classList.add('celebrate'); }
       if (g < 0.86 && celebrated) { celebrated = false; root!.classList.remove('celebrate'); }
-      if (hint) hint.style.opacity = launched ? '0' : '0.95';
     }
-    function onScroll() { if (!ticking) { ticking = true; requestAnimationFrame(update); } }
+
+    function frame() {
+      rafPending = false;
+      readScroll();
+      // While the hop is in flight, hold at the top so the seed always LANDS at the
+      // top before it starts descending.
+      var target = hopping ? 0 : gTarget;
+      var diff = target - gVisual;
+      if (Math.abs(diff) > 0.0008) {
+        var step = diff * EASE;                         // ease toward target…
+        if (step > MAXSTEP) step = MAXSTEP;             // …but cap the speed so a far
+        else if (step < -MAXSTEP) step = -MAXSTEP;      // scroll jump can't lurch the seed
+        gVisual += step;
+        render();
+        schedule();
+      } else {
+        gVisual = target;
+        render();
+        if (hopping || Math.abs(gTarget - gVisual) > 0.0008) schedule();
+      }
+    }
+    function schedule() { if (!rafPending) { rafPending = true; requestAnimationFrame(frame); } }
+    function onScroll() { schedule(); }
     function onResize() {
       buildBraid(); measure();
       grows.forEach(function (p: any) { p.style.strokeDasharray = p._len; });
-      positionLeaves(); if (docked) dockOffset(); update();
+      positionLeaves(); if (docked) dockOffset(); schedule();
     }
 
     try {
@@ -552,9 +632,17 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
       if (prefersReduced) { renderStatic(); return; }
       grows.forEach(function (p: any) { p.style.strokeDasharray = p._len; p.style.strokeDashoffset = p._len; });
       dockOffset();
+      // The launch hop finished → let the eased descent from the top begin.
+      climber!.addEventListener('animationend', function (e) {
+        if ((e as AnimationEvent).animationName === 'climberHop') {
+          hopping = false;
+          climber!.classList.remove('launching');
+          schedule();
+        }
+      });
       window.addEventListener('scroll', onScroll, { passive: true });
       window.addEventListener('resize', onResize);
-      update();
+      schedule();
     } catch (err) {
       console.warn(
         '[worlds] animation setup failed — falling back to the static beanstalk. ' +
