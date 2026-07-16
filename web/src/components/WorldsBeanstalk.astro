@@ -401,6 +401,9 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
     var stage = document.getElementById('stage');
     var center = document.getElementById('vine-center') as unknown as SVGPathElement | null;
     var grows = Array.prototype.slice.call(document.querySelectorAll('.grow')) as SVGPathElement[];
+    var braidEls = ['braidA', 'braidB', 'braidC']
+      .map(function (id) { return document.getElementById(id); })
+      .filter(Boolean) as unknown as SVGPathElement[];
     var climber = document.getElementById('climber');
     var seedSlot = document.getElementById('seedSlot');
     var root = document.getElementById('root');
@@ -451,6 +454,27 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
     }
     function measure() { grows.forEach(function (p: any) { p._len = p.getTotalLength(); }); }
 
+    // The seed must ride the LEADING tip of the growing stalk. The braids (the
+    // visible strands) are longer than the center path and their extra length is
+    // back-loaded — wiggle amplitude grows downward (amp = 3.2 + 11*s/cLen) — so
+    // revealing them by fraction-of-own-length makes their tip reach a center
+    // fraction f > g. Tracking the seed at center-fraction g therefore leaves it
+    // lagging further and further behind the drawn stalk the deeper you scroll.
+    // Instead track the braids' real frontier: the average of the three strand
+    // tips ≈ the centerline at that frontier (the 120°-phased offsets cancel), so
+    // the seed always sits at the growing edge and leads the vine toward the ground.
+    function frontierPoint(frac: number): { x: number; y: number } {
+      var sx = 0, sy = 0, n = 0;
+      for (var k = 0; k < braidEls.length; k++) {
+        var bp: any = braidEls[k];
+        if (!bp || !bp._len) continue;
+        var p = bp.getPointAtLength(frac * bp._len);
+        sx += p.x; sy += p.y; n++;
+      }
+      if (!n) { var c = center!.getPointAtLength(frac * cLen); return { x: c.x, y: c.y }; }
+      return { x: sx / n, y: sy / n };
+    }
+
     function positionLeaves() {
       leaves.forEach(function (leaf: HTMLElement) {
         var f = parseFloat(leaf.getAttribute('data-frac') || '0') || 0;
@@ -493,7 +517,7 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
         if (!docked) { dockOffset(); climber!.classList.add('docked'); docked = true; }
       } else {
         if (docked) { climber!.classList.remove('docked'); docked = false; }
-        var pt = center!.getPointAtLength(g * cLen);   // g=0 → top of the stalk
+        var pt = frontierPoint(g);   // the braids' leading tip — the seed leads the stalk down
         (climber as HTMLElement).style.left = (pt.x / VBW * 100) + '%';
         (climber as HTMLElement).style.top = (pt.y / VBH * 100) + '%';
         (climber as HTMLElement).style.opacity = (g < 0.995) ? '1' : '0';

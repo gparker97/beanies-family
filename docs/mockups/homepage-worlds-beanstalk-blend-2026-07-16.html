@@ -387,6 +387,7 @@
   var stage = document.getElementById('stage');
   var center = document.getElementById('vine-center');
   var grows = Array.prototype.slice.call(document.querySelectorAll('.grow'));
+  var braidEls = ['braidA', 'braidB', 'braidC'].map(function (id) { return document.getElementById(id); }).filter(Boolean);
   var climber = document.getElementById('climber');
   var seedSlot = document.getElementById('seedSlot');
   var root = document.getElementById('root');
@@ -417,6 +418,21 @@
   }
   buildBraid();
   function measure() { grows.forEach(function (p) { p._len = p.getTotalLength(); }); }
+
+  // Seed rides the LEADING braid tip (braids are longer + back-loaded, so their
+  // frontier is at center-fraction f > g). Average of the 3 strand tips ≈ the
+  // centerline frontier (120°-phased offsets cancel) → the seed leads the stalk.
+  function frontierPoint(frac) {
+    var sx = 0, sy = 0, n = 0;
+    for (var k = 0; k < braidEls.length; k++) {
+      var bp = braidEls[k];
+      if (!bp || !bp._len) continue;
+      var p = bp.getPointAtLength(frac * bp._len);
+      sx += p.x; sy += p.y; n++;
+    }
+    if (!n) { var c = center.getPointAtLength(frac * cLen); return { x: c.x, y: c.y }; }
+    return { x: sx / n, y: sy / n };
+  }
   measure();
 
   function rand(a, b) { return a + Math.random() * (b - a); }
@@ -506,7 +522,7 @@
       if (!docked) { dockOffset(); climber.classList.add('docked'); docked = true; }
     } else {
       if (docked) { climber.classList.remove('docked'); docked = false; }
-      var pt = center.getPointAtLength(g * cLen);   // g=0 → top of the stalk
+      var pt = frontierPoint(g);   // the braids' leading tip — the seed leads the stalk down
       climber.style.left = (pt.x / VBW * 100) + '%';
       climber.style.top = (pt.y / VBH * 100) + '%';
       climber.style.opacity = (g < 0.995) ? '1' : '0';
