@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-07-16",
-    "translationCount": 3739
+    "translationCount": 3744
   },
   "translations": {
     "app.name": {
@@ -14392,9 +14392,9 @@
       "lastUpdated": "2026-05-16"
     },
     "family.resetPassword.error.updateFailed": {
-      "translation": "已在本地保存新密钥，但无法更新其密码记录。请重试。",
-      "hash": "hjw0u0",
-      "lastUpdated": "2026-05-16"
+      "translation": "无法更新密码。未更改任何内容。请重试。",
+      "hash": "1d0sz5",
+      "lastUpdated": "2026-07-16"
     },
     "auth.signinHeal.unexpectedError": {
       "translation": "无法重新同步您的帐户密钥",
@@ -18699,6 +18699,31 @@
     "family.resetPassword.error.saveFailed": {
       "translation": "无法保存新密码。没有任何更改—他们的当前密码仍然有效。请检查您的网络连接，然后重试。",
       "hash": "ntzl07",
+      "lastUpdated": "2026-07-16"
+    },
+    "changePassword.error.noConnection": {
+      "translation": "您需要连接才能更改密码。请重新连接并重试。",
+      "hash": "wcc9h9",
+      "lastUpdated": "2026-07-16"
+    },
+    "changePassword.error.rollbackFailed": {
+      "translation": "出错了，我们无法完全撤消更改。为了安全起见，请退出并重新登录，然后重试。",
+      "hash": "fw8m6q",
+      "lastUpdated": "2026-07-16"
+    },
+    "family.resetPassword.error.noConnection": {
+      "translation": "您需要连接才能重置他们的密码。请重新连接并重试。",
+      "hash": "gigom5",
+      "lastUpdated": "2026-07-16"
+    },
+    "family.resetPassword.error.rollbackFailed": {
+      "translation": "出错了，我们无法完全撤消更改。为了安全起见，请退出并重新登录，然后重试。",
+      "hash": "fw8m6q",
+      "lastUpdated": "2026-07-16"
+    },
+    "family.resetPassword.error.unexpected": {
+      "translation": "出错了。请重试。",
+      "hash": "dp1w0g",
       "lastUpdated": "2026-07-16"
     }
   }

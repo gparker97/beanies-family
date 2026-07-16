@@ -46,6 +46,12 @@ vi.mock('@/stores/syncStore', () => ({
     setMemberWrappedKey: setMemberWrappedKeyMock,
     syncNow: syncNowMock,
     DURABLE_ROTATION_SAVE_TIMEOUT_MS: 50,
+    canDurablySaveNow: () => true,
+    syncNowDurable: async (ms = 5000) => {
+      const r = await raceTimeout(syncNowMock(true), ms);
+      if (r === undefined) return 'timeout';
+      return r ? 'saved' : 'failed';
+    },
     syncNowBounded: async (ms = 5000) => !!(await raceTimeout(syncNowMock(true), ms)),
     resetState: vi.fn(),
   }),

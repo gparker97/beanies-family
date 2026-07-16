@@ -18,6 +18,7 @@
  */
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as syncServiceModule from '@/services/sync/syncService';
 
 const {
   saveFailureCallbackHolder,
@@ -146,8 +147,9 @@ vi.mock('@/services/google/driveService', () => ({
   },
 }));
 vi.mock('@/services/sync/offlineQueue', () => ({ clearQueue: vi.fn() }));
+const { saveSettingsMock } = vi.hoisted(() => ({ saveSettingsMock: vi.fn(async () => {}) }));
 vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
-  saveSettings: vi.fn(async () => {}),
+  saveSettings: saveSettingsMock,
 }));
 vi.mock('@/services/registry/registryService', () => ({
   registerCurrentFamily: vi.fn(async () => {}),
@@ -624,6 +626,61 @@ describe('syncStore — save-failure banner visibility', () => {
         context: { silent_refresh_had_refresh_token: boolean };
       };
       expect(arg.context.silent_refresh_had_refresh_token).toBe(true);
+    });
+  });
+
+  // Guards the single-core refactor: syncNowBounded delegates to syncNowDurable,
+  // whose catch maps a post-write syncNow rejection (successful Drive write,
+  // failed settings-metadata write) to 'saved' — so a durable save is never
+  // misreported as a failure and never false-pages. (docs/plans/2026-07-16-password-rotation-remediation.md)
+  describe('syncNowDurable / syncNowBounded delegation', () => {
+    it('maps a post-write reject to "saved" (durable) and does not throw', async () => {
+      const store = useSyncStore();
+      vi.mocked(syncServiceModule.save).mockResolvedValue(true); // Drive write succeeds
+      saveSettingsMock.mockRejectedValueOnce(new Error('settings write failed')); // metadata write throws
+
+      await expect(store.syncNowDurable(50)).resolves.toBe('saved');
+      // A warning is logged for the swallowed metadata failure — never silent.
+      expect(reportErrorMock).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'sync-now-durable', severity: 'warning' })
+      );
+    });
+
+    it('syncNowBounded returns true on a post-write reject (does not throw)', async () => {
+      const store = useSyncStore();
+      vi.mocked(syncServiceModule.save).mockResolvedValue(true);
+      saveSettingsMock.mockRejectedValueOnce(new Error('settings write failed'));
+
+      await expect(store.syncNowBounded(50)).resolves.toBe(true);
+    });
+
+    it('maps a clean save failure to "failed" (nothing reached Drive)', async () => {
+      const store = useSyncStore();
+      vi.mocked(syncServiceModule.save).mockResolvedValue(false);
+
+      await expect(store.syncNowDurable(50)).resolves.toBe('failed');
+      await expect(store.syncNowBounded(50)).resolves.toBe(false);
+    });
+  });
+
+  describe('canDurablySaveNow', () => {
+    it('false when no provider is configured (cache-only family)', () => {
+      const store = useSyncStore();
+      vi.mocked(syncServiceModule.getProviderType).mockReturnValue(null);
+      expect(store.canDurablySaveNow()).toBe(false);
+    });
+
+    it('true for a local-file provider regardless of network', () => {
+      const store = useSyncStore();
+      vi.mocked(syncServiceModule.getProviderType).mockReturnValue('local');
+      expect(store.canDurablySaveNow()).toBe(true);
+    });
+
+    it('true for an online google_drive provider', () => {
+      const store = useSyncStore();
+      vi.mocked(syncServiceModule.getProviderType).mockReturnValue('google_drive');
+      // navigator.onLine defaults to true in the test environment.
+      expect(store.canDurablySaveNow()).toBe(true);
     });
   });
 });

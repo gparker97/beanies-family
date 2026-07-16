@@ -13,6 +13,7 @@ import PasswordEntryFields from '@/components/ui/PasswordEntryFields.vue';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
+import { reportError } from '@/utils/errorReporter';
 import type { FamilyMember } from '@/types/models';
 
 const { t } = useTranslation();
@@ -99,6 +100,17 @@ async function handleSave() {
     // Closed-union `ResetError` → translated copy. Compile-time forces this
     // key to exist for every error variant declared in authStore.
     formError.value = t(`family.resetPassword.error.${result.error}` as never);
+  } catch (e) {
+    // Defense-in-depth: the store no longer throws on the rotation path, but a
+    // stray rejection (e.g. hashPassword) must never leave the admin staring at a
+    // stopped spinner with no feedback (the Settings modal already catches).
+    formError.value = t('family.resetPassword.error.unexpected');
+    reportError({
+      surface: 'reset-member-password',
+      message: 'resetMemberPassword threw',
+      severity: 'error',
+      error: e,
+    });
   } finally {
     isSubmitting.value = false;
   }
