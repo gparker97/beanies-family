@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import WorldsBeanstalk from '../components/WorldsBeanstalk.astro';
 import { SOFTWARE_APPLICATION } from '@beanies/brand/schema';
 import { APP_URL } from '@beanies/brand/nav';
 ---
@@ -387,6 +388,11 @@ import { APP_URL } from '@beanies/brand/nav';
     </section>
 
     <div class="section-fade section-fade--hero-out"></div>
+
+    <!-- WHAT'S INSIDE — three-worlds scroll-grown beanstalk (Notion #56) -->
+    <WorldsBeanstalk />
+
+    <div class="section-fade section-fade--to-dark"></div>
 
     <!-- SECURITY -->
     <section id="security" class="security-section">
@@ -1213,7 +1219,7 @@ import { APP_URL } from '@beanies/brand/nav';
 .section-fade--to-light { background: linear-gradient(180deg, var(--deep-slate) 0%, var(--cloud-white) 100%); }
 .section-fade--to-story { background: linear-gradient(180deg, var(--cloud-white) 0%, #fdf8f5 100%); }
 .section-fade--from-story { background: linear-gradient(180deg, #fdf8f5 0%, var(--cloud-white) 100%); }
-.section-fade--hero-out { background: linear-gradient(180deg, var(--cloud-white) 0%, var(--cloud-white) 30%, var(--deep-slate) 100%); }
+.section-fade--hero-out { background: linear-gradient(180deg, var(--cloud-white) 0%, #fffdfb 100%); }
 
 .ambient-orb { border-radius: 50%; filter: blur(80px); pointer-events: none; position: absolute; }
 
