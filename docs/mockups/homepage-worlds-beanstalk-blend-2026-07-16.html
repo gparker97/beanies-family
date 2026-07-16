@@ -26,7 +26,16 @@
   h1, h2, h3, .display { font-family: 'Outfit', system-ui, sans-serif; }
 
   .faux { padding: 4rem 1.5rem; text-align: center; }
-  .faux--hero { background: linear-gradient(180deg, #fff 0%, #fff7f3 100%); }
+  .faux--hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0.2rem; position: relative; overflow: hidden; background: radial-gradient(120% 70% at 50% 0%, #fff 0%, #fff7f3 60%, #fdf3ee 100%); }
+  .fhero__bean { position: absolute; opacity: 0.5; pointer-events: none; }
+  .fhero__title { font-family: 'Outfit', sans-serif; font-size: clamp(2.6rem, 9vw, 5rem); font-weight: 800; letter-spacing: -0.04em; line-height: 0.98; margin: 0.2rem 0; }
+  .fhero__title em { color: var(--heritage-orange); font-style: normal; }
+  .fhero__sub { color: var(--muted-text); max-width: 30rem; font-size: 1.05rem; line-height: 1.5; margin: 0.4rem auto 0.2rem; }
+  .fhero__privacy { color: var(--muted-text); font-size: 0.86rem; opacity: 0.85; margin: 0.2rem 0 0.8rem; }
+  .fhero__cta { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .fhero__ghost { color: var(--deep-slate); font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.92rem; text-decoration: none; }
+  .fhero__scroll { margin-top: 2.2rem; color: #9aa6b2; font-size: 0.74rem; display: inline-flex; flex-direction: column; align-items: center; gap: 3px; }
+  .fhero__scroll .chev { font-size: 1.1rem; color: var(--heritage-orange); animation: bob 1.6s ease-in-out infinite; }
   .faux--security { background: var(--deep-slate); color: #fff; }
   .faux .eyebrow { font-family: 'Outfit', sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--heritage-orange); opacity: 0.6; }
   .faux h2 { font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 800; margin: 0.4rem 0 0.6rem; letter-spacing: -0.02em; }
@@ -210,10 +219,19 @@
 <body>
 
   <section class="faux faux--hero">
-    <span class="eyebrow">↑ hero section (existing)</span>
-    <h2>every. bean. <em style="color:var(--heritage-orange);font-style:normal">counts.</em></h2>
-    <p>the private, all-in-one home for your family's plans, money and memories.</p>
-    <small>— existing homepage continues; NEW section begins below —</small>
+    <span class="fhero__bean" style="left:8%;top:16%;font-size:1.7rem;transform:rotate(-15deg)">🫘</span>
+    <span class="fhero__bean" style="right:10%;top:22%;font-size:1.3rem;transform:rotate(20deg)">🫘</span>
+    <span class="fhero__bean" style="left:14%;bottom:24%;font-size:1.5rem;transform:rotate(-28deg)">🫘</span>
+    <span class="fhero__bean" style="right:12%;bottom:30%;font-size:1.6rem;transform:rotate(12deg)">🫘</span>
+    <span class="eyebrow">↑ hero section (approximation of the live homepage)</span>
+    <h1 class="fhero__title">every. bean.<br /><em>counts.</em></h1>
+    <p class="fhero__sub">the private, all-in-one home for your family's plans, money and memories.</p>
+    <p class="fhero__privacy">🔒 your data never leaves your hands.</p>
+    <div class="fhero__cta">
+      <a class="cta" href="#">start your family →</a>
+      <a class="fhero__ghost" href="#">why I built this ↓</a>
+    </div>
+    <span class="fhero__scroll"><span>scroll down</span><span class="chev">↓</span></span>
   </section>
 
   <section class="worlds" aria-label="what's inside beanies">
@@ -222,9 +240,9 @@
     <div class="orb orb--3"></div>
 
     <div class="intro">
-      <span class="label">what's inside</span>
-      <h2>three worlds. one <span class="pop">calm</span> HQ.</h2>
-      <p class="lede"><span class="seed-slot" id="seedSlot" aria-hidden="true"></span>watch it grow — and see where the beans go.</p>
+      <span class="label">check out these magic beans</span>
+      <h2>your <span class="pop">calm</span> family HQ</h2>
+      <p class="lede"><span class="seed-slot" id="seedSlot" aria-hidden="true"></span>reduce the mental load and watch your family grow</p>
       <span class="grow-hint"><span>follow the vine</span><span class="chev">↓</span></span>
     </div>
 
@@ -264,14 +282,14 @@
       <span class="vine-leaf" data-frac="0.03" data-side="l" style="--r:-8deg"><span class="t">activities</span></span>
       <span class="vine-leaf" data-frac="0.06" data-side="r" style="--r:6deg"><span class="t">travel plans</span></span>
       <span class="vine-leaf" data-frac="0.09" data-side="l" style="--r:-6deg"><span class="t">to-dos</span></span>
-      <span class="vine-leaf" data-frac="0.12" data-side="r" style="--r:7deg"><span class="t">lists</span></span>
-      <span class="vine-leaf" data-frac="0.30" data-side="l" style="--r:7deg"><span class="t">accounts</span></span>
-      <span class="vine-leaf" data-frac="0.335" data-side="r" style="--r:-6deg"><span class="t">budgets</span></span>
+      <span class="vine-leaf" data-frac="0.12" data-side="r" style="--r:7deg"><span class="t">family lists</span></span>
+      <span class="vine-leaf" data-frac="0.30" data-side="l" style="--r:7deg"><span class="t">bank accounts</span></span>
+      <span class="vine-leaf" data-frac="0.335" data-side="r" style="--r:-6deg"><span class="t">family budget</span></span>
       <span class="vine-leaf" data-frac="0.37" data-side="l" style="--r:6deg"><span class="t">savings goals</span></span>
       <span class="vine-leaf" data-frac="0.40" data-side="r" style="--r:-7deg"><span class="t">net worth</span></span>
-      <span class="vine-leaf" data-frac="0.59" data-side="r" style="--r:-6deg"><span class="t">scrapbook</span></span>
-      <span class="vine-leaf" data-frac="0.63" data-side="l" style="--r:7deg"><span class="t">recipes</span></span>
-      <span class="vine-leaf" data-frac="0.67" data-side="r" style="--r:-7deg"><span class="t">milestones</span></span>
+      <span class="vine-leaf" data-frac="0.59" data-side="r" style="--r:-6deg"><span class="t">family scrapbook</span></span>
+      <span class="vine-leaf" data-frac="0.63" data-side="l" style="--r:7deg"><span class="t">secret recipes</span></span>
+      <span class="vine-leaf" data-frac="0.67" data-side="r" style="--r:-7deg"><span class="t">beanie milestones</span></span>
       <span class="vine-leaf" data-frac="0.70" data-side="l" style="--r:6deg"><span class="t">care &amp; safety</span></span>
 
       <div class="scene" data-i="0" data-center="0.20">
@@ -282,9 +300,9 @@
           <span class="card__vine card__vine--right"></span>
           <div class="card__head">
             <span class="card__glyph" style="background: rgba(174,214,241,0.42)">📅</span>
-            <div><p class="card__kicker">the treehouse</p><h3 class="card__name">your plans</h3></div>
+            <div><p class="card__kicker">world 1 - the treehouse</p><h3 class="card__name">your beanie plans</h3></div>
           </div>
-          <p class="card__lead">who's doing what, and when — finally sorted.</p>
+          <p class="card__lead">who's picking up joey tomorrow? now you know.</p>
           <div class="mini">
             <div class="drow"><span class="who">🎹 piano lesson · thu</span><span class="tag" style="background:rgba(174,214,241,0.5);color:var(--deep-slate)">5:30 pm</span></div>
             <div class="drow"><span class="who">🚗 school drop-off</span><span class="tag" style="background:rgba(241,93,34,0.12);color:var(--heritage-orange)">greg's turn</span></div>
@@ -301,9 +319,9 @@
           <span class="card__vine card__vine--right"></span>
           <div class="card__head">
             <span class="card__glyph" style="background: rgba(230,126,34,0.14)">🐷</span>
-            <div><p class="card__kicker">the piggy bank</p><h3 class="card__name">your money</h3></div>
+            <div><p class="card__kicker">world 2 - the piggy bank</p><h3 class="card__name">your money</h3></div>
           </div>
-          <p class="card__lead">grown-up money, minus the spreadsheet dread.</p>
+          <p class="card__lead">manage your money, throw away the spreadsheets</p>
           <div class="mini">
             <div class="money-row">
               <div class="ring"><span>62%</span></div>
@@ -325,9 +343,9 @@
           <span class="card__vine card__vine--right"></span>
           <div class="card__head">
             <span class="card__glyph" style="background: rgba(62,142,82,0.14)">🌱</span>
-            <div><p class="card__kicker">the pod</p><h3 class="card__name">your beanpod</h3></div>
+            <div><p class="card__kicker">world 3 - the family jewels</p><h3 class="card__name">your beanpod</h3></div>
           </div>
-          <p class="card__lead">the warm stuff — kept close, kept encrypted.</p>
+          <p class="card__lead">everything about your precious beans - fully private and encrypted</p>
           <div class="mini">
             <div class="drow"><span class="who">🎉 emma's first steps</span><span class="sub">milestone</span></div>
             <div class="drow"><span class="who">💊 vitamin D · 8am</span><span class="tag" style="background:rgba(174,214,241,0.5);color:var(--deep-slate)">daily</span></div>
@@ -347,13 +365,13 @@
           <span class="pebble" style="width:10px;height:7px;left:150px;top:42px"></span>
         </div>
         <div class="grass grass--front" id="grassFront"></div>
-        <div class="root-note">…and it all grows from you.</div>
+        <div class="root-note">… peace of mind starts here</div>
       </div>
     </div>
 
     <div class="payoff">
       <p class="tag-line">three worlds. one family. <em>zero chaos.</em></p>
-      <a class="cta" href="#">plant your family's beanstalk →</a>
+      <a class="cta" href="#">plant a beanstalk of your own →</a>
     </div>
   </section>
 
@@ -377,7 +395,7 @@
   var leaves = Array.prototype.slice.call(document.querySelectorAll('.vine-leaf'));
   if (!stage || !center) return;
 
-  var VBW = 1080, VBH = 2400, P_TRIGGER = 0.045;
+  var VBW = 1080, VBH = 2400;
   var cLen = center.getTotalLength();
 
   function buildBraid() {
@@ -471,38 +489,43 @@
 
   grows.forEach(function (p) { p.style.strokeDasharray = p._len; p.style.strokeDashoffset = p._len; });
 
-  function progress() {
-    var r = stage.getBoundingClientRect(), vh = window.innerHeight;
-    return Math.max(0, Math.min(1, (vh * 0.5 - r.top) / r.height));
-  }
-
   var docked = true, celebrated = false, ticking = false;
   function update() {
     ticking = false;
-    var p = progress();
-    grows.forEach(function (path) { path.style.strokeDashoffset = path._len * (1 - p); });
+    var r = stage.getBoundingClientRect(), vh = window.innerHeight, H = r.height || 1;
+    var pRaw = (vh * 0.5 - r.top) / H;      // center-based scroll position (unclamped)
+    var P0 = 0.08 * vh / H;                 // launch anchor — seed jumps here, growth starts at 0
+    var launched = pRaw >= P0;
+    // growth is REMAPPED so g=0 at the launch point: the seed lands at the very TOP
+    // of the stalk (nothing grown yet), then the beanstalk grows down as you scroll.
+    var g = launched ? Math.max(0, Math.min(1, (pRaw - P0) / (1 - P0))) : 0;
 
-    if (p < P_TRIGGER) {
+    grows.forEach(function (path) { path.style.strokeDashoffset = path._len * (1 - g); });
+
+    if (!launched) {
       if (!docked) { dockOffset(); climber.classList.add('docked'); docked = true; }
     } else {
       if (docked) { climber.classList.remove('docked'); docked = false; }
-      var pt = center.getPointAtLength(p * cLen);
+      var pt = center.getPointAtLength(g * cLen);   // g=0 → top of the stalk
       climber.style.left = (pt.x / VBW * 100) + '%';
       climber.style.top = (pt.y / VBH * 100) + '%';
-      climber.style.opacity = (p < 0.995) ? '1' : '0';
+      climber.style.opacity = (g < 0.995) ? '1' : '0';
     }
 
+    // leaves unfurl ONLY as the seed passes their point on the vine
     leaves.forEach(function (leaf) {
       var f = parseFloat(leaf.getAttribute('data-frac')) || 0;
-      leaf.classList.toggle('sprout', p >= f);
+      leaf.classList.toggle('sprout', g >= f);
     });
+    // cards appear as the seed reaches them and STAY visible going down;
+    // they hide again only when scrolling back UP past their entry point
     scenes.forEach(function (s) {
       var c = parseFloat(s.getAttribute('data-center')) || 0;
-      s.classList.toggle('in', Math.abs(p - c) < 0.12);
+      s.classList.toggle('in', g >= (c - 0.05));
     });
-    if (p > 0.95 && !celebrated) { celebrated = true; root.classList.add('celebrate'); }
-    if (p < 0.86 && celebrated) { celebrated = false; root.classList.remove('celebrate'); }
-    if (hint) hint.style.opacity = (p > 0.05) ? '0' : '0.95';
+    if (g > 0.95 && !celebrated) { celebrated = true; root.classList.add('celebrate'); }
+    if (g < 0.86 && celebrated) { celebrated = false; root.classList.remove('celebrate'); }
+    if (hint) hint.style.opacity = launched ? '0' : '0.95';
   }
   function onScroll() { if (!ticking) { ticking = true; requestAnimationFrame(update); } }
   window.addEventListener('scroll', onScroll, { passive: true });
