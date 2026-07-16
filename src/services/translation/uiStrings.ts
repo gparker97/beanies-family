@@ -1898,6 +1898,15 @@ const STRING_DEFS = {
     beanie:
       "couldn't save your new password. nothing changed — your current password still works. please check your connection and try again.",
   },
+  'changePassword.error.noConnection': {
+    en: "You'll need a connection to change your password. Reconnect and try again.",
+    beanie: "you'll need a connection to change your password. reconnect and try again.",
+  },
+  'changePassword.error.rollbackFailed': {
+    en: "Something went wrong and we couldn't fully undo the change. Please sign out and back in to be safe, then try again.",
+    beanie:
+      "something went wrong and we couldn't fully undo the change. please sign out and back in to be safe, then try again.",
+  },
 
   // ── Admin/owner reset of another member's password ────────────────────────
   // Used by ResetMemberPasswordModal. Error keys map 1:1 onto `ResetError`
@@ -1967,14 +1976,26 @@ const STRING_DEFS = {
     beanie: 'failed to re-wrap the account key. please try again.',
   },
   'family.resetPassword.error.updateFailed': {
-    en: "Saved the new key locally but couldn't update their password record. Please try again.",
-    beanie:
-      "saved the new key locally but couldn't update their password record. please try again.",
+    en: "Couldn't update their password. Nothing was changed. Please try again.",
+    beanie: "couldn't update their password. nothing was changed. please try again.",
   },
   'family.resetPassword.error.saveFailed': {
     en: "Couldn't save the new password. Nothing changed — their current password still works. Please check your connection and try again.",
     beanie:
       "couldn't save the new password. nothing changed — their current password still works. please check your connection and try again.",
+  },
+  'family.resetPassword.error.noConnection': {
+    en: "You'll need a connection to reset their password. Reconnect and try again.",
+    beanie: "you'll need a connection to reset their password. reconnect and try again.",
+  },
+  'family.resetPassword.error.rollbackFailed': {
+    en: "Something went wrong and we couldn't fully undo the change. Please sign out and back in to be safe, then try again.",
+    beanie:
+      "something went wrong and we couldn't fully undo the change. please sign out and back in to be safe, then try again.",
+  },
+  'family.resetPassword.error.unexpected': {
+    en: 'Something went wrong. Please try again.',
+    beanie: 'something went wrong. please try again.',
   },
 
   // ── Transfer Ownership ────────────────────────────────────────────────────
