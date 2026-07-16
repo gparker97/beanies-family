@@ -1,0 +1,543 @@
+---
+/**
+ * WorldsBeanstalk — the homepage "three worlds" scroll-grown beanstalk section.
+ *
+ * FAITHFUL PORT of the approved, copy-final mockup:
+ *   docs/mockups/homepage-worlds-beanstalk-blend-2026-07-16.html (commit c037bdf5)
+ * Plan: docs/plans/2026-07-16-homepage-worlds-beanstalk-section.md
+ *
+ * ⚠️ LOAD-BEARING CONSTANTS. The SVG path, braid params (step/wl/phases/amp),
+ * the growth remap (P0 / g), the seed dock/launch, leaf data-frac values, and the
+ * animation timings below are interdependent and were tuned by eye in the mockup.
+ * Do NOT "clean them up", rename them, or refactor the generators in place. To change
+ * the design: edit the mockup first, re-verify it, then re-port here.
+ *
+ * The only deviations from the mockup (all per the plan): font-family stacks mapped to
+ * the site's loaded fonts (Caveat is a CIG accent font — @fontsource-variable/caveat is
+ * loaded in BaseLayout), the family image uses the /brand/ public path, the mockup's
+ * :root brand tokens are inherited from .landing-page (only --vine-green(-light) are
+ * declared here), the grass is pre-rendered deterministically at build time (Astro can't
+ * scope styles onto JS-created nodes), and decorative emoji get aria-hidden.
+ */
+
+// --- Deterministic grass generator (build-time; reproduces the mockup's buildGrass()
+//     distribution with a fixed seed so builds are reproducible). Call order matches
+//     the mockup exactly: curl, x, y, h, rot, delay, sw, sd. ---
+const makeSeededRand = (seed: number) => {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+};
+const seeded = makeSeededRand(20260716);
+const rnd = (a: number, b: number) => a + seeded() * (b - a);
+
+interface BladeOpts {
+  spread: number; depth: number; hMin: number; hMax: number; w: number;
+  rot: number; curlRot: number; span: number; c1: string; c2: string;
+}
+function makeBlades(n: number, o: BladeOpts) {
+  const blades: { curl: boolean; style: string }[] = [];
+  for (let i = 0; i < n; i++) {
+    const curl = seeded() < 0.42;
+    const x = rnd(-o.spread, o.spread);
+    const y = rnd(0, o.depth);
+    const depthF = 1 - y / (o.depth + 8);
+    const h = rnd(o.hMin, o.hMax) * (0.7 + depthF * 0.5);
+    const rot = rnd(-1, 1) * (curl ? o.curlRot : o.rot);
+    const delay = rnd(0, o.span);
+    const sw = rnd(2.4, 4);
+    const sd = (rot > 0 ? -1 : 1) * Number(rnd(4, 8).toFixed(0));
+    blades.push({
+      curl,
+      style:
+        `--x:${x.toFixed(0)}px;--y:${y.toFixed(0)}px;--h:${h.toFixed(0)}px;--w:${o.w}px;` +
+        `--rot:${rot.toFixed(0)}deg;--d:${delay.toFixed(2)}s;--sw:${sw.toFixed(1)}s;` +
+        `--sd:${sd.toFixed(0)}deg;--c1:${o.c1};--c2:${o.c2};`,
+    });
+  }
+  return blades;
+}
+
+// back row: behind the family, wider + a touch lighter for depth
+const backBlades = makeBlades(20, { spread: 150, depth: 44, hMin: 26, hMax: 54, w: 10, rot: 16, curlRot: 34, span: 2.6, c1: '#3a8a4f', c2: '#79c98d' });
+// front row: in front of the family's feet, taller + darker
+const frontBlades = makeBlades(24, { spread: 158, depth: 30, hMin: 34, hMax: 72, w: 12, rot: 18, curlRot: 40, span: 3.0, c1: '#245f34', c2: '#4fa066' });
+// a few little bean sprouts popping among the grass (fixed positions in the mockup)
+const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10, 2.3], ['🫘', 128, 4, 1.2]] as [string, number, number, number][])
+  .map((g, i) => ({ emoji: g[0], style: `--x:${g[1]}px;--y:${g[2]}px;--rot:${i % 2 ? 8 : -8}deg;--d:${g[3]}s;` }));
+---
+
+<section class="worlds" aria-label="what's inside beanies">
+  <div class="orb orb--1"></div>
+  <div class="orb orb--2"></div>
+  <div class="orb orb--3"></div>
+
+  <div class="intro">
+    <span class="label">check out these magic beans</span>
+    <h2>your <span class="pop">calm</span> family HQ</h2>
+    <p class="lede"><span class="seed-slot" id="seedSlot" aria-hidden="true"></span>reduce the mental load and watch your family grow</p>
+    <span class="grow-hint"><span>follow the vine</span><span class="chev" aria-hidden="true">↓</span></span>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="vine-wrap">
+      <svg viewBox="0 0 1080 2400" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="coreGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="2260">
+            <stop offset="0" stop-color="#6ab77e" /><stop offset="0.5" stop-color="#3e8e52" />
+            <stop offset="0.82" stop-color="#4e7a30" /><stop offset="1" stop-color="#4a5f28" />
+          </linearGradient>
+          <linearGradient id="strandA" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="2260">
+            <stop offset="0" stop-color="#7cc48f" /><stop offset="0.55" stop-color="#3e8e52" /><stop offset="1" stop-color="#52632c" />
+          </linearGradient>
+          <linearGradient id="strandB" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="2260">
+            <stop offset="0" stop-color="#4e9e63" /><stop offset="0.55" stop-color="#2f7a44" /><stop offset="1" stop-color="#405525" />
+          </linearGradient>
+          <linearGradient id="strandC" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="2260">
+            <stop offset="0" stop-color="#63b478" /><stop offset="0.55" stop-color="#367e49" /><stop offset="1" stop-color="#4a5f28" />
+          </linearGradient>
+          <linearGradient id="trunkGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="2260">
+            <stop offset="0" stop-color="#3e8e52" stop-opacity="0" /><stop offset="0.6" stop-color="#3e8e52" stop-opacity="0" />
+            <stop offset="0.82" stop-color="#5a5426" stop-opacity="0.7" /><stop offset="1" stop-color="#5a4a24" stop-opacity="0.85" />
+          </linearGradient>
+        </defs>
+        <path id="vine-center" d="M540 0 C 540 240 380 360 440 620 C 500 840 760 900 660 1180 C 588 1400 340 1500 440 1780 C 505 1990 560 2120 540 2260" stroke="rgba(62,142,82,0.10)" stroke-width="22"></path>
+        <path class="grow" id="vine-trunk" d="M540 0 C 540 240 380 360 440 620 C 500 840 760 900 660 1180 C 588 1400 340 1500 440 1780 C 505 1990 560 2120 540 2260" stroke="url(#trunkGrad)" stroke-width="26"></path>
+        <path class="grow" id="vine-core" d="M540 0 C 540 240 380 360 440 620 C 500 840 760 900 660 1180 C 588 1400 340 1500 440 1780 C 505 1990 560 2120 540 2260" stroke="url(#coreGrad)" stroke-width="8"></path>
+        <path class="grow braid" id="braidA" stroke="url(#strandA)" stroke-width="5.5"></path>
+        <path class="grow braid" id="braidB" stroke="url(#strandB)" stroke-width="5.5"></path>
+        <path class="grow braid" id="braidC" stroke="url(#strandC)" stroke-width="5.5"></path>
+      </svg>
+    </div>
+
+    <span class="climber docked" id="climber" aria-hidden="true"><span class="glyph">🌱</span></span>
+
+    <span class="vine-leaf" data-frac="0.03" data-side="l" style="--r:-8deg"><span class="t">activities</span></span>
+    <span class="vine-leaf" data-frac="0.06" data-side="r" style="--r:6deg"><span class="t">travel plans</span></span>
+    <span class="vine-leaf" data-frac="0.09" data-side="l" style="--r:-6deg"><span class="t">to-dos</span></span>
+    <span class="vine-leaf" data-frac="0.12" data-side="r" style="--r:7deg"><span class="t">family lists</span></span>
+    <span class="vine-leaf" data-frac="0.30" data-side="l" style="--r:7deg"><span class="t">bank accounts</span></span>
+    <span class="vine-leaf" data-frac="0.335" data-side="r" style="--r:-6deg"><span class="t">family budget</span></span>
+    <span class="vine-leaf" data-frac="0.37" data-side="l" style="--r:6deg"><span class="t">savings goals</span></span>
+    <span class="vine-leaf" data-frac="0.40" data-side="r" style="--r:-7deg"><span class="t">net worth</span></span>
+    <span class="vine-leaf" data-frac="0.59" data-side="r" style="--r:-6deg"><span class="t">family scrapbook</span></span>
+    <span class="vine-leaf" data-frac="0.63" data-side="l" style="--r:7deg"><span class="t">secret recipes</span></span>
+    <span class="vine-leaf" data-frac="0.67" data-side="r" style="--r:-7deg"><span class="t">beanie milestones</span></span>
+    <span class="vine-leaf" data-frac="0.70" data-side="l" style="--r:6deg"><span class="t">care &amp; safety</span></span>
+
+    <div class="scene" data-i="0" data-center="0.20">
+      <div class="card">
+        <span class="card__vine card__vine--top"></span>
+        <span class="card__vine card__vine--bottom"></span>
+        <span class="card__vine card__vine--left"></span>
+        <span class="card__vine card__vine--right"></span>
+        <div class="card__head">
+          <span class="card__glyph" style="background: rgba(174,214,241,0.42)">📅</span>
+          <div><p class="card__kicker">world 1 - the treehouse</p><h3 class="card__name">your beanie plans</h3></div>
+        </div>
+        <p class="card__lead">who's picking up joey tomorrow? now you know.</p>
+        <div class="mini">
+          <div class="drow"><span class="who">🎹 piano lesson · thu</span><span class="tag" style="background:rgba(174,214,241,0.5);color:var(--deep-slate)">5:30 pm</span></div>
+          <div class="drow"><span class="who">🚗 school drop-off</span><span class="tag" style="background:rgba(241,93,34,0.12);color:var(--heritage-orange)">greg's turn</span></div>
+          <div class="drow"><span class="who">✈️ tokyo family trip</span><span class="tag" style="background:rgba(39,174,96,0.12);color:var(--soft-green)">12 sleeps</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scene" data-i="1" data-center="0.48">
+      <div class="card">
+        <span class="card__vine card__vine--top"></span>
+        <span class="card__vine card__vine--bottom"></span>
+        <span class="card__vine card__vine--left"></span>
+        <span class="card__vine card__vine--right"></span>
+        <div class="card__head">
+          <span class="card__glyph" style="background: rgba(230,126,34,0.14)">🐷</span>
+          <div><p class="card__kicker">world 2 - the piggy bank</p><h3 class="card__name">your money</h3></div>
+        </div>
+        <p class="card__lead">manage your money, throw away the spreadsheets</p>
+        <div class="mini">
+          <div class="money-row">
+            <div class="ring"><span>62%</span></div>
+            <div><div class="money-big">$48,210</div><div class="money-lbl">net worth · emergency fund 62%</div></div>
+          </div>
+          <div class="barwrap">
+            <div class="bar-line"><span>groceries budget</span><span>on track</span></div>
+            <div class="bar"><i style="width:48%"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scene" data-i="2" data-center="0.78">
+      <div class="card">
+        <span class="card__vine card__vine--top"></span>
+        <span class="card__vine card__vine--bottom"></span>
+        <span class="card__vine card__vine--left"></span>
+        <span class="card__vine card__vine--right"></span>
+        <div class="card__head">
+          <span class="card__glyph" style="background: rgba(62,142,82,0.14)">🌱</span>
+          <div><p class="card__kicker">world 3 - the family jewels</p><h3 class="card__name">your beanpod</h3></div>
+        </div>
+        <p class="card__lead">everything about your precious beans - fully private and encrypted</p>
+        <div class="mini">
+          <div class="drow"><span class="who">🎉 emma's first steps</span><span class="sub">milestone</span></div>
+          <div class="drow"><span class="who">💊 vitamin D · 8am</span><span class="tag" style="background:rgba(174,214,241,0.5);color:var(--deep-slate)">daily</span></div>
+          <div class="drow"><span class="who">🍜 grandma's noodles</span><span class="tag" style="background:rgba(230,126,34,0.14);color:var(--terracotta)">recipe</span></div>
+          <div class="drow"><span class="who">🔒 all of it</span><span class="lock">encrypted &amp; yours</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="root" id="root">
+      <div class="root__burst"></div>
+      <div class="grass grass--back" id="grassBack">
+        {backBlades.map((b) => (<span class={b.curl ? 'blade curl' : 'blade'} style={b.style}></span>))}
+      </div>
+      <img class="family" src="/brand/beanies_family_hugging_transparent_512x512.webp" alt="the beanie family, holding hands — the root of it all" width="512" height="512" loading="lazy" decoding="async" />
+      <div class="dirt">
+        <span class="pebble" style="width:8px;height:6px;left:66px;top:24px"></span>
+        <span class="pebble" style="width:6px;height:5px;left:220px;top:34px"></span>
+        <span class="pebble" style="width:10px;height:7px;left:150px;top:42px"></span>
+      </div>
+      <div class="grass grass--front" id="grassFront">
+        {frontBlades.map((b) => (<span class={b.curl ? 'blade curl' : 'blade'} style={b.style}></span>))}
+        {gbeans.map((g) => (<span class="gbean" aria-hidden="true" style={g.style}>{g.emoji}</span>))}
+      </div>
+      <div class="root-note">… peace of mind starts here</div>
+    </div>
+  </div>
+
+  <div class="payoff">
+    <p class="tag-line">three worlds. one family. <em>zero chaos.</em></p>
+    <a class="cta" href="https://app.beanies.family">plant a beanstalk of your own →</a>
+  </div>
+</section>
+
+<style>
+  /* --vine-green(-light) are decorative beanstalk tokens the page's brand palette
+     doesn't define — scope them to the section. All other tokens (--heritage-orange,
+     --deep-slate, --sky-silk, --terracotta, --cloud-white, --soft-green, --muted-text)
+     are inherited from .landing-page. */
+  .worlds {
+    --vine-green: #3e8e52;
+    --vine-green-light: #57a56a;
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(120% 42% at 50% 0%, #fff7f3 0%, rgba(255,247,243,0) 40%),
+      linear-gradient(180deg, #fffdfb 0%, #f3faf4 55%, #fbfaf6 100%);
+    padding: 3rem 1rem 0;
+  }
+  .orb { position: absolute; border-radius: 50%; filter: blur(64px); opacity: 0.5; pointer-events: none; z-index: 0; }
+  .orb--1 { width: 340px; height: 340px; top: 8%; right: -120px; background: rgba(174,214,241,0.34); }
+  .orb--2 { width: 380px; height: 380px; top: 44%; left: -150px; background: rgba(241,93,34,0.11); }
+  .orb--3 { width: 320px; height: 320px; bottom: 12%; right: -110px; background: rgba(62,142,82,0.12); }
+
+  .intro { position: relative; z-index: 3; text-align: center; max-width: 38rem; margin: 0 auto; }
+  .intro .label { font-family: 'Outfit Variable', Outfit, sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--heritage-orange); display: inline-flex; align-items: center; gap: 0.5rem; }
+  .intro .label::before, .intro .label::after { content: ""; width: 26px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--heritage-orange)); }
+  .intro .label::after { background: linear-gradient(90deg, var(--heritage-orange), transparent); }
+  .intro h2 { font-family: 'Outfit Variable', Outfit, sans-serif; font-size: clamp(1.9rem, 5vw, 3rem); font-weight: 800; letter-spacing: -0.03em; margin: 0.6rem 0 0.35rem; line-height: 1.05; text-wrap: balance; }
+  .intro h2 .pop { color: var(--heritage-orange); }
+  .intro .lede { color: var(--muted-text); font-size: 1rem; line-height: 1.5; text-wrap: balance; }
+  .seed-slot { display: inline-block; width: 1.5em; height: 1em; vertical-align: -0.15em; }
+  .grow-hint { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 0.6rem; color: var(--muted-text); font-size: 0.74rem; transition: opacity 0.4s ease; }
+  .grow-hint .chev { font-size: 1.1rem; color: var(--vine-green); animation: bob 1.6s ease-in-out infinite; }
+  @keyframes bob { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(4px);} }
+
+  /* stage does NOT create a stacking context (no z-index) so the climber can float
+     above the intro copy when docked yet duck behind the cards when descending */
+  .stage { position: relative; width: 100%; max-width: 1080px; margin: 0.25rem auto 0; height: 2400px; }
+  .vine-wrap { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+  .vine-wrap svg { width: 100%; height: 100%; display: block; }
+  .vine-wrap path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  .climber { position: absolute; width: 36px; height: 36px; margin-left: -18px; margin-top: -18px; display: grid; place-items: center; z-index: 4; pointer-events: none; transition: transform 0.75s cubic-bezier(0.5,-0.15,0.25,1.3); }
+  .climber .glyph { font-size: 26px; line-height: 1; filter: drop-shadow(0 0 10px rgba(241,93,34,0.5)); animation: climberBob 2.1s ease-in-out infinite; }
+  @keyframes climberBob { 0%,100%{ transform: rotate(-8deg); } 50%{ transform: rotate(8deg) translateY(-2px); } }
+  .climber.docked { transform: translate(var(--bx, 0), var(--by, 0)); }
+
+  /* ---- feature leaves ---- */
+  .vine-leaf { position: absolute; width: 158px; height: 62px; display: grid; place-items: center; z-index: 7; --r: 0deg; }
+  .vine-leaf::before {
+    content: ""; position: absolute; inset: 0; z-index: 0;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 62'%3E%3Cdefs%3E%3ClinearGradient id='lg' x1='0' y1='0' x2='0.85' y2='1'%3E%3Cstop offset='0' stop-color='%235aa86e'/%3E%3Cstop offset='0.55' stop-color='%233e8e52'/%3E%3Cstop offset='1' stop-color='%23276437'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M7 31 C 22 13 50 9 82 11 C 116 13 140 19 153 31 C 140 43 116 49 82 51 C 50 53 22 49 7 31 Z' fill='url(%23lg)' stroke='%231f5730' stroke-width='1.4'/%3E%3Cpath d='M13 31 C 55 29 110 29 148 31' stroke='%231f5730' stroke-width='1.5' fill='none' opacity='0.22' stroke-linecap='round'/%3E%3Cpath d='M46 31 L 37 24 M46 31 L 37 38' stroke='%231f5730' stroke-width='1' fill='none' opacity='0.18' stroke-linecap='round'/%3E%3Cpath d='M30 19 C 64 13 104 14 130 21' stroke='%23d6f0d9' stroke-width='1.8' fill='none' opacity='0.38' stroke-linecap='round'/%3E%3C/svg%3E") center/100% 100% no-repeat;
+    filter: drop-shadow(0 5px 13px rgba(45,119,66,0.32));
+  }
+  .vine-leaf .t { position: relative; z-index: 1; color: #fff; font-family: 'Outfit Variable', Outfit, sans-serif; font-weight: 700; font-size: 0.9rem; letter-spacing: 0.005em; white-space: nowrap; text-shadow: 0 1px 3px rgba(12,40,20,0.7); padding-left: 8px; }
+  .vine-leaf.r { transform-origin: left center; transform: translateY(-50%) scale(0.12) rotate(var(--r)); opacity: 0; transition: opacity 0.4s ease, transform 0.55s cubic-bezier(0.34,1.6,0.5,1); }
+  .vine-leaf.r.sprout { transform: translateY(-50%) scale(1) rotate(var(--r)); opacity: 1; }
+  .vine-leaf.l { transform-origin: right center; transform: translate(-100%, -50%) scale(0.12) rotate(var(--r)); opacity: 0; transition: opacity 0.4s ease, transform 0.55s cubic-bezier(0.34,1.6,0.5,1); }
+  .vine-leaf.l.sprout { transform: translate(-100%, -50%) scale(1) rotate(var(--r)); opacity: 1; }
+  .vine-leaf.l::before { transform: scaleX(-1); }
+  .vine-leaf.l .t { padding-left: 0; padding-right: 8px; }
+
+  /* ---- world card, wrapped onto the stalk by tendrils on all sides ---- */
+  .scene { position: absolute; left: 0; right: 0; display: flex; justify-content: center; z-index: 5; padding: 0 3%; }
+  .scene[data-i="0"] { top: 14%; }
+  .scene[data-i="1"] { top: 42%; }
+  .scene[data-i="2"] { top: 72%; }
+
+  .card {
+    position: relative; width: min(86%, 392px);
+    background: linear-gradient(180deg, #ffffff 0%, #f4fbf5 100%);
+    border: 1px solid rgba(62,142,82,0.30);
+    border-radius: 9px 28px 26px 28px;
+    box-shadow: 0 14px 42px rgba(44,62,80,0.12), 0 6px 26px rgba(62,142,82,0.16), inset 0 0 0 1px rgba(255,255,255,0.6);
+    padding: 1.35rem 1.4rem; text-align: left;
+    opacity: 0; transform: translateY(30px) scale(0.97);
+    transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.34,1.5,0.64,1);
+  }
+  .scene.in .card { opacity: 1; transform: none; }
+
+  .card__vine { position: absolute; z-index: -1; opacity: 0; background-repeat: no-repeat; background-position: center; background-size: contain; transition: opacity 0.5s ease, transform 0.65s cubic-bezier(0.34,1.5,0.64,1); }
+  .card__vine--top { left: 50%; top: -70px; width: 60px; height: 78px; transform-origin: bottom center; transform: translateX(-50%) scaleY(0);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 78'%3E%3Cpath d='M30 78 C 30 60 15 55 19 40 C 22 29 37 30 34 20 C 32 12 24 14 26 21' fill='none' stroke='%233e8e52' stroke-width='4.5' stroke-linecap='round'/%3E%3Cpath d='M34 20 C 33 9 46 5 49 13 C 51 20 41 24 37 17 C 35 12 41 12 40 16' fill='none' stroke='%23347f49' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M17 44 C 6 40 5 28 14 26 C 18 35 26 37 17 44 Z' fill='%2357a56a' stroke='%232d7742' stroke-width='1'/%3E%3C/svg%3E"); }
+  .card__vine--bottom { left: 50%; bottom: -64px; width: 58px; height: 70px; transform-origin: top center; transform: translateX(-50%) scaleY(0);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 58 70'%3E%3Cpath d='M29 0 C 29 18 43 22 39 38 C 36 50 19 48 22 60 C 24 68 33 66 31 59' fill='none' stroke='%233e8e52' stroke-width='4.5' stroke-linecap='round'/%3E%3Cpath d='M22 60 C 21 69 9 71 8 63 C 8 57 17 56 18 62' fill='none' stroke='%23347f49' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M42 34 C 53 38 54 50 45 52 C 41 43 33 41 42 34 Z' fill='%2357a56a' stroke='%232d7742' stroke-width='1'/%3E%3C/svg%3E"); }
+  .card__vine--left { left: -52px; top: 26%; width: 78px; height: 66px; transform-origin: right center; transform: scaleX(0);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 78 66'%3E%3Cpath d='M78 40 C 60 40 52 26 38 30 C 26 33 27 47 17 44 C 9 42 11 33 18 34' fill='none' stroke='%233e8e52' stroke-width='4.5' stroke-linecap='round'/%3E%3Cpath d='M17 44 C 7 47 2 37 9 32 C 15 28 20 37 13 41' fill='none' stroke='%23347f49' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M40 30 C 36 19 46 12 51 20 C 55 27 44 33 40 30 Z' fill='%2357a56a' stroke='%232d7742' stroke-width='1'/%3E%3C/svg%3E"); }
+  .card__vine--right { right: -52px; top: 26%; width: 78px; height: 66px; transform-origin: left center; transform: scaleX(0);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 78 66'%3E%3Cpath d='M0 40 C 18 40 26 26 40 30 C 52 33 51 47 61 44 C 69 42 67 33 60 34' fill='none' stroke='%233e8e52' stroke-width='4.5' stroke-linecap='round'/%3E%3Cpath d='M61 44 C 71 47 76 37 69 32 C 63 28 58 37 65 41' fill='none' stroke='%23347f49' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M38 30 C 42 19 32 12 27 20 C 23 27 34 33 38 30 Z' fill='%2357a56a' stroke='%232d7742' stroke-width='1'/%3E%3C/svg%3E"); }
+  .scene.in .card__vine--top { opacity: 1; transform: translateX(-50%) scaleY(1); transition-delay: 0.02s; }
+  .scene.in .card__vine--bottom { opacity: 1; transform: translateX(-50%) scaleY(1); transition-delay: 0.14s; }
+  .scene.in .card__vine--left { opacity: 1; transform: scaleX(1); transition-delay: 0.08s; }
+  .scene.in .card__vine--right { opacity: 1; transform: scaleX(1); transition-delay: 0.08s; }
+
+  .card__head, .card__lead, .mini > * { opacity: 0; transform: translateY(12px); transition: opacity 0.45s ease, transform 0.5s cubic-bezier(0.34,1.4,0.64,1); }
+  .scene.in .card__head { opacity: 1; transform: none; transition-delay: 0.18s; }
+  .scene.in .card__lead { opacity: 1; transform: none; transition-delay: 0.30s; }
+  .scene.in .mini > *:nth-child(1) { opacity: 1; transform: none; transition-delay: 0.42s; }
+  .scene.in .mini > *:nth-child(2) { opacity: 1; transform: none; transition-delay: 0.52s; }
+  .scene.in .mini > *:nth-child(3) { opacity: 1; transform: none; transition-delay: 0.62s; }
+  .scene.in .mini > *:nth-child(4) { opacity: 1; transform: none; transition-delay: 0.72s; }
+
+  .card__head { display: flex; align-items: center; gap: 0.75rem; }
+  .card__glyph { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; font-size: 1.65rem; flex-shrink: 0; box-shadow: 0 0 0 4px rgba(62,142,82,0.08); }
+  .card__kicker { font-family: 'Outfit Variable', Outfit, sans-serif; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--vine-green); opacity: 0.85; margin: 0; }
+  .card__name { font-family: 'Outfit Variable', Outfit, sans-serif; margin: 0.1rem 0 0; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.025em; line-height: 1; }
+  .card__lead { margin: 0.8rem 0 0; font-size: 1rem; line-height: 1.45; color: var(--deep-slate); font-weight: 500; }
+
+  .mini { margin-top: 0.95rem; display: flex; flex-direction: column; gap: 0.4rem; }
+  .drow { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; background: rgba(62,142,82,0.06); border-radius: 12px; padding: 0.5rem 0.7rem; font-size: 0.85rem; }
+  .who { display: flex; align-items: center; gap: 0.4rem; font-weight: 600; color: var(--deep-slate); }
+  .sub { color: var(--muted-text); font-size: 0.76rem; }
+  .tag { font-family: 'Outfit Variable', Outfit, sans-serif; font-size: 0.7rem; font-weight: 700; border-radius: 999px; padding: 0.13rem 0.55rem; }
+  .money-row { display: flex; align-items: center; gap: 0.9rem; background: rgba(62,142,82,0.06); border-radius: 14px; padding: 0.7rem 0.8rem; }
+  .ring { width: 62px; height: 62px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: conic-gradient(var(--heritage-orange) 0 62%, rgba(230,126,34,0.16) 62% 100%); }
+  .ring span { width: 44px; height: 44px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-family: 'Outfit Variable', Outfit, sans-serif; font-weight: 800; font-size: 0.8rem; color: var(--heritage-orange); }
+  .money-big { font-family: 'Outfit Variable', Outfit, sans-serif; font-weight: 800; font-size: 1.45rem; line-height: 1; }
+  .money-lbl { font-size: 0.72rem; color: var(--muted-text); margin-top: 2px; }
+  .barwrap { background: rgba(62,142,82,0.06); border-radius: 12px; padding: 0.55rem 0.7rem; }
+  .bar-line { font-size: 0.72rem; color: var(--muted-text); display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .bar { height: 7px; border-radius: 999px; background: rgba(44,62,80,0.08); overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--terracotta), var(--heritage-orange)); }
+  .lock { font-family: 'Outfit Variable', Outfit, sans-serif; font-weight: 700; color: var(--soft-green); font-size: 0.72rem; display: inline-flex; align-items: center; gap: 0.25rem; }
+
+  /* ---- rooted family + cartoon dirt + layered grass ---- */
+  .root { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 340px; height: 330px; z-index: 6; }
+  .root__burst { position: absolute; left: 50%; bottom: 150px; width: 220px; height: 220px; transform: translate(-50%, 50%) scale(0.4); border-radius: 50%; background: radial-gradient(circle, rgba(241,93,34,0.22) 0%, rgba(241,93,34,0) 62%); opacity: 0; pointer-events: none; z-index: 0; }
+  .root.celebrate .root__burst { animation: burst 1.1s ease-out; }
+  @keyframes burst { 0%{ opacity: 0; transform: translate(-50%,50%) scale(0.3);} 35%{ opacity: 1;} 100%{ opacity: 0; transform: translate(-50%,50%) scale(1.25);} }
+
+  .dirt { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); width: 310px; height: 72px; z-index: 1;
+    background: radial-gradient(58% 92% at 50% 22%, #a9713f 0%, #8b5a30 55%, #6f4724 100%);
+    border-radius: 46% 54% 50% 50% / 66% 70% 40% 36%; box-shadow: inset 0 -8px 14px rgba(60,36,16,0.4), 0 6px 14px rgba(60,36,16,0.25); }
+  .dirt::before { content: ""; position: absolute; inset: 0; border-radius: inherit; opacity: 0.5;
+    background-image: radial-gradient(rgba(60,36,16,0.5) 1.6px, transparent 2px), radial-gradient(rgba(255,220,180,0.35) 1.4px, transparent 2px);
+    background-size: 22px 20px, 30px 26px; background-position: 0 0, 11px 9px; }
+  .pebble { position: absolute; border-radius: 50%; background: #7a5330; box-shadow: inset 0 1px 1px rgba(255,255,255,0.25); }
+
+  .grass { position: absolute; left: 50%; transform: translateX(-50%); width: 320px; height: 110px; bottom: 44px; pointer-events: none; }
+  .grass--back { z-index: 2; filter: saturate(0.85) brightness(1.05); }
+  .grass--front { z-index: 4; }
+  .blade { position: absolute; bottom: var(--y, 0); left: 50%; width: var(--w, 11px); height: var(--h, 40px); transform: translateX(var(--x)) scaleY(0) rotate(var(--rot, 0deg)); transform-origin: bottom center; background: linear-gradient(to top, var(--c1, #2d7742) 0%, var(--c2, #57a56a) 100%); clip-path: polygon(50% 0%, 78% 52%, 100% 100%, 0% 100%, 22% 52%); border-radius: 2px; }
+  .blade.curl { clip-path: none; width: calc(var(--w, 11px) - 1px); border-radius: 60% 60% 46% 54% / 100% 100% 8% 8%; }
+  .gbean { position: absolute; bottom: var(--y, 6px); left: 50%; width: 22px; height: 22px; display: grid; place-items: center; font-size: 16px; transform: translateX(var(--x)) scale(0) rotate(var(--rot,0deg)); transform-origin: bottom center; }
+  .root.celebrate .blade { animation: sprout 0.9s cubic-bezier(0.2,1.5,0.35,1) var(--d, 0s) forwards, sway var(--sw, 3s) ease-in-out calc(var(--d, 0s) + 0.9s) infinite; }
+  .root.celebrate .gbean { animation: popbean 0.7s cubic-bezier(0.2,1.6,0.4,1) var(--d, 0s) forwards; }
+  @keyframes sprout { to { transform: translateX(var(--x)) scaleY(1) rotate(var(--rot,0deg)); } }
+  @keyframes sway { 0%,100%{ transform: translateX(var(--x)) scaleY(1) rotate(var(--rot,0deg)); } 50%{ transform: translateX(var(--x)) scaleY(1) rotate(calc(var(--rot,0deg) + var(--sd, 5deg))); } }
+  @keyframes popbean { to { transform: translateX(var(--x)) scale(1) rotate(var(--rot,0deg)); } }
+
+  .root .family { position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%); width: 190px; height: auto; filter: drop-shadow(0 12px 22px rgba(44,62,80,0.18)); z-index: 3; }
+  .root.celebrate .family { animation: familyHop 1.7s cubic-bezier(0.28,1.5,0.5,1) 0.15s; }
+  @keyframes familyHop { 0%{ transform: translateX(-50%) translateY(0); } 14%{ transform: translateX(-50%) translateY(-30px) scale(1.05);} 30%{ transform: translateX(-50%) translateY(0) scale(0.98);} 44%{ transform: translateX(-50%) translateY(-16px);} 58%{ transform: translateX(-50%) translateY(0);} 72%{ transform: translateX(-50%) translateY(-8px);} 86%,100%{ transform: translateX(-50%) translateY(0);} }
+  .root .root-note { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); width: 300px; text-align: center; font-family: 'Caveat Variable', Caveat, 'Outfit', cursive; font-size: 1.15rem; color: var(--muted-text); opacity: 0; transition: opacity 0.5s ease; z-index: 5; }
+  .root.celebrate .root-note { opacity: 1; transition-delay: 0.9s; }
+
+  .payoff { position: relative; z-index: 3; text-align: center; padding: 1.25rem 1rem 4rem; }
+  .payoff .tag-line { font-family: 'Outfit Variable', Outfit, sans-serif; font-size: clamp(1.5rem, 4.5vw, 2.3rem); font-weight: 800; letter-spacing: -0.02em; margin: 0 0 1.1rem; }
+  .payoff .tag-line em { color: var(--heritage-orange); font-style: normal; }
+  .cta { display: inline-block; background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta)); color: #fff; font-family: 'Outfit Variable', Outfit, sans-serif; font-weight: 700; font-size: 1rem; text-decoration: none; padding: 0.85rem 1.7rem; border-radius: 16px; box-shadow: 0 8px 22px rgba(241,93,34,0.28); transition: transform 0.2s ease, box-shadow 0.2s ease; }
+  .cta:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(241,93,34,0.36); }
+
+  @media (max-width: 780px) {
+    .stage { height: 2550px; }
+    .card { width: min(92%, 360px); }
+    .vine-leaf { width: 134px; height: 54px; }
+    .vine-leaf .t { font-size: 0.78rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .grow-hint { display: none; }
+    .card { opacity: 1 !important; transform: none !important; }
+    .card__vine { opacity: 1 !important; }
+    .card__vine--top, .card__vine--bottom { transform: translateX(-50%) scaleY(1) !important; }
+    .card__vine--left, .card__vine--right { transform: scaleX(1) !important; }
+    .card__head, .card__lead, .mini > * { opacity: 1 !important; transform: none !important; }
+    .vine-leaf { opacity: 1 !important; }
+    .vine-leaf.r { transform: translateY(-50%) scale(1) rotate(var(--r)) !important; }
+    .vine-leaf.l { transform: translate(-100%,-50%) scale(1) rotate(var(--r)) !important; }
+    .climber .glyph { animation: none; }
+    .blade { transform: translateX(var(--x)) scaleY(1) rotate(var(--rot,0deg)) !important; }
+    .gbean { transform: translateX(var(--x)) scale(1) rotate(var(--rot,0deg)) !important; }
+  }
+</style>
+
+<script>
+  (function () {
+    var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var stage = document.getElementById('stage');
+    var center = document.getElementById('vine-center') as unknown as SVGPathElement | null;
+    var grows = Array.prototype.slice.call(document.querySelectorAll('.grow')) as SVGPathElement[];
+    var climber = document.getElementById('climber');
+    var seedSlot = document.getElementById('seedSlot');
+    var root = document.getElementById('root');
+    var hint = document.querySelector('.grow-hint') as HTMLElement | null;
+    var scenes = Array.prototype.slice.call(document.querySelectorAll('.scene'));
+    var leaves = Array.prototype.slice.call(document.querySelectorAll('.vine-leaf'));
+
+    // Shared fail-safe: the fully-grown, all-revealed static state with no animation.
+    // Used by the reduced-motion branch AND any runtime error, so a failure degrades to
+    // a complete, visible section rather than a broken one — never a silent failure.
+    function renderStatic() {
+      grows.forEach(function (p) { p.style.strokeDasharray = 'none'; p.style.strokeDashoffset = '0'; });
+      scenes.forEach(function (s) { s.classList.add('in'); });
+      leaves.forEach(function (l) { l.classList.add('sprout'); });
+      if (root) root.classList.add('celebrate');
+      if (climber) { climber.classList.remove('docked'); (climber as HTMLElement).style.opacity = '0'; }
+    }
+
+    if (!stage || !center) {
+      console.warn(
+        '[worlds] beanstalk section could not initialise: missing #stage or #vine-center in the DOM — ' +
+        'the section renders statically. If this fires, WorldsBeanstalk.astro markup is out of sync with its script ' +
+        '(see docs/mockups/homepage-worlds-beanstalk-blend-2026-07-16.html).',
+      );
+      return;
+    }
+
+    var VBW = 1080, VBH = 2400;
+    var cLen = 0;
+    var docked = true, celebrated = false, ticking = false;
+
+    function buildBraid() {
+      cLen = center!.getTotalLength();
+      var stepv = 5, wl = 58, phases = [0, 2.0944, 4.1888], d = ['', '', ''];
+      for (var s = 0; s <= cLen; s += stepv) {
+        var a = center!.getPointAtLength(Math.max(0, s - 1.2));
+        var b = center!.getPointAtLength(Math.min(cLen, s + 1.2));
+        var tx = b.x - a.x, ty = b.y - a.y, tl = Math.hypot(tx, ty) || 1, nx = -ty / tl, ny = tx / tl;
+        var pt = center!.getPointAtLength(s), amp = 3.2 + 11 * (s / cLen);
+        for (var k = 0; k < 3; k++) {
+          var off = amp * Math.sin((2 * Math.PI * s) / wl + phases[k]);
+          d[k] += (d[k] ? ' L' : 'M') + (pt.x + nx * off).toFixed(1) + ' ' + (pt.y + ny * off).toFixed(1);
+        }
+      }
+      document.getElementById('braidA')!.setAttribute('d', d[0]);
+      document.getElementById('braidB')!.setAttribute('d', d[1]);
+      document.getElementById('braidC')!.setAttribute('d', d[2]);
+    }
+    function measure() { grows.forEach(function (p: any) { p._len = p.getTotalLength(); }); }
+
+    function positionLeaves() {
+      leaves.forEach(function (leaf: HTMLElement) {
+        var f = parseFloat(leaf.getAttribute('data-frac') || '0') || 0;
+        var pt = center!.getPointAtLength(f * cLen);
+        leaf.style.left = (pt.x / VBW * 100) + '%';
+        leaf.style.top = (pt.y / VBH * 100) + '%';
+        var left = leaf.getAttribute('data-side') === 'l';
+        leaf.classList.toggle('l', left); leaf.classList.toggle('r', !left);
+      });
+    }
+
+    // dock the seed over its slot in the copy (recomputed on resize / when docking)
+    function homeAtStalkTop() {
+      var pt0 = center!.getPointAtLength(0);
+      (climber as HTMLElement).style.left = (pt0.x / VBW * 100) + '%';
+      (climber as HTMLElement).style.top = (pt0.y / VBH * 100) + '%';
+      return pt0;
+    }
+    function dockOffset() {
+      var pt0 = homeAtStalkTop();
+      var st = stage!.getBoundingClientRect(), sl = seedSlot!.getBoundingClientRect();
+      var homeX = st.left + (pt0.x / VBW) * st.width, homeY = st.top + (pt0.y / VBH) * st.height;
+      (climber as HTMLElement).style.setProperty('--bx', ((sl.left + sl.width / 2) - homeX).toFixed(1) + 'px');
+      (climber as HTMLElement).style.setProperty('--by', ((sl.top + sl.height / 2) - homeY).toFixed(1) + 'px');
+    }
+
+    function update() {
+      ticking = false;
+      var r = stage!.getBoundingClientRect(), vh = window.innerHeight, H = r.height || 1;
+      var pRaw = (vh * 0.5 - r.top) / H;      // center-based scroll position (unclamped)
+      var P0 = 0.08 * vh / H;                 // launch anchor — seed jumps here, growth starts at 0
+      var launched = pRaw >= P0;
+      // growth is REMAPPED so g=0 at the launch point: the seed lands at the very TOP
+      // of the stalk (nothing grown yet), then the beanstalk grows down as you scroll.
+      var g = launched ? Math.max(0, Math.min(1, (pRaw - P0) / (1 - P0))) : 0;
+
+      grows.forEach(function (path: any) { path.style.strokeDashoffset = path._len * (1 - g); });
+
+      if (!launched) {
+        if (!docked) { dockOffset(); climber!.classList.add('docked'); docked = true; }
+      } else {
+        if (docked) { climber!.classList.remove('docked'); docked = false; }
+        var pt = center!.getPointAtLength(g * cLen);   // g=0 → top of the stalk
+        (climber as HTMLElement).style.left = (pt.x / VBW * 100) + '%';
+        (climber as HTMLElement).style.top = (pt.y / VBH * 100) + '%';
+        (climber as HTMLElement).style.opacity = (g < 0.995) ? '1' : '0';
+      }
+
+      // leaves unfurl ONLY as the seed passes their point on the vine
+      leaves.forEach(function (leaf: HTMLElement) {
+        var f = parseFloat(leaf.getAttribute('data-frac') || '0') || 0;
+        leaf.classList.toggle('sprout', g >= f);
+      });
+      // cards appear as the seed reaches them and STAY visible going down;
+      // they hide again only when scrolling back UP past their entry point
+      scenes.forEach(function (s: HTMLElement) {
+        var c = parseFloat(s.getAttribute('data-center') || '0') || 0;
+        s.classList.toggle('in', g >= (c - 0.05));
+      });
+      if (g > 0.95 && !celebrated) { celebrated = true; root!.classList.add('celebrate'); }
+      if (g < 0.86 && celebrated) { celebrated = false; root!.classList.remove('celebrate'); }
+      if (hint) hint.style.opacity = launched ? '0' : '0.95';
+    }
+    function onScroll() { if (!ticking) { ticking = true; requestAnimationFrame(update); } }
+    function onResize() {
+      buildBraid(); measure();
+      grows.forEach(function (p: any) { p.style.strokeDasharray = p._len; });
+      positionLeaves(); if (docked) dockOffset(); update();
+    }
+
+    try {
+      buildBraid();
+      measure();
+      positionLeaves();
+      if (prefersReduced) { renderStatic(); return; }
+      grows.forEach(function (p: any) { p.style.strokeDasharray = p._len; p.style.strokeDashoffset = p._len; });
+      dockOffset();
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onResize);
+      update();
+    } catch (err) {
+      console.warn(
+        '[worlds] animation setup failed — falling back to the static beanstalk. ' +
+        'Fix guidance: verify the SVG path #vine-center is present and getTotalLength/getPointAtLength are available.',
+        err,
+      );
+      renderStatic();
+    }
+  })();
+</script>
