@@ -1893,6 +1893,11 @@ const STRING_DEFS = {
     en: 'Could not update password. Please try again.',
     beanie: 'could not update password. please try again.',
   },
+  'changePassword.error.saveFailed': {
+    en: "Couldn't save your new password. Nothing changed — your current password still works. Please check your connection and try again.",
+    beanie:
+      "couldn't save your new password. nothing changed — your current password still works. please check your connection and try again.",
+  },
 
   // ── Admin/owner reset of another member's password ────────────────────────
   // Used by ResetMemberPasswordModal. Error keys map 1:1 onto `ResetError`
@@ -1915,9 +1920,11 @@ const STRING_DEFS = {
     en: 'Password reset. Share the new password with {name}.',
     beanie: 'password reset. share the new password with {name}.',
   },
-  'family.resetPassword.successDeferredSync': {
-    en: 'Will sync to your cloud file when the connection returns.',
-    beanie: 'will sync to your cloud file when the connection returns.',
+  // Shared spinner label while a password change/reset blocks on the durable
+  // Drive save (BeanieFormModal `submitting-label`). Used by both rotation modals.
+  'auth.passwordRotation.savingLabel': {
+    en: 'Saving your new password…',
+    beanie: 'saving your new password…',
   },
   'family.resetPassword.error.required': {
     en: 'Please enter and confirm a new password.',
@@ -1963,6 +1970,11 @@ const STRING_DEFS = {
     en: "Saved the new key locally but couldn't update their password record. Please try again.",
     beanie:
       "saved the new key locally but couldn't update their password record. please try again.",
+  },
+  'family.resetPassword.error.saveFailed': {
+    en: "Couldn't save the new password. Nothing changed — their current password still works. Please check your connection and try again.",
+    beanie:
+      "couldn't save the new password. nothing changed — their current password still works. please check your connection and try again.",
   },
 
   // ── Transfer Ownership ────────────────────────────────────────────────────

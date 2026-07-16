@@ -32,17 +32,27 @@ const syncStoreState = {
 const wrapForMemberMock = vi.fn(async () => {});
 const syncNowMock = vi.fn<(force?: boolean) => Promise<boolean>>(async () => true);
 
+const setMemberWrappedKeyMock = vi.fn(async () => {});
+
 vi.mock('@/stores/syncStore', () => ({
   useSyncStore: () => ({
     get familyKey() {
       return syncStoreState.familyKey;
     },
+    get envelope() {
+      return null;
+    },
     wrapFamilyKeyForMember: wrapForMemberMock,
+    setMemberWrappedKey: setMemberWrappedKeyMock,
     syncNow: syncNowMock,
+    DURABLE_ROTATION_SAVE_TIMEOUT_MS: 50,
     syncNowBounded: async (ms = 5000) => !!(await raceTimeout(syncNowMock(true), ms)),
     resetState: vi.fn(),
   }),
 }));
+
+// Stub telemetry so the durable-success logEvent doesn't hit the real queue.
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 
 // familyContextStore: not used in changePassword directly but signOut path
 // imports it — provide a stub so authStore's module load succeeds.
