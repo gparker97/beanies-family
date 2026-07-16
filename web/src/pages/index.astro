@@ -1219,7 +1219,10 @@ import { APP_URL } from '@beanies/brand/nav';
 .section-fade--to-light { background: linear-gradient(180deg, var(--deep-slate) 0%, var(--cloud-white) 100%); }
 .section-fade--to-story { background: linear-gradient(180deg, var(--cloud-white) 0%, #fdf8f5 100%); }
 .section-fade--from-story { background: linear-gradient(180deg, #fdf8f5 0%, var(--cloud-white) 100%); }
-.section-fade--hero-out { background: linear-gradient(180deg, var(--cloud-white) 0%, #fffdfb 100%); }
+/* hero → "what's inside" features: a taller, gradual warm-in (matching the
+   --to-story pattern) so the features section's warm top eases in rather than
+   starting abruptly. Ends on the features' warm tone (#fff7f3) for a seamless seam. */
+.section-fade--hero-out { height: 180px; background: linear-gradient(180deg, var(--cloud-white) 0%, #fff9f4 58%, #fff7f3 100%); }
 
 .ambient-orb { border-radius: 50%; filter: blur(80px); pointer-events: none; position: absolute; }
 
