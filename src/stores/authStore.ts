@@ -72,7 +72,13 @@ export const DEFERRED_PASSWORD_HASH = '';
 // before reading any other field.
 // ─────────────────────────────────────────────────────────────────────────
 
-export type RotateError = 'familyKeyMissing' | 'wrapFailed' | 'updateFailed' | 'saveFailed';
+export type RotateError =
+  | 'familyKeyMissing'
+  | 'wrapFailed'
+  | 'updateFailed'
+  | 'saveFailed'
+  | 'noConnection'
+  | 'rollbackFailed';
 export type RotateResult = { success: true } | { success: false; error: RotateError };
 
 export type RotateSurface = 'change-password' | 'reset-member-password' | 'signin-heal';
@@ -126,6 +132,21 @@ async function rotateMemberPassword(
     return { success: false, error: 'familyKeyMissing' };
   }
 
+  // Early offline gate (user surfaces only): if a durable save is CONFIDENTLY
+  // impossible (no write provider, or a cloud provider while the browser is
+  // offline), block BEFORE mutating anything and tell the user plainly. This
+  // avoids the scary rollback+critical-page+~24s-wait path for the common offline
+  // case. signin-heal is best-effort and never blocks — it skips this gate.
+  if (surface !== 'signin-heal' && !syncStore.canDurablySaveNow()) {
+    logEvent({
+      level: 'info',
+      surface,
+      message: 'rotation blocked — no durable save target',
+      context: { member_id_tail: memberIdTail, action: 'rotation-blocked-offline' },
+    });
+    return { success: false, error: 'noConnection' };
+  }
+
   // Capture-before-mutate: snapshot the exact pre-change credential state so a
   // failed durable save can restore it byte-for-byte (transactional rotation).
   const member = familyStore.members.find((m) => m.id === memberId);
@@ -135,18 +156,47 @@ async function rotateMemberPassword(
     requiresPassword: member?.requiresPassword ?? true,
   };
 
-  // Single-sourced rollback used by both undo sites (updateFailed + save-fail),
-  // so they can never drift. `wrapOnly` reverts just the envelope wrapped key
-  // (the updateFailed case, where passwordHash never changed).
-  async function restoreCredential(opts?: { wrapOnly?: boolean }): Promise<void> {
-    // setMemberWrappedKey(id, undefined) DELETES the entry — correct when the
-    // member had no prior one (first-time set), else restores the old entry.
-    await syncStore.setMemberWrappedKey(memberId, old.wrappedKeyEntry);
-    if (!opts?.wrapOnly) {
-      await familyStore.updateMember(memberId, {
-        passwordHash: old.passwordHash,
-        requiresPassword: old.requiresPassword,
+  // Single-sourced, fully-guarded rollback used by both undo sites (updateFailed +
+  // save-fail), so they can never drift. Returns true only if the pre-change state
+  // was fully restored. `wrapOnly` reverts just the envelope wrapped key (the
+  // updateFailed case, where passwordHash never changed). A failed rollback is
+  // genuinely data-at-risk (the local doc may still hold the NEW hash) → critical.
+  async function restoreCredential(opts?: { wrapOnly?: boolean }): Promise<boolean> {
+    try {
+      // setMemberWrappedKey(id, undefined) DELETES the entry — correct when the
+      // member had no prior one (first-time set), else restores the old entry.
+      // This is the only call that can throw (mid-flight envelope-clear).
+      await syncStore.setMemberWrappedKey(memberId, old.wrappedKeyEntry);
+      if (!opts?.wrapOnly) {
+        const restored = await familyStore.updateMember(memberId, {
+          passwordHash: old.passwordHash,
+          requiresPassword: old.requiresPassword,
+        });
+        if (!restored) {
+          // local hash NOT reverted — new hash may persist (data-at-risk).
+          reportError({
+            surface,
+            message: 'rollback hash-restore returned null — credential may be half-rotated',
+            severity: 'critical',
+            context: {
+              member_id_tail: memberIdTail,
+              action: 'rotation-rollback-failed',
+              error_code: 'update-null',
+            },
+          });
+          return false;
+        }
+      }
+      return true;
+    } catch (e) {
+      reportError({
+        surface,
+        message: 'rollback threw — credential may be half-rotated',
+        severity: 'critical',
+        error: e,
+        context: { member_id_tail: memberIdTail, action: 'rotation-rollback-failed' },
       });
+      return false;
     }
   }
 
@@ -170,7 +220,11 @@ async function rotateMemberPassword(
   if (!updated) {
     // Wrap succeeded but the passwordHash write failed — roll back the wrap so
     // no half-rotated envelope (new wrapped key + old hash) ever persists.
-    await restoreCredential({ wrapOnly: true });
+    const rolledBack = await restoreCredential({ wrapOnly: true });
+    if (!rolledBack) {
+      // critical already logged inside restoreCredential.
+      return { success: false, error: 'rollbackFailed' };
+    }
     reportError({
       surface,
       message: 'updateMember returned null after wrap succeeded — wrap rolled back',
@@ -203,11 +257,13 @@ async function rotateMemberPassword(
     return { success: true };
   }
 
-  // User-initiated change/reset: block on the REAL Drive save (~12s). `saved`
-  // collapses timeout+failure into "not saved" (syncNowBounded coerces the
-  // raceTimeout undefined → false), and either triggers a full rollback.
-  const saved = await syncStore.syncNowBounded(syncStore.DURABLE_ROTATION_SAVE_TIMEOUT_MS);
-  if (saved) {
+  // User-initiated change/reset: block on the REAL Drive save (~12s). The
+  // three-state outcome distinguishes a clean failure (nothing reached Drive)
+  // from a timeout (the non-cancellable write may still land) — the whole reason
+  // we don't use syncNowBounded here. A post-write reject maps to 'saved' inside
+  // syncNowDurable (the credential is durable; only the metadata write failed).
+  const outcome = await syncStore.syncNowDurable(syncStore.DURABLE_ROTATION_SAVE_TIMEOUT_MS);
+  if (outcome === 'saved') {
     logEvent({
       level: 'info',
       surface,
@@ -217,8 +273,12 @@ async function rotateMemberPassword(
     return { success: true };
   }
 
-  // Not saved → fully restore the pre-change credential (all three pieces).
-  await restoreCredential();
+  // Not saved → fully restore the pre-change credential (all three pieces). A
+  // rollback that can't complete is itself data-at-risk (critical logged inside).
+  const restored = await restoreCredential();
+  if (!restored) {
+    return { success: false, error: 'rollbackFailed' };
+  }
   reportError({
     surface,
     message: 'password rotation rolled back — durable save did not confirm',
@@ -226,25 +286,34 @@ async function rotateMemberPassword(
     context: {
       member_id_tail: memberIdTail,
       action: 'rotation-rolled-back',
-      error_code: 'not-saved',
+      error_code: outcome, // 'failed' | 'timeout'
     },
   });
 
-  // Convergence re-save: serialize the rolled-back (old-password) state BEHIND
-  // any stray in-flight new-password upload via syncService's save() mutex, so
-  // Drive converges back to the old password even if the earlier non-cancellable
-  // write() lands after the rollback. If THIS re-save also fails, Drive may hold
-  // the new password while local is old (a cross-device lockout window until the
-  // next successful auto-sync) — the one data-at-risk case that pages.
-  const reSaved = await syncStore.syncNowBounded(syncStore.DURABLE_ROTATION_SAVE_TIMEOUT_MS);
-  if (!reSaved) {
-    reportError({
-      surface,
-      message:
-        'rollback re-save did not confirm — Drive may hold the new password while local reverted (possible cross-device lockout window)',
-      severity: 'critical',
-      context: { member_id_tail: memberIdTail, action: 'rotation-resave-failed' },
-    });
+  // Convergence re-save ONLY on timeout (the non-cancellable write may have
+  // landed). It serializes the rolled-back (old-password) state BEHIND any stray
+  // in-flight upload via syncService's save() mutex, so Drive converges back to
+  // the old password. On a clean 'failed' nothing reached Drive, so no
+  // convergence + no critical is needed. Reuses syncNowDurable so a post-write
+  // metadata reject here maps to 'saved' (Drive converged) rather than firing a
+  // false page. If this re-save doesn't confirm 'saved', Drive may hold the new
+  // password while local is old (a cross-device lockout window) — the one
+  // data-at-risk case that pages.
+  if (outcome === 'timeout') {
+    const converged = await syncStore.syncNowDurable(syncStore.DURABLE_ROTATION_SAVE_TIMEOUT_MS);
+    if (converged !== 'saved') {
+      reportError({
+        surface,
+        message:
+          'rollback re-save did not confirm after a timed-out durable save — Drive may hold the new password while local reverted (possible cross-device lockout window)',
+        severity: 'critical',
+        context: {
+          member_id_tail: memberIdTail,
+          action: 'rotation-resave-failed',
+          error_code: converged,
+        },
+      });
+    }
   }
   return { success: false, error: 'saveFailed' };
 }
@@ -866,15 +935,18 @@ export const useAuthStore = defineStore('auth', () => {
       // is owned by the caller, so different surfaces (Settings vs. Family
       // page) can use different language. `result.error` is a closed union,
       // so this switch is exhaustive at compile time.
+      const t = useTranslationStore().t;
       const errorMessages: Record<RotateError, string> = {
         familyKeyMissing: 'Could not load family key — please sign out and back in, then try again',
         wrapFailed: 'Failed to re-wrap your account key. Please try again.',
-        updateFailed:
-          "Saved the new key locally but couldn't update your password record. Please try again.",
-        // The durable-save-failed case is the one the user hits on a bad
-        // connection — routed through i18n (en + beanie + zh) per the approved
-        // copy. The three legacy strings above stay English-only (out of scope).
-        saveFailed: useTranslationStore().t('changePassword.error.saveFailed'),
+        // Now that updateFailed rolls back the wrap, nothing is saved — corrected
+        // from the old "saved the new key locally" copy (English-only, in place).
+        updateFailed: "Couldn't update your password. Nothing was changed. Please try again.",
+        // The connection-dependent cases are routed through i18n (en + beanie +
+        // zh). The two legacy strings above stay English-only (out of scope).
+        saveFailed: t('changePassword.error.saveFailed'),
+        noConnection: t('changePassword.error.noConnection'),
+        rollbackFailed: t('changePassword.error.rollbackFailed'),
       };
       return { success: false, error: errorMessages[result.error] };
     }

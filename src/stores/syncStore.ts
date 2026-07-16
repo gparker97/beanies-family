@@ -572,8 +572,61 @@ export const useSyncStore = defineStore('sync', () => {
    * the best-effort post-auth bound because here we are trading spinner time for
    * a hard durability guarantee, not merely avoiding a wedge. */
   const DURABLE_ROTATION_SAVE_TIMEOUT_MS = 12000;
+
+  /**
+   * Three-state bounded save — the SINGLE implementation of the
+   * `raceTimeout(syncNow(true), …)` pattern. Distinguishes the three outcomes the
+   * transactional password-rotation path needs (`syncNowBounded` collapses them):
+   *   - `'saved'`   — the Drive write confirmed.
+   *   - `'failed'`  — a clean failure; the write did NOT complete (nothing reached Drive).
+   *   - `'timeout'` — the bound elapsed; the non-cancellable write MAY still be in flight.
+   *
+   * `syncNow(true)` only ever rejects AFTER a successful Drive write (the post-write
+   * `settingsRepo.saveSettings` metadata write throws — `save()`/`doSave` themselves
+   * catch all and return `false`). So a rejection means the credential IS durable: we
+   * surface the metadata failure as a `warning` and report `'saved'`, never failing a
+   * genuinely-durable rotation or firing a false page.
+   */
+  async function syncNowDurable(timeoutMs: number): Promise<'saved' | 'failed' | 'timeout'> {
+    try {
+      const r = await raceTimeout(syncNow(true), timeoutMs);
+      if (r === undefined) return 'timeout';
+      return r ? 'saved' : 'failed';
+    } catch (e) {
+      reportError({
+        surface: 'sync-now-durable',
+        severity: 'warning',
+        message:
+          'syncNow rejected after a successful Drive write (settings metadata write failed) — credential is durable',
+        error: e,
+      });
+      return 'saved';
+    }
+  }
+
+  /** Bounded best-effort save → boolean. Thin wrapper over `syncNowDurable` so there
+   * is exactly ONE implementation of the timeout + reject-means-saved core. (A
+   * post-write reject now maps to `true` instead of throwing — strictly safer for
+   * both callers: login-completion + signin-heal.) */
   async function syncNowBounded(timeoutMs = POST_AUTH_SAVE_TIMEOUT_MS): Promise<boolean> {
-    return !!(await raceTimeout(syncNow(true), timeoutMs));
+    return (await syncNowDurable(timeoutMs)) === 'saved';
+  }
+
+  /**
+   * Whether a durable save (Drive OR local file) is possible RIGHT NOW — the
+   * pre-mutation gate for password rotation. Returns false only when durability is
+   * CONFIDENTLY impossible: no write provider configured (cache-only family), or a
+   * cloud provider while the browser reports offline. A local-file provider is
+   * durable without network. An online cloud provider that then fails mid-write is
+   * NOT pre-blocked here — it falls through to the durable-or-rollback path.
+   */
+  function canDurablySaveNow(): boolean {
+    const providerType = syncService.getProviderType(); // 'google_drive' | 'local' | null
+    if (!providerType) return false; // cache-only family: no durable target
+    if (providerType === 'google_drive' && typeof navigator !== 'undefined' && !navigator.onLine) {
+      return false; // cloud provider needs the network
+    }
+    return true;
   }
 
   /**
@@ -3444,6 +3497,8 @@ export const useSyncStore = defineStore('sync', () => {
     migrateStorage,
     syncNow,
     syncNowBounded,
+    syncNowDurable,
+    canDurablySaveNow,
     DURABLE_ROTATION_SAVE_TIMEOUT_MS,
     forceSyncNow,
     checkForConflicts,

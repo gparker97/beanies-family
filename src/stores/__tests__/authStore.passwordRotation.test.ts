@@ -44,9 +44,24 @@ const setMemberWrappedKeyMock = vi.fn(
   async (_id: string, _entry: WrappedMemberKey | undefined) => {}
 );
 const syncNowMock = vi.fn<(force?: boolean) => Promise<boolean>>(async () => true);
+// Controls the early offline gate; default true (durable save possible).
+const canDurablySaveNowState = { value: true };
 // Shortened durable-save bound so the never-settles/timeout tests run in ~100ms
 // instead of the real 12s. The real code reads syncStore.DURABLE_ROTATION_SAVE_TIMEOUT_MS.
 const DURABLE_ROTATION_SAVE_TIMEOUT_MS = 50;
+
+// Faithful mirror of the real syncNowDurable over syncNowMock: undefined→'timeout',
+// false→'failed', true→'saved', reject→'saved' (post-write metadata failure). Tests
+// drive it via the existing syncNowMock so call counts stay assertable.
+async function syncNowDurableImpl(ms = 5000): Promise<'saved' | 'failed' | 'timeout'> {
+  try {
+    const r = await raceTimeout(syncNowMock(true), ms);
+    if (r === undefined) return 'timeout';
+    return r ? 'saved' : 'failed';
+  } catch {
+    return 'saved';
+  }
+}
 
 vi.mock('@/stores/syncStore', () => ({
   useSyncStore: () => ({
@@ -60,9 +75,10 @@ vi.mock('@/stores/syncStore', () => ({
     setMemberWrappedKey: setMemberWrappedKeyMock,
     syncNow: syncNowMock,
     DURABLE_ROTATION_SAVE_TIMEOUT_MS,
-    // Mirror the real syncNowBounded: race syncNow(true) against the timeout so the
-    // 'syncNow called with true' + rollback + never-settles assertions still hold.
-    syncNowBounded: async (ms = 5000) => !!(await raceTimeout(syncNowMock(true), ms)),
+    canDurablySaveNow: () => canDurablySaveNowState.value,
+    syncNowDurable: syncNowDurableImpl,
+    // syncNowBounded now delegates to syncNowDurable in the real store; mirror that.
+    syncNowBounded: async (ms = 5000) => (await syncNowDurableImpl(ms)) === 'saved',
     resetState: vi.fn(),
   }),
 }));
@@ -182,6 +198,7 @@ beforeEach(() => {
   membersRef.value = [];
   syncStoreState.familyKey = FAKE_KEY;
   syncStoreState.envelope = buildEnvelope();
+  canDurablySaveNowState.value = true; // durable save possible by default
   // Default sync returns true and updateMember returns truthy.
   syncNowMock.mockResolvedValue(true);
   updateMemberMock.mockImplementation(async (id) => ({ id, updated: true }));
@@ -233,16 +250,16 @@ describe('authStore.changePassword (after rotateMemberPassword refactor)', () =>
     const result = await store.changePassword('real-pw', 'new-strong-pw');
 
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/locally/);
+    expect(result.error).toMatch(/Nothing was changed/);
     // updateFailed rolls back ONLY the wrap (hash never changed) — one restore
     // call, no passwordHash restore.
     expect(setMemberWrappedKeyMock).toHaveBeenCalledTimes(1);
   });
 
-  it('rolls back + maps saveFailed to inline copy when the durable save fails', async () => {
+  it('rolls back + maps saveFailed on a CLEAN durable-save failure (no convergence, no critical)', async () => {
     const member = await memberWithPassword('m1', 'real-pw');
     membersRef.value = [member];
-    // Durable save fails; convergence re-save then succeeds (default true).
+    // Clean failure (write did not complete) → 'failed' → NO convergence re-save.
     syncNowMock.mockResolvedValueOnce(false);
 
     const store = useAuthStore();
@@ -260,13 +277,41 @@ describe('authStore.changePassword (after rotateMemberPassword refactor)', () =>
       'm1',
       expect.objectContaining({ passwordHash: member.passwordHash, requiresPassword: false })
     );
-    // Convergence re-save issued (syncNow called twice: durable + re-save).
-    expect(syncNowMock).toHaveBeenCalledTimes(2);
-    // Rollback telemetry (warning), no critical (re-save succeeded).
+    // Clean 'failed' → NO convergence re-save (syncNow called ONCE).
+    expect(syncNowMock).toHaveBeenCalledTimes(1);
+    // Rollback telemetry (warning, error_code:'failed'), and NO critical.
     expect(reportErrorMock).toHaveBeenCalledWith(
       expect.objectContaining({
         severity: 'warning',
-        context: expect.objectContaining({ action: 'rotation-rolled-back' }),
+        context: expect.objectContaining({ action: 'rotation-rolled-back', error_code: 'failed' }),
+      })
+    );
+    expect(reportErrorMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'critical' })
+    );
+  });
+
+  it('blocks early with noConnection when no durable save target (no mutation)', async () => {
+    const member = await memberWithPassword('m1', 'real-pw');
+    membersRef.value = [member];
+    canDurablySaveNowState.value = false; // offline / cache-only
+
+    const store = useAuthStore();
+    store.currentUser = { memberId: 'm1', email: 't@example.com', familyId: 'fam-1' };
+    store.isAuthenticated = true;
+
+    const result = await store.changePassword('real-pw', 'new-strong-pw');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('changePassword.error.noConnection');
+    // NOTHING mutated, no save attempted, no rollback, no critical.
+    expect(wrapForMemberMock).not.toHaveBeenCalled();
+    expect(updateMemberMock).not.toHaveBeenCalled();
+    expect(setMemberWrappedKeyMock).not.toHaveBeenCalled();
+    expect(syncNowMock).not.toHaveBeenCalled();
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ action: 'rotation-blocked-offline' }),
       })
     );
     expect(reportErrorMock).not.toHaveBeenCalledWith(
@@ -525,13 +570,33 @@ describe('authStore.resetMemberPassword', () => {
     expect(setMemberWrappedKeyMock).not.toHaveBeenCalled();
   });
 
-  it('rolls back + returns saveFailed when the durable save fails (no-prior-entry removes)', async () => {
+  it('treats a post-write syncNow rejection as a durable success (no rollback)', async () => {
+    const me = await memberWithPassword('admin', 'pw', { canManagePod: true });
+    const target = await memberWithPassword('m2', 'oldpw');
+    membersRef.value = [me, target];
+    // syncNow rejects only AFTER a successful Drive write → syncNowDurable maps to 'saved'.
+    syncNowMock.mockRejectedValueOnce(new Error('settings metadata write failed'));
+
+    const store = useAuthStore();
+    store.currentUser = { memberId: 'admin', email: 'a@x.com', familyId: 'fam-1' };
+    store.isAuthenticated = true;
+
+    const result = await store.resetMemberPassword('m2', 'temp-pw');
+    expect(result).toEqual({ success: true });
+    // Durable success → NO rollback, NO critical.
+    expect(setMemberWrappedKeyMock).not.toHaveBeenCalled();
+    expect(reportErrorMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'critical' })
+    );
+  });
+
+  it('rolls back + returns saveFailed on a CLEAN save failure (no convergence, no-prior-entry removes)', async () => {
     const me = await memberWithPassword('admin', 'pw', { canManagePod: true });
     const target = await memberWithPassword('m2', 'oldpw');
     membersRef.value = [me, target];
     // Envelope has NO entry for m2 → rollback must REMOVE the freshly-added one.
     syncStoreState.envelope = buildEnvelope({});
-    syncNowMock.mockResolvedValueOnce(false); // durable save fails; re-save then succeeds
+    syncNowMock.mockResolvedValueOnce(false); // clean failure → 'failed' → no convergence
 
     const store = useAuthStore();
     store.currentUser = { memberId: 'admin', email: 'a@x.com', familyId: 'fam-1' };
@@ -546,15 +611,21 @@ describe('authStore.resetMemberPassword', () => {
       'm2',
       expect.objectContaining({ passwordHash: target.passwordHash })
     );
-    // Convergence re-save issued.
-    expect(syncNowMock).toHaveBeenCalledTimes(2);
+    // Clean 'failed' → NO convergence (syncNow called ONCE), NO critical.
+    expect(syncNowMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'critical' })
+    );
   });
 
-  it('pages critical when BOTH the durable save and the convergence re-save fail', async () => {
+  it('pages critical when the durable save TIMES OUT and the convergence re-save then fails', async () => {
     const me = await memberWithPassword('admin', 'pw', { canManagePod: true });
     const target = await memberWithPassword('m2', 'oldpw');
     membersRef.value = [me, target];
-    syncNowMock.mockResolvedValue(false); // every save fails (durable + re-save)
+    // Primary save never settles → 'timeout' (write may have landed) → convergence.
+    // Convergence save then cleanly fails → converged !== 'saved' → critical.
+    syncNowMock.mockResolvedValue(false);
+    syncNowMock.mockImplementationOnce(() => new Promise<boolean>(() => {}));
 
     const store = useAuthStore();
     store.currentUser = { memberId: 'admin', email: 'a@x.com', familyId: 'fam-1' };
@@ -566,6 +637,48 @@ describe('authStore.resetMemberPassword', () => {
       expect.objectContaining({
         severity: 'critical',
         context: expect.objectContaining({ action: 'rotation-resave-failed' }),
+      })
+    );
+  }, 10000);
+
+  it('does NOT page critical when a timed-out save then converges on re-save', async () => {
+    const me = await memberWithPassword('admin', 'pw', { canManagePod: true });
+    const target = await memberWithPassword('m2', 'oldpw');
+    membersRef.value = [me, target];
+    // Primary save times out → 'timeout'; convergence re-save succeeds (default true).
+    syncNowMock.mockImplementationOnce(() => new Promise<boolean>(() => {}));
+
+    const store = useAuthStore();
+    store.currentUser = { memberId: 'admin', email: 'a@x.com', familyId: 'fam-1' };
+    store.isAuthenticated = true;
+
+    const result = await store.resetMemberPassword('m2', 'temp-pw');
+    expect(result).toEqual({ success: false, error: 'saveFailed' });
+    expect(reportErrorMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'critical' })
+    );
+  }, 10000);
+
+  it('returns rollbackFailed + critical when the rollback itself fails', async () => {
+    const me = await memberWithPassword('admin', 'pw', { canManagePod: true });
+    const target = await memberWithPassword('m2', 'oldpw');
+    membersRef.value = [me, target];
+    syncNowMock.mockResolvedValueOnce(false); // clean save failure → rollback
+    // The mutation updateMember succeeds; the ROLLBACK updateMember returns null.
+    updateMemberMock
+      .mockImplementationOnce(async (id) => ({ id, updated: true })) // mutation
+      .mockResolvedValueOnce(null); // rollback hash-restore fails
+
+    const store = useAuthStore();
+    store.currentUser = { memberId: 'admin', email: 'a@x.com', familyId: 'fam-1' };
+    store.isAuthenticated = true;
+
+    const result = await store.resetMemberPassword('m2', 'temp-pw');
+    expect(result).toEqual({ success: false, error: 'rollbackFailed' });
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'critical',
+        context: expect.objectContaining({ action: 'rotation-rollback-failed' }),
       })
     );
   });

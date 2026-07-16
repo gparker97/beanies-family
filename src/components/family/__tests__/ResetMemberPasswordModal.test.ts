@@ -27,6 +27,9 @@ vi.mock('@/stores/authStore', () => ({
   }),
 }));
 
+const { reportErrorMock } = vi.hoisted(() => ({ reportErrorMock: vi.fn() }));
+vi.mock('@/utils/errorReporter', () => ({ reportError: reportErrorMock }));
+
 function buildMember(overrides: Partial<FamilyMember> = {}): FamilyMember {
   return {
     id: 'm2',
@@ -149,6 +152,25 @@ describe('ResetMemberPasswordModal — happy path', () => {
     );
     expect(w.emitted('reset')).toBeTruthy();
     expect(w.emitted('close')).toBeTruthy();
+  });
+
+  it('surfaces an inline error (never a silent stop) if the store rejects', async () => {
+    resetMemberPasswordMock.mockRejectedValueOnce(new Error('unexpected'));
+    const w = mountModal();
+    await w.find('[data-test="new"]').setValue('temp-pw');
+    await w.find('[data-test="confirm"]').setValue('temp-pw');
+    await w.find('[data-test="submit"]').trigger('click');
+    await flushPromises();
+
+    expect(w.text()).toContain('family.resetPassword.error.unexpected');
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'reset-member-password',
+        message: 'resetMemberPassword threw',
+      })
+    );
+    // Spinner cleared, no crash.
+    expect(w.emitted('close')).toBeFalsy();
   });
 });
 
