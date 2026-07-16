@@ -20,6 +20,8 @@ import * as docClient from '@/services/automerge/worker/docClient';
 import { clearGoogleSessionState } from '@/services/google/googleAuth';
 import { clearFolderCache } from '@/services/google/driveService';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
+import type { WrappedMemberKey } from '@/types/syncFileV4';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from './translationStore';
 
@@ -70,9 +72,8 @@ export const DEFERRED_PASSWORD_HASH = '';
 // before reading any other field.
 // ─────────────────────────────────────────────────────────────────────────
 
-export type RotateError = 'familyKeyMissing' | 'wrapFailed' | 'updateFailed';
-export type RotateResult =
-  { success: true; syncDeferred: boolean } | { success: false; error: RotateError };
+export type RotateError = 'familyKeyMissing' | 'wrapFailed' | 'updateFailed' | 'saveFailed';
+export type RotateResult = { success: true } | { success: false; error: RotateError };
 
 export type RotateSurface = 'change-password' | 'reset-member-password' | 'signin-heal';
 
@@ -90,6 +91,20 @@ export type ResetError =
   | 'cannotResetOwner'
   | 'notAuthorized';
 
+/**
+ * The three pre-mutation credential pieces captured so a rotation can be
+ * FULLY undone. `wrappedKeyEntry` is the member's prior envelope wrapped-key
+ * (or `undefined` when the member had no entry — a first-time password set,
+ * whose rollback must REMOVE the freshly-added entry). `requiresPassword` is
+ * derived from `!passwordHash` on every read, so restoring `passwordHash`
+ * alone already restores it — we capture it only for the explicit restore call.
+ */
+interface RotationSnapshot {
+  wrappedKeyEntry: WrappedMemberKey | undefined;
+  passwordHash: string;
+  requiresPassword: boolean;
+}
+
 async function rotateMemberPassword(
   memberId: string,
   newPassword: string,
@@ -99,14 +114,40 @@ async function rotateMemberPassword(
   // (established pattern — see other lazy imports below).
   const { useSyncStore } = await import('@/stores/syncStore');
   const syncStore = useSyncStore();
+  const familyStore = useFamilyStore();
+  const memberIdTail = memberId.slice(-8);
   if (!syncStore.familyKey) {
     reportError({
       surface,
       message: 'familyKey not loaded — cannot wrap',
       severity: 'warning',
-      context: { member_id_tail: memberId.slice(-8) },
+      context: { member_id_tail: memberIdTail },
     });
     return { success: false, error: 'familyKeyMissing' };
+  }
+
+  // Capture-before-mutate: snapshot the exact pre-change credential state so a
+  // failed durable save can restore it byte-for-byte (transactional rotation).
+  const member = familyStore.members.find((m) => m.id === memberId);
+  const old: RotationSnapshot = {
+    wrappedKeyEntry: syncStore.envelope?.wrappedKeys?.[memberId],
+    passwordHash: member?.passwordHash ?? '',
+    requiresPassword: member?.requiresPassword ?? true,
+  };
+
+  // Single-sourced rollback used by both undo sites (updateFailed + save-fail),
+  // so they can never drift. `wrapOnly` reverts just the envelope wrapped key
+  // (the updateFailed case, where passwordHash never changed).
+  async function restoreCredential(opts?: { wrapOnly?: boolean }): Promise<void> {
+    // setMemberWrappedKey(id, undefined) DELETES the entry — correct when the
+    // member had no prior one (first-time set), else restores the old entry.
+    await syncStore.setMemberWrappedKey(memberId, old.wrappedKeyEntry);
+    if (!opts?.wrapOnly) {
+      await familyStore.updateMember(memberId, {
+        passwordHash: old.passwordHash,
+        requiresPassword: old.requiresPassword,
+      });
+    }
   }
 
   try {
@@ -116,42 +157,96 @@ async function rotateMemberPassword(
       surface,
       message: 'wrapFamilyKeyForMember threw',
       error: e,
-      context: { member_id_tail: memberId.slice(-8) },
+      context: { member_id_tail: memberIdTail },
     });
     return { success: false, error: 'wrapFailed' };
   }
 
   const newHash = await hashPassword(newPassword);
-  const familyStore = useFamilyStore();
   const updated = await familyStore.updateMember(memberId, {
     passwordHash: newHash,
     requiresPassword: false,
   });
   if (!updated) {
-    // Inconsistent local state: wrappedKey rotated but passwordHash unchanged.
-    // Retry is idempotent — both writes overwrite. Surface explicitly.
+    // Wrap succeeded but the passwordHash write failed — roll back the wrap so
+    // no half-rotated envelope (new wrapped key + old hash) ever persists.
+    await restoreCredential({ wrapOnly: true });
     reportError({
       surface,
-      message:
-        'updateMember returned null after wrap succeeded — passwordHash stale; retry is idempotent',
+      message: 'updateMember returned null after wrap succeeded — wrap rolled back',
       severity: 'error',
-      context: { member_id_tail: memberId.slice(-8) },
+      context: {
+        member_id_tail: memberIdTail,
+        action: 'rotation-rolled-back',
+        error_code: 'update-failed',
+      },
     });
     return { success: false, error: 'updateFailed' };
   }
 
-  // Bound the Drive push so the caller's spinner can't wedge forever. The
-  // rotation is already committed to the in-memory doc + IndexedDB cache above
-  // (wrapFamilyKeyForMember + updateMember), so a slow/offline/token-rejected
-  // syncNow must resolve-and-proceed — the push rides the next auto-sync. A
-  // timeout surfaces as syncDeferred (callers show "will sync when online"),
-  // exactly like the biometric/login-completion saves. `syncNowBounded` is the
-  // shared home for this `raceTimeout(syncNow(true), …)` pattern.
-  const synced = await syncStore.syncNowBounded();
-  // syncNow failure/timeout already raises SaveFailureBanner (on failure) or
-  // will retry on next auto-sync (on timeout). We expose syncDeferred so callers
-  // can include "will sync when online" in their success toast.
-  return { success: true, syncDeferred: !synced };
+  // ── Durable save vs best-effort, by surface ──────────────────────────────
+  // signin-heal re-wraps with the CURRENT password (no old/new split-brain) and
+  // must never block or fail sign-in — keep its best-effort resolve-and-proceed
+  // 5s bound. NO rollback, NO error surface (regressing this would re-introduce
+  // the 0.9.5R3/R4 spinner-freeze class). The caller discards the result.
+  if (surface === 'signin-heal') {
+    const synced = await syncStore.syncNowBounded();
+    logEvent({
+      level: 'info',
+      surface,
+      message: 'signin-heal rotation save (best-effort)',
+      context: {
+        member_id_tail: memberIdTail,
+        action: synced ? 'rotation-saved' : 'rotation-deferred',
+      },
+    });
+    return { success: true };
+  }
+
+  // User-initiated change/reset: block on the REAL Drive save (~12s). `saved`
+  // collapses timeout+failure into "not saved" (syncNowBounded coerces the
+  // raceTimeout undefined → false), and either triggers a full rollback.
+  const saved = await syncStore.syncNowBounded(syncStore.DURABLE_ROTATION_SAVE_TIMEOUT_MS);
+  if (saved) {
+    logEvent({
+      level: 'info',
+      surface,
+      message: 'rotation saved durably',
+      context: { member_id_tail: memberIdTail, action: 'rotation-saved' },
+    });
+    return { success: true };
+  }
+
+  // Not saved → fully restore the pre-change credential (all three pieces).
+  await restoreCredential();
+  reportError({
+    surface,
+    message: 'password rotation rolled back — durable save did not confirm',
+    severity: 'warning',
+    context: {
+      member_id_tail: memberIdTail,
+      action: 'rotation-rolled-back',
+      error_code: 'not-saved',
+    },
+  });
+
+  // Convergence re-save: serialize the rolled-back (old-password) state BEHIND
+  // any stray in-flight new-password upload via syncService's save() mutex, so
+  // Drive converges back to the old password even if the earlier non-cancellable
+  // write() lands after the rollback. If THIS re-save also fails, Drive may hold
+  // the new password while local is old (a cross-device lockout window until the
+  // next successful auto-sync) — the one data-at-risk case that pages.
+  const reSaved = await syncStore.syncNowBounded(syncStore.DURABLE_ROTATION_SAVE_TIMEOUT_MS);
+  if (!reSaved) {
+    reportError({
+      surface,
+      message:
+        'rollback re-save did not confirm — Drive may hold the new password while local reverted (possible cross-device lockout window)',
+      severity: 'critical',
+      context: { member_id_tail: memberIdTail, action: 'rotation-resave-failed' },
+    });
+  }
+  return { success: false, error: 'saveFailed' };
 }
 
 /**
@@ -776,6 +871,10 @@ export const useAuthStore = defineStore('auth', () => {
         wrapFailed: 'Failed to re-wrap your account key. Please try again.',
         updateFailed:
           "Saved the new key locally but couldn't update your password record. Please try again.",
+        // The durable-save-failed case is the one the user hits on a bad
+        // connection — routed through i18n (en + beanie + zh) per the approved
+        // copy. The three legacy strings above stay English-only (out of scope).
+        saveFailed: useTranslationStore().t('changePassword.error.saveFailed'),
       };
       return { success: false, error: errorMessages[result.error] };
     }
@@ -796,7 +895,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function resetMemberPassword(
     targetMemberId: string,
     newPassword: string
-  ): Promise<{ success: true; syncDeferred: boolean } | { success: false; error: ResetError }> {
+  ): Promise<{ success: true } | { success: false; error: ResetError }> {
     if (!isAuthenticated.value || !currentUser.value) {
       return { success: false, error: 'notAuthenticated' };
     }
@@ -824,7 +923,7 @@ export const useAuthStore = defineStore('auth', () => {
       return { success: false, error: result.error };
     }
     window.plausible?.('admin_password_reset');
-    return { success: true, syncDeferred: result.syncDeferred };
+    return { success: true };
   }
 
   /**

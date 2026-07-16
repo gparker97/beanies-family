@@ -89,8 +89,9 @@ async function handleSave() {
     const result = await authStore.resetMemberPassword(props.member.id, newPassword.value);
     if (result.success) {
       const successMsg = fmt('family.resetPassword.success', { name: memberName.value });
-      const hint = result.syncDeferred ? t('family.resetPassword.successDeferredSync') : undefined;
-      showToast('success', successMsg, hint, { surface: 'reset-member-password' });
+      // Success is now durable (rotateMemberPassword blocks on the Drive save and
+      // rolls back otherwise), so there is no "will sync later" deferred state.
+      showToast('success', successMsg, undefined, { surface: 'reset-member-password' });
       emit('reset');
       emit('close');
       return;
@@ -117,6 +118,7 @@ function handleClose() {
     :save-label="t('family.resetPassword.submit')"
     :save-disabled="!canSubmit"
     :is-submitting="isSubmitting"
+    :submitting-label="t('auth.passwordRotation.savingLabel')"
     save-gradient="orange"
     @close="handleClose"
     @save="handleSave"

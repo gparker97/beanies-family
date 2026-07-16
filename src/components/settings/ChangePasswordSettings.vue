@@ -128,6 +128,7 @@ async function handleSave() {
     :save-label="t('changePassword.submit')"
     :save-disabled="!canSubmit"
     :is-submitting="isSubmitting"
+    :submitting-label="t('auth.passwordRotation.savingLabel')"
     save-gradient="orange"
     @close="handleClose"
     @save="handleSave"

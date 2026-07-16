@@ -14,6 +14,8 @@ interface Props {
   saveGradient?: 'orange' | 'purple' | 'teal';
   saveDisabled?: boolean;
   isSubmitting?: boolean;
+  /** Label shown beside the spinner while submitting. Defaults to `common.saving`. */
+  submittingLabel?: string;
   showDelete?: boolean;
   /** When true, uses the #custom-header slot edge-to-edge (no padding/border). Modal only. */
   customHeader?: boolean;
@@ -35,6 +37,7 @@ const props = withDefaults(defineProps<Props>(), {
   saveGradient: 'orange',
   saveDisabled: false,
   isSubmitting: false,
+  submittingLabel: undefined,
   showDelete: false,
   customHeader: false,
   variant: 'modal',
@@ -168,7 +171,7 @@ const containerProps = computed(() => {
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
               />
             </svg>
-            {{ t('common.saving') }}
+            {{ submittingLabel || t('common.saving') }}
           </span>
           <span v-else>{{ saveLabel || t('action.save') }}</span>
         </button>
