@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-15",
-    "translationCount": 3737
+    "lastUpdated": "2026-07-16",
+    "translationCount": 3739
   },
   "translations": {
     "app.name": {
@@ -14341,11 +14341,6 @@
       "hash": "llsjxy",
       "lastUpdated": "2026-05-16"
     },
-    "family.resetPassword.successDeferredSync": {
-      "translation": "当连接恢复时，将同步到您的云文件。",
-      "hash": "z4bfim",
-      "lastUpdated": "2026-05-16"
-    },
     "family.resetPassword.error.required": {
       "translation": "请输入并确认新密码。",
       "hash": "aq5ndf",
@@ -18690,6 +18685,21 @@
       "translation": "我们无法完成关联您的日历。请轻触“关联” ，然后重试。",
       "hash": "uj5m1",
       "lastUpdated": "2026-07-15"
+    },
+    "changePassword.error.saveFailed": {
+      "translation": "无法保存您的新密码。没有任何更改—您当前的密码仍然有效。请检查您的网络连接，然后重试。",
+      "hash": "zh7j18",
+      "lastUpdated": "2026-07-16"
+    },
+    "auth.passwordRotation.savingLabel": {
+      "translation": "正在保存您的新密码…",
+      "hash": "manrb8",
+      "lastUpdated": "2026-07-16"
+    },
+    "family.resetPassword.error.saveFailed": {
+      "translation": "无法保存新密码。没有任何更改—他们的当前密码仍然有效。请检查您的网络连接，然后重试。",
+      "hash": "ntzl07",
+      "lastUpdated": "2026-07-16"
     }
   }
 }

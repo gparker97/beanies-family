@@ -566,6 +566,12 @@ export const useSyncStore = defineStore('sync', () => {
    * single home for the `raceTimeout(syncNow(true), …)` pattern (was duplicated across
    * the login-completion sites + password rotation). */
   const POST_AUTH_SAVE_TIMEOUT_MS = 5000;
+  /** Longer bound for the DURABLE password-rotation save: the user is shown a
+   * "saving your new password…" spinner while this blocks, and on not-saved the
+   * rotation fully rolls back (see authStore.rotateMemberPassword). Bigger than
+   * the best-effort post-auth bound because here we are trading spinner time for
+   * a hard durability guarantee, not merely avoiding a wedge. */
+  const DURABLE_ROTATION_SAVE_TIMEOUT_MS = 12000;
   async function syncNowBounded(timeoutMs = POST_AUTH_SAVE_TIMEOUT_MS): Promise<boolean> {
     return !!(await raceTimeout(syncNow(true), timeoutMs));
   }
@@ -1636,20 +1642,40 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Set (or remove) a member's wrapped-key envelope entry, then persist.
+   * Passing `entry` assigns it; passing `undefined` DELETES the member's entry
+   * — the transactional-rotation rollback (authStore.rotateMemberPassword) uses
+   * the delete form to restore a member who had NO prior entry (first-time
+   * password set), which must remove the entry rather than leave the new one.
+   * The single write path for member wrapped keys (add + remove both persist
+   * via the same setEnvelope RPC, keeping the worker cache in sync).
+   */
+  async function setMemberWrappedKey(
+    memberId: string,
+    entry: { wrapped: string; salt: string } | undefined
+  ): Promise<void> {
+    if (!envelope.value) throw new Error('No envelope loaded');
+    const env = { ...envelope.value };
+    const wrappedKeys = { ...env.wrappedKeys };
+    if (entry) {
+      wrappedKeys[memberId] = { wrapped: entry.wrapped, salt: entry.salt };
+    } else {
+      delete wrappedKeys[memberId];
+    }
+    env.wrappedKeys = wrappedKeys;
+    envelope.value = env;
+    syncService.setEnvelope(env); // also RPCs the worker to persist the envelope cache
+  }
+
+  /**
    * Add a wrapped key entry to the envelope for a new member (joinFamily flow).
+   * Delegates to `setMemberWrappedKey` (one write path, DRY).
    */
   async function addMemberWrappedKey(
     memberId: string,
     wrappedKey: { wrapped: string; salt: string }
   ): Promise<void> {
-    if (!envelope.value) throw new Error('No envelope loaded');
-    const env = { ...envelope.value };
-    env.wrappedKeys = {
-      ...env.wrappedKeys,
-      [memberId]: { wrapped: wrappedKey.wrapped, salt: wrappedKey.salt },
-    };
-    envelope.value = env;
-    syncService.setEnvelope(env); // also RPCs the worker to persist the envelope cache
+    await setMemberWrappedKey(memberId, wrappedKey);
   }
 
   /**
@@ -3418,6 +3444,7 @@ export const useSyncStore = defineStore('sync', () => {
     migrateStorage,
     syncNow,
     syncNowBounded,
+    DURABLE_ROTATION_SAVE_TIMEOUT_MS,
     forceSyncNow,
     checkForConflicts,
     loadFromFile,
@@ -3438,6 +3465,7 @@ export const useSyncStore = defineStore('sync', () => {
     decryptPendingFileWithKey,
     wrapFamilyKeyForMember,
     addMemberWrappedKey,
+    setMemberWrappedKey,
     addInvitePackage,
     disconnect,
     manualExport,

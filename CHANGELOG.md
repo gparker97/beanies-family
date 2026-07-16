@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-16
+
+### Security
+
+- **Changing or resetting a family member's password now saves to your cloud file before it says "done" — or changes nothing at all.** Previously, if the save was slow or offline, the new password was applied locally and left to catch up in the background, which could lose the change or leave the old password still working on another device. Now the app waits for the save to finish (showing "saving your new password…") and, if it can't confirm within a few seconds, fully undoes the change and asks you to try again — your current password keeps working the whole time. No more half-applied password changes.
+
 ## 2026-07-15
 
 ### Performance

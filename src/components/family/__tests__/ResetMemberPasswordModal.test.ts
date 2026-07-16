@@ -131,7 +131,7 @@ describe('ResetMemberPasswordModal — error rendering', () => {
 
 describe('ResetMemberPasswordModal — happy path', () => {
   it('calls resetMemberPassword with member id + new password and shows success toast', async () => {
-    resetMemberPasswordMock.mockResolvedValueOnce({ success: true, syncDeferred: false });
+    resetMemberPasswordMock.mockResolvedValueOnce({ success: true });
     const w = mountModal();
     await w.find('[data-test="new"]').setValue('temp-pw');
     await w.find('[data-test="confirm"]').setValue('temp-pw');
@@ -139,6 +139,8 @@ describe('ResetMemberPasswordModal — happy path', () => {
     await flushPromises();
 
     expect(resetMemberPasswordMock).toHaveBeenCalledWith('m2', 'temp-pw');
+    // Success is durable (rotateMemberPassword blocks on the Drive save + rolls
+    // back otherwise), so the toast never carries a "will sync later" hint.
     expect(showToast).toHaveBeenCalledWith(
       'success',
       expect.stringContaining('family.resetPassword.success'),
@@ -147,22 +149,6 @@ describe('ResetMemberPasswordModal — happy path', () => {
     );
     expect(w.emitted('reset')).toBeTruthy();
     expect(w.emitted('close')).toBeTruthy();
-  });
-
-  it('includes the syncDeferred hint when sync failed', async () => {
-    resetMemberPasswordMock.mockResolvedValueOnce({ success: true, syncDeferred: true });
-    const w = mountModal();
-    await w.find('[data-test="new"]').setValue('temp-pw');
-    await w.find('[data-test="confirm"]').setValue('temp-pw');
-    await w.find('[data-test="submit"]').trigger('click');
-    await flushPromises();
-
-    expect(showToast).toHaveBeenCalledWith(
-      'success',
-      expect.any(String),
-      'family.resetPassword.successDeferredSync',
-      expect.any(Object)
-    );
   });
 });
 

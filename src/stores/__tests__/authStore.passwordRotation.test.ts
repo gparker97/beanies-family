@@ -39,7 +39,14 @@ const syncStoreState = {
 const wrapForMemberMock = vi.fn(async (_id: string, _password: string) => {
   // Default: success. Per-test overrides via mockRejectedValueOnce when needed.
 });
+// Rollback setter — records ('id', entry|undefined) so tests can assert restore.
+const setMemberWrappedKeyMock = vi.fn(
+  async (_id: string, _entry: WrappedMemberKey | undefined) => {}
+);
 const syncNowMock = vi.fn<(force?: boolean) => Promise<boolean>>(async () => true);
+// Shortened durable-save bound so the never-settles/timeout tests run in ~100ms
+// instead of the real 12s. The real code reads syncStore.DURABLE_ROTATION_SAVE_TIMEOUT_MS.
+const DURABLE_ROTATION_SAVE_TIMEOUT_MS = 50;
 
 vi.mock('@/stores/syncStore', () => ({
   useSyncStore: () => ({
@@ -50,13 +57,23 @@ vi.mock('@/stores/syncStore', () => ({
       return syncStoreState.envelope;
     },
     wrapFamilyKeyForMember: wrapForMemberMock,
+    setMemberWrappedKey: setMemberWrappedKeyMock,
     syncNow: syncNowMock,
+    DURABLE_ROTATION_SAVE_TIMEOUT_MS,
     // Mirror the real syncNowBounded: race syncNow(true) against the timeout so the
-    // 'syncNow called with true' + syncDeferred + never-settles assertions still hold.
+    // 'syncNow called with true' + rollback + never-settles assertions still hold.
     syncNowBounded: async (ms = 5000) => !!(await raceTimeout(syncNowMock(true), ms)),
     resetState: vi.fn(),
   }),
 }));
+
+// ── telemetry spies — assert success/rollback/critical outcome events ───────
+const { logEventMock, reportErrorMock } = vi.hoisted(() => ({
+  logEventMock: vi.fn(),
+  reportErrorMock: vi.fn(),
+}));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: logEventMock }));
+vi.mock('@/utils/errorReporter', () => ({ reportError: reportErrorMock }));
 
 // ── fileSync mock — controls unwrapWrappedKey result for self-heal tests
 const { unwrapWrappedKeyMock } = vi.hoisted(() => ({
@@ -192,6 +209,16 @@ describe('authStore.changePassword (after rotateMemberPassword refactor)', () =>
       expect.objectContaining({ passwordHash: expect.any(String), requiresPassword: false })
     );
     expect(syncNowMock).toHaveBeenCalledWith(true);
+    // Durable-success outcome event (measurable failure rate) on the existing
+    // allowlisted `action` key.
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'change-password',
+        context: expect.objectContaining({ action: 'rotation-saved' }),
+      })
+    );
+    // No rollback on the happy path.
+    expect(setMemberWrappedKeyMock).not.toHaveBeenCalled();
   });
 
   it('surfaces updateMember failure (previously silent bug)', async () => {
@@ -207,6 +234,44 @@ describe('authStore.changePassword (after rotateMemberPassword refactor)', () =>
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/locally/);
+    // updateFailed rolls back ONLY the wrap (hash never changed) — one restore
+    // call, no passwordHash restore.
+    expect(setMemberWrappedKeyMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('rolls back + maps saveFailed to inline copy when the durable save fails', async () => {
+    const member = await memberWithPassword('m1', 'real-pw');
+    membersRef.value = [member];
+    // Durable save fails; convergence re-save then succeeds (default true).
+    syncNowMock.mockResolvedValueOnce(false);
+
+    const store = useAuthStore();
+    store.currentUser = { memberId: 'm1', email: 't@example.com', familyId: 'fam-1' };
+    store.isAuthenticated = true;
+
+    const result = await store.changePassword('real-pw', 'new-strong-pw');
+
+    expect(result.success).toBe(false);
+    // Mapped through the i18n key (t() returns the key untouched in this harness).
+    expect(result.error).toBe('changePassword.error.saveFailed');
+    // Full rollback: wrap restored + passwordHash restored to the old hash.
+    expect(setMemberWrappedKeyMock).toHaveBeenCalledWith('m1', undefined);
+    expect(updateMemberMock).toHaveBeenLastCalledWith(
+      'm1',
+      expect.objectContaining({ passwordHash: member.passwordHash, requiresPassword: false })
+    );
+    // Convergence re-save issued (syncNow called twice: durable + re-save).
+    expect(syncNowMock).toHaveBeenCalledTimes(2);
+    // Rollback telemetry (warning), no critical (re-save succeeded).
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'warning',
+        context: expect.objectContaining({ action: 'rotation-rolled-back' }),
+      })
+    );
+    expect(reportErrorMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'critical' })
+    );
   });
 
   it('returns familyKeyMissing when syncStore.familyKey is null', async () => {
@@ -440,7 +505,7 @@ describe('authStore.resetMemberPassword', () => {
     expect(result).toEqual({ success: false, error: 'updateFailed' });
   });
 
-  it('happy path — calls wrap + updateMember + syncNow, returns syncDeferred:false', async () => {
+  it('happy path — calls wrap + updateMember + durable syncNow, returns success', async () => {
     const me = await memberWithPassword('admin', 'pw', { canManagePod: true });
     const target = await memberWithPassword('m2', 'oldpw');
     membersRef.value = [me, target];
@@ -449,47 +514,79 @@ describe('authStore.resetMemberPassword', () => {
     store.isAuthenticated = true;
 
     const result = await store.resetMemberPassword('m2', 'temp-pw');
-    expect(result).toEqual({ success: true, syncDeferred: false });
+    expect(result).toEqual({ success: true });
     expect(wrapForMemberMock).toHaveBeenCalledWith('m2', 'temp-pw');
     expect(updateMemberMock).toHaveBeenCalledWith(
       'm2',
       expect.objectContaining({ passwordHash: expect.any(String), requiresPassword: false })
     );
     expect(syncNowMock).toHaveBeenCalledWith(true);
+    // No rollback on the durable-success path.
+    expect(setMemberWrappedKeyMock).not.toHaveBeenCalled();
   });
 
-  it('returns syncDeferred:true when syncNow fails', async () => {
+  it('rolls back + returns saveFailed when the durable save fails (no-prior-entry removes)', async () => {
     const me = await memberWithPassword('admin', 'pw', { canManagePod: true });
     const target = await memberWithPassword('m2', 'oldpw');
     membersRef.value = [me, target];
-    syncNowMock.mockResolvedValueOnce(false);
+    // Envelope has NO entry for m2 → rollback must REMOVE the freshly-added one.
+    syncStoreState.envelope = buildEnvelope({});
+    syncNowMock.mockResolvedValueOnce(false); // durable save fails; re-save then succeeds
+
     const store = useAuthStore();
     store.currentUser = { memberId: 'admin', email: 'a@x.com', familyId: 'fam-1' };
     store.isAuthenticated = true;
 
     const result = await store.resetMemberPassword('m2', 'temp-pw');
-    expect(result).toEqual({ success: true, syncDeferred: true });
+    expect(result).toEqual({ success: false, error: 'saveFailed' });
+    // No-prior-entry rollback: remove the new entry.
+    expect(setMemberWrappedKeyMock).toHaveBeenCalledWith('m2', undefined);
+    // passwordHash restored to the old hash.
+    expect(updateMemberMock).toHaveBeenLastCalledWith(
+      'm2',
+      expect.objectContaining({ passwordHash: target.passwordHash })
+    );
+    // Convergence re-save issued.
+    expect(syncNowMock).toHaveBeenCalledTimes(2);
   });
 
-  // Regression (2026-07-15): a degraded Drive sync made syncNow(true) hang
-  // forever, so rotateMemberPassword never resolved → the reset modal's spinner
-  // spun indefinitely. raceTimeout now bounds the post-rotation push: the
-  // rotation still succeeds (already cached) and reports syncDeferred:true.
-  it('still resolves (syncDeferred:true) when syncNow never settles — spinner-hang fix', async () => {
+  it('pages critical when BOTH the durable save and the convergence re-save fail', async () => {
     const me = await memberWithPassword('admin', 'pw', { canManagePod: true });
     const target = await memberWithPassword('m2', 'oldpw');
     membersRef.value = [me, target];
-    // Never-settling push simulates a wedged worker / offline Drive. Real timers
-    // here (rotateMemberPassword awaits real PBKDF2 before the raceTimeout, which
-    // doesn't flush under fake timers); the raceTimeout ceiling is 5s, so the
-    // test timeout is raised to give it headroom. Pre-fix this hung forever.
+    syncNowMock.mockResolvedValue(false); // every save fails (durable + re-save)
+
+    const store = useAuthStore();
+    store.currentUser = { memberId: 'admin', email: 'a@x.com', familyId: 'fam-1' };
+    store.isAuthenticated = true;
+
+    const result = await store.resetMemberPassword('m2', 'temp-pw');
+    expect(result).toEqual({ success: false, error: 'saveFailed' });
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'critical',
+        context: expect.objectContaining({ action: 'rotation-resave-failed' }),
+      })
+    );
+  });
+
+  // Regression (2026-07-15 → durable rewrite): a degraded Drive sync made
+  // syncNow(true) hang forever. The durable-rotation bound now times out the push
+  // and rolls back (never hangs) — the modal shows the retry error instead of
+  // spinning. Convergence re-save then resolves (default true).
+  it('resolves (saveFailed, no hang) when the durable save never settles', async () => {
+    const me = await memberWithPassword('admin', 'pw', { canManagePod: true });
+    const target = await memberWithPassword('m2', 'oldpw');
+    membersRef.value = [me, target];
+    // Never-settling first push simulates a wedged worker / offline Drive; the
+    // shortened DURABLE_ROTATION_SAVE_TIMEOUT_MS (50ms) bounds it. Pre-fix: hung.
     syncNowMock.mockImplementationOnce(() => new Promise<boolean>(() => {}));
     const store = useAuthStore();
     store.currentUser = { memberId: 'admin', email: 'a@x.com', familyId: 'fam-1' };
     store.isAuthenticated = true;
 
     const result = await store.resetMemberPassword('m2', 'temp-pw');
-    expect(result).toEqual({ success: true, syncDeferred: true });
+    expect(result).toEqual({ success: false, error: 'saveFailed' });
     expect(syncNowMock).toHaveBeenCalledWith(true);
   }, 10000);
 });
