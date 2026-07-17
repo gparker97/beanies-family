@@ -7,6 +7,7 @@ const isHome = currentPath === '/';
 // In-page anchors on the homepage stay as #anchors so the same-page smooth-scroll
 // handler can intercept them. From other pages we prepend "/" so the browser
 // navigates to the homepage first, then resolves the anchor.
+const featuresHref = isHome ? '#features' : '/#features';
 const storyHref = isHome ? '#story' : '/#story';
 const securityHref = isHome ? '#security' : '/#security';
 ---
@@ -19,6 +20,7 @@ const securityHref = isHome ? '#security' : '/#security';
   </a>
   <div class="fnav__right">
     <div class="fnav__links">
+      <a href={featuresHref} data-scroll-to={isHome ? 'features' : undefined}>what's inside</a>
       <a href={storyHref} data-scroll-to={isHome ? 'story' : undefined}>my story</a>
       <a href={securityHref} data-scroll-to={isHome ? 'security' : undefined}>security</a>
       <a href="/blog">beanstalk</a>
@@ -71,6 +73,7 @@ const securityHref = isHome ? '#security' : '/#security';
   </div>
 
   <ul class="fnav-drawer__links">
+    <li><a href={featuresHref} data-scroll-to={isHome ? 'features' : undefined} data-close-drawer>what's inside</a></li>
     <li><a href={storyHref} data-scroll-to={isHome ? 'story' : undefined} data-close-drawer>my story</a></li>
     <li><a href={securityHref} data-scroll-to={isHome ? 'security' : undefined} data-close-drawer>security</a></li>
     <li><a href="/blog" data-close-drawer>beanstalk</a></li>
@@ -180,7 +183,8 @@ const securityHref = isHome ? '#security' : '/#security';
   // If the viewport crosses back above the hamburger threshold while the
   // drawer is open (e.g. rotating a tablet to landscape), close it so the
   // hidden drawer can't eat scroll or focus.
-  const mql = window.matchMedia('(min-width: 820px)');
+  // Must match the hamburger threshold in the stylesheet below.
+  const mql = window.matchMedia('(min-width: 930px)');
   mql.addEventListener('change', (e) => {
     if (e.matches) closeDrawer();
   });
@@ -199,7 +203,9 @@ const securityHref = isHome ? '#security' : '/#security';
     border: 1px solid rgb(44 62 80 / 6%);
     border-radius: 40px;
     display: flex;
-    gap: 12px;
+    /* Brand lockup needs real separation from the first nav link — at 12px
+       "beanies.family" and the link read as one run-on string. */
+    gap: 22px;
     left: 50%;
     padding: 6px 10px 6px 16px;
     position: fixed;
@@ -456,10 +462,13 @@ const securityHref = isHome ? '#security' : '/#security';
     transform: translateY(-1px);
   }
 
-  /* Hamburger threshold. Above 820px, the full nav (5 links + CTA at
-     0.85rem) fits on a single row comfortably. Below, swap to the
-     drawer — no ugly wrapping, no compromise. */
-  @media (max-width: 820px) {
+  /* Hamburger threshold. The pill's contents can't shrink (every label is
+     nowrap), so below its intrinsic width it overflows the viewport and the
+     brand lockup collides with the links rather than reflowing. Measured
+     intrinsic width with 6 links + CTA at 0.85rem = 831px; +~50px clear on
+     each side = 930px. Below that, swap to the drawer before it gets tight.
+     Keep in sync with the matchMedia query in the script above. */
+  @media (max-width: 930px) {
     .fnav {
       gap: 8px;
       padding: 5px 6px 5px 14px;
