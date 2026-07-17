@@ -8,6 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-17
+
+### Changed
+
+- **The homepage now points you to the features section.** The new "what's inside" section that shows what beanies.family actually does was only reachable by scrolling past it — there was no way to link to it. It now has a spot in the top menu, in the mobile menu, and in the footer, and the button under the headline reads "see what's inside" instead of "why I built this" (my story is still one tap away in the menu).
+- **Closed the empty gap between the homepage hero and the features section**, so scrolling down lands you on "check out these magic beans" straight away instead of passing through a blank stretch of page.
+
+### Fixed
+
+- **The site menu no longer crowds the beanies.family logo.** On narrower windows the menu links could run right up against the logo and spill past the edge of the screen; the menu now gives the logo proper room and switches to the drop-down menu before things get tight.
+
 ## 2026-07-16
 
 ### Security

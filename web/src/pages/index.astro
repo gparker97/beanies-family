@@ -59,7 +59,7 @@ import { APP_URL } from '@beanies/brand/nav';
         <a data-testid="homepage-get-started" class="btn-primary" href={`${APP_URL}/welcome`}>
           start counting beans 🫘
         </a>
-        <a class="hero__story-link" href="#story" data-scroll-to="story">why I built this ↓</a>
+        <a class="hero__jump-link" href="#features" data-scroll-to="features">see what's inside ↓</a>
       </div>
 
       <!-- FLOATING DEVICE SHOWCASE
@@ -861,7 +861,7 @@ import { APP_URL } from '@beanies/brand/nav';
   justify-content: center;
   min-height: 100vh;
   overflow: hidden;
-  padding: 100px 24px 40px;
+  padding: 100px 24px 24px;
   position: relative;
   text-align: center;
 }
@@ -978,7 +978,7 @@ import { APP_URL } from '@beanies/brand/nav';
 }
 .btn-primary:hover { box-shadow: 0 12px 40px rgb(241 93 34 / 35%); transform: translateY(-2px); }
 
-.hero__story-link {
+.hero__jump-link {
   align-items: center;
   background: rgb(44 62 80 / 4%);
   border: 1px solid rgb(44 62 80 / 6%);
@@ -994,7 +994,7 @@ import { APP_URL } from '@beanies/brand/nav';
   text-decoration: none;
   transition: all 200ms;
 }
-.hero__story-link:hover {
+.hero__jump-link:hover {
   background: rgb(241 93 34 / 5%);
   border-color: rgb(241 93 34 / 12%);
   color: var(--heritage-orange);
@@ -1002,7 +1002,10 @@ import { APP_URL } from '@beanies/brand/nav';
 }
 
 /* SHOWCASE */
-.showcase { height: 440px; margin: 32px auto 0; max-width: 1000px; position: relative; width: 100%; }
+/* Devices inside are absolutely positioned, so this height is reserved by
+   hand. Keep it just past the tallest device (~381px) plus its drop shadow —
+   surplus here reads as dead space above the trust row. */
+.showcase { height: 400px; margin: 32px auto 0; max-width: 1000px; position: relative; width: 100%; }
 .showcase__device {
   background: var(--cloud-white);
   border: 1px solid rgb(44 62 80 / 8%);
@@ -1219,10 +1222,12 @@ import { APP_URL } from '@beanies/brand/nav';
 .section-fade--to-light { background: linear-gradient(180deg, var(--deep-slate) 0%, var(--cloud-white) 100%); }
 .section-fade--to-story { background: linear-gradient(180deg, var(--cloud-white) 0%, #fdf8f5 100%); }
 .section-fade--from-story { background: linear-gradient(180deg, #fdf8f5 0%, var(--cloud-white) 100%); }
-/* hero → "what's inside" features: a taller, gradual warm-in (matching the
-   --to-story pattern) so the features section's warm top eases in rather than
-   starting abruptly. Ends on the features' warm tone (#fff7f3) for a seamless seam. */
-.section-fade--hero-out { height: 180px; background: linear-gradient(180deg, var(--cloud-white) 0%, #fff9f4 58%, #fff7f3 100%); }
+/* hero → "what's inside" features: warms the hero's cloud-white into the
+   features section's warm top (#fff7f3) for a seamless seam. Kept short on
+   purpose — these are three near-identical off-whites, so the blend is
+   imperceptible well under 80px and any extra height reads as an empty band
+   between the hero and the features section. */
+.section-fade--hero-out { height: 72px; background: linear-gradient(180deg, var(--cloud-white) 0%, #fff9f4 58%, #fff7f3 100%); }
 
 .ambient-orb { border-radius: 50%; filter: blur(80px); pointer-events: none; position: absolute; }
 
@@ -1398,7 +1403,7 @@ import { APP_URL } from '@beanies/brand/nav';
 }
 
 @media (max-width: 640px) {
-  .hero { padding: 120px 20px 40px; }
+  .hero { padding: 120px 20px 24px; }
   .showcase { display: flex; flex-direction: column; gap: 16px; height: auto; }
   .showcase__device { left: auto !important; position: relative !important; right: auto !important; top: auto !important; transform: none !important; width: 100% !important; }
   .showcase__device:hover { transform: translateY(-4px) !important; }
