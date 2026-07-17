@@ -52,9 +52,9 @@ Vibe coders may also relate to the fact that, once this is done, I will almost d
 
 I feel like, 20 years from now, this will be a silly thing to worry about. Vibe coding will be so common that your grandmother will be doing it in her spare time. And I'll be sitting back in a rocking chair with a piece of pine straw in my teeth, saying things like, "back in _my_ day, 100 tokens could get you a full-stack browser-based model-view-controller finance tracking app, with enough left over to build a python log parser to boot." And all the village children will listen to my stories with amazement and wonder.
 
-![Abe Simpson sitting on a tree stump lecturing Bart and a group of kids, captioned "back in my day, vibe coding was just called 'coding'"](/blog/abe-simpson-back-in-my-day.webp)
+![Abe Simpson sitting on a tree stump lecturing Bart and a group of kids, captioned "back in my day we called coding 'vibe coding', nobody remembers why"](/blog/abe-simpson-back-in-my-day.webp)
 
-_not to mention, youtube had a "dislike" button_
+_also, youtube had a "dislike" button_
 
 For now, though, this is new territory, and I'm still figuring it out. In the meantime, all I know how to do is build. Because I really, really need to build.
 
