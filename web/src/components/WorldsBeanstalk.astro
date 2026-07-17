@@ -69,7 +69,7 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
   .map((g, i) => ({ emoji: g[0], style: `--x:${g[1]}px;--y:${g[2]}px;--rot:${i % 2 ? 8 : -8}deg;--d:${g[3]}s;` }));
 ---
 
-<section class="worlds" aria-label="what's inside beanies">
+<section id="features" class="worlds" aria-label="what's inside beanies">
   <div class="orb orb--1"></div>
   <div class="orb orb--2"></div>
   <div class="orb orb--3"></div>
@@ -227,7 +227,7 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
     background:
       radial-gradient(120% 42% at 50% 0%, #fff7f3 0%, rgba(255,247,243,0) 40%),
       linear-gradient(180deg, #fffdfb 0%, #f3faf4 55%, #fbfaf6 100%);
-    padding: 3rem 1rem 0;
+    padding: 1.25rem 1rem 0;
   }
   .orb { position: absolute; border-radius: 50%; filter: blur(64px); opacity: 0.5; pointer-events: none; z-index: 0; }
   .orb--1 { width: 340px; height: 340px; top: 8%; right: -120px; background: rgba(174,214,241,0.34); }
