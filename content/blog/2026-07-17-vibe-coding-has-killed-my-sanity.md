@@ -9,7 +9,7 @@ excerpt: "Six months of vibe coding, and the effects of that first puff haven't 
 subtitle: 'i wanted to make this post better, but i was too busy vibe coding'
 featured: false
 author: greg
-draft: true
+draft: false
 ---
 
 As a certain comedian once said, about a completely unrelated topic, you shouldn't vibe code. Unless, you really, really need to vibe code. In which case, you really should vibe code. (I'm paraphrasing.)
@@ -45,8 +45,6 @@ With AI, you can now technically do all of that by yourself. Whether you _should
 AI hasn't changed what you need to build good software that sells. But the temptation to skip all the actual hard parts and just _build_, now that we can, is hard to ignore.
 
 Founders, almost by design, have an incessant desire for control. Building a profitable business from the ground up is more than just building software, and it requires a certain attention to detail that is genuinely difficult to delegate. Founders now have that control at their fingertips, which is a bit like giving your car keys to your teenager. There's an inherent danger to having this level of control, and to me that's the risk of this thing taking over your whole life.
-
-Vibe coding is a fantastic weapon, and like any weapon it's great if you use it properly, and not so great if you don't know how to wield it.
 
 The fact that I'm sitting here at midnight, stressing over an unfinished essay that nobody is chomping at the bit to read is a decent indicator that I may have fallen slightly out of step with reality. Vibe coders may also relate to the fact that, once this is done, I will almost definitely try to squeeze in "just one more prompt" for 4 more hours until I collapse from exhaustion and my family finds me, tomorrow morning, drooling onto my keyboard.
 
