@@ -51,7 +51,7 @@
   "dependencies": {
     "@automerge/automerge": "^3.2.6",
     "@beanies/brand": "*",
-    "@capacitor/android": "^8.3.4",
+    "@capacitor/android": "^8.4.1",
     "@capacitor/app": "^8.1.0",
     "@capacitor/browser": "^8.0.3",
     "@capacitor/core": "^8.4.1",
