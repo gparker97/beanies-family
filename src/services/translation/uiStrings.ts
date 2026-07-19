@@ -2508,6 +2508,10 @@ const STRING_DEFS = {
     beanie:
       'some beans may be out of date. try refreshing the app. if it keeps happening, sign out and sign back in.',
   },
+  'docWorker.updateFailed': {
+    en: "We couldn't update your data",
+    beanie: "couldn't update your beans",
+  },
   'error.refreshFailed': {
     en: 'Refresh failed',
     beanie: "couldn't refresh",

@@ -32,7 +32,10 @@ export function bootstrapDocClient(): void {
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        void docClient.flush();
+        // Failure is already classified + reported by docClient's notifyFailure
+        // policy — swallow the rejection so the same failure doesn't ALSO report
+        // via main.ts's global unhandledrejection catch-all (double firehose).
+        docClient.flush().catch(() => {});
         return;
       }
       void docClient.checkWorkerLiveness();

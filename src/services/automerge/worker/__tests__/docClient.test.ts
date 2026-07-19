@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { reactive, isReactive } from 'vue';
 import { CorruptPayloadError } from '@/types/sync';
 import { serializeError, type RpcRequest } from '../protocol';
@@ -8,8 +8,16 @@ vi.mock('@/utils/perfTiming', () => ({ record: vi.fn() }));
 vi.mock('../../projection', () => ({ applyDelta: vi.fn() }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+// Stub the visibility tracker (not the DOM): default = never hidden, so the
+// suspension-aware deadline behaves exactly like a plain timeout unless a test
+// overrides the implementation (see the suspension-aware describe below).
+vi.mock('@/utils/visibilityTracker', () => ({
+  wasHiddenSince: vi.fn(() => false),
+  getHiddenDurationMs: vi.fn(() => null),
+}));
 
 import { showToast } from '@/composables/useToast';
+import { wasHiddenSince } from '@/utils/visibilityTracker';
 import { record } from '@/utils/perfTiming';
 import { applyDelta } from '../../projection';
 import { reportError } from '@/utils/errorReporter';
@@ -178,18 +186,33 @@ describe('docClient', () => {
     }
   });
 
-  it('reconstructs a generic error, rejects, and surfaces a toast', async () => {
+  it('reconstructs a generic BACKGROUND-op error, rejects, and reports firehose-only (no toast)', async () => {
     useWorker((req) => ({
       cid: req.cid,
       ok: false,
       error: { name: 'Error', message: 'db exploded' },
     }));
     await expect(getHeads()).rejects.toThrow('db exploded');
+    expect(showToast).not.toHaveBeenCalled(); // background op → never toasts
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'doc-worker', severity: 'error' })
+    );
+  });
+
+  it('a USER-ACTION op error toasts WITHOUT paging (no critical flag)', async () => {
+    useWorker((req) => ({
+      cid: req.cid,
+      ok: false,
+      error: { name: 'Error', message: 'write failed' },
+    }));
+    await expect(mutate({ op: 'delete', collection: 'todos', id: 'x' })).rejects.toThrow(
+      'write failed'
+    );
     expect(showToast).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(showToast).mock.calls[0]![3]).toMatchObject({
-      surface: 'doc-worker',
-      critical: true,
-    });
+    const opts = vi.mocked(showToast).mock.calls[0]![3] as Record<string, unknown>;
+    expect(opts.surface).toBe('doc-worker');
+    expect(opts.critical).toBeUndefined(); // never pages — useToast auto-reports non-paging
+    expect(reportError).not.toHaveBeenCalled(); // no double-report beside the toast
   });
 
   it('rejects a CorruptPayloadError as its class WITHOUT a toast (recovery classifies it)', async () => {
@@ -302,10 +325,10 @@ describe('docClient — Set-driven two-tier RPC timeout', () => {
     vi.clearAllMocks();
   });
 
-  it('a HEAVY_METHOD (mergeRemoteEnvelope) survives past the 45s mutation budget; a mutate times out at 45s', async () => {
+  it('a HEAVY_METHOD (mergeRemoteEnvelope) survives past 45s; a light mutate behind it EXTENDS instead of timing out', async () => {
     vi.useFakeTimers();
     try {
-      useWorker(() => null); // never responds → both hang until their timeout fires
+      useWorker(() => null); // never responds → both hang until their deadlines fire
       const mergeOutcome = mergeRemoteEnvelope(
         { encryptedPayload: '', familyId: 'f' } as never,
         'f'
@@ -324,23 +347,32 @@ describe('docClient — Set-driven two-tier RPC timeout', () => {
       );
 
       await vi.advanceTimersByTimeAsync(0); // flush the ready handshake
-      await vi.advanceTimersByTimeAsync(46_000); // past 45s: mutation budget fires, 120s heavy ceiling does not
+      await vi.advanceTimersByTimeAsync(46_000); // past 45s: mutate's budget fires…
 
-      // The light mutate times out at 45s. Because a HEAVY op (merge) is still in
-      // flight — legitimately progressing toward its own 120s ceiling — the mutate
-      // timeout does NOT tear the worker down; it just rejects this one call.
-      await expect(mutateOutcome).resolves.toContain("'mutate' timed out");
+      // …but the light mutate is queued behind the progressing heavy merge in the
+      // worker's serial FIFO — its deadline EXTENDS instead of rejecting.
+      expect(await Promise.race([mutateOutcome, Promise.resolve('pending')])).toBe('pending');
       expect(await Promise.race([mergeOutcome, Promise.resolve('pending')])).toBe('pending');
 
-      // The merge hits its 120s heavy ceiling → NOW it's worker-death (a heavy op that
-      // itself timed out). It recovers + auto-retries once (merge is idempotent/retryable),
-      // so it stays pending on the fresh worker rather than rejecting immediately.
-      await vi.advanceTimersByTimeAsync(80_000); // past 120s: attempt-1 heavy timeout → recover + retry
+      // The merge hits its 120s heavy ceiling → worker-death corroboration (5s probe,
+      // unanswered) → teardown drains the mutate (quiet WorkerCrashError) → ONE
+      // consolidating NON-paging toast for the drained user-action op. The merge
+      // itself (retryable) heals by re-issuing on a fresh respawn — still pending.
+      await vi.advanceTimersByTimeAsync(80_000); // t≈126s: 120s ceiling + 5s probe + drain
+      expect(await mutateOutcome).toContain('rpc-timeout:mergeRemoteEnvelope');
+      expect(showToast).toHaveBeenCalledTimes(1); // drained mutate → toast…
+      const toastOpts = vi.mocked(showToast).mock.calls[0]![3] as Record<string, unknown>;
+      expect(toastOpts.critical).toBeUndefined(); // …non-paging
       expect(await Promise.race([mergeOutcome, Promise.resolve('pending')])).toBe('pending');
 
-      // The retried merge also hits 120s → terminal failure surfaces (no third attempt).
-      await vi.advanceTimersByTimeAsync(125_000);
+      // The retried merge also hits 120s (+5s probe) → terminal, firehose-only
+      // (background op — no second toast).
+      await vi.advanceTimersByTimeAsync(130_000);
       await expect(mergeOutcome).resolves.toContain("'mergeRemoteEnvelope' timed out");
+      expect(showToast).toHaveBeenCalledTimes(1);
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'doc-worker', severity: 'error' })
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -407,15 +439,15 @@ describe('docClient — worker-death recovery on RPC timeout', () => {
     }
   });
 
-  it('A7: a sibling light-op timeout does NOT tear down the worker while a mutate is in flight', async () => {
+  it('A7: a light-op timeout behind an in-flight mutate EXTENDS its deadline; both complete, worker intact', async () => {
     vi.useFakeTimers();
     try {
-      const fw = useWorker(never); // auto-answers nothing; we emit the mutate reply by hand
+      const fw = useWorker(never); // auto-answers nothing; we emit both replies by hand
       const headsOutcome = getHeads().then(
         (r) => r,
         (e: Error) => e.message
       );
-      // A generous explicit budget keeps the mutate in flight past getHeads' 45s timeout.
+      // A generous explicit budget keeps the mutate in flight past getHeads' 45s budget.
       const mutateOutcome = mutate(
         { op: 'delete', collection: 'todos', id: 'z' },
         { timeoutMs: 100_000 }
@@ -425,18 +457,57 @@ describe('docClient — worker-death recovery on RPC timeout', () => {
       );
 
       await vi.advanceTimersByTimeAsync(0); // handshake — both in flight
-      await vi.advanceTimersByTimeAsync(45_000); // getHeads hits 45s; mutate (100s budget) still in flight
+      await vi.advanceTimersByTimeAsync(46_000); // getHeads' 45s budget fires…
 
-      // The mutate in flight is real work → the worker is NOT declared dead. getHeads
-      // rejects itself only; no corroboration ping, no recovery, worker intact.
-      expect(await headsOutcome).toContain("'getHeads' timed out");
-      expect(reportError).not.toHaveBeenCalled(); // worker never torn down → no recovery telemetry
-      expect(fw.posted.some((m) => m.method === 'ping')).toBe(false); // mutate-spare short-circuits before any probe
+      // …but the mutate in flight is real work → getHeads EXTENDS its deadline
+      // instead of rejecting. No probe, no recovery, no rejection, worker intact.
+      expect(await Promise.race([headsOutcome, Promise.resolve('pending')])).toBe('pending');
+      expect(fw.posted.some((m) => m.method === 'ping')).toBe(false);
+      expect(reportError).not.toHaveBeenCalled();
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'doc-worker-recovery',
+          message: expect.stringContaining('deadline extended (busy-behind-heavy)'),
+        })
+      );
 
-      // The mutate was never dropped — it's still live and now completes normally.
+      // Both complete normally once the worker answers — as if nothing happened.
       const mutateReq = fw.posted.find((m) => m.method === 'mutate')!;
       fw.emit({ cid: mutateReq.cid, ok: true, result: { id: 'z' } });
       expect(await mutateOutcome).toEqual({ id: 'z' });
+      const headsReq = fw.posted.find((m) => m.method === 'getHeads')!;
+      fw.emit({ cid: headsReq.cid, ok: true, result: { heads: ['h'] } });
+      expect(await headsOutcome).toEqual({ heads: ['h'] });
+      expect(showToast).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('backstop: a light op that EXHAUSTS its extensions behind a live mutate rejects firehose-only without probing', async () => {
+    vi.useFakeTimers();
+    try {
+      const fw = useWorker(never);
+      const headsOutcome = getHeads().then(
+        () => 'resolved',
+        (e: Error) => e.message
+      );
+      // Quiet long-budget mutate keeps the in-flight guard active the whole time.
+      void mutate(
+        { op: 'delete', collection: 'todos', id: 'q' },
+        { timeoutMs: 400_000, quiet: true }
+      ).catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(0); // handshake
+      // 45s budget + 3 visible-page extensions → final rejection at the 4th fire (t=180s).
+      await vi.advanceTimersByTimeAsync(181_000);
+
+      expect(await headsOutcome).toContain("'getHeads' timed out");
+      expect(fw.posted.some((m) => m.method === 'ping')).toBe(false); // backstop short-circuits the probe
+      expect(showToast).not.toHaveBeenCalled(); // background op → firehose only
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'doc-worker', severity: 'error' })
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -457,7 +528,10 @@ describe('docClient — worker-death recovery on RPC timeout', () => {
 
       expect(await outcome).toContain("'getHeads' timed out");
       expect(created).toHaveLength(2); // bounded: exactly two attempts
-      expect(showToast).toHaveBeenCalledTimes(1); // single terminal toast (getHeads is non-quiet)
+      expect(showToast).not.toHaveBeenCalled(); // background op → never toasts
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'doc-worker', severity: 'error' }) // single terminal firehose event
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -624,10 +698,48 @@ describe('docClient — A7 liveness corroboration', () => {
     vi.clearAllMocks();
   });
 
-  it('a false-positive timeout (worker answers the probe) rejects the call but does NOT tear down', async () => {
+  it('a false-positive timeout (worker answers the probe) transparently RETRIES on the live worker', async () => {
     vi.useFakeTimers();
     try {
-      // The worker never answers getHeads but DOES answer the corroboration ping → alive.
+      // The worker misses the FIRST getHeads but answers the corroboration ping →
+      // alive-but-busy. The transparent re-issue (attempt 2) then succeeds.
+      let headsCalls = 0;
+      const wedgeOnceLivePing: Responder = (req) => {
+        if (req.method === 'ping') return { cid: req.cid, ok: true, result: { ok: true } };
+        if (req.method === 'getHeads') {
+          headsCalls += 1;
+          return headsCalls >= 2 ? { cid: req.cid, ok: true, result: { heads: ['h'] } } : null;
+        }
+        return null;
+      };
+      const { created } = useWorkers([wedgeOnceLivePing]);
+
+      const outcome = getHeads().then(
+        (r) => r,
+        (e: Error) => e.message
+      );
+      await vi.advanceTimersByTimeAsync(0); // handshake
+      await vi.advanceTimersByTimeAsync(45_000); // timeout → probe answers → transparent re-issue heals
+
+      expect(await outcome).toEqual({ heads: ['h'] }); // the caller never saw a failure
+      expect(created).toHaveLength(1); // the worker was NOT re-spawned
+      expect(showToast).not.toHaveBeenCalled();
+      expect(reportError).not.toHaveBeenCalled(); // no recovery, no firehose failure
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'doc-worker-recovery',
+          context: expect.objectContaining({ recovery_method: 'liveness-false-positive' }),
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a false-positive whose retry ALSO times out rejects firehose-only, worker never torn down', async () => {
+    vi.useFakeTimers();
+    try {
+      // The worker never answers getHeads but always answers the ping → alive both times.
       const wedgeHeadsLivePing: Responder = (req) =>
         req.method === 'ping' ? { cid: req.cid, ok: true, result: { ok: true } } : null;
       const { created } = useWorkers([wedgeHeadsLivePing]);
@@ -637,17 +749,14 @@ describe('docClient — A7 liveness corroboration', () => {
         (e: Error) => e.message
       );
       await vi.advanceTimersByTimeAsync(0); // handshake
-      await vi.advanceTimersByTimeAsync(45_000); // getHeads times out → probe ping sent
-      await vi.advanceTimersByTimeAsync(0); // probe answers immediately → false positive
+      await vi.advanceTimersByTimeAsync(45_000); // attempt-1 timeout → probe answers → re-issue
+      await vi.advanceTimersByTimeAsync(45_000); // attempt-2 timeout → probe answers → no third attempt
 
-      expect(await outcome).toContain("'getHeads' timed out"); // this call rejects…
-      expect(created).toHaveLength(1); // …but the worker is NOT re-spawned
-      expect(reportError).not.toHaveBeenCalled(); // no recovery — worker is alive
-      expect(logEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          surface: 'doc-worker-recovery',
-          context: expect.objectContaining({ recovery_method: 'liveness-false-positive' }),
-        })
+      expect(await outcome).toContain("'getHeads' timed out"); // bounded: rejects after one retry
+      expect(created).toHaveLength(1); // worker alive throughout — never re-spawned
+      expect(showToast).not.toHaveBeenCalled(); // background op → firehose only
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'doc-worker', severity: 'error' })
       );
     } finally {
       vi.useRealTimers();
@@ -674,5 +783,214 @@ describe('docClient — A7 liveness corroboration', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('docClient — suspension-aware deadlines', () => {
+  beforeEach(() => {
+    __resetDocClientForTesting();
+    vi.clearAllMocks();
+    vi.mocked(wasHiddenSince).mockImplementation(() => false);
+  });
+
+  afterEach(() => {
+    vi.mocked(wasHiddenSince).mockImplementation(() => false);
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+  });
+
+  it('re-arms when the wait spanned a hidden period instead of declaring the worker dead', async () => {
+    vi.useFakeTimers();
+    try {
+      let hiddenSince = true; // the page was hidden at some point during the first window
+      vi.mocked(wasHiddenSince).mockImplementation(() => hiddenSince);
+      const fw = useWorker(never);
+      const outcome = getHeads().then(
+        (r) => r,
+        (e: Error) => e.message
+      );
+      await vi.advanceTimersByTimeAsync(0); // handshake
+      await vi.advanceTimersByTimeAsync(46_000); // fire #1 → was-hidden → re-arm
+
+      // No probe, no rejection — suspended time doesn't count as worker death.
+      expect(fw.posted.some((m) => m.method === 'ping')).toBe(false);
+      expect(await Promise.race([outcome, Promise.resolve('pending')])).toBe('pending');
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'doc-worker-recovery',
+          message: expect.stringContaining('deadline extended (was-hidden)'),
+        })
+      );
+
+      // The worker answers during the extended window → completes as if nothing happened.
+      hiddenSince = false;
+      const req = fw.posted.find((m) => m.method === 'getHeads')!;
+      fw.emit({ cid: req.cid, ok: true, result: { heads: ['h'] } });
+      expect(await outcome).toEqual({ heads: ['h'] });
+      expect(showToast).not.toHaveBeenCalled();
+      expect(reportError).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('hidden-at-fire re-arms do NOT consume the extension cap (overnight-hidden tab)', async () => {
+    vi.useFakeTimers();
+    try {
+      let hidden = true;
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+      const fw = useWorker(never);
+      const outcome = getHeads().then(
+        (r) => r,
+        (e: Error) => e.message
+      );
+      await vi.advanceTimersByTimeAsync(0); // handshake
+      // 6 consecutive fires while hidden — far past MAX_DEADLINE_EXTENSIONS (3), all exempt.
+      await vi.advanceTimersByTimeAsync(45_000 * 6);
+      expect(await Promise.race([outcome, Promise.resolve('pending')])).toBe('pending');
+      expect(fw.posted.some((m) => m.method === 'ping')).toBe(false);
+
+      // Resume → the worker answers → clean completion.
+      hidden = false;
+      const req = fw.posted.find((m) => m.method === 'getHeads')!;
+      fw.emit({ cid: req.cid, ok: true, result: { heads: ['h'] } });
+      expect(await outcome).toEqual({ heads: ['h'] });
+      expect(showToast).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounded: visible-page extensions are capped, then the normal timeout ladder runs', async () => {
+    vi.useFakeTimers();
+    try {
+      // Permanently "was hidden during every window" on a visible page → each re-arm
+      // consumes the cap; after MAX_DEADLINE_EXTENSIONS (3) the timeout is declared.
+      vi.mocked(wasHiddenSince).mockImplementation(() => true);
+      const { created } = useWorkers([never, never]);
+      const outcome = getHeads().then(
+        () => 'resolved',
+        (e: Error) => e.message
+      );
+      await vi.advanceTimersByTimeAsync(0); // handshake
+      // Attempt 1: 45s budget + 3 capped extensions = 180s, then the probe (which
+      // itself extends up to its own cap) confirms death → recover → attempt 2
+      // repeats the same bounded sequence → terminal. Advance generously past both.
+      await vi.advanceTimersByTimeAsync(400_000);
+      await vi.advanceTimersByTimeAsync(400_000);
+
+      expect(await outcome).toContain('timed out');
+      expect(created).toHaveLength(2); // bounded — recovered once, terminated on attempt 2
+      expect(showToast).not.toHaveBeenCalled(); // background op stays quiet throughout
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('absolute ceiling: a permanently-hidden page rejects at ABSOLUTE_DEADLINE_CEILING_MS, firehose-only', async () => {
+    vi.useFakeTimers();
+    try {
+      const hidden = true;
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+      const fw = useWorker(never);
+      const outcome = getHeads().then(
+        () => 'resolved',
+        (e: Error) => e.message
+      );
+      // A long-budget quiet mutate keeps the in-flight backstop active, so the
+      // ceiling rejection short-circuits the probe (no ping while hidden).
+      void mutate(
+        { op: 'delete', collection: 'todos', id: 'q' },
+        { timeoutMs: 900_000, quiet: true }
+      ).catch(() => {});
+      await vi.advanceTimersByTimeAsync(0); // handshake
+      await vi.advanceTimersByTimeAsync(660_000); // hidden fires every 45s; ceiling hit at ≥600s
+
+      expect(await outcome).toContain('exceeded absolute deadline'); // never pends forever
+      expect(fw.posted.some((m) => m.method === 'ping')).toBe(false); // backstop skipped the probe
+      expect(showToast).not.toHaveBeenCalled();
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'doc-worker', severity: 'error' })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('extension telemetry is capped: one event per reason + one settle summary', async () => {
+    vi.useFakeTimers();
+    try {
+      let hidden = true;
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+      const fw = useWorker(never);
+      const outcome = getHeads().then(
+        (r) => r,
+        (e: Error) => e.message
+      );
+      await vi.advanceTimersByTimeAsync(0); // handshake
+      await vi.advanceTimersByTimeAsync(45_000 * 5); // 5 hidden extensions
+      hidden = false;
+      const req = fw.posted.find((m) => m.method === 'getHeads')!;
+      fw.emit({ cid: req.cid, ok: true, result: { heads: ['h'] } });
+      expect(await outcome).toEqual({ heads: ['h'] });
+
+      const extensionEvents = vi
+        .mocked(logEvent)
+        .mock.calls.filter(([e]) => String(e.message).includes('deadline extended'));
+      const summaryEvents = vi
+        .mocked(logEvent)
+        .mock.calls.filter(([e]) => String(e.message).includes('deadline extensions settled'));
+      expect(extensionEvents).toHaveLength(1); // first 'hidden' occurrence only
+      expect(summaryEvents).toHaveLength(1); // one settle summary
+      expect(summaryEvents[0]![0]).toMatchObject({
+        context: expect.objectContaining({ recovery_attempt: 5 }),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('docClient — worker crash notification policy', () => {
+  beforeEach(() => {
+    __resetDocClientForTesting();
+    vi.clearAllMocks();
+  });
+
+  it('crash with only BACKGROUND ops in flight → single firehose event, no toast, no page', async () => {
+    const fw = useWorker(never);
+    const outcome = getHeads().then(
+      () => 'resolved',
+      (e: Error) => e.message
+    );
+    await tick(); // handshake + post
+    fw.onerror?.(new Error('boom'));
+    expect(await outcome).toContain('boom'); // drained with a definite rejection
+    expect(showToast).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'doc-worker', severity: 'error' })
+    );
+  });
+
+  it('crash with a USER-ACTION op (mutate) awaiting → ONE non-paging toast', async () => {
+    const fw = useWorker(never);
+    const outcome = mutate({ op: 'delete', collection: 'todos', id: 'x' }).then(
+      () => 'resolved',
+      (e: Error) => e.message
+    );
+    await tick();
+    fw.onerror?.(new Error('boom'));
+    expect(await outcome).toContain('boom');
+    expect(showToast).toHaveBeenCalledTimes(1);
+    const opts = vi.mocked(showToast).mock.calls[0]![3] as Record<string, unknown>;
+    expect(opts.critical).toBeUndefined(); // never pages
+  });
+
+  it('crash with NOTHING in flight → console-only (guard retained: no toast, no report)', async () => {
+    const fw = useWorker(okHeads);
+    await getHeads(); // completes — nothing left in flight
+    vi.clearAllMocks();
+    fw.onerror?.(new Error('idle boom'));
+    expect(showToast).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
   });
 });

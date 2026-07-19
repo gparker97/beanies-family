@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-16",
-    "translationCount": 3744
+    "lastUpdated": "2026-07-19",
+    "translationCount": 3745
   },
   "translations": {
     "app.name": {
@@ -18725,6 +18725,11 @@
       "translation": "出错了。请重试。",
       "hash": "dp1w0g",
       "lastUpdated": "2026-07-16"
+    },
+    "docWorker.updateFailed": {
+      "translation": "我们无法更新您的数据",
+      "hash": "z1846k",
+      "lastUpdated": "2026-07-19"
     }
   }
 }

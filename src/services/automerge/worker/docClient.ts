@@ -10,20 +10,26 @@
  *     resolves, so read-after-write is race-free,
  *   - worker perf samples are replayed through `perfTiming.record` (one shared
  *     telemetry buffer — the worker can't run the buffer itself),
- *   - failures surface via a single `showToast('error', …, {surface:'doc-worker'})`
- *     — independent of whether the caller awaited — EXCEPT the expected-
- *     degradation class (`CorruptPayloadError`, or a caller that opts out with
- *     `quiet`), which the caller classifies (recovery dispatches on the
- *     reconstructed `instanceof CorruptPayloadError`).
+ *   - failures route through ONE policy (`notifyFailure`): a NON-paging toast
+ *     iff a user-action op (`USER_ACTION_METHODS`) is implicated, firehose-only
+ *     `reportError` otherwise — EXCEPT the expected-degradation class
+ *     (`CorruptPayloadError`, or a caller that opts out with `quiet`), which the
+ *     caller classifies (recovery dispatches on the reconstructed
+ *     `instanceof CorruptPayloadError`). Nothing here pages Slack — persistent
+ *     save failure escalates via the debounced save-failure banner instead,
+ *   - RPC deadlines are suspension-aware (`awaitWithSuspensionAwareDeadline`):
+ *     time spent hidden/frozen doesn't count toward declaring the worker dead.
  *
  * Worker-death recovery + the inline fallback executor are seams here and
  * completed in Task #6 (`setInlineExecutor`, `setRehydrator`).
  */
 import { withTimeout } from '@/utils/timing';
+import { wasHiddenSince } from '@/utils/visibilityTracker';
 import { record as recordPerf } from '@/utils/perfTiming';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { showToast } from '@/composables/useToast';
+import { tr } from '@/services/translation/tr';
 import { CorruptPayloadError } from '@/types/sync';
 import { applyDelta, applyChunk, bumpDocVersion, resetProjection } from '../projection';
 import {
@@ -237,15 +243,16 @@ function onWorkerError(err: unknown): void {
   const message = err instanceof Error ? err.message : 'worker crashed';
   console.error('[docClient] worker error — rejecting pending + scheduling recovery', err);
   // Surface the crash ONCE here (only when calls were actually awaiting — a crash
-  // with no in-flight work self-heals on the next request's re-spawn). Fired
-  // BEFORE the drain, since `recoverDeadWorker` empties `pending`. Every drained
-  // call rejects with a quiet WorkerCrashError, so N in-flight RPCs → ONE toast.
+  // with no in-flight work self-heals on the next request's re-spawn, console-only).
+  // Fired BEFORE the drain, since `recoverDeadWorker` empties `pending`. Every
+  // drained call rejects with a quiet WorkerCrashError, so N in-flight RPCs → ONE
+  // notification: a toast (non-paging) iff a user-action op was awaiting, else a
+  // single firehose event (see notifyFailure).
   if (pending.size > 0) {
-    showToast('error', "We couldn't update your data", message, {
-      surface: 'doc-worker',
-      error: err instanceof Error ? err : new DocWorkerError(message),
-      critical: true,
-    });
+    notifyFailure(
+      err instanceof Error ? err : new DocWorkerError(message),
+      [...pending.values()].map((p) => p.method)
+    );
   }
   recoverDeadWorker(message);
 }
@@ -336,6 +343,11 @@ function ensureReady(): Promise<'worker' | 'inline'> {
   return readyPromise;
 }
 
+// ─── Method classification sets ──────────────────────────────────────────────
+// Adding a worker method? Decide its membership in each of the five sets below
+// explicitly (JSON_SAFE / HEAVY / ENVELOPE / RETRYABLE / USER_ACTION) — the
+// axes are orthogonal and change for independent reasons.
+
 // Methods whose `args` carry ONLY plain-JSON doc data (mutation ops, envelopes).
 // We deep-plainify these before `postMessage` so a Vue reactive proxy (or any
 // non-structured-cloneable wrapper) that slipped in can't crash the clone. NOT
@@ -397,9 +409,25 @@ const RETRYABLE_METHODS = new Set([
   'ping',
 ]);
 
+// Methods where a USER-VISIBLE edit is in doubt when they fail: the user tapped
+// something and their change may not have applied. Only these ever toast — a
+// failure of any other (background, self-healable) method is firehose-only via
+// `notifyFailure`. Failure-direction of an omission: a missed method degrades to
+// firehose-only (invisible to the user but recoverable + observable) — safe.
+// Orthogonal to RETRYABLE (retry-safety) and HEAVY (timeout tier); membership
+// changes independently.
+const USER_ACTION_METHODS = new Set(['mutate', 'initDoc']);
+
 // A liveness ping does no compute, so a live worker answers near-instantly — a
 // short ceiling turns a reaped/wedged worker into a fast recovery on resume.
 const PING_TIMEOUT_MS = 5_000;
+
+// Suspension-aware deadline bounds (see awaitWithSuspensionAwareDeadline):
+// visible-page re-arms are capped; hidden-now re-arms are exempt from the cap
+// (an overnight-hidden tab must not burn extensions and reject while hidden)
+// but everything is hard-bounded by the absolute wall-clock ceiling.
+const MAX_DEADLINE_EXTENSIONS = 3;
+const ABSOLUTE_DEADLINE_CEILING_MS = 10 * 60_000;
 
 const plainify = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
 
@@ -469,100 +497,243 @@ async function requestCore(
   // the tight mutation budget. An explicit opts.timeoutMs still overrides both.
   const timeoutMs =
     opts.timeoutMs ?? (HEAVY_METHODS.has(method) ? HEAVY_RPC_TIMEOUT_MS : DEFAULT_RPC_TIMEOUT_MS);
+  // A LIGHT op queued behind a progressing HEAVY op (or a live in-flight `mutate`)
+  // in the worker's serial FIFO isn't dead — extend its deadline instead of
+  // rejecting. Excludes THIS call's own pending entry (it stays in `pending`
+  // across extensions so late replies still resolve). NOT applied to the
+  // liveness probe: its whole job is a prompt alive/dead verdict, and it still
+  // gets the visibility extensions (a mid-probe backgrounding must not
+  // false-confirm death) — only the busy-behind-sibling extension is skipped.
+  const extendWhile =
+    !opts.probe && !HEAVY_METHODS.has(method)
+      ? () =>
+          [...pending.entries()].some(
+            ([id, p]) => id !== cid && (HEAVY_METHODS.has(p.method) || p.method === 'mutate')
+          )
+      : undefined;
   let res: RpcResponse;
   try {
-    res = await withTimeout(responsePromise, timeoutMs, `doc-worker '${method}' timed out`);
+    res = await awaitWithSuspensionAwareDeadline(responsePromise, timeoutMs, method, extendWhile);
   } catch (timeoutErr) {
-    // A timeout means the worker went silent WITHOUT firing `onerror` (an OS-reaped
-    // mobile worker, or a FIFO wedged behind a hung whole-doc op). Nothing else tears
-    // it down, so without this the client re-posts to the corpse forever until the
-    // user force-quits. Treat it as a death signal: recover, then heal or surface.
-    pending.delete(cid); // drop THIS call first…
-
-    // A1: a rehydrate RPC that times out must reject ONLY itself. Calling
-    // recoverDeadWorker mid-spawn would reset `readyPromise` / tear down the worker
-    // we're still rehydrating and re-enter. spawn()'s own catch then logs + continues
-    // (a genuinely wedged worker is caught by the next real RPC's normal timeout path).
-    if (rehydrating) {
-      throw surface(timeoutErr, method, opts.quiet);
-    }
-
-    // A7: a pure liveness probe (the corroboration ping below) never recovers, reports,
-    // or retries — it just throws so its caller learns "worker dead" and owns the
-    // recovery. This is also what stops a probe from recursing into another probe.
-    if (opts.probe) {
-      throw surface(timeoutErr, method, opts.quiet);
-    }
-
-    // A7: before declaring the worker dead, corroborate — UNLESS this IS a ping
-    // (`checkWorkerLiveness`'s own probe; a ping timeout is already the death signal,
-    // and re-pinging would recurse).
-    if (method !== 'ping') {
-      // A LIGHT op can legitimately time out (45 s) while a HEAVY whole-doc op is still
-      // progressing toward its 120 s ceiling — the light one is queued behind it in the
-      // worker's serial FIFO, which is NOT proof the worker is dead. Likewise, a live
-      // in-flight `mutate` means the worker has real work in hand. Tearing the worker
-      // down here would abort a slow-but-progressing large-doc load / drop the mutate —
-      // the exact cases we must protect. So spare the worker (reject only this call)
-      // whenever a heavy op OR a mutate is still in flight.
-      const heavyStillInFlight = [...pending.values()].some((p) => HEAVY_METHODS.has(p.method));
-      const mutateStillInFlight = [...pending.values()].some((p) => p.method === 'mutate');
-      if (!HEAVY_METHODS.has(method) && (heavyStillInFlight || mutateStillInFlight)) {
-        throw surface(timeoutErr, method, opts.quiet); // reject just this call; leave the worker to finish
-      }
-
-      // Corroborate death with a fast liveness PROBE (a ping that never recovers/reports
-      // on its own — see `opts.probe` above). If it answers, the worker is alive-but-busy
-      // → false positive → reject only this call, worker untouched. If it times out, the
-      // worker is confirmed dead → fall through to the shared teardown below (which owns
-      // the recover + report with THIS real method, so telemetry isn't reduced to 'ping').
-      let pingAnswered = false;
-      try {
-        await request('ping', undefined, { quiet: true, timeoutMs: PING_TIMEOUT_MS, probe: true });
-        pingAnswered = true;
-      } catch {
-        /* probe timed out → worker confirmed dead → fall through to teardown */
-      }
-      if (pingAnswered) {
-        logEvent({
-          level: 'info',
-          surface: 'doc-worker-recovery',
-          message: `doc-worker '${method}' timed out but a liveness ping answered — worker alive, not torn down`,
-          context: { recovery_method: 'liveness-false-positive', recovery_attempt: attempt },
-        });
-        throw surface(timeoutErr, method, opts.quiet);
-      }
-      // else: fall through to the shared teardown path.
-    }
-
-    // Teardown path — reached by a genuine ping timeout (`checkWorkerLiveness`) OR a
-    // non-ping op whose corroboration probe confirmed death. Tear the worker down
-    // (idempotent), report once with the renamed A9 keys (no longer stripped) carrying
-    // the REAL method, then retry-or-reject.
-    const lostSiblings = pending.size > 0; // counts OTHER in-flight calls drained by recovery
-    recoverDeadWorker(`rpc-timeout:${method}`); // drains siblings (quiet) + tears down → next request re-spawns
-    reportError({
-      surface: 'doc-worker-recovery',
-      message: `doc-worker '${method}' timed out — worker recovered; next request re-spawns a fresh worker`,
-      severity: 'warning', // telemetry + console only — never pages, never toasts
-      context: { recovery_method: method, recovery_attempt: attempt, lost_siblings: lostSiblings },
-    });
-    if (attempt === 1 && RETRYABLE_METHODS.has(method)) {
-      // This idempotent call heals transparently on the fresh worker. But any SIBLING
-      // calls just drained can't be re-issued (we don't own their args/idempotency) and
-      // a drained WorkerCrashError is quiet — so a concurrently-in-flight `mutate` would
-      // otherwise vanish toast-less. Fire the ONE consolidating toast for them by reusing
-      // surface() for its toast side-effect (timeoutErr is not an expected/quiet class);
-      // ignore the returned error and do NOT throw, because THIS call still heals.
-      if (lostSiblings) surface(timeoutErr, method, false);
-      return requestCore(method, args, opts, 2); // fresh ensureReady() re-spawns + rehydrates
-    }
-    // Non-retryable or retry exhausted: surface() throws AND fires the single toast,
-    // which already covers any drained siblings — no separate sibling toast needed.
-    throw surface(timeoutErr, method, opts.quiet);
+    return handleRpcTimeout(timeoutErr, method, args, opts, attempt, cid);
   }
   if (res.ok) return { result: res.result, changed: res.changed };
   throw surface(reconstructError(res.error, method), method, opts.quiet);
+}
+
+/** Await an RPC response with a deadline that doesn't count suspended time.
+ *
+ * Wall-clock `setTimeout` keeps counting while a backgrounded/frozen page (and
+ * its worker) are suspended — on resume the throttled timer fires immediately,
+ * false-declaring a healthy worker dead. At each timer fire this loop decides
+ * extend-vs-reject:
+ *   - page hidden right now            → re-arm (exempt from the extension cap —
+ *     an overnight-hidden tab must not burn extensions and reject while hidden);
+ *   - page was hidden during the window (incl. armed-while-hidden, detected via
+ *     the resume transition) → re-arm, counts toward MAX_DEADLINE_EXTENSIONS;
+ *   - `extendWhile()` (light op queued behind heavy/mutate) → re-arm, counts.
+ * Everything is hard-bounded by ABSOLUTE_DEADLINE_CEILING_MS from first arm, so
+ * a pathological visibility state (e.g. `document.hidden` stuck true) becomes a
+ * bounded, observable failure — never an infinitely-pending promise.
+ *
+ * Extension telemetry is capped per call: first occurrence per reason + one
+ * settle summary carrying the total, so an overnight-pending RPC can't emit
+ * hundreds of near-identical events.
+ *
+ * NOTE: `promise` (an RPC responsePromise) only ever RESOLVES — pending entries
+ * are resolved (never rejected) even on drain — so a rejection out of this
+ * helper is always a deadline rejection. */
+async function awaitWithSuspensionAwareDeadline<T>(
+  promise: Promise<T>,
+  budgetMs: number,
+  method: string,
+  extendWhile?: () => boolean
+): Promise<T> {
+  const TIMED_OUT = Symbol('timed-out');
+  // Register the lazy visibility listener BEFORE any hidden transition during
+  // this wait (wasHiddenSince registers it on first call).
+  wasHiddenSince(Date.now());
+  const firstArmedAt = Date.now();
+  let cappedExtensions = 0;
+  let totalExtensions = 0;
+  const reasonsLogged = new Set<string>();
+
+  const settleSummary = (): void => {
+    if (totalExtensions === 0) return;
+    logEvent({
+      level: 'info',
+      surface: 'doc-worker-recovery',
+      message: `doc-worker '${method}' deadline extensions settled (total ${totalExtensions})`,
+      context: { recovery_method: method, recovery_attempt: totalExtensions },
+    });
+  };
+
+  for (;;) {
+    const armedAt = Date.now();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<typeof TIMED_OUT>((resolve) => {
+      timer = setTimeout(() => resolve(TIMED_OUT), budgetMs);
+    });
+    let settled: T | typeof TIMED_OUT;
+    try {
+      settled = await Promise.race([promise, timeout]);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+    if (settled !== TIMED_OUT) {
+      settleSummary();
+      return settled;
+    }
+
+    // Timer fired — extend or reject.
+    if (Date.now() - firstArmedAt >= ABSOLUTE_DEADLINE_CEILING_MS) {
+      settleSummary();
+      throw new Error(`doc-worker '${method}' exceeded absolute deadline`);
+    }
+    const hiddenNow = typeof document !== 'undefined' && document.hidden;
+    let reason: 'hidden' | 'was-hidden' | 'busy-behind-heavy' | null = null;
+    if (hiddenNow) reason = 'hidden';
+    else if (wasHiddenSince(armedAt)) reason = 'was-hidden';
+    else if (extendWhile?.()) reason = 'busy-behind-heavy';
+    if (reason === null || (reason !== 'hidden' && cappedExtensions >= MAX_DEADLINE_EXTENSIONS)) {
+      settleSummary();
+      throw new Error(`doc-worker '${method}' timed out`);
+    }
+    if (reason !== 'hidden') cappedExtensions++;
+    totalExtensions++;
+    if (!reasonsLogged.has(reason)) {
+      reasonsLogged.add(reason);
+      logEvent({
+        level: 'info',
+        surface: 'doc-worker-recovery',
+        message: `doc-worker '${method}' deadline extended (${reason})`,
+        context: { recovery_method: method, recovery_attempt: totalExtensions },
+      });
+    }
+  }
+}
+
+/** The ordered timeout-decision ladder, extracted from `requestCore`'s catch so
+ * the happy path stays readable. Branch precedence:
+ *   1. rehydrating   — reject only this call (recovery mid-spawn would re-enter);
+ *   2. probe         — a pure liveness probe never recovers/reports/retries;
+ *   3. in-flight backstop — a light op that exhausted its extensions while a
+ *      heavy/mutate op is STILL in flight rejects WITHOUT probing: a live worker
+ *      mid-WASM can't answer the 5 s ping (serial FIFO), so probing here would
+ *      false-confirm death and tear down a progressing heavy op;
+ *   4. corroboration — probe the worker; if it answers, the worker is alive-but-
+ *      busy → transparently re-issue retryable methods, else reject quietly;
+ *   5. teardown      — confirmed dead: recover, report (real method, A9 keys),
+ *      then retry-or-reject with drained-sibling-aware notification.
+ *
+ * A timeout means the worker went silent WITHOUT firing `onerror` (an OS-reaped
+ * mobile worker, or a FIFO wedged behind a hung whole-doc op). Nothing else
+ * tears it down, so without this the client would re-post to the corpse forever
+ * until the user force-quits. */
+async function handleRpcTimeout(
+  timeoutErr: unknown,
+  method: string,
+  args: unknown,
+  opts: RequestOpts,
+  attempt: number,
+  cid: number
+): Promise<{ result: unknown; changed?: boolean }> {
+  pending.delete(cid); // drop THIS call first…
+
+  // A1: a rehydrate RPC that times out must reject ONLY itself. Calling
+  // recoverDeadWorker mid-spawn would reset `readyPromise` / tear down the worker
+  // we're still rehydrating and re-enter. spawn()'s own catch then logs + continues
+  // (a genuinely wedged worker is caught by the next real RPC's normal timeout path).
+  if (rehydrating) {
+    throw surface(timeoutErr, method, opts.quiet);
+  }
+
+  // A7: a pure liveness probe (the corroboration ping below) never recovers, reports,
+  // or retries — it just throws so its caller learns "worker dead" and owns the
+  // recovery. This is also what stops a probe from recursing into another probe.
+  if (opts.probe) {
+    throw surface(timeoutErr, method, opts.quiet);
+  }
+
+  // A7: before declaring the worker dead, corroborate — UNLESS this IS a ping
+  // (`checkWorkerLiveness`'s own probe; a ping timeout is already the death signal,
+  // and re-pinging would recurse).
+  if (method !== 'ping') {
+    // Backstop to the extendWhile deadline extension: a light op that STILL
+    // exhausted its extensions behind a heavy/mutate op rejects only itself —
+    // see branch 3 in the ladder above. Firehose-only under notifyFailure.
+    const heavyStillInFlight = [...pending.values()].some((p) => HEAVY_METHODS.has(p.method));
+    const mutateStillInFlight = [...pending.values()].some((p) => p.method === 'mutate');
+    if (!HEAVY_METHODS.has(method) && (heavyStillInFlight || mutateStillInFlight)) {
+      throw surface(timeoutErr, method, opts.quiet); // reject just this call; leave the worker to finish
+    }
+
+    // Corroborate death with a fast liveness PROBE (a ping that never recovers/reports
+    // on its own — see `opts.probe` above). If it answers, the worker is alive-but-busy
+    // → false positive → transparently re-issue a retryable method on the live worker
+    // (same `attempt` escalator as the respawn retry → at most one retry total), else
+    // reject only this call, worker untouched. If the probe times out, the worker is
+    // confirmed dead → fall through to the shared teardown below (which owns the
+    // recover + report with THIS real method, so telemetry isn't reduced to 'ping').
+    let pingAnswered = false;
+    try {
+      await request('ping', undefined, { quiet: true, timeoutMs: PING_TIMEOUT_MS, probe: true });
+      pingAnswered = true;
+    } catch {
+      /* probe timed out → worker confirmed dead → fall through to teardown */
+    }
+    if (pingAnswered) {
+      logEvent({
+        level: 'info',
+        surface: 'doc-worker-recovery',
+        message: `doc-worker '${method}' timed out but a liveness ping answered — worker alive, not torn down`,
+        context: { recovery_method: 'liveness-false-positive', recovery_attempt: attempt },
+      });
+      if (attempt === 1 && RETRYABLE_METHODS.has(method)) {
+        return requestCore(method, args, opts, 2); // re-issue on the live worker
+      }
+      throw surface(timeoutErr, method, opts.quiet);
+    }
+    // else: fall through to the shared teardown path.
+  }
+
+  // Teardown path — reached by a genuine ping timeout (`checkWorkerLiveness`) OR a
+  // non-ping op whose corroboration probe confirmed death. Capture the sibling
+  // methods BEFORE the drain empties `pending` (they drive toast-vs-firehose
+  // classification below), tear the worker down (idempotent), report once with
+  // the renamed A9 keys carrying the REAL method, then retry-or-reject.
+  const drainedMethods = [...pending.values()].map((p) => p.method);
+  recoverDeadWorker(`rpc-timeout:${method}`); // drains siblings (quiet) + tears down → next request re-spawns
+  reportError({
+    surface: 'doc-worker-recovery',
+    message: `doc-worker '${method}' timed out — worker recovered; next request re-spawns a fresh worker`,
+    severity: 'warning', // telemetry + console only — never pages, never toasts
+    context: {
+      recovery_method: method,
+      recovery_attempt: attempt,
+      lost_siblings: drainedMethods.length > 0,
+    },
+  });
+  if (attempt === 1 && RETRYABLE_METHODS.has(method)) {
+    // This idempotent call heals transparently on the fresh worker. But any SIBLING
+    // calls just drained can't be re-issued (we don't own their args/idempotency) and
+    // a drained WorkerCrashError is quiet — so a concurrently-in-flight `mutate` would
+    // otherwise vanish notification-less. Fire the ONE consolidating notification for
+    // them (toast iff a user-action op was drained, firehose otherwise); do NOT throw,
+    // because THIS call still heals.
+    if (drainedMethods.length > 0) {
+      notifyFailure(
+        timeoutErr instanceof Error ? timeoutErr : new DocWorkerError(String(timeoutErr), method),
+        drainedMethods
+      );
+    }
+    return requestCore(method, args, opts, 2); // fresh ensureReady() re-spawns + rehydrates
+  }
+  // Non-retryable or retry exhausted: one classify-and-notify over the FULL
+  // implicated set (this method + drained siblings) — a drained `mutate` behind
+  // a failed background op still gets its toast; an all-background set degrades
+  // to a single firehose event.
+  throw surface(timeoutErr, method, opts.quiet, [method, ...drainedMethods]);
 }
 
 async function request<T = unknown>(
@@ -583,18 +754,51 @@ async function requestMutate<T>(
   return { result: result as T, changed: changed ?? true };
 }
 
-/** Turn a failure into a surfaced-or-quiet rejection. Returns the error to throw. */
-function surface(err: unknown, method: string, quiet?: boolean): Error {
+/** The single toast-vs-firehose policy for every docClient failure site
+ * (`surface()`, `onWorkerError`, drained siblings). Toast — NON-paging — iff a
+ * user-action op is implicated (the user's edit is in doubt); otherwise the
+ * failure is background + self-healable → firehose-only. Nothing here ever
+ * pages Slack: the single `critical` escalation for "data isn't saving" is the
+ * debounced save-failure banner (syncStore), which carries real recovery CTAs. */
+function notifyFailure(error: Error, methods: string[]): void {
+  if (methods.some((m) => USER_ACTION_METHODS.has(m))) {
+    // No `critical` flag — never pages. useToast auto-reports error toasts
+    // (surface/error) at non-paging severity, so no separate reportError here
+    // (it would double-report).
+    showToast(
+      'error',
+      tr('docWorker.updateFailed', "We couldn't update your data"),
+      error.message,
+      {
+        surface: 'doc-worker',
+        error,
+      }
+    );
+  } else {
+    reportError({
+      surface: 'doc-worker',
+      message: `background op(s) '${methods.join(',')}' failed — self-heal pending`,
+      error,
+      severity: 'error', // firehose + console only — never pages
+    });
+  }
+}
+
+/** Turn a failure into a surfaced-or-quiet rejection. Returns the error to throw.
+ * `implicatedMethods` widens the toast-vs-firehose classification beyond the
+ * failing method itself (terminal teardown passes the drained siblings too). */
+function surface(
+  err: unknown,
+  method: string,
+  quiet?: boolean,
+  implicatedMethods?: string[]
+): Error {
   const error = err instanceof Error ? err : new DocWorkerError(String(err), method);
   // Expected-degradation classes stay quiet: CorruptPayloadError (recovery
   // dispatches on it) + WorkerCrashError (already surfaced once at the crash site).
   const expected = error instanceof CorruptPayloadError || error instanceof WorkerCrashError;
   if (!quiet && !expected) {
-    showToast('error', "We couldn't update your data", error.message, {
-      surface: 'doc-worker',
-      error,
-      critical: true,
-    });
+    notifyFailure(error, implicatedMethods ?? [method]);
   }
   return error;
 }
