@@ -10,19 +10,10 @@
  * diagnostic error descriptor — both used identically by the web and native paths.
  */
 
-import { useTranslationStore } from '@/stores/translationStore';
-
-/** Translate a key with an English fallback (Pinia may be pre-init in edge flows). */
-export function tr(key: string, fallback: string): string {
-  try {
-    // `t` is typed to the literal key union; these keys are added to uiStrings.ts
-    // but the cast keeps this helper key-agnostic (and pre-Pinia safe via catch).
-    const s = (useTranslationStore().t as (k: string) => string)(key);
-    return s && s !== key ? s : fallback;
-  } catch {
-    return fallback;
-  }
-}
+// `tr` now lives in translation/ (it's mechanism-agnostic and also used by the
+// doc-worker client); re-exported here so existing biometric call sites keep
+// their import path.
+export { tr } from '@/services/translation/tr';
 
 // Per-device, self-healing suppression of the PROACTIVE biometric offer (the
 // App.vue post-sign-in nag) after a decline/failure. Stored as an expiry timestamp

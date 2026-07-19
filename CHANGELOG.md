@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-19
+
+### Fixed
+
+- **No more false "We couldn't update your data" errors after backgrounding the app.** Returning to the app after it had been in the background (or waking a laptop overnight) could show a scary error toast — and page our on-call channel — even though nothing was wrong: the app was counting time spent asleep against its internal "is the data engine stuck?" timers. The app now knows the difference between "asleep" and "stuck": time in the background doesn't count, briefly-busy states retry silently, and background housekeeping failures self-heal without bothering you. You'll only see an error when something genuinely needs your attention — a failed edit, or the existing "your data isn't saving" banner with its reconnect options.
+
 ## 2026-07-17
 
 ### Added
