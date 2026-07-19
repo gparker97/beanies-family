@@ -35,6 +35,24 @@ function ensureVisibilityListener(): void {
   visibilityTracker.listenerRegistered = true;
 }
 
+/** True if the page is hidden now, was hidden at any point since `sinceTs`,
+ * or became visible since `sinceTs` (a resume transition during the window
+ * implies the page was hidden when the window opened — covers a caller whose
+ * wait started while the page was already hidden, e.g. the backgrounding
+ * cache flush, independent of visibilitychange listener registration order).
+ * Used by the doc-worker's suspension-aware RPC deadlines: time spent hidden
+ * must not count toward declaring the worker dead. */
+export function wasHiddenSince(sinceTs: number): boolean {
+  ensureVisibilityListener();
+  if (typeof document !== 'undefined' && document.hidden) return true;
+  const { lastHiddenAt, lastVisibleAt } = visibilityTracker;
+  if (lastHiddenAt !== null && lastHiddenAt >= sinceTs) return true;
+  // `lastHiddenAt !== null` guards the module-load initialization of
+  // `lastVisibleAt` (or a spurious visible event with no prior hidden) from
+  // reading as "was hidden".
+  return lastHiddenAt !== null && lastVisibleAt !== null && lastVisibleAt >= sinceTs;
+}
+
 /** ms the page was last hidden before becoming visible, or null if never
  *  hidden this session. Used as a wake-time diagnostic on auth/sync failures. */
 export function getHiddenDurationMs(): number | null {
