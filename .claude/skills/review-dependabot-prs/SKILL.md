@@ -1,6 +1,6 @@
 ---
 name: review-dependabot-prs
-description: Review, triage, and action all open Dependabot PRs — squash-merge the safe ones, close the genuinely out-of-scope ones with an explanation (and propose an ignore entry for indefinitely-deferred majors), and surface the ones that need a human decision with a written analysis. Use when greg invokes `/review-dependabot-prs` or asks to handle / review / clean up / triage the Dependabot PRs or dependency-update backlog.
+description: Review, triage, and action all open bot-authored PRs — both Dependabot dependency bumps AND the monthly `automation`-labeled data-sync PRs (airport-sync, holiday-sync, translation-sync): squash-merge the safe ones, close the genuinely out-of-scope ones with an explanation (and propose an ignore entry for indefinitely-deferred majors), and surface the ones that need a human decision with a written analysis. Use when greg invokes `/review-dependabot-prs` or asks to handle / review / clean up / triage the Dependabot PRs, the dependency-update backlog, or the monthly airport / public-holiday / translation bot PRs.
 ---
 
 # review-dependabot-prs — Dependabot PR Triage
@@ -8,6 +8,8 @@ description: Review, triage, and action all open Dependabot PRs — squash-merge
 Dependabot opens a steady trickle of dependency-bump PRs (npm weekly + GitHub Actions weekly — see `.github/dependabot.yml`). Left alone they pile up; merged carelessly they break the build. This skill is the standardized triage so every Dependabot PR gets the same comprehensive look: read what changed, check CI, weigh blast radius, then **act** — merge, close, or hold-for-decision — rather than freestyling each backlog sweep.
 
 The cost of both failure modes is real: stale deps accumulate CVEs; a careless major-version merge eats a day of breakage. The right call usually needs the same checklist every time, so it lives here.
+
+**This sweep also picks up the monthly `automation` data-sync bot PRs** — airport-sync, holiday-sync, translation-sync (see `.github/workflows/*-sync.yml`). They're the same mental mode (a bot's mechanical PR that wants a quick human skim) and greg deliberately runs them through this same review rather than auto-merging, so they belong in the same pass. They're triaged on a different axis than dependency bumps — see **Step 4b**.
 
 ---
 
@@ -39,7 +41,12 @@ If it's dirty, stop and ask — don't mix Dependabot triage with unrelated uncom
 gh pr list --author "app/dependabot" --state open --json number,title,headRefName,createdAt,labels
 ```
 
-If the list is empty → report "no open Dependabot PRs — backlog is clean" and stop.
+Also enumerate the `automation` data-sync bot PRs (they run through Step 4b, not the Dependabot classification):
+```
+gh pr list --label "automation" --state open --json number,title,headRefName,createdAt,labels
+```
+
+If **both** lists are empty → report "no open bot PRs — backlog is clean" and stop. If only one is empty, proceed with the other.
 
 ## Step 2: Gather data on each PR
 
@@ -72,6 +79,27 @@ Read `docs/STATUS.md`, section "**Major-version dependency migrations**" and "**
 | 🔁 **Stale / behind main** | `mergeStateStatus` is `BEHIND` / `mergeable` is `CONFLICTING` purely because main moved (no real conflict in the dep change itself) | `@dependabot rebase` comment (Step 5); record as "re-check next run" — don't block waiting for the rebase + re-run |
 
 When in doubt between two categories, pick the *safer* one: 🔶 (hold) over ✅ (merge), and 🔶 over ❌ (close). A held PR costs a follow-up; a bad merge or a wrongly-closed security fix costs more.
+
+## Step 4b: Automation data-sync PRs (airports / holidays / translations)
+
+The three monthly `automation`-labeled PRs (authored by `app/github-actions`) are **data refreshes, not code changes**, so the semver / advisory / deferred-list machinery above doesn't apply — triage them on their own axis:
+
+- `airport-sync.yml` → regenerates `src/constants/airports.ts` from OurAirports (public domain)
+- `holiday-sync.yml` → refreshes `public/holidays/*.json` (+ `src/constants/countries.ts`)
+- `translation-sync.yml` → refreshes translation data
+
+**Critical — these PRs bypass the app's CI, and that's expected.** They're created with the default `GITHUB_TOKEN`, and GitHub deliberately will **not** run your other workflows (`main-ci`, `e2e`, type-check) on a branch pushed by that token — a recursion guard. So expect `mergeStateStatus: UNSTABLE` with the **only** check being `GitGuardian` (a GitHub App, which does run). That is **normal, not a failure** — there's simply no build gate on these PRs. The consequence: a malformed upstream (e.g. OurAirports changing its CSV format → broken generated TS) would sail straight through. **You are the gate** — do a light diff sanity check before merging.
+
+Skim `gh pr diff <n>` (for the 100-file holiday PR, `gh pr view <n> --json files` + spot-check a couple), then:
+
+| Signal | Read | Action |
+|---|---|---|
+| Small, sensible data churn — a handful of entries added/removed, a "last regenerated" date bump, a normal yearly holiday-window roll-forward | clean | squash-merge (Step 5) |
+| Something load-bearing looks wrong — a major airport (LHR / JFK / SIN …) dropped, an IATA code reassigned to a different city, a whole country's holidays emptied, a wildly lopsided deletion count, or a diff that reads like a format break (garbled fields, TS that won't parse) | suspicious | **don't merge** — hold and flag it in the report with the *specific* anomaly; the upstream source or the generator (`scripts/updateAirports.mjs` and the holiday/translation equivalents) may need a look |
+
+Because CI didn't gate the PR, close the loop yourself when a **`.ts`** data file changed (`airports.ts`, `countries.ts`): either run `npm run type-check` locally *before* merging, or — since the squash-merge to `main` triggers the push-driven `main-ci` / `e2e` — glance that the post-merge run goes green and say so in the report. Pure `public/holidays/*.json` data changes are lower-risk (no compile step) but still deserve the skim.
+
+There's no "close as out-of-scope" for these — they're either clean-and-merge or hold-with-an-anomaly-note. They don't touch the `docs/STATUS.md` deferred list, so **Step 6 doesn't apply** to them.
 
 ## Step 5: Take action
 
@@ -121,7 +149,9 @@ A table — one row per PR:
 - **recommendation** — the clear call for this PR: **Merge** or **Close** (those are the two normal outcomes). Use **Rebase** only when the sole blocker is a stale branch with no other decision pending. Always state one — even for a held PR, give the recommendation you'd act on once greg signs off (e.g. a held major you've vetted as safe is **Merge**; a held major with real breakage risk is **Close**).
 - **notes** — one brief phrase explaining the recommendation (e.g. "critical CVE fix, breaking changes inert on Node 24", "ESLint-10 ERESOLVE-blocked on peers", "dev-only patch, green CI").
 
-Then a short tally: **N merged · M closed · K held · J rebased**. For each **held** PR, one line stating exactly what greg needs to decide. For each **closed** PR, one line with the revisit condition. If you proposed a `dependabot.yml` ignore entry, show the diff and ask for confirmation.
+Include the `automation` data-sync PRs in the same table (dep type = e.g. `data-sync (airports)`; bump = `data`; verdict = ✅ merge or 🔶 hold-anomaly). For a held data-sync PR, the notes state the specific anomaly you spotted.
+
+Then a short tally: **N merged · M closed · K held · J rebased** (counting both Dependabot and automation PRs). For each **held** PR, one line stating exactly what greg needs to decide (for a data-sync hold: the anomaly). For each **closed** PR, one line with the revisit condition. If you proposed a `dependabot.yml` ignore entry, show the diff and ask for confirmation. If you merged a data-sync PR that touched a `.ts` file, note the post-merge CI / type-check result.
 
 ---
 
@@ -131,6 +161,7 @@ Then a short tally: **N merged · M closed · K held · J rebased**. For each **
 - **Never `gh pr merge --admin`** — if a required check isn't `SUCCESS` (skipped E2E/Lighthouse excepted), the PR is a hold, not a merge. Admin-bypass is off the table.
 - **Never close a real security advisory PR unless you've confirmed the vulnerable path is unreachable** — check the advisory's affected versions/functions against actual usage in the tree. Can't confirm? Hold it; don't close it.
 - **Squash-merge only.**
+- **`automation` data-sync PRs bypass CI by design** — created by `GITHUB_TOKEN`, so `main-ci`/`e2e`/type-check don't run on the branch; `UNSTABLE` with only `GitGuardian` green is normal, not a red flag. You are the build gate: skim the data diff for anomalies (a major airport vanishing, a country's holidays emptied, a format break) before merging, and verify type-check/post-merge CI when a `.ts` data file (`airports.ts`, `countries.ts`) changed. Never auto-merge them blind. See Step 4b.
 - **`@dependabot close` (PR comment) is preferred over `gh pr close`** for out-of-scope PRs — Dependabot tracks the close and won't immediately recreate the same-version PR. For indefinitely-deferred majors, follow up with a `.github/dependabot.yml` `ignore` entry (with greg's confirmation) so it stops recurring weekly.
 - **Don't block on rebases** — post `@dependabot rebase`, note it, move on. The re-run happens async; the next sweep picks it up.
 - **Dirty working tree on entry → stop and ask.** Don't entangle this with unrelated changes.
