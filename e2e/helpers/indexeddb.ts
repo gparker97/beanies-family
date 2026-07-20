@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 import type {
   FamilyMember,
   Account,
@@ -163,6 +163,45 @@ export class IndexedDBHelper {
     // once `isLoadingData` clears, so it is the same readiness signal
     // `bypassLoginIfNeeded` gates on.
     await this.page.getByTestId('app-content').waitFor({ state: 'visible', timeout: 30000 });
+
+    // `app-content` visible only proves `isLoadingData` cleared — it does NOT
+    // prove the async snapshot restore has actually projected the seeded
+    // collections into the live doc. On a slower browser under CI contention
+    // (firefox in the 3-browser scheduled run, 2026-07-20) the restore can still
+    // be in flight when this returns, so the next navigation's `stageSnapshot`
+    // captures a not-yet-restored doc and drops the seed — the empty account
+    // dropdown in financial-data:37 that the 2026-07-07 app-content gate fixed
+    // for webkit but not firefox. Gate directly on the seeded data being
+    // observable in the live projection (`exportData()` reads the same
+    // projection the UI renders from), so the restore is provably complete
+    // before we return. Browser-agnostic; supersedes the app-content-only gate.
+    const expectedCounts: Record<string, number> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (key !== 'settings' && Array.isArray(value) && value.length > 0) {
+        expectedCounts[key] = value.length;
+      }
+    }
+    if (Object.keys(expectedCounts).length > 0) {
+      await expect
+        .poll(
+          () =>
+            this.page.evaluate((counts) => {
+              const exported = (
+                window as unknown as Record<string, any>
+              ).__e2eDataBridge.exportData() as Record<string, unknown[]>;
+              return Object.entries(counts).every(
+                ([col, n]) => (exported[col]?.length ?? 0) >= (n as number)
+              );
+            }, expectedCounts),
+          {
+            timeout: 30000,
+            message:
+              'seeded collections never projected into the live doc after reload — ' +
+              'the async snapshot restore did not complete (see docs/E2E_HEALTH.md 2026-07-20)',
+          }
+        )
+        .toBe(true);
+    }
   }
 
   async exportData(): Promise<ExportedData> {
