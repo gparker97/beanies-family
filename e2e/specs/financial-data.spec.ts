@@ -34,7 +34,19 @@ test.describe('Financial Data', () => {
     await expect(dashboardPage.netWorthValue).toContainText('5,000', { timeout: 10000 });
   });
 
-  test('Create income and expense, verify dashboard summary', async ({ page }) => {
+  test('Create income and expense, verify dashboard summary', async ({ page, browserName }) => {
+    // Quarantined on firefox (2026-07-20, greg-approved). Firefox — scheduled/
+    // dispatch-only, non-gating — loses the seeded memory-provider family across
+    // the `seedData` reload: the app comes back with "No active family" +
+    // sync-config-total-failure, so App.vue Path-3 restore never repopulates the
+    // doc and the account dropdown stays empty. This is a firefox-only fragility
+    // of the E2E seed/restore harness (real users have a `.beanpod` file →
+    // Path 1/2, unaffected), not a product bug. chromium + webkit (the deploy
+    // gate) run this test normally. See docs/E2E_HEALTH.md 2026-07-20.
+    test.skip(
+      browserName === 'firefox',
+      'firefox memory-provider seed/restore loses the active family across reload — harness fragility, non-gating. See E2E_HEALTH 2026-07-20'
+    );
     // Navigate first so we have a page context for IndexedDB operations
     await gotoRoot(page);
     const dbHelper = new IndexedDBHelper(page);
