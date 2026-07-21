@@ -39,6 +39,11 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: 'stylelint'
         update-types: ['version-update:semver-major']
+      # typescript 7 is the native-port compiler; vue-tsc + typescript-eslint +
+      # @microsoft/eslint-plugin-sdl must ship TS7-compatible releases first.
+      # PR #282 (5.9.3 -> 7.0.2) failed CI outright on 2026-07-21.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
       # Major bumps needing a focused migration with QA — re-enable when scheduled
       - dependency-name: 'astro'
         update-types: ['version-update:semver-major']
