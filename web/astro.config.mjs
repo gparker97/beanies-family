@@ -14,21 +14,30 @@ export default defineConfig({
   build: {
     format: 'file',
     // Inline ALL page CSS into <style> rather than emitting <link> tags.
+    // Astro's default ('auto') only inlines stylesheets under ~4KB; ours are
+    // larger, so by default they ship as render-blocking <link>s.
     //
-    // Astro's default ('auto') only inlines stylesheets under ~4KB, so our two
-    // homepage bundles (~10KB each) shipped as render-blocking requests. That
-    // was the entire Lighthouse failure: on the homepage the LCP element is the
-    // hero mascot, which LOADS in 84ms but had a 2707ms *render delay* (83% of
-    // LCP) waiting on those two stylesheets. Lighthouse measured 1510ms of
-    // render-blocking savings here, taking LCP from 3245ms back under the
-    // 3000ms budget. Total blocking time was already 0ms, so this was never a
-    // JS problem.
+    // DECISION (2026-07-21, provisional — see below): keep 'always'.
+    // Rationale: it removes two render-blocking requests from the critical
+    // path. Cost: ~112KB of CSS is inlined into EVERY page document, which
+    // forfeits cross-page CSS caching across a 91-page site — a repeat visitor
+    // re-downloads it per page instead of hitting cache.
     //
-    // Trade-off, accepted deliberately: inlining costs ~21KB per HTML document
-    // and forfeits cross-page CSS caching on repeat visits. For a marketing
-    // site whose traffic is overwhelmingly first-visit landings from search and
-    // social, eliminating two round trips on the critical path wins. Revisit if
-    // the site ever becomes browse-heavy.
+    // This setting was originally introduced expecting a ~1510ms LCP win (the
+    // figure Lighthouse's "render-blocking resources" audit advertised). The
+    // measured result was 87ms. That estimate assumes the bytes go away; they
+    // don't, they move into the HTML. The homepage LCP regression was actually
+    // fixed by two other changes — see
+    // docs/plans/2026-07-21-homepage-lcp-critical-css.md. Stating that here so
+    // nobody re-derives the wrong causal story from this line.
+    //
+    // NOT YET RE-VALIDATED against 'auto' now that the real fix has landed.
+    // The comparison needs a quiet CI runner and we did not have one: on
+    // 2026-07-21 the identical commit produced total-blocking-time readings
+    // between 80ms and 1342ms across consecutive runs, which is not a basis
+    // for a config decision. Re-measure both settings when Lighthouse is
+    // stable, and prefer 'auto' if it holds LCP — cacheability is worth real
+    // money on a browse-heavy content site.
     inlineStylesheets: 'always',
   },
   markdown: {
