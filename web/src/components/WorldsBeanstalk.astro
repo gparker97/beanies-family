@@ -224,6 +224,24 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
     --vine-green: #3e8e52;
     --vine-green-light: #57a56a;
     position: relative; overflow: hidden;
+    /* This section is below the fold and scroll-driven, but it was ~27% of the
+       homepage DOM and ~19.7KB of CSS that first paint had to style, lay out and
+       paint anyway — including the three blurred .orb elements below. Skipping it
+       until it approaches the viewport is what the browser gives us for free here.
+       Added 2026-07-21 to fix the homepage LCP regression; see
+       docs/plans/2026-07-21-homepage-lcp-critical-css.md.
+
+       The `auto` keyword makes the browser remember the section's REAL rendered size
+       after first render, so the literal below is only a first-paint placeholder.
+       It is derived, not measured by eye: .stage has a fixed height of 2400px
+       (2550px at <=780px) plus the intro/payoff blocks and padding. DO NOT treat
+       3000px as a measurement and do not maintain it by hand.
+
+       NOTE: this is why dockOffset() guards against degenerate rects — while the
+       section is skipped its descendants are unlaid-out. Removing that guard
+       reintroduces a silent mis-positioned seed on cold load. */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 3000px;
     background:
       radial-gradient(120% 42% at 50% 0%, #fff7f3 0%, rgba(255,247,243,0) 40%),
       linear-gradient(180deg, #fffdfb 0%, #f3faf4 55%, #fbfaf6 100%);
@@ -452,6 +470,9 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
     var VBW = 1080, VBH = 2400;
     var cLen = 0;
     var docked = true, celebrated = false, launchedState = false, hopping = false, rafPending = false;
+    // Set when dockOffset() had to refuse a degenerate measurement (see dockOffset).
+    // Cleared on the first successful recompute.
+    var dockDirty = false;
     // gVisual is the EASED position the beanie + stalk actually render at; gTarget is
     // where the scroll says they should be. Easing gVisual toward gTarget means the
     // seed ALWAYS travels from the top downward — even on a fast scroll that jumps
@@ -521,9 +542,21 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
     function dockOffset() {
       var pt0 = homeAtStalkTop();
       var st = stage!.getBoundingClientRect(), sl = seedSlot!.getBoundingClientRect();
+      // The section carries `content-visibility: auto`, so while it is off-screen its
+      // subtree is size-contained and UNLAID-OUT — these rects come back degenerate
+      // (0×0). Setup runs before the user has scrolled anywhere near here, so on a cold
+      // load that is the normal case, not an edge case. Writing --bx/--by from zero
+      // rects would park the docked seed in the wrong place, silently, until something
+      // happened to trigger a resize. Refuse the bad measurement, flag it, and let
+      // readScroll() retry once the section has actually been rendered.
+      // Deliberately browser-agnostic (no contentvisibilityautostatechange dependency)
+      // and it also hardens against any other zero-layout ancestor state.
+      // See docs/plans/2026-07-21-homepage-lcp-critical-css.md § Step 2 (a-i).
+      if (!st.width || !sl.width) { dockDirty = true; return; }
       var homeX = st.left + (pt0.x / VBW) * st.width, homeY = st.top + (pt0.y / VBH) * st.height;
       (climber as HTMLElement).style.setProperty('--bx', ((sl.left + sl.width / 2) - homeX).toFixed(1) + 'px');
       (climber as HTMLElement).style.setProperty('--by', ((sl.top + sl.height / 2) - homeY).toFixed(1) + 'px');
+      dockDirty = false;
     }
 
     // Read the scroll → gTarget, and manage the docked ↔ launched transition +
@@ -550,6 +583,11 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
           climber!.classList.add('docked');
           climber!.classList.remove('launching');
           docked = true;
+        } else if (dockDirty) {
+          // Already docked, but the offset was computed from a degenerate rect while
+          // the section was still skipped by content-visibility. We are inside
+          // readScroll, so the section is being rendered now — retry. Self-clearing.
+          dockOffset();
         }
       } else if (!launchedState) {
         // First frame past the launch point: pin to the TOP (gVisual=0) and hop the
