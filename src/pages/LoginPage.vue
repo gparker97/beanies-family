@@ -93,11 +93,12 @@ const isSingleFamilyAutoSelect = ref(false);
 //  - showCreateWelcome: starts true; latched false ONLY on proceed (✕/cancel leaves
 //    it true so the intro re-shows on re-entry, since they haven't seen the wizard).
 //
-// Invite gate intentionally retained but flag-gated off in prod (VITE_INVITE_BEAN_HASHES
-// cleared) — see docs/plans/2026-07-21-remove-invite-gate-create-welcome-modal.md. NOT
-// dead code: re-adding the env var re-gates. To fully remove: delete this + the create
-// block's InviteGateOverlay + InviteGateOverlay/InviteDiscordButton/inviteToken.ts + the
-// inviteGate.* strings.
+// Invite gate intentionally retained but switched off in prod — see
+// docs/plans/2026-07-21-remove-invite-gate-create-welcome-modal.md. NOT dead code: set the
+// INVITE_GATE repo variable to "true" to re-gate (the token hashes secret stays populated
+// but inert meanwhile; see features.ts for the two-condition interlock). To fully remove:
+// delete this + the create block's InviteGateOverlay + InviteGateOverlay/InviteDiscordButton/
+// inviteToken.ts + the inviteGate.* strings.
 const inviteGateLocked = ref(features.inviteGate);
 const showCreateWelcome = ref(true);
 

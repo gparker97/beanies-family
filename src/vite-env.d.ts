@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_REGISTRY_API_URL: string | undefined;
   readonly VITE_REGISTRY_API_KEY: string | undefined;
   readonly VITE_OAUTH_PROXY_URL: string | undefined;
+  /** "true" (and only "true") arms the invite gate; anything else leaves it off. */
+  readonly VITE_INVITE_GATE: string | undefined;
   readonly VITE_INVITE_BEAN_HASHES: string | undefined;
   readonly VITE_INVITE_WEBHOOK_URL: string | undefined;
   readonly VITE_SLACK_WEBHOOK_URL: string | undefined;
