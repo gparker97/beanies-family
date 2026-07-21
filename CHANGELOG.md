@@ -18,6 +18,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - **Creating a family no longer requires an invite code.** beanies.family is live, so the "we're still building — invite only" gate has been retired.
+- **The Android app is now live on Google Play** for everyone, and a fresh build carrying the open sign-up flow was submitted to the production track.
+
+### Performance
+
+- **The homepage loads noticeably faster on phones.** The two soft colour washes behind the hero were being blurred by the browser on every load before anything could appear on screen; they are now pre-rendered gradients that look the same and cost nothing. The "three worlds" beanstalk section — which sits well below the fold and only animates once you scroll to it — no longer holds up that first paint either. Largest Contentful Paint improved from 3.2s to 2.7s, with the beanstalk unchanged visually.
+- **Every page except the homepage stopped downloading a font it never used.** The handwritten Caveat face is now loaded only by the one section that uses it, instead of by all 91 pages.
 
 ## 2026-07-20
 
