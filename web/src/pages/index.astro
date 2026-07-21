@@ -3,6 +3,20 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import WorldsBeanstalk from '../components/WorldsBeanstalk.astro';
 import { SOFTWARE_APPLICATION } from '@beanies/brand/schema';
 import { APP_URL } from '@beanies/brand/nav';
+
+// The LCP element. Single source of truth: this same path feeds BOTH the
+// `<link rel="preload" as="image">` (via BaseLayout's `lcpImage`) and the
+// `<img src>` below. They MUST stay identical — if they drift, the browser
+// preloads a file it never uses, the real LCP image silently loses its
+// preload, and the only signal is a console notice. Hoisted 2026-07-21 to
+// make that drift unrepresentable.
+//
+// 512 is the RIGHT size, not an oversight: the box is 180 CSS px
+// (`.hero__mascot`, at every breakpoint) and device pixel ratios of
+// 2.625 (the profile Lighthouse emulates) to 3 need 473-540px. Shrinking
+// this to "match" the 180px box would make it visibly soft on most phones.
+// See docs/plans/2026-07-21-homepage-lcp-critical-css.md § Step 1a.
+const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 ---
 
 <BaseLayout
@@ -10,7 +24,7 @@ import { APP_URL } from '@beanies/brand/nav';
   description="one app to manage your family's money, activities, and all the little beans. open source and fully encrypted. no ads, no tracking, no nonsense."
   canonicalPath="/"
   jsonLd={SOFTWARE_APPLICATION}
-  lcpImage="/brand/beanies_family_hugging_transparent_512x512.webp"
+  lcpImage={HERO_MASCOT}
 >
   <div class="landing-page">
     <!-- HERO -->
@@ -26,12 +40,12 @@ import { APP_URL } from '@beanies/brand/nav';
       <img src="/brand/beanies_impact_bullet_transparent_192x192.webp" alt="" width="192" height="192" loading="lazy" decoding="async" class="hero__deco-img" style="animation: decoFloat2 10s ease-in-out infinite; left: 4%; opacity: 0.05; top: 45%; transform: rotate(15deg); width: 35px; height: auto" />
 
       <div class="hero__deco" style="background: var(--sky-silk); height: 400px; right: -150px; top: -100px; width: 400px"></div>
-      <div class="hero__deco" style="background: var(--heritage-orange); bottom: 10%; filter: blur(100px); height: 300px; left: -120px; width: 300px"></div>
-      <div class="hero__deco" style="background: var(--terracotta); filter: blur(80px); height: 200px; opacity: 0.04; right: 5%; top: 40%; width: 200px"></div>
+      <div class="hero__deco" style="background: radial-gradient(circle, var(--heritage-orange) 0%, var(--heritage-orange) 18%, transparent 72%); bottom: calc(10% - 300px); height: 900px; left: -420px; width: 900px"></div>
+      <div class="hero__deco" style="background: radial-gradient(circle, var(--terracotta) 0%, var(--terracotta) 20%, transparent 74%); height: 680px; opacity: 0.04; right: calc(5% - 240px); top: calc(40% - 240px); width: 680px"></div>
 
       <div class="hero__mascot">
         <img
-          src="/brand/beanies_family_hugging_transparent_512x512.webp"
+          src={HERO_MASCOT}
           alt="the beanies family"
           width="512"
           height="512"
@@ -867,6 +881,23 @@ import { APP_URL } from '@beanies/brand/nav';
 }
 
 .hero__bean { font-size: 2.2rem; opacity: 0.05; pointer-events: none; position: absolute; }
+/* The two warm hero blobs were `filter: blur(100px)` / `blur(80px)` over a solid
+   circle until 2026-07-21. A large-radius blur is rastered on the main thread
+   before first paint and these sit above the fold, so they were gating homepage
+   LCP. They are now pre-baked radial-gradients (see the inline styles on the
+   .hero__deco divs): visually equivalent, effectively free to raster.
+
+   The geometry is DERIVED, not eyeballed. A CSS blur radius is the Gaussian
+   sigma, so colour spreads ~3σ past the element box — the visible blob was far
+   bigger than its 300px/200px div. Each replacement box is therefore grown to
+   (original + 3σ per side) and re-anchored on the SAME centre via calc(), with
+   gradient stops approximating the blurred disc: a near-solid core, falling off
+   to transparent inside the box. Do NOT "simplify" these back to a small box
+   with a blur filter — that is the regression this fixed.
+   See docs/plans/2026-07-21-homepage-lcp-critical-css.md § Step 1.
+
+   `.ambient-orb` below still uses blur(80px) deliberately: it is below the fold,
+   where paint cost is not on the LCP path. */
 .hero__deco { border-radius: 50%; opacity: 0.06; pointer-events: none; position: absolute; }
 .hero__deco-img { pointer-events: none; position: absolute; }
 
