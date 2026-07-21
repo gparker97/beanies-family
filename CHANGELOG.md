@@ -14,6 +14,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Refreshed the airport and public-holiday reference data.** The built-in airport list (used by travel & vacation planning) and the country public-holiday calendars (used by the Family Planner) were regenerated from their latest upstream sources — a few airports that stopped scheduled service dropped off, and holiday dates rolled forward. _(Data update; reaches users on the next app release.)_
 
+## 2026-07-21
+
+> Implemented on the `remove-invite-gate-welcome-survey` branch — not yet deployed. The invite gate stays live in production until the `VITE_INVITE_BEAN_HASHES` deploy variable is cleared.
+
+### Added
+
+- **A warm welcome screen when you create a new family**, previewing the three quick setup steps and reassuring you that your data stays private (with a link to how zero-knowledge privacy works) — shown in place of the old "invite only" screen.
+- **An optional "how did you hear about us?" question during family setup.** Fully skippable — it never blocks creating your family.
+
+### Changed
+
+- **Creating a family no longer requires an invite code.** beanies.family is live, so the "we're still building — invite only" gate has been retired.
+
 ## 2026-07-19
 
 ### Changed

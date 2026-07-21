@@ -32,6 +32,10 @@ export const features = {
   // VITE_REGISTRY_API_URL (cloud, where one Lambda backs both surfaces).
   oauthProxy: ok(env.VITE_OAUTH_PROXY_URL) || ok(env.VITE_REGISTRY_API_URL),
   registry: ok(env.VITE_REGISTRY_API_URL) && ok(env.VITE_REGISTRY_API_KEY),
+  // Invite gate: intentionally retained but flag-gated OFF in prod (VITE_INVITE_BEAN_HASHES
+  // cleared) as of 2026-07-21, superseded by the Create-pod welcome modal. NOT dead code —
+  // re-adding the env var re-gates instantly. See
+  // docs/plans/2026-07-21-remove-invite-gate-create-welcome-modal.md.
   inviteGate: ok(env.VITE_INVITE_BEAN_HASHES),
   // NOTE: VITE_INVITE_WEBHOOK_URL and VITE_MARKETING_URL are NOT gated here — they
   // are read directly at their point of use (InviteGateOverlay's `hasInviteWebhook`;

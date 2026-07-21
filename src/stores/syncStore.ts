@@ -1308,7 +1308,10 @@ export const useSyncStore = defineStore('sync', () => {
     password: string,
     memberId: string,
     familyId: string,
-    familyName: string
+    familyName: string,
+    /** Optional "how did you hear about us?" answer (stable English label or free
+     *  text) — appended to the pod-created Slack notification only. Never persisted. */
+    heardVia?: string | null
   ): Promise<CreatePodResult> {
     // Re-entrancy guard. The UI shouldn't be able to call this twice
     // concurrently (the storage step disables its CTA while in flight), but
@@ -1507,7 +1510,8 @@ export const useSyncStore = defineStore('sync', () => {
             ? 'Local File'
             : '(unknown)';
       slackNotify(
-        `🎉 *Family pod created!*\n*Family:* ${familyName}\n*Owner:* ${ownerMember.name}\n*Storage:* ${storageLabel}`
+        `🎉 *Family pod created!*\n*Family:* ${familyName}\n*Owner:* ${ownerMember.name}\n*Storage:* ${storageLabel}` +
+          (heardVia ? `\n*Heard via:* ${heardVia}` : '')
       );
 
       return { ok: true };

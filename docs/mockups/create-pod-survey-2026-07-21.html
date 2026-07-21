@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create Pod — "How did you hear about us?" · beanies.family mockup</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --slate: #2c3e50;
+        --orange: #f15d22;
+        --orange-hover: #d14d1a;
+        --terracotta: #e67e22;
+        --silk: #aed6f1;
+        --cloud: #f8f9fa;
+        --success: #27ae60;
+
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-silk-20: rgba(174, 214, 241, 0.2);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+        --sq: 24px;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        color: var(--slate);
+        background: #eef1f4;
+        -webkit-font-smoothing: antialiased;
+        padding: 40px 20px 72px;
+      }
+      .page-title { text-align: center; max-width: 760px; margin: 0 auto 8px; }
+      .page-title h1 {
+        font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 26px;
+        letter-spacing: -0.01em; margin: 0 0 6px; color: var(--slate);
+      }
+      .page-title p { font-size: 14px; color: rgba(44, 62, 80, 0.6); margin: 0; line-height: 1.5; }
+
+      .stage-grid {
+        display: flex; flex-wrap: wrap; gap: 40px; justify-content: center;
+        align-items: flex-start; margin: 44px auto 0; max-width: 1120px;
+      }
+      .stage-col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+      .stage-label {
+        font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.08em; color: rgba(44, 62, 80, 0.45);
+      }
+
+      /* Warm login-flow background the create surfaces sit on */
+      .surface {
+        position: relative; border-radius: 28px; overflow: hidden; box-shadow: var(--soft-shadow);
+        background:
+          radial-gradient(120% 90% at 80% 0%, rgba(174, 214, 241, 0.35) 0%, transparent 55%),
+          radial-gradient(120% 90% at 0% 100%, rgba(230, 126, 34, 0.16) 0%, transparent 50%),
+          var(--cloud);
+        display: flex; align-items: center; justify-content: center; padding: 26px;
+      }
+      .surface.desktop { width: 560px; min-height: 640px; }
+      .surface.mobile { width: 340px; min-height: 700px; }
+
+      .card {
+        position: relative; width: 100%; max-width: 440px; background: #fff;
+        border-radius: var(--sq); box-shadow: var(--card-shadow); padding: 28px 26px 22px;
+        text-transform: lowercase; /* warm brand voice — strings stay standard-cased */
+      }
+      .surface.mobile .card { max-width: 100%; }
+
+      .eyebrow {
+        font-family: 'Caveat', cursive; font-size: 21px; font-weight: 700;
+        color: var(--orange); line-height: 1; text-align: center; margin-bottom: 4px;
+      }
+      .card h2 {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 21px; line-height: 1.2;
+        letter-spacing: -0.01em; margin: 2px 0 6px; color: var(--slate); text-align: center;
+      }
+      .card .sub {
+        font-size: 13px; line-height: 1.5; color: rgba(44, 62, 80, 0.6);
+        text-align: center; margin: 0 auto 18px; max-width: 320px;
+      }
+
+      /* option grid */
+      .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .surface.mobile .opts { grid-template-columns: 1fr 1fr; }
+      .opt {
+        display: flex; align-items: center; gap: 10px; padding: 12px 13px;
+        border: 1.5px solid var(--tint-slate-5); border-radius: 16px; background: #fff;
+        cursor: pointer; transition: border-color 0.15s, background 0.15s, transform 0.1s;
+        font-family: 'Outfit', sans-serif; font-size: 13.5px; font-weight: 600; color: var(--slate);
+      }
+      .opt .ic {
+        width: 30px; height: 30px; flex: 0 0 auto; border-radius: 10px; display: grid;
+        place-items: center; font-size: 16px; background: var(--tint-slate-5);
+      }
+      .opt:hover { border-color: var(--silk); transform: translateY(-1px); }
+      .opt.sel {
+        border-color: var(--orange); background: var(--tint-orange-8);
+      }
+      .opt.sel .ic { background: var(--tint-orange-15); }
+
+      /* "somewhere else" free-text, revealed when that tile is selected */
+      .other-wrap { margin-top: 10px; }
+      .other-wrap input {
+        width: 100%; border: 1.5px solid var(--silk); border-radius: 12px; padding: 11px 13px;
+        font-family: 'Inter', sans-serif; font-size: 13.5px; color: var(--slate); outline: none;
+        text-transform: none;
+      }
+      .other-wrap input::placeholder { color: rgba(44, 62, 80, 0.4); }
+
+      .cta {
+        width: 100%; border: none; border-radius: 16px; padding: 14px; margin-top: 18px;
+        font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; color: #fff;
+        cursor: pointer; background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        box-shadow: 0 8px 20px rgba(241, 93, 34, 0.28); transition: transform 0.15s;
+      }
+      .cta:hover { transform: translateY(-1px); }
+      .skip {
+        display: block; width: 100%; text-align: center; margin-top: 12px; background: none;
+        border: none; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 13px;
+        color: rgba(44, 62, 80, 0.5); text-transform: lowercase;
+      }
+      .skip:hover { color: var(--slate); text-decoration: underline; }
+
+      /* progress dots — shows this is a step in the create flow */
+      .steps { display: flex; gap: 6px; justify-content: center; margin-bottom: 16px; }
+      .steps span { width: 7px; height: 7px; border-radius: 50%; background: var(--tint-slate-5); }
+      .steps span.on { background: var(--orange); width: 20px; border-radius: 4px; }
+
+      /* dark */
+      .dark .surface {
+        background:
+          radial-gradient(120% 90% at 80% 0%, rgba(174, 214, 241, 0.14) 0%, transparent 55%),
+          radial-gradient(120% 90% at 0% 100%, rgba(230, 126, 34, 0.12) 0%, transparent 50%),
+          #1a252f;
+      }
+      .dark .card { background: #34495e; }
+      .dark .card h2 { color: #ecf0f1; }
+      .dark .card .sub { color: #bdc3c7; }
+      .dark .opt { background: #2c3e50; border-color: rgba(174,214,241,0.12); color: #ecf0f1; }
+      .dark .opt .ic { background: rgba(174,214,241,0.12); }
+      .dark .opt.sel { background: rgba(241,93,34,0.16); border-color: var(--orange); }
+      .dark .stage-label { color: rgba(236,240,241,0.5); }
+      .dark .skip { color: #8ea0ae; }
+
+      .section-split {
+        max-width: 1120px; margin: 56px auto 0; border-top: 1px dashed rgba(44, 62, 80, 0.18);
+        padding-top: 28px; text-align: center;
+      }
+      .notes {
+        max-width: 760px; margin: 56px auto 0; background: #fff; border-radius: 20px;
+        padding: 22px 26px; box-shadow: var(--card-shadow);
+      }
+      .notes h4 {
+        font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.06em; color: var(--orange); margin: 0 0 10px;
+      }
+      .notes ul { margin: 0; padding-left: 18px; }
+      .notes li { font-size: 13px; line-height: 1.6; color: rgba(44,62,80,0.78); margin-bottom: 5px; }
+      .notes code {
+        font-family: ui-monospace, monospace; font-size: 12px; background: var(--tint-slate-5);
+        padding: 1px 5px; border-radius: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-title">
+      <h1>Create Pod — "how did you hear about us?"</h1>
+      <p>
+        A brief, skippable single-question step near the end of the create flow. The answer rides the
+        existing <code>🎉 Family pod created!</code> Slack notification as an extra line. Replaces the
+        old invite gate's intent-signal, without gating anyone. · 2026-07-21
+      </p>
+    </div>
+
+    <!-- LIGHT desktop + mobile -->
+    <div class="stage-grid">
+      <div class="stage-col">
+        <div class="stage-label">Desktop · light · "somewhere else" selected</div>
+        <div class="surface desktop"><div class="card" id="cardLight"></div></div>
+      </div>
+      <div class="stage-col">
+        <div class="stage-label">Mobile · light</div>
+        <div class="surface mobile"><div class="card" id="cardMobile"></div></div>
+      </div>
+    </div>
+
+    <!-- DARK -->
+    <div class="section-split"><span class="stage-label">Dark mode</span></div>
+    <div class="stage-grid dark">
+      <div class="stage-col">
+        <div class="stage-label">Desktop · dark</div>
+        <div class="surface desktop"><div class="card" id="cardDark"></div></div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <h4>Build notes for the plan</h4>
+      <ul>
+        <li>
+          <strong>Single-select</strong> (primary source). Tapping a tile selects it; selecting
+          "somewhere else" reveals the free-text input.
+        </li>
+        <li>
+          <strong>Skippable — never a gate.</strong> "skip" completes the flow with no answer. The
+          CTA is enabled even with nothing selected (skip and finish are equivalent paths).
+        </li>
+        <li>
+          <strong>Answer rides the 2nd Slack trigger.</strong> Thread the selection into
+          <code>createNewFile()</code> so <code>🎉 Family pod created!</code> gains a
+          <code>*Heard via:* reddit</code> line. Because that Slack fires at the "finishing" phase
+          (before the optional add-members step), this survey slots in <em>just before finalize</em>
+          — see the placement question I'll ask.
+        </li>
+        <li>
+          Options are the real acquisition channels (reddit, product hunt, substack/blog, google,
+          app store, chatgpt / ai search, a friend, somewhere else). Easy to reorder/trim.
+        </li>
+        <li>
+          All copy via <code>t()</code> (<code>createSurvey.*</code>, en + beanie + zh); lowercase is
+          CSS, strings stay standard-cased. No new telemetry context key beyond the allowlisted
+          <code>action</code>.
+        </li>
+      </ul>
+    </div>
+
+    <script>
+      const OPTS = [
+        { ic: '👽', label: 'reddit' },
+        { ic: '🚀', label: 'product hunt' },
+        { ic: '📮', label: 'substack / blog' },
+        { ic: '🔍', label: 'google search' },
+        { ic: '📱', label: 'app store' },
+        { ic: '🤖', label: 'chatgpt / ai search' },
+        { ic: '👋', label: 'a friend' },
+        { ic: '✨', label: 'somewhere else' },
+      ];
+      function card(selectedIndex, showOther) {
+        const opts = OPTS.map(
+          (o, i) =>
+            `<div class="opt ${i === selectedIndex ? 'sel' : ''}"><span class="ic">${o.ic}</span>${o.label}</div>`
+        ).join('');
+        return `
+          <div class="steps"><span></span><span></span><span></span><span class="on"></span></div>
+          <div class="eyebrow">one last thing 🌱</div>
+          <h2>how did you hear about us?</h2>
+          <p class="sub">it helps us reach more families like yours. totally optional.</p>
+          <div class="opts">${opts}</div>
+          ${showOther ? '<div class="other-wrap"><input placeholder="tell us where…" /></div>' : ''}
+          <button class="cta">finish setup</button>
+          <button class="skip">skip</button>
+        `;
+      }
+      // Light desktop: "somewhere else" selected → free-text shown
+      document.getElementById('cardLight').innerHTML = card(7, true);
+      // Mobile: "reddit" selected
+      document.getElementById('cardMobile').innerHTML = card(0, false);
+      // Dark: nothing selected yet
+      document.getElementById('cardDark').innerHTML = card(-1, false);
+    </script>
+  </body>
+</html>
