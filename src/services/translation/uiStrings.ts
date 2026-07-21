@@ -6292,6 +6292,65 @@ const STRING_DEFS = {
   },
   'inviteGate.confirmedJoinDiscord': { en: 'Join the Discord', beanie: 'join the discord' },
 
+  // Create-pod welcome modal (shown at the start of the Create path, replacing the invite gate).
+  // Rendered all-lowercase via CSS — these strings stay standard-cased for CI + screen readers.
+  'createWelcome.eyebrow': { en: 'Welcome home', beanie: 'welcome home' },
+  'createWelcome.title': {
+    en: "Let's grow your family pod",
+    beanie: "let's grow your family pod",
+  },
+  'createWelcome.subtitle': {
+    en: "Three quick steps to your private family space — just a couple of minutes. Here's what's ahead.",
+    beanie:
+      "three quick steps to your private family space — just a couple of minutes. here's what's ahead.",
+  },
+  'createWelcome.step1Title': { en: 'About you', beanie: 'about you' },
+  'createWelcome.step1Body': {
+    en: 'Your name and a couple of details to set up your space.',
+    beanie: 'your name and a couple of details to set up your space.',
+  },
+  'createWelcome.step2Title': { en: 'Your Family Data File', beanie: 'your family data file' },
+  'createWelcome.step2Body': {
+    en: "We create your private, encrypted file — the safe home for your family's data.",
+    beanie: "we create your private, encrypted file — the safe home for your family's data.",
+  },
+  'createWelcome.step3Title': { en: 'Your family', beanie: 'your family' },
+  'createWelcome.step3Body': {
+    en: "Add your partner or little beanies whenever you're ready.",
+    beanie: "add your partner or little beanies whenever you're ready.",
+  },
+  'createWelcome.safeText': {
+    en: 'Your data is encrypted on your device and stored in a file only you can open — we never see it.',
+    beanie:
+      'your data is encrypted on your device and stored in a file only you can open — we never see it.',
+  },
+  'createWelcome.safeLink': { en: 'How your data stays safe', beanie: 'how your data stays safe' },
+  'createWelcome.cta': { en: 'Plant my bean pod', beanie: 'plant my bean pod' },
+  'createWelcome.ctaHint': {
+    en: 'You can change anything later.',
+    beanie: 'you can change anything later.',
+  },
+
+  // Create-pod "how did you hear about us?" survey (shown after the password step, before finalize).
+  // Rendered all-lowercase via CSS. The Slack attribution label is a separate stable-English
+  // constant in CreatePodSurvey.vue (HEARD_OPTIONS.slackLabel) — NOT these display strings.
+  'createSurvey.eyebrow': { en: 'One last thing', beanie: 'one last thing' },
+  'createSurvey.title': { en: 'How did you hear about us?', beanie: 'how did you hear about us?' },
+  'createSurvey.subtitle': {
+    en: 'It helps us reach more families like yours. Totally optional.',
+    beanie: 'it helps us reach more families like yours. totally optional.',
+  },
+  'createSurvey.optReddit': { en: 'Reddit', beanie: 'reddit' },
+  'createSurvey.optProductHunt': { en: 'Product Hunt', beanie: 'product hunt' },
+  'createSurvey.optSubstack': { en: 'Substack / blog', beanie: 'substack / blog' },
+  'createSurvey.optGoogle': { en: 'Google search', beanie: 'google search' },
+  'createSurvey.optAppStore': { en: 'App store', beanie: 'app store' },
+  'createSurvey.optAi': { en: 'ChatGPT / AI search', beanie: 'chatgpt / ai search' },
+  'createSurvey.optFriend': { en: 'A friend', beanie: 'a friend' },
+  'createSurvey.optOther': { en: 'Somewhere else', beanie: 'somewhere else' },
+  'createSurvey.otherPlaceholder': { en: 'Tell us where…', beanie: 'tell us where…' },
+  'createSurvey.cta': { en: 'Finish setup', beanie: 'finish setup' },
+
   // Linked asset accounts
   'accounts.linkedTo': { en: 'Linked to {asset}', beanie: 'linked to {asset}' },
   'accounts.editOnAssetsPage': {

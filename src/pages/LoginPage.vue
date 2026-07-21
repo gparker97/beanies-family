@@ -13,6 +13,7 @@ import ResumePodSetup from '@/components/login/ResumePodSetup.vue';
 import JoinPodView from '@/components/login/JoinPodView.vue';
 import BiometricLoginView from '@/components/login/BiometricLoginView.vue';
 import InviteGateOverlay from '@/components/login/InviteGateOverlay.vue';
+import CreatePodWelcome from '@/components/login/CreatePodWelcome.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { isNavigationCancelled } from '@/utils/appChrome';
@@ -84,7 +85,21 @@ const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
  */
 const reconnectDriveFile = ref<{ fileId: string; fileName: string; familyName?: string }>();
 const isSingleFamilyAutoSelect = ref(false);
+// Two mutually-exclusive create-path overlays over the always-mounted CreatePodView.
+// Precedence is encoded by v-if/v-else-if order in the 'create' block below: the
+// invite gate (only when flagged on) OUTRANKS the welcome intro. Two independent
+// once-per-mount latches:
+//  - inviteGateLocked: starts features.inviteGate; latched false on unlock.
+//  - showCreateWelcome: starts true; latched false ONLY on proceed (✕/cancel leaves
+//    it true so the intro re-shows on re-entry, since they haven't seen the wizard).
+//
+// Invite gate intentionally retained but flag-gated off in prod (VITE_INVITE_BEAN_HASHES
+// cleared) — see docs/plans/2026-07-21-remove-invite-gate-create-welcome-modal.md. NOT
+// dead code: re-adding the env var re-gates. To fully remove: delete this + the create
+// block's InviteGateOverlay + InviteGateOverlay/InviteDiscordButton/inviteToken.ts + the
+// inviteGate.* strings.
 const inviteGateLocked = ref(features.inviteGate);
+const showCreateWelcome = ref(true);
 
 // Reactive resume-setup detection. Runs synchronously on setup and re-fires
 // whenever auth state or `?resume=setup` changes, so we catch BOTH cases:
@@ -703,9 +718,16 @@ async function handleStartOver() {
             @finish-storage="handleFinishStorage"
           />
         </div>
+        <!-- Optional invite gate: retained, flag-gated (off in prod). Outranks the welcome intro. -->
         <InviteGateOverlay
           v-if="inviteGateLocked"
           @unlocked="inviteGateLocked = false"
+          @cancel="activeView = 'welcome'"
+        />
+        <!-- Welcome intro: shown once the gate (if any) is passed. -->
+        <CreatePodWelcome
+          v-else-if="showCreateWelcome"
+          @dismiss="showCreateWelcome = false"
           @cancel="activeView = 'welcome'"
         />
       </div>

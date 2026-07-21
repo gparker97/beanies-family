@@ -44,9 +44,14 @@
  * Phase reachability — the create and load sub-flows are disjoint:
  *
  *   create (genuinely-new family):
- *     no-registry-entry → identity → (storage |        ) → finishing
- *                                     (already-connected) → finalizePod
+ *     no-registry-entry → identity → survey → (storage |        ) → finishing
+ *                                              (already-connected) → finalizePod
  *       → finalizePod SUCCESS → members → SetupProgressModal → signed-in /nook
+ *
+ *   The `survey` phase ("how did you hear about us?") sits between `identity`
+ *   (the one universal pre-finalize node — password is collected there) and the
+ *   finalize dispatch, so its answer can ride the `createNewFile` Slack. It is
+ *   optional/skippable and MUST never block finalize (see `proceedToFinalize`).
  *
  *   load (existing pod — NEVER reaches `members`):
  *     auto-loadable → auto-load → completeAutoLoad success → signed-in /nook
@@ -57,12 +62,13 @@
  * branch — never from any existing-pod load (`handleAutoLoadSubmit`,
  * `openExistingOnDrive`, `retry`), which emit `signed-in '/nook'` directly.
  */
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
 import CreateMembersStep from '@/components/login/CreateMembersStep.vue';
+import CreatePodSurvey from '@/components/login/CreatePodSurvey.vue';
 import SetupProgressModal from '@/components/login/SetupProgressModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useAuthStore } from '@/stores/authStore';
@@ -98,15 +104,21 @@ const emit = defineEmits<{
  * `auto-load` is the non-destructive happy path; `identity` + `storage` are
  * the create flow (genuinely-new families). `finishing` is the spinner shown
  * during a critical write — both auto-load decrypt and create-pod write.
+ * `survey` is the optional create-only "how did you hear about us?" step shown
+ * after `identity` and before finalize (its answer rides the create Slack).
  * `members` is the terminal create-only add-family-members step, reached ONLY
  * after a successful pod write (see the phase-reachability table above).
  */
-type Phase = 'probing' | 'auto-load' | 'identity' | 'storage' | 'finishing' | 'members' | 'retry';
+type Phase =
+  'probing' | 'auto-load' | 'identity' | 'survey' | 'storage' | 'finishing' | 'members' | 'retry';
 const phase = ref<Phase>('probing');
 
 const ownerName = ref('');
 const password = ref('');
 const confirmPassword = ref('');
+// "How did you hear about us?" answer (a stable English Slack label or free text;
+// null = skipped). Captured in the `survey` phase, threaded into createNewFile.
+const heardVia = ref<string | null>(null);
 const formError = ref<string | null>(null);
 const busy = ref(false);
 const showLocalFileWarning = ref(false);
@@ -377,6 +389,39 @@ async function handleIdentityNext() {
       });
       return;
     }
+    // Password is set + owner rehydrated. Show the optional "how did you hear
+    // about us?" survey before finalize — the `identity` phase is the one node
+    // every create path passes through, so the answer can ride createNewFile's
+    // Slack. The survey drives `proceedToFinalize()` on complete/skip.
+    phase.value = 'survey';
+  } catch (e) {
+    console.error('[ResumePodSetup] unexpected error resuming setup', e);
+    reportError({
+      surface: 'resumeSetup.rehydrateOwner',
+      message: `Unexpected error resuming setup: ${e instanceof Error ? e.message : String(e)}`,
+      error: e,
+      severity: 'error',
+    });
+    formError.value = t('setup.fileCreateFailed');
+    phase.value = 'storage';
+  } finally {
+    busy.value = false;
+    if (!navigatedAway.value && phase.value === 'finishing') phase.value = 'storage';
+  }
+}
+
+/**
+ * The finalize dispatch that writes the pod, extracted so BOTH the desktop
+ * already-connected path (via the survey's @complete) and error-degradation
+ * reach it with the SAME safety envelope — a peer of `handleConnectDrive` /
+ * `handleConnectLocal`. The survey's callback fires on a LATER tick after an
+ * indefinite user pause, so this MUST re-arm the busy latch + try/catch + finally
+ * rather than run the point-of-no-return bare.
+ */
+async function proceedToFinalize() {
+  if (busy.value) return;
+  busy.value = true;
+  try {
     // Desktop create hand-off: storage was ALREADY connected on this same page
     // (CreatePodView's step-2 popup / local picker installed the provider and,
     // for Drive, wrote the stub `.beanpod`). Write straight into it — do NOT
@@ -419,10 +464,10 @@ async function handleIdentityNext() {
       }
     }
   } catch (e) {
-    console.error('[ResumePodSetup] unexpected error resuming setup', e);
+    console.error('[ResumePodSetup] unexpected error finalizing pod', e);
     reportError({
-      surface: 'resumeSetup.rehydrateOwner',
-      message: `Unexpected error resuming setup: ${e instanceof Error ? e.message : String(e)}`,
+      surface: 'resumeSetup.finalizeDispatch',
+      message: `Unexpected error finalizing pod: ${e instanceof Error ? e.message : String(e)}`,
       error: e,
       severity: 'error',
     });
@@ -433,6 +478,31 @@ async function handleIdentityNext() {
     if (!navigatedAway.value && phase.value === 'finishing') phase.value = 'storage';
   }
 }
+
+/**
+ * Survey complete/skip — record the answer (may be null) and proceed to finalize.
+ * A survey failure must NEVER block pod creation (see `onErrorCaptured` below).
+ */
+function handleSurveyComplete(heard: string | null) {
+  heardVia.value = heard;
+  void proceedToFinalize();
+}
+
+// Belt-and-braces: if the survey subtree throws, degrade to skip and still
+// create the pod (a cosmetic survey must never block family creation). Scoped to
+// the survey phase so non-survey errors keep propagating normally.
+onErrorCaptured((err) => {
+  if (phase.value !== 'survey') return undefined;
+  reportError({
+    surface: 'resumeSetup.survey',
+    message: `survey step errored — skipping: ${err instanceof Error ? err.message : String(err)}`,
+    error: err,
+    severity: 'warning',
+  });
+  heardVia.value = null;
+  void proceedToFinalize();
+  return false; // handled — stop propagation
+});
 
 /** Step 2: write the pod file with the now-connected provider, then route to /nook. */
 async function finalizePod(): Promise<boolean> {
@@ -452,7 +522,8 @@ async function finalizePod(): Promise<boolean> {
     password.value,
     user.memberId,
     familyContextStore.activeFamilyId ?? user.familyId ?? '',
-    familyContextStore.activeFamilyName ?? 'My Family'
+    familyContextStore.activeFamilyName ?? 'My Family',
+    heardVia.value
   );
   if (!result.ok) {
     if (result.reason === 'existing-pod') {
@@ -714,7 +785,9 @@ async function handleConnectLocal() {
   <div
     class="mx-auto max-w-[480px] rounded-3xl bg-gradient-to-b from-white to-[#fffaf3] p-8 shadow-xl dark:bg-slate-800 dark:from-slate-800 dark:to-slate-800"
   >
-    <div class="mb-2 text-center">
+    <!-- The survey phase carries its own hero (eyebrow/title/subtitle), so the
+         generic ResumeSetup header is hidden while it shows. -->
+    <div v-if="phase !== 'survey'" class="mb-2 text-center">
       <img
         src="/brand/beanies_impact_bullet_transparent_192x192.png"
         alt=""
@@ -722,10 +795,13 @@ async function handleConnectLocal() {
       />
     </div>
 
-    <h2 class="font-outfit mb-1 text-center text-xl font-bold text-gray-900 dark:text-gray-100">
+    <h2
+      v-if="phase !== 'survey'"
+      class="font-outfit mb-1 text-center text-xl font-bold text-gray-900 dark:text-gray-100"
+    >
       {{ t('resumeSetup.title') }}
     </h2>
-    <p class="mb-6 text-center text-sm text-gray-500 dark:text-gray-400">
+    <p v-if="phase !== 'survey'" class="mb-6 text-center text-sm text-gray-500 dark:text-gray-400">
       {{ phase === 'auto-load' ? t('resumeSetup.subtitleRecovery') : t('resumeSetup.subtitle') }}
     </p>
 
@@ -866,6 +942,9 @@ async function handleConnectLocal() {
       </p>
     </div>
 
+    <!-- Survey (create-only): "how did you hear about us?" before finalize. -->
+    <CreatePodSurvey v-else-if="phase === 'survey'" @complete="handleSurveyComplete" />
+
     <!-- Members (create-finish only): add family members after the pod write. -->
     <CreateMembersStep v-else-if="phase === 'members'" @finish="handleMembersFinish" />
 
@@ -875,9 +954,13 @@ async function handleConnectLocal() {
       <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('resumeSetup.finishing') }}</p>
     </div>
 
-    <!-- Start over — hidden during a critical write AND on the members step
-         (the pod already exists; the user should finish, not sign back out). -->
-    <div v-if="phase !== 'finishing' && phase !== 'members'" class="mt-6 text-center">
+    <!-- Start over — hidden during a critical write, on the members step (the pod
+         already exists; the user should finish, not sign back out), and on the
+         survey (which has its own skip affordance). -->
+    <div
+      v-if="phase !== 'finishing' && phase !== 'members' && phase !== 'survey'"
+      class="mt-6 text-center"
+    >
       <button
         type="button"
         class="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
