@@ -1,11 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // We test the sha256 logic directly since the env var is baked at import time.
 // Instead, we test validateInviteToken by mocking the module's env.
+//
+// The gate needs BOTH env vars (see features.ts): the explicit VITE_INVITE_GATE
+// switch AND non-empty hashes. `armGate()` sets both — token validation only
+// runs when the gate is armed, since validateInviteToken short-circuits to
+// `true` (allow everyone) whenever the gate is off. Setting hashes alone would
+// leave the gate OFF and make every "rejects …" assertion pass vacuously.
+function armGate(hashes: string): void {
+  vi.stubEnv('VITE_INVITE_GATE', 'true');
+  vi.stubEnv('VITE_INVITE_BEAN_HASHES', hashes);
+}
 
 describe('inviteToken', () => {
   beforeEach(() => {
     vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('features.inviteGate is false when env var is empty', async () => {
@@ -15,7 +29,7 @@ describe('inviteToken', () => {
   });
 
   it('features.inviteGate is true when env var has hashes', async () => {
-    vi.stubEnv('VITE_INVITE_BEAN_HASHES', 'abc123');
+    armGate('abc123');
     const { features } = await import('@/config/features');
     expect(features.inviteGate).toBe(true);
   });
@@ -27,7 +41,7 @@ describe('inviteToken', () => {
   });
 
   it('validateInviteToken rejects empty token', async () => {
-    vi.stubEnv('VITE_INVITE_BEAN_HASHES', 'abc123');
+    armGate('abc123');
     const { validateInviteToken } = await import('../inviteToken');
     expect(await validateInviteToken('')).toBe(false);
     expect(await validateInviteToken('   ')).toBe(false);
@@ -37,7 +51,7 @@ describe('inviteToken', () => {
     // SHA-256 of "test-token" (lowercase)
     // echo -n "test-token" | sha256sum
     const hash = '4c5dc9b7708905f77f5e5d16316b5dfb425e68cb326dcd55a860e90a7707031e';
-    vi.stubEnv('VITE_INVITE_BEAN_HASHES', hash);
+    armGate(hash);
     const { validateInviteToken } = await import('../inviteToken');
     expect(await validateInviteToken('test-token')).toBe(true);
   });
@@ -45,7 +59,7 @@ describe('inviteToken', () => {
   it('validateInviteToken is case-insensitive', async () => {
     // SHA-256 of "test-token" (lowercased)
     const hash = '4c5dc9b7708905f77f5e5d16316b5dfb425e68cb326dcd55a860e90a7707031e';
-    vi.stubEnv('VITE_INVITE_BEAN_HASHES', hash);
+    armGate(hash);
     const { validateInviteToken } = await import('../inviteToken');
     expect(await validateInviteToken('Test-Token')).toBe(true);
     expect(await validateInviteToken('TEST-TOKEN')).toBe(true);
@@ -53,7 +67,7 @@ describe('inviteToken', () => {
 
   it('validateInviteToken rejects invalid token', async () => {
     const hash = '4c5dc9b7708905f77f5e5d16316b5dfb425e68cb326dcd55a860e90a7707031e';
-    vi.stubEnv('VITE_INVITE_BEAN_HASHES', hash);
+    armGate(hash);
     const { validateInviteToken } = await import('../inviteToken');
     expect(await validateInviteToken('wrong-token')).toBe(false);
   });
@@ -61,7 +75,7 @@ describe('inviteToken', () => {
   it('validateInviteToken supports multiple hashes', async () => {
     const hash1 = '4c5dc9b7708905f77f5e5d16316b5dfb425e68cb326dcd55a860e90a7707031e'; // test-token
     const hash2 = 'abc123'; // dummy second hash
-    vi.stubEnv('VITE_INVITE_BEAN_HASHES', `${hash1}, ${hash2}`);
+    armGate(`${hash1}, ${hash2}`);
     const { validateInviteToken } = await import('../inviteToken');
     expect(await validateInviteToken('test-token')).toBe(true);
   });

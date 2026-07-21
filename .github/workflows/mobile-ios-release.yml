@@ -62,6 +62,10 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           VITE_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           VITE_GOOGLE_PROJECT_NUMBER: ${{ secrets.GOOGLE_PROJECT_NUMBER }}
+          # Explicit on/off switch for the invite gate (repo VARIABLE, not a secret, so
+          # its value is visible/editable in the UI). Only "true" arms the gate; the
+          # hashes secret below stays populated but inert while this is off.
+          VITE_INVITE_GATE: ${{ vars.INVITE_GATE }}
           VITE_INVITE_BEAN_HASHES: ${{ secrets.INVITE_BEAN_HASHES }}
           VITE_INVITE_WEBHOOK_URL: ${{ secrets.INVITE_WEBHOOK_URL }}
           VITE_CONTACT_WEBHOOK_URL: ${{ secrets.CONTACT_WEBHOOK_URL }}

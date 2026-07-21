@@ -17,6 +17,13 @@ const env = import.meta.env;
 
 const ok = (v: unknown): boolean => typeof v === 'string' && v.trim().length > 0;
 
+// Explicit boolean switch, for gates that must be turned on/off deliberately
+// rather than inferred from "some config string happens to be present".
+// ONLY the exact string "true" (case/whitespace-insensitive) enables — unset,
+// empty, "false", or a typo all mean OFF. That asymmetry is deliberate: a
+// misconfigured build fails OPEN (feature off), never silently on.
+const flagOn = (v: unknown): boolean => typeof v === 'string' && v.trim().toLowerCase() === 'true';
+
 // The canonical cloud host. Update this set if it ever changes.
 const CLOUD_HOSTS = new Set(['app.beanies.family']);
 
@@ -32,11 +39,19 @@ export const features = {
   // VITE_REGISTRY_API_URL (cloud, where one Lambda backs both surfaces).
   oauthProxy: ok(env.VITE_OAUTH_PROXY_URL) || ok(env.VITE_REGISTRY_API_URL),
   registry: ok(env.VITE_REGISTRY_API_URL) && ok(env.VITE_REGISTRY_API_KEY),
-  // Invite gate: intentionally retained but flag-gated OFF in prod (VITE_INVITE_BEAN_HASHES
-  // cleared) as of 2026-07-21, superseded by the Create-pod welcome modal. NOT dead code —
-  // re-adding the env var re-gates instantly. See
+  // Invite gate: retained but switched OFF in prod as of 2026-07-21, superseded by the
+  // Create-pod welcome modal. NOT dead code — flip the INVITE_GATE repo variable to
+  // "true" to re-gate (e.g. a future closed cohort or paid beta). See
   // docs/plans/2026-07-21-remove-invite-gate-create-welcome-modal.md.
-  inviteGate: ok(env.VITE_INVITE_BEAN_HASHES),
+  //
+  // TWO conditions, both required:
+  //   1. VITE_INVITE_GATE === "true"  — the explicit operator switch (repo VARIABLE,
+  //      readable/editable in the GitHub UI, unlike the write-only secret).
+  //   2. VITE_INVITE_BEAN_HASHES non-empty — at least one valid token must exist.
+  // The AND is a safety interlock: arming the gate with no valid tokens would lock
+  // 100% of new users out of the Create path with no way in. Turning the gate off does
+  // NOT require deleting the hashes secret, so the tokens survive for later re-arming.
+  inviteGate: flagOn(env.VITE_INVITE_GATE) && ok(env.VITE_INVITE_BEAN_HASHES),
   // NOTE: VITE_INVITE_WEBHOOK_URL and VITE_MARKETING_URL are NOT gated here — they
   // are read directly at their point of use (InviteGateOverlay's `hasInviteWebhook`;
   // `utils/marketing.ts`'s MARKETING_URL, which has its own apex fallback). A derived

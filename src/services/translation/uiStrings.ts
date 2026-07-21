@@ -6300,9 +6300,8 @@ const STRING_DEFS = {
     beanie: "let's grow your family pod",
   },
   'createWelcome.subtitle': {
-    en: "Three quick steps to your private family space — just a couple of minutes. Here's what's ahead.",
-    beanie:
-      "three quick steps to your private family space — just a couple of minutes. here's what's ahead.",
+    en: "Three quick steps to your private family space. Here's what's ahead.",
+    beanie: "three quick steps to your private family space. here's what's ahead.",
   },
   'createWelcome.step1Title': { en: 'About you', beanie: 'about you' },
   'createWelcome.step1Body': {
