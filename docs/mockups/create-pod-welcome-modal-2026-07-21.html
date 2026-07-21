@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create Pod — Welcome Modal · beanies.family mockup</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --slate: #2c3e50;
+        --slate-ink: #1a252f;
+        --orange: #f15d22;
+        --orange-hover: #d14d1a;
+        --terracotta: #e67e22;
+        --silk: #aed6f1;
+        --cloud: #f8f9fa;
+        --success: #27ae60;
+
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-silk-10: rgba(174, 214, 241, 0.1);
+        --tint-silk-20: rgba(174, 214, 241, 0.2);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+        --tint-slate-10: rgba(44, 62, 80, 0.1);
+        --tint-success-10: rgba(39, 174, 96, 0.1);
+
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+        --modal-shadow: 0 24px 70px rgba(44, 62, 80, 0.22);
+
+        --sq: 24px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        color: var(--slate);
+        background: #eef1f4;
+        -webkit-font-smoothing: antialiased;
+        padding: 40px 20px 72px;
+      }
+
+      .page-title {
+        text-align: center;
+        max-width: 760px;
+        margin: 0 auto 8px;
+      }
+      .page-title h1 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 26px;
+        letter-spacing: -0.01em;
+        margin: 0 0 6px;
+        color: var(--slate);
+      }
+      .page-title p {
+        font-size: 14px;
+        color: rgba(44, 62, 80, 0.6);
+        margin: 0;
+        line-height: 1.5;
+      }
+
+      /* ── Stage grid: desktop + mobile side by side ─────────────── */
+      .stage-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 40px;
+        justify-content: center;
+        align-items: flex-start;
+        margin: 44px auto 0;
+        max-width: 1120px;
+      }
+      .stage-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+      .stage-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(44, 62, 80, 0.45);
+      }
+
+      /* Faux "create screen" behind the modal to show real context */
+      .backdrop {
+        position: relative;
+        border-radius: 28px;
+        overflow: hidden;
+        box-shadow: var(--soft-shadow);
+        background:
+          radial-gradient(120% 90% at 80% 0%, rgba(174, 214, 241, 0.35) 0%, transparent 55%),
+          radial-gradient(120% 90% at 0% 100%, rgba(230, 126, 34, 0.16) 0%, transparent 50%),
+          var(--cloud);
+      }
+      .backdrop.desktop {
+        width: 560px;
+        height: 620px;
+      }
+      .backdrop.mobile {
+        width: 340px;
+        height: 640px;
+      }
+      /* blurred hint of the create wizard underneath */
+      .ghost {
+        position: absolute;
+        inset: 0;
+        padding: 26px;
+        filter: blur(2px);
+        opacity: 0.45;
+        pointer-events: none;
+      }
+      .ghost .g-bar {
+        height: 12px;
+        border-radius: 6px;
+        background: var(--tint-slate-10);
+        margin-bottom: 14px;
+      }
+      .ghost .g-field {
+        height: 46px;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: var(--card-shadow);
+        margin-bottom: 14px;
+      }
+      .ghost .g-steps {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 22px;
+      }
+      .ghost .g-steps span {
+        flex: 1;
+        height: 6px;
+        border-radius: 4px;
+        background: var(--tint-slate-10);
+      }
+      .ghost .g-steps span.on {
+        background: var(--orange);
+      }
+
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.55);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(3px);
+      }
+
+      /* ── The modal ─────────────────────────────────────────────── */
+      .modal-wrap {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+      }
+      .modal {
+        position: relative;
+        width: 100%;
+        max-width: 420px;
+        background: #fff;
+        border-radius: var(--sq);
+        box-shadow: var(--modal-shadow);
+        padding: 26px 24px 22px;
+        overflow: hidden;
+        /* All display copy renders lowercase (warm brand voice) via CSS —
+           underlying t() strings stay standard-cased for CI + screen readers,
+           mirroring the app's CSS-uppercase section-header pattern. */
+        text-transform: lowercase;
+      }
+      .backdrop.mobile .modal {
+        max-width: 100%;
+      }
+      /* faint growth glow at the very top of the modal */
+      .modal::before {
+        content: '';
+        position: absolute;
+        top: -60px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 240px;
+        height: 120px;
+        background: radial-gradient(closest-side, var(--tint-orange-15), transparent);
+        pointer-events: none;
+      }
+
+      .close {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: 12px;
+        background: transparent;
+        color: rgba(44, 62, 80, 0.4);
+        font-size: 18px;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        transition: background 0.15s;
+      }
+      .close:hover {
+        background: var(--tint-slate-5);
+        color: var(--slate);
+      }
+
+      /* Hero */
+      .hero {
+        text-align: center;
+        position: relative;
+      }
+      .mascot {
+        width: 76px;
+        height: 76px;
+        margin: 2px auto 8px;
+        border-radius: 20px;
+        display: grid;
+        place-items: center;
+        font-size: 40px;
+        background:
+          radial-gradient(closest-side, var(--tint-silk-20), var(--tint-orange-8));
+      }
+      .mascot .ph {
+        font-size: 11px;
+        line-height: 1.15;
+      }
+      .eyebrow {
+        font-family: 'Caveat', cursive;
+        font-size: 21px;
+        font-weight: 700;
+        color: var(--orange);
+        line-height: 1;
+        margin-bottom: 2px;
+      }
+      .hero h2 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 22px;
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+        margin: 4px 0 6px;
+        color: var(--slate);
+      }
+      .hero h2 .fam {
+        color: var(--orange);
+      }
+      .hero .sub {
+        font-size: 13.5px;
+        line-height: 1.5;
+        color: rgba(44, 62, 80, 0.62);
+        margin: 0 auto;
+        max-width: 300px;
+      }
+
+      /* ── Growing journey: three steps on a vine ────────────────── */
+      .journey {
+        position: relative;
+        margin: 20px 2px 16px;
+        padding-left: 4px;
+      }
+      .vine {
+        position: absolute;
+        left: 26px;
+        top: 26px;
+        bottom: 30px;
+        width: 2px;
+        background: repeating-linear-gradient(
+          to bottom,
+          var(--silk) 0 6px,
+          transparent 6px 12px
+        );
+      }
+      .step {
+        position: relative;
+        display: flex;
+        gap: 15px;
+        align-items: flex-start;
+        padding: 9px 0;
+      }
+      .node {
+        position: relative;
+        z-index: 1;
+        flex: 0 0 auto;
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 21px;
+        background: var(--tint-orange-8);
+        box-shadow: 0 0 0 4px #fff;
+      }
+      .step:nth-child(3) .node {
+        background: var(--tint-silk-20);
+      }
+      .step:nth-child(4) .node {
+        background: var(--tint-success-10);
+      }
+      .num {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        width: 19px;
+        height: 19px;
+        border-radius: 50%;
+        background: var(--slate);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+      }
+      .step:nth-child(4) .num {
+        background: var(--success);
+      }
+      .step-body {
+        padding-top: 3px;
+      }
+      .step-body h3 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 15px;
+        margin: 0 0 2px;
+        color: var(--slate);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .opt {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: lowercase;
+        letter-spacing: 0.05em;
+        color: var(--slate);
+        background: var(--tint-silk-20);
+        border-radius: 20px;
+        padding: 2px 8px;
+      }
+      .step-body p {
+        font-size: 12.5px;
+        line-height: 1.45;
+        color: rgba(44, 62, 80, 0.6);
+        margin: 0;
+      }
+
+      /* ── Security reassurance strip ─────────────────────────────── */
+      .safe {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        background: var(--tint-silk-10);
+        border-radius: 16px;
+        padding: 13px 14px;
+        margin: 2px 0 18px;
+      }
+      .safe .eyes {
+        flex: 0 0 auto;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 20px;
+        box-shadow: var(--card-shadow);
+      }
+      .safe .eyes .ph {
+        font-size: 9px;
+        line-height: 1.1;
+        text-align: center;
+        color: rgba(44, 62, 80, 0.5);
+      }
+      .safe-text {
+        font-size: 12px;
+        line-height: 1.45;
+        color: rgba(44, 62, 80, 0.7);
+      }
+      .safe-text a {
+        color: var(--orange);
+        font-weight: 600;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .safe-text a:hover {
+        text-decoration: underline;
+      }
+
+      /* CTA */
+      .cta {
+        width: 100%;
+        border: none;
+        border-radius: 16px;
+        padding: 14px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        color: #fff;
+        cursor: pointer;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        box-shadow: 0 8px 20px rgba(241, 93, 34, 0.28);
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s;
+      }
+      .cta:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 26px rgba(241, 93, 34, 0.34);
+      }
+      .cta-hint {
+        text-align: center;
+        font-size: 11.5px;
+        color: rgba(44, 62, 80, 0.45);
+        margin: 9px 0 0;
+      }
+
+      /* ── Dark mode variant panel ───────────────────────────────── */
+      .dark .backdrop {
+        background:
+          radial-gradient(120% 90% at 80% 0%, rgba(174, 214, 241, 0.14) 0%, transparent 55%),
+          radial-gradient(120% 90% at 0% 100%, rgba(230, 126, 34, 0.12) 0%, transparent 50%),
+          #1a252f;
+      }
+      .dark .scrim {
+        background: rgba(15, 22, 30, 0.55);
+      }
+      .dark .modal {
+        background: #34495e;
+      }
+      .dark .node {
+        box-shadow: 0 0 0 4px #34495e;
+      }
+      .dark .hero h2,
+      .dark .step-body h3 {
+        color: #ecf0f1;
+      }
+      .dark .hero .sub,
+      .dark .step-body p,
+      .dark .safe-text {
+        color: #bdc3c7;
+      }
+      .dark .close {
+        color: #8ea0ae;
+      }
+      .dark .safe {
+        background: rgba(174, 214, 241, 0.08);
+      }
+      .dark .safe .eyes,
+      .dark .ghost .g-field {
+        background: #2c3e50;
+      }
+      .dark .stage-label {
+        color: rgba(236, 240, 241, 0.5);
+      }
+      .dark .opt {
+        color: #ecf0f1;
+        background: rgba(174, 214, 241, 0.16);
+      }
+
+      .section-split {
+        max-width: 1120px;
+        margin: 56px auto 0;
+        border-top: 1px dashed rgba(44, 62, 80, 0.18);
+        padding-top: 28px;
+        text-align: center;
+      }
+      .section-split .stage-label {
+        display: block;
+        margin-bottom: 2px;
+      }
+
+      /* Annotations */
+      .notes {
+        max-width: 760px;
+        margin: 56px auto 0;
+        background: #fff;
+        border-radius: 20px;
+        padding: 22px 26px;
+        box-shadow: var(--card-shadow);
+      }
+      .notes h4 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--orange);
+        margin: 0 0 10px;
+      }
+      .notes ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .notes li {
+        font-size: 13px;
+        line-height: 1.6;
+        color: rgba(44, 62, 80, 0.78);
+        margin-bottom: 5px;
+      }
+      .notes code {
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 12px;
+        background: var(--tint-slate-5);
+        padding: 1px 5px;
+        border-radius: 5px;
+      }
+
+      /* reveal animation */
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .step {
+        animation: rise 0.5s both;
+      }
+      .step:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      .step:nth-child(3) {
+        animation-delay: 0.28s;
+      }
+      .step:nth-child(4) {
+        animation-delay: 0.41s;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .step {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-title">
+      <h1>Create Pod — Welcome Modal</h1>
+      <p>
+        Replaces the invite-gate overlay. Shown once when a new user taps “Create a new pod,”
+        before the setup wizard. Warm, brief, previews the three real steps, and settles security
+        nerves. · 2026-07-21
+      </p>
+    </div>
+
+    <!-- LIGHT: desktop + mobile -->
+    <div class="stage-grid">
+      <div class="stage-col">
+        <div class="stage-label">Desktop · light</div>
+        <div class="backdrop desktop">
+          <div class="ghost">
+            <div class="g-steps"><span class="on"></span><span></span><span></span></div>
+            <div class="g-bar" style="width: 55%"></div>
+            <div class="g-field"></div>
+            <div class="g-field"></div>
+            <div class="g-bar" style="width: 40%"></div>
+            <div class="g-field"></div>
+          </div>
+          <div class="scrim"></div>
+          <div class="modal-wrap">
+            <div class="modal" id="modalLight"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage-col">
+        <div class="stage-label">Mobile · light</div>
+        <div class="backdrop mobile">
+          <div class="ghost">
+            <div class="g-steps"><span class="on"></span><span></span><span></span></div>
+            <div class="g-bar" style="width: 60%"></div>
+            <div class="g-field"></div>
+            <div class="g-field"></div>
+          </div>
+          <div class="scrim"></div>
+          <div class="modal-wrap">
+            <div class="modal" id="modalMobile"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DARK -->
+    <div class="section-split">
+      <span class="stage-label">Dark mode</span>
+    </div>
+    <div class="stage-grid dark">
+      <div class="stage-col">
+        <div class="stage-label">Desktop · dark</div>
+        <div class="backdrop desktop">
+          <div class="ghost">
+            <div class="g-steps"><span class="on"></span><span></span><span></span></div>
+            <div class="g-bar" style="width: 55%"></div>
+            <div class="g-field"></div>
+            <div class="g-field"></div>
+            <div class="g-bar" style="width: 40%"></div>
+            <div class="g-field"></div>
+          </div>
+          <div class="scrim"></div>
+          <div class="modal-wrap">
+            <div class="modal" id="modalDark"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <h4>Build notes for the plan</h4>
+      <ul>
+        <li>
+          Mascot marks (🫘 / 🙈) are <strong>placeholders</strong>. Real build swaps in the brand
+          PNGs: hero → <code>beanies_family_icon_transparent_384x384.png</code>, security strip →
+          <code>beanies_covering_eyes_transparent_512x512.png</code>. The CIG forbids redrawing the
+          bean characters.
+        </li>
+        <li>
+          All copy routes through <code>t()</code> with new <code>createWelcome.*</code> keys
+          (en + beanie + zh). The handwritten “welcome home 🌱” eyebrow is a Caveat accent — one per
+          screen, allowed per the CIG.
+        </li>
+        <li>
+          “How your data stays safe →” links to the Help Center security article (opens in a new
+          tab; the modal state is preserved).
+        </li>
+        <li>
+          Numbered steps are justified — setup is a real ordered sequence. Step 3 is tagged
+          <em>Optional</em> because adding family members can be skipped.
+        </li>
+        <li>
+          Reuses <code>BaseModal</code> (Tier 1, view-only) with <code>fullscreenMobile</code>; the
+          close (✕) emits the same <code>cancel</code> path the gate used — back to the Create/Join
+          chooser, never trapped.
+        </li>
+      </ul>
+    </div>
+
+    <script>
+      const modalHTML = `
+        <button class="close" aria-label="Close">✕</button>
+        <div class="hero">
+          <div class="mascot" title="beanies_family_icon PNG in real build">🫘<span class="ph"></span></div>
+          <div class="eyebrow">welcome home 🌱</div>
+          <h2>let's grow your family <span class="fam">pod</span></h2>
+          <p class="sub">three quick steps to your private family space — just a couple of minutes. here's what's ahead.</p>
+        </div>
+
+        <div class="journey">
+          <div class="vine"></div>
+
+          <div class="step">
+            <div class="node">👋<span class="num">1</span></div>
+            <div class="step-body">
+              <h3>about you</h3>
+              <p>your name and a couple of details to set up your space.</p>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="node">🔐<span class="num">2</span></div>
+            <div class="step-body">
+              <h3>your family data file</h3>
+              <p>we create your private, encrypted file — the safe home for your family's data.</p>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="node">🌳<span class="num">3</span></div>
+            <div class="step-body">
+              <h3>your family <span class="opt">optional</span></h3>
+              <p>add your partner or little beanies whenever you're ready.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="safe">
+          <div class="eyes" title="beanies_covering_eyes PNG in real build">🙈</div>
+          <div class="safe-text">
+            your data is encrypted on your device and stored in a file only you can open — we never see it.
+            <a href="#">how your data stays safe →</a>
+          </div>
+        </div>
+
+        <button class="cta">plant my bean pod</button>
+        <p class="cta-hint">you can change anything later.</p>
+      `;
+      document.getElementById('modalLight').innerHTML = modalHTML;
+      document.getElementById('modalMobile').innerHTML = modalHTML;
+      document.getElementById('modalDark').innerHTML = modalHTML;
+    </script>
+  </body>
+</html>

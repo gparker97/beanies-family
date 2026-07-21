@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-19",
-    "translationCount": 3745
+    "lastUpdated": "2026-07-21",
+    "translationCount": 3771
   },
   "translations": {
     "app.name": {
@@ -18730,6 +18730,136 @@
       "translation": "我们无法更新您的数据",
       "hash": "z1846k",
       "lastUpdated": "2026-07-19"
+    },
+    "createWelcome.eyebrow": {
+      "translation": "欢迎回家。",
+      "hash": "4su5",
+      "lastUpdated": "2026-07-21"
+    },
+    "createWelcome.title": {
+      "translation": "让我们来种植您的家庭吊舱",
+      "hash": "wmbqse",
+      "lastUpdated": "2026-07-21"
+    },
+    "createWelcome.subtitle": {
+      "translation": "只需三步即可抵达私人家庭空间，只需几分钟即可抵达。以下是未来的发展方向。",
+      "hash": "kj7bfn",
+      "lastUpdated": "2026-07-21"
+    },
+    "createWelcome.step1Title": {
+      "translation": "关于您",
+      "hash": "aylhbg",
+      "lastUpdated": "2026-07-21"
+    },
+    "createWelcome.step1Body": {
+      "translation": "您的姓名和一些设置房源的详细信息。",
+      "hash": "wg2kck",
+      "lastUpdated": "2026-07-21"
+    },
+    "createWelcome.step2Title": {
+      "translation": "您的家庭数据文件",
+      "hash": "n0cz7h",
+      "lastUpdated": "2026-07-21"
+    },
+    "createWelcome.step2Body": {
+      "translation": "我们为您创建私人加密文件，为您家人的数据提供安全的家园。",
+      "hash": "vm3jf9",
+      "lastUpdated": "2026-07-21"
+    },
+    "createWelcome.step3Title": {
+      "translation": "您的家庭",
+      "hash": "1gp8lt",
+      "lastUpdated": "2026-07-21"
+    },
+    "createWelcome.step3Body": {
+      "translation": "准备好后，您可以添加伴侣或小帽子。",
+      "hash": "7qi044",
+      "lastUpdated": "2026-07-21"
+    },
+    "createWelcome.safeText": {
+      "translation": "您的数据在您的设备上加密，并存储在只有您可以打开的文件中—我们永远不会看到它。",
+      "hash": "ycof8q",
+      "lastUpdated": "2026-07-21"
+    },
+    "createWelcome.safeLink": {
+      "translation": "如何保障您的数据安全",
+      "hash": "7wtm24",
+      "lastUpdated": "2026-07-21"
+    },
+    "createWelcome.cta": {
+      "translation": "种植我的豆荚",
+      "hash": "eoxies",
+      "lastUpdated": "2026-07-21"
+    },
+    "createWelcome.ctaHint": {
+      "translation": "您可以稍后更改任何内容。",
+      "hash": "19voin",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.eyebrow": {
+      "translation": "最后一件事。",
+      "hash": "3vyjnm",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.title": {
+      "translation": "您是如何得知我们的？",
+      "hash": "nhe68i",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.subtitle": {
+      "translation": "这有助于我们接触到更多像您这样的家庭。完全可选。",
+      "hash": "aj8y53",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.optReddit": {
+      "translation": "保存此",
+      "hash": "um1u9u",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.optProductHunt": {
+      "translation": "产品搜索",
+      "hash": "iigndw",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.optSubstack": {
+      "translation": "子堆栈/博客",
+      "hash": "b9bcd1",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.optGoogle": {
+      "translation": "谷歌搜索",
+      "hash": "j0ng3z",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.optAppStore": {
+      "translation": "App store",
+      "hash": "xs9vya",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.optAi": {
+      "translation": "ChatGPT/AI搜索",
+      "hash": "jdbzby",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.optFriend": {
+      "translation": "一位朋友",
+      "hash": "lscrz7",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.optOther": {
+      "translation": "别的地方",
+      "hash": "mz738a",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.otherPlaceholder": {
+      "translation": "告诉我们在哪里……",
+      "hash": "nsfwdq",
+      "lastUpdated": "2026-07-21"
+    },
+    "createSurvey.cta": {
+      "translation": "完成设置",
+      "hash": "on3bo0",
+      "lastUpdated": "2026-07-21"
     }
   }
 }
