@@ -17,6 +17,52 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.21',
+    date: '2026-07-21',
+    month: '21 july 2026',
+    // Explicitly false: `isSpotlightRelease` defaults to TRUE for any note with
+    // feature cards, and this change is only visible to people creating a NEW
+    // family - existing users (the ones who see this note) see nothing change.
+    spotlight: false,
+    summary: {
+      en: 'Anyone can create a family now - no invite code needed. Setting up starts with a short welcome that walks you through the three steps.',
+      beanie:
+        'anyone can create a family now - no invite code needed. setting up starts with a short welcome that walks you through the three steps.',
+    },
+    features: [
+      {
+        icon: '🌱',
+        title: { en: 'No more invite codes', beanie: 'no more invite codes' },
+        description: {
+          en: 'beanies.family is open to everyone, so you can share it with friends and family without passing along a code.',
+          beanie:
+            'beanies.family is open to everyone, so you can share it with friends and family without passing along a code.',
+        },
+      },
+      {
+        title: { en: 'A warmer start', beanie: 'a warmer start' },
+        description: {
+          en: 'Creating a family now opens with a quick preview of the three setup steps, and how your data stays private.',
+          beanie:
+            'creating a family now opens with a quick preview of the three setup steps, and how your data stays private.',
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.07.15',
     date: '2026-07-15',
     month: '15 july 2026',
