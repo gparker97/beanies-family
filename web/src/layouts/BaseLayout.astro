@@ -10,9 +10,11 @@ import '../styles/global.css';
 // Variable fonts are a single file per family, covering all weights 300-800.
 import '@fontsource-variable/outfit';
 import '@fontsource-variable/inter';
-// Caveat — CIG accent font (handwritten captions/notes); used by the homepage
-// "three worlds" section's handwritten payoff line. See beanies-theme SKILL §Caveat.
-import '@fontsource-variable/caveat';
+// NOTE: Caveat (the CIG handwritten accent face) is deliberately NOT imported here.
+// Exactly one component uses it, so it is imported by that component instead —
+// see WorldsBeanstalk.astro. Same per-page pattern as Fraunces, which the blog,
+// guides and help pages import themselves. Outfit and Inter stay global because
+// every page uses them (global.css sets them as the heading/body faces).
 
 interface Props {
   title: string;

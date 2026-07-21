@@ -13,12 +13,19 @@
  * the design: edit the mockup first, re-verify it, then re-port here.
  *
  * The only deviations from the mockup (all per the plan): font-family stacks mapped to
- * the site's loaded fonts (Caveat is a CIG accent font — @fontsource-variable/caveat is
- * loaded in BaseLayout), the family image uses the /brand/ public path, the mockup's
+ * the site's loaded fonts (Caveat is a CIG accent font, imported by this component —
+ * see the import below), the family image uses the /brand/ public path, the mockup's
  * :root brand tokens are inherited from .landing-page (only --vine-green(-light) are
  * declared here), the grass is pre-rendered deterministically at build time (Astro can't
  * scope styles onto JS-created nodes), and decorative emoji get aria-hidden.
  */
+
+// Caveat — the CIG handwritten accent face, used by `.root-note` below and by
+// nothing else on the site. Imported HERE rather than in BaseLayout so the other
+// 90 pages don't carry its @font-face rules; colocating it with its only consumer
+// also means it cannot be orphaned if this section is ever removed. Mirrors the
+// existing per-page Fraunces pattern.
+import '@fontsource-variable/caveat';
 
 // --- Deterministic grass generator (build-time; reproduces the mockup's buildGrass()
 //     distribution with a fixed seed so builds are reproducible). Call order matches
