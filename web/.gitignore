@@ -12,3 +12,8 @@ node_modules/
 
 # Lighthouse CI local runs
 .lighthouseci/
+
+# Chrome profile dirs from local Lighthouse runs under WSL, where a Windows-style
+# TMP/TEMP leaks in and Chrome creates the path literally. Prefix runs with
+# TMPDIR=/tmp to avoid them; this is the backstop.
+C:*

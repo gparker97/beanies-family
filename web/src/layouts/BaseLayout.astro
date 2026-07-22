@@ -10,6 +10,13 @@ import '../styles/global.css';
 // Variable fonts are a single file per family, covering all weights 300-800.
 import '@fontsource-variable/outfit';
 import '@fontsource-variable/inter';
+// Do NOT add <link rel="preload"> for these. Measured 2026-07-22: preloading
+// Outfit alone takes homepage CLS to a clean 0, but costs a hard +377ms of LCP
+// (2714ms -> 3088ms), busting the 3000ms budget. fetchpriority="low" does not
+// help. The hero mascot has only ~290ms of LCP headroom, so any extra
+// critical-path request breaks it. The fix that gets CLS to 0 without a network
+// request is a size-adjust metric-matched fallback face — see
+// docs/plans/2026-07-22-lighthouse-gate-honesty-and-homepage-cls.md.
 // NOTE: Caveat (the CIG handwritten accent face) is deliberately NOT imported here.
 // Exactly one component uses it, so it is imported by that component instead —
 // see WorldsBeanstalk.astro. Same per-page pattern as Fraunces, which the blog,
