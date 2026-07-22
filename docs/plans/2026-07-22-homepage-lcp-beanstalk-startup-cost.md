@@ -422,6 +422,58 @@ What must nonetheless stay observable:
 - **Pass 3 (Sustainability)**: Judged the build-time precompute over-engineered as a first move — five reasons recorded in "Why not precompute (yet)" (designer-iteration tax, verification-by-deletion, ~7KB gz on the critical document, a new stale-geometry failure class needing four artifacts to contain, and irreversibility). Demoted it to Step 3 contingency with its full spec retained, and promoted `IntersectionObserver` deferral to the primary lever with a new Step 1b (pre-setup static defaults, Requirement 7), Step 1c (cheap contained tidies), Requirement 8 (revertible in one commit), and caveats on TBT relocation, the improved `dockDirty` situation, and the implausibly-slow ~0.5ms/call figure pointing at layout rather than Bézier flattening.
 - **Pass 4 (Fresh-eyes sweep)**: Found and fixed four correctness defects in the newly-promoted deferral design — retargeted the observer from `#stage` (inside the `content-visibility: auto` skipped subtree, where it cannot report early and collapses the `rootMargin` head-start) to the `.worlds` section, widened `rootMargin` to 1200px, and required `disconnect()` before `setup()`; replaced the magic `stroke-dasharray: 4000` with a length-independent `opacity` hide; made that hide a **JS-applied, JS-removed** `data-beanstalk="pending"` attribute after discovering the missing-DOM early return does **not** call `renderStatic()`, so a bare CSS default would have turned three currently-visible degradations (JS off, module load failure, missing DOM) into a blank section; and pinned the climber reveal to `dockOffset()`'s success path so a refused degenerate measurement can no longer show a mis-parked seed. Also dropped the redundant `.vine-leaf { opacity: 0 }` base rule (`.l`/`.r` already declare it), required `data-side` be deleted rather than left as a second source of truth alongside the new static class, added read-before-write batching in `positionLeaves()` and `render()` (twelve forced layout flushes at startup and one per animation frame, output-identical to remove), and made "visible scroll jank on a throttled device" an explicit Step 3 escalation trigger alongside CI evidence.
 
+## Outcome (attempted and REVERTED, 2026-07-22)
+
+**Steps 0–2 were executed. Step 1 achieved its mechanical goal completely and did not improve LCP at all. It was reverted. The plan's central premise is disproven — do not retry this approach, and do not build Step 3.**
+
+### Step 0 — profile (confirmed the plan's assumption)
+
+Local, instrumented, `performance.now()` around each startup call:
+
+|                    | CPU 1×      | CPU 4× (≈CI) |
+| ------------------ | ----------- | ------------ |
+| `buildBraid()`     | **242.7ms** | **894.4ms**  |
+| `measure()`        | 0.4ms       | 1.8ms        |
+| `positionLeaves()` | 4.9ms       | 13.9ms       |
+| total              | 248.0ms     | 910.1ms      |
+
+`buildBraid()` is 98% of the block, and its 894ms at 4× throttle closely matches CI's 819ms attribution — so CI behaves like a 4×-throttled machine and the diagnosis transfers. **Assumption 1 confirmed.** Note `measure()` costs 0.4ms, so Step 3's machinery for precomputing path lengths was solving a non-problem.
+
+### Step 1 — implemented as specified, and it worked mechanically
+
+`IntersectionObserver` on `.worlds`, `rootMargin: 1200px`, `disconnect()` before `setup()`, JS-applied/JS-removed `data-beanstalk="pending"` hide, plus the `VINE_CENTER_D` DRY fix. Behaviour verified across five cases (cold load defers; fires once on scroll; deep-link fires immediately; missing `IntersectionObserver` falls back to immediate setup; reduced-motion still builds the braid before `renderStatic()`).
+
+### Step 2 — CI measurement: the work vanished, LCP did not move
+
+| Metric                     | Before (`29907683159`) | After (`29911829582`) |
+| -------------------------- | ---------------------- | --------------------- |
+| Script Evaluation          | 858ms                  | **32ms**              |
+| TBT                        | 390ms                  | **0ms**               |
+| Style & Layout             | 707ms                  | 399ms                 |
+| beanstalk in `bootup-time` | 819ms eval             | **absent entirely**   |
+| **LCP**                    | 3162.5ms               | **3158.9ms**          |
+| Render Delay               | 2612ms                 | 2692ms                |
+| **FCP score**              | 0.89 (tight)           | **0.65 (tight)**      |
+
+**~1.2s of main-thread work was removed and LCP changed by 3ms.** Render delay was never main-thread-bound.
+
+Worse, **FCP regressed from ~1.7s to ~2.6s** — real, not noise (before: 0.89/0.93/0.89/0.89/0.89; after: 0.65/0.65/0.81/0.65/0.65).
+
+Hypothesis tested and refuted: that the `opacity: 0` pending-hide created a stacking context forcing composition of the 2400px subtree that `content-visibility: auto` was skipping. Changing it to `visibility: hidden` (`bbc9c4ac`, run `29912328624`) left FCP at 0.65. **The regression is caused by the deferral itself, not the hide.**
+
+### Verdict
+
+Reverted both commits (`cc03bbad`, `bbc9c4ac`); `WorldsBeanstalk.astro` is byte-identical to its pre-attempt state. A change that costs 0.9s of FCP to buy a TBT improvement Lighthouse cannot reliably measure is net-negative for users — FCP is when the visitor sees anything at all.
+
+### What this rules out for any future attempt
+
+1. **The beanstalk's 819ms was never gating LCP.** Removing it entirely moved LCP by 3ms. The root-cause diagnosis in this plan's Context section is wrong about _consequence_, though right about _magnitude_.
+2. **Step 3 (build-time precompute) is now pointless and must not be built.** It removes exactly the same work that deferral already removed to no effect. Six new artifacts for a proven-zero LCP gain.
+3. **LCP on this page is ~3160ms invariant** — measured at 3162.5 / 3158.9 / 3159.6 across three materially different builds (beanstalk running, deferred with opacity hide, deferred with visibility hide). Something structural pins it, not page work. TTFB is 454ms and the hero image is fully downloaded at 38ms.
+4. **Deferring below-the-fold script can make FCP worse.** Counterintuitive and unexplained; whatever the mechanism, it is now a measured fact about this page.
+
+A future attempt should start by explaining the invariant ~3160ms — not by removing more main-thread work, which has now been demonstrated not to matter.
+
 ## Prompt Log
 
 <details>
