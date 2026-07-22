@@ -440,6 +440,30 @@ When asked to implement a GitHub issue/ticket:
 4. **Mark ready for testing**: Once complete, remove the `in-progress` label, apply the `ready-for-testing` label, and add a comment summarizing the changes made
 5. **Ask questions** before starting if requirements are unclear
 
+## Branch Hygiene
+
+This project commits straight to `main` (linear history, deploys run from `main`). Branches are therefore **short-lived and exceptional** — a branch that outlives its merge is pure confusion cost.
+
+**The rule: delete a branch the moment it is merged, superseded, or abandoned.** Local _and_ remote, in the same breath as the merge. Never leave one lying around "just in case" — `main`'s history and the reflog already are the just-in-case.
+
+- **On merge** — delete both refs immediately: `git branch -d <name>` and `git push origin --delete <name>`.
+- **On abandon** — delete it too, and record why in `docs/STATUS.md` or the relevant plan's Outcome section. A branch is a terrible place to store intent; prose is where intent belongs.
+- **Never delete a branch backing an open PR** (all `dependabot/**` branches) — that closes the PR. Those are the one standing exception.
+- **Run a sweep during `/end-session`** so stale refs cannot accumulate across sessions.
+
+**Judging "merged" by commit count is not safe.** When a branch is rebased, squashed or amended on its way into `main`, its commit SHAs change, so `git rev-list --count main..<branch>` still reports unmerged commits even though every line of the work shipped. Two branches in this repo hit exactly that (`app-icon-dawn`, `calendar-drive-parity-p2`), and one of them carried a "resume anchor" commit that made long-shipped work look abandoned.
+
+Verify by **content**, not by commit count:
+
+```bash
+git diff main <branch> -- <paths>                     # empty  => byte-identical to main
+comm -23 <(git ls-tree -r --name-only <branch> | sort) \
+         <(git ls-tree -r --name-only main | sort)    # empty  => no unique files
+git merge-base --is-ancestor <sha> main               # exit 0 => that commit is on main
+```
+
+If the content is on `main`, the branch is merged regardless of what the counts say. See `docs/lessons.md`.
+
 ## Changelog
 
 `CHANGELOG.md` must be updated **every time changes are pushed** to the repository. This is a mandatory part of every commit/push workflow.
