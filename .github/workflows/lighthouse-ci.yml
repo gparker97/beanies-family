@@ -3,6 +3,34 @@ name: Lighthouse CI
 # Runs on PRs that touch the Astro marketing site or its content. Asserts
 # Core Web Vitals + perf/SEO thresholds on the static build. Vue-only PRs
 # are skipped so the main CI pipeline stays fast.
+#
+# ASSERTION DISPOSITIONS (2026-07-22). The config is JSON and cannot hold
+# comments, so the reasoning lives here. Full measurements:
+# docs/plans/2026-07-22-lighthouse-gate-honesty-and-homepage-cls.md
+#
+#   aggregationMethod: median   LHCI defaults to `optimistic` = BEST-of-N. That
+#     is why this gate reported homepage CLS as 0,0,0 for weeks while the real,
+#     zero-variance value was 0.1868 — ~2x its own budget. Never revert to the
+#     default; it makes the gate structurally unable to see a defect that is
+#     present on every run. Expect reported numbers to look WORSE than the
+#     pre-2026-07-22 history: that is the gate becoming honest, not a regression.
+#
+#   total-blocking-time: warn   NOT a relaxation — the 300ms budget is unchanged,
+#     only the severity. Lighthouse scales main-thread work by a per-run CPU
+#     benchmarkIndex, so on a contended shared runner TBT inflates ~30x. Measured
+#     the same commit: 434 / 435 / 1343ms in CI vs a median of 14ms on a quiet
+#     machine. The assertion's noise floor exceeds its budget by 4x, so it cannot
+#     distinguish pass from fail. It still prints its value and spread every run,
+#     so a genuine order-of-magnitude regression stays visible in this log.
+#
+#   categories:performance: warn   Same reason, inherited: 30% of this composite
+#     IS total-blocking-time, so it carries TBT's noise. Local median after the
+#     CLS fix is ~0.94, comfortably over the 0.90 threshold — but that is a quiet
+#     machine, and CI cannot reproduce it. The 0.90 number is unchanged.
+#
+#   LCP / CLS / SEO stay `error`. These are the ones CI can actually measure:
+#     LCP is network-simulated and varied 0.1% across runs (3157.9-3161.9ms);
+#     CLS was bit-identical across five runs. They are the real gate.
 
 on:
   pull_request:

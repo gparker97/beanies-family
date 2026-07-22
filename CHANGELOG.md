@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-07-22
 
+### Fixed
+
+- **The homepage no longer shifts under your eyes while it loads.** The hero's headline, buttons and link used to jump sideways the moment the brand font finished downloading — the stand-in font the browser shows first is noticeably wider, and because the hero is centred, every line slid across as it was swapped out. The stand-in is now width-matched to the real font, so the text lands in the same place from the first paint. The decorative blobs behind the hero were riding the same movement and have been pinned too. Measured layout shift dropped from 0.19 to 0.008, comfortably inside Google's "good" threshold, with no cost to how fast the page paints.
+
 ### Changed
 
 - **New app icon.** The home-screen icon is now the father-and-son beanies on a soft sunrise background, replacing the family-hugging illustration. The old one packed five characters into a 48px tile, so almost none of it survived at notification and launcher sizes — the two-bean mark keeps its shape all the way down, and the lighter ground lets the orange arrow read clearly instead of blending into the background it sat on. Live now on the web app; the Android build carrying it is with Google for review.
