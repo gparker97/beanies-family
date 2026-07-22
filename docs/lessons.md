@@ -4,6 +4,26 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## Stale branches manufacture false uncertainty — delete on merge, and judge "merged" by content, not commit count
+
+**Date:** 2026-07-22
+**Context:** A branch audit found 9 non-`main` branches. Three were trivially merged. Two were not, and both wasted real time:
+
+- **`app-icon-dawn`** — `git rev-list --count main..origin/app-icon-dawn` said **1 unmerged commit**. The app icon had in fact shipped to web _and_ Google Play the day before. It landed on `main` as `983d8731` with the same subject but a different SHA (rebased on the way in), so the count was measuring SHA identity, not content. Comparing file trees settled it: nothing on the branch was missing from `main`.
+- **`calendar-drive-parity-p2`** — reported **2 unmerged commits**, and its tip was a commit literally titled _"P2 resume anchor — progress snapshot + exact next steps"_, containing a `git checkout` resume recipe and a **"Do NOT merge P2 to `main` until task #14 is green and Drive auth is live-verified"** gate. Every signal said "interrupted high-risk WIP, handle with care." It was none of those things: P2 **and** P3 had been completed and shipped to prod as `0.9.4R8` on 2026-07-12 via merge `12bfd23f`, with follow-on fixes on top (`d3b1defd`). The merge's parent was `1ae7f9fa`, _not_ the branch tip — work continued past the anchor, got rebased, and merged under new SHAs while the remote ref was never updated or deleted. `git diff main origin/calendar-drive-parity-p2 -- src/services/google/redirectState.ts` was **empty**: byte-identical.
+
+Cost: an end-of-session cleanup turned into a full investigation — reading a 300-line plan, tracing merge parents, diffing trees — to establish that two branches contained nothing. I also initially recommended _keeping_ `calendar-drive-parity-p2` on the strength of its resume-anchor commit, which would have preserved the confusion indefinitely.
+
+**Rules:**
+
+1. **Delete a branch the moment it is merged, superseded, or abandoned — local and remote, in the same breath as the merge.** `git branch -d <name>` + `git push origin --delete <name>`. This project commits straight to `main`, so a surviving branch has no job to do. `main`'s history and the reflog are the safety net; a stale ref is not a backup, it is a decoy. Codified in `CLAUDE.md` § Branch Hygiene.
+2. **Never conclude "unmerged" from `git rev-list --count`.** Rebase, squash and amend all change SHAs, so a fully-shipped branch routinely reports unmerged commits. Check **content**: `git diff main <branch> -- <paths>` (empty = identical), `comm -23` over the two file trees (empty = nothing unique), `git merge-base --is-ancestor <sha> main`. Content on `main` means merged, whatever the counts say.
+3. **A branch is a terrible place to store intent.** The resume anchor was well-written and completely misleading, because the branch it lived on was frozen while the work moved on. Parked work belongs in `docs/STATUS.md` or a plan's Outcome section — prose that is maintained — and the branch should still be deleted.
+4. **Never delete a branch backing an open PR** (`dependabot/**`) — that closes the PR. The one standing exception.
+5. **Sweep for stale branches during `/end-session`**, so refs cannot silently accumulate across sessions.
+
+---
+
 ## `type-check` + unit tests can be green while the production `vite build` is broken — run `npm run build` before pushing import-graph changes
 
 **Date:** 2026-07-15

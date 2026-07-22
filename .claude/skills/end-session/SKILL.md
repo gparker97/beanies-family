@@ -78,6 +78,34 @@ If any launch-relevant work was done (new features, user-facing changes, metrics
 - Ask the user if they want to complete any of them now before closing out.
 - For items that can't be completed, add a note to `docs/STATUS.md` under a "Pending / Next Session" section so the next developer knows.
 
+### Step 5.4: Sweep for stale branches (mandatory)
+
+This project commits straight to `main`, so any surviving branch is a candidate for deletion. Stale refs accumulate silently and cost real time later — see `docs/lessons.md` and `CLAUDE.md` § Branch Hygiene.
+
+```bash
+git fetch --all --prune
+git branch -vv          # local; "[origin/x: gone]" means the remote is already deleted
+git branch -r -v        # remote
+```
+
+For each non-`main` branch, classify it:
+
+- **Backing an open PR** (`dependabot/**` — confirm with `gh pr list --state open --json headRefName`) → **keep**. Deleting the branch closes the PR.
+- **Merged** → delete both refs: `git branch -d <name>` and `git push origin --delete <name>`.
+- **Genuinely unmerged work** → keep, and make sure the intent is captured in `docs/STATUS.md` or a plan Outcome, not only in the branch.
+
+**Judge "merged" by content, never by commit count.** Rebase/squash/amend change SHAs, so a fully-shipped branch routinely reports unmerged commits:
+
+```bash
+git diff main <branch> -- <paths>                     # empty  => byte-identical to main
+comm -23 <(git ls-tree -r --name-only <branch> | sort) \
+         <(git ls-tree -r --name-only main | sort)    # empty  => no unique files
+git merge-base --is-ancestor <sha> main               # exit 0 => that commit is on main
+git log main --oneline --grep="<branch keyword>" -i   # find the merge/squash commit
+```
+
+Confirm with greg before deleting **remote** branches (harder to reverse than local). Report what was deleted and what was kept, with the reason.
+
 ### Step 5.5: Validate the existing STATUS.md pending block before re-saving (mandatory)
 
 Pending items rot. An item carried forward from session to session may have been shipped in commits since it was added. **Before saving an updated STATUS.md, verify every existing entry in "Pending / Next Session" still applies.**
