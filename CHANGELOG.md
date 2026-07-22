@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-22
+
+### Changed
+
+- **New app icon.** The home-screen icon is now the father-and-son beanies on a soft sunrise background, replacing the family-hugging illustration. The old one packed five characters into a 48px tile, so almost none of it survived at notification and launcher sizes — the two-bean mark keeps its shape all the way down, and the lighter ground lets the orange arrow read clearly instead of blending into the background it sat on. Applies to iOS, Android and the installed web app. _(Native icons reach users on the next store release.)_
+- **Installed Android web app gets a proper masked icon.** Android crops home-screen icons to the launcher's shape, which was clipping the arrow. A dedicated maskable icon now keeps the whole mark inside the safe area whatever shape the launcher uses.
+
 ## 2026-07-21
 
 ### Added
@@ -24,7 +31,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **The homepage loads noticeably faster on phones.** The two soft colour washes behind the hero were being blurred by the browser on every load before anything could appear on screen; they are now pre-rendered gradients that look the same and cost nothing. The "three worlds" beanstalk section — which sits well below the fold and only animates once you scroll to it — no longer holds up that first paint either. Largest Contentful Paint improved from 3.2s to 2.7s, with the beanstalk unchanged visually.
 - **Every page except the homepage stopped downloading a font it never used.** The handwritten Caveat face is now loaded only by the one section that uses it, instead of by all 91 pages.
-
 ## 2026-07-20
 
 ### Changed
