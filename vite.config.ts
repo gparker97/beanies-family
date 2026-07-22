@@ -163,7 +163,7 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['brand/*.png', 'icons/*.png'],
+      includeAssets: ['brand/*.png'],
       manifest: {
         name: 'beanies.family',
         short_name: 'beanies.family',
@@ -191,6 +191,17 @@ export default defineConfig({
             src: 'brand/beanies_father_son_icon_512x512.png',
             sizes: '512x512',
             type: 'image/png',
+          },
+          // Maskable variant: Android crops installed-PWA icons to the launcher
+          // shape (circle, squircle, teardrop) and only the inner ~66% is safe.
+          // The `any` icons above bleed the arrow to the canvas edge, so without
+          // this Android would clip the arrow's tip and tail. Same artwork,
+          // scaled to 62% of the canvas over the same gradient.
+          {
+            src: 'brand/beanies_app_icon_maskable_512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
           },
         ],
       },
