@@ -295,7 +295,7 @@ const VINE_CENTER_D =
      This attribute is set by JS and removed by JS. It is deliberately NOT a CSS default:
      with JS disabled, a failed module load, or markup out of sync with the script, the
      attribute is never applied and the section stays visible exactly as it does today. */
-  .stage[data-beanstalk='pending'] { opacity: 0; }
+  .stage[data-beanstalk='pending'] { visibility: hidden; }
   .vine-wrap { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
   .vine-wrap svg { width: 100%; height: 100%; display: block; }
   .vine-wrap path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
