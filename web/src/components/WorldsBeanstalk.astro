@@ -74,6 +74,14 @@ const frontBlades = makeBlades(24, { spread: 158, depth: 30, hMin: 34, hMax: 72,
 // a few little bean sprouts popping among the grass (fixed positions in the mockup)
 const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10, 2.3], ['🫘', 128, 4, 1.2]] as [string, number, number, number][])
   .map((g, i) => ({ emoji: g[0], style: `--x:${g[1]}px;--y:${g[2]}px;--rot:${i % 2 ? 8 : -8}deg;--d:${g[3]}s;` }));
+
+// THE centre path. #vine-center, #vine-trunk and #vine-core must trace exactly the same
+// curve — the trunk and core are the visible strokes, #vine-center is the invisible
+// geometry the braid and the seed are measured against. This was written out three
+// times; editing one and missing the others silently desynchronised the stalk from the
+// seed that rides it. One literal, three consumers.
+const VINE_CENTER_D =
+  'M540 0 C 540 240 380 360 440 620 C 500 840 760 900 660 1180 C 588 1400 340 1500 440 1780 C 505 1990 560 2120 540 2260';
 ---
 
 <section id="features" class="worlds" aria-label="what's inside beanies">
@@ -110,9 +118,9 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
             <stop offset="0.82" stop-color="#5a5426" stop-opacity="0.7" /><stop offset="1" stop-color="#5a4a24" stop-opacity="0.85" />
           </linearGradient>
         </defs>
-        <path id="vine-center" d="M540 0 C 540 240 380 360 440 620 C 500 840 760 900 660 1180 C 588 1400 340 1500 440 1780 C 505 1990 560 2120 540 2260" stroke="rgba(62,142,82,0.10)" stroke-width="22"></path>
-        <path class="grow" id="vine-trunk" d="M540 0 C 540 240 380 360 440 620 C 500 840 760 900 660 1180 C 588 1400 340 1500 440 1780 C 505 1990 560 2120 540 2260" stroke="url(#trunkGrad)" stroke-width="26"></path>
-        <path class="grow" id="vine-core" d="M540 0 C 540 240 380 360 440 620 C 500 840 760 900 660 1180 C 588 1400 340 1500 440 1780 C 505 1990 560 2120 540 2260" stroke="url(#coreGrad)" stroke-width="8"></path>
+        <path id="vine-center" d={VINE_CENTER_D} stroke="rgba(62,142,82,0.10)" stroke-width="22"></path>
+        <path class="grow" id="vine-trunk" d={VINE_CENTER_D} stroke="url(#trunkGrad)" stroke-width="26"></path>
+        <path class="grow" id="vine-core" d={VINE_CENTER_D} stroke="url(#coreGrad)" stroke-width="8"></path>
         <path class="grow braid" id="braidA" stroke="url(#strandA)" stroke-width="5.5"></path>
         <path class="grow braid" id="braidB" stroke="url(#strandB)" stroke-width="5.5"></path>
         <path class="grow braid" id="braidC" stroke="url(#strandC)" stroke-width="5.5"></path>
@@ -276,6 +284,18 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
   /* stage does NOT create a stacking context (no z-index) so the climber can float
      above the intro copy when docked yet duck behind the cards when descending */
   .stage { position: relative; width: 100%; max-width: 1080px; margin: 0.25rem auto 0; height: 2400px; }
+
+  /* The script now defers its setup until the section approaches the viewport (see the
+     comment above setup() in the script block). Between parse and setup the stalk would
+     otherwise render fully drawn, with unpositioned leaves and the seed parked at the
+     stage origin. Hiding via opacity is length-independent — no magic dasharray value
+     that has to stay larger than the longest path — and costs no layout, so it cannot
+     affect CLS.
+
+     This attribute is set by JS and removed by JS. It is deliberately NOT a CSS default:
+     with JS disabled, a failed module load, or markup out of sync with the script, the
+     attribute is never applied and the section stays visible exactly as it does today. */
+  .stage[data-beanstalk='pending'] { opacity: 0; }
   .vine-wrap { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
   .vine-wrap svg { width: 100%; height: 100%; display: block; }
   .vine-wrap path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -670,31 +690,87 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
       positionLeaves(); if (docked) dockOffset(); schedule();
     }
 
-    try {
-      buildBraid();
-      measure();
-      positionLeaves();
-      if (prefersReduced) { renderStatic(); return; }
-      grows.forEach(function (p: any) { p.style.strokeDasharray = p._len; p.style.strokeDashoffset = p._len; });
-      dockOffset();
-      // The launch hop finished → let the eased descent from the top begin.
-      climber!.addEventListener('animationend', function (e) {
-        if ((e as AnimationEvent).animationName === 'climberHop') {
-          hopping = false;
-          climber!.classList.remove('launching');
-          schedule();
+    // Everything above is cheap (DOM lookups + function definitions). Everything
+    // below is not: buildBraid() alone measured 243ms on a desktop and 894ms at 4x
+    // CPU throttle, because it walks the centre path in 5-unit steps calling
+    // getPointAtLength() three times per step (~1500 SVG geometry computations).
+    //
+    // That used to run at module-evaluation time, on the pre-LCP main thread, for a
+    // section that is ENTIRELY BELOW THE FOLD — and it was the single largest item on
+    // the homepage: Lighthouse attributed 819ms of script evaluation to this 2KB file
+    // while the hero mascot, fully downloaded at 38ms, sat unpainted until 3162ms.
+    // See docs/plans/2026-07-22-homepage-lcp-beanstalk-startup-cost.md.
+    //
+    // `content-visibility: auto` (added 2026-07-21) already defers this section's
+    // LAYOUT and PAINT. This defers its SCRIPT to the same moment. A deferred
+    // <script type="module"> defers the DOWNLOAD, not the EXECUTION — that is the
+    // trap the previous fix fell into.
+    function setup() {
+      try {
+        buildBraid();
+        measure();
+        positionLeaves();
+        if (prefersReduced) {
+          renderStatic();
+          stage!.removeAttribute('data-beanstalk');   // reveal only once the static state is built
+          return;
         }
-      });
-      window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('resize', onResize);
-      schedule();
-    } catch (err) {
-      console.warn(
-        '[worlds] animation setup failed — falling back to the static beanstalk. ' +
-        'Fix guidance: verify the SVG path #vine-center is present and getTotalLength/getPointAtLength are available.',
-        err,
-      );
-      renderStatic();
+        grows.forEach(function (p: any) { p.style.strokeDasharray = p._len; p.style.strokeDashoffset = p._len; });
+        dockOffset();
+        // Reveal ONLY here — after the strands are hidden by their dash offset and the
+        // seed has been docked. Revealing any earlier flashes a fully-drawn stalk with
+        // an undocked seed parked at the stage origin.
+        stage!.removeAttribute('data-beanstalk');
+        // The launch hop finished → let the eased descent from the top begin.
+        climber!.addEventListener('animationend', function (e) {
+          if ((e as AnimationEvent).animationName === 'climberHop') {
+            hopping = false;
+            climber!.classList.remove('launching');
+            schedule();
+          }
+        });
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onResize);
+        schedule();
+      } catch (err) {
+        console.warn(
+          '[worlds] animation setup failed — falling back to the static beanstalk. ' +
+          'Fix guidance: verify the SVG path #vine-center is present and getTotalLength/getPointAtLength are available.',
+          err,
+        );
+        stage!.removeAttribute('data-beanstalk');
+        renderStatic();
+      }
+    }
+
+    // Observe the SECTION, not #stage. #stage lives inside the `content-visibility:
+    // auto` subtree, so while the section is skipped its descendants are unlaid-out —
+    // an observer on #stage cannot report reliably or early, which would collapse the
+    // rootMargin head-start this depends on. 1200px is generous enough that setup
+    // finishes well before the section is on screen even on a fast flick-scroll.
+    //
+    // If the user loads deep-linked or scroll-restored past this point, the observer
+    // fires immediately on its first callback — IntersectionObserver reports initial
+    // intersection state on observe(), so an already-visible section is not missed.
+    var worlds = stage!.closest('.worlds');
+    if (typeof IntersectionObserver === 'undefined' || !worlds) {
+      // No observer (or unexpected markup) → run now. This is exactly the pre-2026-07-22
+      // behaviour, so the fallback is the old, known-good path rather than a new one.
+      setup();
+    } else {
+      // Applied by JS, removed by JS — deliberately NOT a CSS default. The missing-DOM
+      // early return above does NOT call renderStatic(); it warns and returns, relying
+      // on the markup already being visible. A bare CSS default would therefore turn
+      // three currently-visible degradations (JS disabled, module load failure, markup
+      // out of sync) into a blank section. Setting it here means it can only ever be
+      // applied when JS is running and has committed to removing it again.
+      stage!.setAttribute('data-beanstalk', 'pending');
+      var io = new IntersectionObserver(function (entries) {
+        if (!entries.some(function (e) { return e.isIntersecting; })) return;
+        io.disconnect();   // before setup(), so a throw cannot leave it armed to re-fire
+        setup();
+      }, { rootMargin: '1200px 0px' });
+      io.observe(worlds);
     }
   })();
 </script>
