@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
-- **New app icon.** The home-screen icon is now the father-and-son beanies on a soft sunrise background, replacing the family-hugging illustration. The old one packed five characters into a 48px tile, so almost none of it survived at notification and launcher sizes — the two-bean mark keeps its shape all the way down, and the lighter ground lets the orange arrow read clearly instead of blending into the background it sat on. Applies to iOS, Android and the installed web app. _(Native icons reach users on the next store release.)_
+- **New app icon.** The home-screen icon is now the father-and-son beanies on a soft sunrise background, replacing the family-hugging illustration. The old one packed five characters into a 48px tile, so almost none of it survived at notification and launcher sizes — the two-bean mark keeps its shape all the way down, and the lighter ground lets the orange arrow read clearly instead of blending into the background it sat on. Live now on the web app; the Android build carrying it is with Google for review.
 - **Installed Android web app gets a proper masked icon.** Android crops home-screen icons to the launcher's shape, which was clipping the arrow. A dedicated maskable icon now keeps the whole mark inside the safe area whatever shape the launcher uses.
 
 ## 2026-07-21

@@ -373,3 +373,16 @@ if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
 2. **Read the failure screenshot/`error-context.md` before theorizing.** The page snapshot showed the exact blocking error message — it would have pointed straight at the registry on the first look, before the contention rabbit-hole.
 3. **A fix that's green locally but still red on CI means the local repro was invalid** — don't push-and-pray; reproduce the CI failure locally first (fresh server, CI-parity worker count).
 4. **When the app gates a flow on an external service (registry/Drive/API), the E2E harness must mock that service** — don't rely on "the wizard exits before it's reached"; that assumption rots when flows change. See `e2e/helpers/registry-mock.ts`.
+
+## 16. A markdown-only fix commit skips CI — and the deploy gate hard-fails on it
+
+**Date:** 2026-07-22
+**Context:** During `/deploy-prod-auto` for the app-icon change, CI failed on `Check formatting`. The cause was upstream: the icon commit was rebased onto a moved `main`, and **resolving a conflict during a rebase bypasses the lint-staged prettier hook** — `git add` + `git rebase --continue` runs no hooks, so a malformed CHANGELOG.md sailed into the commit that `git commit` would have auto-fixed.
+
+The fix commit touched only `CHANGELOG.md`. Both `main-ci.yml` and `security.yml` carry `paths-ignore: ['*.md', 'docs/**', ...]`, so **neither workflow ran for the new HEAD**. `deploy.yml`'s gate then refuses to deploy: it looks for a CI run matching the HEAD sha and errors with "No Main Branch CI run found for commit $SHA" when there is none. The deploy is blocked not by a failure but by an absence.
+
+**Rule:**
+
+1. **After resolving a rebase conflict, run the formatter before `git rebase --continue`.** Hooks do not run during a rebase. `npx prettier --check <file>` on anything you hand-edited is the cheap guard.
+2. **If a deploy's final commit touches only markdown, expect no CI run.** Dispatch both gates manually — `gh workflow run main-ci.yml --ref main` and `gh workflow run security.yml --ref main` — before `deploy.yml`. A dispatched run is attributed to the branch HEAD, so the gate's `--commit=$SHA` lookup finds it.
+3. **Don't reach for `skip_gate`.** It exists for config-only changes verified locally; using it to route around a missing CI run deploys code that was never checked.
