@@ -40,24 +40,12 @@ import {
   markUnreadIn,
   pruneReadState,
   type DeriveInput,
-  type NotificationOccurrence,
 } from '@/utils/notifications';
 import type { AppNotification } from '@/types/notifications';
+import { assembleOccurrencesByDate } from '@/utils/occurrenceAssembly';
 
 const WINDOW_DAYS = 30;
 const MS_PER_DAY = 86_400_000;
-
-/** Distinct {year, month} pairs spanning [start, end] inclusive (≤2 for 30 days). */
-function distinctMonths(start: Date, end: Date): { year: number; month: number }[] {
-  const out: { year: number; month: number }[] = [];
-  const cur = new Date(start.getFullYear(), start.getMonth(), 1);
-  const last = new Date(end.getFullYear(), end.getMonth(), 1);
-  while (cur <= last) {
-    out.push({ year: cur.getFullYear(), month: cur.getMonth() });
-    cur.setMonth(cur.getMonth() + 1);
-  }
-  return out;
-}
 
 export const useNotificationsStore = defineStore('notifications', () => {
   const todoStore = useTodoStore();
@@ -96,14 +84,14 @@ export const useNotificationsStore = defineStore('notifications', () => {
     // One pass over the distinct months spanning the window (≤2), over the
     // UNFILTERED activeActivities, so duty-only occurrences survive and we never
     // re-expand the same month per-day (the deriver re-checks the trigger window).
+    // Shared assembly with the OS forward scheduler (occurrenceAssembly.ts).
     const end = now.value;
     const start = new Date(end.getTime() - WINDOW_DAYS * MS_PER_DAY);
-    const occurrencesByDate: Record<string, NotificationOccurrence[]> = {};
-    for (const { year, month } of distinctMonths(start, end)) {
-      for (const occ of activityStore.activeActivitiesForMonth(year, month)) {
-        (occurrencesByDate[occ.date] ??= []).push(occ);
-      }
-    }
+    const occurrencesByDate = assembleOccurrencesByDate(
+      activityStore.activeActivitiesForMonth,
+      start,
+      end
+    );
 
     return {
       todos: todoStore.todos,

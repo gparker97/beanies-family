@@ -75,17 +75,17 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
   {
     slug: 'notifications',
     category: 'features',
-    title: 'Notifications — staying on top of what needs you',
+    title: 'Notifications & reminders — staying on top of what needs you',
     excerpt:
-      "The bell in your header quietly keeps track of what's coming due, what's been assigned to you, and what's coming up — so you don't have to.",
+      "The bell in your header keeps track of what's coming due, assigned, and coming up — and the app can give you a timely heads-up before activities, travel and timed to-dos start.",
     icon: '\u{1F514}',
-    readTime: 3,
-    updatedDate: '2026-05-29',
+    readTime: 4,
+    updatedDate: '2026-07-23',
     sections: [
       {
         type: 'paragraph',
         content:
-          "Family life has a lot of moving parts. The notification bell in the top bar gathers the things that need <em>you</em> into one calm place, with a soft orange dot when there's something unread. Tap it to open your notifications.",
+          "Family life has a lot of moving parts. The notification bell in the top bar gathers the things that need <em>you</em> into one calm place, with warm orange ring-lines beside it when there's something unread. Tap it to open your notifications.",
       },
       {
         type: 'heading',
@@ -122,6 +122,49 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
+        content: 'Reminders before things start',
+        level: 2,
+        id: 'reminders',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On the beanies app (iOS and Android), you can get a notification <em>before</em> something starts — a drop-off, a flight, a timed to-do — so you leave and prepare on time, even when the app is closed. Reminders arrive ahead of the event, not the moment it begins.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>Settings → Reminders</strong> and turn on <strong>Reminders on this device</strong>.',
+          'The first time, your phone asks permission to send notifications — tap <strong>Allow</strong>.',
+          'Under <strong>How much notice?</strong>, choose how far ahead each kind arrives.',
+        ],
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Activities</strong> use the reminder time set on each activity, so you can give an important one more notice.',
+          '<strong>Travel</strong> reminds you before each departure — flights and cruises two hours ahead by default, trains and ferries one hour, all adjustable.',
+          '<strong>Timed to-dos</strong> (ones with a time) remind you a set amount before they’re due.',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Reminders are per-device: turning them off on your phone doesn’t affect your tablet or your partner’s phone. Each device sends its own, from the same family plan.',
+        title: 'Set per device',
+        icon: '\u{1F4F1}',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'If notifications are switched off for beanies in your phone’s settings, reminders can’t be sent — but nothing is lost: the bell and your daily briefing still show everything the moment you open the app. Turn them back on any time in your device’s notification settings.',
+        title: 'If reminders are off',
+        icon: '\u{1F514}',
+      },
+      {
+        type: 'heading',
         content: 'A daily tip from the beanies',
         level: 2,
         id: 'daily-tip',
@@ -153,8 +196,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'For now, notifications appear while the app is open (and catch up the next time you open it). Push notifications — the kind that reach you when the app is closed — are coming in a later update.',
-        title: 'In-app for now',
+          'The bell and your daily briefing work everywhere — phone, tablet and the web app. The timed reminders described above are delivered by the iOS and Android apps; on the web the same items still appear in your briefing when you open beanies.',
+        title: 'Where reminders reach you',
         icon: '\u{1F331}',
       },
     ],

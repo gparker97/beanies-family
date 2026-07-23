@@ -5,21 +5,18 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: {} }));
 
 import { stableNotificationId, buildScheduledNotifications } from '../useLocalNotifications';
-import type { CriticalItem } from '../useCriticalItems';
+import type { ScheduledReminder } from '../useScheduledReminders';
 
-function item(over: Partial<CriticalItem>): CriticalItem {
+function reminder(over: Partial<ScheduledReminder> = {}): ScheduledReminder {
   return {
-    id: 'id-1',
-    type: 'activity',
-    message: 'pick up Neil from football',
-    icon: '🚗',
-    time: '15:00',
+    id: 'activity-reminder:id-1:2026-05-22',
+    fireAt: new Date('2026-05-22T14:30:00'),
+    title: 'Football',
+    body: 'Time to drop off — Neil',
+    kind: 'activity',
     ...over,
   };
 }
-
-const TODAY = '2026-05-22';
-const NOW = new Date('2026-05-22T10:00:00').getTime(); // local 10am
 
 describe('stableNotificationId', () => {
   it('is deterministic, positive, and non-zero', () => {
@@ -29,55 +26,52 @@ describe('stableNotificationId', () => {
     expect(Number.isInteger(a)).toBe(true);
   });
 
-  it('differs for different ids (incl. synthesized holiday ids)', () => {
+  it('differs for different ids', () => {
     expect(stableNotificationId('a')).not.toBe(stableNotificationId('b'));
-    expect(stableNotificationId('holiday-2026-05-23')).not.toBe(
-      stableNotificationId('holiday-2026-05-24')
+    expect(stableNotificationId('travel-reminder:seg-1:2026-05-23')).not.toBe(
+      stableNotificationId('travel-reminder:seg-1:2026-05-24')
     );
   });
 });
 
 describe('buildScheduledNotifications (ADR-029 A4)', () => {
-  it('schedules a timed, not-completed item whose time is still in the future', () => {
-    const out = buildScheduledNotifications([item({ time: '15:00' })], TODAY, NOW);
+  it('maps a reminder to an exact, Doze-bypassing, channel-targeted payload', () => {
+    const out = buildScheduledNotifications([reminder()]);
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({
-      id: stableNotificationId('id-1'),
-      title: 'beanies.family',
-      body: 'pick up Neil from football',
+      id: stableNotificationId('activity-reminder:id-1:2026-05-22'),
+      title: 'Football',
+      body: 'Time to drop off — Neil',
+      channelId: 'reminders',
+      extra: { kind: 'activity' },
     });
-    expect(out[0].schedule).toEqual({ at: new Date('2026-05-22T15:00:00') });
+    // allowWhileIdle bypasses Doze batching; fires at the pre-computed lead time.
+    expect(out[0].schedule).toEqual({
+      at: new Date('2026-05-22T14:30:00'),
+      allowWhileIdle: true,
+    });
   });
 
-  it('skips items whose time has already passed today', () => {
-    expect(buildScheduledNotifications([item({ time: '08:00' })], TODAY, NOW)).toHaveLength(0);
+  it('is a straight 1:1 mapping preserving order (the builder already sorted/capped)', () => {
+    const reminders = [
+      reminder({ id: 'a', kind: 'travel' }),
+      reminder({ id: 'b', kind: 'todo' }),
+      reminder({ id: 'c', kind: 'activity' }),
+    ];
+    const out = buildScheduledNotifications(reminders);
+    expect(out.map((n) => n.id)).toEqual([
+      stableNotificationId('a'),
+      stableNotificationId('b'),
+      stableNotificationId('c'),
+    ]);
+    expect(out.map((n) => (n.extra as { kind: string }).kind)).toEqual([
+      'travel',
+      'todo',
+      'activity',
+    ]);
   });
 
-  it('skips untimed items (no specific fire time)', () => {
-    expect(buildScheduledNotifications([item({ time: '' })], TODAY, NOW)).toHaveLength(0);
-  });
-
-  it('skips completed items', () => {
-    expect(
-      buildScheduledNotifications([item({ time: '15:00', completed: true })], TODAY, NOW)
-    ).toHaveLength(0);
-  });
-
-  it('skips items with an invalid time', () => {
-    expect(buildScheduledNotifications([item({ time: 'not-a-time' })], TODAY, NOW)).toHaveLength(0);
-  });
-
-  it('keeps only the qualifying items from a mixed list', () => {
-    const out = buildScheduledNotifications(
-      [
-        item({ id: 'past', time: '08:00' }),
-        item({ id: 'future', time: '18:30' }),
-        item({ id: 'untimed', time: '' }),
-        item({ id: 'done', time: '20:00', completed: true }),
-      ],
-      TODAY,
-      NOW
-    );
-    expect(out.map((n) => n.id)).toEqual([stableNotificationId('future')]);
+  it('returns [] for an empty schedule', () => {
+    expect(buildScheduledNotifications([])).toEqual([]);
   });
 });

@@ -49,6 +49,19 @@
     <!-- #52: BiometricPrompt for hardware Keystore biometric unlock (ADR-029). -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
+    <!-- #55: on-device reminder notifications (@capacitor/local-notifications).
+         POST_NOTIFICATIONS is the Android 13+ (API 33) runtime prompt to show any
+         notification. RECEIVE_BOOT_COMPLETED lets the plugin re-register scheduled
+         alarms after a reboot. SCHEDULE_EXACT_ALARM is a NORMAL declaration for
+         Android 13 (auto-granted, revocable) — we deliberately do NOT build the
+         Android 14+ user-grant flow (USE_EXACT_ALARM is Play-restricted to
+         alarm/clock apps): the plugin falls back to setAndAllowWhileIdle when the
+         permission is absent, which combined with the lead-time offset delivers
+         on time without the extra friction. See ADR-029 + the #55 plan. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
     <!-- Android 11+ (API 30+) package visibility: without this <queries> entry,
          Intent(ACTION_IMAGE_CAPTURE).resolveActivity() returns null even when a
          camera app is installed, so Capacitor's WebView file chooser silently

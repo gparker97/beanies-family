@@ -136,10 +136,12 @@ function onToggleRead(id: string) {
             v-if="isEmpty"
             class="flex flex-col items-center justify-center gap-3 py-16 text-center"
           >
+            <!-- #55: the beanie-bell greets an empty drawer at a size where its
+                 detail reads (the monoline bell drives the tiny header control). -->
             <img
-              src="/brand/beanies_celebrating_circle_transparent_300x300.png"
+              src="/brand/beanies_reminder_bell_transparent_256x256.png"
               alt=""
-              class="h-20 w-20 opacity-90"
+              class="h-28 w-28 opacity-95"
             />
             <p class="font-outfit text-secondary-500 text-base font-semibold dark:text-gray-200">
               {{ t('notifications.empty') }}

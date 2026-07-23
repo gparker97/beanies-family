@@ -10,7 +10,7 @@
 
      PENDING / NEXT SESSION (validated 2026-07-22 — checked against the repo, not carried forward blind; **3 stale items dropped**: #49 was closed but still named as the top pickup; Dependabot #250/#251 no longer exist, superseded by a new batch #284-#292; Google OAuth verification was APPROVED 2026-07-03 but the 06-18 archive block still says "awaiting Google" — that block is historical, left as-is):
      - **PARKED (greg's call): homepage LCP ~3160ms.** Honest red, gates nothing (no deploy workflow references lighthouse-ci). Do NOT re-attempt the beanstalk deferral or the precompute step — both ruled out by measurement. See the HOMEPAGE LCP block above.
-     - **Verify Android `0.9.6` vc14 cleared Google review** (submitted 2026-07-21 to the production track).
+     - ✅ **Android `0.9.6` vc14 cleared Google review** (greg confirmed 2026-07-23; submitted 2026-07-21 to the production track). DONE — do not carry forward.
      - **Chase Apple org enrolment** — still silent post business-doc submission; iOS wholly blocked, Swift biometric path never compiled.
      - **Calendar out-of-the-Lab what's-new announcement** still unsent (OAuth approved 2026-07-03). Needs the Discord CTA per the standing convention.
      - **Dependabot backlog is large** — #284-#292 open incl. pinia 3→4 and automerge 3.2.6→3.3.2 (both majors/minors worth care). `/review-dependabot-prs`.

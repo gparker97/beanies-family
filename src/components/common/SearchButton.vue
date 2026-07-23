@@ -18,21 +18,27 @@ const showSearch = ref(false);
 </script>
 
 <template>
+  <!-- #55: bigger, circle-less glyph (matches the notification bell) — the 40px
+       flex box stays the tap target, only the visible magnifier grows. -->
   <button
     type="button"
-    class="flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors hover:bg-gray-50 dark:bg-slate-800 dark:shadow-none dark:hover:bg-slate-700"
+    class="flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-[14px] text-gray-400 transition-colors hover:bg-black/5 dark:text-gray-500 dark:hover:bg-white/10"
     :aria-label="t('search.placeholder')"
     @click="showSearch = true"
   >
     <svg
-      class="h-[18px] w-[18px] text-gray-400 dark:text-gray-500"
+      class="text-gray-400 dark:text-gray-500"
+      width="26"
+      height="26"
       fill="none"
       stroke="currentColor"
-      stroke-width="2"
+      stroke-width="1.9"
+      stroke-linecap="round"
+      stroke-linejoin="round"
       viewBox="0 0 24 24"
     >
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20.5 20.5-3.6-3.6" />
     </svg>
   </button>
 

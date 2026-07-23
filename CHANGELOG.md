@@ -8,6 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-23
+
+### Added
+
+- **Reminders that reach you before things start.** On the iOS and Android apps, beanies can now notify you _ahead_ of an activity, a travel departure, or a timed to-do — so you leave and prepare on time, even when the app is closed. A new **Settings → Reminders** section lets you turn reminders on or off per device and choose how much notice each kind gets: activities use the reminder time set on each one, flights and cruises default to two hours, trains and ferries to one hour (all adjustable), and timed to-dos get a default lead you can change.
+- **A friendlier notification bell.** The header bell is now a little beanie wearing its hat, and unread items show warm orange ring-lines beside it (never a red dot). When a new reminder arrives the bell gives a single gentle ring — and stays still if you prefer reduced motion. The empty notifications drawer now greets you with the beanie-bell.
+
+### Changed
+
+- **Reminders now arrive on time, and early.** Previously a "time to drop off" reminder could land a few minutes _after_ the event; reminders now fire ahead of the event and are delivered promptly instead of being held back by the phone's battery-saving. The header search and bell icons are also a touch larger and cleaner.
+
 ## 2026-07-22
 
 ### Fixed

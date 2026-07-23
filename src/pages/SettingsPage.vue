@@ -12,6 +12,7 @@ import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
 import AiSettings from '@/components/settings/AiSettings.vue';
 import CalendarSyncSettings from '@/components/settings/CalendarSyncSettings.vue';
 import BeanieLabSection from '@/components/settings/BeanieLabSection.vue';
+import RemindersSettings from '@/components/settings/RemindersSettings.vue';
 import { useBeanieLab } from '@/composables/useBeanieLab';
 import { isFlagEnabled } from '@/config/flags';
 import { CALENDAR_SYNC_OPEN } from '@/constants/settingsDeepLinks';
@@ -840,6 +841,9 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
          hasAnyLabFeature so the section disappears (no empty header/glyph/toggle)
          when zero Lab features are available — the Lab stays conceptually
          permanent, this is just a display-time emptiness guard (#35). -->
+    <!-- ── Reminders (#55) — device-scoped OS notification prefs ─────────── -->
+    <RemindersSettings />
+
     <BeanieLabSection v-if="hasAnyLabFeature" @open-ai="showAi = true" />
 
     <!-- ── Feature Flags (dev-only, owner/admin) ───────────────────────────

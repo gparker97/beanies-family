@@ -6605,6 +6605,70 @@ const STRING_DEFS = {
   'notifications.youDropoff': { en: "you're on drop-off", beanie: "you're on drop-off" },
   'notifications.youPickup': { en: "you're on pick-up", beanie: "you're on pick-up" },
 
+  // Reminders (#55) — OS local-notification settings + notification copy
+  'reminders.title': { en: 'Reminders', beanie: 'reminders' },
+  'reminders.description': {
+    en: 'A heads-up before activities, travel and to-dos — so you leave and prepare on time.',
+    beanie: 'a heads-up before activities, travel and to-dos — so you leave and prepare on time.',
+  },
+  'reminders.masterToggle': { en: 'Reminders on this device', beanie: 'reminders on this device' },
+  'reminders.masterToggleHint': {
+    en: 'Get a nudge before things start. Reminders come from this device, so this switch only affects the phone or computer you’re on.',
+    beanie:
+      'get a nudge before things start. reminders come from this device, so this switch only affects the phone or computer you’re on.',
+  },
+  'reminders.howMuchNotice': { en: 'How much notice?', beanie: 'how much notice?' },
+  'reminders.activities': { en: 'Activities', beanie: 'activities' },
+  'reminders.activitiesHint': {
+    en: 'Each activity keeps its own reminder time.',
+    beanie: 'each activity keeps its own reminder time.',
+  },
+  'reminders.editActivity': { en: 'Edit an activity', beanie: 'edit an activity' },
+  'reminders.flights': { en: 'Flights', beanie: 'flights' },
+  'reminders.cruises': { en: 'Cruises', beanie: 'cruises' },
+  'reminders.trains': { en: 'Trains', beanie: 'trains' },
+  'reminders.ferries': { en: 'Ferries', beanie: 'ferries' },
+  'reminders.timedTodos': { en: 'Timed to-dos', beanie: 'timed to-dos' },
+  'reminders.timedTodosHint': {
+    en: 'To-dos that have a time set.',
+    beanie: 'to-dos that have a time set.',
+  },
+  'reminders.permissionNudge': {
+    en: 'Turn on notifications in your device settings to get these. Your in-app briefing still shows everything either way.',
+    beanie:
+      'turn on notifications in your device settings to get these. your in-app briefing still shows everything either way.',
+  },
+  'reminders.openDeviceSettings': { en: 'Open device settings', beanie: 'open device settings' },
+  // Lead-time option labels
+  'reminders.lead.atTime': { en: 'At the time', beanie: 'at the time' },
+  'reminders.lead.dayBefore': { en: 'The day before', beanie: 'the day before' },
+  'reminders.lead.hours': { en: '{n} hours before', beanie: '{n} hours before' },
+  'reminders.lead.hourOne': { en: '{n} hour before', beanie: '{n} hour before' },
+  'reminders.lead.minutes': { en: '{n} minutes before', beanie: '{n} minutes before' },
+  'reminders.lead.minuteOne': { en: '{n} minute before', beanie: '{n} minute before' },
+  // Travel-plan creation hint
+  'reminders.travelHint': {
+    en: 'We’ll remind you {lead} this trip.',
+    beanie: 'we’ll remind you {lead} this trip.',
+  },
+  'reminders.travelHintLink': { en: 'Change reminder timing', beanie: 'change reminder timing' },
+  // OS notification copy (title/body per kind) — filled via fillTemplate
+  'reminders.activityTitle': { en: '{title}', beanie: '{title}' },
+  'reminders.activityBodyDropoff': {
+    en: 'Time to drop off — {who}',
+    beanie: 'time to drop off — {who}',
+  },
+  'reminders.activityBodyPickup': {
+    en: 'Time to pick up — {who}',
+    beanie: 'time to pick up — {who}',
+  },
+  'reminders.activityBodyWho': { en: 'Coming up · {who}', beanie: 'coming up · {who}' },
+  'reminders.activityBody': { en: 'Coming up soon', beanie: 'coming up soon' },
+  'reminders.todoTitle': { en: '{title}', beanie: '{title}' },
+  'reminders.todoBody': { en: 'Due at {time}', beanie: 'due at {time}' },
+  'reminders.travelTitle': { en: '{title}', beanie: '{title}' },
+  'reminders.travelBody': { en: 'Departs at {time}', beanie: 'departs at {time}' },
+
   // Navigation
   'nav.beanstalk': { en: 'Beanie Beanstalk', beanie: 'beanie beanstalk' },
   'nav.help': { en: 'Help', beanie: 'help' },
