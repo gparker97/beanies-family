@@ -17,6 +17,21 @@ const config: CapacitorConfig = {
   // Native biometric uses the hardware Keystore via the custom `BiometricKeystore`
   // plugin (no WebAuthn/RP-ID/assetlinks). The retired @capgo/capacitor-passkey shim
   // config was removed with it (ADR-029, 2026-07-14). Web/PWA keeps WebAuthn-PRF.
+  plugins: {
+    LocalNotifications: {
+      // Without this, @capacitor/local-notifications falls back to
+      // `android.R.drawable.ic_dialog_info` (LocalNotificationManager.java:469) —
+      // Android's stock "i" glyph, which is what every beanies notification showed
+      // until 2026-07-23. Applies to EVERY notification the app posts.
+      //
+      // The drawable MUST be an alpha-only silhouette: Android renders the small
+      // icon from the alpha channel and discards colour, so a full-colour asset
+      // becomes a white blob. See the comments in the drawable itself.
+      smallIcon: 'ic_stat_beanie_bell',
+      // Heritage Orange — the accent Android draws alongside the silhouette.
+      iconColor: '#F15D22',
+    },
+  },
 };
 
 export default config;

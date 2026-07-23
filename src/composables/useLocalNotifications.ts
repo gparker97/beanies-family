@@ -5,6 +5,8 @@ import {
   useScheduledReminders,
   buildReminderSchedule,
   type ScheduledReminder,
+  type ReminderInput,
+  type ReminderPrefs,
 } from '@/composables/useScheduledReminders';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
@@ -46,6 +48,18 @@ import {
  * The `@capacitor/local-notifications` import is confined to this module and
  * `useNotificationPermission`. No-op on web (the in-app briefing surfaces the
  * same items there). See ADR-029.
+ *
+ * Entry points, outermost first:
+ *   watch(reminderInput, prefs) → queueReschedule (debounce)
+ *     → runReschedule (in-flight/rerun guard — never call reschedule directly)
+ *       → runRescheduleFor(input, prefs, now)   ← EXPORTED SEAM. Holds the
+ *         not-ready guard: `input === null` means the family doc isn't loaded,
+ *         which is NOT "nothing to schedule". Reconciling against an empty
+ *         desired set cancels every armed alarm on the device. DO NOT REMOVE —
+ *         sign-out's cancel is `cancelAllScheduledReminders`, called explicitly
+ *         from authStore, not a side effect of an empty schedule.
+ *         → reconcileScheduled(...)             ← EXPORTED SEAM: schedule,
+ *           cancel-stale, refresh exact-alarm, emit `reschedule`.
  */
 
 const RESCHEDULE_DEBOUNCE_MS = 1000;
@@ -124,6 +138,15 @@ let scheduleFailureToasted = false;
  *  posted to a non-existent channel is silently dropped, so this MUST run
  *  before the first schedule. Returns false when the channel is unavailable. */
 async function ensureChannel(): Promise<boolean> {
+  // Channels are an Android-O+ concept. `createChannel` is `call.unimplemented()`
+  // on iOS (LocalNotificationsPlugin.swift:640) and throws on web, so without this
+  // guard it rejected on EVERY iOS reschedule and emitted a warning each time —
+  // noise that also buried a real Android channel failure in the same bucket.
+  // Deliberately does NOT latch `channelReady`: that is module state cleared only
+  // by the test reset, so latching it off a PLATFORM check would let a suite that
+  // switches platform mid-run skip createChannel and report a false green on the
+  // one guard protecting Android from silently dropping every reminder.
+  if (getPlatform() !== 'android') return true;
   if (channelReady) return true;
   try {
     await LocalNotifications.createChannel({
@@ -134,11 +157,12 @@ async function ensureChannel(): Promise<boolean> {
     channelReady = true;
     return true;
   } catch (e) {
-    // Critical on Android: without the channel EVERY reminder is silently
-    // dropped by the OS, which is the same user impact as a failed schedule.
+    // Only reachable on Android now (the guard above returns early elsewhere),
+    // so always critical: without the channel EVERY reminder is silently dropped
+    // by the OS — the same user impact as a failed schedule.
     reportError({
       surface: 'local-notifications-schedule',
-      severity: getPlatform() === 'android' ? 'critical' : 'warning',
+      severity: 'critical',
       message: 'createChannel(reminders) failed; reminders will not post on Android O+',
       error: e,
       context: { notif_error_stage: 'channel' },
@@ -153,39 +177,71 @@ async function ensureChannel(): Promise<boolean> {
  * directions are unit-testable against a mocked plugin — with no Pinia, no Vue
  * watch and no fake timers.
  */
+export interface ReconcileMeta {
+  /** The MAX_SCHEDULED cap clipped the desired list. */
+  truncated: boolean;
+  /** Records dropped by a THROWN error — a malformed record. Actionable: data bug. */
+  skipped: number;
+  /** Records dropped by a RULE — None, hidden audience, non-traveller, anchorless
+   *  duty. Expected, NOT a bug. Separate from `skipped` on purpose: conflating
+   *  "we chose to drop this" with "this record is broken" makes both useless. */
+  gated: number;
+  /** Device to-do lead (minutes). */
+  todoLead: number;
+  /** Device DEFAULT activity lead. Decides whether activity reminders exist at
+   *  all (0 = None), so "my activity reminders stopped" is untriageable without it. */
+  activityLead: number;
+}
+
 export async function reconcileScheduled(
   toSchedule: LocalNotificationSchema[],
   granted: boolean,
-  meta: { truncated: boolean; skipped: number; todoLead: number }
+  meta: ReconcileMeta
 ): Promise<void> {
   const desiredIds = new Set(toSchedule.map((n) => n.id));
+  // What was ACTUALLY armed — not the size of the desired set. A denied or
+  // channel-less device must report 0, or every fleet aggregate counts phantom
+  // reminders for the whole denied population.
+  let armed = 0;
 
   // Step 2 — schedule. Guarded by its own try/catch: if this throws, the
   // previously-armed alarms are still intact and the user is no worse off.
   if (granted && toSchedule.length > 0) {
-    try {
-      await ensureChannel();
-      await LocalNotifications.schedule({ notifications: toSchedule });
-      scheduleFailureToasted = false; // recovered
-    } catch (e) {
-      reportError({
-        surface: 'local-notifications-schedule',
-        severity: 'critical',
-        message: 'failed to arm device reminders',
-        error: e,
-        context: { notif_count: toSchedule.length, notif_error_stage: 'schedule' },
-      });
-      if (!scheduleFailureToasted) {
-        scheduleFailureToasted = true;
-        // `silent` because we just reported this ourselves at `critical` under a
-        // precise surface — an error toast auto-reports on surface `app`, which
-        // would double-log the same failure into two un-dedupable buckets.
-        const t = useTranslationStore().t;
-        showToast('error', t('reminders.scheduleFailed'), t('reminders.scheduleFailedHelp'), {
-          silent: true,
+    // Inside the `if`, not hoisted above it: ensureChannel never throws (it
+    // catches and reports internally) and does NOT latch `channelReady` on
+    // failure, so calling it on runs with nothing to schedule would emit a fresh
+    // `critical` on every debounced reschedule for a broken-channel device.
+    const channelOk = await ensureChannel();
+    if (channelOk) {
+      try {
+        await LocalNotifications.schedule({ notifications: toSchedule });
+        armed = toSchedule.length;
+        scheduleFailureToasted = false; // recovered
+      } catch (e) {
+        reportError({
+          surface: 'local-notifications-schedule',
+          severity: 'critical',
+          message: 'failed to arm device reminders',
+          error: e,
+          // NOTE: on THIS event `notif_count` is the count ATTEMPTED, not armed.
+          context: { notif_count: toSchedule.length, notif_error_stage: 'schedule' },
         });
+        if (!scheduleFailureToasted) {
+          scheduleFailureToasted = true;
+          // `silent` because we just reported this ourselves at `critical` under a
+          // precise surface — an error toast auto-reports on surface `app`, which
+          // would double-log the same failure into two un-dedupable buckets.
+          const t = useTranslationStore().t;
+          showToast('error', t('reminders.scheduleFailed'), t('reminders.scheduleFailedHelp'), {
+            silent: true,
+          });
+        }
+        // NO early return: step 3 must still run. "Stale" is `pending − desired`,
+        // so alarms for items still wanted are never cancelled — only genuinely
+        // removed ones are. Cancelling after a failed schedule therefore removes
+        // exactly what should go and keeps what should stay. Returning here would
+        // make the surplus permanent instead of transient.
       }
-      return;
     }
   }
 
@@ -221,13 +277,81 @@ export async function reconcileScheduled(
     surface: 'local-notifications',
     message: 'reschedule',
     context: {
-      notif_count: toSchedule.length,
+      // ARMED, not desired. See the `armed` declaration above.
+      notif_count: armed,
       notif_lead_default: meta.todoLead,
+      notif_activity_lead: meta.activityLead,
       notif_truncated: meta.truncated,
       notif_skipped: meta.skipped,
+      notif_gated: meta.gated,
       notif_exact_alarm: exactAlarmPermission.value,
       notif_permission: notificationPermission.value,
     },
+  });
+}
+
+/**
+ * Cancel EVERY pending reminder. The explicit replacement for the cancel that
+ * the not-ready guard in `runRescheduleFor` removes.
+ *
+ * Sign-out is the one case where "no family data" must mean "cancel", not
+ * "wait". Until now that cancel happened by accident — signing out nulled
+ * `currentMember`, which emptied the desired set, which made the reconcile
+ * cancel the world. With the guard in place that path is gone, and pending
+ * alarms carry activity titles and resolved member names: leaving them armed
+ * would put family content on the lock screen of a device the user just signed
+ * out of and wiped.
+ */
+export async function cancelAllScheduledReminders(): Promise<void> {
+  if (!isNative()) return;
+  try {
+    const pending = await LocalNotifications.getPending();
+    if (pending.notifications.length > 0) {
+      await LocalNotifications.cancel({
+        notifications: pending.notifications.map((n) => ({ id: n.id })),
+      });
+    }
+  } catch (e) {
+    reportError({
+      surface: 'local-notifications-schedule',
+      severity: 'warning',
+      message:
+        'failed to cancel reminders on sign-out; family content may remain on the lock screen',
+      error: e,
+      context: { notif_error_stage: 'cancel_all' },
+    });
+  }
+}
+
+/**
+ * Steps 0-4 of one reschedule. Exported so the not-ready guard — the regression
+ * that silently deleted every armed reminder on cold start — is testable with a
+ * plain `ReminderInput` fixture, no Pinia and no Vue watch.
+ */
+export async function runRescheduleFor(
+  input: ReminderInput | null,
+  prefs: ReminderPrefs,
+  now: Date
+): Promise<void> {
+  // "Not ready" is NOT "nothing to schedule". Until the family doc is loaded and
+  // a current member exists, `reminderInput` is null and the desired set is
+  // empty — reconciling against it would cancel every armed reminder on the
+  // device. That happens on every cold start (lock screen, or killed before
+  // decryption completes). Returns BEFORE the permission check too: prompting a
+  // locked-out user is wrong. Deliberately emits nothing — a `notif_count: 0`
+  // here is the exact misleading signal that made this bug invisible.
+  // Sign-out's cancel is handled explicitly by `cancelAllScheduledReminders`.
+  if (input === null) return;
+
+  const { reminders, truncated, skipped, gated } = buildReminderSchedule(input, now, prefs);
+  const toSchedule = buildScheduledNotifications(reminders);
+  const granted = await ensureNotificationPermission(toSchedule.length > 0);
+  await reconcileScheduled(toSchedule, granted, {
+    truncated,
+    skipped,
+    gated,
+    todoLead: prefs.todoReminderLead,
+    activityLead: prefs.activityReminderLead,
   });
 }
 
@@ -267,25 +391,9 @@ export function useLocalNotifications(): void {
     })
   );
 
-  async function reschedule(): Promise<void> {
-    // Fresh `now` each run — no fireAt drifts past between recompute and schedule.
-    const { reminders, truncated, skipped } = buildReminderSchedule(
-      reminderInput.value,
-      new Date(),
-      prefs.value
-    );
-    const toSchedule = buildScheduledNotifications(reminders);
-
-    // Step 1 — always CHECK (so a mid-session revoke is visible); only PROMPT
-    // when there is actually something to remind about.
-    const granted = await ensureNotificationPermission(toSchedule.length > 0);
-
-    await reconcileScheduled(toSchedule, granted, {
-      truncated,
-      skipped,
-      todoLead: prefs.value.todoReminderLead,
-    });
-  }
+  // Fresh `now` each run — no fireAt drifts past between recompute and schedule.
+  const reschedule = (): Promise<void> =>
+    runRescheduleFor(reminderInput.value, prefs.value, new Date());
 
   /**
    * The single entry point. Every trigger goes through here — never call

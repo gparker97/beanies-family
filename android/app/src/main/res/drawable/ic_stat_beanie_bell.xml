@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Notification small icon — the beanie-bell ("the bell IS the beanie cap", #55).
+
+  Android renders this from the ALPHA CHANNEL ONLY: colour is discarded and the
+  system tints the shape (white in the shade, the accent on some surfaces). A
+  full-colour raster here renders as a white blob — the usual version of this
+  bug. So this is a flat monoline silhouette, and a VectorDrawable rather than
+  PNG buckets: one file, crisp at every density.
+
+  Ported from `src/components/ui/BeanieBellIcon.vue` — same 40x40 viewport, with
+  three deliberate differences for the 24dp size:
+    • strokes thickened 2.2 -> 2.6 so the outline survives at notification size
+    • the 50%-opacity centre line dropped (opacity variation muddies a silhouette)
+    • the pom expressed as a path (VectorDrawable has no <circle> element)
+
+  Wired up via `capacitor.config.ts` -> plugins.LocalNotifications.smallIcon.
+  Without that, @capacitor/local-notifications falls back to
+  android.R.drawable.ic_dialog_info — Android's stock "i" glyph.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="40"
+    android:viewportHeight="40"
+    android:tint="#FFFFFFFF">
+
+    <!-- Cap body: the bell shell. -->
+    <path
+        android:pathData="M20,6C14.2,6 10.8,10.8 10.8,18c0,5.2 -1.4,7.6 -2.7,9.4c-0.7,1 0,2.5 1.2,2.5h21.4c1.2,0 1.9,-1.5 1.2,-2.5c-1.3,-1.8 -2.7,-4.2 -2.7,-9.4C29.2,10.8 25.8,6 20,6Z"
+        android:strokeWidth="2.6"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Folded cuff = the bell rim. -->
+    <path
+        android:pathData="M9.9,24.6c3.4,1.35 16.8,1.35 20.2,0"
+        android:strokeWidth="2.6"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Clapper. -->
+    <path
+        android:pathData="M20,30.2c-1.7,0 -2.8,1.1 -2.8,2.6a2.8,2.8 0 0 0 5.6,0c0,-1.5 -1.1,-2.6 -2.8,-2.6Z"
+        android:fillColor="#FFFFFFFF" />
+
+    <!-- Pom (was a <circle> in the SFC). -->
+    <path
+        android:pathData="M20,2.3a2.1,2.1 0 1 0 0,4.2a2.1,2.1 0 1 0 0,-4.2Z"
+        android:fillColor="#FFFFFFFF" />
+</vector>
