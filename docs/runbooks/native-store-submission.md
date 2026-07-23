@@ -182,8 +182,23 @@ status-bar}` and `@capgo/capacitor-passkey` ship none — the app-level manifest
   Aug-2026 bump.
 - **Exact alarm permission (`USE_EXACT_ALARM`) — REQUIRED from the 2026-07 reminders release.**
   Declared in `AndroidManifest.xml` alongside `SCHEDULE_EXACT_ALARM` (capped at `maxSdkVersion="32"`).
-  Play requires a declaration for it, prompted on the first upload that carries the permission; it
-  surfaces as a blocking item on the release and/or under **App content**.
+
+  **Where + when.** The declaration form is `goo.gle/play-permission-decl-form` (linked from Google's
+  [Permissions and APIs that Access Sensitive Information](https://support.google.com/googleplay/android-developer/answer/9888170)
+  policy). In-console, restricted-permission declarations sit under **Policy → App content**; the item
+  appears once Play detects the permission in an uploaded bundle, and shows as a blocking item on the
+  release page — which is usually how you notice it. Google documents the criteria and the form but
+  NOT the console navigation, and the Play Console layout moves, so treat the path as a hint and let
+  the release blocker route you.
+
+  **Upload FIRST — a closed-testing upload is enough.** There is nothing to declare until an AAB
+  carrying the permission exists, and you do not need a production release to trigger it. Sequence:
+  build → closed testing → declaration appears → complete it → on-device verification → promote.
+
+  **Answer the foreground-service question with "no".** The form may ask about foreground services
+  alongside exact alarms. beanies uses neither — no foreground service, no background processing;
+  alarms are scheduled via `AlarmManager` and delivered by the OS while the app is closed.
+  Conflating the two is a common way these declarations get bounced.
 
   **This is not paperwork — it is the release.** `USE_EXACT_ALARM` is auto-granted and
   non-revocable; without it, `SCHEDULE_EXACT_ALARM` is denied by default from API 34 and
