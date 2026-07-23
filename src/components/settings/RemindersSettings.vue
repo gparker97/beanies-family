@@ -7,17 +7,31 @@
  * per-item reminder time (this row just links to the activity editor). Mirrors
  * the BeanieLabSection toggle-handler contract (persist via the store, which
  * toasts + re-throws; the control reads the persisted value so a failed write
- * self-heals). Native-only OS delivery — on web the section still persists the
- * prefs (honoured by the in-app briefing) but hides the OS-permission nudge.
+ * self-heals).
+ *
+ * The MASTER TOGGLE governs OS notifications, which are native-only. The
+ * LEAD-TIME selects apply on every platform: the to-do lead is honoured by the
+ * in-app bell too (injected into the deriver as `todoLeadMinutes`), so nothing
+ * here is an inert control on web.
+ *
+ * Permission state is read from `useNotificationPermission` — the shared module
+ * the scheduler also writes to — rather than calling the plugin directly, so a
+ * mid-session grant/revoke is reflected without a remount and this component
+ * doesn't transitively pull in the whole scheduler.
  */
-import { computed, onMounted, ref } from 'vue';
-import { LocalNotifications } from '@capacitor/local-notifications';
+import { computed } from 'vue';
 import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { isNative } from '@/services/sync/capabilities';
 import { reportError } from '@/utils/errorReporter';
+import { showToast } from '@/composables/useToast';
+import {
+  notificationPermission,
+  exactAlarmPermission,
+  openExactAlarmSettings,
+} from '@/composables/useNotificationPermission';
 import { LEAD_OPTIONS, formatLeadLabel } from '@/utils/reminderSchedule';
 import type { SupportedTravelType } from '@/types/models';
 
@@ -81,27 +95,41 @@ async function onTodoLead(value: string | number): Promise<void> {
   }
 }
 
-// OS-permission nudge — native only; shown when reminders are on but the OS
-// permission isn't granted. Denial is not an error (the in-app briefing still
-// shows everything), so a failed check just hides the nudge.
-const permissionGranted = ref(true);
-onMounted(async () => {
-  if (!isNative()) return;
+// OS-permission nudge — native only, and ONLY once a denial has actually been
+// observed. Never on 'prompt' or 'unknown': telling a user notifications are off
+// before we have ever asked is a pre-emptive block warning (CLAUDE.md § Cloud
+// Auth UX). The ref is live, so granting permission in OS settings and swiping
+// back clears the nudge without a remount.
+const showPermissionNudge = computed(
+  () => isNative() && remindersEnabled.value && notificationPermission.value === 'denied'
+);
+
+// Exact-alarm recovery — Android 12/12L only in practice, where
+// SCHEDULE_EXACT_ALARM is user-revocable (from API 33 the app declares
+// USE_EXACT_ALARM, which is auto-granted and non-revocable). The ref stays
+// 'unknown' off Android, so this never shows there.
+const showExactAlarmNudge = computed(
+  () => isNative() && remindersEnabled.value && exactAlarmPermission.value === 'denied'
+);
+
+async function onOpenExactAlarmSettings(): Promise<void> {
   try {
-    permissionGranted.value = (await LocalNotifications.checkPermissions()).display === 'granted';
+    await openExactAlarmSettings();
   } catch (e) {
+    // Some OEM builds have no exact-alarm Settings activity. Give the user the
+    // manual route rather than a dead button.
+    showToast('error', t('reminders.exactAlarmHelp'), t('reminders.exactAlarmManual'), {
+      silent: true,
+    });
     reportError({
       surface: 'local-notifications-permission',
       severity: 'warning',
-      message: 'settings permission check failed',
+      message: 'exact-alarm settings hand-off failed; user given the manual path',
       error: e,
-      context: { notif_error_stage: 'permission' },
+      context: { notif_error_stage: 'exact_alarm_settings' },
     });
   }
-});
-const showPermissionNudge = computed(
-  () => isNative() && remindersEnabled.value && !permissionGranted.value
-);
+}
 </script>
 
 <template>
@@ -242,6 +270,30 @@ const showPermissionNudge = computed(
       <p class="text-xs text-[var(--deep-slate)] dark:text-slate-300">
         {{ t('reminders.permissionNudge') }}
       </p>
+    </div>
+
+    <!-- Exact-alarm recovery. Only after a denial is observed — never a
+         pre-emptive capability warning. Orange, never red: this is routine
+         friction, not a destructive action. -->
+    <div
+      v-if="showExactAlarmNudge"
+      class="mt-4 flex items-start gap-3 rounded-2xl p-4"
+      style="background-color: var(--tint-orange-8)"
+      role="status"
+    >
+      <span class="flex-none text-base text-[var(--heritage-orange)]" aria-hidden="true">⏰</span>
+      <div class="min-w-0">
+        <p class="text-xs text-[var(--deep-slate)] dark:text-slate-300">
+          {{ t('reminders.exactAlarmHelp') }}
+        </p>
+        <button
+          type="button"
+          class="mt-2 cursor-pointer text-xs font-semibold text-[var(--heritage-orange)] underline"
+          @click="onOpenExactAlarmSettings"
+        >
+          {{ t('reminders.openDeviceSettings') }}
+        </button>
+      </div>
     </div>
   </section>
 </template>
