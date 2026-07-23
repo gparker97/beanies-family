@@ -2,6 +2,11 @@
 /**
  * Settings → Reminders (#55) — device-scoped OS local-notification preferences.
  *
+ * A card-opened DRAWER (same shape as `CalendarSyncSettings`), not an inline
+ * panel: reminders are a configuration area with several controls, not a quick
+ * toggle like sound effects or beanie mode, so they get their own category card
+ * rather than sitting loose on the settings page.
+ *
  * A master on/off toggle plus adjustable lead-times: per travel type (flights,
  * cruise, train, ferry) and one for timed to-dos. Activities keep their own
  * per-item reminder time (this row just links to the activity editor). Mirrors
@@ -22,6 +27,7 @@
 import { computed } from 'vue';
 import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
+import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { isNative } from '@/services/sync/capabilities';
@@ -34,6 +40,9 @@ import {
 } from '@/composables/useNotificationPermission';
 import { LEAD_OPTIONS, formatLeadLabel } from '@/utils/reminderSchedule';
 import type { SupportedTravelType } from '@/types/models';
+
+defineProps<{ open: boolean }>();
+defineEmits<{ close: [] }>();
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
@@ -133,53 +142,23 @@ async function onOpenExactAlarmSettings(): Promise<void> {
 </script>
 
 <template>
-  <section
-    class="rounded-[var(--sq)] bg-white p-5 shadow-[0_2px_12px_rgba(44,62,80,0.04)] dark:bg-slate-800"
+  <BeanieFormModal
+    variant="drawer"
+    :open="open"
+    :title="t('reminders.title')"
+    icon="🔔"
+    icon-bg="var(--tint-orange-8)"
+    :save-label="t('action.close')"
+    @close="$emit('close')"
+    @save="$emit('close')"
   >
-    <!-- Header -->
-    <div class="flex items-start gap-3.5">
-      <span
-        class="flex h-11 w-11 flex-none items-center justify-center rounded-[14px] text-[var(--heritage-orange)]"
-        style="background-color: var(--tint-orange-8)"
-        aria-hidden="true"
-      >
-        <svg
-          width="26"
-          height="26"
-          viewBox="0 0 40 40"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path
-            d="M20 6C14.2 6 10.8 10.8 10.8 18c0 5.2-1.4 7.6-2.7 9.4-.7 1 0 2.5 1.2 2.5h21.4c1.2 0 1.9-1.5 1.2-2.5-1.3-1.8-2.7-4.2-2.7-9.4C29.2 10.8 25.8 6 20 6Z"
-          />
-          <path d="M9.9 24.6c3.4 1.35 16.8 1.35 20.2 0" />
-          <path d="M20 7.6V24.3" stroke-opacity=".5" />
-          <path
-            d="M20 30.2c-1.7 0-2.8 1.1-2.8 2.6a2.8 2.8 0 0 0 5.6 0c0-1.5-1.1-2.6-2.8-2.6Z"
-            fill="currentColor"
-            stroke="none"
-          />
-          <circle cx="20" cy="4.4" r="2.1" fill="currentColor" stroke="none" />
-        </svg>
-      </span>
-      <div>
-        <h3 class="font-outfit text-lg font-bold text-[var(--deep-slate)] dark:text-slate-200">
-          {{ t('reminders.title') }}
-        </h3>
-        <p class="mt-0.5 text-sm text-[var(--deep-slate)]/45 dark:text-slate-500">
-          {{ t('reminders.description') }}
-        </p>
-      </div>
-    </div>
+    <p class="-mt-1 text-sm text-[var(--deep-slate)]/45 dark:text-slate-500">
+      {{ t('reminders.description') }}
+    </p>
 
     <!-- Master toggle -->
     <SettingToggleRow
       testid="reminders-master"
-      class="mt-2"
       :title="t('reminders.masterToggle')"
       :hint="t('reminders.masterToggleHint')"
       :model-value="remindersEnabled"
@@ -295,5 +274,5 @@ async function onOpenExactAlarmSettings(): Promise<void> {
         </button>
       </div>
     </div>
-  </section>
+  </BeanieFormModal>
 </template>

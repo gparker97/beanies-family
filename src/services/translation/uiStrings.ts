@@ -2174,10 +2174,18 @@ const STRING_DEFS = {
   'settings.subtitle': { en: 'Configure your app preferences', beanie: 'tune your beanie patch' },
   'settings.general': { en: 'General', beanie: 'general' },
   'settings.editProfile': { en: 'Edit Profile', beanie: 'edit profile' },
-  'settings.card.community': { en: 'Community', beanie: 'community' },
-  'settings.card.communityDesc': {
-    en: 'Join other families on our Discord',
-    beanie: 'join other families on our discord',
+  // Discord moved out of the settings-card grid to a standalone CTA at the
+  // bottom of the page — joining a community is an invitation, not a
+  // preference to configure.
+  'settings.discordCta': { en: 'Join us on Discord', beanie: 'join us on discord' },
+  'settings.discordCtaDesc': {
+    en: 'Meet other families, ask us anything, help shape what we build next',
+    beanie: 'meet other families, ask us anything, help shape what we build next',
+  },
+  'settings.card.reminders': { en: 'Reminders', beanie: 'reminders' },
+  'settings.card.remindersDesc': {
+    en: 'Notification timing for activities, travel & to-dos',
+    beanie: 'when we nudge you',
   },
   'settings.card.appearance': { en: 'Appearance', beanie: 'appearance' },
   'settings.card.appearanceDesc': { en: 'Theme & display preferences', beanie: 'how things look' },

@@ -10,3 +10,6 @@
 
 /** Opens Settings → Google Calendar. */
 export const CALENDAR_SYNC_OPEN = 'calendar-sync';
+
+/** Opens Settings → Reminders. */
+export const REMINDERS_OPEN = 'reminders';
