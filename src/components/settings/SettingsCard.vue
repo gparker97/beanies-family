@@ -1,9 +1,13 @@
 <script setup lang="ts">
 defineProps<{
-  icon: string;
+  /** Emoji for the icon box. Optional when the `icon` slot supplies artwork
+   *  instead (e.g. the beanie-bell SVG on Reminders). */
+  icon?: string;
   title: string;
   description: string;
   iconBg?: string;
+  /** Icon-box foreground, for slotted `currentColor` artwork. */
+  iconColor?: string;
 }>();
 
 defineEmits<{ click: [] }>();
@@ -16,9 +20,9 @@ defineEmits<{ click: [] }>();
   >
     <div
       class="mb-3.5 flex h-11 w-11 items-center justify-center rounded-[14px] text-xl"
-      :style="{ backgroundColor: iconBg ?? 'var(--tint-orange-8)' }"
+      :style="{ backgroundColor: iconBg ?? 'var(--tint-orange-8)', color: iconColor }"
     >
-      {{ icon }}
+      <slot name="icon">{{ icon }}</slot>
     </div>
     <div class="flex items-center gap-2">
       <p class="font-outfit text-[0.9rem] font-bold text-[var(--deep-slate)] dark:text-slate-200">

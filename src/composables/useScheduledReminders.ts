@@ -59,6 +59,9 @@ export interface ScheduledReminder {
 export interface ReminderPrefs {
   remindersEnabled: boolean;
   todoReminderLead: number;
+  /** Device default lead for activities that don't override it, and the
+   *  fallback a duty reminder uses when the activity says "None". */
+  activityReminderLead: number;
   /** Fully-resolved per-type lead map (defaults merged with device overrides). */
   travelReminderLeads: Partial<Record<SupportedTravelType, number>>;
 }
@@ -89,7 +92,8 @@ function withinWindow(dateISO: string, startISO: string, endISO: string): boolea
  */
 export function buildActivityReminders(
   input: ReminderInput,
-  now: Date
+  now: Date,
+  prefs: ReminderPrefs
 ): { reminders: ScheduledReminder[]; skipped: number } {
   const out: ScheduledReminder[] = [];
   let skipped = 0;
@@ -102,7 +106,11 @@ export function buildActivityReminders(
         if (!a?.id) continue;
         const ctx = activityReminderContext(a, input.currentMember, input.resolveMember);
         if (!ctx.relevant) continue;
-        const lead = resolveOsActivityLead(a.reminderMinutes, ctx.dutyRoles.length > 0);
+        const lead = resolveOsActivityLead(
+          a.reminderMinutes,
+          ctx.dutyRoles.length > 0,
+          prefs.activityReminderLead
+        );
         if (lead === null) continue; // the chip says "None"
         const who = ctx.who.join(' · ');
 
@@ -271,7 +279,7 @@ export function buildReminderSchedule(
 ): { reminders: ScheduledReminder[]; truncated: boolean; skipped: number } {
   if (!input || !prefs.remindersEnabled) return { reminders: [], truncated: false, skipped: 0 };
   const parts = [
-    buildActivityReminders(input, now),
+    buildActivityReminders(input, now, prefs),
     buildTravelReminders(input, now, prefs),
     buildTodoReminders(input, now, prefs),
   ];
@@ -300,6 +308,7 @@ export function useScheduledReminders(): {
   const prefs = computed<ReminderPrefs>(() => ({
     remindersEnabled: settingsStore.remindersEnabled,
     todoReminderLead: settingsStore.todoReminderLead,
+    activityReminderLead: settingsStore.activityReminderLead,
     travelReminderLeads: settingsStore.travelReminderLeads,
   }));
 

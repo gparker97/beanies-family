@@ -28,6 +28,7 @@ import { computed } from 'vue';
 import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import BeanieBellIcon from '@/components/ui/BeanieBellIcon.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { isNative } from '@/services/sync/capabilities';
@@ -104,6 +105,15 @@ async function onTodoLead(value: string | number): Promise<void> {
   }
 }
 
+/** The default NEW activities start with — not a retro-edit of existing ones. */
+async function onActivityLead(value: string | number): Promise<void> {
+  try {
+    await settingsStore.setActivityReminderLead(Number(value));
+  } catch {
+    // Surfaced + re-thrown by the store.
+  }
+}
+
 // OS-permission nudge — native only, and ONLY once a denial has actually been
 // observed. Never on 'prompt' or 'unknown': telling a user notifications are off
 // before we have ever asked is a pre-emptive block warning (CLAUDE.md § Cloud
@@ -146,12 +156,13 @@ async function onOpenExactAlarmSettings(): Promise<void> {
     variant="drawer"
     :open="open"
     :title="t('reminders.title')"
-    icon="🔔"
     icon-bg="var(--tint-orange-8)"
+    icon-color="var(--heritage-orange)"
     :save-label="t('action.close')"
     @close="$emit('close')"
     @save="$emit('close')"
   >
+    <template #icon><BeanieBellIcon :size="26" /></template>
     <p class="-mt-1 text-sm text-[var(--deep-slate)]/45 dark:text-slate-500">
       {{ t('reminders.description') }}
     </p>
@@ -172,7 +183,8 @@ async function onOpenExactAlarmSettings(): Promise<void> {
       {{ t('reminders.howMuchNotice') }}
     </p>
 
-    <!-- Activities — informational (each activity keeps its own reminder) -->
+    <!-- Activities — the DEFAULT new activities start with. Each activity can
+         still override it in its own editor, which the hint says plainly. -->
     <div
       class="flex items-center justify-between gap-4 border-b border-[var(--tint-slate-05)] py-3"
     >
@@ -187,12 +199,13 @@ async function onOpenExactAlarmSettings(): Promise<void> {
           </p>
         </div>
       </div>
-      <RouterLink
-        to="/activities"
-        class="font-outfit text-sm font-semibold text-[var(--heritage-orange)]"
-      >
-        {{ t('reminders.editActivity') }}
-      </RouterLink>
+      <BaseSelect
+        class="w-40 flex-none"
+        :model-value="settingsStore.activityReminderLead"
+        :options="leadOptions"
+        :aria-label="t('reminders.activities')"
+        @update:model-value="onActivityLead"
+      />
     </div>
 
     <!-- Travel types -->

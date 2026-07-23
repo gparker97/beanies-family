@@ -77,6 +77,7 @@ function derive(overrides: Partial<DeriveInput>, now: Date = NOW) {
   const base: DeriveInput = {
     todos: [],
     todoLeadMinutes: 30,
+    activityLeadDefault: 30,
     lists: [],
     members: MEMBERS,
     currentMember: viewer,

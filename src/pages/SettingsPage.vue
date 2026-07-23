@@ -13,6 +13,7 @@ import AiSettings from '@/components/settings/AiSettings.vue';
 import CalendarSyncSettings from '@/components/settings/CalendarSyncSettings.vue';
 import BeanieLabSection from '@/components/settings/BeanieLabSection.vue';
 import RemindersSettings from '@/components/settings/RemindersSettings.vue';
+import BeanieBellIcon from '@/components/ui/BeanieBellIcon.vue';
 import { useBeanieLab } from '@/composables/useBeanieLab';
 import { isFlagEnabled } from '@/config/flags';
 import { CALENDAR_SYNC_OPEN, REMINDERS_OPEN } from '@/constants/settingsDeepLinks';
@@ -736,12 +737,14 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         @click="showSecurity = true"
       />
       <SettingsCard
-        icon="🔔"
         :title="t('settings.card.reminders')"
         :description="t('settings.card.remindersDesc')"
         icon-bg="var(--tint-orange-8)"
+        icon-color="var(--heritage-orange)"
         @click="showReminders = true"
-      />
+      >
+        <template #icon><BeanieBellIcon :size="24" /></template>
+      </SettingsCard>
     </div>
 
     <!-- ── Install App Banner ──────────────────────────────────────────── -->
@@ -854,24 +857,52 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
 
     <!-- ── Discord CTA ─────────────────────────────────────────────────────
          Deliberately NOT a settings card: joining a community is an invitation,
-         not a preference to configure. Given the warm gradient treatment so it
-         reads as an offer at the end of the page rather than another row of
-         config. Sits above the about footer so it's the last thing you meet. -->
+         not a preference to configure, and a card gave it the same weight as
+         "Currency & Rates".
+
+         Sky Silk panel rather than an orange banner — Silk is the brand's calm/
+         welcome colour, so the invitation reads warm instead of shouty, and the
+         Deep Slate copy sits on it at full contrast. (The first attempt put
+         white text on a gradient fading to `var(--terracotta)`, a token that
+         does not exist — it resolved to transparent and the text vanished into
+         the page. Colour here comes from real tokens only.)
+
+         Orange is reserved for the one action pill, per the CIG. The whole panel
+         is a single <button> so there's one tab stop and one accessible name;
+         the pill is presentational. -->
     <button
       type="button"
-      class="focus-visible:ring-primary-500 flex w-full cursor-pointer items-center gap-4 rounded-3xl bg-gradient-to-r from-[var(--heritage-orange)] to-[var(--terracotta)] p-5 text-left text-white shadow-[var(--card-shadow)] transition-transform hover:scale-[1.01] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+      class="group relative w-full cursor-pointer overflow-hidden rounded-[var(--sq)] bg-[var(--tint-silk-20)] p-5 text-left ring-1 ring-[var(--deep-slate)]/5 transition-all duration-200 hover:-translate-y-px hover:shadow-[0_6px_24px_rgba(44,62,80,0.08)] focus-visible:ring-2 focus-visible:ring-[var(--heritage-orange)] focus-visible:outline-none motion-reduce:transform-none motion-reduce:transition-none dark:bg-slate-800 dark:ring-white/5"
       @click="openDiscord('settings')"
     >
-      <span
-        class="flex h-11 w-11 flex-none items-center justify-center rounded-[14px] bg-white/20 text-xl"
+      <!-- A line of beanies, already holding hands — the community you're being
+           invited into. Decorative, low-contrast, and behind the copy. -->
+      <img
+        src="/brand/beanies_celebrating_line_transparent_560x225.png"
+        alt=""
         aria-hidden="true"
-        >💬</span
-      >
-      <span class="min-w-0 flex-1">
-        <span class="font-outfit block text-sm font-bold">{{ t('settings.discordCta') }}</span>
-        <span class="block text-xs text-white/80">{{ t('settings.discordCtaDesc') }}</span>
-      </span>
-      <span class="flex-none text-lg" aria-hidden="true">→</span>
+        class="pointer-events-none absolute -right-6 -bottom-3 h-24 w-auto opacity-15 select-none dark:opacity-10"
+      />
+      <div class="relative flex items-center gap-4">
+        <span
+          class="flex h-11 w-11 flex-none items-center justify-center rounded-[14px] bg-white/70 text-xl shadow-[0_1px_4px_rgba(44,62,80,0.06)] dark:bg-white/10"
+          aria-hidden="true"
+          >💬</span
+        >
+        <span class="min-w-0 flex-1">
+          <span
+            class="font-outfit block text-sm font-bold text-[var(--deep-slate)] dark:text-slate-100"
+            >{{ t('settings.discordCta') }}</span
+          >
+          <span class="mt-0.5 block text-xs text-[var(--deep-slate)]/55 dark:text-slate-400">{{
+            t('settings.discordCtaDesc')
+          }}</span>
+        </span>
+        <span
+          class="font-outfit flex-none rounded-[14px] bg-[var(--heritage-orange)] px-4 py-2.5 text-xs font-bold text-white shadow-[0_2px_8px_rgba(241,93,34,0.25)] transition-transform group-hover:scale-[1.03] motion-reduce:transform-none"
+          >{{ t('settings.discordCtaAction') }}</span
+        >
+      </div>
     </button>
 
     <!-- ── About Footer ────────────────────────────────────────────────── -->

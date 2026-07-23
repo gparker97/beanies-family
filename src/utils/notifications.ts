@@ -62,6 +62,9 @@ export interface DeriveInput {
    *  pure; `notificationsStore` supplies `settingsStore.todoReminderLead`,
    *  which already resolves to DEFAULT_TODO_LEAD when unset. */
   todoLeadMinutes: number;
+  /** Device DEFAULT activity lead (minutes), for activities that don't set their
+   *  own. Injected for the same purity reason. */
+  activityLeadDefault: number;
   /** Beanie Lists — feeds the derived `list-completed` creator notification. */
   lists: FamilyList[];
   members: FamilyMember[];
@@ -295,7 +298,7 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
         // Trigger math only — the bell is a feed of what's on today, so it does
         // NOT apply the OS scheduler's "0 means None" skip (that would empty it:
         // every stored activity carries 0). See `resolveOsActivityLead`.
-        const reminder = activityLeadMinutes(a.reminderMinutes);
+        const reminder = activityLeadMinutes(a.reminderMinutes, input.activityLeadDefault);
         const trigger = a.startTime
           ? minusMinutes(localDateTime(date, a.startTime) ?? occDay, reminder)
           : startOfLocalDay(occDay);

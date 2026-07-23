@@ -103,8 +103,11 @@ export const DEFAULT_ACTIVITY_LEAD = 30;
  * reminder exists. Shared by the in-app deriver (`utils/notifications.ts`) and
  * the OS scheduler so the default can't drift between them.
  */
-export function activityLeadMinutes(reminderMinutes: number | undefined): number {
-  return typeof reminderMinutes === 'number' ? reminderMinutes : DEFAULT_ACTIVITY_LEAD;
+export function activityLeadMinutes(
+  reminderMinutes: number | undefined,
+  defaultLead: number = DEFAULT_ACTIVITY_LEAD
+): number {
+  return typeof reminderMinutes === 'number' ? reminderMinutes : defaultLead;
 }
 
 /**
@@ -125,10 +128,12 @@ export function activityLeadMinutes(reminderMinutes: number | undefined): number
  */
 export function resolveOsActivityLead(
   reminderMinutes: number | undefined,
-  isDuty: boolean
+  isDuty: boolean,
+  /** The device's configured activity default (Settings → Reminders). */
+  defaultLead: number = DEFAULT_ACTIVITY_LEAD
 ): number | null {
-  const lead = activityLeadMinutes(reminderMinutes);
-  if (lead === 0) return isDuty ? DEFAULT_ACTIVITY_LEAD : null;
+  const lead = activityLeadMinutes(reminderMinutes, defaultLead);
+  if (lead === 0) return isDuty ? defaultLead : null;
   return lead;
 }
 

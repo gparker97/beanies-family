@@ -9,6 +9,8 @@ interface Props {
   title: string;
   icon?: string;
   iconBg?: string;
+  /** Icon-box foreground, for slotted `currentColor` artwork. */
+  iconColor?: string;
   size?: 'default' | 'narrow' | 'wide' | 'full';
   saveLabel?: string;
   saveGradient?: 'orange' | 'purple' | 'teal';
@@ -32,6 +34,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   icon: undefined,
   iconBg: undefined,
+  iconColor: undefined,
   size: 'default',
   saveLabel: undefined,
   saveGradient: 'orange',
@@ -95,15 +98,18 @@ const containerProps = computed(() => {
     <template #header>
       <slot v-if="customHeader && variant === 'modal'" name="custom-header" />
       <div v-else class="flex w-full items-center gap-3">
-        <!-- Icon box -->
+        <!-- Icon box. The `icon` slot lets a caller supply artwork instead of an
+             emoji (e.g. the beanie-bell on Settings → Reminders); `iconColor`
+             drives `currentColor` for such artwork. -->
         <div
-          v-if="icon"
+          v-if="icon || $slots.icon"
           class="flex h-[44px] w-[44px] flex-shrink-0 items-center justify-center rounded-[14px] text-xl"
           :style="{
             backgroundColor: iconBg || 'var(--tint-orange-8)',
+            color: iconColor,
           }"
         >
-          {{ icon }}
+          <slot name="icon">{{ icon }}</slot>
         </div>
         <!-- Title. Additive `title-content` slot lets a caller supply an
              inline-editable title (e.g. ListDetailModal); fallback renders the

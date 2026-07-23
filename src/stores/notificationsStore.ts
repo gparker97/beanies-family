@@ -100,6 +100,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       // Makes the Settings → Reminders to-do lead real on every platform (it
       // used to be a hardcoded 30 that no control could change).
       todoLeadMinutes: settingsStore.todoReminderLead,
+      activityLeadDefault: settingsStore.activityReminderLead,
       // Gate the list-completed notification on the same flag as the rest of
       // Beanie Lists. `loadLists()` runs ungated in the central load, so a
       // flag-OFF device can hold synced lists; feeding [] keeps the pure deriver
