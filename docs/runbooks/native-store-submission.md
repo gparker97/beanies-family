@@ -183,17 +183,28 @@ status-bar}` and `@capgo/capacitor-passkey` ship none — the app-level manifest
 - **Exact alarm permission (`USE_EXACT_ALARM`) — REQUIRED from the 2026-07 reminders release.**
   Declared in `AndroidManifest.xml` alongside `SCHEDULE_EXACT_ALARM` (capped at `maxSdkVersion="32"`).
 
-  **Where + when.** The declaration form is `goo.gle/play-permission-decl-form` (linked from Google's
-  [Permissions and APIs that Access Sensitive Information](https://support.google.com/googleplay/android-developer/answer/9888170)
-  policy). In-console, restricted-permission declarations sit under **Policy → App content**; the item
-  appears once Play detects the permission in an uploaded bundle, and shows as a blocking item on the
-  release page — which is usually how you notice it. Google documents the criteria and the form but
-  NOT the console navigation, and the Play Console layout moves, so treat the path as a hint and let
-  the release blocker route you.
+  **Where + when — CONFIRMED 2026-07-23, the hard way.** The declaration form does not exist as a
+  standing menu item, so do not go hunting for it. It is CONTEXTUAL: Play only creates it once it has
+  a bundle carrying the permission to attach it to.
 
-  **Upload FIRST — a closed-testing upload is enough.** There is nothing to declare until an AAB
-  carrying the permission exists, and you do not need a production release to trigger it. Sequence:
-  build → closed testing → declaration appears → complete it → on-device verification → promote.
+  That produces a chicken-and-egg on the FIRST release carrying the permission: the API upload
+  (`upload_to_play: true`) is rejected with `You must let us know whether your app uses any exact
+alarm permissions`, but the rejection means no bundle lands, so no form appears. What actually
+  happened, and the sequence to repeat:
+
+  1. Run `mobile-android-release.yml` with **`upload_to_play: false`** → downloadable signed AAB
+     artifact (`gh run download <id> -n beanies-family-release-aab`).
+  2. **Test and release → Testing → Closed testing → Create new release**, upload that AAB **through
+     the console UI**.
+  3. The exact-alarm declaration surfaces on that release / under **App content**. (There is NO
+     "Policy" top-level menu in the current console — that was a bad guess the first time.)
+  4. Complete it, roll out.
+  5. **Subsequent releases go back to the normal API path** (`upload_to_play: true`). The manual
+     upload is a one-time unlock, not the new normal.
+
+  **It is a multiple-choice declaration, NOT a free-text justification.** Confirmed 2026-07-23: greg
+  selected only that the app contains a calendar. The prose below is therefore reference material for
+  choosing the right option (and for any future appeal or re-review), not something to paste.
 
   **Answer the foreground-service question with "no".** The form may ask about foreground services
   alongside exact alarms. beanies uses neither — no foreground service, no background processing;
@@ -211,7 +222,16 @@ status-bar}` and `@capgo/capacitor-passkey` ship none — the app-level manifest
   a **calendar**. beanies.family qualifies on the calendar limb — the Family Planner is a calendar
   with user-set per-event reminders. This is an honest claim; do not stretch it.
 
-  **What to say** (adapt, don't paste verbatim):
+  **The answers** (multiple choice — see above; there is no free-text box):
+
+  - Uses exact alarms: **yes**
+  - Permission: **`USE_EXACT_ALARM`** (+ `SCHEDULE_EXACT_ALARM` capped at `maxSdkVersion="32"`)
+  - Use case: **a calendar app that shows event notifications**
+  - Foreground services: **no**. Full-screen intents: **no**. beanies uses neither — alarms go to
+    `AlarmManager` and the OS delivers them while the app is closed. The form bundles these together
+    and answering loosely is a common way declarations get bounced.
+
+  **The reasoning behind that choice** (reference only — keep it if the declaration is ever queried):
 
   > beanies.family is a family calendar and planner. Users set a reminder time on each activity,
   > travel departure and timed to-do (e.g. "30 minutes before"), and the app must notify them at
