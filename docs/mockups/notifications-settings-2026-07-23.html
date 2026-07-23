@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reminders — beanie bell & settings · beanies.family</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --deep-slate: #2C3E50; --slate-surface: #34495E;
+    --heritage-orange: #F15D22; --terracotta: #E67E22; --sky-silk: #AED6F1;
+    --cloud-white: #F8F9FA; --green: #27AE60;
+    --tint-orange-8: rgba(241, 93, 34, 0.08); --tint-silk-20: rgba(174, 214, 241, 0.2);
+    --tint-slate-05: rgba(44, 62, 80, 0.05); --sq: 24px;
+    --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05); --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family:'Inter',system-ui,sans-serif; background:var(--cloud-white); color:var(--deep-slate); line-height:1.5; padding:40px 20px 80px; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1080px; margin:0 auto; }
+  .page-head { text-align:center; margin-bottom:6px; }
+  .page-head h1 { font-family:'Outfit'; font-weight:800; font-size:30px; letter-spacing:-0.02em; }
+  .page-head .fam { color:var(--heritage-orange); }
+  .page-head p { color:rgba(44,62,80,0.5); font-size:14px; margin-top:6px; }
+  .stamp { text-align:center; font-size:12px; color:rgba(44,62,80,0.35); margin-bottom:16px; }
+  .section-label { font-family:'Outfit'; font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:rgba(44,62,80,0.42); margin:44px 0 16px; display:flex; align-items:center; gap:10px; }
+  .section-label::after { content:''; flex:1; height:1px; background:var(--tint-slate-05); }
+  .card { background:#fff; border-radius:var(--sq); box-shadow:var(--card-shadow); }
+
+  .beanbell { display:inline-block; transform-origin:50% 12%; }
+  .beanbell.ring { animation: ring 1.4s ease-in-out 0.4s 1; }
+  .demo-hover:hover .beanbell { animation: ring 1.4s ease-in-out 0 1; }
+  @keyframes ring { 0%{transform:rotate(0)} 12%{transform:rotate(12deg)} 26%{transform:rotate(-10deg)} 40%{transform:rotate(7deg)} 54%{transform:rotate(-5deg)} 68%{transform:rotate(3deg)} 82%{transform:rotate(-1.5deg)} 100%{transform:rotate(0)} }
+  @media (prefers-reduced-motion: reduce){ .beanbell.ring, .demo-hover:hover .beanbell { animation:none !important; } }
+
+  /* concept compare */
+  .compare { display:flex; gap:20px; padding:30px; flex-wrap:wrap; }
+  .concept { flex:1; min-width:240px; border-radius:18px; padding:24px; text-align:center; background:var(--cloud-white); }
+  .concept.lead { background:#fff; outline:2px solid var(--heritage-orange); }
+  .concept .stage { height:96px; display:flex; align-items:center; justify-content:center; }
+  .concept .cn { font-family:'Outfit'; font-weight:700; font-size:14px; margin-top:10px; }
+  .concept .cd { font-size:12px; color:rgba(44,62,80,0.55); margin-top:5px; }
+  .concept .lead-badge { display:inline-block; background:var(--heritage-orange); color:#fff; font-family:'Outfit'; font-weight:700; font-size:9.5px; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:6px; }
+
+  .sizes { display:flex; align-items:flex-end; gap:34px; flex-wrap:wrap; padding:6px 30px 30px; justify-content:center; }
+  .size-cell { text-align:center; }
+  .size-cell .cap { font-family:'Outfit'; font-weight:600; font-size:11px; color:rgba(44,62,80,0.45); margin-top:12px; }
+
+  .variants { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+  @media (max-width:720px){ .variants{ grid-template-columns:1fr; } }
+  .variant { padding:26px; text-align:center; position:relative; }
+  .variant.rec { outline:2px solid var(--heritage-orange); }
+  .rec-badge { position:absolute; top:14px; right:14px; background:var(--heritage-orange); color:#fff; font-family:'Outfit'; font-weight:700; font-size:10px; letter-spacing:0.05em; text-transform:uppercase; padding:4px 10px; border-radius:20px; }
+  .variant .stage { height:92px; display:flex; align-items:center; justify-content:center; }
+  .variant .vn { font-family:'Outfit'; font-weight:700; font-size:15px; margin-top:14px; }
+  .variant .vd { font-size:12.5px; color:rgba(44,62,80,0.55); margin-top:6px; }
+
+  .headers { display:flex; flex-direction:column; gap:16px; }
+  .hbar { display:flex; align-items:center; gap:16px; background:var(--deep-slate); border-radius:20px; padding:14px 20px; }
+  .hbar .greet { color:#fff; font-family:'Outfit'; font-weight:600; font-size:15px; margin-right:auto; opacity:0.92; }
+  .hbar .tag { font-family:'Outfit'; font-weight:600; font-size:11px; letter-spacing:0.05em; text-transform:uppercase; padding:4px 10px; border-radius:20px; }
+  .hbar .tag.old { color:#94a3b8; background:rgba(255,255,255,0.06); }
+  .hbar .tag.new { color:#fff; background:var(--heritage-orange); }
+  .old-btn { height:40px; width:40px; border-radius:14px; background:var(--slate-surface); display:flex; align-items:center; justify-content:center; position:relative; }
+  .old-btn svg { width:18px; height:18px; }
+  .old-btn .dot { position:absolute; top:7px; right:7px; width:9px; height:9px; border-radius:50%; background:var(--heritage-orange); box-shadow:0 0 0 2px var(--deep-slate); }
+  .new-ic { height:40px; width:40px; display:flex; align-items:center; justify-content:center; position:relative; cursor:pointer; }
+  .new-ic svg { width:30px; height:30px; }
+  .new-ic.bell svg { width:34px; height:34px; }
+
+  .devices { display:flex; gap:40px; flex-wrap:wrap; align-items:flex-start; justify-content:center; }
+  .device-col { display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .device-cap { font-family:'Outfit'; font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:rgba(44,62,80,0.4); }
+  .phone { width:378px; max-width:100%; background:var(--cloud-white); border-radius:38px; box-shadow:var(--soft-shadow); padding:14px; border:1px solid rgba(44,62,80,0.06); }
+  .phone-inner { background:var(--cloud-white); border-radius:26px; overflow:hidden; }
+  .desk { width:460px; max-width:100%; }
+  .set-card { padding:22px; }
+  .phone .set-card { border-radius:22px; box-shadow:none; background:#fff; }
+  .card-head { display:flex; gap:14px; align-items:flex-start; }
+  .icon-sq { flex:none; width:46px; height:46px; border-radius:14px; background:var(--tint-orange-8); display:flex; align-items:center; justify-content:center; color:var(--heritage-orange); }
+  .icon-sq svg { width:30px; height:30px; }
+  .card-head h3 { font-family:'Outfit'; font-weight:700; font-size:18px; }
+  .card-head p { font-size:12.5px; color:rgba(44,62,80,0.45); margin-top:2px; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 0; border-bottom:1px solid var(--tint-slate-05); }
+  .row:last-child { border-bottom:none; }
+  .row-txt .t { font-family:'Outfit'; font-weight:600; font-size:13px; }
+  .row-txt .h { font-size:11px; color:rgba(44,62,80,0.42); line-height:1.4; margin-top:2px; max-width:230px; }
+  .row-left { display:flex; align-items:center; gap:10px; }
+  .row-emoji { font-size:16px; }
+  .sw { flex:none; width:44px; height:26px; border-radius:20px; background:var(--heritage-orange); position:relative; }
+  .sw::after { content:''; position:absolute; top:3px; right:3px; width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
+  .group-label { font-family:'Outfit'; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em; color:rgba(44,62,80,0.38); margin:20px 0 4px; }
+  .lead-select { flex:none; display:flex; align-items:center; gap:8px; background:var(--cloud-white); border:1px solid var(--tint-slate-05); border-radius:12px; padding:8px 12px; font-family:'Outfit'; font-weight:600; font-size:12.5px; color:var(--deep-slate); cursor:pointer; }
+  .lead-select .chev { font-size:9px; color:rgba(44,62,80,0.4); }
+  .link { color:var(--heritage-orange); font-family:'Outfit'; font-weight:600; font-size:12.5px; cursor:pointer; }
+  .perm-strip { display:flex; gap:12px; align-items:flex-start; background:var(--tint-orange-8); border-radius:16px; padding:14px 16px; margin-top:18px; }
+  .perm-strip .pi { color:var(--heritage-orange); flex:none; font-size:16px; }
+  .perm-strip .pt { font-size:12px; }
+  .perm-strip .pt b { font-family:'Outfit'; font-weight:600; }
+  .off-note { font-size:11.5px; color:rgba(44,62,80,0.4); margin-top:16px; text-align:center; font-style:italic; }
+  .travel-demo { max-width:460px; margin:0 auto; }
+  .field-lbl { font-family:'Outfit'; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em; color:rgba(44,62,80,0.4); margin-bottom:6px; }
+  .field-input { background:#fff; border:1px solid var(--tint-slate-05); border-radius:12px; padding:12px 14px; font-family:'Outfit'; font-weight:600; font-size:14px; display:flex; justify-content:space-between; }
+  .hint-row { display:flex; gap:10px; align-items:center; margin-top:10px; padding:11px 14px; background:var(--tint-silk-20); border-radius:12px; }
+  .hint-row .he { font-size:15px; }
+  .hint-row .ht { font-size:12px; }
+  .caption { text-align:center; font-size:12px; color:rgba(44,62,80,0.45); margin-top:14px; max-width:680px; margin-left:auto; margin-right:auto; }
+  .set-card.plain { padding:22px 24px; }
+  .drawer-wrap { display:flex; justify-content:center; }
+  .drawer { width:360px; max-width:100%; background:#fff; border-radius:22px; box-shadow:var(--soft-shadow); overflow:hidden; }
+  .drawer-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--tint-slate-05); }
+  .drawer-head .dt { font-family:'Outfit'; font-weight:700; font-size:16px; }
+  .drawer-head .dx { color:rgba(44,62,80,0.35); font-size:18px; }
+  .drawer-empty { padding:36px 28px 40px; text-align:center; }
+  .drawer-empty img { width:118px; height:auto; filter: drop-shadow(0 6px 14px rgba(44,62,80,0.12)); }
+  .drawer-empty .et { font-family:'Outfit'; font-weight:700; font-size:16px; margin-top:16px; }
+  .drawer-empty .ed { font-size:13px; color:rgba(44,62,80,0.5); margin-top:6px; max-width:250px; margin-left:auto; margin-right:auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-head">
+    <h1>Reminders — the beanie bell <span class="fam">·</span> <span class="fam">beanies.family</span></h1>
+    <p>Issue #55 · v4 · the whole bell IS the beanie cap</p>
+  </div>
+  <div class="stamp">2026-07-23 · CIG-clamped · hover any bell to replay the ring · respects prefers-reduced-motion</div>
+
+  <!-- 1 · CONCEPT COMPARE -->
+  <div class="section-label">1 · the idea — the bell body becomes the cap</div>
+  <div class="card demo-hover">
+    <div class="compare">
+      <!-- previous -->
+      <div class="concept">
+        <div class="stage"><div class="beanbell">
+          <svg width="60" height="60" viewBox="0 0 40 40" fill="none" stroke="var(--deep-slate)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 20v1.2a8.5 8.5 0 0 0-3.6 6.95v1.35l-1.7 2a1 1 0 0 0 .78 1.62h22a1 1 0 0 0 .78-1.62l-1.7-2v-1.35A8.5 8.5 0 0 0 27 21.2V20"/>
+            <path d="M16.6 33a3.4 3.4 0 0 0 6.8 0"/>
+            <path d="M11.3 15C11.3 8.5 14.8 6 20 6s8.7 2.5 8.7 9" fill="var(--sky-silk)" fill-opacity="0.35"/>
+            <path d="M9.6 18.8C9.6 21 12.2 21.9 20 22.1 27.8 21.9 30.4 21 30.4 18.8L30.4 15.4C30.4 13.7 27.5 13 20 13 12.5 13 9.6 13.7 9.6 15.4Z" fill="var(--sky-silk)" fill-opacity="0.5"/>
+            <circle cx="20" cy="4.4" r="1.9" fill="var(--heritage-orange)" stroke="none"/>
+          </svg>
+        </div></div>
+        <div class="cn">Previous · hat on bell</div>
+        <div class="cd">A cap wrapping a separate bell body.</div>
+      </div>
+      <!-- new lead -->
+      <div class="concept lead">
+        <span class="lead-badge">New idea</span>
+        <div class="stage"><div class="beanbell ring">
+          <svg width="66" height="66" viewBox="0 0 40 40" fill="none" stroke="var(--deep-slate)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <!-- cap = bell body -->
+            <path d="M20 6C14.2 6 10.8 10.8 10.8 18c0 5.2-1.4 7.6-2.7 9.4-.7 1 0 2.5 1.2 2.5h21.4c1.2 0 1.9-1.5 1.2-2.5-1.3-1.8-2.7-4.2-2.7-9.4C29.2 10.8 25.8 6 20 6Z" fill="var(--sky-silk)" fill-opacity="0.4"/>
+            <!-- folded cuff -->
+            <path d="M9.9 24.6c3.4 1.35 16.8 1.35 20.2 0"/>
+            <!-- knit ribs -->
+            <path d="M20 7.6V24.3" stroke-opacity=".45"/>
+            <path d="M15.7 8.5V24.5" stroke-opacity=".38"/>
+            <path d="M24.3 8.5V24.5" stroke-opacity=".38"/>
+            <path d="M12.5 12V24.5" stroke-opacity=".3"/>
+            <path d="M27.5 12V24.5" stroke-opacity=".3"/>
+            <!-- clapper poking out -->
+            <path d="M20 30.2c-1.7 0-2.8 1.1-2.8 2.6a2.8 2.8 0 0 0 5.6 0c0-1.5-1.1-2.6-2.8-2.6Z" fill="var(--deep-slate)" fill-opacity="0.9" stroke="none"/>
+            <!-- pom -->
+            <circle cx="20" cy="4.4" r="2.1" fill="var(--heritage-orange)" stroke="none"/>
+          </svg>
+        </div></div>
+        <div class="cn">New · the bell is the cap</div>
+        <div class="cd">Ribbed beanie body, folded cuff = the rim, pom on top, clapper peeking out below.</div>
+      </div>
+    </div>
+
+    <div class="sizes">
+      <div class="size-cell"><div class="beanbell">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="var(--deep-slate)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 6C14.2 6 10.8 10.8 10.8 18c0 5.2-1.4 7.6-2.7 9.4-.7 1 0 2.5 1.2 2.5h21.4c1.2 0 1.9-1.5 1.2-2.5-1.3-1.8-2.7-4.2-2.7-9.4C29.2 10.8 25.8 6 20 6Z"/>
+          <path d="M9.9 24.6c3.4 1.35 16.8 1.35 20.2 0"/>
+          <path d="M20 7.6V24.3" stroke-opacity=".5"/><path d="M15.7 8.8V24.5" stroke-opacity=".4"/><path d="M24.3 8.8V24.5" stroke-opacity=".4"/>
+          <path d="M20 30.2c-1.7 0-2.8 1.1-2.8 2.6a2.8 2.8 0 0 0 5.6 0c0-1.5-1.1-2.6-2.8-2.6Z" fill="var(--deep-slate)" stroke="none"/>
+          <circle cx="20" cy="4.4" r="2.1" fill="var(--heritage-orange)" stroke="none"/>
+        </svg>
+      </div><div class="cap">34px · header</div></div>
+      <div class="size-cell"><div class="beanbell">
+        <svg width="22" height="22" viewBox="0 0 40 40" fill="none" stroke="var(--deep-slate)" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 6C14.2 6 10.8 10.8 10.8 18c0 5.2-1.4 7.6-2.7 9.4-.7 1 0 2.5 1.2 2.5h21.4c1.2 0 1.9-1.5 1.2-2.5-1.3-1.8-2.7-4.2-2.7-9.4C29.2 10.8 25.8 6 20 6Z"/>
+          <path d="M9.9 24.6c3.4 1.35 16.8 1.35 20.2 0"/>
+          <path d="M20 30.2c-1.7 0-2.8 1.1-2.8 2.6a2.8 2.8 0 0 0 5.6 0c0-1.5-1.1-2.6-2.8-2.6Z" fill="var(--deep-slate)" stroke="none"/>
+          <circle cx="20" cy="4.4" r="2.3" fill="var(--heritage-orange)" stroke="none"/>
+        </svg>
+      </div><div class="cap">20px · floor (ribs drop)</div></div>
+    </div>
+    <p class="caption">The silhouette now reads as a knitted beanie: cap dome + ribbing + a folded cuff that doubles as the bell's flared rim, orange pom crowning it, and the slate clapper poking out the bottom — that nub plus the flare keep it legible as a bell. Ribs thin out and drop by the 20px floor, leaving the cap-and-pom shape.</p>
+  </div>
+
+  <!-- 2 · UNREAD -->
+  <div class="section-label">2 · unread signal — the warm ringing lines (not a dot)</div>
+  <div class="variants demo-hover">
+    <div class="card variant">
+      <div class="stage"><div class="beanbell">
+        <svg width="50" height="50" viewBox="0 0 40 40" fill="none" stroke="var(--deep-slate)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 6C14.2 6 10.8 10.8 10.8 18c0 5.2-1.4 7.6-2.7 9.4-.7 1 0 2.5 1.2 2.5h21.4c1.2 0 1.9-1.5 1.2-2.5-1.3-1.8-2.7-4.2-2.7-9.4C29.2 10.8 25.8 6 20 6Z" fill="var(--sky-silk)" fill-opacity="0.4"/>
+          <path d="M9.9 24.6c3.4 1.35 16.8 1.35 20.2 0"/>
+          <path d="M20 7.6V24.3" stroke-opacity=".45"/><path d="M15.7 8.5V24.5" stroke-opacity=".38"/><path d="M24.3 8.5V24.5" stroke-opacity=".38"/>
+          <path d="M20 30.2c-1.7 0-2.8 1.1-2.8 2.6a2.8 2.8 0 0 0 5.6 0c0-1.5-1.1-2.6-2.8-2.6Z" fill="var(--deep-slate)" fill-opacity="0.9" stroke="none"/>
+          <circle cx="20" cy="4.4" r="2.1" fill="var(--heritage-orange)" stroke="none"/>
+        </svg>
+      </div></div>
+      <div class="vn">All clear</div>
+      <div class="vd">No pending reminders — a calm beanie bell, no waves.</div>
+    </div>
+    <div class="card variant rec">
+      <span class="rec-badge">Unread</span>
+      <div class="stage"><div class="beanbell">
+        <svg width="56" height="56" viewBox="0 0 46 40" fill="none" stroke="var(--deep-slate)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 6C14.2 6 10.8 10.8 10.8 18c0 5.2-1.4 7.6-2.7 9.4-.7 1 0 2.5 1.2 2.5h21.4c1.2 0 1.9-1.5 1.2-2.5-1.3-1.8-2.7-4.2-2.7-9.4C29.2 10.8 25.8 6 20 6Z" fill="var(--sky-silk)" fill-opacity="0.4"/>
+          <path d="M9.9 24.6c3.4 1.35 16.8 1.35 20.2 0"/>
+          <path d="M20 7.6V24.3" stroke-opacity=".45"/><path d="M15.7 8.5V24.5" stroke-opacity=".38"/><path d="M24.3 8.5V24.5" stroke-opacity=".38"/>
+          <path d="M20 30.2c-1.7 0-2.8 1.1-2.8 2.6a2.8 2.8 0 0 0 5.6 0c0-1.5-1.1-2.6-2.8-2.6Z" fill="var(--deep-slate)" fill-opacity="0.9" stroke="none"/>
+          <circle cx="20" cy="4.4" r="2.1" fill="var(--heritage-orange)" stroke="none"/>
+          <path d="M34.5 17a7 7 0 0 1 0 10" stroke="var(--heritage-orange)"/>
+          <path d="M38 14a11.5 11.5 0 0 1 0 16" stroke="var(--terracotta)"/>
+        </svg>
+      </div></div>
+      <div class="vn">Pending reminders</div>
+      <div class="vd">Warm orange→terracotta lines replace the dot. A <b>new</b> reminder fires a one-shot ring (hover to preview); the lines are the steady unread state.</div>
+    </div>
+    <div class="card variant">
+      <div class="stage"><div class="beanbell" style="opacity:0.5">
+        <svg width="50" height="50" viewBox="0 0 40 40" fill="none" stroke="var(--deep-slate)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 6C14.2 6 10.8 10.8 10.8 18c0 5.2-1.4 7.6-2.7 9.4-.7 1 0 2.5 1.2 2.5h21.4c1.2 0 1.9-1.5 1.2-2.5-1.3-1.8-2.7-4.2-2.7-9.4C29.2 10.8 25.8 6 20 6Z"/>
+          <path d="M9.9 24.6c3.4 1.35 16.8 1.35 20.2 0"/>
+          <path d="M20 30.2c-1.7 0-2.8 1.1-2.8 2.6a2.8 2.8 0 0 0 5.6 0c0-1.5-1.1-2.6-2.8-2.6Z" fill="rgba(44,62,80,0.5)" stroke="none"/>
+          <circle cx="20" cy="4.4" r="2.1" fill="rgba(44,62,80,0.4)" stroke="none"/>
+        </svg>
+      </div></div>
+      <div class="vn">Reminders off</div>
+      <div class="vd">Device toggle off — muted beanie, pom greys out. No waves, no ring.</div>
+    </div>
+  </div>
+
+  <!-- 3 · HEADER -->
+  <div class="section-label">3 · bigger header icons — fill the space, drop the circles</div>
+  <div class="card" style="padding:24px;">
+    <div class="headers demo-hover">
+      <div class="hbar">
+        <span class="tag old">Now</span>
+        <span class="greet">Hi, Greg</span>
+        <span class="old-btn"><svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg></span>
+        <span class="old-btn"><svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15.5V11a6 6 0 0 1 12 0v4.5l1.4 1.6a.6.6 0 0 1-.45 1H5.05a.6.6 0 0 1-.45-1L6 15.5Z"/><path d="M10 19.5a2 2 0 0 0 4 0"/></svg><span class="dot"></span></span>
+      </div>
+      <div class="hbar">
+        <span class="tag new">Proposed</span>
+        <span class="greet">Hi, Greg</span>
+        <span class="new-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-3.6-3.6"/></svg></span>
+        <span class="new-ic bell"><span class="beanbell">
+          <svg viewBox="0 0 46 40" fill="none" stroke="#e2e8f0" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 6C14.2 6 10.8 10.8 10.8 18c0 5.2-1.4 7.6-2.7 9.4-.7 1 0 2.5 1.2 2.5h21.4c1.2 0 1.9-1.5 1.2-2.5-1.3-1.8-2.7-4.2-2.7-9.4C29.2 10.8 25.8 6 20 6Z"/>
+            <path d="M9.9 24.6c3.4 1.35 16.8 1.35 20.2 0"/>
+            <path d="M20 7.6V24.3" stroke-opacity=".55"/><path d="M15.7 9V24.4" stroke-opacity=".45"/><path d="M24.3 9V24.4" stroke-opacity=".45"/>
+            <path d="M20 30.2c-1.7 0-2.8 1.1-2.8 2.6a2.8 2.8 0 0 0 5.6 0c0-1.5-1.1-2.6-2.8-2.6Z" fill="#e2e8f0" stroke="none"/>
+            <circle cx="20" cy="4.4" r="2.1" fill="var(--heritage-orange)" stroke="none"/>
+            <path d="M34.5 17a7 7 0 0 1 0 10" stroke="var(--heritage-orange)"/>
+            <path d="M38 14a11.5 11.5 0 0 1 0 16" stroke="var(--terracotta)"/>
+          </svg>
+        </span></span>
+      </div>
+    </div>
+    <p class="caption">Glyphs grow to ~30–34px and sit directly in the header — no containing circle. The tap/click target stays a full 40px (invisible), so nothing gets harder to hit. Search and bell share one weight and size. Applies to the mobile header + desktop toolbar.</p>
+  </div>
+
+  <!-- 4 · STICKER HOME -->
+  <div class="section-label">4 · where the full-colour sticker lives — the drawer's empty state</div>
+  <div class="drawer-wrap">
+    <div class="drawer">
+      <div class="drawer-head"><span class="dt">Reminders</span><span class="dx">✕</span></div>
+      <div class="drawer-empty">
+        <img src="beanie-reminder-bell.png" alt="A friendly bell wearing a beanie hat" />
+        <div class="et">You're all caught up</div>
+        <div class="ed">No reminders right now — we'll give you a heads-up before anything's due.</div>
+      </div>
+    </div>
+  </div>
+  <p class="caption">The Gemini beanie-bell gets its own home here: the notifications drawer's empty state, at ~118px where its face and knit detail actually read. The monoline beanie-bell drives the tiny header control; this sticker warms the empty drawer.</p>
+
+  <!-- 5 · SETTINGS -->
+  <div class="section-label">5 · the settings section — options &amp; wording</div>
+  <div class="devices">
+    <div class="device-col">
+      <div class="device-cap">mobile · 375px</div>
+      <div class="phone"><div class="phone-inner">
+        <div class="set-card">
+          <div class="card-head">
+            <span class="icon-sq"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6C14.2 6 10.8 10.8 10.8 18c0 5.2-1.4 7.6-2.7 9.4-.7 1 0 2.5 1.2 2.5h21.4c1.2 0 1.9-1.5 1.2-2.5-1.3-1.8-2.7-4.2-2.7-9.4C29.2 10.8 25.8 6 20 6Z"/>
+              <path d="M9.9 24.6c3.4 1.35 16.8 1.35 20.2 0"/><path d="M20 7.6V24.3" stroke-opacity=".5"/>
+              <path d="M20 30.2c-1.7 0-2.8 1.1-2.8 2.6a2.8 2.8 0 0 0 5.6 0c0-1.5-1.1-2.6-2.8-2.6Z" fill="currentColor" stroke="none"/>
+              <circle cx="20" cy="4.4" r="2.1" fill="currentColor" stroke="none"/></svg></span>
+            <div><h3>Reminders</h3><p>A heads-up before activities, travel and to-dos — so you leave and prepare on time.</p></div>
+          </div>
+          <div class="row" style="margin-top:6px;"><div class="row-txt"><div class="t">Reminders on this device</div><div class="h">Get a nudge before things start. This switch only affects this phone.</div></div><span class="sw"></span></div>
+          <div class="group-label">How much notice?</div>
+          <div class="row"><div class="row-left"><span class="row-emoji">🗓️</span><div class="row-txt"><div class="t">Activities</div><div class="h">Set on each activity</div></div></div><span class="link">Edit an activity →</span></div>
+          <div class="row"><div class="row-left"><span class="row-emoji">✈️</span><div class="row-txt"><div class="t">Flights</div></div></div><span class="lead-select">2 hours before <span class="chev">▼</span></span></div>
+          <div class="row"><div class="row-left"><span class="row-emoji">🚢</span><div class="row-txt"><div class="t">Cruises</div></div></div><span class="lead-select">2 hours before <span class="chev">▼</span></span></div>
+          <div class="row"><div class="row-left"><span class="row-emoji">🚆</span><div class="row-txt"><div class="t">Trains</div></div></div><span class="lead-select">1 hour before <span class="chev">▼</span></span></div>
+          <div class="row"><div class="row-left"><span class="row-emoji">⛴️</span><div class="row-txt"><div class="t">Ferries</div></div></div><span class="lead-select">1 hour before <span class="chev">▼</span></span></div>
+          <div class="row"><div class="row-left"><span class="row-emoji">🚗</span><div class="row-txt"><div class="t">Car trips</div></div></div><span class="lead-select">1 hour before <span class="chev">▼</span></span></div>
+          <div class="row"><div class="row-left"><span class="row-emoji">✅</span><div class="row-txt"><div class="t">Timed to-dos</div><div class="h">To-dos with a time set</div></div></div><span class="lead-select">30 min before <span class="chev">▼</span></span></div>
+          <div class="perm-strip"><span class="pi">🔔</span><div class="pt"><b>Turn on device notifications to get these.</b> Your in-app briefing still shows everything either way. <span class="link">Open device settings →</span></div></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="device-col">
+      <div class="device-cap">desktop card · 460px</div>
+      <div class="desk"><div class="card set-card">
+        <div class="card-head">
+          <span class="icon-sq"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 6C14.2 6 10.8 10.8 10.8 18c0 5.2-1.4 7.6-2.7 9.4-.7 1 0 2.5 1.2 2.5h21.4c1.2 0 1.9-1.5 1.2-2.5-1.3-1.8-2.7-4.2-2.7-9.4C29.2 10.8 25.8 6 20 6Z"/>
+            <path d="M9.9 24.6c3.4 1.35 16.8 1.35 20.2 0"/><path d="M20 7.6V24.3" stroke-opacity=".5"/>
+            <path d="M20 30.2c-1.7 0-2.8 1.1-2.8 2.6a2.8 2.8 0 0 0 5.6 0c0-1.5-1.1-2.6-2.8-2.6Z" fill="currentColor" stroke="none"/>
+            <circle cx="20" cy="4.4" r="2.1" fill="currentColor" stroke="none"/></svg></span>
+          <div><h3>Reminders</h3><p>A heads-up before activities, travel and to-dos — so you leave and prepare on time.</p></div>
+        </div>
+        <div class="row" style="margin-top:6px;"><div class="row-txt"><div class="t">Reminders on this device</div><div class="h">Get a nudge before things start. Reminders are sent by this device, so this switch only affects the phone or computer you're on.</div></div><span class="sw"></span></div>
+        <div class="group-label">How much notice?</div>
+        <div class="row"><div class="row-left"><span class="row-emoji">🗓️</span><div class="row-txt"><div class="t">Activities</div><div class="h">Each activity keeps its own reminder time (set when you create or edit it).</div></div></div><span class="link">Edit an activity →</span></div>
+        <div class="row"><div class="row-left"><span class="row-emoji">✈️</span><div class="row-txt"><div class="t">Flights</div></div></div><span class="lead-select">2 hours before <span class="chev">▼</span></span></div>
+        <div class="row"><div class="row-left"><span class="row-emoji">🚢</span><div class="row-txt"><div class="t">Cruises</div></div></div><span class="lead-select">2 hours before <span class="chev">▼</span></span></div>
+        <div class="row"><div class="row-left"><span class="row-emoji">🚆</span><div class="row-txt"><div class="t">Trains</div></div></div><span class="lead-select">1 hour before <span class="chev">▼</span></span></div>
+        <div class="row"><div class="row-left"><span class="row-emoji">⛴️</span><div class="row-txt"><div class="t">Ferries</div></div></div><span class="lead-select">1 hour before <span class="chev">▼</span></span></div>
+        <div class="row"><div class="row-left"><span class="row-emoji">🚗</span><div class="row-txt"><div class="t">Car trips</div></div></div><span class="lead-select">1 hour before <span class="chev">▼</span></span></div>
+        <div class="row"><div class="row-left"><span class="row-emoji">✅</span><div class="row-txt"><div class="t">Timed to-dos</div><div class="h">To-dos that have a time set.</div></div></div><span class="lead-select">30 min before <span class="chev">▼</span></span></div>
+        <p class="off-note">Reminder wording stays in the beanie voice, fully translated (en / beanie / 中文).</p>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- 6 · TRAVEL HINT -->
+  <div class="section-label">6 · the hint in travel-plan creation</div>
+  <div class="travel-demo"><div class="card set-card plain">
+    <div class="field-lbl">Departure</div>
+    <div class="field-input"><span>Fri 25 Jul · 09:00</span><span style="color:rgba(44,62,80,0.3)">🕐</span></div>
+    <div class="hint-row"><span class="he">🔔</span><span class="ht">We'll remind you <b>2 hours before</b> this flight. <span class="link">Change reminder timing in Settings →</span></span></div>
+  </div></div>
+  <p class="caption">A quiet Sky-Silk hint under the departure field on travel segments — tells families the reminder exists and where to tune it, without cluttering the form.</p>
+</div>
+</body>
+</html>
