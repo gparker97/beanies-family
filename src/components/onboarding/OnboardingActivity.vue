@@ -103,7 +103,9 @@ async function handleAddActivity() {
       feeAmount: activityFee.value,
       feeCurrency: activityCurrency.value as CurrencyCode,
       feeSchedule: 'monthly',
-      reminderMinutes: 0,
+      // Seeded from the device default, like ActivityModal. Hardcoding 0 meant
+      // every activity a brand-new family created was permanently "None".
+      reminderMinutes: settingsStore.activityReminderLead,
       isActive: true,
       createdBy: creatorId,
       ...toAssigneePayload(ids),

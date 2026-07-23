@@ -193,6 +193,9 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'notif_tz_changed',
   'notif_skipped',
   'notif_lateness_bucket',
+  'notif_activity_lead',
+  'notif_gated',
+  'notif_backfilled',
 ]);
 
 export const MAX_STRING_LEN = 200;

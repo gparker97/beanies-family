@@ -168,11 +168,18 @@ describe('activityToGoogleEvent', () => {
       ctx
     );
     expect(ev.recurrence).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=WE']);
-    expect(ev.reminders).toEqual({
-      useDefault: false,
-      overrides: [{ method: 'popup', minutes: 30 }],
-    });
+    // NO reminder override, even at reminderMinutes: 30. Reminders live in
+    // beanies only — one on each surface means duplicate alerts from two apps.
+    // `useDefault: false` + empty also suppresses the calendar's own default.
+    expect(ev.reminders).toEqual({ useDefault: false, overrides: [] });
     expect(ev.location).toBe('East Field');
+  });
+
+  it('never exports a reminder override, at any reminderMinutes', () => {
+    for (const reminderMinutes of [0, 30, 1440] as const) {
+      const ev = activityToGoogleEvent(makeActivity({ startTime: '16:00', reminderMinutes }), ctx);
+      expect(ev.reminders).toEqual({ useDefault: false, overrides: [] });
+    }
   });
 
   it('always sets recurrence to [] for a non-recurring activity (clears a stale RRULE on patch)', () => {
@@ -220,5 +227,14 @@ describe('computePushHash', () => {
     expect(computePushHash(a)).toBe(
       computePushHash(makeActivity({ updatedAt: '2030-01-01T00:00:00.000Z' }))
     );
+  });
+
+  it('is INVARIANT across reminderMinutes — it is not exported, so it must not dirty', () => {
+    // Guards the #55 decision: reminders are never pushed to Google, so a
+    // reminder-time edit must not re-push a byte-identical event. Including this
+    // field in the hash meant every such edit cost a Google patch call, forever.
+    const base = computePushHash(makeActivity({ reminderMinutes: 0 }));
+    expect(computePushHash(makeActivity({ reminderMinutes: 30 }))).toBe(base);
+    expect(computePushHash(makeActivity({ reminderMinutes: 1440 }))).toBe(base);
   });
 });

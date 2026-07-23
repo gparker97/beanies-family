@@ -67,6 +67,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useListStore } from '@/stores/listStore';
 import { useActivityStore } from '@/stores/activityStore';
+import { usePermissions } from '@/composables/usePermissions';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
@@ -108,6 +109,10 @@ const goalsStore = useGoalsStore();
 const todoStore = useTodoStore();
 const listStore = useListStore();
 const activityStore = useActivityStore();
+// Read in setup, not inside the async post-init closure: usePermissions()
+// registers a `watch` on every call, and one created outside a component's
+// effect scope is never disposed.
+const { canEditActivities } = usePermissions();
 const vacationStore = useVacationStore();
 const budgetStore = useBudgetStore();
 const favoritesStore = useFavoritesStore();
@@ -1097,6 +1102,19 @@ onMounted(async () => {
     // join flow, cross-browser). If rates exist, only refresh if auto-update is
     // enabled and rates are stale (>24h).
     // After updating, reload the store so Vue reactive state reflects the new rates.
+    // ONE-SHOT #55 activity-reminder back-fill. Fire-and-forget — it must never
+    // block or break boot. Deliberately here, NOT in activityStore's load path
+    // (where the other two migrations live): this one needs `canEditActivities`,
+    // which resolves from `familyStore.currentMember`, and `loadActivities()` can
+    // complete before that lands — a load-path trigger would take the
+    // !canEdit early return on its only run and silently never retry.
+    // The permission is read in setup (a `watch` created inside this async
+    // closure would be outside the component's effect scope) and passed IN, so
+    // the store action stays free of usePermissions' per-call watcher.
+    void activityStore
+      .backfillReminderMinutes({ canEdit: canEditActivities.value })
+      .catch((e) => console.warn('[App] activity reminder back-fill failed', e));
+
     const hasNoRates = !settingsStore.exchangeRates || settingsStore.exchangeRates.length === 0;
     if (hasNoRates) {
       forceUpdateRates()

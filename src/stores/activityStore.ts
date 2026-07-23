@@ -18,6 +18,9 @@ import { useToday } from '@/composables/useToday';
 import { normalizeAssignees } from '@/utils/assignees';
 import { overrideOccurrenceYmd } from '@/utils/calendar/overrideOccurrenceYmd';
 import { ACTIVITY_COLORS, getActivityCategoryColor } from '@/constants/activityCategories';
+import { selectActivitiesToBackfill } from '@/utils/activityReminderBackfill';
+import { DEFAULT_ACTIVITY_LEAD } from '@/utils/reminderSchedule';
+import { logEvent } from '@/services/telemetry';
 import { reportError } from '@/utils/errorReporter';
 import type {
   FamilyActivity,
@@ -509,6 +512,66 @@ export const useActivityStore = defineStore('activities', () => {
     }
   }
 
+  /**
+   * ONE-SHOT #55 back-fill — see `utils/activityReminderBackfill.ts` for the rule
+   * and the retirement contract.
+   *
+   * Deliberately NOT `wrapAsync` (unlike every other action here): that sets the
+   * shared `isLoading` — flashing the planner skeletons at boot — writes
+   * `error.value`, and error-toasts by default. This is invisible maintenance, so
+   * it owns a single try/catch, exactly like `familyStore.normalizeRoles`.
+   *
+   * Writes the CONSTANT, not the device's `activityReminderLead`: activities are
+   * family-shared data, so the result must not depend on which device ran it.
+   */
+  async function backfillReminderMinutes(opts: { canEdit: boolean }): Promise<void> {
+    const settingsStore = useSettingsStore();
+    // Both pre-conditions return WITHOUT writing the marker, so a skipped run
+    // stays retryable:
+    //  • already done for this family
+    //  • an empty list at boot is indistinguishable from "still settling";
+    //    burning the one-shot on it would leave the corpus dark forever behind a
+    //    marker saying it was done
+    //  • a limited member's device must not silently rewrite family-shared data
+    if (settingsStore.activityReminderBackfilledAt) return;
+    if (activities.value.length === 0) return;
+    if (!opts.canEdit) return;
+
+    try {
+      const candidates = selectActivitiesToBackfill(activities.value);
+      const ids = candidates.map((a) => a.id);
+      // Zero candidates still marks — otherwise an already-clean family
+      // re-selects on every boot forever. Only the pre-conditions skip marking.
+      if (ids.length > 0) {
+        await activityRepo.backfillActivityReminders(ids, DEFAULT_ACTIVITY_LEAD);
+        const patched = new Set(ids);
+        activities.value = activities.value.map((a) =>
+          patched.has(a.id) ? { ...a, reminderMinutes: DEFAULT_ACTIVITY_LEAD } : a
+        );
+      }
+      // Marker LAST: if the app dies mid-migration it stays unset and the next
+      // run resumes. Re-running is a no-op — the selector only matches 0.
+      await settingsStore.setActivityReminderBackfilledAt(new Date().toISOString());
+      logEvent({
+        level: 'info',
+        surface: 'activity-reminder-backfill',
+        message: 'activity reminder back-fill complete',
+        context: { notif_backfilled: ids.length },
+      });
+    } catch (err) {
+      // Not critical: no user action failed and no data is at risk — the
+      // activities are untouched on failure and the marker stays unset, so the
+      // next boot retries. No toast: invisible maintenance.
+      reportError({
+        surface: 'activity-reminder-backfill',
+        severity: 'error',
+        message: 'activity reminder back-fill failed; will retry next boot',
+        error: err,
+        context: { notif_error_stage: 'backfill' },
+      });
+    }
+  }
+
   // Actions
   async function loadActivities() {
     await wrapAsync(
@@ -688,6 +751,7 @@ export const useActivityStore = defineStore('activities', () => {
   }
 
   return {
+    backfillReminderMinutes,
     // State
     activities,
     isLoading,

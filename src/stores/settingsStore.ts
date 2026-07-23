@@ -18,12 +18,14 @@ import type {
   LanguageCode,
   CountryCode,
   SupportedTravelType,
+  ReminderMinutes,
 } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import {
   DEFAULT_ACTIVITY_LEAD,
   DEFAULT_TODO_LEAD,
   DEFAULT_TRAVEL_LEADS,
+  toActivityLeadOption,
 } from '@/utils/reminderSchedule';
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -102,8 +104,12 @@ export const useSettingsStore = defineStore('settings', () => {
   // The DEFAULT lead new activities start with (and the fallback a duty reminder
   // uses when an activity says "None"). Each activity can still override it in
   // its own editor — this only sets where they begin.
-  const activityReminderLead = computed(
-    () => globalSettings.value.activityReminderLead ?? DEFAULT_ACTIVITY_LEAD
+  // Narrowed HERE — the single read site every consumer goes through, exactly as
+  // `aiTier` coalesces above. A pref written by an older build (LEAD_OPTIONS once
+  // offered 180, which is not in ReminderMinutes) is snapped to a valid option,
+  // so NO consumer needs a cast or a guard.
+  const activityReminderLead = computed<ReminderMinutes>(() =>
+    toActivityLeadOption(globalSettings.value.activityReminderLead ?? DEFAULT_ACTIVITY_LEAD)
   );
   // Fully-resolved per-type lead map (device overrides merged over the defaults),
   // so consumers (the scheduler + the settings selects) read one complete map.
@@ -120,6 +126,8 @@ export const useSettingsStore = defineStore('settings', () => {
   });
   const customInstitutions = computed(() => settings.value.customInstitutions ?? []);
   const onboardingCompleted = computed(() => settings.value.onboardingCompleted ?? true);
+  /** ISO timestamp of the one-shot #55 activity-reminder back-fill, or undefined. */
+  const activityReminderBackfilledAt = computed(() => settings.value.activityReminderBackfilledAt);
   const weekStartDay = computed(() => settings.value.weekStartDay ?? 1); // default Monday
   // Country of residence — drives public-holiday display. Dual-tracked: the
   // per-family value (synced via .beanpod) wins; the device mirror is the
@@ -483,6 +491,18 @@ export const useSettingsStore = defineStore('settings', () => {
     persistGlobalSetting('reminders.title', 'todoReminderLead', minutes);
   const setActivityReminderLead = (minutes: number) =>
     persistGlobalSetting('reminders.title', 'activityReminderLead', minutes);
+
+  /**
+   * Marker for the one-shot #55 back-fill. Deliberately a plain throwing setter
+   * with NO try/catch: the ONE caller (activityStore.backfillReminderMinutes)
+   * owns classification, and a migration-specific `surface` string has no
+   * business living in settingsStore — it would be stranded here when the
+   * migration is deleted. The rejection propagates so the caller leaves the
+   * marker unset and the next boot retries.
+   */
+  async function setActivityReminderBackfilledAt(iso: string): Promise<void> {
+    settings.value = await settingsRepo.saveSettings({ activityReminderBackfilledAt: iso });
+  }
   const setTravelReminderLead = (type: SupportedTravelType, minutes: number) =>
     persistGlobalSetting('reminders.title', 'travelReminderLeads', {
       ...(globalSettings.value.travelReminderLeads ?? {}),
@@ -747,6 +767,7 @@ export const useSettingsStore = defineStore('settings', () => {
     remindersEnabled,
     todoReminderLead,
     activityReminderLead,
+    activityReminderBackfilledAt,
     travelReminderLeads,
     preferredCurrencies,
     effectiveDisplayCurrencies,
@@ -783,6 +804,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setRemindersEnabled,
     setTodoReminderLead,
     setActivityReminderLead,
+    setActivityReminderBackfilledAt,
     setTravelReminderLead,
     setPreferredCurrencies,
     setOnboardingCompleted,

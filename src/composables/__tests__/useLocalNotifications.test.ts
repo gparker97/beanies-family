@@ -31,6 +31,7 @@ vi.mock('@/stores/translationStore', () => ({
 }));
 
 import {
+  runRescheduleFor,
   stableNotificationId,
   buildScheduledNotifications,
   latenessBucket,
@@ -49,6 +50,14 @@ function reminder(over: Partial<ScheduledReminder> = {}): ScheduledReminder {
     ...over,
   };
 }
+
+const META = { truncated: false, skipped: 0, gated: 0, todoLead: 30, activityLead: 30 };
+const PREFS = {
+  remindersEnabled: true,
+  todoReminderLead: 30,
+  activityReminderLead: 30,
+  travelReminderLeads: {},
+};
 
 describe('stableNotificationId', () => {
   it('is deterministic, positive, and non-zero', () => {
@@ -125,8 +134,31 @@ describe('latenessBucket', () => {
   });
 });
 
+describe('runRescheduleFor — the not-ready guard', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    __resetLocalNotificationsForTesting();
+    plugin.getPending.mockResolvedValue({ notifications: [] });
+    plugin.checkPermissions.mockResolvedValue({ display: 'granted' });
+  });
+
+  it('REGRESSION: a null input touches NOTHING and emits NOTHING', async () => {
+    // The headline defect. `reminderInput` is null until the family doc loads, so
+    // this runs on every cold start (lock screen, or killed before decryption).
+    // Reconciling against the resulting empty desired set cancelled every armed
+    // alarm on the device — silently, while telemetry logged a healthy-looking
+    // `notif_count: 0`. Sign-out's cancel is explicit now, not a side effect of
+    // an empty schedule, so this must be a total no-op.
+    await runRescheduleFor(null, PREFS, new Date());
+    expect(plugin.checkPermissions).not.toHaveBeenCalled();
+    expect(plugin.getPending).not.toHaveBeenCalled();
+    expect(plugin.cancel).not.toHaveBeenCalled();
+    expect(plugin.schedule).not.toHaveBeenCalled();
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+});
+
 describe('reconcileScheduled — the ordering that stops a failure wiping reminders', () => {
-  const META = { truncated: false, skipped: 0, gated: 0, todoLead: 30, activityLead: 30 };
   const payload = buildScheduledNotifications([reminder({ id: 'keep' })]);
 
   beforeEach(() => {
