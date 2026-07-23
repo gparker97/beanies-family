@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-07-23",
-    "translationCount": 3802
+    "translationCount": 3806
   },
   "translations": {
     "app.name": {
@@ -19014,6 +19014,26 @@
     "reminders.todoBodyAllDay": {
       "translation": "今天到期",
       "hash": "26qih7",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.scheduleFailed": {
+      "translation": "我们无法设置您的设备提醒",
+      "hash": "cgkupa",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.scheduleFailedHelp": {
+      "translation": "您的应用内提醒仍会显示所有内容。我们会自动重试。",
+      "hash": "3srm2a",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.exactAlarmHelp": {
+      "translation": "提醒可能会延迟送达。允许精确闹钟，让提醒准时到达。",
+      "hash": "gofeci",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.exactAlarmManual": {
+      "translation": "打开 设置 → 应用 → beanies.family → 闹钟和提醒",
+      "hash": "87jxiz",
       "lastUpdated": "2026-07-23"
     }
   }

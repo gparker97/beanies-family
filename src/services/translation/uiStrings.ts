@@ -6669,6 +6669,25 @@ const STRING_DEFS = {
   },
   'reminders.activityBodyWho': { en: 'Coming up · {who}', beanie: 'coming up · {who}' },
   'reminders.activityBody': { en: 'Coming up soon', beanie: 'coming up soon' },
+  // Shown once per session if the OS refuses to arm the reminders. States the
+  // fallback truthfully — the in-app bell is unaffected by an OS failure.
+  'reminders.scheduleFailed': {
+    en: "We couldn't set your device reminders",
+    beanie: "we couldn't set your device reminders",
+  },
+  'reminders.scheduleFailedHelp': {
+    en: "Your in-app reminders still show everything. We'll try again automatically.",
+    beanie: "your in-app reminders still show everything. we'll try again automatically.",
+  },
+  // Exact-alarm recovery (Android 12/12L, where the permission is revocable).
+  'reminders.exactAlarmHelp': {
+    en: 'Reminders may arrive late. Allow exact alarms so they land on time.',
+    beanie: 'reminders may arrive late. allow exact alarms so they land on time.',
+  },
+  'reminders.exactAlarmManual': {
+    en: 'Open Settings → Apps → beanies.family → Alarms & reminders',
+    beanie: 'open settings → apps → beanies.family → alarms & reminders',
+  },
   'reminders.todoBody': { en: 'Due at {time}', beanie: 'due at {time}' },
   'reminders.todoBodyAllDay': { en: 'Due today', beanie: 'due today' },
   'reminders.travelBody': { en: 'Departs at {time}', beanie: 'departs at {time}' },

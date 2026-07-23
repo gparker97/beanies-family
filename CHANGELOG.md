@@ -13,11 +13,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - **Reminders that reach you before things start.** On the iOS and Android apps, beanies can now notify you _ahead_ of an activity, a travel departure, or a timed to-do — so you leave and prepare on time, even when the app is closed. A new **Settings → Reminders** section lets you turn reminders on or off per device and choose how much notice each kind gets: activities use the reminder time set on each one, flights and cruises default to two hours, trains and ferries to one hour (all adjustable), and timed to-dos get a default lead you can change.
+- **Reminders go only to the people they concern.** A to-do someone assigned privately to themselves stays on their phone, and a flight reminder reaches only the family members actually on that flight — not everyone's lock screen.
+- **Both halves of a school run.** If you are down for drop-off _and_ pick-up, you get a reminder before each one — the pick-up timed off the end of the activity, not the start. Tick a run off and its reminder stops.
+- **All-day items remind you in the morning.** All-day activities and to-dos with a date but no time now nudge you at 9am on the day, instead of quietly never reminding you at all.
+- **"None" means none.** Setting an activity's reminder to "None" now genuinely turns its phone reminder off. New activities start at 30 minutes' notice so they still remind you by default.
 - **A friendlier notification bell.** The header bell is now a little beanie wearing its hat, and unread items show warm orange ring-lines beside it (never a red dot). When a new reminder arrives the bell gives a single gentle ring — and stays still if you prefer reduced motion. The empty notifications drawer now greets you with the beanie-bell.
 
 ### Changed
 
-- **Reminders now arrive on time, and early.** Previously a "time to drop off" reminder could land a few minutes _after_ the event; reminders now fire ahead of the event and are delivered promptly instead of being held back by the phone's battery-saving. The header search and bell icons are also a touch larger and cleaner.
+- **Reminders now arrive on time, and early.** Previously a "time to drop off" reminder could land a few minutes _after_ the event: it fired at the event itself, and Android's battery-saving was free to hold it back further. Reminders now fire ahead of the event and the app asks Android for precise alarm delivery, so they are no longer batched up and delivered late. The header search and bell icons are also a touch larger and cleaner.
+- **Chinese reminders show the right title.** Notification titles in Chinese displayed the literal word "标题" instead of the activity or to-do's name.
+- **Screen readers announce unread notifications.** The bell's unread state was invisible to assistive technology; it is now part of the button's spoken label.
+- **If a reminder can't be set, you're told.** When the phone refuses to schedule reminders the app now says so once, and makes clear the in-app reminders still show everything — instead of failing quietly.
 
 ## 2026-07-22
 
