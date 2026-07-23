@@ -180,6 +180,41 @@ status-bar}` and `@capgo/capacitor-passkey` ship none — the app-level manifest
   personalized financial advice.
 - **Target API level:** `targetSdk 36` already exceeds the current floor (API 35) and the expected
   Aug-2026 bump.
+- **Exact alarm permission (`USE_EXACT_ALARM`) — REQUIRED from the 2026-07 reminders release.**
+  Declared in `AndroidManifest.xml` alongside `SCHEDULE_EXACT_ALARM` (capped at `maxSdkVersion="32"`).
+  Play requires a declaration for it, prompted on the first upload that carries the permission; it
+  surfaces as a blocking item on the release and/or under **App content**.
+
+  **This is not paperwork — it is the release.** `USE_EXACT_ALARM` is auto-granted and
+  non-revocable; without it, `SCHEDULE_EXACT_ALARM` is denied by default from API 34 and
+  `@capacitor/local-notifications` **silently** downgrades to `setAndAllowWhileIdle`
+  (`LocalNotificationManager.java:380-393`) — inexact, Doze-batched to roughly one alarm per
+  9 minutes. That is the original "9am reminder arrived at 9:05" defect. If the declaration is
+  refused, reminders ship late again and no amount of app-side code fixes it.
+
+  **Eligibility:** Play restricts the permission to apps whose _core function_ is an alarm clock or
+  a **calendar**. beanies.family qualifies on the calendar limb — the Family Planner is a calendar
+  with user-set per-event reminders. This is an honest claim; do not stretch it.
+
+  **What to say** (adapt, don't paste verbatim):
+
+  > beanies.family is a family calendar and planner. Users set a reminder time on each activity,
+  > travel departure and timed to-do (e.g. "30 minutes before"), and the app must notify them at
+  > that exact moment — a reminder to leave for the school run is worthless if it arrives after the
+  > event. Inexact alarms are batched by Doze and can be delayed well beyond the user's chosen lead
+  > time. The permission is used solely to deliver these user-scheduled reminders on device; it
+  > performs no background processing and no tracking.
+
+  **If it is refused:** fall back to `SCHEDULE_EXACT_ALARM` alone plus the in-app Settings hand-off,
+  which is already built (the exact-alarm recovery row in `RemindersSettings.vue` calls
+  `openExactAlarmSettings()`). That is a manifest-only change — drop `USE_EXACT_ALARM` and the
+  `maxSdkVersion="32"` cap. UX is worse (every user must find an Android Settings toggle, and most
+  won't), so treat it as the fallback, not the plan.
+
+  **Verify it actually took effect** after the build is live: CloudWatch `notif_exact_alarm` should
+  read `granted` across the fleet. A meaningful `denied` rate means the declaration did not apply and
+  the late-delivery defect is still shipping — that field exists precisely because the failure is
+  otherwise invisible (the schedule looks perfectly healthy).
 
 ---
 
