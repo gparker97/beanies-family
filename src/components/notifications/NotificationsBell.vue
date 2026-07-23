@@ -50,7 +50,11 @@ function toggle() {
   <button
     type="button"
     class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] text-gray-400 transition-colors hover:bg-black/5 dark:text-gray-500 dark:hover:bg-white/10"
-    :aria-label="t('notifications.title')"
+    :aria-label="
+      store.hasUnread
+        ? `${t('notifications.title')} — ${t('notifications.unread')}`
+        : t('notifications.title')
+    "
     @click="toggle"
   >
     <span ref="bellEl" class="inline-flex">
@@ -83,13 +87,12 @@ function toggle() {
         />
         <!-- pom (the one colour accent; greys when reminders are off) -->
         <circle cx="20" cy="4.4" r="2.1" :fill="pomColor" stroke="none" />
-        <!-- unread → warm ringing lines (never a red dot) -->
+        <!-- unread → warm ringing lines (never a red dot). Purely decorative:
+             the whole <svg> is aria-hidden, so unread state is announced via the
+             button's own aria-label. An aria-label on a <path> in here reaches
+             no screen reader (and would be overridden by the button's anyway). -->
         <template v-if="store.hasUnread">
-          <path
-            d="M34.5 17a7 7 0 0 1 0 10"
-            stroke="#F15D22"
-            :aria-label="t('notifications.unread')"
-          />
+          <path d="M34.5 17a7 7 0 0 1 0 10" stroke="#F15D22" />
           <path d="M38 14a11.5 11.5 0 0 1 0 16" stroke="#E67E22" />
         </template>
       </svg>

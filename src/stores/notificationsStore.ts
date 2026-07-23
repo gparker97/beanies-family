@@ -18,6 +18,7 @@ import { useListStore } from '@/stores/listStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useBeanTips } from '@/composables/useBeanTips';
 import { useCommunityNudge } from '@/composables/useCommunityNudge';
 import { useInstallNudge } from '@/composables/useInstallNudge';
@@ -52,6 +53,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const listStore = useListStore();
   const activityStore = useActivityStore();
   const familyStore = useFamilyStore();
+  const settingsStore = useSettingsStore();
   const calendarSyncStore = useCalendarSyncStore();
   // Bound ONCE at store-setup scope (mirrors the other store bindings above);
   // the snapshot reads `issuedTips.value` on each recompute — no re-instantiation.
@@ -95,6 +97,9 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
     return {
       todos: todoStore.todos,
+      // Makes the Settings → Reminders to-do lead real on every platform (it
+      // used to be a hardcoded 30 that no control could change).
+      todoLeadMinutes: settingsStore.todoReminderLead,
       // Gate the list-completed notification on the same flag as the rest of
       // Beanie Lists. `loadLists()` runs ungated in the central load, so a
       // flag-OFF device can hold synced lists; feeding [] keeps the pure deriver

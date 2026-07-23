@@ -76,6 +76,7 @@ function activity(o: Partial<FamilyActivity>): FamilyActivity {
 function derive(overrides: Partial<DeriveInput>, now: Date = NOW) {
   const base: DeriveInput = {
     todos: [],
+    todoLeadMinutes: 30,
     lists: [],
     members: MEMBERS,
     currentMember: viewer,

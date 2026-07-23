@@ -16,7 +16,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -192,6 +192,14 @@ export function suspiciousTranslationReason(source, translated) {
   // 6. Implausibly long output for a short label (junk padding).
   if (source.length <= 24 && translated.length > source.length * 6 + 24)
     return 'implausible length';
+
+  // 7. Every `{placeholder}` in the source must survive verbatim. MyMemory
+  //    translates them ("{title}" → "标题"), which silently destroys the
+  //    interpolation: `fillTemplate` finds no token, so the value is emitted
+  //    raw. That shipped a zh notification titled "标题" for every reminder.
+  //    This is a whole CLASS of defect — ~40 keys carry placeholders.
+  const placeholders = source.match(/\{[a-zA-Z0-9_]+\}/g) ?? [];
+  if (placeholders.some((p) => !translated.includes(p))) return 'placeholder lost in translation';
 
   return null;
 }
@@ -413,8 +421,13 @@ async function main() {
   }
 }
 
-// Run if called directly
-main().catch((error) => {
-  console.error('\n❌ Fatal error:', error.message);
-  process.exit(1);
-});
+// Run as a CLI only when invoked directly — NOT when a test imports
+// `suspiciousTranslationReason`. Without this guard, importing the module calls
+// the MyMemory API and rewrites public/translations/zh.json during the test run.
+// Same pattern as scripts/derive-store-version.mjs.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  main().catch((error) => {
+    console.error('\n❌ Fatal error:', error.message);
+    process.exit(1);
+  });
+}
