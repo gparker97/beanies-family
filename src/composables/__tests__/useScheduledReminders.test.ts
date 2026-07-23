@@ -195,6 +195,64 @@ describe('buildReminderSchedule — activities', () => {
     expect(reminders).toHaveLength(0);
   });
 
+  it('a pickup duty with NO endTime emits no duty reminder — and the generic covers it', () => {
+    // It used to fall through to the 09:00 all-day anchor, so a parent was told
+    // to collect their child at breakfast. A role now fires only on its own
+    // anchor; with none, the generic reminder covers the occurrence instead.
+    const a = activity({
+      startTime: '15:30',
+      endTime: undefined,
+      reminderMinutes: 30,
+      assigneeIds: [neil.id as UUID],
+      pickupMemberId: me.id,
+    });
+    const { reminders } = buildReminderSchedule(
+      input({ occurrencesByDate: { '2026-05-22': [occ('2026-05-22', a)] } }),
+      NOW,
+      PREFS
+    );
+    expect(reminders).toHaveLength(1);
+    expect(reminders[0].id.endsWith(':pickup')).toBe(false);
+    expect(reminders[0].fireAt).toEqual(new Date('2026-05-22T15:00:00')); // 15:30 − 30
+  });
+
+  it('an anchorless duty on a "None" activity gets NOTHING — not a generic reminder', () => {
+    // The duty exemption applies only to DUTY reminders. Without the ownLead /
+    // dutyLead split, the fall-through would emit a generic reminder on an
+    // activity the user explicitly switched off.
+    const a = activity({
+      startTime: '15:30',
+      endTime: undefined,
+      reminderMinutes: 0,
+      assigneeIds: [neil.id as UUID],
+      pickupMemberId: me.id,
+    });
+    const { reminders } = buildReminderSchedule(
+      input({ occurrencesByDate: { '2026-05-22': [occ('2026-05-22', a)] } }),
+      NOW,
+      PREFS
+    );
+    expect(reminders).toHaveLength(0);
+  });
+
+  it('a duty already ticked off still SUPPRESSES the generic reminder (no new nag)', () => {
+    // Counting emitted reminders instead of anchored roles would resurrect a
+    // generic "coming up" the moment a parent ticks their drop-off complete.
+    const a = activity({
+      startTime: '09:00',
+      reminderMinutes: 30,
+      assigneeIds: [neil.id as UUID],
+      dropoffMemberId: me.id,
+      dropoffCompletions: [{ date: '2026-05-24', completedBy: me.id, completedAt: '' }],
+    });
+    const { reminders } = buildReminderSchedule(
+      input({ occurrencesByDate: { '2026-05-24': [occ('2026-05-24', a)] } }),
+      new Date('2026-05-24T06:00:00'),
+      PREFS
+    );
+    expect(reminders).toHaveLength(0);
+  });
+
   it('REGRESSION: a duty-only drop-off for a NON-assignee IS scheduled', () => {
     // The original bug: member-filtering dropped duty-only occurrences.
     const a = activity({

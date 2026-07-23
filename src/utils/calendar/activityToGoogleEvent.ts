@@ -71,11 +71,27 @@ function buildStartEnd(
   return startEndForDate(activity, resolveActivityDays(activity).startYmd, timeZone);
 }
 
-function buildReminders(activity: FamilyActivity): GoogleEventResource['reminders'] {
-  const minutes = activity.reminderMinutes;
-  return minutes > 0
-    ? { useDefault: false, overrides: [{ method: 'popup', minutes }] }
-    : { useDefault: false, overrides: [] };
+/**
+ * Synced events carry NO reminder — deliberately, and permanently (greg,
+ * 2026-07-23). Reminders live in beanies, where they are more configurable; a
+ * reminder on both surfaces means duplicate alerts from two apps for the same
+ * event.
+ *
+ * `useDefault: false` with an empty `overrides` explicitly means "no reminders",
+ * and also suppresses the CALENDAR's own default popup — which is the point:
+ * beanies owns the alert.
+ *
+ * Caveat worth knowing: `reminders` is per-authenticated-user, so this silences
+ * the connected account only. Another Google user who has *subscribed* to the
+ * calendar still gets their own calendar-level defaults, which no field we write
+ * can override.
+ *
+ * Takes no argument on purpose — a parameter would invite "just read
+ * reminderMinutes again". See also `computePushHash`, which deliberately
+ * excludes `reminderMinutes` because of this.
+ */
+function buildReminders(): GoogleEventResource['reminders'] {
+  return { useDefault: false, overrides: [] };
 }
 
 /** Assemble the shared event body (summary/description/reminders/status/location)
@@ -95,7 +111,7 @@ function assembleEvent(
     start,
     end,
     recurrence,
-    reminders: buildReminders(activity),
+    reminders: buildReminders(),
     status: 'confirmed',
   };
   if (activity.location && activity.location.trim()) resource.location = activity.location;
@@ -167,8 +183,12 @@ export function computePushHash(
     feeCurrency: activity.feeCurrency,
     feeSchedule: activity.feeSchedule,
     notes: activity.notes,
-    reminderMinutes: activity.reminderMinutes,
     isActive: activity.isActive,
+    // NOTE: `reminderMinutes` is deliberately EXCLUDED — it is not exported
+    // (`buildReminders` always emits empty overrides), so a field that cannot
+    // affect the pushed event must not dirty its hash. Including it made every
+    // reminder-time edit re-push a byte-identical event to Google, forever.
+    // Do not restore it as "obviously push-relevant"; it is not.
   };
   let payload = JSON.stringify(relevant);
   // Fold the RESOLVED member names rendered into the description, so a member rename

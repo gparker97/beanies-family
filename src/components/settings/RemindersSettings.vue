@@ -39,7 +39,7 @@ import {
   exactAlarmPermission,
   openExactAlarmSettings,
 } from '@/composables/useNotificationPermission';
-import { LEAD_OPTIONS, formatLeadLabel } from '@/utils/reminderSchedule';
+import { LEAD_OPTIONS, ACTIVITY_LEAD_OPTIONS, formatLeadLabel } from '@/utils/reminderSchedule';
 import type { SupportedTravelType } from '@/types/models';
 
 defineProps<{ open: boolean }>();
@@ -53,6 +53,15 @@ const remindersEnabled = computed(() => settingsStore.remindersEnabled);
 // Lead-time options for every select (shared list, human labels).
 const leadOptions = computed(() =>
   LEAD_OPTIONS.map((m) => ({ value: m, label: formatLeadLabel(m, t) }))
+);
+
+// Activities get their own list: 0 means "None" (no reminder), never "at the
+// time", and 120/180 are travel leads the activity editor cannot render.
+const activityLeadOptions = computed(() =>
+  ACTIVITY_LEAD_OPTIONS.map((m) => ({
+    value: m,
+    label: formatLeadLabel(m, t, 'planner.reminder.none'),
+  }))
 );
 
 // One row per travel type the app can fire on. "Flights" drives both the
@@ -202,7 +211,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
       <BaseSelect
         class="w-40 flex-none"
         :model-value="settingsStore.activityReminderLead"
-        :options="leadOptions"
+        :options="activityLeadOptions"
         :aria-label="t('reminders.activities')"
         @update:model-value="onActivityLead"
       />

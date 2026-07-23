@@ -8,7 +8,7 @@
  * leads. See `docs/plans/2026-07-23-notifications-end-to-end-native.md`.
  */
 import type { SupportedTravelType } from '@/utils/vacation';
-import type { FamilyActivity, FamilyMember } from '@/types/models';
+import type { FamilyActivity, FamilyMember, ReminderMinutes } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { normalizeAssignees } from '@/utils/assignees';
@@ -169,18 +169,76 @@ export const DEFAULT_TRAVEL_LEADS: Record<SupportedTravelType, number> = {
 };
 
 /**
- * Lead-time options offered in the Settings selects (minutes). `0` = "at the
+ * Lead-time options for the TRAVEL and TO-DO selects (minutes). `0` = "at the
  * event time"; `1440` = "the day before".
+ *
+ * NOT for activities — see `ACTIVITY_LEAD_OPTIONS`. This list carries 120/180,
+ * which are real travel leads (`DEFAULT_TRAVEL_LEADS` is 120 for flights) but
+ * are not offered on activity chips, and 180 is not even in the
+ * `ReminderMinutes` union. The names read as general-vs-specific, which is the
+ * trap that shipped an activity default the editor could not render.
  */
 export const LEAD_OPTIONS = [0, 15, 30, 60, 120, 180, 1440] as const;
+
+/**
+ * Lead-time options for ACTIVITIES. Deliberately separate from `LEAD_OPTIONS`:
+ *  - `0` means "None" here (no OS reminder), never "at the event time".
+ *  - Every value must be a member of `ReminderMinutes`, since it is stored per
+ *    activity — `satisfies` makes an out-of-union value a COMPILE ERROR.
+ * Shared by the Settings default select and the ActivityModal chips so the two
+ * can never offer different values.
+ */
+export const ACTIVITY_LEAD_OPTIONS = [
+  0, 15, 30, 60, 1440,
+] as const satisfies readonly ReminderMinutes[];
+
+/**
+ * Chip labels (short register — the ActivityModal chip row). An exhaustive
+ * record over ACTIVITY_LEAD_OPTIONS, so adding a value is a compile error until
+ * its key exists. The selects use the sentence register via `formatLeadLabel`;
+ * the two registers are a deliberate design choice, not drift.
+ */
+export const ACTIVITY_LEAD_CHIP_KEYS: Record<(typeof ACTIVITY_LEAD_OPTIONS)[number], UIStringKey> =
+  {
+    0: 'planner.reminder.none',
+    15: 'planner.reminder.15min',
+    30: 'planner.reminder.30min',
+    60: 'planner.reminder.1hour',
+    1440: 'planner.reminder.1day',
+  };
+
+/**
+ * Snap a persisted lead to one of the values the activity UI actually OFFERS,
+ * falling back to the default.
+ *
+ * NOTE: narrower than the `ReminderMinutes` union, which still admits 5/10/120 —
+ * so do NOT apply this to `activity.reminderMinutes`, it would rewrite a
+ * legitimate stored 120 to 30. Named for the option list, not the type, for
+ * exactly that reason. Applied ONCE, in the settingsStore getter.
+ */
+export function toActivityLeadOption(value: number): ReminderMinutes {
+  return (ACTIVITY_LEAD_OPTIONS as readonly number[]).includes(value)
+    ? (value as ReminderMinutes)
+    : DEFAULT_ACTIVITY_LEAD;
+}
 
 /**
  * Human, i18n label for a lead value ("2 hours before", "30 minutes before",
  * "at the time", "the day before"). `t` is injected so this stays pure — the
  * keys carry `{n}` placeholders filled via `fillTemplate`.
  */
-export function formatLeadLabel(minutes: number, t: (key: UIStringKey) => string): string {
-  if (minutes <= 0) return t('reminders.lead.atTime');
+export function formatLeadLabel(
+  minutes: number,
+  t: (key: UIStringKey) => string,
+  /**
+   * The ONE domain difference: for a to-do or a flight `0` means "at the event
+   * time"; for an ACTIVITY it means "no reminder". Passing it makes that choice
+   * visible at the call site instead of hiding it behind a near-identical second
+   * function whose identical signature would make a mis-import silent.
+   */
+  zeroLabelKey: UIStringKey = 'reminders.lead.atTime'
+): string {
+  if (minutes <= 0) return t(zeroLabelKey);
   if (minutes === 1440) return t('reminders.lead.dayBefore');
   if (minutes % 60 === 0) {
     const hours = minutes / 60;
