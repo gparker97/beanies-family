@@ -177,13 +177,22 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   // PII-free counters/enums/bools: how many reminders were scheduled, whether the
   // MAX_SCHEDULED cap clipped the list, the to-do default lead, the permission
   // outcome, which reschedule stage failed, and the delivered reminder's kind.
-  // MIRROR every key here in the Lambda allowlist + its pinned test.
+  // MIRROR every key here in the Lambda allowlist + its pinned test, AND in the
+  // store data-collection declarations (docs/runbooks/native-store-submission.md,
+  // PrivacyInfo.xcprivacy, Play Data Safety, web/src/pages/privacy.astro).
   'notif_count',
   'notif_truncated',
   'notif_lead_default',
   'notif_permission',
   'notif_error_stage',
   'notif_kind',
+  // Added by the #55 remediation. `notif_exact_alarm` is the one that makes the
+  // silent inexact-alarm downgrade visible — without it a late reminder is
+  // undiagnosable, because the schedule itself looks perfectly healthy.
+  'notif_exact_alarm',
+  'notif_tz_changed',
+  'notif_skipped',
+  'notif_lateness_bucket',
 ]);
 
 export const MAX_STRING_LEN = 200;
