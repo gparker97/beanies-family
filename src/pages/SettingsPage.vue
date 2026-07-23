@@ -15,7 +15,7 @@ import BeanieLabSection from '@/components/settings/BeanieLabSection.vue';
 import RemindersSettings from '@/components/settings/RemindersSettings.vue';
 import { useBeanieLab } from '@/composables/useBeanieLab';
 import { isFlagEnabled } from '@/config/flags';
-import { CALENDAR_SYNC_OPEN } from '@/constants/settingsDeepLinks';
+import { CALENDAR_SYNC_OPEN, REMINDERS_OPEN } from '@/constants/settingsDeepLinks';
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
 import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
 import BaseModal from '@/components/ui/BaseModal.vue';
@@ -112,6 +112,7 @@ const showDataManagement = ref(false);
 const showTransferOwnership = ref(false);
 const showAi = ref(false);
 const showCalendarSync = ref(false);
+const showReminders = ref(false);
 // beanies AI (#133) still lives inside The Beanie Lab (per-device opt-in);
 // useBeanieLab is the single source of truth for its visibility (Lab on + a
 // reader flag), shared with BeanieLabSection. Google Calendar (#32/#34)
@@ -135,6 +136,9 @@ const cardOpenMap: Record<string, () => void> = {
   [CALENDAR_SYNC_OPEN]: () => {
     // Official feature — gated on the googleCalendarSync flag (kill-switch), not the Lab.
     if (calendarAvailable) showCalendarSync.value = true;
+  },
+  [REMINDERS_OPEN]: () => {
+    showReminders.value = true;
   },
   appearance: () => {
     showAppearance.value = true;
@@ -732,11 +736,11 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         @click="showSecurity = true"
       />
       <SettingsCard
-        icon="💬"
-        :title="t('settings.card.community')"
-        :description="t('settings.card.communityDesc')"
-        icon-bg="var(--tint-silk-20)"
-        @click="openDiscord('settings')"
+        icon="🔔"
+        :title="t('settings.card.reminders')"
+        :description="t('settings.card.remindersDesc')"
+        icon-bg="var(--tint-orange-8)"
+        @click="showReminders = true"
       />
     </div>
 
@@ -841,15 +845,34 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
          hasAnyLabFeature so the section disappears (no empty header/glyph/toggle)
          when zero Lab features are available — the Lab stays conceptually
          permanent, this is just a display-time emptiness guard (#35). -->
-    <!-- ── Reminders (#55) — device-scoped OS notification prefs ─────────── -->
-    <RemindersSettings />
-
     <BeanieLabSection v-if="hasAnyLabFeature" @open-ai="showAi = true" />
 
     <!-- ── Feature Flags (dev-only, owner/admin) ───────────────────────────
          DevFlagsCard is undefined in prod (DEV-gated dynamic import above), so
          this renders nothing and ships no flag-editing code to users. -->
     <component :is="DevFlagsCard" v-if="DevFlagsCard && (isOwner || canManagePod)" />
+
+    <!-- ── Discord CTA ─────────────────────────────────────────────────────
+         Deliberately NOT a settings card: joining a community is an invitation,
+         not a preference to configure. Given the warm gradient treatment so it
+         reads as an offer at the end of the page rather than another row of
+         config. Sits above the about footer so it's the last thing you meet. -->
+    <button
+      type="button"
+      class="focus-visible:ring-primary-500 flex w-full cursor-pointer items-center gap-4 rounded-3xl bg-gradient-to-r from-[var(--heritage-orange)] to-[var(--terracotta)] p-5 text-left text-white shadow-[var(--card-shadow)] transition-transform hover:scale-[1.01] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+      @click="openDiscord('settings')"
+    >
+      <span
+        class="flex h-11 w-11 flex-none items-center justify-center rounded-[14px] bg-white/20 text-xl"
+        aria-hidden="true"
+        >💬</span
+      >
+      <span class="min-w-0 flex-1">
+        <span class="font-outfit block text-sm font-bold">{{ t('settings.discordCta') }}</span>
+        <span class="block text-xs text-white/80">{{ t('settings.discordCtaDesc') }}</span>
+      </span>
+      <span class="flex-none text-lg" aria-hidden="true">→</span>
+    </button>
 
     <!-- ── About Footer ────────────────────────────────────────────────── -->
     <div class="px-2 pb-4 text-center text-xs text-slate-400 dark:text-slate-500">
@@ -876,6 +899,9 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     <!-- ══════════════════════════════════════════════════════════════════ -->
     <!-- ── MODALS ────────────────────────────────────────────────────── -->
     <!-- ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ── Reminders drawer (#55) — device-scoped OS notification prefs ─── -->
+    <RemindersSettings :open="showReminders" @close="showReminders = false" />
 
     <!-- ── beanies AI drawer (Beanie Lab surface) ─────────────────────────
          Mount-gated on aiVisible so it can never open while the Lab is off. -->

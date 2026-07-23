@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-07-23",
-    "translationCount": 3806
+    "translationCount": 3808
   },
   "translations": {
     "app.name": {
@@ -15476,16 +15476,6 @@
       "hash": "1l29yi",
       "lastUpdated": "2026-06-07"
     },
-    "settings.card.community": {
-      "translation": "粉丝论坛",
-      "hash": "8nt3ux",
-      "lastUpdated": "2026-06-07"
-    },
-    "settings.card.communityDesc": {
-      "translation": "与其他家庭一起使用我们的Discord",
-      "hash": "qjhp8x",
-      "lastUpdated": "2026-06-07"
-    },
     "planner.duplicate.title": {
       "translation": "已在您的日历上？",
       "hash": "sj2i6l",
@@ -19034,6 +19024,26 @@
     "reminders.exactAlarmManual": {
       "translation": "打开 设置 → 应用 → beanies.family → 闹钟和提醒",
       "hash": "87jxiz",
+      "lastUpdated": "2026-07-23"
+    },
+    "settings.discordCta": {
+      "translation": "加入我们的 Discord",
+      "hash": "ql9n0p",
+      "lastUpdated": "2026-07-23"
+    },
+    "settings.discordCtaDesc": {
+      "translation": "结识其他家庭，随时向我们提问，一起决定我们接下来做什么",
+      "hash": "w6gip3",
+      "lastUpdated": "2026-07-23"
+    },
+    "settings.card.reminders": {
+      "translation": "提醒",
+      "hash": "jn6xgf",
+      "lastUpdated": "2026-07-23"
+    },
+    "settings.card.remindersDesc": {
+      "translation": "活动、旅行和待办事项的通知时间",
+      "hash": "rhafy5",
       "lastUpdated": "2026-07-23"
     }
   }
