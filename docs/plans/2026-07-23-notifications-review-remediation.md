@@ -647,6 +647,27 @@ No bare `catch {}` is introduced; every new catch site classifies, logs, and —
 - **Pass 3 (Sustainability)**: Caught a bell-side regression the shared lead resolver would have introduced (duty-only activities at `reminderMinutes: 0` would vanish from the in-app briefing because only the OS caller passed `isDuty`) and a duty-id collision between the generic and drop-off reminders; removed Pass 2's deprecated `dutyRole` alias — its "four live consumers" are four consumers of a _different_ field, and `ActivityReminderContext.dutyRole` has two readers, both being rewritten; stopped `allDayAnchor` being forced onto the in-app deriver, where 09:00 would hide all-day items from the bell until mid-morning; made the traveller argument required so a forgetful caller gets a compile error instead of silently reminding everyone; added an in-flight/queue guard so the new reconcile can never run concurrently with the foreground re-anchor; moved cancellation off the permission gate so requirement 13 actually holds; extracted `useNotificationPermission` so Settings stops transitively importing five Pinia stores; bounded the schedule-failure toast to once per session; cut two low-value `notif_*` keys; closed the placeholder-destruction class permanently via a seventh `suspiciousTranslationReason` rule; and split the work into three independently revertable slices.
 - **Pass 4 (Fresh-eyes sweep)**: Corrected a load-bearing plugin-API error carried from Pass 1 (`checkPermissions()` returns `display` only — `exact_alarm` is on the Android-only `checkExactNotificationSetting()`, so requirements 2 and 3 would have silently no-opped on every platform); caught that sharing the lead-0 skip with the in-app deriver would delete activity entries from the bell for the _entire_ existing corpus, not just duty-only ones (split into `activityLeadMinutes` + `resolveOsActivityLead`); resolved the reset contract's contradiction by hoisting reconcile state to module scope and exporting a `reconcileScheduled` seam (there is no existing composable test harness); stopped the schedule-failure toast double-reporting via `useToast`'s auto-reporter (`silent: true`); split the compound guards the all-day anchor would have replaced wholesale (id-less activities and completed to-dos would have been scheduled); gave the exact-alarm recovery a home in Settings and moved it out of Slice A, which could not have delivered it; unblocked the translator-guard test by adding the repo's direct-invocation guard to a script that self-executes on import; fixed an a11y fix that `aria-label` override would have suppressed; folded `notif_permission` into the existing `reschedule` event to halve firehose volume; and promoted Assumption 4 from unverified to source-confirmed on Android.
 
+## Outcome
+
+**IMPLEMENTED 2026-07-23** — all three slices on `main`, not deployed.
+
+- **Slice A** `87bd83ba` — `USE_EXACT_ALARM` + capped `SCHEDULE_EXACT_ALARM`, exact-alarm read/telemetry, all `notif_*` store declarations.
+- **Slice B** `4f00ddf1` — the pure builders: audience gate, traveller filter, lead-0 semantics + duty exemption, duty roles/pickup anchor, all-day anchor, i18n, a11y.
+- **Slice C** `887e7ab6` — reconcile ordering, `useNotificationPermission`, queue guard, timezone re-anchor, Settings rewiring.
+
+Gates: `type-check`, 3981 Vitest tests, 77 Lambda tests, `build`, `lint`, `stylelint`, `translate` — all green.
+
+**Found during implementation (not in the plan):**
+
+- The telemetry Lambda's allowlist **drift-guard test never ran in CI**. It uses `node:test` while CI runs vitest only, and the one lambda glob in `vitest.config.ts` (`lambda/registry`) matched a vitest-style file instead. The guard CLAUDE.md's privacy gate leans on had never executed. Added `npm run test:lambda` and wired it into both workflows — 77 tests across telemetry/ai-extract/oauth now run on every push.
+- `scripts/updateTranslations.mjs` **self-executed on import**, so the new rule-7 test would have called the MyMemory API and rewritten `zh.json` during the test run. Added the repo's existing direct-invocation guard.
+- Assumption 4 was **promoted from unverified to source-confirmed** on Android before Slice C landed (`FLAG_CANCEL_CURRENT` + request code = notification id; `NotificationStorage` keyed by id). On-device step 7 remains as a smoke check; iOS stays unverified.
+- Assumption 6 **confirmed**: the `notif_*` keys were added today in `e1bf4cac` and never shipped, so the declaration gap was a pre-ship fix, not a live misdeclaration.
+
+**Deliberately deferred:** the `hasDetailData` knock-on, the duty-reminder cap interaction with `MAX_SCHEDULED = 60`, and all iOS behaviour remain unverified on real hardware — they need greg's on-device pass (Testing Plan steps 7-14).
+
+**Still open:** the Play Console exact-alarm declaration (external dependency, must accompany the release) and greg's on-device verification. Neither is a code task.
+
 ## Prompt Log
 
 > **No GitHub issue created.** This plan was approved for direct implementation.
