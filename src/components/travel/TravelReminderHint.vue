@@ -13,6 +13,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatLeadLabel } from '@/utils/reminderSchedule';
 import { isSupportedTravelType } from '@/utils/vacation';
+import { REMINDERS_OPEN } from '@/constants/settingsDeepLinks';
 import type { VacationTravelType } from '@/types/models';
 
 const props = defineProps<{ type?: VacationTravelType }>();
@@ -37,9 +38,14 @@ const text = computed(() => {
     <span class="text-sm" aria-hidden="true">🔔</span>
     <p class="text-xs text-[var(--deep-slate)] dark:text-slate-200">
       {{ text }}
-      <RouterLink to="/settings" class="font-semibold text-[var(--heritage-orange)]">{{
-        t('reminders.travelHintLink')
-      }}</RouterLink>
+      <!-- Deep-links straight into the Reminders drawer — reminders are their
+           own Settings category now, so a bare /settings link would land the
+           user on the grid with nothing obviously actionable. -->
+      <RouterLink
+        :to="{ path: '/settings', query: { open: REMINDERS_OPEN } }"
+        class="font-semibold text-[var(--heritage-orange)]"
+        >{{ t('reminders.travelHintLink') }}</RouterLink
+      >
     </p>
   </div>
 </template>

@@ -234,9 +234,10 @@ function hasDetailData(activity: FamilyActivity): boolean {
     activity.instructorName ||
     activity.instructorContact ||
     (activity.feeAmount && activity.feeAmount > 0) ||
-    // Only counts as "detail the user set" when it differs from the default —
-    // otherwise the new default would auto-expand this panel on every activity.
-    (activity.reminderMinutes > 0 && activity.reminderMinutes !== DEFAULT_ACTIVITY_LEAD) ||
+    // NOTE: `reminderMinutes` is deliberately absent — the reminder field was
+    // promoted out of this collapsible, so it can no longer be a reason to
+    // auto-expand it (and with a non-zero default it would expand on nearly
+    // every activity).
     !activity.isActive
   );
 }
@@ -1079,7 +1080,20 @@ function handleSave() {
         </p>
       </FormFieldGroup>
 
-      <!-- 10. "Add more details" collapsible -->
+      <!-- 10. Reminder — a primary field, not an "advanced" one. Promoted out of
+           the collapsible once reminders became real OS notifications: it is
+           now the control that decides whether the user's phone actually buzzes
+           before this activity, so burying it behind a disclosure would hide
+           the feature from most people. Sits directly above "more details". -->
+      <FormFieldGroup :label="t('planner.field.reminder')">
+        <FrequencyChips
+          :model-value="String(reminderMinutes)"
+          :options="reminderChipOptions"
+          @update:model-value="reminderMinutes = Number($event) as ReminderMinutes"
+        />
+      </FormFieldGroup>
+
+      <!-- 11. "Add more details" collapsible -->
       <div>
         <button
           type="button"
@@ -1115,15 +1129,6 @@ function handleSave() {
               rows="2"
               class="focus:border-primary-500 w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm text-[var(--color-text)] transition-all focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
               :placeholder="t('planner.field.notes')"
-            />
-          </FormFieldGroup>
-
-          <!-- Reminder chips -->
-          <FormFieldGroup :label="t('planner.field.reminder')" optional>
-            <FrequencyChips
-              :model-value="String(reminderMinutes)"
-              :options="reminderChipOptions"
-              @update:model-value="reminderMinutes = Number($event) as ReminderMinutes"
             />
           </FormFieldGroup>
 
