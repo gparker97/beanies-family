@@ -42,6 +42,11 @@ import type {
   UpdateFamilyActivityInput,
 } from '@/types/models';
 import type { FieldConfidence } from '@/services/ai/types';
+import {
+  ACTIVITY_LEAD_OPTIONS,
+  ACTIVITY_LEAD_CHIP_KEYS,
+  toActivityLeadOption,
+} from '@/utils/reminderSchedule';
 
 const props = defineProps<{
   open: boolean;
@@ -125,7 +130,9 @@ const instructorContact = ref('');
 // NOT 0. `0` is the chip's "None" and now genuinely suppresses the OS reminder,
 // so defaulting to it would mean every newly created activity silently never
 // reminds.
-const reminderMinutes = ref<ReminderMinutes>(settingsStore.activityReminderLead as ReminderMinutes);
+// No cast: settingsStore.activityReminderLead is already narrowed to a valid
+// ReminderMinutes at the getter (the single read site every consumer uses).
+const reminderMinutes = ref<ReminderMinutes>(settingsStore.activityReminderLead);
 const notes = ref('');
 const isActive = ref(true);
 const color = ref('');
@@ -312,7 +319,7 @@ const { isEditing, isSubmitting } = useFormModal(
       feeCustomPeriodUnit.value = 'weeks';
       instructorName.value = '';
       instructorContact.value = '';
-      reminderMinutes.value = settingsStore.activityReminderLead as ReminderMinutes;
+      reminderMinutes.value = settingsStore.activityReminderLead;
       notes.value = '';
       isActive.value = true;
       color.value = '';
@@ -416,13 +423,12 @@ watch(
   }
 );
 
-const reminderChipOptions = computed(() => [
-  { value: '0', label: t('planner.reminder.none') },
-  { value: '15', label: t('planner.reminder.15min') },
-  { value: '30', label: t('planner.reminder.30min') },
-  { value: '60', label: t('planner.reminder.1hour') },
-  { value: '1440', label: t('planner.reminder.1day') },
-]);
+// Generated from the shared option list, so the chips and the Settings default
+// select can never offer different values (they used to: LEAD_OPTIONS carried
+// 120/180, which the chips could not render and 180 isn't even a ReminderMinutes).
+const reminderChipOptions = computed(() =>
+  ACTIVITY_LEAD_OPTIONS.map((m) => ({ value: String(m), label: t(ACTIVITY_LEAD_CHIP_KEYS[m]) }))
+);
 
 const hasCost = computed(() => (feeAmount.value ?? 0) > 0);
 
@@ -1089,7 +1095,7 @@ function handleSave() {
         <FrequencyChips
           :model-value="String(reminderMinutes)"
           :options="reminderChipOptions"
-          @update:model-value="reminderMinutes = Number($event) as ReminderMinutes"
+          @update:model-value="reminderMinutes = toActivityLeadOption(Number($event))"
         />
       </FormFieldGroup>
 

@@ -1409,6 +1409,11 @@ export interface Settings {
   preferredCurrencies?: CurrencyCode[];
   customInstitutions?: string[];
   onboardingCompleted?: boolean;
+  /** ISO timestamp of the one-shot #55 activity-reminder back-fill. Once-per
+   *  FAMILY guard (synced), so a second device can't re-apply the migration over
+   *  a later deliberate "None". See utils/activityReminderBackfill.ts —
+   *  the field OUTLIVES the migration code; do not delete it with the code. */
+  activityReminderBackfilledAt?: string;
   weekStartDay?: 0 | 1; // 0=Sunday, 1=Monday (default: 1)
   country?: CountryCode; // family's country of residence — drives public-holiday display on the planner
   showPublicHolidays?: boolean; // default true once `country` is set; lets the family hide holidays
