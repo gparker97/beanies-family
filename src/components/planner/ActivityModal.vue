@@ -42,6 +42,7 @@ import type {
   UpdateFamilyActivityInput,
 } from '@/types/models';
 import type { FieldConfidence } from '@/services/ai/types';
+import { DEFAULT_ACTIVITY_LEAD } from '@/utils/reminderSchedule';
 
 const props = defineProps<{
   open: boolean;
@@ -121,7 +122,10 @@ const createRecurringPayment = ref(false);
 const feePayFromAccountId = ref('');
 const instructorName = ref('');
 const instructorContact = ref('');
-const reminderMinutes = ref<ReminderMinutes>(0);
+// Defaults to a real lead, NOT 0. `0` is the chip's "None" and now genuinely
+// suppresses the OS reminder — leaving it as the default would mean every newly
+// created activity silently never reminds.
+const reminderMinutes = ref<ReminderMinutes>(DEFAULT_ACTIVITY_LEAD);
 const notes = ref('');
 const isActive = ref(true);
 const color = ref('');
@@ -230,7 +234,9 @@ function hasDetailData(activity: FamilyActivity): boolean {
     activity.instructorName ||
     activity.instructorContact ||
     (activity.feeAmount && activity.feeAmount > 0) ||
-    activity.reminderMinutes > 0 ||
+    // Only counts as "detail the user set" when it differs from the default —
+    // otherwise the new default would auto-expand this panel on every activity.
+    (activity.reminderMinutes > 0 && activity.reminderMinutes !== DEFAULT_ACTIVITY_LEAD) ||
     !activity.isActive
   );
 }
@@ -305,7 +311,7 @@ const { isEditing, isSubmitting } = useFormModal(
       feeCustomPeriodUnit.value = 'weeks';
       instructorName.value = '';
       instructorContact.value = '';
-      reminderMinutes.value = 0;
+      reminderMinutes.value = DEFAULT_ACTIVITY_LEAD;
       notes.value = '';
       isActive.value = true;
       color.value = '';

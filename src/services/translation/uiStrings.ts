@@ -6652,8 +6652,13 @@ const STRING_DEFS = {
     beanie: 'we’ll remind you {lead} this trip.',
   },
   'reminders.travelHintLink': { en: 'Change reminder timing', beanie: 'change reminder timing' },
-  // OS notification copy (title/body per kind) — filled via fillTemplate
-  'reminders.activityTitle': { en: '{title}', beanie: '{title}' },
+  // OS notification copy (BODY only — filled via fillTemplate). The notification
+  // TITLE is the item's own name, passed straight through. It deliberately has
+  // no key: a value that is nothing but `{title}` is a translation-pipeline
+  // hazard, and the zh auto-translation duly replaced the placeholder with the
+  // word "标题", destroying every notification title. `updateTranslations.mjs`
+  // now rejects placeholder-losing translations, but the real fix is not to
+  // round-trip a bare placeholder through t() at all.
   'reminders.activityBodyDropoff': {
     en: 'Time to drop off — {who}',
     beanie: 'time to drop off — {who}',
@@ -6664,9 +6669,8 @@ const STRING_DEFS = {
   },
   'reminders.activityBodyWho': { en: 'Coming up · {who}', beanie: 'coming up · {who}' },
   'reminders.activityBody': { en: 'Coming up soon', beanie: 'coming up soon' },
-  'reminders.todoTitle': { en: '{title}', beanie: '{title}' },
   'reminders.todoBody': { en: 'Due at {time}', beanie: 'due at {time}' },
-  'reminders.travelTitle': { en: '{title}', beanie: '{title}' },
+  'reminders.todoBodyAllDay': { en: 'Due today', beanie: 'due today' },
   'reminders.travelBody': { en: 'Departs at {time}', beanie: 'departs at {time}' },
 
   // Navigation

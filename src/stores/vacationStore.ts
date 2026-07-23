@@ -69,17 +69,18 @@ export const useVacationStore = defineStore('vacations', () => {
    */
   const allTravelSegmentOccurrences = computed<TravelSegmentOccurrence[]>(() =>
     vacations.value.flatMap((v) =>
-      v.travelSegments.flatMap((seg, idx) => safeExtract(v.id, seg, idx))
+      v.travelSegments.flatMap((seg, idx) => safeExtract(v.id, seg, idx, v.assigneeIds ?? []))
     )
   );
 
   function safeExtract(
     vacationId: string,
     seg: VacationTravelSegment,
-    idx: number
+    idx: number,
+    tripAssigneeIds: string[]
   ): TravelSegmentOccurrence[] {
     try {
-      return extractSegmentOccurrences(vacationId, seg, idx);
+      return extractSegmentOccurrences(vacationId, seg, idx, tripAssigneeIds);
     } catch (err) {
       console.error(
         `[vacationStore] failed to extract occurrences for segment ${seg?.id ?? '<no id>'} on vacation ${vacationId}:`,

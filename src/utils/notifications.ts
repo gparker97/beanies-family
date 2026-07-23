@@ -22,7 +22,7 @@ import { entityDeepLink } from '@/utils/entityDeepLink';
 import { CALENDAR_SYNC_OPEN } from '@/constants/settingsDeepLinks';
 import {
   activityReminderContext,
-  DEFAULT_ACTIVITY_LEAD,
+  activityLeadMinutes,
   localDateTime,
   minusMinutes,
 } from '@/utils/reminderSchedule';
@@ -37,9 +37,6 @@ export interface CalendarConnectionHealth {
 }
 
 const MS_PER_DAY = 86_400_000;
-/** Lead time before a timed todo's due moment that the in-app `todo-due` fires
- *  (the OS scheduler's todo lead is device-configurable — see reminderSchedule). */
-const DUE_LEAD_MINUTES = 30;
 /** Prefixes used by the prune exemption (all window-exempt kinds). Adding a
  *  new exempt kind = one entry here + the kind's own deriver block. */
 const WHATS_NEW_PREFIX = 'whats-new:';
@@ -60,6 +57,11 @@ export interface NotificationOccurrence {
 
 export interface DeriveInput {
   todos: TodoItem[];
+  /** Device to-do reminder lead (minutes) before a timed to-do's due moment.
+   *  Injected rather than read from the settings store so this module stays
+   *  pure; `notificationsStore` supplies `settingsStore.todoReminderLead`,
+   *  which already resolves to DEFAULT_TODO_LEAD when unset. */
+  todoLeadMinutes: number;
   /** Beanie Lists — feeds the derived `list-completed` creator notification. */
   lists: FamilyList[];
   members: FamilyMember[];
@@ -94,8 +96,20 @@ export interface DeriveInput {
 export const todoDueId = (todoId: string, dueDate: string): string =>
   `todo-due:${todoId}:${dueDate}`;
 export const todoAssignedId = (todoId: string): string => `todo-assigned:${todoId}`;
-export const activityReminderId = (activityId: string, occurrenceDate: string): string =>
-  `activity-reminder:${activityId}:${occurrenceDate}`;
+/**
+ * `role` is appended only by the OS scheduler's duty reminders, so a drop-off
+ * and a pickup on the same occurrence get distinct ids (they hash to distinct
+ * `stableNotificationId`s and therefore don't overwrite each other). Omitting it
+ * keeps the in-app deriver's ids byte-identical to before.
+ */
+export const activityReminderId = (
+  activityId: string,
+  occurrenceDate: string,
+  role?: 'dropoff' | 'pickup'
+): string =>
+  role
+    ? `activity-reminder:${activityId}:${occurrenceDate}:${role}`
+    : `activity-reminder:${activityId}:${occurrenceDate}`;
 // OS travel-departure reminder (no in-app equivalent kind). One per segment
 // departure occurrence; the date keeps it stable across reschedules.
 export const travelReminderId = (segmentId: string, occurrenceDate: string): string =>
@@ -204,7 +218,10 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
         const dueDay = localDateTime(todo.dueDate);
         if (dueDay) {
           const trigger = todo.dueTime
-            ? minusMinutes(localDateTime(todo.dueDate, todo.dueTime) ?? dueDay, DUE_LEAD_MINUTES)
+            ? minusMinutes(
+                localDateTime(todo.dueDate, todo.dueTime) ?? dueDay,
+                input.todoLeadMinutes
+              )
             : startOfLocalDay(dueDay);
           const triggerMs = trigger.getTime();
           if (inWindow(triggerMs)) {
@@ -275,8 +292,10 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
         if (!ctx.relevant) continue;
         const occDay = localDateTime(date);
         if (!occDay) continue;
-        const reminder =
-          typeof a.reminderMinutes === 'number' ? a.reminderMinutes : DEFAULT_ACTIVITY_LEAD;
+        // Trigger math only — the bell is a feed of what's on today, so it does
+        // NOT apply the OS scheduler's "0 means None" skip (that would empty it:
+        // every stored activity carries 0). See `resolveOsActivityLead`.
+        const reminder = activityLeadMinutes(a.reminderMinutes);
         const trigger = a.startTime
           ? minusMinutes(localDateTime(date, a.startTime) ?? occDay, reminder)
           : startOfLocalDay(occDay);

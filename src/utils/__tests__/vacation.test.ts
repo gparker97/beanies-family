@@ -60,7 +60,7 @@ describe('extractSegmentOccurrences', () => {
   });
 
   it('emits 2 occurrences for a booked outbound flight with both sides', () => {
-    const out = extractSegmentOccurrences('vac-1', flightSeg(), 0);
+    const out = extractSegmentOccurrences('vac-1', flightSeg(), 0, []);
     expect(out).toHaveLength(2);
     expect(out[0]).toMatchObject({
       vacationId: 'vac-1',
@@ -80,7 +80,8 @@ describe('extractSegmentOccurrences', () => {
     const out = extractSegmentOccurrences(
       'vac-1',
       flightSeg({ arrivalDate: undefined, arrivalTime: undefined }),
-      0
+      0,
+      []
     );
     expect(out).toHaveLength(1);
     expect(out[0].kind).toBe('departure');
@@ -99,7 +100,7 @@ describe('extractSegmentOccurrences', () => {
       arrivalDate: undefined,
       arrivalTime: undefined,
     });
-    const out = extractSegmentOccurrences('vac-1', cruise, 0);
+    const out = extractSegmentOccurrences('vac-1', cruise, 0, []);
     expect(out).toHaveLength(2);
     expect(out[0]).toMatchObject({
       transportType: 'cruise',
@@ -116,7 +117,7 @@ describe('extractSegmentOccurrences', () => {
   });
 
   it('propagates pending status through occurrences', () => {
-    const out = extractSegmentOccurrences('vac-1', flightSeg({ status: 'pending' }), 0);
+    const out = extractSegmentOccurrences('vac-1', flightSeg({ status: 'pending' }), 0, []);
     expect(out.every((o) => o.status === 'pending')).toBe(true);
   });
 
@@ -129,7 +130,8 @@ describe('extractSegmentOccurrences', () => {
         arrivalDate: '2026-06-16',
         arrivalTime: '02:30',
       }),
-      0
+      0,
+      []
     );
     expect(out).toHaveLength(2);
     expect(out[0]).toMatchObject({ kind: 'departure', date: '2026-06-15', time: '22:00' });
@@ -137,13 +139,20 @@ describe('extractSegmentOccurrences', () => {
   });
 
   it('returns empty array for unsupported types (car, activity, flight_other)', () => {
-    expect(extractSegmentOccurrences('vac-1', flightSeg({ type: 'car' }), 0)).toEqual([]);
-    expect(extractSegmentOccurrences('vac-1', flightSeg({ type: 'activity' }), 0)).toEqual([]);
-    expect(extractSegmentOccurrences('vac-1', flightSeg({ type: 'flight_other' }), 0)).toEqual([]);
+    expect(extractSegmentOccurrences('vac-1', flightSeg({ type: 'car' }), 0, [])).toEqual([]);
+    expect(extractSegmentOccurrences('vac-1', flightSeg({ type: 'activity' }), 0, [])).toEqual([]);
+    expect(extractSegmentOccurrences('vac-1', flightSeg({ type: 'flight_other' }), 0, [])).toEqual(
+      []
+    );
   });
 
   it('logs and skips a side with a malformed date — does not throw', () => {
-    const out = extractSegmentOccurrences('vac-1', flightSeg({ departureDate: 'not-a-date' }), 0);
+    const out = extractSegmentOccurrences(
+      'vac-1',
+      flightSeg({ departureDate: 'not-a-date' }),
+      0,
+      []
+    );
     expect(out).toHaveLength(1);
     expect(out[0].kind).toBe('arrival');
     expect(warnSpy).toHaveBeenCalledWith(
@@ -158,7 +167,8 @@ describe('extractSegmentOccurrences', () => {
         departureDate: undefined,
         arrivalDate: undefined,
       }),
-      0
+      0,
+      []
     );
     expect(out).toEqual([]);
   });
@@ -168,7 +178,8 @@ describe('extractSegmentOccurrences', () => {
     const out = extractSegmentOccurrences(
       'vac-1',
       flightSeg({ departureTime: '', arrivalTime: '' }),
-      0
+      0,
+      []
     );
     expect(out).toHaveLength(2);
     expect(out[0].time).toBeUndefined();
@@ -176,7 +187,7 @@ describe('extractSegmentOccurrences', () => {
   });
 
   it('passes through segmentIndex unchanged', () => {
-    const out = extractSegmentOccurrences('vac-1', flightSeg(), 7);
+    const out = extractSegmentOccurrences('vac-1', flightSeg(), 7, []);
     expect(out.every((o) => o.segmentIndex === 7)).toBe(true);
   });
 });

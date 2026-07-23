@@ -18,16 +18,17 @@ const neil = { id: 'neil', name: 'Neil' } as FamilyMember;
 const resolveMember = (id: string): FamilyMember | undefined =>
   id === 'me' ? me : id === 'neil' ? neil : undefined;
 
-// A recognisable t so we can assert which template was chosen.
+// A recognisable t so we can assert which template was chosen. NOTE: there are
+// no `*Title` keys — a notification's title is the item's own name, passed
+// straight through. Keys whose whole value was `{title}` were deleted after the
+// zh auto-translation replaced the placeholder with the word "标题".
 const T: Partial<Record<string, string>> = {
-  'reminders.activityTitle': '{title}',
   'reminders.activityBodyDropoff': 'Time to drop off — {who}',
   'reminders.activityBodyPickup': 'Time to pick up — {who}',
   'reminders.activityBodyWho': 'Coming up · {who}',
   'reminders.activityBody': 'Coming up soon',
-  'reminders.todoTitle': '{title}',
   'reminders.todoBody': 'Due at {time}',
-  'reminders.travelTitle': '{title}',
+  'reminders.todoBodyAllDay': 'Due today',
   'reminders.travelBody': 'Departs at {time}',
 };
 const t = (k: UIStringKey): string => T[k] ?? String(k);
@@ -57,6 +58,8 @@ function travel(over: Partial<TravelSegmentOccurrence> = {}): TravelSegmentOccur
     date: '2026-05-25',
     time: '09:00',
     title: 'Flight to Tokyo',
+    // Default: no explicit trip assignees → reminds everyone (today's behaviour).
+    tripAssigneeIds: [],
     ...over,
   };
 }
@@ -105,14 +108,90 @@ describe('buildReminderSchedule — activities', () => {
     expect(reminders[0].kind).toBe('activity');
   });
 
-  it('reminderMinutes = 0 fires AT the event time (distinct from off)', () => {
+  it('reminderMinutes = 0 means "None" — schedules NOTHING', () => {
+    // The chip renders 0 as `planner.reminder.none` and ActivityListCard hides
+    // the chip entirely at 0. Firing at the event time would be the very defect
+    // #55 exists to fix (an alert that arrives when it is already too late).
     const a = activity({ startTime: '15:00', reminderMinutes: 0 });
     const { reminders } = buildReminderSchedule(
       input({ occurrencesByDate: { '2026-05-22': [occ('2026-05-22', a)] } }),
       NOW,
       PREFS
     );
-    expect(reminders[0].fireAt).toEqual(new Date('2026-05-22T15:00:00'));
+    expect(reminders).toHaveLength(0);
+  });
+
+  it('REGRESSION: reminderMinutes = 0 STILL schedules when the viewer is on duty', () => {
+    // Guards the landmine in the None change: `reminderMinutes` is required and
+    // ActivityModal defaulted it to 0 for the app's whole life, so every stored
+    // activity reads "None". Without the duty exemption this change would have
+    // silently switched off every school-run reminder in existence.
+    const a = activity({
+      startTime: '09:00',
+      reminderMinutes: 0,
+      assigneeIds: [neil.id as UUID],
+      dropoffMemberId: me.id,
+    });
+    const earlier = new Date('2026-05-24T06:00:00'); // so 09:00−30 = 08:30 is still ahead
+    const { reminders } = buildReminderSchedule(
+      input({ occurrencesByDate: { '2026-05-24': [occ('2026-05-24', a)] } }),
+      earlier,
+      PREFS
+    );
+    expect(reminders).toHaveLength(1);
+    expect(reminders[0].fireAt).toEqual(new Date('2026-05-24T08:30:00')); // falls back to the 30m default
+  });
+
+  it('a viewer on BOTH duties gets two reminders — dropoff@start, pickup@end', () => {
+    // The pickup half used to be lost entirely: every reminder was derived from
+    // startTime and `dutyRole` resolved to 'dropoff' first, so a parent doing
+    // both runs was told "time to pick up" at drop-off time and got nothing at
+    // the end of the activity.
+    const a = activity({
+      startTime: '15:00',
+      endTime: '17:00',
+      reminderMinutes: 30,
+      assigneeIds: [neil.id as UUID],
+      dropoffMemberId: me.id,
+      pickupMemberId: me.id,
+    });
+    const { reminders } = buildReminderSchedule(
+      input({ occurrencesByDate: { '2026-05-22': [occ('2026-05-22', a)] } }),
+      NOW,
+      PREFS
+    );
+    expect(reminders).toHaveLength(2);
+    const dropoff = reminders.find((r) => r.id.endsWith(':dropoff'));
+    const pickup = reminders.find((r) => r.id.endsWith(':pickup'));
+    expect(dropoff?.fireAt).toEqual(new Date('2026-05-22T14:30:00')); // 15:00 − 30
+    expect(pickup?.fireAt).toEqual(new Date('2026-05-22T16:30:00')); // 17:00 − 30
+  });
+
+  it('does not fire a duty that is already marked done for that date', () => {
+    const base: Partial<FamilyActivity> = {
+      startTime: '09:00',
+      reminderMinutes: 30,
+      assigneeIds: [neil.id as UUID],
+      dropoffMemberId: me.id,
+    };
+    const earlier = new Date('2026-05-24T06:00:00'); // 08:30 is ahead — so a skip is the gate, not the clock
+    const day = { '2026-05-24': [occ('2026-05-24', activity(base))] };
+    // Control: it schedules while the duty is outstanding…
+    expect(
+      buildReminderSchedule(input({ occurrencesByDate: day }), earlier, PREFS).reminders
+    ).toHaveLength(1);
+
+    // …and stops once it's ticked off.
+    const done = activity({
+      ...base,
+      dropoffCompletions: [{ date: '2026-05-24', completedBy: me.id, completedAt: '' }],
+    });
+    const { reminders } = buildReminderSchedule(
+      input({ occurrencesByDate: { '2026-05-24': [occ('2026-05-24', done)] } }),
+      earlier,
+      PREFS
+    );
+    expect(reminders).toHaveLength(0);
   });
 
   it('REGRESSION: a duty-only drop-off for a NON-assignee IS scheduled', () => {
@@ -163,6 +242,46 @@ describe('buildReminderSchedule — activities', () => {
 });
 
 describe('buildReminderSchedule — travel', () => {
+  it('PRIVACY: does NOT arm a member who is not on the segment', () => {
+    // Without the traveller filter the whole family is woken 2h before a flight
+    // only one of them is on.
+    const { reminders } = buildReminderSchedule(
+      input({
+        travelOccurrences: [
+          travel({
+            travellerIds: [neil.id] as UUID[],
+            tripAssigneeIds: [me.id, neil.id] as UUID[],
+          }),
+        ],
+      }),
+      NOW,
+      PREFS
+    );
+    expect(reminders).toHaveLength(0);
+  });
+
+  it('arms a member who IS on the segment', () => {
+    const { reminders } = buildReminderSchedule(
+      input({
+        travelOccurrences: [
+          travel({ travellerIds: [me.id] as UUID[], tripAssigneeIds: [me.id, neil.id] as UUID[] }),
+        ],
+      }),
+      NOW,
+      PREFS
+    );
+    expect(reminders).toHaveLength(1);
+  });
+
+  it('a trip with no assignees still reminds everyone (undefined = whole trip)', () => {
+    const { reminders } = buildReminderSchedule(
+      input({ travelOccurrences: [travel({ travellerIds: undefined, tripAssigneeIds: [] })] }),
+      NOW,
+      PREFS
+    );
+    expect(reminders).toHaveLength(1);
+  });
+
   it('schedules a departure at (time − per-type lead), incl. flight_return', () => {
     const { reminders } = buildReminderSchedule(
       input({
@@ -220,14 +339,45 @@ describe('buildReminderSchedule — todos', () => {
     expect(reminders[0].kind).toBe('todo');
   });
 
-  it('skips completed, undated, and untimed to-dos', () => {
+  it('skips completed and undated to-dos', () => {
     const { reminders } = buildReminderSchedule(
       input({
         todos: [
           todo({ id: 'done' as UUID, completed: true }),
           todo({ id: 'undated' as UUID, dueDate: undefined }),
-          todo({ id: 'untimed' as UUID, dueTime: undefined }),
         ],
+      }),
+      NOW,
+      PREFS
+    );
+    expect(reminders).toHaveLength(0);
+  });
+
+  it('a dated but UNTIMED to-do fires at the 09:00 morning-of anchor, no lead', () => {
+    // Previously skipped in silence while the in-app bell still showed it, so
+    // the two surfaces disagreed about which items remind at all.
+    const { reminders } = buildReminderSchedule(
+      input({ todos: [todo({ id: 'untimed' as UUID, dueTime: undefined })] }),
+      NOW,
+      PREFS
+    );
+    expect(reminders).toHaveLength(1);
+    expect(reminders[0].fireAt).toEqual(new Date('2026-05-23T09:00:00'));
+  });
+
+  it('PRIVACY: does NOT schedule a to-do assigned privately to another adult', () => {
+    // `todos` is the whole family's unfiltered active list, so without the
+    // audience gate another adult's private to-do TITLE was pushed to every
+    // family member's lock screen — content the app deliberately hides in-app.
+    // Explicit adults here: the shared fixtures carry no role/ageGroup, so they
+    // classify as children and would pass this for the wrong reason.
+    const adultMe = { id: 'me', name: 'Greg', role: 'owner' } as FamilyMember;
+    const adultPartner = { id: 'sofia', name: 'Sofia', role: 'owner' } as FamilyMember;
+    const { reminders } = buildReminderSchedule(
+      input({
+        currentMember: adultMe,
+        resolveMember: (id) => (id === 'me' ? adultMe : id === 'sofia' ? adultPartner : undefined),
+        todos: [todo({ assigneeIds: [adultPartner.id] as UUID[] })],
       }),
       NOW,
       PREFS

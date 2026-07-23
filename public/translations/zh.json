@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-07-23",
-    "translationCount": 3804
+    "translationCount": 3802
   },
   "translations": {
     "app.name": {
@@ -18981,11 +18981,6 @@
       "hash": "1tspeg",
       "lastUpdated": "2026-07-23"
     },
-    "reminders.activityTitle": {
-      "translation": "标题",
-      "hash": "f4yf6o",
-      "lastUpdated": "2026-07-23"
-    },
     "reminders.activityBodyDropoff": {
       "translation": "是时候下车了— {who}",
       "hash": "lptd26",
@@ -19006,24 +19001,19 @@
       "hash": "tdbi3l",
       "lastUpdated": "2026-07-23"
     },
-    "reminders.todoTitle": {
-      "translation": "标题",
-      "hash": "f4yf6o",
-      "lastUpdated": "2026-07-23"
-    },
     "reminders.todoBody": {
       "translation": "截止于{time}",
       "hash": "a3gm4q",
       "lastUpdated": "2026-07-23"
     },
-    "reminders.travelTitle": {
-      "translation": "标题",
-      "hash": "f4yf6o",
-      "lastUpdated": "2026-07-23"
-    },
     "reminders.travelBody": {
       "translation": "出发时间： {time}",
       "hash": "a6addt",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.todoBodyAllDay": {
+      "translation": "今天到期",
+      "hash": "26qih7",
       "lastUpdated": "2026-07-23"
     }
   }

@@ -31,10 +31,14 @@ import {
   activityReminderContext,
   localDateTime,
   minusMinutes,
-  DEFAULT_ACTIVITY_LEAD,
+  allDayAnchor,
+  resolveOsActivityLead,
   DEFAULT_TRAVEL_LEADS,
 } from '@/utils/reminderSchedule';
 import { activityReminderId, todoDueId, travelReminderId } from '@/utils/notifications';
+import { classifyAudience, isDutyDone } from '@/utils/audience';
+import { normalizeAssignees } from '@/utils/assignees';
+import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
 
 /** How far ahead we arm reminders. Kept < the OS pending-notification ceiling via MAX_SCHEDULED. */
 export const REMINDER_WINDOW_DAYS = 14;
@@ -76,92 +80,162 @@ function withinWindow(dateISO: string, startISO: string, endISO: string): boolea
   return dateISO >= startISO && dateISO <= endISO;
 }
 
-/** Activity reminders — timed occurrences only, lead = per-activity reminderMinutes. */
-export function buildActivityReminders(input: ReminderInput, now: Date): ScheduledReminder[] {
+/**
+ * Activity reminders. Emits EITHER the viewer's duty reminders (one per role —
+ * dropoff on `startTime`, pickup on `endTime`) OR the generic activity reminder,
+ * never both — mirroring the briefing's rule at `useCriticalItems.ts:191`. Both
+ * emitting would collide: the ids would hash to the same `stableNotificationId`
+ * and one would silently overwrite the other.
+ */
+export function buildActivityReminders(
+  input: ReminderInput,
+  now: Date
+): { reminders: ScheduledReminder[]; skipped: number } {
   const out: ScheduledReminder[] = [];
+  let skipped = 0;
   const nowMs = now.getTime();
   for (const [date, occurrences] of Object.entries(input.occurrencesByDate)) {
     if (!withinWindow(date, input.windowStartISO, input.windowEndISO)) continue;
     for (const occ of occurrences) {
       try {
         const a = occ?.activity;
-        if (!a?.id || !a.startTime) continue; // untimed → no meaningful OS fire time
+        if (!a?.id) continue;
         const ctx = activityReminderContext(a, input.currentMember, input.resolveMember);
         if (!ctx.relevant) continue;
-        const at = localDateTime(date, a.startTime);
-        if (!at) continue;
-        const lead =
-          typeof a.reminderMinutes === 'number' ? a.reminderMinutes : DEFAULT_ACTIVITY_LEAD;
-        const fireAt = minusMinutes(at, lead);
-        if (fireAt.getTime() <= nowMs) continue;
+        const lead = resolveOsActivityLead(a.reminderMinutes, ctx.dutyRoles.length > 0);
+        if (lead === null) continue; // the chip says "None"
         const who = ctx.who.join(' · ');
-        let body: string;
-        if (ctx.dutyRole === 'dropoff') {
-          body = fillTemplate(input.t('reminders.activityBodyDropoff'), { who });
-        } else if (ctx.dutyRole === 'pickup') {
-          body = fillTemplate(input.t('reminders.activityBodyPickup'), { who });
-        } else if (ctx.who.length) {
-          body = fillTemplate(input.t('reminders.activityBodyWho'), { who });
-        } else {
-          body = input.t('reminders.activityBody');
+
+        // Duty reminders: one per role, each anchored on its own time. A parent
+        // who both drops off and picks up needs two alerts, hours apart.
+        if (ctx.dutyRoles.length > 0) {
+          for (const role of ctx.dutyRoles) {
+            const done = isDutyDone(
+              role === 'dropoff' ? a.dropoffCompletions : a.pickupCompletions,
+              date
+            );
+            if (done) continue; // already ticked off — don't nag
+            const anchorTime = role === 'dropoff' ? a.startTime : a.endTime;
+            const at = anchorTime ? localDateTime(date, anchorTime) : allDayAnchor(date);
+            if (!at) continue;
+            const fireAt = anchorTime ? minusMinutes(at, lead) : at;
+            if (fireAt.getTime() <= nowMs) continue;
+            out.push({
+              id: activityReminderId(a.id, date, role),
+              fireAt,
+              title: ctx.title,
+              body: fillTemplate(
+                input.t(
+                  role === 'dropoff'
+                    ? 'reminders.activityBodyDropoff'
+                    : 'reminders.activityBodyPickup'
+                ),
+                { who }
+              ),
+              kind: 'activity',
+            });
+          }
+          continue; // duty emitted → suppress the generic reminder
         }
+
+        // Generic reminder. An untimed (all-day) activity fires at the morning-of
+        // anchor with no lead subtracted — it has no start to lead into.
+        const at = a.startTime ? localDateTime(date, a.startTime) : allDayAnchor(date);
+        if (!at) continue;
+        const fireAt = a.startTime ? minusMinutes(at, lead) : at;
+        if (fireAt.getTime() <= nowMs) continue;
         out.push({
           id: activityReminderId(a.id, date),
           fireAt,
-          title: fillTemplate(input.t('reminders.activityTitle'), { title: ctx.title }),
-          body,
+          title: ctx.title,
+          body: ctx.who.length
+            ? fillTemplate(input.t('reminders.activityBodyWho'), { who })
+            : input.t('reminders.activityBody'),
           kind: 'activity',
         });
       } catch (err) {
+        skipped++;
         console.warn(`[buildReminderSchedule] skipped activity occurrence on ${date}:`, err);
       }
     }
   }
-  return out;
+  return { reminders: out, skipped };
 }
 
-/** Timed-to-do reminders — active todos with a dueDate + dueTime, device lead. */
+/**
+ * Timed-to-do reminders — active, dated todos, device lead.
+ *
+ * The `classifyAudience` gate is NOT optional: `input.todos` is the whole
+ * family's unfiltered active list, so without it a to-do another adult assigned
+ * privately to themselves is pushed to every family member's lock screen —
+ * content the app deliberately hides in-app. This is the fourth caller of that
+ * rule (`utils/notifications.ts:173`, `useCriticalItems.ts:254`,
+ * `reminderSchedule.ts` via `activityReminderContext`, and here); if you add a
+ * fifth surface, call the shared classifier rather than re-deriving it.
+ */
 export function buildTodoReminders(
   input: ReminderInput,
   now: Date,
   prefs: ReminderPrefs
-): ScheduledReminder[] {
+): { reminders: ScheduledReminder[]; skipped: number } {
   const out: ScheduledReminder[] = [];
+  let skipped = 0;
   const nowMs = now.getTime();
   for (const todo of input.todos) {
     try {
-      if (todo.completed || !todo.dueDate || !todo.dueTime) continue;
+      if (todo.completed || !todo.dueDate) continue;
+      const audience = classifyAudience(
+        normalizeAssignees(todo),
+        input.currentMember,
+        input.resolveMember
+      );
+      if (audience.kind === 'hidden') continue; // someone else's — never surface it
       const dateISO = todo.dueDate.slice(0, 10);
       if (!withinWindow(dateISO, input.windowStartISO, input.windowEndISO)) continue;
-      const at = localDateTime(todo.dueDate, todo.dueTime);
+      // Untimed but dated → morning-of anchor, no lead subtracted.
+      const at = todo.dueTime ? localDateTime(todo.dueDate, todo.dueTime) : allDayAnchor(dateISO);
       if (!at) continue;
-      const fireAt = minusMinutes(at, prefs.todoReminderLead);
+      const fireAt = todo.dueTime ? minusMinutes(at, prefs.todoReminderLead) : at;
       if (fireAt.getTime() <= nowMs) continue;
       out.push({
         id: todoDueId(todo.id, dateISO),
         fireAt,
-        title: fillTemplate(input.t('reminders.todoTitle'), { title: todo.title }),
-        body: fillTemplate(input.t('reminders.todoBody'), { time: formatTime12(todo.dueTime) }),
+        title: todo.title,
+        body: todo.dueTime
+          ? fillTemplate(input.t('reminders.todoBody'), { time: formatTime12(todo.dueTime) })
+          : input.t('reminders.todoBodyAllDay'),
         kind: 'todo',
       });
     } catch (err) {
+      skipped++;
       console.warn(`[buildReminderSchedule] skipped todo ${todo?.id ?? '?'}:`, err);
     }
   }
-  return out;
+  return { reminders: out, skipped };
 }
 
-/** Travel reminders — departure occurrences only (SupportedTravelType), per-type lead. */
+/**
+ * Travel reminders — departure occurrences only (SupportedTravelType), per-type lead.
+ *
+ * Filtered to the segment's actual travellers: without this every family
+ * member's phone is woken 2h before a flight only one of them is on.
+ * `resolveSegmentTravellers` owns the "undefined = the whole trip" rule; an
+ * empty resolved list means the trip has no assignees, which still reminds
+ * everyone (today's behaviour — don't tighten it here).
+ */
 export function buildTravelReminders(
   input: ReminderInput,
   now: Date,
   prefs: ReminderPrefs
-): ScheduledReminder[] {
+): { reminders: ScheduledReminder[]; skipped: number } {
   const out: ScheduledReminder[] = [];
+  let skipped = 0;
   const nowMs = now.getTime();
   for (const o of input.travelOccurrences) {
     try {
       if (o.kind !== 'departure' || !o.time) continue;
+      const travellers = resolveSegmentTravellers(o.travellerIds, o.tripAssigneeIds);
+      if (travellers.length > 0 && !travellers.includes(input.currentMember.id)) continue;
       const at = localDateTime(o.date, o.time);
       if (!at) continue;
       const lead =
@@ -171,18 +245,19 @@ export function buildTravelReminders(
       out.push({
         id: travelReminderId(o.segmentId, o.date),
         fireAt,
-        title: fillTemplate(input.t('reminders.travelTitle'), { title: o.title }),
+        title: o.title,
         body: fillTemplate(input.t('reminders.travelBody'), { time: formatTime12(o.time) }),
         kind: 'travel',
       });
     } catch (err) {
+      skipped++;
       console.warn(
         `[buildReminderSchedule] skipped travel occurrence ${o?.segmentId ?? '?'}:`,
         err
       );
     }
   }
-  return out;
+  return { reminders: out, skipped };
 }
 
 /**
@@ -193,16 +268,21 @@ export function buildReminderSchedule(
   input: ReminderInput | null,
   now: Date,
   prefs: ReminderPrefs
-): { reminders: ScheduledReminder[]; truncated: boolean } {
-  if (!input || !prefs.remindersEnabled) return { reminders: [], truncated: false };
-  const all = [
-    ...buildActivityReminders(input, now),
-    ...buildTravelReminders(input, now, prefs),
-    ...buildTodoReminders(input, now, prefs),
+): { reminders: ScheduledReminder[]; truncated: boolean; skipped: number } {
+  if (!input || !prefs.remindersEnabled) return { reminders: [], truncated: false, skipped: 0 };
+  const parts = [
+    buildActivityReminders(input, now),
+    buildTravelReminders(input, now, prefs),
+    buildTodoReminders(input, now, prefs),
   ];
+  const all = parts.flatMap((p) => p.reminders);
+  // Surfaced as `notif_skipped`: a non-zero count against a healthy
+  // `notif_count` is the only way to see one family's data quietly dropping a
+  // reminder on every run.
+  const skipped = parts.reduce((n, p) => n + p.skipped, 0);
   all.sort((a, b) => a.fireAt.getTime() - b.fireAt.getTime());
   const truncated = all.length > MAX_SCHEDULED;
-  return { reminders: truncated ? all.slice(0, MAX_SCHEDULED) : all, truncated };
+  return { reminders: truncated ? all.slice(0, MAX_SCHEDULED) : all, truncated, skipped };
 }
 
 export function useScheduledReminders(): {
