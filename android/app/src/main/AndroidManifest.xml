@@ -52,15 +52,32 @@
     <!-- #55: on-device reminder notifications (@capacitor/local-notifications).
          POST_NOTIFICATIONS is the Android 13+ (API 33) runtime prompt to show any
          notification. RECEIVE_BOOT_COMPLETED lets the plugin re-register scheduled
-         alarms after a reboot. SCHEDULE_EXACT_ALARM is a NORMAL declaration for
-         Android 13 (auto-granted, revocable) — we deliberately do NOT build the
-         Android 14+ user-grant flow (USE_EXACT_ALARM is Play-restricted to
-         alarm/clock apps): the plugin falls back to setAndAllowWhileIdle when the
-         permission is absent, which combined with the lead-time offset delivers
-         on time without the extra friction. See ADR-029 + the #55 plan. -->
+         alarms after a reboot.
+
+         EXACT ALARMS — do not "simplify" this back to SCHEDULE_EXACT_ALARM alone.
+         An earlier revision of this comment claimed the plugin's fallback
+         "combined with the lead-time offset delivers on time". It does not: when
+         exact alarms are unavailable the plugin silently degrades to
+         AlarmManager.setAndAllowWhileIdle (LocalNotificationManager.java:380-393),
+         which is INEXACT and Doze-batched to roughly one alarm per 9 minutes.
+         `allowWhileIdle` buys permission to fire DURING Doze, not punctuality, and
+         a lead-time offset cannot compensate for an unbounded deferral. That is
+         the root cause of the original "9am reminder arrived at 9:05" defect.
+
+         USE_EXACT_ALARM (API 33+) is auto-granted and non-revocable. Play
+         restricts it to apps whose core function is an alarm clock or calendar;
+         beanies.family's Family Planner is a calendar with user-set per-event
+         reminders, which is the declared justification in the Play Console.
+         SCHEDULE_EXACT_ALARM is capped at API 32, where it is auto-granted (it is
+         denied-by-default from API 34) — on Android 12/12L it IS user-revocable,
+         which is why the Settings recovery row exists. See the #55 remediation
+         plan (docs/plans/2026-07-23-notifications-review-remediation.md). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
 
     <!-- Android 11+ (API 30+) package visibility: without this <queries> entry,
          Intent(ACTION_IMAGE_CAPTURE).resolveActivity() returns null even when a

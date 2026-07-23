@@ -86,9 +86,11 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       </li>
       <li>
         <strong>diagnostic logs:</strong> a stream of technical events (error messages, the screen
-        or route where an error happened, timings, browser and network type, and a build id) helps
-        us spot and reproduce issues. this stream is PII-free: it carries no family content and is
-        correlated only by a random family id, not by your name or email
+        or route where an error happened, timings, browser and network type, a build id, and — on
+        the phone apps — whether your reminders were successfully set and whether you granted
+        notification permission) helps us spot and reproduce issues. this stream is PII-free: it
+        carries counts and yes/no answers, never the name or content of a reminder, no family
+        content at all, and is correlated only by a random family id, not by your name or email
       </li>
       <li>
         <strong>what we do with it:</strong> we use it solely to diagnose and fix problems and keep

@@ -115,6 +115,10 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'notif_permission',
   'notif_error_stage',
   'notif_kind',
+  'notif_exact_alarm',
+  'notif_tz_changed',
+  'notif_skipped',
+  'notif_lateness_bucket',
 ]);
 
 function getHeaders(event) {
