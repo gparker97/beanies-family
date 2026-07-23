@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-24
+
+### Fixed
+
+- **Reminders now buzz and chime.** Android reminders were posting silently — no sound and no vibration — because the notification channel was created without vibration enabled (the plugin turns it off unless explicitly asked) and, once created, a channel's sound and vibration can never be changed. Reminders now use a freshly-configured channel with vibration on and the default notification sound, and the old silent channel is retired automatically. On devices that already had reminders, the new settings take effect after this update.
+
 ## 2026-07-23
 
 ### Added

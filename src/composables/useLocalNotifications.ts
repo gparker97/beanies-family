@@ -63,7 +63,15 @@ import {
  */
 
 const RESCHEDULE_DEBOUNCE_MS = 1000;
-const REMINDERS_CHANNEL_ID = 'reminders';
+const REMINDERS_CHANNEL_ID = 'reminders_v2';
+/**
+ * The pre-fix channel id. A channel's importance/sound/vibration are FROZEN at
+ * first creation — every later `createChannel` with the same id is a no-op — so
+ * the vibration fix cannot reach a device that already created the original,
+ * vibration-less `reminders` channel. The fix therefore publishes under a NEW id
+ * (above) and retires this one on init. Do not reuse this string.
+ */
+const LEGACY_REMINDERS_CHANNEL_ID = 'reminders';
 
 /**
  * Map a stable string id to a positive 32-bit int — the plugin requires integer
@@ -153,8 +161,33 @@ async function ensureChannel(): Promise<boolean> {
       id: REMINDERS_CHANNEL_ID,
       name: 'Reminders',
       importance: 4, // HIGH — heads-up + sound, so a time-critical reminder is seen
+      // MUST be set: Capacitor defaults `vibration` to false and calls
+      // enableVibration(false) EXPLICITLY (NotificationChannelManager.java), so an
+      // omitted flag means the reminder posts with no buzz on every device — not
+      // "Android's default", an actively-disabled one.
+      vibration: true,
+      // `sound` is deliberately UNSET. Any value routes the plugin to
+      // android.resource://…/raw/<name>, and there is no bundled raw sound, so
+      // passing one would MUTE the channel. Unset = the OS default notification
+      // sound, which a HIGH-importance channel already gets from its constructor.
     });
     channelReady = true;
+    // Retire the pre-fix channel once per session. Its sound/vibration are frozen
+    // (see LEGACY_REMINDERS_CHANNEL_ID), so a device that has it would keep the
+    // silent one forever unless it is deleted and reminders move to the new id.
+    // Best-effort: deleteChannel is a no-op for an absent id (fresh installs), so
+    // a throw here must not fail the arm — the new channel is already created.
+    try {
+      await LocalNotifications.deleteChannel({ id: LEGACY_REMINDERS_CHANNEL_ID });
+    } catch (e) {
+      logEvent({
+        level: 'debug',
+        surface: 'local-notifications',
+        message: 'legacy reminders channel cleanup skipped',
+        context: { notif_error_stage: 'channel' },
+        error: e,
+      });
+    }
     return true;
   } catch (e) {
     // Only reachable on Android now (the guard above returns early elsewhere),

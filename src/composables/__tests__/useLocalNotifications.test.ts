@@ -8,6 +8,7 @@ const { plugin, reportError, logEvent, showToast } = vi.hoisted(() => ({
     cancel: vi.fn(),
     getPending: vi.fn(),
     createChannel: vi.fn(),
+    deleteChannel: vi.fn(),
     checkExactNotificationSetting: vi.fn(),
     checkPermissions: vi.fn(),
     requestPermissions: vi.fn(),
@@ -83,7 +84,7 @@ describe('buildScheduledNotifications (ADR-029 A4)', () => {
       id: stableNotificationId('activity-reminder:id-1:2026-05-22'),
       title: 'Football',
       body: 'Time to drop off — Neil',
-      channelId: 'reminders',
+      channelId: 'reminders_v2',
       extra: { kind: 'activity' },
     });
     // allowWhileIdle bypasses Doze batching; fires at the pre-computed lead time.
@@ -168,7 +169,26 @@ describe('reconcileScheduled — the ordering that stops a failure wiping remind
     plugin.schedule.mockResolvedValue(undefined);
     plugin.cancel.mockResolvedValue(undefined);
     plugin.createChannel.mockResolvedValue(undefined);
+    plugin.deleteChannel.mockResolvedValue(undefined);
     plugin.checkExactNotificationSetting.mockResolvedValue({ exact_alarm: 'granted' });
+  });
+
+  it('creates the channel with vibration ON and retires the frozen legacy channel', async () => {
+    await reconcileScheduled(payload, true, META);
+    // Capacitor disables vibration unless we ask for it; a HIGH channel gets the
+    // default sound only when `sound` is left unset.
+    expect(plugin.createChannel).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'reminders_v2', importance: 4, vibration: true })
+    );
+    expect(plugin.createChannel.mock.calls[0][0]).not.toHaveProperty('sound');
+    // The old silent channel must be deleted, or a device that has it keeps it.
+    expect(plugin.deleteChannel).toHaveBeenCalledWith({ id: 'reminders' });
+  });
+
+  it('a failing legacy-channel delete does not fail the arm', async () => {
+    plugin.deleteChannel.mockRejectedValue(new Error('absent'));
+    await reconcileScheduled(payload, true, META);
+    expect(plugin.schedule).toHaveBeenCalled(); // reminders still armed
   });
 
   it('schedules BEFORE cancelling, so a schedule failure cannot destroy live alarms', async () => {
