@@ -1255,12 +1255,36 @@ export const useAuthStore = defineStore('auth', () => {
    * let the caller navigate. A user who can't sign out is much worse than
    * a missed final save.
    */
+  /**
+   * Drop every armed OS reminder on sign-out.
+   *
+   * Pending alarms carry activity titles and resolved member names, so leaving
+   * them would put family content on the lock screen of a signed-out device.
+   * This used to happen implicitly — a null `currentMember` emptied the desired
+   * set and the reconcile cancelled the world — but the not-ready guard in
+   * `useLocalNotifications` removed that side effect, so it is explicit now.
+   *
+   * DYNAMIC import, matching the syncStore pattern below: a static one would pull
+   * `@capacitor/local-notifications` into authStore's graph for every consumer
+   * and every test. Never throws — the callee reports internally.
+   */
+  async function cancelRemindersForSignOut(): Promise<void> {
+    try {
+      const { cancelAllScheduledReminders } = await import('@/composables/useLocalNotifications');
+      await cancelAllScheduledReminders();
+    } catch (e) {
+      console.warn('[authStore] failed to cancel OS reminders during sign-out', e);
+    }
+  }
+
   async function signOut(): Promise<void> {
     // Force a durable save of the latest doc BEFORE the cache is torn down, so
     // the freshest edit (which may live only in the worker cache) reaches Drive.
     // Bounded timeout — Drive can hang indefinitely if its API key is rejected,
     // the file was deleted, or the network is offline. Don't let that block sign-out.
     await forceSaveWithTimeout(3000);
+
+    await cancelRemindersForSignOut();
 
     // Wipe Google session state (in-memory tokens, refresh tokens in
     // IndexedDB+localStorage, folder cache). Without this, signing in
@@ -1414,6 +1438,9 @@ export const useAuthStore = defineStore('auth', () => {
     // Force a durable save of the latest doc before clearing the cache.
     // Bounded — see signOut() for rationale.
     await forceSaveWithTimeout(3000);
+
+    // Doubly important here: this path promises the device is clean.
+    await cancelRemindersForSignOut();
 
     // Wipe Google session state — same rationale as signOut().
     await clearGoogleSessionStateWithTimeout(3000);
