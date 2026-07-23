@@ -16,6 +16,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:lambda": "node --test infrastructure/lambda/telemetry/__tests__/*.test.mjs infrastructure/lambda/ai-extract/__tests__/*.test.mjs infrastructure/lambda/oauth/__tests__/*.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",

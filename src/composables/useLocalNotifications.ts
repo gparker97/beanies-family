@@ -1,6 +1,6 @@
 import { watch } from 'vue';
 import { LocalNotifications, type LocalNotificationSchema } from '@capacitor/local-notifications';
-import { isNative } from '@/services/sync/capabilities';
+import { isNative, getPlatform } from '@/services/sync/capabilities';
 import {
   useScheduledReminders,
   buildReminderSchedule,
@@ -13,8 +13,12 @@ import { logEvent } from '@/services/telemetry';
  * On-device local notifications for the native (Capacitor) app — ADR-029 A4.
  *
  * Schedules a reminder for each upcoming timed item (activities, travel
- * departures, timed to-dos) at (event − lead), delivered exactly via
- * `allowWhileIdle` so Doze can't defer it (#55). The forward source + fire times
+ * departures, timed to-dos) at (event − lead). Punctuality comes from the
+ * manifest's USE_EXACT_ALARM, NOT from `allowWhileIdle` — the latter only permits
+ * firing during Doze; without an exact-alarm grant the plugin silently degrades
+ * to `setAndAllowWhileIdle`, which Doze batches to ~1 alarm per 9 minutes and
+ * which caused the original #55 late-delivery defect. `exactAlarmState` below
+ * makes that degradation visible instead of silent. The forward source + fire times
  * come from the pure `buildReminderSchedule` (`useScheduledReminders`), gated by
  * the per-device master toggle. Reminders are generated entirely ON-DEVICE from
  * already-decrypted data — beanies' servers never see the schedule.
@@ -60,6 +64,40 @@ export function buildScheduledNotifications(
     channelId: REMINDERS_CHANNEL_ID,
     extra: { kind: r.kind },
   }));
+}
+
+/**
+ * Exact-alarm state, Android-only. `'unknown'` on iOS/web and until the first
+ * successful check.
+ *
+ * NOTE: `checkPermissions()` does NOT carry this — it returns `{ display }` only
+ * (`PermissionStatus`). `exact_alarm` lives on `SettingsPermissionStatus`,
+ * returned exclusively by `checkExactNotificationSetting()`, which is documented
+ * Android-only. Reading it off `checkPermissions()` yields `undefined` on every
+ * platform, silently.
+ */
+let exactAlarmState: 'granted' | 'denied' | 'unknown' = 'unknown';
+
+/**
+ * Refresh {@link exactAlarmState}. No-op (and never a throw) off Android — the
+ * plugin method does not exist there. A failure leaves the state untouched and
+ * is reported rather than swallowed, so a permanently-`unknown` fleet is
+ * distinguishable from a genuinely granted one.
+ */
+async function refreshExactAlarmState(): Promise<void> {
+  if (getPlatform() !== 'android') return;
+  try {
+    const { exact_alarm } = await LocalNotifications.checkExactNotificationSetting();
+    exactAlarmState = exact_alarm === 'granted' ? 'granted' : 'denied';
+  } catch (e) {
+    reportError({
+      surface: 'local-notifications-permission',
+      severity: 'warning',
+      message: 'checkExactNotificationSetting failed; exact-alarm state unknown',
+      error: e,
+      context: { notif_error_stage: 'exact_alarm_check' },
+    });
+  }
 }
 
 let initialized = false;
@@ -175,8 +213,12 @@ export function useLocalNotifications(): void {
       if (toSchedule.length > 0) {
         await LocalNotifications.schedule({ notifications: toSchedule });
       }
+      await refreshExactAlarmState();
       // Success-path signal too, so scheduled-RATE (not just failures) is
       // measurable — emitted even at count 0 (toggle off / nothing due).
+      // `notif_exact_alarm` is the load-bearing field: a 'denied' fleet means
+      // reminders are being delivered inexactly (Doze-batched) even though the
+      // schedule itself looks perfectly healthy — the original #55 defect.
       logEvent({
         level: 'info',
         surface: 'local-notifications',
@@ -185,6 +227,7 @@ export function useLocalNotifications(): void {
           notif_count: toSchedule.length,
           notif_lead_default: prefs.value.todoReminderLead,
           notif_truncated: truncated,
+          notif_exact_alarm: exactAlarmState,
         },
       });
     } catch (e) {

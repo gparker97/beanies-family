@@ -39,6 +39,13 @@ jobs:
       - name: Unit tests
         run: npm run test:run
 
+      # These use `node:test`, not vitest, so `test:run` does not pick them up.
+      # Includes the telemetry allowlist drift guard that keeps the Lambda's
+      # ALLOWED_CONTEXT_KEYS in sync with src/utils/diagnosticContext.ts — the
+      # check CLAUDE.md's privacy gate relies on.
+      - name: Lambda tests
+        run: npm run test:lambda
+
       - name: Build
         run: npm run build
 

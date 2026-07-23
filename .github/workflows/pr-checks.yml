@@ -53,6 +53,11 @@ jobs:
       - name: Run tests
         run: npm run test:run
 
+      # `node:test` suites — not picked up by vitest. Carries the telemetry
+      # allowlist drift guard (see main-ci.yml for the rationale).
+      - name: Lambda tests
+        run: npm run test:lambda
+
       - name: Upload coverage
         uses: codecov/codecov-action@v7
         if: always()
