@@ -28,6 +28,7 @@ import type {
   VacationSegmentStatus,
   VacationAccommodation,
   VacationTransportation,
+  SupportedTravelType,
 } from '@/types/models';
 
 /** Emoji lookup for vacation trip types */
@@ -1093,9 +1094,10 @@ export function buildCruisePortOptions(): ComboOption[] {
 // their actual departure / arrival times. Pure derivation — orchestration sits
 // in `vacationStore` (see `allTravelSegmentOccurrences` + `safeExtract`).
 
-/** Travel-segment types that have a meaningful departure/arrival pair. */
-export type SupportedTravelType =
-  'flight_outbound' | 'flight_return' | 'train' | 'ferry' | 'cruise';
+/** Travel-segment types that have a meaningful departure/arrival pair.
+ *  Canonical definition lives in `@/types/models` (avoids a circular import
+ *  when model interfaces key on it); imported above + re-exported for consumers. */
+export type { SupportedTravelType };
 
 /** A single calendar occurrence — one side of a travel segment. */
 export interface TravelSegmentOccurrence {

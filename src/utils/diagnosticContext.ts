@@ -173,6 +173,17 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'has_session',
   'registry_had_file_id',
   'token_valid',
+  // OS local-notification diagnostics (#55, surface `local-notifications`). All
+  // PII-free counters/enums/bools: how many reminders were scheduled, whether the
+  // MAX_SCHEDULED cap clipped the list, the to-do default lead, the permission
+  // outcome, which reschedule stage failed, and the delivered reminder's kind.
+  // MIRROR every key here in the Lambda allowlist + its pinned test.
+  'notif_count',
+  'notif_truncated',
+  'notif_lead_default',
+  'notif_permission',
+  'notif_error_stage',
+  'notif_kind',
 ]);
 
 export const MAX_STRING_LEN = 200;

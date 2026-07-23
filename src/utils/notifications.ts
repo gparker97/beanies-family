@@ -20,6 +20,12 @@ import { normalizeAssignees } from '@/utils/assignees';
 import { classifyAudience } from '@/utils/audience';
 import { entityDeepLink } from '@/utils/entityDeepLink';
 import { CALENDAR_SYNC_OPEN } from '@/constants/settingsDeepLinks';
+import {
+  activityReminderContext,
+  DEFAULT_ACTIVITY_LEAD,
+  localDateTime,
+  minusMinutes,
+} from '@/utils/reminderSchedule';
 
 /** Minimal calendar-connection shape the deriver needs (keeps it store-decoupled). */
 export interface CalendarConnectionHealth {
@@ -31,10 +37,9 @@ export interface CalendarConnectionHealth {
 }
 
 const MS_PER_DAY = 86_400_000;
-/** Lead time before a timed todo's due moment that the `todo-due` fires. */
+/** Lead time before a timed todo's due moment that the in-app `todo-due` fires
+ *  (the OS scheduler's todo lead is device-configurable — see reminderSchedule). */
 const DUE_LEAD_MINUTES = 30;
-/** Reminder lead used when an activity has no explicit `reminderMinutes`. */
-const DEFAULT_REMINDER_MINUTES = 30;
 /** Prefixes used by the prune exemption (all window-exempt kinds). Adding a
  *  new exempt kind = one entry here + the kind's own deriver block. */
 const WHATS_NEW_PREFIX = 'whats-new:';
@@ -91,6 +96,10 @@ export const todoDueId = (todoId: string, dueDate: string): string =>
 export const todoAssignedId = (todoId: string): string => `todo-assigned:${todoId}`;
 export const activityReminderId = (activityId: string, occurrenceDate: string): string =>
   `activity-reminder:${activityId}:${occurrenceDate}`;
+// OS travel-departure reminder (no in-app equivalent kind). One per segment
+// departure occurrence; the date keeps it stable across reschedules.
+export const travelReminderId = (segmentId: string, occurrenceDate: string): string =>
+  `travel-reminder:${segmentId}:${occurrenceDate}`;
 // One per completion event (encodes completedAt so a re-completion is a new id).
 export const listCompletedId = (listId: string, completedAt: string): string =>
   `list-completed:${listId}:${completedAt}`;
@@ -111,31 +120,13 @@ export const communityNudgeId = (messageIndex: number): string =>
 export const INSTALL_NUDGE_ID = 'install-nudge';
 
 // ── Internal pure date helpers (LOCAL time — avoids the UTC-midnight trap of
-//    `new Date('YYYY-MM-DD')`) ─────────────────────────────────────────────────
-function localDateTime(dateStr: string, time?: string): Date | null {
-  const dm = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
-  if (!dm) return null;
-  let hh = 0;
-  let mm = 0;
-  if (time) {
-    const tm = /^(\d{1,2}):(\d{2})/.exec(time);
-    if (tm) {
-      hh = Number(tm[1]);
-      mm = Number(tm[2]);
-    }
-  }
-  const d = new Date(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3]), hh, mm, 0, 0);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
+//    `new Date('YYYY-MM-DD')`). `localDateTime` + `minusMinutes` are shared with
+//    the OS forward scheduler and live in `@/utils/reminderSchedule`. ───────────
 function startOfLocalDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
 }
 function endOfLocalDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-}
-function minusMinutes(d: Date, minutes: number): Date {
-  return new Date(d.getTime() - minutes * 60_000);
 }
 function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -165,11 +156,6 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
     occurrencesByDate,
   } = input;
   const resolveMember = (id: string): FamilyMember | undefined => members.find((m) => m.id === id);
-  const displayNames = (ids: string[]): string[] =>
-    ids
-      .map(resolveMember)
-      .filter((m): m is FamilyMember => m !== undefined)
-      .map((m) => m.name);
   const nowMs = now.getTime();
   const windowStartMs = nowMs - windowDays * MS_PER_DAY;
   const isRead = (id: string): boolean => readState[id] !== undefined;
@@ -285,14 +271,12 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
       try {
         const a = occ?.activity;
         if (!a?.id) continue;
-        const audience = classifyAudience(normalizeAssignees(a), currentMember, resolveMember);
-        const isDuty =
-          a.dropoffMemberId === currentMember.id || a.pickupMemberId === currentMember.id;
-        if (audience.kind === 'hidden' && !isDuty) continue;
+        const ctx = activityReminderContext(a, currentMember, resolveMember);
+        if (!ctx.relevant) continue;
         const occDay = localDateTime(date);
         if (!occDay) continue;
         const reminder =
-          typeof a.reminderMinutes === 'number' ? a.reminderMinutes : DEFAULT_REMINDER_MINUTES;
+          typeof a.reminderMinutes === 'number' ? a.reminderMinutes : DEFAULT_ACTIVITY_LEAD;
         const trigger = a.startTime
           ? minusMinutes(localDateTime(date, a.startTime) ?? occDay, reminder)
           : startOfLocalDay(occDay);
@@ -300,23 +284,15 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
         if (!inWindow(triggerMs)) continue;
         const id = activityReminderId(a.id, date);
         const link = entityDeepLink('activity', a.id);
-        const who = displayNames(normalizeAssignees(a));
-        if (a.location) who.push(a.location);
-        const dutyRole =
-          a.dropoffMemberId === currentMember.id
-            ? 'dropoff'
-            : a.pickupMemberId === currentMember.id
-              ? 'pickup'
-              : undefined;
         out.push({
           id,
           kind: 'activity-reminder',
-          title: a.title,
-          subtitle: who.length ? who.join(' · ') : undefined,
+          title: ctx.title,
+          subtitle: ctx.who.length ? ctx.who.join(' · ') : undefined,
           occurredAt: trigger.toISOString(),
           eventDate: date,
           eventTime: a.startTime,
-          dutyRole,
+          dutyRole: ctx.dutyRole,
           route: link.path,
           query: link.query,
           sourceId: a.id,

@@ -1,0 +1,247 @@
+<script setup lang="ts">
+/**
+ * Settings → Reminders (#55) — device-scoped OS local-notification preferences.
+ *
+ * A master on/off toggle plus adjustable lead-times: per travel type (flights,
+ * cruise, train, ferry) and one for timed to-dos. Activities keep their own
+ * per-item reminder time (this row just links to the activity editor). Mirrors
+ * the BeanieLabSection toggle-handler contract (persist via the store, which
+ * toasts + re-throws; the control reads the persisted value so a failed write
+ * self-heals). Native-only OS delivery — on web the section still persists the
+ * prefs (honoured by the in-app briefing) but hides the OS-permission nudge.
+ */
+import { computed, onMounted, ref } from 'vue';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
+import BaseSelect from '@/components/ui/BaseSelect.vue';
+import { useTranslation } from '@/composables/useTranslation';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { isNative } from '@/services/sync/capabilities';
+import { reportError } from '@/utils/errorReporter';
+import { LEAD_OPTIONS, formatLeadLabel } from '@/utils/reminderSchedule';
+import type { SupportedTravelType } from '@/types/models';
+
+const { t } = useTranslation();
+const settingsStore = useSettingsStore();
+
+const remindersEnabled = computed(() => settingsStore.remindersEnabled);
+
+// Lead-time options for every select (shared list, human labels).
+const leadOptions = computed(() =>
+  LEAD_OPTIONS.map((m) => ({ value: m, label: formatLeadLabel(m, t) }))
+);
+
+// One row per travel type the app can fire on. "Flights" drives both the
+// outbound and return legs (they share a lead).
+const TRAVEL_ROWS: {
+  key: string;
+  emoji: string;
+  types: SupportedTravelType[];
+  labelKey: 'reminders.flights' | 'reminders.cruises' | 'reminders.trains' | 'reminders.ferries';
+}[] = [
+  {
+    key: 'flights',
+    emoji: '✈️',
+    types: ['flight_outbound', 'flight_return'],
+    labelKey: 'reminders.flights',
+  },
+  { key: 'cruises', emoji: '🚢', types: ['cruise'], labelKey: 'reminders.cruises' },
+  { key: 'trains', emoji: '🚆', types: ['train'], labelKey: 'reminders.trains' },
+  { key: 'ferries', emoji: '⛴️', types: ['ferry'], labelKey: 'reminders.ferries' },
+];
+const ACTIVITIES_EMOJI = '🗓️';
+const TODO_EMOJI = '✅';
+
+const travelLeadFor = (types: SupportedTravelType[]): number =>
+  settingsStore.travelReminderLeads[types[0]];
+
+async function onToggle(enabled: boolean): Promise<void> {
+  try {
+    await settingsStore.setRemindersEnabled(enabled);
+  } catch {
+    // Already surfaced (toast + console.error) and re-thrown; the toggle reads
+    // the persisted value, so a failed write simply stays where it was.
+  }
+}
+
+async function onTravelLead(types: SupportedTravelType[], value: string | number): Promise<void> {
+  const minutes = Number(value);
+  try {
+    for (const type of types) await settingsStore.setTravelReminderLead(type, minutes);
+  } catch {
+    // Surfaced + re-thrown by the store; the select re-reads the persisted value.
+  }
+}
+
+async function onTodoLead(value: string | number): Promise<void> {
+  try {
+    await settingsStore.setTodoReminderLead(Number(value));
+  } catch {
+    // Surfaced + re-thrown by the store.
+  }
+}
+
+// OS-permission nudge — native only; shown when reminders are on but the OS
+// permission isn't granted. Denial is not an error (the in-app briefing still
+// shows everything), so a failed check just hides the nudge.
+const permissionGranted = ref(true);
+onMounted(async () => {
+  if (!isNative()) return;
+  try {
+    permissionGranted.value = (await LocalNotifications.checkPermissions()).display === 'granted';
+  } catch (e) {
+    reportError({
+      surface: 'local-notifications-permission',
+      severity: 'warning',
+      message: 'settings permission check failed',
+      error: e,
+      context: { notif_error_stage: 'permission' },
+    });
+  }
+});
+const showPermissionNudge = computed(
+  () => isNative() && remindersEnabled.value && !permissionGranted.value
+);
+</script>
+
+<template>
+  <section
+    class="rounded-[var(--sq)] bg-white p-5 shadow-[0_2px_12px_rgba(44,62,80,0.04)] dark:bg-slate-800"
+  >
+    <!-- Header -->
+    <div class="flex items-start gap-3.5">
+      <span
+        class="flex h-11 w-11 flex-none items-center justify-center rounded-[14px] text-[var(--heritage-orange)]"
+        style="background-color: var(--tint-orange-8)"
+        aria-hidden="true"
+      >
+        <svg
+          width="26"
+          height="26"
+          viewBox="0 0 40 40"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M20 6C14.2 6 10.8 10.8 10.8 18c0 5.2-1.4 7.6-2.7 9.4-.7 1 0 2.5 1.2 2.5h21.4c1.2 0 1.9-1.5 1.2-2.5-1.3-1.8-2.7-4.2-2.7-9.4C29.2 10.8 25.8 6 20 6Z"
+          />
+          <path d="M9.9 24.6c3.4 1.35 16.8 1.35 20.2 0" />
+          <path d="M20 7.6V24.3" stroke-opacity=".5" />
+          <path
+            d="M20 30.2c-1.7 0-2.8 1.1-2.8 2.6a2.8 2.8 0 0 0 5.6 0c0-1.5-1.1-2.6-2.8-2.6Z"
+            fill="currentColor"
+            stroke="none"
+          />
+          <circle cx="20" cy="4.4" r="2.1" fill="currentColor" stroke="none" />
+        </svg>
+      </span>
+      <div>
+        <h3 class="font-outfit text-lg font-bold text-[var(--deep-slate)] dark:text-slate-200">
+          {{ t('reminders.title') }}
+        </h3>
+        <p class="mt-0.5 text-sm text-[var(--deep-slate)]/45 dark:text-slate-500">
+          {{ t('reminders.description') }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Master toggle -->
+    <SettingToggleRow
+      testid="reminders-master"
+      class="mt-2"
+      :title="t('reminders.masterToggle')"
+      :hint="t('reminders.masterToggleHint')"
+      :model-value="remindersEnabled"
+      @update:model-value="onToggle"
+    />
+
+    <!-- Lead-time controls -->
+    <p
+      class="font-outfit mt-5 mb-1 text-xs font-semibold tracking-[0.08em] text-[var(--deep-slate)]/40 uppercase dark:text-slate-500"
+    >
+      {{ t('reminders.howMuchNotice') }}
+    </p>
+
+    <!-- Activities — informational (each activity keeps its own reminder) -->
+    <div
+      class="flex items-center justify-between gap-4 border-b border-[var(--tint-slate-05)] py-3"
+    >
+      <div class="flex items-center gap-2.5">
+        <span class="text-base" aria-hidden="true">{{ ACTIVITIES_EMOJI }}</span>
+        <div>
+          <p class="font-outfit text-sm font-semibold text-[var(--deep-slate)] dark:text-slate-200">
+            {{ t('reminders.activities') }}
+          </p>
+          <p class="text-xs text-[var(--deep-slate)]/40 dark:text-slate-500">
+            {{ t('reminders.activitiesHint') }}
+          </p>
+        </div>
+      </div>
+      <RouterLink
+        to="/activities"
+        class="font-outfit text-sm font-semibold text-[var(--heritage-orange)]"
+      >
+        {{ t('reminders.editActivity') }}
+      </RouterLink>
+    </div>
+
+    <!-- Travel types -->
+    <div
+      v-for="row in TRAVEL_ROWS"
+      :key="row.key"
+      class="flex items-center justify-between gap-4 border-b border-[var(--tint-slate-05)] py-3"
+    >
+      <div class="flex items-center gap-2.5">
+        <span class="text-base" aria-hidden="true">{{ row.emoji }}</span>
+        <p class="font-outfit text-sm font-semibold text-[var(--deep-slate)] dark:text-slate-200">
+          {{ t(row.labelKey) }}
+        </p>
+      </div>
+      <BaseSelect
+        class="w-40 flex-none"
+        :model-value="travelLeadFor(row.types)"
+        :options="leadOptions"
+        :aria-label="t(row.labelKey)"
+        @update:model-value="(v) => onTravelLead(row.types, v)"
+      />
+    </div>
+
+    <!-- Timed to-dos -->
+    <div class="flex items-center justify-between gap-4 py-3">
+      <div class="flex items-center gap-2.5">
+        <span class="text-base" aria-hidden="true">{{ TODO_EMOJI }}</span>
+        <div>
+          <p class="font-outfit text-sm font-semibold text-[var(--deep-slate)] dark:text-slate-200">
+            {{ t('reminders.timedTodos') }}
+          </p>
+          <p class="text-xs text-[var(--deep-slate)]/40 dark:text-slate-500">
+            {{ t('reminders.timedTodosHint') }}
+          </p>
+        </div>
+      </div>
+      <BaseSelect
+        class="w-40 flex-none"
+        :model-value="settingsStore.todoReminderLead"
+        :options="leadOptions"
+        :aria-label="t('reminders.timedTodos')"
+        @update:model-value="onTodoLead"
+      />
+    </div>
+
+    <!-- OS-permission nudge (Heritage Orange — never red) -->
+    <div
+      v-if="showPermissionNudge"
+      class="mt-4 flex items-start gap-3 rounded-2xl p-4"
+      style="background-color: var(--tint-orange-8)"
+      role="status"
+    >
+      <span class="flex-none text-base text-[var(--heritage-orange)]" aria-hidden="true">🔔</span>
+      <p class="text-xs text-[var(--deep-slate)] dark:text-slate-300">
+        {{ t('reminders.permissionNudge') }}
+      </p>
+    </div>
+  </section>
+</template>

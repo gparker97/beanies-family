@@ -41,6 +41,11 @@ export interface GlobalSettings {
   beanieMode?: boolean;
   soundEnabled?: boolean;
   beanieLabEnabled?: boolean; // per-device opt-in to experimental features (The Beanie Lab); off by default, never family-synced
+  // ── OS reminder preferences (#55) — device-scoped; local notifications live
+  //    per-device, so these are never family-synced. See reminderSchedule.ts. ──
+  remindersEnabled?: boolean; // master on/off for OS local notifications; on by default
+  todoReminderLead?: number; // minutes before a timed to-do's due time (default DEFAULT_TODO_LEAD)
+  travelReminderLeads?: Partial<Record<SupportedTravelType, number>>; // per-travel-type override; missing type → DEFAULT_TRAVEL_LEADS
   isTrustedDevice?: boolean;
   trustedDevicePromptShown?: boolean;
   cachedFamilyKeys?: Record<string, string>;
@@ -865,6 +870,13 @@ export type VacationTravelType =
   | 'ferry'
   | 'car'
   | 'activity';
+
+/** Travel-segment types that have a meaningful departure/arrival time pair (and
+ *  so a calendar occurrence + an OS reminder). Subset of VacationTravelType;
+ *  defined here (not in utils/vacation) so model interfaces can key on it
+ *  without a circular import. `utils/vacation` re-exports it. */
+export type SupportedTravelType =
+  'flight_outbound' | 'flight_return' | 'train' | 'ferry' | 'cruise';
 
 export type VacationActivityCategory =
   'show_musical' | 'theme_park' | 'sporting_event' | 'concert' | 'excursion' | 'other';
