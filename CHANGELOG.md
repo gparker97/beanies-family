@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
-- **Reminders that reach you before things start.** On the iOS and Android apps, beanies can now notify you _ahead_ of an activity, a travel departure, or a timed to-do — so you leave and prepare on time, even when the app is closed. A new **Settings → Reminders** section lets you turn reminders on or off per device and choose how much notice each kind gets: activities use the reminder time set on each one, flights and cruises default to two hours, trains and ferries to one hour (all adjustable), and timed to-dos get a default lead you can change.
+- **Reminders that reach you before things start.** On the Android app (iPhone to follow), beanies can now notify you _ahead_ of an activity, a travel departure, or a timed to-do — so you leave and prepare on time, even when the app is closed. A new **Settings → Reminders** section lets you turn reminders on or off per device and choose how much notice each kind gets: activities use the reminder time set on each one, flights and cruises default to two hours, trains and ferries to one hour (all adjustable), and timed to-dos get a default lead you can change.
 - **Reminders go only to the people they concern.** A to-do someone assigned privately to themselves stays on their phone, and a flight reminder reaches only the family members actually on that flight — not everyone's lock screen.
 - **Both halves of a school run.** If you are down for drop-off _and_ pick-up, you get a reminder before each one — the pick-up timed off the end of the activity, not the start. Tick a run off and its reminder stops.
 - **All-day items remind you in the morning.** All-day activities and to-dos with a date but no time now nudge you at 9am on the day, instead of quietly never reminding you at all.
@@ -31,6 +31,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Reminders survive opening the app on the lock screen.** Opening beanies without unlocking your family data could silently delete every reminder you had set — you'd simply never hear from them again. They're now left alone until your data is ready, and cleared deliberately when you sign out rather than by accident.
 - **"Time to pick up" now arrives near the pickup.** For an activity with a start time but no end time it was firing at 9am, hours early. It now fires before the activity instead, and ticking a school run off no longer starts a second, different reminder for it.
 - **Android notifications show the beanie-bell.** They'd been showing Android's generic "i" icon — no notification icon had ever been set.
+- **Reminders no longer vanish when you open the app on the lock screen.** Opening beanies before unlocking your family data could silently delete every reminder you'd set. They're now left alone until your data is ready, and cleared deliberately when you sign out instead of by accident.
+- **"Time to pick up" arrives near the pickup.** For an activity with a start time but no end time it was firing at 9am, hours early. Ticking a school run off also no longer starts a different reminder for the same thing.
+- **Reminders you set to "None" stay off.** The reminder options for an activity now read the same in Settings as they do on the activity itself, so choosing "None" can't quietly mean something else.
+- **Activities created during first-time setup get reminders too.** They were being saved with no reminder time at all.
 - **If a reminder can't be set, you're told.** When the phone refuses to schedule reminders the app now says so once, and makes clear the in-app reminders still show everything — instead of failing quietly.
 
 ## 2026-07-22
