@@ -60,6 +60,11 @@ export async function ensureNotificationPermission(mayPrompt: boolean): Promise<
     notificationPermission.value = display as NotifPermission;
     return display === 'granted';
   } catch (e) {
+    // 'unknown', NOT the stale previous value. A latched 'granted' here would
+    // make the reschedule event report a permission state we never observed, and
+    // would keep the Settings nudge hidden because the ref isn't 'denied' — the
+    // device would look healthy while arming nothing.
+    notificationPermission.value = 'unknown';
     reportError({
       surface: 'local-notifications-permission',
       severity: 'warning',

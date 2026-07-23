@@ -72,6 +72,10 @@ This mitigates confirmation-finding 5: every stored activity carries `reminderMi
 
 19. Synced Google Calendar events carry **no** reminder override, and `reminderMinutes` is removed from the push hash so a reminder edit never re-pushes an identical event.
 
+### G. Android notification icon
+
+20. Android notifications show the beanie-bell, not Android's stock "i" glyph. The plugin falls back to `android.R.drawable.ic_dialog_info` when no small icon is configured (`LocalNotificationManager.java:469`) — nothing configures one today, which is why every beanies notification carries the generic info icon.
+
 ### E. Changelog
 
 18. `CHANGELOG.md` covers the settings restructure and the back-fill, stating plainly that a deliberate "None" may have been reset.
@@ -454,7 +458,18 @@ Add a comment at `useScheduledReminders.ts:46` recording (a) why earliest-first 
 
 Also record that **the back-fill materially raises occupancy**: before it, `resolveOsActivityLead` gated out essentially the entire corpus, so truncation was near-theoretical; after it, five daily recurring activities alone fill 70 slots in a 14-day window. The self-healing argument is unchanged, but `notif_truncated: true` becomes a routine signal rather than an alarm — say so, or the first CloudWatch look reads it as a regression.
 
-### 10. `CHANGELOG.md` (req 18)
+### 10. Android notification icon (req 20)
+
+Android renders the notification small icon as a **silhouette from the alpha channel only** — colour is discarded and the system tints it. A full-colour PNG becomes a white blob, which is the usual version of this bug. So the asset must be a flat single-shape mark, and a `VectorDrawable` is the right form: one file, crisp at every density, no PNG buckets.
+
+The beanie-bell is already monoline `currentColor` paths (`BeanieBellIcon.vue`), so it ports directly — same 40×40 viewport, strokes thickened slightly for legibility at 24dp, the 50%-opacity centre line dropped (opacity variation muddies a silhouette) and the `<circle>` pom expressed as a path (`VectorDrawable` has no circle element).
+
+- `android/app/src/main/res/drawable/ic_stat_beanie_bell.xml` — the drawable.
+- `capacitor.config.ts` — `plugins.LocalNotifications.smallIcon: 'ic_stat_beanie_bell'` plus `iconColor: '#F15D22'` (Heritage Orange) for the accent Android draws alongside it.
+
+Applies to **every** notification the app posts, not just reminders.
+
+### 11. `CHANGELOG.md` (req 18)
 
 Entries for the settings restructure (Reminders card/drawer, Discord CTA, configurable activity default) and — plainly — the back-fill, including that a deliberate "None" may have been reset.
 
@@ -462,6 +477,7 @@ Entries for the settings restructure (Reminders card/drawer, Discord CTA, config
 
 **Created**
 
+- `android/app/src/main/res/drawable/ic_stat_beanie_bell.xml` — notification small icon (alpha-only silhouette)
 - `src/utils/activityReminderBackfill.ts` — the one-shot selector + its retirement contract (one deletable module, not smeared across the scheduling core)
 - `src/utils/__tests__/activityReminderBackfill.test.ts`
 
@@ -481,6 +497,7 @@ Entries for the settings restructure (Reminders card/drawer, Discord CTA, config
 - `src/App.vue` — `usePermissions()` in setup; fire-and-forget back-fill in the post-load block
 - `src/stores/authStore.ts` — `await cancelAllScheduledReminders()` in `signOut()` and `signOutAndClearData()`
 - `src/utils/diagnosticContext.ts`, `infrastructure/lambda/telemetry/index.mjs` (+ pinned test), `docs/runbooks/native-store-submission.md` — two new keys
+- `capacitor.config.ts` — `LocalNotifications.smallIcon` + `iconColor` (nothing configured one, hence the stock "i")
 - `src/utils/calendar/activityToGoogleEvent.ts` — `buildReminders` always returns empty overrides; `reminderMinutes` out of `computePushHash`
 - `CHANGELOG.md`
 
@@ -539,6 +556,7 @@ No bare `catch {}`. The back-fill's catch classifies, logs, leaves the marker un
 - [ ] `notif_activity_lead`, `notif_gated` and `notif_backfilled` are in both allowlists, the pinned lambda test, and the runbook's key enumeration
 - [ ] The back-fill's retirement contract is in its module docstring: what to delete, in what order, and why the `Settings` marker field outlives the code
 - [ ] A synced Google Calendar event carries no reminder override, and editing an activity's reminder time makes `applyUpsert` return `false` with **no `patchEvent` call**
+- [ ] Android notifications show the beanie-bell, not the stock "i" — verified on device, at notification-shade and lock-screen sizes
 - [ ] CHANGELOG covers the settings restructure **and** states that a deliberate "None" may have been reset
 - [ ] `npm run type-check`, full Vitest, `npm run test:lambda`, `npm run build`, `lint`, `stylelint`, `translate` all green
 
@@ -564,7 +582,8 @@ No bare `catch {}`. The back-fill's catch classifies, logs, leaves the marker un
 12. Two devices, two members: privately-assigned to-do and traveller-subset flight reach only the right device.
 13. Arm reminders, **sign out and clear data**, force-quit → `getPending()` is empty and nothing fires.
 14. Calendar sync: after the first post-update boot, a synced event in Google shows **no** reminder; changing a beanies reminder time afterwards does not touch Google.
-15. Back-fill: existing activities show 30 in the editor and schedule reminders; **a vacation trip produces no 09:00-per-day storm**; any linked recurring payment that was deactivated is **still deactivated**.
+15. Notification icon: the beanie-bell renders as a clean silhouette in the shade and on the lock screen — not a white blob (the failure mode when the asset isn't alpha-only).
+16. Back-fill: existing activities show 30 in the editor and schedule reminders; **a vacation trip produces no 09:00-per-day storm**; any linked recurring payment that was deactivated is **still deactivated**.
 
 **CloudWatch:** `notif_exact_alarm: granted` fleet-wide is the release gate. `notif_count` must never be non-zero on a device reporting `notif_permission: denied`. Expect `notif_truncated` to rise after the back-fill — only actionable if paired with a user report of a missing near-term reminder.
 

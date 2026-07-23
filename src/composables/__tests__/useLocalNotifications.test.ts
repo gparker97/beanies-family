@@ -126,7 +126,7 @@ describe('latenessBucket', () => {
 });
 
 describe('reconcileScheduled — the ordering that stops a failure wiping reminders', () => {
-  const META = { truncated: false, skipped: 0, todoLead: 30 };
+  const META = { truncated: false, skipped: 0, gated: 0, todoLead: 30, activityLead: 30 };
   const payload = buildScheduledNotifications([reminder({ id: 'keep' })]);
 
   beforeEach(() => {
