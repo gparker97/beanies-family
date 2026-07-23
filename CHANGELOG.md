@@ -21,9 +21,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **Reminders now live in their own Settings section.** They've moved out of the main settings page into a **Reminders** card of their own, alongside the other categories — with a new setting for the default reminder time on new activities (30 minutes, adjustable, and you can still change it on any individual activity). The reminder picker also moved out of "add more details" in the activity editor, so it's visible when you create something.
+- **Your existing activities now have reminders.** Every activity created before this update was stored with no reminder time, so none of them would have notified you. They've all been set to 30 minutes' notice. If you had deliberately set one to "None", it will have been reset too — we couldn't tell the two apart, since they were stored the same way. You can set any of them back to "None" and it will stick.
+- **Synced calendar events no longer carry their own reminder.** If you sync to Google Calendar, beanies used to be able to add a popup reminder to the exported event — which meant two alerts for the same thing, one from each app. Reminders are now beanies' job alone. You may notice your calendar re-syncing once after this update.
+- **Joining our Discord is now an invitation at the bottom of Settings** rather than a settings card, and the notification bell in Settings is the beanie-bell rather than a generic icon.
 - **Reminders now arrive on time, and early.** Previously a "time to drop off" reminder could land a few minutes _after_ the event: it fired at the event itself, and Android's battery-saving was free to hold it back further. Reminders now fire ahead of the event and the app asks Android for precise alarm delivery, so they are no longer batched up and delivered late. The header search and bell icons are also a touch larger and cleaner.
 - **Chinese reminders show the right title.** Notification titles in Chinese displayed the literal word "标题" instead of the activity or to-do's name.
 - **Screen readers announce unread notifications.** The bell's unread state was invisible to assistive technology; it is now part of the button's spoken label.
+- **Reminders survive opening the app on the lock screen.** Opening beanies without unlocking your family data could silently delete every reminder you had set — you'd simply never hear from them again. They're now left alone until your data is ready, and cleared deliberately when you sign out rather than by accident.
+- **"Time to pick up" now arrives near the pickup.** For an activity with a start time but no end time it was firing at 9am, hours early. It now fires before the activity instead, and ticking a school run off no longer starts a second, different reminder for it.
+- **Android notifications show the beanie-bell.** They'd been showing Android's generic "i" icon — no notification icon had ever been set.
 - **If a reminder can't be set, you're told.** When the phone refuses to schedule reminders the app now says so once, and makes clear the in-app reminders still show everything — instead of failing quietly.
 
 ## 2026-07-22

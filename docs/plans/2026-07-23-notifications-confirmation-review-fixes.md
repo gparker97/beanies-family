@@ -618,6 +618,22 @@ Failure modes, all self-healing: a hash is recorded only after a successful writ
 - **Pass 5 (Focused — Google Calendar decision)**: Confirmed `{ useDefault: false, overrides: [] }` is correct and already the live behaviour, that `reminderMinutes` has no other consumer in the export or any pull/merge path, and that the hash change invalidates every `lastPushedHash` with no versioning to reuse — but corrected three of my claims: the burst is **not** corrective (the corpus is all at `0`, which already emits empty overrides, so almost every re-push is byte-identical), the no-self-loop evidence named the wrong collection (`calendarEventLinks`, not `calendarConnections`), and the cost omitted Phase B (`computeExceptionHash` delegates to `computePushHash`). Also caught an unlisted hard test break at `calendarMapping.test.ts:160-176`.
 - **Pass 4 (Fresh-eyes sweep)**: Caught that the not-ready guard silently removes today's _accidental_ cancel-on-sign-out — leaving activity titles and member names armed on the lock screen after "sign out and clear data" (verified: nothing outside the two notification modules cancels, and neither authStore sign-out path touches them) — and added an explicit `cancelAllScheduledReminders()` in both; required `{ quiet: true }` on the back-fill batch (`mutate` is a `USER_ACTION_METHOD`, so a failed migration would have red-toasted at boot) and barred `wrapAsync` for the same reason; replaced `dutyEmitted` with `dutyAnchored` after finding the proposed exclusivity rule would resurrect a generic reminder the moment a parent ticks their drop-off complete; removed the `dutyLead!` assertion and the redundant `BACKFILL_LEAD` alias; moved the `canEditActivities` check out of the store action (`usePermissions()` leaks a watcher per call); kept `ensureChannel()` inside the schedule guard (hoisting it out would fire a `critical` on every empty run); corrected the Open Decision's evidence — the reconcile IS hash-diffed, the real trigger is `reminderMinutes` being folded into `computePushHash`, which also means the re-push burst happens on either answer; and pinned down the zero-candidate marker path, the third meaning of `notif_count` on the failure event, and that `activityReminderContext` must stay inside the per-occurrence try.
 
+## Outcome
+
+**IMPLEMENTED 2026-07-23** — on `main`, not deployed.
+
+- `f5b91678` — the cold-start wipe (+ the explicit sign-out cancel it made necessary), duty anchors, `remindersForActivityOccurrence`, platform-honest `ensureChannel`, armed-count telemetry, `'unknown'` permission, notification icon.
+- `efd9291a` — activity lead options + all three casts, back-fill, no Google reminder overrides, telemetry declarations.
+
+Gates: `type-check`, 3993 Vitest tests, 77 Lambda tests, `build`, `lint`, `stylelint`, `translate` — all green.
+
+**Found during implementation (not in the plan):**
+
+- Importing `cancelAllScheduledReminders` statically into `authStore` broke 22 tests in `dataClearingSecurity.test.ts` — it dragged the Capacitor plugin into a suite that partially mocks `capabilities`. Switched to the dynamic-import pattern authStore already uses for `syncStore`, which also keeps the plugin out of a hub module's static graph (per `docs/lessons.md`).
+- The `calendarMapping.test.ts` break the focused review predicted landed exactly as described; it now asserts the no-override contract plus hash-invariance across `reminderMinutes`.
+
+**Still open:** greg's on-device Android pass (Testing Plan 6-16 — cold-start first, then the Doze timing test), the Play Console exact-alarm declaration, and the notification-icon check at real notification sizes. None is a code task.
+
 ## Prompt Log
 
 > **No GitHub issue created.** This plan was approved for direct implementation.
