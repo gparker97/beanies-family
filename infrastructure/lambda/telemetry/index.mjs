@@ -107,6 +107,14 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'has_session',
   'registry_had_file_id',
   'token_valid',
+  // OS local-notification diagnostics (#55). PII-free counters/enums/bools.
+  // Mirror of src/utils/diagnosticContext.ts.
+  'notif_count',
+  'notif_truncated',
+  'notif_lead_default',
+  'notif_permission',
+  'notif_error_stage',
+  'notif_kind',
 ]);
 
 function getHeaders(event) {

@@ -17,8 +17,10 @@ import type {
   ExchangeRate,
   LanguageCode,
   CountryCode,
+  SupportedTravelType,
 } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { DEFAULT_TODO_LEAD, DEFAULT_TRAVEL_LEADS } from '@/utils/reminderSchedule';
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -88,6 +90,17 @@ export const useSettingsStore = defineStore('settings', () => {
   // Per-device opt-in to The Beanie Lab (experimental features). Default OFF;
   // never family-synced (lives in GlobalSettings, like beanieMode/soundEnabled).
   const beanieLabEnabled = computed(() => globalSettings.value.beanieLabEnabled ?? false);
+  // ── OS reminder prefs (#55) — device-scoped, never family-synced (GlobalSettings). ──
+  const remindersEnabled = computed(() => globalSettings.value.remindersEnabled ?? true);
+  const todoReminderLead = computed(
+    () => globalSettings.value.todoReminderLead ?? DEFAULT_TODO_LEAD
+  );
+  // Fully-resolved per-type lead map (device overrides merged over the defaults),
+  // so consumers (the scheduler + the settings selects) read one complete map.
+  const travelReminderLeads = computed<Record<SupportedTravelType, number>>(() => ({
+    ...DEFAULT_TRAVEL_LEADS,
+    ...(globalSettings.value.travelReminderLeads ?? {}),
+  }));
   const preferredCurrencies = computed(() => settings.value.preferredCurrencies ?? []);
   const effectiveDisplayCurrencies = computed(() => {
     const prefs = preferredCurrencies.value;
@@ -453,6 +466,17 @@ export const useSettingsStore = defineStore('settings', () => {
   const setBeanieLabEnabled = (enabled: boolean) =>
     persistGlobalSetting('settings.beanieLab.title', 'beanieLabEnabled', enabled);
 
+  // ── OS reminder prefs (#55) actions — device-scoped via persistGlobalSetting. ──
+  const setRemindersEnabled = (enabled: boolean) =>
+    persistGlobalSetting('reminders.title', 'remindersEnabled', enabled);
+  const setTodoReminderLead = (minutes: number) =>
+    persistGlobalSetting('reminders.title', 'todoReminderLead', minutes);
+  const setTravelReminderLead = (type: SupportedTravelType, minutes: number) =>
+    persistGlobalSetting('reminders.title', 'travelReminderLeads', {
+      ...(globalSettings.value.travelReminderLeads ?? {}),
+      [type]: minutes,
+    });
+
   async function setExchangeRateAutoUpdate(enabled: boolean): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -708,6 +732,9 @@ export const useSettingsStore = defineStore('settings', () => {
     beanieMode,
     soundEnabled,
     beanieLabEnabled,
+    remindersEnabled,
+    todoReminderLead,
+    travelReminderLeads,
     preferredCurrencies,
     effectiveDisplayCurrencies,
     customInstitutions,
@@ -740,6 +767,9 @@ export const useSettingsStore = defineStore('settings', () => {
     setBeanieMode,
     setSoundEnabled,
     setBeanieLabEnabled,
+    setRemindersEnabled,
+    setTodoReminderLead,
+    setTravelReminderLead,
     setPreferredCurrencies,
     setOnboardingCompleted,
     setWeekStartDay,

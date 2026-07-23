@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-21",
-    "translationCount": 3771
+    "lastUpdated": "2026-07-23",
+    "translationCount": 3804
   },
   "translations": {
     "app.name": {
@@ -18860,6 +18860,171 @@
       "translation": "完成设置",
       "hash": "on3bo0",
       "lastUpdated": "2026-07-21"
+    },
+    "reminders.title": {
+      "translation": "提醒",
+      "hash": "jn6xgf",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.description": {
+      "translation": "活动、旅行和待办事项前的提示—让您按时离开并做好准备。",
+      "hash": "rnx8ct",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.masterToggle": {
+      "translation": "此设备上的提醒",
+      "hash": "euusdy",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.masterToggleHint": {
+      "translation": "在开始之前轻推一下。提醒来自此设备，因此此开关仅影响您使用的手机或计算机。",
+      "hash": "wipess",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.howMuchNotice": {
+      "translation": "提前多久通知？",
+      "hash": "jyj4cc",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.activities": {
+      "translation": "活动",
+      "hash": "46kgs3",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.activitiesHint": {
+      "translation": "每项活动都有自己的提醒时间。",
+      "hash": "fbaug9",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.editActivity": {
+      "translation": "编辑活动",
+      "hash": "7o0aek",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.flights": {
+      "translation": "航班",
+      "hash": "erkmhv",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.cruises": {
+      "translation": "郵輪",
+      "hash": "q8pgwy",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.trains": {
+      "translation": "列车",
+      "hash": "tgv2wl",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.ferries": {
+      "translation": "渡轮",
+      "hash": "blegbc",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.timedTodos": {
+      "translation": "限时待办事项",
+      "hash": "6g5grj",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.timedTodosHint": {
+      "translation": "已设置时间的待办事项。",
+      "hash": "4ardd5",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.permissionNudge": {
+      "translation": "在设备设置中打开通知以获取这些通知。无论如何，您的应用内简报仍会显示所有内容。",
+      "hash": "59we5w",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.openDeviceSettings": {
+      "translation": "设备设置",
+      "hash": "24k53",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.lead.atTime": {
+      "translation": "当时，",
+      "hash": "jd38eh",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.lead.dayBefore": {
+      "translation": "前一天",
+      "hash": "p45kr2",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.lead.hours": {
+      "translation": "提前{n}小时",
+      "hash": "se0kna",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.lead.hourOne": {
+      "translation": "{n}小时前",
+      "hash": "q2kl2d",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.lead.minutes": {
+      "translation": "{n}分钟前",
+      "hash": "1yfpvu",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.lead.minuteOne": {
+      "translation": "{n}分钟前",
+      "hash": "twd9u3",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.travelHint": {
+      "translation": "我们会提醒您{lead}此行程。",
+      "hash": "48p5ja",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.travelHintLink": {
+      "translation": "更改提醒时间",
+      "hash": "1tspeg",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.activityTitle": {
+      "translation": "标题",
+      "hash": "f4yf6o",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.activityBodyDropoff": {
+      "translation": "是时候下车了— {who}",
+      "hash": "lptd26",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.activityBodyPickup": {
+      "translation": "是时候上车了— {who}",
+      "hash": "7wp7ii",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.activityBodyWho": {
+      "translation": "即将推出· {who}",
+      "hash": "uzx4b9",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.activityBody": {
+      "translation": "即將播出",
+      "hash": "tdbi3l",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.todoTitle": {
+      "translation": "标题",
+      "hash": "f4yf6o",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.todoBody": {
+      "translation": "截止于{time}",
+      "hash": "a3gm4q",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.travelTitle": {
+      "translation": "标题",
+      "hash": "f4yf6o",
+      "lastUpdated": "2026-07-23"
+    },
+    "reminders.travelBody": {
+      "translation": "出发时间： {time}",
+      "hash": "a6addt",
+      "lastUpdated": "2026-07-23"
     }
   }
 }

@@ -9,6 +9,7 @@ import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import { BaseCombobox } from '@/components/ui';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
+import TravelReminderHint from '@/components/travel/TravelReminderHint.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useTranslation } from '@/composables/useTranslation';
@@ -652,6 +653,7 @@ async function handleSave() {
                 :placeholder="t('vacation.field.terminalPlaceholder')"
               />
             </FormFieldGroup>
+            <TravelReminderHint :type="segment?.type" />
           </div>
         </div>
       </template>
@@ -924,6 +926,7 @@ async function handleSave() {
             :placeholder="t('vacation.field.bookingReference')"
           />
         </FormFieldGroup>
+        <TravelReminderHint :type="segment?.type" />
       </template>
 
       <!-- Link (common) -->

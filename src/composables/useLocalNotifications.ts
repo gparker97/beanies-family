@@ -1,34 +1,37 @@
 import { watch } from 'vue';
 import { LocalNotifications, type LocalNotificationSchema } from '@capacitor/local-notifications';
 import { isNative } from '@/services/sync/capabilities';
-import { useCriticalItems, type CriticalItem } from '@/composables/useCriticalItems';
-import { useToday } from '@/composables/useToday';
+import {
+  useScheduledReminders,
+  buildReminderSchedule,
+  type ScheduledReminder,
+} from '@/composables/useScheduledReminders';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 
 /**
  * On-device local notifications for the native (Capacitor) app — ADR-029 A4.
  *
- * Schedules a reminder for each TIMED item in today's briefing
- * (`useCriticalItems`) at its time, so a family member gets pinged when a
- * pickup / dropoff / timed activity / due-today to-do is due. Reminders are
- * generated entirely ON-DEVICE from already-decrypted data — beanies' servers
- * never see the schedule (this is why it's local notifications, not remote
- * push: a zero-knowledge backend can't trigger meaningful per-user pushes).
+ * Schedules a reminder for each upcoming timed item (activities, travel
+ * departures, timed to-dos) at (event − lead), delivered exactly via
+ * `allowWhileIdle` so Doze can't defer it (#55). The forward source + fire times
+ * come from the pure `buildReminderSchedule` (`useScheduledReminders`), gated by
+ * the per-device master toggle. Reminders are generated entirely ON-DEVICE from
+ * already-decrypted data — beanies' servers never see the schedule.
  *
- * Strategy: cancel-all-then-reschedule (debounced) on any briefing change —
+ * Strategy: cancel-all-then-reschedule (debounced) on any input/pref change —
  * correct for a family's item volumes, with no diff-state to drift. The
  * `@capacitor/local-notifications` import is confined to this module. No-op on
- * web. See ADR-029.
+ * web (the in-app briefing surfaces the same items there). See ADR-029.
  */
 
 const RESCHEDULE_DEBOUNCE_MS = 1000;
+const REMINDERS_CHANNEL_ID = 'reminders';
 
 /**
- * Map a `CriticalItem.id` (a UUID, or a synthesized `holiday-…`) to a stable,
- * positive 32-bit int — the plugin requires integer notification ids, and the
- * mapping must be stable so "cancel on completion" cancels the right reminder.
- * FNV-1a over the string.
+ * Map a stable string id to a positive 32-bit int — the plugin requires integer
+ * notification ids, and the mapping must be stable so "cancel then reschedule"
+ * re-uses the same id for the same logical reminder. FNV-1a over the string.
  */
 export function stableNotificationId(id: string): number {
   let h = 0x811c9dc5;
@@ -41,27 +44,22 @@ export function stableNotificationId(id: string): number {
 }
 
 /**
- * Pure: build the notification payloads for today's timed, not-yet-completed
- * briefing items whose time is still in the future. Exported for unit testing.
+ * Map the pure schedule to plugin payloads. `allowWhileIdle` bypasses Doze
+ * batching; `channelId` targets the high-importance reminders channel (created
+ * at init); `extra.kind` lets the delivered-listener tag its telemetry.
+ * Exported for unit testing.
  */
 export function buildScheduledNotifications(
-  items: CriticalItem[],
-  todayStr: string,
-  nowMs: number
+  reminders: ScheduledReminder[]
 ): LocalNotificationSchema[] {
-  const out: LocalNotificationSchema[] = [];
-  for (const item of items) {
-    if (!item.time || item.completed) continue; // untimed → no specific fire time; done → no reminder
-    const at = new Date(`${todayStr}T${item.time}:00`);
-    if (Number.isNaN(at.getTime()) || at.getTime() <= nowMs) continue; // invalid or already past
-    out.push({
-      id: stableNotificationId(item.id),
-      title: 'beanies.family',
-      body: item.message,
-      schedule: { at },
-    });
-  }
-  return out;
+  return reminders.map((r) => ({
+    id: stableNotificationId(r.id),
+    title: r.title,
+    body: r.body,
+    schedule: { at: r.fireAt, allowWhileIdle: true },
+    channelId: REMINDERS_CHANNEL_ID,
+    extra: { kind: r.kind },
+  }));
 }
 
 let initialized = false;
@@ -75,11 +73,34 @@ export function useLocalNotifications(): void {
   if (!isNative()) return;
   initialized = true;
 
-  const { criticalItems } = useCriticalItems();
-  const { today } = useToday();
+  const { reminderInput, prefs } = useScheduledReminders();
 
   let permissionGranted = false;
   let permissionRequested = false;
+  let channelReady = false;
+
+  /** Create the reminders channel (idempotent). On Android O+ a notification
+   *  posted to a non-existent channel is silently dropped, so this MUST run
+   *  before the first schedule. */
+  async function ensureChannel(): Promise<void> {
+    if (channelReady) return;
+    try {
+      await LocalNotifications.createChannel({
+        id: REMINDERS_CHANNEL_ID,
+        name: 'Reminders',
+        importance: 4, // HIGH — heads-up + sound, so a time-critical reminder is seen
+      });
+      channelReady = true;
+    } catch (e) {
+      reportError({
+        surface: 'local-notifications-schedule',
+        severity: 'warning',
+        message: 'createChannel(reminders) failed; reminders may not post on Android O+',
+        error: e,
+        context: { notif_error_stage: 'channel' },
+      });
+    }
+  }
 
   /** Resolve notification permission, prompting once. Denial is NOT an error. */
   async function ensurePermission(): Promise<boolean> {
@@ -97,7 +118,8 @@ export function useLocalNotifications(): void {
         logEvent({
           level: 'info',
           surface: 'local-notifications',
-          message: `notifications permission: ${display}`,
+          message: 'notifications permission',
+          context: { notif_permission: display },
         });
       }
       return permissionGranted;
@@ -107,13 +129,32 @@ export function useLocalNotifications(): void {
         severity: 'warning',
         message: 'notification permission check/request failed',
         error: e,
+        context: { notif_error_stage: 'permission' },
       });
       return false;
     }
   }
 
+  // Delivered (best-effort) — closes the scheduled-vs-delivered-vs-late triage
+  // loop (the original #55 defect) from CloudWatch without a local repro.
+  void LocalNotifications.addListener('localNotificationReceived', (n) => {
+    const kind = (n.extra as { kind?: string } | undefined)?.kind;
+    logEvent({
+      level: 'info',
+      surface: 'local-notifications',
+      message: 'notification delivered',
+      context: kind ? { notif_kind: kind } : undefined,
+    });
+  });
+
   async function reschedule(): Promise<void> {
-    const toSchedule = buildScheduledNotifications(criticalItems.value, today.value, Date.now());
+    // Fresh `now` each run — no fireAt drifts past between recompute and schedule.
+    const { reminders, truncated } = buildReminderSchedule(
+      reminderInput.value,
+      new Date(),
+      prefs.value
+    );
+    const toSchedule = buildScheduledNotifications(reminders);
 
     // Don't surface the OS permission prompt until there's actually something to
     // remind about (and we haven't been granted yet). Once granted, we still run
@@ -121,6 +162,7 @@ export function useLocalNotifications(): void {
     if (toSchedule.length === 0 && !permissionGranted) return;
 
     if (!(await ensurePermission())) return;
+    await ensureChannel();
 
     try {
       // Every pending notification is ours → cancel-all, then reschedule.
@@ -133,26 +175,39 @@ export function useLocalNotifications(): void {
       if (toSchedule.length > 0) {
         await LocalNotifications.schedule({ notifications: toSchedule });
       }
+      // Success-path signal too, so scheduled-RATE (not just failures) is
+      // measurable — emitted even at count 0 (toggle off / nothing due).
+      logEvent({
+        level: 'info',
+        surface: 'local-notifications',
+        message: 'reschedule',
+        context: {
+          notif_count: toSchedule.length,
+          notif_lead_default: prefs.value.todoReminderLead,
+          notif_truncated: truncated,
+        },
+      });
     } catch (e) {
       reportError({
         surface: 'local-notifications-schedule',
         severity: 'warning',
         message: 'reschedule failed; the in-app briefing still shows these items',
         error: e,
+        context: { notif_count: toSchedule.length, notif_error_stage: 'schedule' },
       });
     }
   }
 
-  // Debounced reschedule on any briefing change (and once on mount). A burst of
+  // Debounced reschedule on any input/pref change (and once on mount). A burst of
   // reactive edits coalesces into a single cancel-all/reschedule.
   let debounce: ReturnType<typeof setTimeout> | null = null;
   watch(
-    criticalItems,
+    [reminderInput, prefs],
     () => {
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(() => void reschedule(), RESCHEDULE_DEBOUNCE_MS);
     },
-    { immediate: true }
+    { immediate: true, deep: true }
   );
 }
 
