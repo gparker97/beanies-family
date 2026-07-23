@@ -18882,13 +18882,8 @@
       "lastUpdated": "2026-07-23"
     },
     "reminders.activitiesHint": {
-      "translation": "每项活动都有自己的提醒时间。",
-      "hash": "fbaug9",
-      "lastUpdated": "2026-07-23"
-    },
-    "reminders.editActivity": {
-      "translation": "编辑活动",
-      "hash": "7o0aek",
+      "translation": "新活动的默认提醒时间，每个活动都可以单独调整",
+      "hash": "q5nidi",
       "lastUpdated": "2026-07-23"
     },
     "reminders.flights": {
@@ -19027,13 +19022,13 @@
       "lastUpdated": "2026-07-23"
     },
     "settings.discordCta": {
-      "translation": "加入我们的 Discord",
-      "hash": "ql9n0p",
+      "translation": "来Discord上打个招呼吧",
+      "hash": "thlpt6",
       "lastUpdated": "2026-07-23"
     },
     "settings.discordCtaDesc": {
       "translation": "结识其他家庭，随时向我们提问，一起决定我们接下来做什么",
-      "hash": "w6gip3",
+      "hash": "t03d4q",
       "lastUpdated": "2026-07-23"
     },
     "settings.card.reminders": {
@@ -19044,6 +19039,11 @@
     "settings.card.remindersDesc": {
       "translation": "活动、旅行和待办事项的通知时间",
       "hash": "rhafy5",
+      "lastUpdated": "2026-07-23"
+    },
+    "settings.discordCtaAction": {
+      "translation": "加入",
+      "hash": "1dlxm",
       "lastUpdated": "2026-07-23"
     }
   }

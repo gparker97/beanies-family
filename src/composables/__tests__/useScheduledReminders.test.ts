@@ -92,6 +92,7 @@ function input(over: Partial<ReminderInput> = {}): ReminderInput {
 const PREFS: ReminderPrefs = {
   remindersEnabled: true,
   todoReminderLead: 30,
+  activityReminderLead: 30,
   travelReminderLeads: DEFAULT_TRAVEL_LEADS,
 };
 

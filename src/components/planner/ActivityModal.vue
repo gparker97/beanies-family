@@ -42,7 +42,6 @@ import type {
   UpdateFamilyActivityInput,
 } from '@/types/models';
 import type { FieldConfidence } from '@/services/ai/types';
-import { DEFAULT_ACTIVITY_LEAD } from '@/utils/reminderSchedule';
 
 const props = defineProps<{
   open: boolean;
@@ -122,10 +121,11 @@ const createRecurringPayment = ref(false);
 const feePayFromAccountId = ref('');
 const instructorName = ref('');
 const instructorContact = ref('');
-// Defaults to a real lead, NOT 0. `0` is the chip's "None" and now genuinely
-// suppresses the OS reminder — leaving it as the default would mean every newly
-// created activity silently never reminds.
-const reminderMinutes = ref<ReminderMinutes>(DEFAULT_ACTIVITY_LEAD);
+// Defaults to the device's configured activity lead (Settings → Reminders),
+// NOT 0. `0` is the chip's "None" and now genuinely suppresses the OS reminder,
+// so defaulting to it would mean every newly created activity silently never
+// reminds.
+const reminderMinutes = ref<ReminderMinutes>(settingsStore.activityReminderLead as ReminderMinutes);
 const notes = ref('');
 const isActive = ref(true);
 const color = ref('');
@@ -312,7 +312,7 @@ const { isEditing, isSubmitting } = useFormModal(
       feeCustomPeriodUnit.value = 'weeks';
       instructorName.value = '';
       instructorContact.value = '';
-      reminderMinutes.value = DEFAULT_ACTIVITY_LEAD;
+      reminderMinutes.value = settingsStore.activityReminderLead as ReminderMinutes;
       notes.value = '';
       isActive.value = true;
       color.value = '';

@@ -2177,11 +2177,12 @@ const STRING_DEFS = {
   // Discord moved out of the settings-card grid to a standalone CTA at the
   // bottom of the page — joining a community is an invitation, not a
   // preference to configure.
-  'settings.discordCta': { en: 'Join us on Discord', beanie: 'join us on discord' },
+  'settings.discordCta': { en: 'Come say hello on Discord', beanie: 'come say hello on discord' },
   'settings.discordCtaDesc': {
-    en: 'Meet other families, ask us anything, help shape what we build next',
-    beanie: 'meet other families, ask us anything, help shape what we build next',
+    en: 'Meet other families, ask us anything, help decide what we build next',
+    beanie: 'meet other families, ask us anything, help decide what we build next',
   },
+  'settings.discordCtaAction': { en: 'Join', beanie: 'join' },
   'settings.card.reminders': { en: 'Reminders', beanie: 'reminders' },
   'settings.card.remindersDesc': {
     en: 'Notification timing for activities, travel & to-dos',
@@ -6628,10 +6629,9 @@ const STRING_DEFS = {
   'reminders.howMuchNotice': { en: 'How much notice?', beanie: 'how much notice?' },
   'reminders.activities': { en: 'Activities', beanie: 'activities' },
   'reminders.activitiesHint': {
-    en: 'Each activity keeps its own reminder time.',
-    beanie: 'each activity keeps its own reminder time.',
+    en: 'The default for new activities — you can change it on any one of them',
+    beanie: 'the default for new activities — you can change it on any one of them',
   },
-  'reminders.editActivity': { en: 'Edit an activity', beanie: 'edit an activity' },
   'reminders.flights': { en: 'Flights', beanie: 'flights' },
   'reminders.cruises': { en: 'Cruises', beanie: 'cruises' },
   'reminders.trains': { en: 'Trains', beanie: 'trains' },
