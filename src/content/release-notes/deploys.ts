@@ -17,6 +17,59 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.23',
+    date: '2026-07-23',
+    month: '23 july 2026',
+    spotlight: true,
+    summary: {
+      en: 'Reminders are here on the Android app - your phone can nudge you before things start.',
+      beanie:
+        'reminders are here on the android app - your phone can nudge you before things start.',
+    },
+    features: [
+      {
+        icon: '🔔',
+        title: {
+          en: 'Reminders before things start',
+          beanie: 'reminders before things start',
+        },
+        description: {
+          en: 'In the app, beanies now notifies you ahead of an activity, a travel departure or a timed to-do, even when the app is closed. Available on Android now, with iPhone to follow. Set how much notice each kind gets in Settings, under Reminders.',
+          beanie:
+            'in the app, beanies now notifies you ahead of an activity, a travel departure or a timed to-do, even when the app is closed. available on android now, with iphone to follow. set how much notice each kind gets in settings, under reminders.',
+        },
+        cta: {
+          label: { en: 'Get the Android app', beanie: 'get the android app' },
+          href: 'https://play.google.com/store/apps/details?id=family.beanies.app',
+        },
+      },
+      {
+        title: {
+          en: 'Your existing activities are ready',
+          beanie: 'your existing activities are ready',
+        },
+        description: {
+          en: 'Every activity you already had has been given 30 minutes of notice, so reminders work straight away. If you had deliberately set one to "None", it has been reset too - we could not tell the two apart. Set it back and it will stick.',
+          beanie:
+            'every activity you already had has been given 30 minutes of notice, so reminders work straight away. if you had deliberately set one to "none", it has been reset too - we could not tell the two apart. set it back and it will stick.',
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.07.21',
     date: '2026-07-21',
     month: '21 july 2026',
