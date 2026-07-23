@@ -29,6 +29,7 @@ import type {
   VacationAccommodation,
   VacationTransportation,
   SupportedTravelType,
+  UUID,
 } from '@/types/models';
 
 /** Emoji lookup for vacation trip types */
@@ -1112,6 +1113,12 @@ export interface TravelSegmentOccurrence {
   /** HH:mm — undefined → render as untimed/all-day. */
   time?: string;
   title: string;
+  /** The segment's travellers. `undefined` = the whole trip — always resolve via
+   *  `resolveSegmentTravellers(travellerIds, tripAssigneeIds)`, never read raw. */
+  travellerIds?: UUID[];
+  /** The trip's assignees, carried so the occurrence is self-contained for that
+   *  resolution (the OS reminder scheduler has no vacation in scope). */
+  tripAssigneeIds: UUID[];
 }
 
 type SideField = {
@@ -1159,7 +1166,12 @@ export function isSupportedTravelType(t: VacationTravelType): t is SupportedTrav
 export function extractSegmentOccurrences(
   vacationId: string,
   seg: VacationTravelSegment,
-  segmentIndex: number
+  segmentIndex: number,
+  /** The trip's `assigneeIds`. REQUIRED, deliberately not defaulted: a default
+   *  of `[]` would let a forgetful caller silently fall back to "everyone is a
+   *  traveller", re-opening the whole-family-woken-for-one-flight bug with no
+   *  failing test and no telemetry. A compile error is the point. */
+  tripAssigneeIds: UUID[]
 ): TravelSegmentOccurrence[] {
   if (!isSupportedTravelType(seg.type)) return [];
   const out: TravelSegmentOccurrence[] = [];
@@ -1184,6 +1196,8 @@ export function extractSegmentOccurrences(
       date: d,
       time: rawTime || undefined,
       title: seg.title,
+      travellerIds: seg.travellerIds,
+      tripAssigneeIds,
     });
   }
   return out;

@@ -52,7 +52,15 @@ export interface ActivityReminderContext {
   title: string;
   /** Assignee names then the location — the at-a-glance "who · where" parts. */
   who: string[];
-  /** The viewer's duty on this occurrence, if any (drives the role chip). */
+  /**
+   * EVERY duty the viewer holds on this occurrence, in fire order (dropoff
+   * before pickup). Empty when they hold none. The OS scheduler emits one
+   * reminder per entry — dropoff anchored on `startTime`, pickup on `endTime`
+   * — because a parent doing both runs needs both alerts.
+   */
+  dutyRoles: ('dropoff' | 'pickup')[];
+  /** The viewer's primary duty — `dutyRoles[0]`. Drives the single-role bell
+   *  chip, which has no way to show two. */
   dutyRole?: 'dropoff' | 'pickup';
 }
 
@@ -71,19 +79,74 @@ export function activityReminderContext(
     .filter((m): m is FamilyMember => m !== undefined)
     .map((m) => m.name);
   if (activity.location) who.push(activity.location);
+  const dutyRoles: ('dropoff' | 'pickup')[] = [];
+  if (isDropoff) dutyRoles.push('dropoff');
+  if (isPickup) dutyRoles.push('pickup');
   return {
     // Duty (dropoff/pickup) overrides a 'hidden' audience — you still need the
     // reminder even if you're not an assignee.
     relevant: !(audience.kind === 'hidden' && !isDuty),
     title: activity.title,
     who,
-    dutyRole: isDropoff ? 'dropoff' : isPickup ? 'pickup' : undefined,
+    dutyRoles,
+    dutyRole: dutyRoles[0],
   };
 }
 
 // ── Default reminder lead-times (minutes) — the single source of defaults ──────
 /** Activity reminder lead when an activity has no explicit `reminderMinutes`. */
 export const DEFAULT_ACTIVITY_LEAD = 30;
+
+/**
+ * Effective activity lead in minutes for TRIGGER MATH ONLY. `0` is preserved
+ * here (fire at the event time) — this function does NOT decide whether a
+ * reminder exists. Shared by the in-app deriver (`utils/notifications.ts`) and
+ * the OS scheduler so the default can't drift between them.
+ */
+export function activityLeadMinutes(reminderMinutes: number | undefined): number {
+  return typeof reminderMinutes === 'number' ? reminderMinutes : DEFAULT_ACTIVITY_LEAD;
+}
+
+/**
+ * OS-scheduling gate. `0` is the activity chip's "None" — `ActivityModal`
+ * renders it as `planner.reminder.none` and offers only 0/15/30/60/1440, so it
+ * literally means "no reminder", never "at the event time". Returns the lead to
+ * use, or `null` to schedule nothing.
+ *
+ * `isDuty` opts out of the None skip: the chip governs *the activity's*
+ * reminder, not *my drop-off run*. This matters more than it looks — every
+ * activity stored to date carries `reminderMinutes: 0` (it was the modal's old
+ * default and the field is required), so without the duty exemption this gate
+ * would silently disable the school-run reminders #55 exists to deliver.
+ *
+ * Deliberately NOT used by the in-app deriver: the bell is a feed of what's on
+ * today, not an alarm, and applying the skip there would empty it. See
+ * `activityLeadMinutes`.
+ */
+export function resolveOsActivityLead(
+  reminderMinutes: number | undefined,
+  isDuty: boolean
+): number | null {
+  const lead = activityLeadMinutes(reminderMinutes);
+  if (lead === 0) return isDuty ? DEFAULT_ACTIVITY_LEAD : null;
+  return lead;
+}
+
+/**
+ * Morning-of anchor for all-day activities and dated-but-untimed to-dos — the
+ * Google Calendar convention. This is an OS *fire time*: the reminder fires AT
+ * 09:00 and the lead is NOT subtracted (an all-day item has no start to lead
+ * into).
+ *
+ * Deliberately NOT used by the in-app deriver, whose all-day trigger stays
+ * `startOfLocalDay`: there "trigger" means "when does this enter the bell
+ * window", and an all-day item is current from midnight. Different question,
+ * different answer — do not unify them.
+ */
+export const ALL_DAY_REMINDER_HOUR = '09:00';
+export function allDayAnchor(dateISO: string): Date | null {
+  return localDateTime(dateISO, ALL_DAY_REMINDER_HOUR);
+}
 /** Timed-to-do reminder lead when the device hasn't overridden it. */
 export const DEFAULT_TODO_LEAD = 30;
 /**
