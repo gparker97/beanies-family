@@ -7,6 +7,7 @@ import {
   dedupeHintsByKey,
   isHint,
   reconcileHints,
+  HINT_LEAD_DAYS,
   type DesiredHint,
   type HelpfulHintsInput,
 } from '@/utils/helpfulHints';
@@ -43,6 +44,7 @@ function baseInput(over: Partial<HelpfulHintsInput> = {}): HelpfulHintsInput {
     members: [],
     occurrences: {},
     vacations: [],
+    leadDays: { ...HINT_LEAD_DAYS },
     translate,
     formatDate,
     ...over,
@@ -83,6 +85,12 @@ describe('computeDesiredHints — birthday (−14d, adults excl. self + pets)', 
   it('does not fire outside the window (15 days out)', () => {
     const kid = member({ id: 'kid', dateOfBirth: { month: 8, day: 8 } }); // 15 days
     expect(computeDesiredHints(baseInput({ members: [kid, dad] })).hints).toHaveLength(0);
+  });
+
+  it('honours a family-configured lead override (30 days fires at 15 days out)', () => {
+    const kid = member({ id: 'kid', dateOfBirth: { month: 8, day: 8 } }); // 15 days out
+    const leadDays = { ...HINT_LEAD_DAYS, 'birthday-present': 30 };
+    expect(computeDesiredHints(baseInput({ members: [kid, dad], leadDays })).hints).toHaveLength(1);
   });
 
   it('skips members with no dateOfBirth and yields nothing when no eligible adults', () => {

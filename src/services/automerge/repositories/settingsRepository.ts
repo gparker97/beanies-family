@@ -11,6 +11,7 @@ import type {
   CurrencyCode,
   LanguageCode,
   ISODateString,
+  HelpfulHintType,
 } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 
@@ -114,6 +115,12 @@ export async function setCalendarClashNudgeEnabled(enabled: boolean): Promise<Se
 
 export async function setHelpfulHintsEnabled(enabled: boolean): Promise<Settings> {
   return saveSettings({ helpfulHintsEnabled: enabled });
+}
+
+export async function setHelpfulHintLeadDays(
+  leadDays: Partial<Record<HelpfulHintType, number>>
+): Promise<Settings> {
+  return saveSettings({ helpfulHintLeadDays: leadDays });
 }
 
 export async function setFeedbackOptOut(optOut: boolean): Promise<Settings> {

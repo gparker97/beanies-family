@@ -21,7 +21,8 @@ import { isAdultMember } from '@/composables/useMemberInfo';
 import { normalizeAssignees } from '@/utils/assignees';
 import { addDaysYmd, extractDatePart, toDateInputValue } from '@/utils/date';
 
-/** Days before the event each hint type fires. The one piece that is pure data. */
+/** DEFAULT days before the event each hint type fires. Families can override
+ *  per type in Settings (family-synced) — this is the fallback when unset. */
 export const HINT_LEAD_DAYS: Record<HelpfulHintType, number> = {
   'birthday-present': 14,
   'birthday-party-gift': 2,
@@ -31,41 +32,50 @@ export const HINT_LEAD_DAYS: Record<HelpfulHintType, number> = {
   'trip-documents': 7,
 };
 
+/** Selectable lead-time options (days before the event) for the Settings picker. */
+export const HINT_LEAD_OPTIONS = [1, 2, 3, 5, 7, 10, 14, 21, 30] as const;
+
 /** Presentation + i18n metadata per hint type. One source of truth for "the list
  *  of hint types", shared by the engine, the row, and the Settings toggles. */
 export const HINT_TYPE_META: Record<
   HelpfulHintType,
-  { emoji: string; labelKey: string; titleKey: string }
+  { emoji: string; labelKey: string; titleKey: string; descKey: string }
 > = {
   'birthday-present': {
     emoji: '🎁',
     labelKey: 'settings.helpfulHints.type.birthdayPresent',
     titleKey: 'todo.hint.title.birthdayPresent',
+    descKey: 'settings.helpfulHints.desc.birthdayPresent',
   },
   'birthday-party-gift': {
-    emoji: '🎁',
+    emoji: '🎉',
     labelKey: 'settings.helpfulHints.type.birthdayPartyGift',
     titleKey: 'todo.hint.title.birthdayPartyGift',
+    descKey: 'settings.helpfulHints.desc.birthdayPartyGift',
   },
   'celebration-gift': {
-    emoji: '🎉',
+    emoji: '🎊',
     labelKey: 'settings.helpfulHints.type.celebrationGift',
     titleKey: 'todo.hint.title.celebrationGift',
+    descKey: 'settings.helpfulHints.desc.celebrationGift',
   },
   'anniversary-plan': {
     emoji: '💍',
     labelKey: 'settings.helpfulHints.type.anniversaryPlan',
     titleKey: 'todo.hint.title.anniversaryPlan',
+    descKey: 'settings.helpfulHints.desc.anniversaryPlan',
   },
   'trip-packing': {
     emoji: '🧳',
     labelKey: 'settings.helpfulHints.type.tripPacking',
     titleKey: 'todo.hint.title.tripPacking',
+    descKey: 'settings.helpfulHints.desc.tripPacking',
   },
   'trip-documents': {
     emoji: '🛂',
     labelKey: 'settings.helpfulHints.type.tripDocuments',
     titleKey: 'todo.hint.title.tripDocuments',
+    descKey: 'settings.helpfulHints.desc.tripDocuments',
   },
 };
 
@@ -86,6 +96,9 @@ export interface HelpfulHintsInput {
   occurrences: Record<string, NotificationOccurrence[]>;
   /** Upcoming vacations (vacationStore.upcomingVacations). */
   vacations: { id: string; name: string; startDate?: string; assigneeIds: string[] }[];
+  /** Fully-resolved lead-days per type (family overrides merged over the
+   *  defaults) — how many days before the event each hint fires. */
+  leadDays: Record<HelpfulHintType, number>;
   translate: HintTranslate;
   formatDate: HintFormatDate;
 }
@@ -142,7 +155,7 @@ function buildDesired(
 ): DesiredHint | null {
   if (!assigneeIds.length) return null; // no audience → no hint
   if (eventDate < input.today) return null; // never retroactive
-  const lead = HINT_LEAD_DAYS[hintType];
+  const lead = input.leadDays[hintType];
   // Absolute day distance is safe: eventDate >= today is guaranteed above.
   const daysUntil = daysApart(input.today, eventDate);
   if (daysUntil > lead) return null; // not yet inside the lead window
