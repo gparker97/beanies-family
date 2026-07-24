@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Blog posts show their category badge again.** Posts categorised as a feature announcement, founder story, or memoir were rendering with no category badge on the post page. All categories now display a badge, and the category vocabulary is validated at build time so a mistyped or new category can't slip through unbadged again.
 - **Reminders now buzz and chime.** Android reminders were posting silently — no sound and no vibration — because the notification channel was created without vibration enabled (the plugin turns it off unless explicitly asked) and, once created, a channel's sound and vibration can never be changed. Reminders now use a freshly-configured channel with vibration on and the default notification sound, and the old silent channel is retired automatically. On devices that already had reminders, the new settings take effect after this update.
 
 ## 2026-07-23
