@@ -1,5 +1,6 @@
 ---
 import { getCollection, render } from 'astro:content';
+import type { BlogCategory } from '~/content.config';
 import { isPublished } from '~/utils/content';
 import {
   buildIssueMap,
@@ -59,7 +60,10 @@ const { Content } = await render(post);
 const canonicalPath = `/blog/${post.data.slug}`;
 const ogImageUrl = new URL(`/og/${post.data.slug}.png`, SITE_URL).toString();
 
-const CATEGORIES: Record<string, { emoji: string; label: string }> = {
+// Typed against BlogCategory (the enum in content.config.ts) so adding a
+// category to the vocabulary forces a matching badge here — TS won't compile
+// a Record that's missing a key. Prevents the silent "no badge" drift.
+const CATEGORIES: Record<BlogCategory, { emoji: string; label: string }> = {
   updates: { emoji: '📣', label: 'updates' },
   'how-to': { emoji: '🛠️', label: 'how-to' },
   philosophy: { emoji: '💭', label: 'philosophy' },
@@ -68,8 +72,16 @@ const CATEGORIES: Record<string, { emoji: string; label: string }> = {
   travel: { emoji: '✈️', label: 'travel' },
   review: { emoji: '🔍', label: 'review' },
   'use-case': { emoji: '🪴', label: 'use case' },
+  'feature announcement': { emoji: '✨', label: 'feature' },
+  'founder story': { emoji: '🌱', label: 'founder story' },
+  memoir: { emoji: '📔', label: 'memoir' },
 };
-const categoryInfo = CATEGORIES[post.data.category];
+// Fallback keeps an unmapped category degrading to a plain tag rather than
+// vanishing — belt-and-braces behind the enum + typed-map guarantees above.
+const categoryInfo = CATEGORIES[post.data.category] ?? {
+  emoji: '🏷️',
+  label: post.data.category,
+};
 
 // Per-issue tint inherited from the /blog index. Drives the hero wash,
 // kicker pill, h2 dot, blockquote rule, links, and prev/next hover

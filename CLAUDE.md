@@ -369,7 +369,7 @@ Filter implementation in `web/src/utils/content.ts` (`isPublished()`). All `getC
 1. Remove any `<!-- TODO: ... -->` / `<!-- GREG: ... -->` authoring placeholders in the body
 2. Bump `lastUpdated` (guides) or verify `date` (blog)
 3. Flip `draft: false` (or remove the line entirely)
-4. Commit + push → deploy-web ships it
+4. Commit + push → this _stages_ the post on `main`; publish it live by manually running the **Deploy web (Astro marketing site)** workflow (`deploy-web.yml` is `workflow_dispatch` only — a push alone does not deploy)
 
 **Local preview during drafting**:
 

@@ -2,6 +2,31 @@ import { defineCollection, z } from 'astro:content';
 import { glob } from 'astro/loaders';
 
 /**
+ * Canonical blog category vocabulary — the single source of truth for the
+ * repo side. `category` is validated against this enum, so a post using an
+ * unknown category fails the build loudly (instead of silently rendering no
+ * badge on the post-detail page, the old `z.string()` failure mode). Every
+ * value here MUST have a matching entry in the `CATEGORIES` badge map in
+ * `web/src/pages/blog/[...slug].astro`, which is typed `Record<BlogCategory, …>`
+ * so TypeScript refuses to compile if the two drift apart.
+ */
+export const BLOG_CATEGORIES = [
+  'updates',
+  'how-to',
+  'philosophy',
+  'security',
+  'stories',
+  'travel',
+  'review',
+  'use-case',
+  'feature announcement',
+  'founder story',
+  'memoir',
+] as const;
+
+export type BlogCategory = (typeof BLOG_CATEGORIES)[number];
+
+/**
  * Blog collection — reads from the repo-level `content/blog/` directory.
  * This is the original location; keeping it there (vs moving into the Astro
  * project) avoids a needless file move and keeps blog authoring friction low.
@@ -12,7 +37,7 @@ const blog = defineCollection({
     title: z.string(),
     slug: z.string(),
     date: z.coerce.date(),
-    category: z.string(),
+    category: z.enum(BLOG_CATEGORIES),
     coverEmoji: z.string().optional(),
     coverImage: z.string().optional(),
     excerpt: z.string(),
