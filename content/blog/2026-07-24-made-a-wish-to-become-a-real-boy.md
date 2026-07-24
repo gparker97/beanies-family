@@ -34,7 +34,7 @@ To install a PWA, you simply add a PWA-enabled mobile website to your home scree
 
 PWAs can be designed to feel like they are almost no different from apps, but that initial friction to get them installed is a major factor that prevents them from truly taking over the app world. In addition, some cool stuff that native apps can do easily, such as send push notifications, access bluetooth, get location data, and more, are either difficult or impossible to do on a PWA.
 
-The reason Apple and Google hate PWAs (or, at the very least, are decidedly indifferent to them) is that they exist _outside of_ the walled gardens of their respective app stores. PWAs can be installed from literally any website, and PWA revenue doesn't flow through Apple or Google's payment providers.
+The reason Apple and Google hate PWAs (or, at the very least, are decidedly ambivalent about them) is that they exist _outside of_ the walled gardens of their respective app stores. PWAs can be installed from literally any website, and PWA revenue doesn't flow through Apple or Google's payment providers.
 
 Apple and Google have therefore trained their users well - ignore the fact that PWAs exist, do very little to help guide users to that option, and reinforce the message that "apps" are only what you can download from the official app stores.
 
