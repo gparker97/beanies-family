@@ -13,7 +13,13 @@
  * and schedule. See `docs/plans/2026-07-23-notifications-end-to-end-native.md`.
  */
 import { computed, type ComputedRef } from 'vue';
-import type { FamilyMember, TodoItem, SupportedTravelType, FamilyActivity } from '@/types/models';
+import type {
+  FamilyMember,
+  TodoItem,
+  SupportedTravelType,
+  FamilyActivity,
+  HelpfulHintType,
+} from '@/types/models';
 import type { NotificationOccurrence } from '@/utils/notifications';
 import type { TravelSegmentOccurrence } from '@/utils/vacation';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -80,6 +86,9 @@ export interface ReminderPrefs {
   activityReminderLead: number;
   /** Fully-resolved per-type lead map (defaults merged with device overrides). */
   travelReminderLeads: Partial<Record<SupportedTravelType, number>>;
+  /** #40: per-device per-hint-type notification mute (absent key ⟹ enabled).
+   *  Suppresses ONLY this device owner's notification for a hint to-do. */
+  helpfulHintNotifyByType: Partial<Record<HelpfulHintType, boolean>>;
 }
 
 export interface ReminderInput {
@@ -272,6 +281,13 @@ export function buildTodoReminders(
         gated++;
         continue; // someone else's — never surface it
       }
+      // #40: a Helpful Hint whose type this device has muted → suppress only
+      // THIS device owner's notification (the shared to-do still shows). Same
+      // "expected rule-drop" bucket as the hidden-audience branch above.
+      if (todo.hintType && prefs.helpfulHintNotifyByType?.[todo.hintType] === false) {
+        gated++;
+        continue;
+      }
       const dateISO = todo.dueDate.slice(0, 10);
       if (!withinWindow(dateISO, input.windowStartISO, input.windowEndISO)) continue;
       // Untimed but dated → morning-of anchor, no lead subtracted.
@@ -390,6 +406,7 @@ export function useScheduledReminders(): {
     todoReminderLead: settingsStore.todoReminderLead,
     activityReminderLead: settingsStore.activityReminderLead,
     travelReminderLeads: settingsStore.travelReminderLeads,
+    helpfulHintNotifyByType: settingsStore.helpfulHintNotifyByType,
   }));
 
   // Reactive to activity/todo/travel data + the day clock. Bounded to the local

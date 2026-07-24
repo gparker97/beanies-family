@@ -19,6 +19,7 @@ import type {
   CountryCode,
   SupportedTravelType,
   ReminderMinutes,
+  HelpfulHintType,
 } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import {
@@ -150,6 +151,15 @@ export const useSettingsStore = defineStore('settings', () => {
   // Family-scoped (synced); default ON (the freebusy scope is granted upfront).
   const calendarClashNudgeEnabled = computed<boolean>(
     () => settings.value.calendarClashNudgeEnabled ?? true
+  );
+  // #40: master on/off for auto-generated Helpful Hint to-dos. Family-scoped
+  // (synced); default ON. Governs whether hints are GENERATED for the family.
+  const helpfulHintsEnabled = computed<boolean>(() => settings.value.helpfulHintsEnabled ?? true);
+  // #40: per-device per-hint-type NOTIFICATION mute (absent key ⟹ enabled).
+  // Device-scoped (never synced), mirroring the #55 per-device reminder prefs —
+  // suppresses only this device owner's notification, never the shared to-do.
+  const helpfulHintNotifyByType = computed<Partial<Record<HelpfulHintType, boolean>>>(
+    () => globalSettings.value.helpfulHintNotifyByType ?? {}
   );
   // #45: when true, the periodic in-app feedback/NPS prompt never auto-opens.
   // Family-scoped (synced); default OFF (prompts enabled).
@@ -509,6 +519,19 @@ export const useSettingsStore = defineStore('settings', () => {
       [type]: minutes,
     });
 
+  // ── Helpful Hints (#40) actions ──
+  // Master switch: family-synced (report-on-failure chain, like the #34 clash nudge).
+  const setHelpfulHintsEnabled = (enabled: boolean) =>
+    persistAiSetting('settings.helpfulHints.label', 'helpfulHintsEnabled', () =>
+      settingsRepo.setHelpfulHintsEnabled(enabled)
+    );
+  // Per-type notification mute: device-scoped map-merge (like setTravelReminderLead).
+  const setHelpfulHintNotifyType = (type: HelpfulHintType, enabled: boolean) =>
+    persistGlobalSetting('reminders.title', 'helpfulHintNotifyByType', {
+      ...(globalSettings.value.helpfulHintNotifyByType ?? {}),
+      [type]: enabled,
+    });
+
   async function setExchangeRateAutoUpdate(enabled: boolean): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -778,6 +801,8 @@ export const useSettingsStore = defineStore('settings', () => {
     showPublicHolidays,
     skipDocumentConsentPrompt,
     calendarClashNudgeEnabled,
+    helpfulHintsEnabled,
+    helpfulHintNotifyByType,
     feedbackOptOut,
     isTrustedDevice,
     trustedDevicePromptShown,
@@ -795,6 +820,8 @@ export const useSettingsStore = defineStore('settings', () => {
     setSyncEnabled,
     setAutoSyncEnabled,
     setCalendarClashNudgeEnabled,
+    setHelpfulHintsEnabled,
+    setHelpfulHintNotifyType,
     setAIProvider,
     setAITier,
     setAIApiKey,

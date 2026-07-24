@@ -58,6 +58,7 @@ const PREFS = {
   todoReminderLead: 30,
   activityReminderLead: 30,
   travelReminderLeads: {},
+  helpfulHintNotifyByType: {},
 };
 
 describe('stableNotificationId', () => {

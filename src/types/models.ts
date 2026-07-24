@@ -47,6 +47,7 @@ export interface GlobalSettings {
   todoReminderLead?: number; // minutes before a timed to-do's due time (default DEFAULT_TODO_LEAD)
   activityReminderLead?: number; // DEFAULT lead for NEW activities + duty reminders (default DEFAULT_ACTIVITY_LEAD); each activity can still override it
   travelReminderLeads?: Partial<Record<SupportedTravelType, number>>; // per-travel-type override; missing type → DEFAULT_TRAVEL_LEADS
+  helpfulHintNotifyByType?: Partial<Record<HelpfulHintType, boolean>>; // #40: per-device per-hint-type notification mute; absent key ⟹ enabled. Never family-synced.
   isTrustedDevice?: boolean;
   trustedDevicePromptShown?: boolean;
   cachedFamilyKeys?: Record<string, string>;
@@ -408,7 +409,22 @@ export interface TodoItem {
   createdBy: UUID; // FK to FamilyMember
   createdAt: ISODateString;
   updatedAt: ISODateString;
+  // Helpful Hints (#40) — present only on auto-generated hint to-dos; absent on
+  // manual to-dos (mirrors the Transaction.recurringItemId auto-generated marker).
+  hintType?: HelpfulHintType; // marker + type; presence ⟹ this is a hint
+  hintKey?: string; // stable dedup key, survives CRDT merge: `${hintType}:${scopeId}:${eventDateISO}`
+  hintEventDate?: ISODateString; // the real event date (birthday/party/trip start) — expiry + display
+  hintAcknowledged?: boolean; // "kept" → permanent, exempt from expiry + master-off cleanup
 }
+
+/** Helpful Hints (#40) — the closed set of rule-based hint triggers. */
+export type HelpfulHintType =
+  | 'birthday-present' // member birthday −14d, adults excl. birthday person
+  | 'birthday-party-gift' // 'birthday' activity −2d, attendees
+  | 'celebration-gift' // other Party-group −2d, attendees
+  | 'anniversary-plan' // 'anniversary' −14d
+  | 'trip-packing' // trip −2d, travellers
+  | 'trip-documents'; // trip −7d, travellers
 
 export type CreateTodoInput = Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateTodoInput = Partial<Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>>;
@@ -1419,6 +1435,7 @@ export interface Settings {
   showPublicHolidays?: boolean; // default true once `country` is set; lets the family hide holidays
   skipDocumentConsentPrompt?: boolean; // #133: when true, the photo→activity AI consent modal is auto-confirmed (default: ask). Family-scoped.
   calendarClashNudgeEnabled?: boolean; // #34: warn when an activity clashes with a connected calendar's free/busy (default: true). Family-scoped.
+  helpfulHintsEnabled?: boolean; // #40: master on/off for auto-generated Helpful Hint to-dos (default: true). Family-scoped.
   feedbackOptOut?: boolean; // #45: when true, the periodic in-app feedback/NPS prompt never auto-opens (default: false). Family-scoped.
   feedbackLastPromptedAt?: ISODateString; // #45: date-only cadence clock — the last time the feedback prompt was shown or a submission was made. Absent until first use. Family-scoped.
   createdAt: ISODateString;

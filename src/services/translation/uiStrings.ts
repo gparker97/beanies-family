@@ -4503,6 +4503,46 @@ const STRING_DEFS = {
     en: 'Things you might do — no pressure, no due date.',
     beanie: 'things you might do — no pressure, no due date.',
   },
+  // #40: Helpful Hints — section, badges, actions, and per-type titles ({name},
+  // {date} are filled via fillTemplate at generation time).
+  'todo.hint.section': { en: 'Helpful Hints', beanie: 'helpful hints' },
+  'todo.hint.sectionHint': {
+    en: "Gentle nudges before what's coming up. Keep the ones you want, or dismiss them.",
+    beanie: "gentle nudges before what's coming up. keep the ones you want, or dismiss them.",
+  },
+  'todo.hint.badge': { en: 'Hint', beanie: 'hint' },
+  'todo.hint.whatsThis': {
+    en: 'A gentle suggestion beanies added ahead of an upcoming birthday, party, or trip. Keep it to make it your own to-do, or dismiss it.',
+    beanie:
+      'a gentle suggestion beanies added ahead of an upcoming birthday, party, or trip. keep it to make it your own to-do, or dismiss it.',
+  },
+  'todo.hint.learnMore': { en: 'Learn more', beanie: 'learn more' },
+  'todo.hint.keep': { en: 'Keep', beanie: 'keep' },
+  'todo.hint.dismiss': { en: 'Dismiss', beanie: 'dismiss' },
+  'todo.hint.title.birthdayPresent': {
+    en: 'Plan a birthday present for {name} ({date})',
+    beanie: 'plan a birthday present for {name} ({date})',
+  },
+  'todo.hint.title.birthdayPartyGift': {
+    en: 'Get a present for {name} ({date})',
+    beanie: 'get a present for {name} ({date})',
+  },
+  'todo.hint.title.celebrationGift': {
+    en: 'Get a gift or card for {name} ({date})',
+    beanie: 'get a gift or card for {name} ({date})',
+  },
+  'todo.hint.title.anniversaryPlan': {
+    en: 'Plan something for {name} ({date})',
+    beanie: 'plan something for {name} ({date})',
+  },
+  'todo.hint.title.tripPacking': {
+    en: 'Start packing for {name} ({date})',
+    beanie: 'start packing for {name} ({date})',
+  },
+  'todo.hint.title.tripDocuments': {
+    en: 'Check passports and documents for {name} ({date})',
+    beanie: 'check passports and documents for {name} ({date})',
+  },
   'todo.kind': { en: 'Track as', beanie: 'track as' },
   'todo.kind.todo': { en: 'To-do', beanie: 'to-do' },
   'todo.moveToSomeday': { en: 'Move to Someday', beanie: 'move to someday' },
@@ -6621,6 +6661,36 @@ const STRING_DEFS = {
     beanie: 'a heads-up before activities, travel and to-dos — so you leave and prepare on time.',
   },
   'reminders.masterToggle': { en: 'Reminders on this device', beanie: 'reminders on this device' },
+  // #40: Helpful Hints settings — master (family-synced) + per-device per-type.
+  'settings.helpfulHints.label': { en: 'Helpful Hints', beanie: 'helpful hints' },
+  'settings.helpfulHints.title': { en: 'Helpful Hints', beanie: 'helpful hints' },
+  'settings.helpfulHints.hint': {
+    en: 'Suggest prep to-dos before birthdays, parties, and trips, for the whole family.',
+    beanie: 'suggest prep to-dos before birthdays, parties, and trips, for the whole family.',
+  },
+  'settings.helpfulHints.perDeviceHint': {
+    en: 'Choose which hints notify you on this device. Turning one off only silences your notifications — everyone still sees the to-do.',
+    beanie:
+      'choose which hints notify you on this device. turning one off only silences your notifications — everyone still sees the to-do.',
+  },
+  'settings.helpfulHints.type.birthdayPresent': {
+    en: 'Birthday presents',
+    beanie: 'birthday presents',
+  },
+  'settings.helpfulHints.type.birthdayPartyGift': {
+    en: 'Birthday party gifts',
+    beanie: 'birthday party gifts',
+  },
+  'settings.helpfulHints.type.celebrationGift': {
+    en: 'Celebration gifts',
+    beanie: 'celebration gifts',
+  },
+  'settings.helpfulHints.type.anniversaryPlan': { en: 'Anniversaries', beanie: 'anniversaries' },
+  'settings.helpfulHints.type.tripPacking': { en: 'Trip packing', beanie: 'trip packing' },
+  'settings.helpfulHints.type.tripDocuments': {
+    en: 'Travel documents',
+    beanie: 'travel documents',
+  },
   'reminders.masterToggleHint': {
     en: 'Get a nudge before things start. Reminders come from this device, so this switch only affects the phone or computer you’re on.',
     beanie:

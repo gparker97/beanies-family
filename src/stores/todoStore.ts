@@ -6,8 +6,10 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import { useToday } from '@/composables/useToday';
 import * as todoRepo from '@/services/automerge/repositories/todoRepository';
 import { normalizeAssignees } from '@/utils/assignees';
+import { classifyAudience } from '@/utils/audience';
 import { isTodoOverdue } from '@/utils/todo';
-import type { TodoItem, CreateTodoInput, UpdateTodoInput } from '@/types/models';
+import { isHint, dedupeHintsByKey } from '@/utils/helpfulHints';
+import type { TodoItem, CreateTodoInput, UpdateTodoInput, FamilyMember } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 
 // Sort comparators — newest-created first / most-recently-completed first.
@@ -27,6 +29,14 @@ export const useTodoStore = defineStore('todos', () => {
     todos.value.filter((t) => !t.completed && !t.someday).sort(byCreatedDesc)
   );
 
+  // #40: the manual/hint boundary — the single place hints are split out of the
+  // "family's own tasks" lanes. `activeTodos` deliberately KEEPS hints (so the
+  // #55 reminder path still schedules their notifications); every attention /
+  // open / scheduled lane derives from `manualActiveTodos` instead, so hints are
+  // structurally excluded from those surfaces in exactly one place. Hints are
+  // surfaced ONLY via `hintTodos` below.
+  const manualActiveTodos = computed(() => activeTodos.value.filter((t) => !isHint(t)));
+
   const somedayTodos = computed(() =>
     todos.value.filter((t) => !t.completed && t.someday).sort(byCreatedDesc)
   );
@@ -35,18 +45,19 @@ export const useTodoStore = defineStore('todos', () => {
     todos.value.filter((t) => t.completed).sort(byCompletedDesc)
   );
 
-  const scheduledTodos = computed(() => activeTodos.value.filter((t) => t.dueDate));
+  const scheduledTodos = computed(() => manualActiveTodos.value.filter((t) => t.dueDate));
 
-  const undatedTodos = computed(() => activeTodos.value.filter((t) => !t.dueDate));
+  const undatedTodos = computed(() => manualActiveTodos.value.filter((t) => !t.dueDate));
 
   // Attention computeds — surfaced via the sidebar/mobile-nav attention
   // badges (see useNavBadges) and the daily briefing (useCriticalItems).
   // Single source of truth: anywhere that needs "what's overdue or due
-  // today" reads from here, not from inline filters.
+  // today" reads from here, not from inline filters. Hint to-dos never appear
+  // here (they derive from manualActiveTodos), so they stay gentle.
   const { today } = useToday();
-  const overdueTodos = computed(() => activeTodos.value.filter((t) => isTodoOverdue(t)));
+  const overdueTodos = computed(() => manualActiveTodos.value.filter((t) => isTodoOverdue(t)));
   const dueTodayTodos = computed(() =>
-    activeTodos.value.filter((t) => {
+    manualActiveTodos.value.filter((t) => {
       if (!t.dueDate || isTodoOverdue(t)) return false;
       // dueDate is an ISODateString; slice handles both date-only and
       // full datetime forms. Comparing as strings avoids re-parsing.
@@ -54,12 +65,28 @@ export const useTodoStore = defineStore('todos', () => {
     })
   );
 
+  // #40: hint to-dos, deduped by hintKey (CRDT-merge collision resolver). The
+  // ONLY getter that surfaces hints. `visibleHintTodos` additionally applies
+  // audience-based visibility so a surprise-sensitive hint (e.g. a birthday
+  // present) is hidden from the person it concerns.
+  const hintTodos = computed(() => dedupeHintsByKey(activeTodos.value.filter(isHint)));
+  function visibleHintTodos(
+    viewer: FamilyMember,
+    resolveMember: (id: string) => FamilyMember | undefined
+  ): TodoItem[] {
+    return hintTodos.value.filter(
+      (t) => classifyAudience(normalizeAssignees(t), viewer, resolveMember).kind !== 'hidden'
+    );
+  }
+
   // ========== FILTERED GETTERS (by global member filter) ==========
 
   const filteredTodos = createMemberFiltered(todos, (t) => normalizeAssignees(t));
 
+  // #40: also excludes hints, so the Open section + every Nook widget / status
+  // toast that reads this feed stays hint-free (children below inherit it).
   const filteredActiveTodos = computed(() =>
-    filteredTodos.value.filter((t) => !t.completed && !t.someday).sort(byCreatedDesc)
+    filteredTodos.value.filter((t) => !t.completed && !t.someday && !isHint(t)).sort(byCreatedDesc)
   );
 
   const filteredSomedayTodos = computed(() =>
@@ -181,6 +208,12 @@ export const useTodoStore = defineStore('todos', () => {
       : updateTodo(id, { someday: false });
   }
 
+  // #40: "keep" a hint — it becomes a permanent normal to-do (exempt from
+  // auto-expiry + master-off cleanup) while retaining its subtle hint marker.
+  async function acknowledgeHint(id: string): Promise<TodoItem | null> {
+    return updateTodo(id, { hintAcknowledged: true });
+  }
+
   function resetState() {
     todos.value = [];
     isLoading.value = false;
@@ -194,10 +227,14 @@ export const useTodoStore = defineStore('todos', () => {
     error,
     // Getters — the three lanes: active / someday / completed
     activeTodos,
+    manualActiveTodos,
     somedayTodos,
     completedTodos,
     scheduledTodos,
     undatedTodos,
+    // #40: Helpful Hints
+    hintTodos,
+    visibleHintTodos,
     // Attention getters — drive sidebar/mobile badges + daily briefing
     overdueTodos,
     dueTodayTodos,
@@ -215,6 +252,7 @@ export const useTodoStore = defineStore('todos', () => {
     deleteTodo,
     toggleComplete,
     setSomeday,
+    acknowledgeHint,
     resetState,
   };
 });
