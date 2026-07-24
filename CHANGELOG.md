@@ -14,6 +14,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Helpful Hints (in development, behind a dev flag).** beanies can now auto-generate gentle prep to-dos ahead of upcoming birthdays, parties, anniversaries, and trips — buy a present, start packing, check passports — each carrying a notification via the reminders framework. Hints are clearly marked, dismissible in one tap or keepable as your own to-do, and controllable in Settings → Reminders (a family master switch plus per-device, per-type notification toggles). The birthday person never sees their own present hint. Not yet enabled for anyone — ships behind the `helpfulHints` flag.
 
+### Changed
+
+- **The month calendar now shows what's on in the greyed edge days.** The first and last rows of the month view spill over into the neighbouring months, and those days were drawn but always empty — so the last few days of last month looked free even when they weren't. They now show their activities, all-day events, flights and trips like any other day.
+- **Transactions now list newest first.** The transactions list was showing the oldest day of the month at the top and the newest at the bottom. It now reads newest-first, matching every other place beanies lists transactions (account and goal activity logs, dashboard recents). Sorting by column is coming later.
+
 ### Fixed
 
 - **Tapping a reminder now opens the thing it is about.** On the app, tapping a reminder notification used to just bring beanies to whatever screen you were last on. It now takes you straight to the activity, to-do, trip, or hint the reminder was for, and opens it - including when the app was fully closed, where it waits for your family data to load before jumping in.

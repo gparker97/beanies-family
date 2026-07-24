@@ -287,6 +287,64 @@ describe('activityStore', () => {
 
   // ── Recurring Expansion ──
 
+  describe('activitiesInRange', () => {
+    it('returns occurrences across a month boundary in one call', () => {
+      const store = useActivityStore();
+      // Weekly Wednesdays from Feb 25 — spans the Feb/Mar boundary.
+      store.activities.push(
+        makeActivity({ id: '1', date: '2026-02-25', recurrence: 'weekly', daysOfWeek: [3] })
+      );
+
+      // The span a month grid showing March would query: the grid's first cell
+      // sits in late February and its last in early April.
+      const occurrences = store.activitiesInRange('2026-02-22', '2026-04-04');
+
+      expect(occurrences.map((o) => o.date)).toEqual([
+        '2026-02-25',
+        '2026-03-04',
+        '2026-03-11',
+        '2026-03-18',
+        '2026-03-25',
+        '2026-04-01',
+      ]);
+    });
+
+    it('clips to the range bounds rather than returning whole months', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({ id: '1', date: '2026-03-04', recurrence: 'weekly', daysOfWeek: [3] })
+      );
+
+      // Range starts AFTER the first two March Wednesdays and ends before the last.
+      const occurrences = store.activitiesInRange('2026-03-15', '2026-03-20');
+
+      expect(occurrences.map((o) => o.date)).toEqual(['2026-03-18']);
+    });
+
+    it('finds a yearly activity in a range that walks past December', () => {
+      const store = useActivityStore();
+      // Guards the `expandRecurring` invariant: the yearly branch compares the
+      // month index raw against 0-11, so a range walker that stepped `month + i`
+      // without normalizing would silently return nothing here.
+      store.activities.push(
+        makeActivity({ id: '1', date: '2025-06-10', recurrence: 'yearly', daysOfWeek: [] })
+      );
+
+      const occurrences = store.activitiesInRange('2025-11-01', '2026-07-01');
+
+      expect(occurrences.map((o) => o.date)).toEqual(['2026-06-10']);
+    });
+
+    it('returns nothing for an inverted or malformed range instead of throwing', () => {
+      const store = useActivityStore();
+      store.activities.push(makeActivity({ id: '1' }));
+
+      expect(store.activitiesInRange('2026-03-31', '2026-03-01')).toEqual([]);
+      expect(store.activitiesInRange('', '2026-03-01')).toEqual([]);
+      expect(store.activitiesInRange('not-a-date', 'also-not')).toEqual([]);
+    });
+  });
+
   describe('monthActivities (recurring expansion)', () => {
     it('should expand a weekly activity across the month', () => {
       const store = useActivityStore();

@@ -18,7 +18,7 @@ vi.mock('@/composables/useTranslation', () => ({
 
 vi.mock('@/stores/activityStore', () => ({
   useActivityStore: () => ({
-    monthActivities: () => [] as Array<{ activity: FamilyActivity; date: string }>,
+    activitiesInRange: () => [] as Array<{ activity: FamilyActivity; date: string }>,
   }),
   CATEGORY_COLORS: {} as Record<string, string>,
   getActivityColor: () => '#F15D22',

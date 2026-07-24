@@ -19,7 +19,10 @@ const mockActivityOccurrences: Array<{ activity: FamilyActivity; date: string }>
 
 vi.mock('@/stores/activityStore', () => ({
   useActivityStore: () => ({
-    monthActivities: () => mockActivityOccurrences,
+    // Mirrors the real store: range-bounded, inclusive. The grid queries the
+    // whole visible span (incl. prev/next-month padding cells), not the month.
+    activitiesInRange: (startYmd: string, endYmd: string) =>
+      mockActivityOccurrences.filter((o) => o.date >= startYmd && o.date <= endYmd),
   }),
   // Stable category color map matching what AllDayActivityChip expects.
   CATEGORY_COLORS: { sports: '#F15D22' } as Record<string, string>,
@@ -309,6 +312,73 @@ describe('CalendarGrid timed-chip row', () => {
     const text = wrapper.text();
     expect(text).toContain('Piano');
     expect(text).toContain('Soccer');
+  });
+
+  it('renders chips on the greyed prev/next-month padding cells too', () => {
+    // April 2026 with a Sunday week start: the grid's first row reaches back to
+    // Mar 29-31 and its last row runs on to May 1-2. Those days are drawn, so
+    // their items must be drawn as well — a visible day that renders empty when
+    // it isn't reads as "nothing on", which is worse than not showing the day.
+    const timed = (id: string, date: string, title: string) => ({
+      activity: {
+        id,
+        title,
+        date,
+        startTime: '10:00',
+        category: 'other_activity',
+        isAllDay: false,
+        recurrence: { type: 'none' },
+        feeSchedule: 'none',
+        reminderMinutes: { default: 15 },
+        isActive: true,
+        createdBy: 'm-1',
+        createdAt: NOW,
+        updatedAt: NOW,
+        assigneeIds: ['m-1'],
+      } as unknown as FamilyActivity,
+      date,
+    });
+
+    mockActivityOccurrences.push(
+      timed('a-prev', '2026-03-30', 'Late March swim'),
+      timed('a-next', '2026-05-01', 'Early May recital')
+    );
+
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
+    const text = wrapper.text();
+
+    expect(text).toContain('Late March swim');
+    expect(text).toContain('Early May recital');
+    expect(wrapper.findAll('[data-testid="month-chip"]').length).toBe(2);
+  });
+
+  it('does not pull in items from outside the visible grid span', () => {
+    // Mar 20 is in the previous month but NOT on the April grid — querying a
+    // whole 3 months instead of the grid range would wrongly surface it.
+    mockActivityOccurrences.push({
+      activity: {
+        id: 'a-offgrid',
+        title: 'Off-grid March event',
+        date: '2026-03-20',
+        startTime: '10:00',
+        category: 'other_activity',
+        isAllDay: false,
+        recurrence: { type: 'none' },
+        feeSchedule: 'none',
+        reminderMinutes: { default: 15 },
+        isActive: true,
+        createdBy: 'm-1',
+        createdAt: NOW,
+        updatedAt: NOW,
+        assigneeIds: ['m-1'],
+      } as unknown as FamilyActivity,
+      date: '2026-03-20',
+    });
+
+    const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
+
+    expect(wrapper.text()).not.toContain('Off-grid March event');
+    expect(wrapper.findAll('[data-testid="month-chip"]').length).toBe(0);
   });
 
   it('renders +N more button when a day exceeds the timed-chip cap', () => {
