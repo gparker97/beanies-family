@@ -12,5 +12,5 @@ export const COMMITTED_FLAGS: Record<DevFlag, boolean> = {
   docWorker: true,
   familyLists: true,
   googleCalendarSync: true,
-  helpfulHints: false,
+  helpfulHints: true,
 };
