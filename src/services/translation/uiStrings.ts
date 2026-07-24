@@ -6674,12 +6674,12 @@ const STRING_DEFS = {
       'choose which hints notify you on this device. turning one off only silences your notifications — everyone still sees the to-do.',
   },
   'settings.helpfulHints.type.birthdayPresent': {
-    en: 'Birthday presents',
-    beanie: 'birthday presents',
+    en: 'Family birthdays',
+    beanie: 'family birthdays',
   },
   'settings.helpfulHints.type.birthdayPartyGift': {
-    en: 'Birthday party gifts',
-    beanie: 'birthday party gifts',
+    en: 'Party invitations',
+    beanie: 'party invitations',
   },
   'settings.helpfulHints.type.celebrationGift': {
     en: 'Celebration gifts',
@@ -6691,6 +6691,40 @@ const STRING_DEFS = {
     en: 'Travel documents',
     beanie: 'travel documents',
   },
+  // #40: per-type descriptions (shown under each hint in Settings).
+  'settings.helpfulHints.desc.birthdayPresent': {
+    en: 'Plan a present or party before someone in your own family has a birthday.',
+    beanie: 'plan a present or party before someone in your own family has a birthday.',
+  },
+  'settings.helpfulHints.desc.birthdayPartyGift': {
+    en: 'Bring a present before a birthday party on your calendar (e.g. one your child is invited to).',
+    beanie:
+      'bring a present before a birthday party on your calendar (e.g. one your child is invited to).',
+  },
+  'settings.helpfulHints.desc.celebrationGift': {
+    en: 'A reminder to bring a gift or card before a wedding, shower, or other celebration.',
+    beanie: 'a reminder to bring a gift or card before a wedding, shower, or other celebration.',
+  },
+  'settings.helpfulHints.desc.anniversaryPlan': {
+    en: 'A reminder to plan something before an anniversary.',
+    beanie: 'a reminder to plan something before an anniversary.',
+  },
+  'settings.helpfulHints.desc.tripPacking': {
+    en: 'A reminder to start packing before a trip.',
+    beanie: 'a reminder to start packing before a trip.',
+  },
+  'settings.helpfulHints.desc.tripDocuments': {
+    en: 'A reminder to check passports, visas, and travel insurance before a trip.',
+    beanie: 'a reminder to check passports, visas, and travel insurance before a trip.',
+  },
+  // #40: per-type lead-time control labels.
+  'settings.helpfulHints.howFarAhead': { en: 'How far ahead', beanie: 'how far ahead' },
+  'settings.helpfulHints.notifyOnDevice': {
+    en: 'Notify me on this device',
+    beanie: 'notify me on this device',
+  },
+  'settings.helpfulHints.leadDays.one': { en: '{n} day before', beanie: '{n} day before' },
+  'settings.helpfulHints.leadDays.other': { en: '{n} days before', beanie: '{n} days before' },
   'reminders.masterToggleHint': {
     en: 'Get a nudge before things start. Reminders come from this device, so this switch only affects the phone or computer you’re on.',
     beanie:

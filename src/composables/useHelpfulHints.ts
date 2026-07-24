@@ -30,8 +30,9 @@ import type { TodoItem } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const DEBOUNCE_MS = 1000;
-/** Forward days assembled for occurrence triggers — the largest hint lead (14). */
-const WINDOW_DAYS = 14;
+/** Floor for the occurrence-assembly window (the largest configured lead may
+ *  extend it). Keeps the window sane if every lead were set very small. */
+const MIN_WINDOW_DAYS = 14;
 const SURFACE = 'helpful-hints';
 
 let initialized = false;
@@ -105,8 +106,12 @@ export function useHelpfulHints(): void {
     }
 
     const todayStr = today.value;
+    const leadDays = settingsStore.helpfulHintLeadDays;
+    // Assemble occurrences out to the largest configured lead, so a family that
+    // sets, say, a 30-day anniversary lead still sees those occurrences.
+    const windowDays = Math.max(MIN_WINDOW_DAYS, ...Object.values(leadDays));
     const start = parseLocalDate(todayStr);
-    const end = parseLocalDate(addDaysYmd(todayStr, WINDOW_DAYS));
+    const end = parseLocalDate(addDaysYmd(todayStr, windowDays));
     const occurrences = assembleOccurrencesByDate(
       activityStore.activeActivitiesForMonth,
       start,
@@ -118,6 +123,7 @@ export function useHelpfulHints(): void {
       members: familyStore.humans,
       occurrences,
       vacations: vacationStore.upcomingVacations,
+      leadDays,
       translate,
       formatDate: (ymd) => formatDateWithDay(ymd),
     });
