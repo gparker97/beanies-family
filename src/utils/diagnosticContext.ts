@@ -196,6 +196,7 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'notif_activity_lead',
   'notif_gated',
   'notif_backfilled',
+  'notif_tap_outcome', // notification tap → navigated | deferred | ignored-no-target
   // Helpful Hints (#40) — reconcile outcome counters + type/op enums. All are
   // non-PII (counts + a closed hint-type enum); no names, member ids, or event
   // content. Family scoping comes from `family_id`.

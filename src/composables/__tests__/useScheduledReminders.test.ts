@@ -110,6 +110,16 @@ describe('buildReminderSchedule — activities', () => {
     expect(reminders[0].kind).toBe('activity');
   });
 
+  it('carries an activity deep link so a tap opens the activity', () => {
+    const a = activity({ id: 'a-deep' as UUID, startTime: '15:00', reminderMinutes: 30 });
+    const { reminders } = buildReminderSchedule(
+      input({ occurrencesByDate: { '2026-05-22': [occ('2026-05-22', a)] } }),
+      NOW,
+      PREFS
+    );
+    expect(reminders[0].deepLink).toEqual({ path: '/activities', query: { activity: 'a-deep' } });
+  });
+
   it('reminderMinutes = 0 means "None" — schedules NOTHING', () => {
     // The chip renders 0 as `planner.reminder.none` and ActivityListCard hides
     // the chip entirely at 0. Firing at the event time would be the very defect
@@ -320,6 +330,15 @@ describe('buildReminderSchedule — travel', () => {
     expect(reminders).toHaveLength(0);
   });
 
+  it('carries the PARENT TRIP deep link (the occurrence already knows its vacationId)', () => {
+    const { reminders } = buildReminderSchedule(
+      input({ travelOccurrences: [travel({ vacationId: 'vac-deep' })] }),
+      NOW,
+      PREFS
+    );
+    expect(reminders[0].deepLink).toEqual({ path: '/travel', query: { vacation: 'vac-deep' } });
+  });
+
   it('arms a member who IS on the segment', () => {
     const { reminders } = buildReminderSchedule(
       input({
@@ -423,6 +442,15 @@ describe('buildReminderSchedule — todos', () => {
     );
     expect(reminders).toHaveLength(1);
     expect(reminders[0].fireAt).toEqual(new Date('2026-05-23T09:00:00'));
+  });
+
+  it('carries a to-do deep link so a tap opens the item (incl. hint to-dos)', () => {
+    const { reminders } = buildReminderSchedule(
+      input({ todos: [todo({ id: 't-deep' as UUID, hintType: 'trip-packing' })] }),
+      NOW,
+      PREFS
+    );
+    expect(reminders[0].deepLink).toEqual({ path: '/todo', query: { view: 't-deep' } });
   });
 
   it('#40: schedules a hint to-do normally when its type is not muted on this device', () => {

@@ -44,6 +44,7 @@ import {
 } from '@/utils/reminderSchedule';
 import { activityReminderId, todoDueId, travelReminderId } from '@/utils/notifications';
 import { dedupeHintsByKey } from '@/utils/helpfulHints';
+import { entityDeepLink, type DeepLink } from '@/utils/entityDeepLink';
 import { classifyAudience, isDutyDone } from '@/utils/audience';
 import { normalizeAssignees } from '@/utils/assignees';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
@@ -77,6 +78,11 @@ export interface ScheduledReminder {
   title: string;
   body: string;
   kind: ReminderKind;
+  /** Where a TAP on this notification should land. Carried verbatim into the
+   *  notification payload (`extra.link`) and pushed straight to the router — the
+   *  delivered notification id is a lossy hash, so the target must ride along.
+   *  Same `{path,query}` shape the in-app bell "Open" uses. */
+  deepLink: DeepLink;
 }
 
 export interface ReminderPrefs {
@@ -192,6 +198,7 @@ export function remindersForActivityOccurrence(
         { who }
       ),
       kind: 'activity',
+      deepLink: entityDeepLink('activity', a.id),
     });
   }
   // Suppress the generic reminder only when a duty role actually had an anchor.
@@ -212,6 +219,7 @@ export function remindersForActivityOccurrence(
       ? fillTemplate(t('reminders.activityBodyWho'), { who })
       : t('reminders.activityBody'),
     kind: 'activity',
+    deepLink: entityDeepLink('activity', a.id),
   });
   return { reminders: out, gated };
 }
@@ -304,6 +312,8 @@ export function buildTodoReminders(
           ? fillTemplate(input.t('reminders.todoBody'), { time: formatTime12(todo.dueTime) })
           : input.t('reminders.todoBodyAllDay'),
         kind: 'todo',
+        // Covers Helpful Hint to-dos too — they are ordinary TodoItems.
+        deepLink: entityDeepLink('todo', todo.id),
       });
     } catch (err) {
       skipped++;
@@ -351,6 +361,8 @@ export function buildTravelReminders(
         title: o.title,
         body: fillTemplate(input.t('reminders.travelBody'), { time: formatTime12(o.time) }),
         kind: 'travel',
+        // The occurrence already carries its parent trip id — no segment lookup.
+        deepLink: entityDeepLink('vacation', o.vacationId),
       });
     } catch (err) {
       skipped++;
