@@ -66,7 +66,7 @@ I'm looking forward to offering more ways for families to take care of their dai
 
 At least, I'll keep telling myself that while I'm filling out these endless app store forms.
 
-Our little PWA has grown up to be a real boy. I'm so proud. I hope you are too.
+Our little PWA has grown up to be a real boy. I'm so proud. I hope you are, too.
 
 greg
 
