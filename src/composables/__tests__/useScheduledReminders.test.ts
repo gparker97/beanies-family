@@ -94,6 +94,7 @@ const PREFS: ReminderPrefs = {
   todoReminderLead: 30,
   activityReminderLead: 30,
   travelReminderLeads: DEFAULT_TRAVEL_LEADS,
+  helpfulHintNotifyByType: {},
 };
 
 describe('buildReminderSchedule — activities', () => {
@@ -422,6 +423,35 @@ describe('buildReminderSchedule — todos', () => {
     );
     expect(reminders).toHaveLength(1);
     expect(reminders[0].fireAt).toEqual(new Date('2026-05-23T09:00:00'));
+  });
+
+  it('#40: schedules a hint to-do normally when its type is not muted on this device', () => {
+    const { reminders, gated } = buildReminderSchedule(
+      input({ todos: [todo({ hintType: 'trip-packing' })] }),
+      NOW,
+      PREFS
+    );
+    expect(reminders).toHaveLength(1);
+    expect(gated).toBe(0);
+  });
+
+  it('#40: suppresses (gates) a hint to-do whose type is muted on this device', () => {
+    const { reminders, gated } = buildReminderSchedule(
+      input({ todos: [todo({ hintType: 'trip-packing' })] }),
+      NOW,
+      { ...PREFS, helpfulHintNotifyByType: { 'trip-packing': false } }
+    );
+    expect(reminders).toHaveLength(0);
+    expect(gated).toBe(1);
+  });
+
+  it('#40: a DIFFERENT muted type does not affect this hint', () => {
+    const { reminders } = buildReminderSchedule(
+      input({ todos: [todo({ hintType: 'trip-packing' })] }),
+      NOW,
+      { ...PREFS, helpfulHintNotifyByType: { 'trip-documents': false } }
+    );
+    expect(reminders).toHaveLength(1);
   });
 
   it('PRIVACY: does NOT schedule a to-do assigned privately to another adult', () => {

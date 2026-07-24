@@ -38,6 +38,7 @@ describe('config/featureFlagWrite', () => {
       docWorker: false,
       familyLists: false,
       googleCalendarSync: false,
+      helpfulHints: false,
     });
     expect(result.source).toContain('aiPhotoExtract: true,');
   });
@@ -71,6 +72,7 @@ describe('config/featureFlagWrite', () => {
       docWorker: false,
       familyLists: false,
       googleCalendarSync: false,
+      helpfulHints: false,
     });
     expect(Object.keys(result.nextState)).not.toContain('bogusOld');
     expect(result.source).not.toContain('bogusOld');

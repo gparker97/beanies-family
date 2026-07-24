@@ -196,6 +196,18 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'notif_activity_lead',
   'notif_gated',
   'notif_backfilled',
+  // Helpful Hints (#40) — reconcile outcome counters + type/op enums. All are
+  // non-PII (counts + a closed hint-type enum); no names, member ids, or event
+  // content. Family scoping comes from `family_id`.
+  'hint_generated',
+  'hint_expired',
+  'hint_pruned_stale',
+  'hint_total',
+  'hint_skipped_records',
+  'hint_master_on',
+  'hint_flag_on',
+  'hint_type',
+  'hint_op',
 ]);
 
 export const MAX_STRING_LEN = 200;
