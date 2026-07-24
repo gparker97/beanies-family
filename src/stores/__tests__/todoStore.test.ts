@@ -149,6 +149,15 @@ describe('todoStore — Helpful Hints (#40)', () => {
     expect(store.hintTodos.map((t) => t.id)).toEqual(['h']);
   });
 
+  it('allHintTodos includes completed hints (for reconcile) while hintTodos excludes them', () => {
+    const store = useTodoStore();
+    const active = todo({ id: 'a', hintType: 'trip-packing', hintKey: 'ka' });
+    const done = todo({ id: 'd', hintType: 'trip-packing', hintKey: 'kd', completed: true });
+    store.todos = [active, done];
+    expect(store.allHintTodos.map((t) => t.id).sort()).toEqual(['a', 'd']);
+    expect(store.hintTodos.map((t) => t.id)).toEqual(['a']); // completed dropped from display
+  });
+
   it('dedupes hintTodos by hintKey, keeping the earliest-created', () => {
     const store = useTodoStore();
     const late = todo({

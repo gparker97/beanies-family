@@ -212,14 +212,13 @@ describe('reconcileHints', () => {
       hintKey: 'k1',
       title: 't',
       assigneeIds: ['a'],
-      nudgeDate: today,
       eventDate: '2026-07-26',
     },
   ];
 
   function hintTodo(over: Partial<TodoItem>): TodoItem {
     return {
-      id: 'id',
+      id: over.id ?? 'id',
       title: 't',
       completed: false,
       createdBy: 'a',
@@ -265,6 +264,35 @@ describe('reconcileHints', () => {
     const done = hintTodo({ hintKey: 'k-done', hintEventDate: '2026-07-01', completed: true });
     const { toRemove } = reconcileHints([...desired], [kept, done], today);
     expect(toRemove).toHaveLength(0);
+  });
+
+  it('does not regenerate a completed hint whose key is still desired (complete = keep)', () => {
+    const done = hintTodo({
+      id: 'done',
+      hintKey: 'k1', // same key as the desired hint
+      hintEventDate: '2026-07-26',
+      completed: true,
+    });
+    const { toCreate, toRemove } = reconcileHints([...desired], [done], today);
+    expect(toCreate).toHaveLength(0); // completed copy blocks regeneration
+    expect(toRemove).toHaveLength(0); // and is never auto-removed
+  });
+
+  it('collapses a cross-device duplicate to the earliest, removing the later copy', () => {
+    const early = hintTodo({
+      id: 'early',
+      hintKey: 'k1',
+      hintEventDate: '2026-07-26',
+      createdAt: '2026-07-20',
+    });
+    const late = hintTodo({
+      id: 'late',
+      hintKey: 'k1',
+      hintEventDate: '2026-07-26',
+      createdAt: '2026-07-21',
+    });
+    const { toRemove } = reconcileHints([...desired], [early, late], today);
+    expect(toRemove.map((t) => t.id)).toEqual(['late']); // only the duplicate loser
   });
 });
 
