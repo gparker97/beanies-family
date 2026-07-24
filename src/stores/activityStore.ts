@@ -324,6 +324,40 @@ export const useActivityStore = defineStore('activities', () => {
   }
 
   /**
+   * All occurrences (direct + recurring expanded) whose date falls within
+   * `[startYmd, endYmd]` inclusive. Same member-filtered source as
+   * {@link monthActivities} — this is the arbitrary-range form of it, used by
+   * the month grid so the prev/next-month padding cells show their items too.
+   *
+   * Walks every calendar month the range touches, normalizing the month index
+   * through a `Date` on each step. That normalization is REQUIRED, not stylistic:
+   * `expandRecurring`'s yearly branch compares `month` raw against `getMonth()`
+   * (0-11), so a caller stepping `month + i` past 11 silently drops every yearly
+   * activity (see the INVARIANT note on `expandRecurringYearly`).
+   */
+  function activitiesInRange(startYmd: string, endYmd: string) {
+    const all: { activity: FamilyActivity; date: string }[] = [];
+    if (!startYmd || !endYmd || startYmd > endYmd) return all;
+    const start = parseLocalDate(startYmd);
+    const end = parseLocalDate(endYmd);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return all;
+    // Cursor sits on the 1st of each month, so `setMonth` can never overflow
+    // a short month (e.g. Jan 31 → Mar 3).
+    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    while (cursor <= end) {
+      const y = cursor.getFullYear();
+      const m = cursor.getMonth();
+      for (const a of filteredActivities.value) {
+        for (const occ of expandRecurring(a, y, m)) {
+          if (occ.date >= startYmd && occ.date <= endYmd) all.push(occ);
+        }
+      }
+      cursor.setMonth(m + 1);
+    }
+    return all;
+  }
+
+  /**
    * All occurrences for a month over the UNFILTERED `activeActivities` source
    * (same source as `activitiesForDate`) — so drop-off/pick-up duty-only
    * occurrences are never dropped by the global member filter. Used by the
@@ -764,6 +798,7 @@ export const useActivityStore = defineStore('activities', () => {
     linkableActivities,
     // Methods
     monthActivities,
+    activitiesInRange,
     activeActivitiesForMonth,
     activitiesForDate,
     // Actions
