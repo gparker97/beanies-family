@@ -10,6 +10,7 @@ import {
 } from '@/composables/useScheduledReminders';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
+import { handleReminderTap, type ReminderExtra } from '@/composables/useReminderTapResume';
 import { useToday } from '@/composables/useToday';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
@@ -106,7 +107,10 @@ export function buildScheduledNotifications(
     body: r.body,
     schedule: { at: r.fireAt, allowWhileIdle: true },
     channelId: REMINDERS_CHANNEL_ID,
-    extra: { kind: r.kind, at: r.fireAt.getTime() },
+    // `link` carries the tap target VERBATIM (the same `{path,query}` the router
+    // takes) — the delivered notification id is a lossy hash, so the target has
+    // to ride in the payload. Typed by the shared `ReminderExtra` contract.
+    extra: { kind: r.kind, at: r.fireAt.getTime(), link: r.deepLink } satisfies ReminderExtra,
   }));
 }
 
@@ -402,7 +406,7 @@ export function useLocalNotifications(): void {
   // SAMPLE, not a census. Good enough to detect a fleet-wide inexact downgrade;
   // useless for auditing one delivery.
   LocalNotifications.addListener('localNotificationReceived', (n) => {
-    const extra = n.extra as { kind?: string; at?: number } | undefined;
+    const extra = n.extra as ReminderExtra | undefined;
     const context: Record<string, string> = {};
     if (extra?.kind) context.notif_kind = extra.kind;
     if (Number.isFinite(extra?.at)) {
@@ -421,6 +425,23 @@ export function useLocalNotifications(): void {
       message: 'delivered-listener registration failed; delivery telemetry is blind this session',
       error: e,
       context: { notif_error_stage: 'listener' },
+    })
+  );
+
+  // TAP → open the item. This module stays router-free: it just forwards the
+  // payload, and `useReminderTapResume` (App.vue) owns the navigate-when-ready
+  // logic — including the cold-start case, where the tap arrives long before the
+  // family doc has loaded. All outcome decisions + logging live in the handler.
+  LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+    handleReminderTap(action.notification?.extra as ReminderExtra | undefined);
+  }).catch((e) =>
+    reportError({
+      surface: 'local-notifications',
+      severity: 'warning',
+      message:
+        'tap-listener registration failed; notification taps will not deep-link this session',
+      error: e,
+      context: { notif_error_stage: 'tap-listener' },
     })
   );
 

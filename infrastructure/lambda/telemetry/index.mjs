@@ -122,6 +122,20 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'notif_activity_lead',
   'notif_gated',
   'notif_backfilled',
+  'notif_tap_outcome',
+  // Helpful Hints (#40) reconcile + skip-reason diagnostics. MIRRORED from the
+  // client allowlist — without these the hint telemetry is dropped at ingest.
+  'hint_generated',
+  'hint_expired',
+  'hint_pruned_stale',
+  'hint_total',
+  'hint_skipped_records',
+  'hint_master_on',
+  'hint_flag_on',
+  'hint_type',
+  'hint_op',
+  'hint_reason',
+  'hint_count',
 ]);
 
 function getHeaders(event) {

@@ -48,6 +48,7 @@ function reminder(over: Partial<ScheduledReminder> = {}): ScheduledReminder {
     title: 'Football',
     body: 'Time to drop off — Neil',
     kind: 'activity',
+    deepLink: { path: '/activities', query: { activity: 'id-1' } },
     ...over,
   };
 }
@@ -121,6 +122,14 @@ describe('buildScheduledNotifications (ADR-029 A4)', () => {
   it('carries the intended fire time so delivery lateness is measurable', () => {
     const out = buildScheduledNotifications([reminder()]);
     expect((out[0].extra as { at: number }).at).toBe(new Date('2026-05-22T14:30:00').getTime());
+  });
+
+  it('carries the deep-link target so a TAP can open the item', () => {
+    // The delivered notification id is a lossy hash, so the tap target has to
+    // ride in `extra` — without this, tapping cannot know what to open.
+    const link = { path: '/todo', query: { view: 't-9' } };
+    const out = buildScheduledNotifications([reminder({ deepLink: link })]);
+    expect((out[0].extra as { link: unknown }).link).toEqual(link);
   });
 });
 
