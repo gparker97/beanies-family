@@ -15,6 +15,8 @@ import { getActivityCategoryById } from '@/constants/activityCategories';
 import { tripTypeEmoji } from '@/utils/vacation';
 import { formatDateShort } from '@/utils/date';
 import { isHint } from '@/utils/helpfulHints';
+import { normalizeAssignees } from '@/utils/assignees';
+import { classifyAudience } from '@/utils/audience';
 import { getTransactionVisual } from '@/utils/transactionLabel';
 import { entityDeepLink } from '@/utils/entityDeepLink';
 
@@ -132,11 +134,20 @@ const results = computed<SearchResult[]>(() => {
   }
 
   // Todos
+  const viewer = familyStore.currentMember;
+  const resolveMember = (id: string) => familyStore.members.find((m) => m.id === id);
   for (const todo of todoStore.todos) {
-    // #40: un-acknowledged Helpful Hints are surprise-sensitive (e.g. a birthday
-    // person could otherwise search up their own present hint) — exclude them.
-    // Acknowledged hints are the family's own to-dos and stay searchable.
-    if (isHint(todo) && !todo.hintAcknowledged) continue;
+    // #40: a Helpful Hint (fresh OR kept) is surprise-sensitive — its title can
+    // name the person it hides from (e.g. a birthday present). Apply the SAME
+    // audience visibility the list uses, so it never leaks in search to a member
+    // classifyAudience hides it from. (Manual to-dos keep their prior behaviour.)
+    if (
+      isHint(todo) &&
+      viewer &&
+      classifyAudience(normalizeAssignees(todo), viewer, resolveMember).kind === 'hidden'
+    ) {
+      continue;
+    }
     if (matches(q, todo.title, todo.description)) {
       const parts: string[] = [];
       if (todo.completed) parts.push(t('search.subtitle.done'));

@@ -70,6 +70,10 @@ export const useTodoStore = defineStore('todos', () => {
   // audience-based visibility so a surprise-sensitive hint (e.g. a birthday
   // present) is hidden from the person it concerns.
   const hintTodos = computed(() => dedupeHintsByKey(activeTodos.value.filter(isHint)));
+  // ALL hint to-dos incl. completed (NOT deduped) — the reconcile engine needs
+  // completed hints (a completed hint blocks regeneration) and the raw duplicates
+  // (to collapse CRDT-merge copies). Display uses `hintTodos`; reconcile uses this.
+  const allHintTodos = computed(() => todos.value.filter(isHint));
   function visibleHintTodos(
     viewer: FamilyMember,
     resolveMember: (id: string) => FamilyMember | undefined
@@ -234,6 +238,7 @@ export const useTodoStore = defineStore('todos', () => {
     undatedTodos,
     // #40: Helpful Hints
     hintTodos,
+    allHintTodos,
     visibleHintTodos,
     // Attention getters — drive sidebar/mobile badges + daily briefing
     overdueTodos,

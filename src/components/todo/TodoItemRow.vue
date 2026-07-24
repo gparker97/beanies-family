@@ -65,10 +65,12 @@ const containerClass = computed(() => {
   if (isFreshHint.value) {
     return `${pad} border-[var(--tint-orange-15)] bg-gradient-to-br from-[var(--tint-orange-4)] to-[var(--tint-orange-15)] hover:from-[var(--tint-orange-8)] hover:to-[var(--tint-orange-15)]`;
   }
-  if (isOverdue.value) {
+  // A KEPT hint keeps a nudge-date dueDate too, so it must ALSO skip overdue/
+  // due-today red — it renders as a plain card with its subtle hint marker.
+  if (!isHintRow.value && isOverdue.value) {
     return `${pad} border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:hover:bg-red-950/50`;
   }
-  if (isDueToday.value) {
+  if (!isHintRow.value && isDueToday.value) {
     return `${pad} border-[var(--color-primary-500)] bg-white shadow-[0_0_0_3px_rgba(241,93,34,0.12)] hover:bg-[var(--tint-orange-8)] dark:bg-slate-800`;
   }
   if (props.compact) {
@@ -80,7 +82,8 @@ const containerClass = computed(() => {
 const checkboxClass = computed(() => {
   if (isSomeday.value)
     return 'border-[var(--color-sky-silk-300)] hover:bg-[var(--tint-silk-20)] dark:border-sky-400/70';
-  if (isOverdue.value) return 'border-red-400 hover:bg-red-100 dark:border-red-500';
+  if (!isHintRow.value && isOverdue.value)
+    return 'border-red-400 hover:bg-red-100 dark:border-red-500';
   return 'border-[var(--color-primary-500)] hover:bg-[var(--tint-orange-8)]';
 });
 
@@ -146,15 +149,17 @@ const timeAgo = computed(() => {
         class="mt-1 flex flex-wrap items-center gap-1.5"
         :class="compact ? 'md:gap-2' : 'md:mt-1.5 md:gap-2.5'"
       >
-        <!-- #40: Helpful Hint marker chip — persists after "keep" as the subtle
-             "from a hint" marker. On a fresh hint it carries the event date +
-             the "what's this?" explainer, and the normal date badges are hidden. -->
+        <!-- #40: Helpful Hint marker chip — shown for every hint (fresh AND kept)
+             and carrying the EVENT date. The normal date badges are hidden for
+             hints (their dueDate is a notification nudge date, not a real due
+             date), so this chip is the only date a hint shows and it never reads
+             as overdue. Fresh hints additionally get the "what's this?" explainer. -->
         <span
           v-if="isHintRow"
           class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-primary-500)] md:px-2.5 md:text-xs"
         >
           {{ hintEmoji }} {{ t('todo.hint.badge')
-          }}<template v-if="isFreshHint && hintEventLabel">, {{ hintEventLabel }}</template>
+          }}<template v-if="hintEventLabel">, {{ hintEventLabel }}</template>
         </span>
         <InfoHintBadge
           v-if="isFreshHint"
@@ -162,9 +167,9 @@ const timeAgo = computed(() => {
           :link="{ text: t('todo.hint.learnMore'), href: hintHelpUrl }"
         />
 
-        <!-- Overdue date badge -->
+        <!-- Overdue date badge (never for a hint — see the marker chip above) -->
         <span
-          v-if="!isFreshHint && formattedDate && isOverdue"
+          v-if="!isHintRow && formattedDate && isOverdue"
           class="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary-500)] px-2 py-0.5 text-[0.625rem] font-semibold text-white md:gap-1.5 md:px-2.5 md:text-xs"
           :class="compact ? 'font-outfit' : ''"
         >
@@ -179,7 +184,7 @@ const timeAgo = computed(() => {
 
         <!-- Due today badge — tinted pill (the card's outlined glow does the heavy lifting) -->
         <span
-          v-else-if="!isFreshHint && formattedDate && isDueToday"
+          v-else-if="!isHintRow && formattedDate && isDueToday"
           class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-primary-500)] md:gap-1.5 md:px-2.5 md:text-xs"
         >
           📅 {{ t('date.today') }}<template v-if="todo.dueTime">, {{ todo.dueTime }}</template>
@@ -187,7 +192,7 @@ const timeAgo = computed(() => {
 
         <!-- Normal date -->
         <span
-          v-else-if="!isFreshHint && formattedDate"
+          v-else-if="!isHintRow && formattedDate"
           class="text-[0.625rem] font-semibold md:text-xs"
           :class="compact ? 'font-outfit' : ''"
           :style="{ color: 'var(--color-primary-500)' }"

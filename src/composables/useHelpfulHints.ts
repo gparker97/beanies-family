@@ -81,7 +81,9 @@ export function useHelpfulHints(): void {
 
     const flagOn = true; // guaranteed by the init guard
     const masterOn = settingsStore.helpfulHintsEnabled;
-    const existing = todoStore.hintTodos;
+    // ALL hints (incl. completed) — so a completed hint's key blocks regeneration
+    // and cross-device duplicates are seen for cleanup (reconcileHints requires it).
+    const existing = todoStore.allHintTodos;
 
     // Master OFF (family-synced) → remove un-acknowledged, un-completed hints and
     // generate nothing. Acknowledged/completed hints are the family's own to-dos.
@@ -118,7 +120,7 @@ export function useHelpfulHints(): void {
       end
     );
 
-    const { hints, skipped } = computeDesiredHints({
+    const { hints, skipped, reasons } = computeDesiredHints({
       today: todayStr,
       members: familyStore.humans,
       occurrences,
@@ -130,16 +132,24 @@ export function useHelpfulHints(): void {
 
     const { toCreate, toRemove } = reconcileHints(hints, existing, todayStr);
 
+    // Notification fire date: the next 09:00 that has NOT already passed (today if
+    // it's still before 09:00, else tomorrow), never after the event. An all-day
+    // to-do anchors the reminder at 09:00 with no lead; the OS path drops a fire
+    // time already in the past, so a nudge date of "today" set in the afternoon
+    // would never notify — hence this forward clamp. Read the clock ONCE per run.
+    const firesTodayStill = new Date().getHours() < 9;
+    const reminderBase = firesTodayStill ? todayStr : addDaysYmd(todayStr, 1);
+
     // Create. Final race guard: skip if an existing hint already claims the key.
     const seen = new Set(existing.map((h) => h.hintKey).filter(Boolean));
     let generated = 0;
     for (const d of toCreate) {
       if (seen.has(d.hintKey)) continue;
+      const dueDate = reminderBase <= d.eventDate ? reminderBase : d.eventDate;
       const created = await todoStore.createTodo({
         title: d.title,
         ...toAssigneePayload(d.assigneeIds),
-        dueDate: d.nudgeDate,
-        dueTime: '09:00',
+        dueDate,
         completed: false,
         createdBy: currentMember.id,
         hintType: d.hintType,
@@ -172,6 +182,17 @@ export function useHelpfulHints(): void {
         hint_skipped_records: skipped,
       },
     });
+
+    // Per-reason "why no hint for X?" trace — a normal degradation, at debug so
+    // it doesn't add noise, but greppable by hint_reason in CloudWatch.
+    for (const [reason, count] of Object.entries(reasons)) {
+      logEvent({
+        level: 'debug',
+        surface: SURFACE,
+        message: 'trigger skipped',
+        context: { hint_reason: reason, hint_count: count },
+      });
+    }
   }
 
   // Single entry point. A thrown reconcile would otherwise silently kill the
@@ -217,6 +238,7 @@ export function useHelpfulHints(): void {
       () => activityStore.activeActivities,
       () => vacationStore.upcomingVacations,
       () => settingsStore.helpfulHintsEnabled,
+      () => settingsStore.helpfulHintLeadDays,
     ],
     queueReconcile,
     { immediate: true, deep: true }

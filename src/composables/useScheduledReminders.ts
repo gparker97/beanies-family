@@ -43,6 +43,7 @@ import {
   DEFAULT_TRAVEL_LEADS,
 } from '@/utils/reminderSchedule';
 import { activityReminderId, todoDueId, travelReminderId } from '@/utils/notifications';
+import { dedupeHintsByKey } from '@/utils/helpfulHints';
 import { classifyAudience, isDutyDone } from '@/utils/audience';
 import { normalizeAssignees } from '@/utils/assignees';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
@@ -428,7 +429,10 @@ export function useScheduledReminders(): {
         windowStartISO,
         windowEndISO
       ),
-      todos: todoStore.activeTodos,
+      // #40: collapse CRDT-merge duplicate hints (same hintKey, different id) so
+      // a duplicated hint is not scheduled — and thus notified — twice. Non-hint
+      // to-dos pass through untouched.
+      todos: dedupeHintsByKey(todoStore.activeTodos),
       currentMember,
       resolveMember: (id: string) => familyStore.members.find((m) => m.id === id),
       windowStartISO,
