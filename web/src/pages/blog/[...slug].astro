@@ -420,6 +420,11 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   height: 1px;
   margin: 2rem 0;
 }
+/* Images sit at 75% of the column rather than full-bleed, so they read as
+   illustrations beside the prose instead of interrupting it. `width: auto`
+   (not 100%) means an image never renders larger than its intrinsic size —
+   small reaction GIFs used to be upscaled to the full column and blurred.
+   On narrow screens the cap is released; 75% of a phone column is too small. */
 .blog-prose img {
   background: white;
   border: 1px solid var(--tint-accent, rgb(241 93 34 / 18%));
@@ -427,10 +432,16 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   box-shadow: 0 8px 24px rgb(44 62 80 / 6%);
   cursor: zoom-in;
   display: block;
+  height: auto;
   margin: 1.5rem auto;
-  max-width: 100%;
+  max-width: 75%;
   padding: 8px;
-  width: 100%;
+  width: auto;
+}
+@media (width <= 640px) {
+  .blog-prose img {
+    max-width: 100%;
+  }
 }
 /* Image captions. Posts author them as a separate italic paragraph after
    the image (![img] / blank line / _caption_), which markdown renders as
