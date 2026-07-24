@@ -241,8 +241,13 @@ const monthTransactions = computed<DisplayTransaction[]>(() => {
   );
 
   const merged = [...actual, ...deduped];
-  // Sort by date ascending (earliest first) so date group headers render chronologically
-  merged.sort((a, b) => a.date.localeCompare(b.date));
+  // Sort by date DESCENDING (newest first) — the ledger convention used everywhere
+  // else transactions are listed (store `filteredSortedTransactions`, the account
+  // activity log, the goal activity log, dashboard recents). The date group headers
+  // inherit this order because `groupedTransactions` keys a Map in iteration order.
+  // The sort is stable, so within a single date real transactions keep their store
+  // order and projections stay after them.
+  merged.sort((a, b) => b.date.localeCompare(a.date));
   return merged;
 });
 

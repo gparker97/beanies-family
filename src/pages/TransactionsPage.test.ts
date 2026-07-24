@@ -766,7 +766,7 @@ describe('TransactionsPage — Unified Ledger', () => {
       expect(rentTxns[0].isProjected).toBeFalsy();
     });
 
-    it('should sort monthTransactions by date ascending', () => {
+    it('should sort monthTransactions by date descending (newest first)', () => {
       const now = new Date();
       const thisMonth20 = new Date(now.getFullYear(), now.getMonth(), 20);
       const thisMonth5 = new Date(now.getFullYear(), now.getMonth(), 5);
@@ -782,8 +782,15 @@ describe('TransactionsPage — Unified Ledger', () => {
 
       const dates = wrapper.vm.monthTransactions.map((tx: { date: string }) => tx.date);
       for (let i = 1; i < dates.length; i++) {
-        expect(dates[i] >= dates[i - 1]).toBe(true);
+        expect(dates[i] <= dates[i - 1]).toBe(true);
       }
+      // Pin the actual order, not just monotonicity — a single-element or
+      // accidentally-empty list would satisfy the loop above vacuously.
+      expect(wrapper.vm.monthTransactions.map((tx: { id: string }) => tx.id)).toEqual([
+        'txn-20',
+        'txn-10',
+        'txn-5',
+      ]);
     });
 
     it('should include projected transactions in summary totals', async () => {
