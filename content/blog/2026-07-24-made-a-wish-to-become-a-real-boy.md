@@ -9,7 +9,6 @@ excerpt: 'What a PWA actually is, why Apple and Google would rather you never fo
 subtitle: 'on the (important) distinctions between a PWA and native app'
 featured: false
 author: greg
-draft: false
 ---
 
 Without googling, how many people here know what a _PWA_ is?
