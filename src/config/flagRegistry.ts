@@ -41,6 +41,11 @@ export const FLAG_REGISTRY = [
     label: 'Off-main-thread Automerge',
     description: 'Run the Automerge doc in a Web Worker (ADR-032). Off → inline fallback.',
   },
+  {
+    id: 'helpfulHints',
+    label: 'Helpful Hints',
+    description: 'Auto-generated to-do reminders before upcoming birthdays, parties, and trips.',
+  },
 ] as const;
 
 /** Union of all known flag ids — derived from the registry (single source of truth). */

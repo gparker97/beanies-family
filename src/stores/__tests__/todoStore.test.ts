@@ -121,3 +121,77 @@ describe('todoStore — someday lane', () => {
     expect(store.somedayTodos).toEqual([]); // not in someday (it's completed)
   });
 });
+
+describe('todoStore — Helpful Hints (#40)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('keeps hints OUT of every manual lane but IN activeTodos + hintTodos', () => {
+    const store = useTodoStore();
+    const manual = todo({ id: 'm', dueDate: '2020-01-01' }); // past → overdue
+    // A hint with a past nudge-date dueDate would leak into overdue/scheduled if
+    // those lanes read activeTodos instead of manualActiveTodos.
+    const hint = todo({
+      id: 'h',
+      dueDate: '2020-01-01',
+      hintType: 'trip-packing',
+      hintKey: 'trip-packing:x:2020-01-03',
+      hintEventDate: '2020-01-03',
+    });
+    store.todos = [manual, hint];
+
+    expect(store.activeTodos.map((t) => t.id).sort()).toEqual(['h', 'm']); // reminder path still sees the hint
+    expect(store.manualActiveTodos.map((t) => t.id)).toEqual(['m']);
+    expect(store.overdueTodos.map((t) => t.id)).toEqual(['m']); // hint never overdue
+    expect(store.scheduledTodos.map((t) => t.id)).toEqual(['m']);
+    expect(store.filteredActiveTodos.map((t) => t.id)).toEqual(['m']); // Open feed hint-free
+    expect(store.hintTodos.map((t) => t.id)).toEqual(['h']);
+  });
+
+  it('dedupes hintTodos by hintKey, keeping the earliest-created', () => {
+    const store = useTodoStore();
+    const late = todo({
+      id: 'late',
+      hintType: 'trip-packing',
+      hintKey: 'k',
+      createdAt: '2026-05-05T00:00:00.000Z',
+    });
+    const early = todo({
+      id: 'early',
+      hintType: 'trip-packing',
+      hintKey: 'k',
+      createdAt: '2026-05-01T00:00:00.000Z',
+    });
+    store.todos = [late, early];
+    expect(store.hintTodos.map((t) => t.id)).toEqual(['early']);
+  });
+
+  it('visibleHintTodos hides a surprise-sensitive hint from a non-assignee', () => {
+    const store = useTodoStore();
+    const dad = { id: 'dad', name: 'Dad', role: 'owner' } as never;
+    const kid = { id: 'kid', name: 'Kid', role: 'member', ageGroup: 'child' } as never;
+    const resolve = (id: string) => (id === 'dad' ? dad : id === 'kid' ? kid : undefined);
+    // Present hint assigned to the adult (dad), excluding the birthday kid.
+    const present = todo({
+      id: 'p',
+      hintType: 'birthday-present',
+      hintKey: 'bp',
+      assigneeIds: ['dad'],
+    });
+    store.todos = [present];
+
+    expect(store.visibleHintTodos(dad, resolve).map((t) => t.id)).toEqual(['p']); // assignee sees it
+    expect(store.visibleHintTodos(kid, resolve)).toEqual([]); // the kid (non-assignee) does not
+  });
+
+  it('acknowledgeHint marks the hint kept', async () => {
+    const store = useTodoStore();
+    (todoRepo.updateTodo as ReturnType<typeof vi.fn>).mockResolvedValue(
+      todo({ id: 'h', hintType: 'trip-packing', hintAcknowledged: true })
+    );
+    await store.acknowledgeHint('h');
+    const calls = (todoRepo.updateTodo as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls.at(-1)![1]).toEqual({ hintAcknowledged: true });
+  });
+});

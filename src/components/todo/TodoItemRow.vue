@@ -4,10 +4,14 @@ import { useTranslation } from '@/composables/useTranslation';
 import { normalizeAssignees } from '@/utils/assignees';
 import { formatNookDate } from '@/utils/date';
 import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
+import { isHint, HINT_TYPE_META } from '@/utils/helpfulHints';
+import { MARKETING_URL } from '@/utils/marketing';
 import MemberChip from '@/components/ui/MemberChip.vue';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import type { TodoItem } from '@/types/models';
 
 const { t } = useTranslation();
+const hintHelpUrl = `${MARKETING_URL}/help/features/helpful-hints`;
 
 const props = withDefaults(
   defineProps<{
@@ -24,11 +28,25 @@ const emit = defineEmits<{
   delete: [id: string];
   /** Move into ("someday · maybe", value=true) / out of (value=false) the parked lane. */
   'set-someday': [id: string, value: boolean];
+  /** #40: "keep" a Helpful Hint → it becomes a permanent normal to-do. */
+  acknowledge: [id: string];
 }>();
 
 const isSomeday = computed(() => !!props.todo.someday);
 const isOverdue = computed(() => isTodoOverdue(props.todo));
 const isDueToday = computed(() => isTodoDueToday(props.todo));
+// #40: `isHintRow` = any hint (drives the persistent subtle marker). `isFreshHint`
+// = an un-acknowledged hint (gets the gentle wash + Keep/Dismiss + explainer, and
+// suppresses the normal date badges so it never reads as overdue). Once kept, a
+// hint behaves like a normal to-do but keeps its marker.
+const isHintRow = computed(() => isHint(props.todo));
+const isFreshHint = computed(() => isHintRow.value && !props.todo.hintAcknowledged);
+const hintEmoji = computed(() =>
+  props.todo.hintType ? HINT_TYPE_META[props.todo.hintType].emoji : ''
+);
+const hintEventLabel = computed(() =>
+  props.todo.hintEventDate ? formatNookDate(props.todo.hintEventDate) : null
+);
 
 // Container styling — early returns rather than a deep nested ternary in the
 // template. A someday row gets a soft Sky-Silk "daydream" wash. A due-today
@@ -41,6 +59,11 @@ const containerClass = computed(() => {
   const pad = props.compact ? 'cursor-pointer p-3.5' : 'p-3 md:gap-4 md:p-4';
   if (isSomeday.value) {
     return `${pad} border-[var(--tint-silk-20)] bg-gradient-to-br from-[var(--tint-silk-10)] to-[var(--tint-silk-20)] hover:from-[var(--tint-silk-20)] hover:to-[var(--tint-silk-30)]`;
+  }
+  // #40: a fresh hint gets a gentle Heritage-Orange wash — BEFORE overdue/due-today,
+  // so a nudge-date-in-the-past hint never renders in the alarming red state.
+  if (isFreshHint.value) {
+    return `${pad} border-[var(--tint-orange-15)] bg-gradient-to-br from-[var(--tint-orange-4)] to-[var(--tint-orange-15)] hover:from-[var(--tint-orange-8)] hover:to-[var(--tint-orange-15)]`;
   }
   if (isOverdue.value) {
     return `${pad} border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:hover:bg-red-950/50`;
@@ -63,9 +86,10 @@ const checkboxClass = computed(() => {
 
 // Hover-action pill background — picks up the Sky-Silk tint on a someday row so
 // the ✏️ / 🗑️ / 💭 buttons sit on a cohesive field rather than a grey patch.
-const actionPillStyle = computed(() =>
-  isSomeday.value ? 'background: var(--tint-silk-20)' : 'background: var(--tint-slate-5)'
-);
+const actionPillStyle = computed(() => {
+  if (isFreshHint.value) return 'background: var(--tint-orange-15)';
+  return isSomeday.value ? 'background: var(--tint-silk-20)' : 'background: var(--tint-slate-5)';
+});
 
 const formattedDate = computed(() => {
   if (!props.todo.dueDate) return null;
@@ -105,7 +129,8 @@ const timeAgo = computed(() => {
         :class="compact ? 'truncate' : 'md:text-base'"
       >
         <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
-        <span v-if="isSomeday" aria-hidden="true">💭&nbsp;</span>{{ todo.title }}
+        <span v-if="isSomeday" aria-hidden="true">💭&nbsp;</span
+        ><span v-else-if="isHintRow" aria-hidden="true">{{ hintEmoji }}&nbsp;</span>{{ todo.title }}
       </p>
 
       <p
@@ -121,9 +146,25 @@ const timeAgo = computed(() => {
         class="mt-1 flex flex-wrap items-center gap-1.5"
         :class="compact ? 'md:gap-2' : 'md:mt-1.5 md:gap-2.5'"
       >
+        <!-- #40: Helpful Hint marker chip — persists after "keep" as the subtle
+             "from a hint" marker. On a fresh hint it carries the event date +
+             the "what's this?" explainer, and the normal date badges are hidden. -->
+        <span
+          v-if="isHintRow"
+          class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-primary-500)] md:px-2.5 md:text-xs"
+        >
+          {{ hintEmoji }} {{ t('todo.hint.badge')
+          }}<template v-if="isFreshHint && hintEventLabel">, {{ hintEventLabel }}</template>
+        </span>
+        <InfoHintBadge
+          v-if="isFreshHint"
+          :text="t('todo.hint.whatsThis')"
+          :link="{ text: t('todo.hint.learnMore'), href: hintHelpUrl }"
+        />
+
         <!-- Overdue date badge -->
         <span
-          v-if="formattedDate && isOverdue"
+          v-if="!isFreshHint && formattedDate && isOverdue"
           class="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary-500)] px-2 py-0.5 text-[0.625rem] font-semibold text-white md:gap-1.5 md:px-2.5 md:text-xs"
           :class="compact ? 'font-outfit' : ''"
         >
@@ -138,7 +179,7 @@ const timeAgo = computed(() => {
 
         <!-- Due today badge — tinted pill (the card's outlined glow does the heavy lifting) -->
         <span
-          v-else-if="formattedDate && isDueToday"
+          v-else-if="!isFreshHint && formattedDate && isDueToday"
           class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-primary-500)] md:gap-1.5 md:px-2.5 md:text-xs"
         >
           📅 {{ t('date.today') }}<template v-if="todo.dueTime">, {{ todo.dueTime }}</template>
@@ -146,7 +187,7 @@ const timeAgo = computed(() => {
 
         <!-- Normal date -->
         <span
-          v-else-if="formattedDate"
+          v-else-if="!isFreshHint && formattedDate"
           class="text-[0.625rem] font-semibold md:text-xs"
           :class="compact ? 'font-outfit' : ''"
           :style="{ color: 'var(--color-primary-500)' }"
@@ -167,9 +208,35 @@ const timeAgo = computed(() => {
       </div>
     </div>
 
+    <!-- #40: Fresh-hint actions — Keep + Dismiss. Always visible (incl. mobile,
+         where the row otherwise has no action buttons) so a hint is always
+         actionable. Replaces the normal hover actions for un-acknowledged hints. -->
+    <div v-if="isFreshHint" class="flex shrink-0 gap-1.5">
+      <button
+        class="flex h-8 w-8 items-center justify-center rounded-[10px] text-sm opacity-70 transition-opacity hover:opacity-100"
+        :style="actionPillStyle"
+        :title="t('todo.hint.keep')"
+        :aria-label="t('todo.hint.keep')"
+        @click.stop="emit('acknowledge', todo.id)"
+      >
+        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
+        <span aria-hidden="true">📌</span>
+      </button>
+      <button
+        class="flex h-8 w-8 items-center justify-center rounded-[10px] text-sm opacity-70 transition-opacity hover:opacity-100"
+        :style="actionPillStyle"
+        :title="t('todo.hint.dismiss')"
+        :aria-label="t('todo.hint.dismiss')"
+        @click.stop="emit('delete', todo.id)"
+      >
+        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
+        <span aria-hidden="true">✕</span>
+      </button>
+    </div>
+
     <!-- Action buttons (full mode, desktop only; hover-revealed) -->
     <div
-      v-if="!compact"
+      v-else-if="!compact"
       class="hidden shrink-0 gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 md:flex"
     >
       <button

@@ -14,6 +14,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { getActivityCategoryById } from '@/constants/activityCategories';
 import { tripTypeEmoji } from '@/utils/vacation';
 import { formatDateShort } from '@/utils/date';
+import { isHint } from '@/utils/helpfulHints';
 import { getTransactionVisual } from '@/utils/transactionLabel';
 import { entityDeepLink } from '@/utils/entityDeepLink';
 
@@ -132,6 +133,10 @@ const results = computed<SearchResult[]>(() => {
 
   // Todos
   for (const todo of todoStore.todos) {
+    // #40: un-acknowledged Helpful Hints are surprise-sensitive (e.g. a birthday
+    // person could otherwise search up their own present hint) — exclude them.
+    // Acknowledged hints are the family's own to-dos and stay searchable.
+    if (isHint(todo) && !todo.hintAcknowledged) continue;
     if (matches(q, todo.title, todo.description)) {
       const parts: string[] = [];
       if (todo.completed) parts.push(t('search.subtitle.done'));

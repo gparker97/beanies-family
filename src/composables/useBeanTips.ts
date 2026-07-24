@@ -39,6 +39,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { isHint } from '@/utils/helpfulHints';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useAccountsStore } from '@/stores/accountsStore';
@@ -178,7 +179,9 @@ export function useBeanTips() {
   const tipContext = computed<TipContext>(() => ({
     transactionCount: transactionsStore.transactions.length,
     activityCount: activityStore.activities.length,
-    todoCount: todoStore.todos.length,
+    // #40: don't let auto-generated Helpful Hints inflate the "do you have any
+    // to-dos?" heuristic (an un-acknowledged hint isn't the family's own task).
+    todoCount: todoStore.todos.filter((t) => !isHint(t) || t.hintAcknowledged).length,
     goalCount: goalsStore.goals.length,
     vacationCount: vacationStore.vacations.length,
     memberCount: familyStore.members.length,

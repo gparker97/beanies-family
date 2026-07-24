@@ -112,6 +112,10 @@ export async function setCalendarClashNudgeEnabled(enabled: boolean): Promise<Se
   return saveSettings({ calendarClashNudgeEnabled: enabled });
 }
 
+export async function setHelpfulHintsEnabled(enabled: boolean): Promise<Settings> {
+  return saveSettings({ helpfulHintsEnabled: enabled });
+}
+
 export async function setFeedbackOptOut(optOut: boolean): Promise<Settings> {
   return saveSettings({ feedbackOptOut: optOut });
 }

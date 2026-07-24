@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-07-24
 
+### Added
+
+- **Helpful Hints (in development, behind a dev flag).** beanies can now auto-generate gentle prep to-dos ahead of upcoming birthdays, parties, anniversaries, and trips — buy a present, start packing, check passports — each carrying a notification via the reminders framework. Hints are clearly marked, dismissible in one tap or keepable as your own to-do, and controllable in Settings → Reminders (a family master switch plus per-device, per-type notification toggles). The birthday person never sees their own present hint. Not yet enabled for anyone — ships behind the `helpfulHints` flag.
+
 ### Fixed
 
 - **Blog posts show their category badge again.** Posts categorised as a feature announcement, founder story, or memoir were rendering with no category badge on the post page. All categories now display a badge, and the category vocabulary is validated at build time so a mistyped or new category can't slip through unbadged again.

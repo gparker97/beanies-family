@@ -67,6 +67,16 @@ const displayedSomedayTodos = computed(() =>
   withMemberFilterAndSort(todoStore.filteredSomedayTodos)
 );
 
+// #40: Helpful Hints visible to the current member (audience-hidden hints — e.g.
+// a birthday person's own present hint — are filtered out in the store), then the
+// page's own member-lens + sort applied like the other lanes.
+const displayedHintTodos = computed(() => {
+  const me = familyStore.currentMember;
+  if (!me) return [];
+  const resolve = (id: string) => familyStore.members.find((m) => m.id === id);
+  return withMemberFilterAndSort(todoStore.visibleHintTodos(me, resolve));
+});
+
 const displayedCompletedTodos = computed(() => {
   let items = todoStore.filteredCompletedTodos;
 
@@ -152,6 +162,17 @@ async function handleDelete(id: string) {
     playWhoosh();
   }
 }
+
+// #40: hints dismiss in ONE tap (no confirm — they're suggestions, not the
+// family's own data), and "keep" promotes a hint to a permanent normal to-do.
+async function handleHintDismiss(id: string) {
+  await todoStore.deleteTodo(id);
+  playWhoosh();
+}
+
+async function handleAcknowledge(id: string) {
+  await todoStore.acknowledgeHint(id);
+}
 </script>
 
 <template>
@@ -174,8 +195,25 @@ async function handleDelete(id: string) {
     <!-- Quick add bar -->
     <QuickAddBar v-if="canEditActivities" ref="quickAddBar" @add="handleQuickAdd" />
 
+    <!-- #40: Helpful Hints — gentle auto-suggested prep to-dos, shown above the
+         family's own tasks. One-tap Keep (acknowledge) or Dismiss on each row. -->
+    <TodoSection
+      v-if="displayedHintTodos.length > 0"
+      :label="t('todo.hint.section')"
+      emoji="💡"
+      label-class="text-[var(--color-primary-500)]"
+      :todos="displayedHintTodos"
+      @toggle="handleToggle"
+      @view="openModal"
+      @edit="openModal"
+      @delete="handleHintDismiss"
+      @acknowledge="handleAcknowledge"
+    >
+      <template #hint>{{ t('todo.hint.sectionHint') }}</template>
+    </TodoSection>
+
     <!-- Empty state -->
-    <div v-if="!hasAnyTodos" class="py-12 text-center">
+    <div v-if="!hasAnyTodos && displayedHintTodos.length === 0" class="py-12 text-center">
       <EmptyStateIllustration variant="goals" class="mb-4" />
       <p class="text-lg font-medium text-[var(--color-text)]">{{ t('todo.noTodos') }}</p>
       <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ t('todo.getStarted') }}</p>

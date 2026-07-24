@@ -251,7 +251,10 @@ export function useCriticalItems() {
     // ── To-dos for the current member ─────────────────────────────────
     // Visibility per `classifyAudience` above: assignees see their own,
     // every adult sees child-only to-dos, everyone sees unassigned ones.
-    for (const todo of todoStore.activeTodos) {
+    // #40: `manualActiveTodos` excludes Helpful Hints — a hint's nudge-date
+    // dueDate is in the past for its whole lead window, so via `activeTodos` it
+    // would surface here as an "overdue" critical item, which hints must never be.
+    for (const todo of todoStore.manualActiveTodos) {
       const audience = classifyAudience(normalizeAssignees(todo), currentMember, getMemberById);
       if (audience.kind === 'hidden') continue;
 

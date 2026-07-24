@@ -11,6 +11,7 @@ import { usePwaUpdater, PWA_POST_UPDATE_ROUTE_KEY } from '@/composables/usePwaUp
 import { installNativeAuthListener } from '@/services/google/googleAuth';
 import { isNative } from '@/services/sync/capabilities';
 import { useLocalNotifications } from '@/composables/useLocalNotifications';
+import { useHelpfulHints } from '@/composables/useHelpfulHints';
 import { useNotifications } from '@/composables/useNotifications';
 import { useCalendarRedirectResume } from '@/composables/useCalendarRedirectResume';
 import { useNativeShell } from '@/composables/useNativeShell';
@@ -1313,6 +1314,11 @@ installNativeAuthListener((returnPath) => {
 // generated on-device from already-decrypted data (no server sees the schedule).
 // No-op on web. See ADR-029.
 useLocalNotifications();
+
+// Helpful Hints (#40): auto-generate gentle prep to-dos before upcoming
+// birthdays, parties, and trips (each carrying a #55 notification). Gated behind
+// the `helpfulHints` dev flag; no-op when off. Runs on all platforms.
+useHelpfulHints();
 
 // In-app notifications: poll tick, app-badge sync, What's-New migration,
 // auto-open on login. Owns no business state — see useNotifications.

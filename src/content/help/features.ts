@@ -203,6 +203,94 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    slug: 'helpful-hints',
+    category: 'features',
+    title: 'Helpful Hints — gentle reminders before the things that matter',
+    excerpt:
+      'Ahead of birthdays, parties, and trips, beanies can drop a gentle, clearly-marked suggestion into your family to-do list — buy a present, start packing, check passports — so the obvious prep never slips.',
+    icon: '\u{1F4A1}',
+    readTime: 3,
+    updatedDate: '2026-07-24',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          'Some prep is obvious in hindsight: a present before a birthday, a bag before a trip, passports before you fly. Helpful Hints notices what is coming up on your calendar and quietly adds a suggested to-do a little ahead of time, so nothing important gets forgotten in the rush.',
+      },
+      {
+        type: 'heading',
+        content: 'What is a hint, and how is it different from my own to-dos?',
+        level: 2,
+        id: 'what-is-a-hint',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A hint is a suggested to-do beanies added for you — not something you typed. It sits at the top of your to-do list in a soft warm card with a <strong>Hint</strong> tag and a little icon, so it never looks like one of your own tasks. Tap the <strong>?</strong> beside it any time to remember what it is. Each hint also gives you a gentle notification around the time it appears, using your normal reminder settings.',
+      },
+      {
+        type: 'heading',
+        content: 'What can I do with a hint?',
+        level: 2,
+        id: 'keep-or-dismiss',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Keep it</strong> (the 📌 button) — the hint becomes a normal to-do you own: assign it, add a due time, tick it off. It keeps a small marker so you remember where it came from.',
+          '<strong>Dismiss it</strong> (the ✕ button) — one tap and it is gone, no confirmation.',
+          '<strong>Ignore it</strong> — do nothing, and the hint quietly disappears on its own once the event has passed. It never nags and never turns red.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Which events create hints?',
+        level: 2,
+        id: 'which-events',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          "<strong>Birthdays</strong> — a couple of weeks before a family member's birthday, the grown-ups get a nudge to plan a present or party.",
+          '<strong>Parties &amp; celebrations</strong> — a couple of days before a birthday party, wedding, or other celebration on the calendar, the people going get a gift reminder.',
+          '<strong>Anniversaries</strong> — a couple of weeks ahead, a nudge to plan something.',
+          '<strong>Trips</strong> — a week before you travel, a reminder to check passports, visas and travel insurance; a couple of days before, a nudge to start packing.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'How do I turn hints on or off?',
+        level: 2,
+        id: 'settings',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>Settings → Reminders</strong> and find <strong>Helpful Hints</strong>.',
+          'The main switch turns hints on or off <strong>for the whole family</strong>. Off means no hints are created, and any not-yet-kept hints disappear for everyone.',
+          'Below it, each kind of hint has its own switch. These control whether <em>you</em> get a notification for that kind on <em>this</em> device.',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'The birthday person never sees their own present hint — so a surprise stays a surprise. It shows up only for the grown-ups planning it.',
+        title: 'Surprises stay secret',
+        icon: '\u{1F381}',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'The per-kind switches only silence <em>your</em> notifications on the device you change them on. The hint itself still appears in the shared family to-do list for everyone — you just will not be pinged about it.',
+        title: 'Your notifications, your device',
+        icon: '\u{1F4F1}',
+      },
+    ],
+  },
+  {
     slug: 'managing-accounts',
     category: 'features',
     title: 'Managing Accounts',

@@ -40,7 +40,11 @@ import {
   openExactAlarmSettings,
 } from '@/composables/useNotificationPermission';
 import { LEAD_OPTIONS, ACTIVITY_LEAD_OPTIONS, formatLeadLabel } from '@/utils/reminderSchedule';
-import type { SupportedTravelType } from '@/types/models';
+import { HELPFUL_HINT_TYPES, HINT_TYPE_META } from '@/utils/helpfulHints';
+import { isFlagEnabled } from '@/config/flags';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import type { SupportedTravelType, HelpfulHintType } from '@/types/models';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 defineProps<{ open: boolean }>();
 defineEmits<{ close: [] }>();
@@ -94,6 +98,36 @@ async function onToggle(enabled: boolean): Promise<void> {
   } catch {
     // Already surfaced (toast + console.error) and re-thrown; the toggle reads
     // the persisted value, so a failed write simply stays where it was.
+  }
+}
+
+// ── Helpful Hints (#40) — only shown when the dev flag is on ──
+const helpfulHintsFlagOn = isFlagEnabled('helpfulHints');
+const helpfulHintsEnabled = computed(() => settingsStore.helpfulHintsEnabled);
+// Per-type rows: type → { label key, emoji, current per-device notify state }.
+const hintTypeRows = computed(() =>
+  HELPFUL_HINT_TYPES.map((type) => ({
+    type,
+    emoji: HINT_TYPE_META[type].emoji,
+    labelKey: HINT_TYPE_META[type].labelKey as UIStringKey,
+    // Absent key ⟹ enabled (default on for this device).
+    enabled: settingsStore.helpfulHintNotifyByType[type] !== false,
+  }))
+);
+
+async function onToggleHelpfulHints(enabled: boolean): Promise<void> {
+  try {
+    await settingsStore.setHelpfulHintsEnabled(enabled);
+  } catch {
+    // Setter toasts + re-throws; the toggle reads the (unchanged) store and reverts.
+  }
+}
+
+async function onToggleHintType(type: HelpfulHintType, enabled: boolean): Promise<void> {
+  try {
+    await settingsStore.setHelpfulHintNotifyType(type, enabled);
+  } catch {
+    // Setter toasts + re-throws; the toggle reverts from the persisted value.
   }
 }
 
@@ -259,6 +293,32 @@ async function onOpenExactAlarmSettings(): Promise<void> {
         @update:model-value="onTodoLead"
       />
     </div>
+
+    <!-- #40: Helpful Hints — master (family-synced) + per-device per-type mutes -->
+    <template v-if="helpfulHintsFlagOn">
+      <p
+        class="font-outfit mt-5 mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-[0.08em] text-[var(--deep-slate)]/40 uppercase dark:text-slate-500"
+      >
+        {{ t('settings.helpfulHints.title') }}
+        <InfoHintBadge :text="t('settings.helpfulHints.perDeviceHint')" />
+      </p>
+      <SettingToggleRow
+        testid="helpful-hints-master"
+        :title="t('settings.helpfulHints.title')"
+        :hint="t('settings.helpfulHints.hint')"
+        :model-value="helpfulHintsEnabled"
+        @update:model-value="onToggleHelpfulHints"
+      />
+      <template v-if="helpfulHintsEnabled">
+        <SettingToggleRow
+          v-for="row in hintTypeRows"
+          :key="row.type"
+          :title="`${row.emoji} ${t(row.labelKey)}`"
+          :model-value="row.enabled"
+          @update:model-value="(v: boolean) => onToggleHintType(row.type, v)"
+        />
+      </template>
+    </template>
 
     <!-- OS-permission nudge (Heritage Orange — never red) -->
     <div
