@@ -14,6 +14,7 @@ import { useLocalNotifications } from '@/composables/useLocalNotifications';
 import { useHelpfulHints } from '@/composables/useHelpfulHints';
 import { useNotifications } from '@/composables/useNotifications';
 import { useCalendarRedirectResume } from '@/composables/useCalendarRedirectResume';
+import { useReminderTapResume } from '@/composables/useReminderTapResume';
 import { useNativeShell } from '@/composables/useNativeShell';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
@@ -1329,6 +1330,12 @@ useNotifications();
 // intent. Reactive + SPA-safe; instantiates the calendar store only when a
 // resume is actually pending (zero-cost when the feature is off). See ADR-032.
 useCalendarRedirectResume();
+
+// Reminder-notification tap → open the item. The tap listener (registered by
+// useLocalNotifications above) only stashes the target; this resolves it to a
+// router navigation once the pod + family doc are ready — which is what makes a
+// COLD-START tap (app killed) land on the item instead of the last screen.
+useReminderTapResume();
 
 // Native shell: hide the splash, set the status-bar style, and wire the Android
 // hardware back button (cooperates with the existing overlay-close mechanism).
