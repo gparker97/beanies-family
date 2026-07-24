@@ -17,6 +17,40 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.07.24',
+    date: '2026-07-24',
+    month: '24 july 2026',
+    spotlight: true,
+    summary: {
+      en: 'Helpful Hints: gentle prep to-dos before birthdays, parties and trips.',
+      beanie: 'helpful hints: gentle prep to-dos before birthdays, parties and trips.',
+    },
+    features: [
+      {
+        icon: '🎁',
+        title: { en: 'Helpful Hints', beanie: 'helpful hints' },
+        description: {
+          en: 'Beanies now drops a gentle, clearly-marked to-do into your family list before the things that sneak up on you - buy a present before a birthday, start packing before a trip, check passports before you fly - each with a reminder so nothing slips. Keep the ones you want, dismiss the rest, and choose how far ahead each kind appears in Settings, under Reminders.',
+          beanie:
+            'beanies now drops a gentle, clearly-marked to-do into your family list before the things that sneak up on you - buy a present before a birthday, start packing before a trip, check passports before you fly - each with a reminder so nothing slips. keep the ones you want, dismiss the rest, and choose how far ahead each kind appears in settings, under reminders.',
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.07.23',
     date: '2026-07-23',
     month: '23 july 2026',
