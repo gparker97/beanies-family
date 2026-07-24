@@ -116,8 +116,13 @@ const calendarDays = computed<MonthDayCellData[]>(() => {
 
   const days: MonthDayCellData[] = [];
 
-  // Activity occurrences for this month — fetched once, partitioned below.
-  const monthOccurrences = activityStore.monthActivities(year, month);
+  // Activity occurrences for the whole VISIBLE span — fetched once, partitioned
+  // below. Queried over the grid range, not the calendar month, so the greyed
+  // prev/next-month padding cells show their items too: a visible day that
+  // renders empty when it isn't reads as "nothing on" and is worse than not
+  // showing the day at all. Holidays already used the grid range (below); this
+  // brings activities, travel segments and trips onto the same span.
+  const monthOccurrences = activityStore.activitiesInRange(gridStartStr, gridEndStr);
 
   // Map date → full timed occurrences (replaces the old {category, color}
   // shape — MonthChip needs the full activity to resolve member color,
@@ -147,11 +152,10 @@ const calendarDays = computed<MonthDayCellData[]>(() => {
     });
   }
 
-  // Build a map of date -> travel-segment occurrences (flights, trains, etc).
-  const monthStartStr = toDateInputValue(new Date(year, month, 1));
-  const monthEndStr = toDateInputValue(new Date(year, month + 1, 0));
+  // Build a map of date -> travel-segment occurrences (flights, trains, etc),
+  // over the grid range for the same reason as the activities above.
   const dateSegments = new Map<string, TravelSegmentOccurrence[]>();
-  for (const occ of vacationStore.travelSegmentOccurrencesInRange(monthStartStr, monthEndStr)) {
+  for (const occ of vacationStore.travelSegmentOccurrencesInRange(gridStartStr, gridEndStr)) {
     if (!dateSegments.has(occ.date)) dateSegments.set(occ.date, []);
     dateSegments.get(occ.date)!.push(occ);
   }
