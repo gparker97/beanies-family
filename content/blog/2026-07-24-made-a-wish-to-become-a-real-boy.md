@@ -1,6 +1,6 @@
 ---
-title: 'our beanies app wishing to be a real boy'
-slug: our-beanies-app-wishing-to-be-a-real-boy
+title: 'our beanies app made a wish to become a real boy'
+slug: made-a-wish-to-become-a-real-boy
 date: 2026-07-24
 category: updates
 coverEmoji: 🤥

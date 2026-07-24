@@ -8,7 +8,7 @@ lastUpdated: 2026-04-22
 relatedPosts:
   - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
-  - our-beanies-app-wishing-to-be-a-real-boy
+  - made-a-wish-to-become-a-real-boy
 tags:
   - local-first
   - privacy
