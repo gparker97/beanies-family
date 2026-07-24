@@ -1436,6 +1436,7 @@ export interface Settings {
   skipDocumentConsentPrompt?: boolean; // #133: when true, the photo→activity AI consent modal is auto-confirmed (default: ask). Family-scoped.
   calendarClashNudgeEnabled?: boolean; // #34: warn when an activity clashes with a connected calendar's free/busy (default: true). Family-scoped.
   helpfulHintsEnabled?: boolean; // #40: master on/off for auto-generated Helpful Hint to-dos (default: true). Family-scoped.
+  helpfulHintLeadDays?: Partial<Record<HelpfulHintType, number>>; // #40: per-type days-before-event override; missing type → HINT_LEAD_DAYS default. Family-scoped.
   feedbackOptOut?: boolean; // #45: when true, the periodic in-app feedback/NPS prompt never auto-opens (default: false). Family-scoped.
   feedbackLastPromptedAt?: ISODateString; // #45: date-only cadence clock — the last time the feedback prompt was shown or a submission was made. Absent until first use. Family-scoped.
   createdAt: ISODateString;

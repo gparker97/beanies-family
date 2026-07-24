@@ -40,9 +40,11 @@ import {
   openExactAlarmSettings,
 } from '@/composables/useNotificationPermission';
 import { LEAD_OPTIONS, ACTIVITY_LEAD_OPTIONS, formatLeadLabel } from '@/utils/reminderSchedule';
-import { HELPFUL_HINT_TYPES, HINT_TYPE_META } from '@/utils/helpfulHints';
+import { HELPFUL_HINT_TYPES, HINT_TYPE_META, HINT_LEAD_OPTIONS } from '@/utils/helpfulHints';
 import { isFlagEnabled } from '@/config/flags';
+import { fillTemplate } from '@/utils/fillTemplate';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import type { SupportedTravelType, HelpfulHintType } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -104,14 +106,25 @@ async function onToggle(enabled: boolean): Promise<void> {
 // ── Helpful Hints (#40) — only shown when the dev flag is on ──
 const helpfulHintsFlagOn = isFlagEnabled('helpfulHints');
 const helpfulHintsEnabled = computed(() => settingsStore.helpfulHintsEnabled);
-// Per-type rows: type → { label key, emoji, current per-device notify state }.
+// Per-type rows: label/desc/emoji + the family lead-days + this device's notify state.
 const hintTypeRows = computed(() =>
   HELPFUL_HINT_TYPES.map((type) => ({
     type,
     emoji: HINT_TYPE_META[type].emoji,
     labelKey: HINT_TYPE_META[type].labelKey as UIStringKey,
-    // Absent key ⟹ enabled (default on for this device).
-    enabled: settingsStore.helpfulHintNotifyByType[type] !== false,
+    descKey: HINT_TYPE_META[type].descKey as UIStringKey,
+    lead: settingsStore.helpfulHintLeadDays[type], // family-synced (resolved)
+    enabled: settingsStore.helpfulHintNotifyByType[type] !== false, // per-device; absent ⟹ on
+  }))
+);
+// Lead-time options (days before the event), human-labelled + pluralized.
+const hintLeadOptions = computed(() =>
+  HINT_LEAD_OPTIONS.map((n) => ({
+    value: n,
+    label: fillTemplate(
+      t(n === 1 ? 'settings.helpfulHints.leadDays.one' : 'settings.helpfulHints.leadDays.other'),
+      { n: String(n) }
+    ),
   }))
 );
 
@@ -128,6 +141,14 @@ async function onToggleHintType(type: HelpfulHintType, enabled: boolean): Promis
     await settingsStore.setHelpfulHintNotifyType(type, enabled);
   } catch {
     // Setter toasts + re-throws; the toggle reverts from the persisted value.
+  }
+}
+
+async function onHintLead(type: HelpfulHintType, value: string | number): Promise<void> {
+  try {
+    await settingsStore.setHelpfulHintLead(type, Number(value));
+  } catch {
+    // Setter toasts + re-throws; the select reverts from the persisted value.
   }
 }
 
@@ -310,13 +331,48 @@ async function onOpenExactAlarmSettings(): Promise<void> {
         @update:model-value="onToggleHelpfulHints"
       />
       <template v-if="helpfulHintsEnabled">
-        <SettingToggleRow
+        <div
           v-for="row in hintTypeRows"
           :key="row.type"
-          :title="`${row.emoji} ${t(row.labelKey)}`"
-          :model-value="row.enabled"
-          @update:model-value="(v: boolean) => onToggleHintType(row.type, v)"
-        />
+          class="border-b border-[var(--tint-slate-05)] py-3 last:border-b-0"
+        >
+          <div class="flex items-center gap-2.5">
+            <span class="text-base" aria-hidden="true">{{ row.emoji }}</span>
+            <div class="min-w-0">
+              <p
+                class="font-outfit text-sm font-semibold text-[var(--deep-slate)] dark:text-slate-200"
+              >
+                {{ t(row.labelKey) }}
+              </p>
+              <p class="text-xs text-[var(--deep-slate)]/45 dark:text-slate-500">
+                {{ t(row.descKey) }}
+              </p>
+            </div>
+          </div>
+          <!-- How far ahead (family-synced) -->
+          <div class="mt-2.5 flex items-center justify-between gap-4 pl-[2.1rem]">
+            <span class="text-xs font-medium text-[var(--deep-slate)]/60 dark:text-slate-400">
+              {{ t('settings.helpfulHints.howFarAhead') }}
+            </span>
+            <BaseSelect
+              class="w-40 flex-none"
+              :model-value="row.lead"
+              :options="hintLeadOptions"
+              :aria-label="t('settings.helpfulHints.howFarAhead')"
+              @update:model-value="(v: string | number) => onHintLead(row.type, v)"
+            />
+          </div>
+          <!-- Notify me on this device (per-device) -->
+          <div class="mt-2 flex items-center justify-between gap-4 pl-[2.1rem]">
+            <span class="text-xs font-medium text-[var(--deep-slate)]/60 dark:text-slate-400">
+              {{ t('settings.helpfulHints.notifyOnDevice') }}
+            </span>
+            <ToggleSwitch
+              :model-value="row.enabled"
+              @update:model-value="(v: boolean) => onToggleHintType(row.type, v)"
+            />
+          </div>
+        </div>
       </template>
     </template>
 

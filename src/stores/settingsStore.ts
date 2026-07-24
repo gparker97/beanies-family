@@ -28,6 +28,7 @@ import {
   DEFAULT_TRAVEL_LEADS,
   toActivityLeadOption,
 } from '@/utils/reminderSchedule';
+import { HINT_LEAD_DAYS } from '@/utils/helpfulHints';
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -161,6 +162,13 @@ export const useSettingsStore = defineStore('settings', () => {
   const helpfulHintNotifyByType = computed<Partial<Record<HelpfulHintType, boolean>>>(
     () => globalSettings.value.helpfulHintNotifyByType ?? {}
   );
+  // #40: fully-resolved per-type lead-days (family overrides merged over the
+  // defaults) — how many days before an event each hint fires. Family-scoped
+  // (synced): the lead governs when the shared to-do appears for everyone.
+  const helpfulHintLeadDays = computed<Record<HelpfulHintType, number>>(() => ({
+    ...HINT_LEAD_DAYS,
+    ...(settings.value.helpfulHintLeadDays ?? {}),
+  }));
   // #45: when true, the periodic in-app feedback/NPS prompt never auto-opens.
   // Family-scoped (synced); default OFF (prompts enabled).
   const feedbackOptOut = computed<boolean>(() => settings.value.feedbackOptOut ?? false);
@@ -531,6 +539,14 @@ export const useSettingsStore = defineStore('settings', () => {
       ...(globalSettings.value.helpfulHintNotifyByType ?? {}),
       [type]: enabled,
     });
+  // Per-type lead-days: family-synced map-merge (report-on-failure chain).
+  const setHelpfulHintLead = (type: HelpfulHintType, days: number) =>
+    persistAiSetting('settings.helpfulHints.label', 'helpfulHintLeadDays', () =>
+      settingsRepo.setHelpfulHintLeadDays({
+        ...(settings.value.helpfulHintLeadDays ?? {}),
+        [type]: days,
+      })
+    );
 
   async function setExchangeRateAutoUpdate(enabled: boolean): Promise<void> {
     isLoading.value = true;
@@ -803,6 +819,7 @@ export const useSettingsStore = defineStore('settings', () => {
     calendarClashNudgeEnabled,
     helpfulHintsEnabled,
     helpfulHintNotifyByType,
+    helpfulHintLeadDays,
     feedbackOptOut,
     isTrustedDevice,
     trustedDevicePromptShown,
@@ -822,6 +839,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setCalendarClashNudgeEnabled,
     setHelpfulHintsEnabled,
     setHelpfulHintNotifyType,
+    setHelpfulHintLead,
     setAIProvider,
     setAITier,
     setAIApiKey,
