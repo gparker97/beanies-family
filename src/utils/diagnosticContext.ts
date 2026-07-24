@@ -208,6 +208,8 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'hint_flag_on',
   'hint_type',
   'hint_op',
+  'hint_reason', // why a candidate was not generated (no-dob | out-of-window | ...)
+  'hint_count', // count carried by the per-reason "trigger skipped" debug event
 ]);
 
 export const MAX_STRING_LEN = 200;

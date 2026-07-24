@@ -33,6 +33,7 @@ import {
 } from '@/content/announcements';
 import { TIPS_BY_ID } from '@/content/tips';
 import { isFlagEnabled } from '@/config/flags';
+import { isHint } from '@/utils/helpfulHints';
 import { reportError } from '@/utils/errorReporter';
 import {
   deriveNotifications,
@@ -96,7 +97,11 @@ export const useNotificationsStore = defineStore('notifications', () => {
     );
 
     return {
-      todos: todoStore.todos,
+      // #40: Helpful Hints have their own surfaces (the dedicated to-do section
+      // + their OS notification). Keep them out of the in-app bell so they don't
+      // triple-surface, aren't shown as "overdue" (their dueDate is a nudge date),
+      // and can't bypass the per-device per-type notification mute.
+      todos: todoStore.todos.filter((t) => !isHint(t)),
       // Makes the Settings → Reminders to-do lead real on every platform (it
       // used to be a hardcoded 30 that no control could change).
       todoLeadMinutes: settingsStore.todoReminderLead,

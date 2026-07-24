@@ -91,7 +91,16 @@ const displayedCompletedTodos = computed(() => {
   return items;
 });
 
-const hasAnyTodos = computed(() => todoStore.todos.length > 0);
+// #40: count only what the viewer can actually SEE — audience-hidden hints (e.g.
+// a birthday person's own present hint) must not suppress the empty state. Hints
+// live in their own section, so the family's own lanes exclude them.
+const hasAnyTodos = computed(
+  () =>
+    todoStore.manualActiveTodos.length > 0 ||
+    todoStore.somedayTodos.length > 0 ||
+    todoStore.completedTodos.length > 0 ||
+    displayedHintTodos.value.length > 0
+);
 
 // Actions
 async function handleQuickAdd(payload: {
@@ -213,7 +222,7 @@ async function handleAcknowledge(id: string) {
     </TodoSection>
 
     <!-- Empty state -->
-    <div v-if="!hasAnyTodos && displayedHintTodos.length === 0" class="py-12 text-center">
+    <div v-if="!hasAnyTodos" class="py-12 text-center">
       <EmptyStateIllustration variant="goals" class="mb-4" />
       <p class="text-lg font-medium text-[var(--color-text)]">{{ t('todo.noTodos') }}</p>
       <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ t('todo.getStarted') }}</p>

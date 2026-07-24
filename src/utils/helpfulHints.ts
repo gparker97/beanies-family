@@ -19,7 +19,7 @@ import type { NotificationOccurrence } from '@/utils/notifications';
 import { ACTIVITY_GROUP_MAP } from '@/constants/activityCategories';
 import { isAdultMember } from '@/composables/useMemberInfo';
 import { normalizeAssignees } from '@/utils/assignees';
-import { addDaysYmd, extractDatePart, toDateInputValue } from '@/utils/date';
+import { daysBetween, extractDatePart, toDateInputValue } from '@/utils/date';
 
 /** DEFAULT days before the event each hint type fires. Families can override
  *  per type in Settings (family-synced) — this is the fallback when unset. */
@@ -103,15 +103,28 @@ export interface HelpfulHintsInput {
   formatDate: HintFormatDate;
 }
 
-/** A hint that should currently exist. */
+/** A hint that should currently exist. The actual notification `dueDate` is
+ *  computed by the orchestrator from `eventDate` + the current clock (so the
+ *  reminder fires at the next 09:00 rather than a past instant) — the engine
+ *  stays pure and time-of-day-agnostic. */
 export interface DesiredHint {
   hintType: HelpfulHintType;
   hintKey: string;
   title: string;
   assigneeIds: string[];
-  nudgeDate: string; // YYYY-MM-DD → TodoItem.dueDate
   eventDate: string; // YYYY-MM-DD → TodoItem.hintEventDate
 }
+
+/** Why a candidate hint was NOT generated — a normal degradation, not an error.
+ *  Tallied per reconcile so a "why no hint for X?" report is triageable. */
+export type HintSkipReason =
+  | 'no-audience'
+  | 'retroactive'
+  | 'out-of-window'
+  | 'no-dob'
+  | 'no-start-date'
+  | 'no-attendees'
+  | 'malformed-record';
 
 /** The single predicate for "is this to-do an auto-generated hint?". */
 export function isHint(todo: TodoItem): todo is TodoItem & { hintType: HelpfulHintType } {
@@ -128,11 +141,6 @@ export function buildHintKey(
   return `${hintType}:${scopeId}:${eventDateISO}`;
 }
 
-/** Larger of two YYYY-MM-DD strings (lexicographic == chronological). */
-function maxYmd(a: string, b: string): string {
-  return a >= b ? a : b;
-}
-
 /** The next annual occurrence (YYYY-MM-DD) of month/day on or after `today`.
  *  Uses the local-Date constructor for overflow correctness (e.g. Feb 29 in a
  *  non-leap year rolls to Mar 1, matching the app's date convention). */
@@ -143,25 +151,35 @@ function nextAnnualDate(today: string, month: number, day: number): string {
   return candidate >= today ? candidate : at(thisYear + 1);
 }
 
+/** Callback used by the source functions to tally why a candidate was skipped. */
+type SkipRecorder = (reason: HintSkipReason) => void;
+
 /** Build a DesiredHint for an in-window event, or null if outside its window /
- *  no audience. `scopeId` = the stable per-source id (member/activity/vacation). */
+ *  no audience (recording the reason). `scopeId` = the stable per-source id. */
 function buildDesired(
   input: HelpfulHintsInput,
   hintType: HelpfulHintType,
   scopeId: string,
   eventDate: string,
   name: string,
-  assigneeIds: string[]
+  assigneeIds: string[],
+  skip: SkipRecorder
 ): DesiredHint | null {
-  if (!assigneeIds.length) return null; // no audience → no hint
-  if (eventDate < input.today) return null; // never retroactive
+  if (!assigneeIds.length) {
+    skip('no-audience');
+    return null;
+  }
+  if (eventDate < input.today) {
+    skip('retroactive');
+    return null;
+  }
   const lead = input.leadDays[hintType];
-  // Absolute day distance is safe: eventDate >= today is guaranteed above.
-  const daysUntil = daysApart(input.today, eventDate);
-  if (daysUntil > lead) return null; // not yet inside the lead window
-  // Nudge date = event − lead, clamped forward to today (we're already inside
-  // the window, so this is effectively "today"): fires the notification promptly.
-  const nudgeDate = maxYmd(addDaysYmd(eventDate, -lead), input.today);
+  // eventDate >= today is guaranteed above, so daysBetween (absolute) is the
+  // forward distance. Reuse the shared date helper rather than re-implement it.
+  if (daysBetween(input.today, eventDate) > lead) {
+    skip('out-of-window');
+    return null;
+  }
   const title = input.translate(HINT_TYPE_META[hintType].titleKey, {
     name,
     date: input.formatDate(eventDate),
@@ -171,15 +189,8 @@ function buildDesired(
     hintKey: buildHintKey(hintType, scopeId, eventDate),
     title,
     assigneeIds,
-    nudgeDate,
     eventDate,
   };
-}
-
-/** Whole-day distance between two YYYY-MM-DD strings (non-negative). */
-function daysApart(a: string, b: string): number {
-  const ms = new Date(b).getTime() - new Date(a).getTime();
-  return Math.abs(Math.round(ms / 86_400_000));
 }
 
 /** Which hint type (if any) an activity category maps to. `birthday`/`anniversary`
@@ -196,16 +207,23 @@ export interface ComputeResult {
   /** Count of records skipped by a thrown error (data bug signal, not a normal
    *  degradation like "no date of birth"). */
   skipped: number;
+  /** Per-reason tally of candidates that did NOT become a hint (normal
+   *  degradations + malformed-record) — for "why no hint for X?" triage. */
+  reasons: Partial<Record<HintSkipReason, number>>;
 }
 
 /** Trigger 1 — member birthday −14d → present/party (adults excl. the birthday
  *  person & pets). */
-function birthdayHints(input: HelpfulHintsInput, onError: () => void): DesiredHint[] {
+function birthdayHints(input: HelpfulHintsInput, skip: SkipRecorder): DesiredHint[] {
   const out: DesiredHint[] = [];
   const adults = input.members.filter((m) => isAdultMember(m) && !m.isPet);
   for (const member of input.members) {
     try {
-      if (member.isPet || !member.dateOfBirth) continue;
+      if (member.isPet) continue;
+      if (!member.dateOfBirth) {
+        skip('no-dob');
+        continue;
+      }
       const { month, day } = member.dateOfBirth;
       const eventDate = nextAnnualDate(input.today, month, day);
       const audience = adults.filter((a) => a.id !== member.id).map((a) => a.id);
@@ -215,24 +233,25 @@ function birthdayHints(input: HelpfulHintsInput, onError: () => void): DesiredHi
         member.id,
         eventDate,
         member.name,
-        audience
+        audience,
+        skip
       );
       if (hint) out.push(hint);
     } catch {
-      onError();
+      skip('malformed-record');
     }
   }
   return out;
 }
 
 /** Triggers 2–4 — Party-group activity occurrences → gift/plan hints (attendees). */
-function activityHints(input: HelpfulHintsInput, onError: () => void): DesiredHint[] {
+function activityHints(input: HelpfulHintsInput, skip: SkipRecorder): DesiredHint[] {
   const out: DesiredHint[] = [];
   for (const occ of Object.values(input.occurrences).flat()) {
     try {
       const { activity, date } = occ;
       const hintType = activityTypeFor(activity.category);
-      if (!hintType) continue;
+      if (!hintType) continue; // not a hint-worthy category — not a "skip"
       const audience = normalizeAssignees(activity);
       const hint = buildDesired(
         input,
@@ -240,54 +259,77 @@ function activityHints(input: HelpfulHintsInput, onError: () => void): DesiredHi
         activity.id,
         extractDatePart(date),
         activity.title,
-        audience
+        audience,
+        skip
       );
       if (hint) out.push(hint);
     } catch {
-      onError();
+      skip('malformed-record');
     }
   }
   return out;
 }
 
 /** Triggers 5–6 — trip −2d packing / −7d documents (travellers). */
-function tripHints(input: HelpfulHintsInput, onError: () => void): DesiredHint[] {
+function tripHints(input: HelpfulHintsInput, skip: SkipRecorder): DesiredHint[] {
   const out: DesiredHint[] = [];
   for (const trip of input.vacations) {
     try {
-      if (!trip.startDate || !trip.assigneeIds.length) continue;
+      if (!trip.startDate) {
+        skip('no-start-date');
+        continue;
+      }
+      if (!trip.assigneeIds.length) {
+        skip('no-attendees');
+        continue;
+      }
       const eventDate = extractDatePart(trip.startDate);
       for (const hintType of ['trip-packing', 'trip-documents'] as const) {
-        const hint = buildDesired(input, hintType, trip.id, eventDate, trip.name, trip.assigneeIds);
+        const hint = buildDesired(
+          input,
+          hintType,
+          trip.id,
+          eventDate,
+          trip.name,
+          trip.assigneeIds,
+          skip
+        );
         if (hint) out.push(hint);
       }
     } catch {
-      onError();
+      skip('malformed-record');
     }
   }
   return out;
 }
 
-/** The full desired set + a count of records that threw (a data-bug signal). */
+/** The full desired set + skip diagnostics (error count + per-reason tally). */
 export function computeDesiredHints(input: HelpfulHintsInput): ComputeResult {
-  let skipped = 0;
-  const onError = () => {
-    skipped += 1;
+  const reasons: Partial<Record<HintSkipReason, number>> = {};
+  const skip: SkipRecorder = (reason) => {
+    reasons[reason] = (reasons[reason] ?? 0) + 1;
   };
   const hints = [
-    ...birthdayHints(input, onError),
-    ...activityHints(input, onError),
-    ...tripHints(input, onError),
+    ...birthdayHints(input, skip),
+    ...activityHints(input, skip),
+    ...tripHints(input, skip),
   ];
-  return { hints, skipped };
+  return { hints, skipped: reasons['malformed-record'] ?? 0, reasons };
 }
 
-/** Diff desired hints against existing hint to-dos.
+/** Diff desired hints against the family's existing hint to-dos.
+ *
+ *  `existing` must be ALL hint to-dos — including COMPLETED ones — so a completed
+ *  hint's `hintKey` blocks regeneration (completing a hint = keeping it).
+ *
  *  - toCreate: desired hints with no existing hint of the same `hintKey`.
- *  - toRemove: existing UN-acknowledged, UN-completed hints that have expired
- *    (event passed) OR are no longer desired (source deleted / moved out of
- *    window). Acknowledged or completed hints are the family's own to-dos and
- *    are never auto-removed. */
+ *  - toRemove (only ever UN-acknowledged, UN-completed hints — the family's own
+ *    kept/completed hints are never auto-removed):
+ *    - cross-device DUPLICATE copies (same `hintKey`, different id): keep one
+ *      primary (an acknowledged/completed copy if any, else the earliest-created)
+ *      and remove the safe extras — otherwise buildTodoReminders double-notifies.
+ *    - EXPIRED: the event has passed (`hintEventDate < today`).
+ *    - STALE: no longer desired (source deleted / moved out of window). */
 export function reconcileHints(
   desired: DesiredHint[],
   existing: TodoItem[],
@@ -296,8 +338,30 @@ export function reconcileHints(
   const desiredKeys = new Set(desired.map((d) => d.hintKey));
   const existingKeys = new Set(existing.map((t) => t.hintKey).filter(Boolean));
   const toCreate = desired.filter((d) => !existingKeys.has(d.hintKey));
+
+  const removable = (t: TodoItem) => !t.hintAcknowledged && !t.completed;
+
+  // Per key, choose the ONE copy to keep (prefer an acknowledged/completed copy,
+  // else the earliest-created) so duplicates from a CRDT merge collapse to one.
+  const byKey = new Map<string, TodoItem[]>();
+  for (const t of existing) {
+    if (!t.hintKey) continue;
+    const arr = byKey.get(t.hintKey);
+    if (arr) arr.push(t);
+    else byKey.set(t.hintKey, [t]);
+  }
+  const winnerByKey = new Map<string, TodoItem>();
+  for (const [key, items] of byKey) {
+    winnerByKey.set(
+      key,
+      items.find((t) => t.hintAcknowledged || t.completed) ??
+        [...items].sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0]!
+    );
+  }
+
   const toRemove = existing.filter((t) => {
-    if (t.hintAcknowledged || t.completed) return false;
+    if (!removable(t)) return false;
+    if (t.hintKey && winnerByKey.get(t.hintKey) !== t) return true; // duplicate copy
     if (t.hintEventDate && t.hintEventDate < today) return true; // expired
     if (!t.hintKey || !desiredKeys.has(t.hintKey)) return true; // stale
     return false;
