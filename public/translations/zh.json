@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-23",
-    "translationCount": 3808
+    "lastUpdated": "2026-07-25",
+    "translationCount": 3841
   },
   "translations": {
     "app.name": {
@@ -19045,6 +19045,171 @@
       "translation": "加入",
       "hash": "1dlxm",
       "lastUpdated": "2026-07-23"
+    },
+    "todo.hint.section": {
+      "translation": "有用的帮助",
+      "hash": "6risjc",
+      "lastUpdated": "2026-07-25"
+    },
+    "todo.hint.sectionHint": {
+      "translation": "在即将发生的事情之前轻轻推一下。保留您想要的，或将其忽略。",
+      "hash": "y91lzv",
+      "lastUpdated": "2026-07-25"
+    },
+    "todo.hint.badge": {
+      "translation": "小贴士",
+      "hash": "1c7mv",
+      "lastUpdated": "2026-07-25"
+    },
+    "todo.hint.whatsThis": {
+      "translation": "在即将到来的生日、派对或行程之前添加一个温和的建议。保留它，让它成为您自己的待办事项，或将其忽略。",
+      "hash": "83oect",
+      "lastUpdated": "2026-07-25"
+    },
+    "todo.hint.learnMore": {
+      "translation": "瞭解更多",
+      "hash": "mxwi0f",
+      "lastUpdated": "2026-07-25"
+    },
+    "todo.hint.keep": {
+      "translation": "保留",
+      "hash": "1e1et",
+      "lastUpdated": "2026-07-25"
+    },
+    "todo.hint.dismiss": {
+      "translation": "解散",
+      "hash": "fur0k6",
+      "lastUpdated": "2026-07-25"
+    },
+    "todo.hint.title.birthdayPresent": {
+      "translation": "为{name}计划生日礼物（ {date} ）",
+      "hash": "l4z7v1",
+      "lastUpdated": "2026-07-25"
+    },
+    "todo.hint.title.birthdayPartyGift": {
+      "translation": "获取{name}的礼物（ {date} ）",
+      "hash": "5n8xd",
+      "lastUpdated": "2026-07-25"
+    },
+    "todo.hint.title.celebrationGift": {
+      "translation": "获取{name}的礼物或卡片（ {date} ）",
+      "hash": "grqbl1",
+      "lastUpdated": "2026-07-25"
+    },
+    "todo.hint.title.anniversaryPlan": {
+      "translation": "为{name} （ {date} ）制定计划",
+      "hash": "uz1iny",
+      "lastUpdated": "2026-07-25"
+    },
+    "todo.hint.title.tripPacking": {
+      "translation": "开始为{name}打包（ {date} ）",
+      "hash": "73vb56",
+      "lastUpdated": "2026-07-25"
+    },
+    "todo.hint.title.tripDocuments": {
+      "translation": "检查{name}的护照和文件（ {date} ）",
+      "hash": "xl0uqf",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.label": {
+      "translation": "有用的帮助",
+      "hash": "6risjc",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.title": {
+      "translation": "有用的帮助",
+      "hash": "6risjc",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.hint": {
+      "translation": "为全家人推荐生日、派对和行程前的准备工作。",
+      "hash": "e4mcji",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.perDeviceHint": {
+      "translation": "选择在此设备上通知您的提示。关闭一个只会使您的通知静音—每个人都能看到待办事项。",
+      "hash": "sers65",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.type.birthdayPresent": {
+      "translation": "家庭生日",
+      "hash": "shc35y",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.type.birthdayPartyGift": {
+      "translation": "派对邀请",
+      "hash": "pmre00",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.type.celebrationGift": {
+      "translation": "庆祝礼物",
+      "hash": "f5no9f",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.type.anniversaryPlan": {
+      "translation": "周年纪念日",
+      "hash": "kmam0i",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.type.tripPacking": {
+      "translation": "行程包装",
+      "hash": "m4q65u",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.type.tripDocuments": {
+      "translation": "旅行文件",
+      "hash": "b3gfgy",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.desc.birthdayPresent": {
+      "translation": "在家人过生日之前安排礼物或派对。",
+      "hash": "oer3v3",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.desc.birthdayPartyGift": {
+      "translation": "在您日历上的生日派对之前带上礼物（例如，您的孩子被邀请参加的生日派对）。",
+      "hash": "j0rl1v",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.desc.celebrationGift": {
+      "translation": "提醒您在婚礼、淋浴或其他庆祝活动前携带礼物或卡片。",
+      "hash": "sc9k1h",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.desc.anniversaryPlan": {
+      "translation": "提醒您在周年纪念日之前计划一些事情。",
+      "hash": "tppb3r",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.desc.tripPacking": {
+      "translation": "提醒您在行程开始前开始收拾行李。",
+      "hash": "pcbhvw",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.desc.tripDocuments": {
+      "translation": "温馨提示：请在行程开始前检查护照、签证和旅行保险。",
+      "hash": "hu9z0z",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.howFarAhead": {
+      "translation": "提前多久",
+      "hash": "rx0614",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.notifyOnDevice": {
+      "translation": "在此设备上通知我",
+      "hash": "talxqw",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.leadDays.one": {
+      "translation": "提前{n}天",
+      "hash": "q2w8ux",
+      "lastUpdated": "2026-07-25"
+    },
+    "settings.helpfulHints.leadDays.other": {
+      "translation": "{n}天前",
+      "hash": "so228i",
+      "lastUpdated": "2026-07-25"
     }
   }
 }
