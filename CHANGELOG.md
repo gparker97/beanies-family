@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-30
+
+### Changed
+
+- **Dependency maintenance.** Merged a batch of safe dependency updates (web-vitals, a group of dev-tooling bumps, and several patch-level libraries). No user-facing behaviour change. Two larger updates (pinia 4, Automerge 3.3.2) are intentionally held for a dedicated migration with testing.
+
 ## 2026-07-24
 
 ### Added
