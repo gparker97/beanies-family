@@ -19,9 +19,16 @@ export type PlatformLabel = 'app' | 'pwa' | 'web';
  * (`pwa`), or an ordinary browser tab (`web`).
  */
 export function getPlatformLabel(): PlatformLabel {
-  if (isNative()) return 'app';
-  if (isStandalone()) return 'pwa';
-  return 'web';
+  try {
+    if (isNative()) return 'app';
+    if (isStandalone()) return 'pwa';
+    return 'web';
+  } catch {
+    // Best-effort telemetry only: these labels ride a fire-and-forget Slack
+    // ping in the pod-creation path, so a detection failure must never throw
+    // into that critical flow. Fall back to a neutral bucket.
+    return 'web';
+  }
 }
 
 function userAgent(): string {
@@ -63,15 +70,20 @@ function formFactor(ua: string): string {
  * `chrome desktop`, `safari ios`, `chrome android` (browser tab).
  */
 export function getDeviceLabel(): string {
-  const ua = userAgent();
+  try {
+    const ua = userAgent();
 
-  if (isNative()) {
-    const platform = getPlatform();
-    if (platform === 'android') return 'android app';
-    if (platform === 'ios') return /iPad/.test(ua) ? 'ipad app' : 'iphone app';
-    return 'app';
+    if (isNative()) {
+      const platform = getPlatform();
+      if (platform === 'android') return 'android app';
+      if (platform === 'ios') return /iPad/.test(ua) ? 'ipad app' : 'iphone app';
+      return 'app';
+    }
+
+    const label = `${browserName(ua)} ${formFactor(ua)}`;
+    return isStandalone() ? `${label} pwa` : label;
+  } catch {
+    // See getPlatformLabel: never throw into the pod-creation flow.
+    return 'unknown';
   }
-
-  const label = `${browserName(ua)} ${formFactor(ua)}`;
-  return isStandalone() ? `${label} pwa` : label;
 }

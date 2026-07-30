@@ -94,3 +94,15 @@ describe('getDeviceLabel — installed PWA', () => {
     expect(getDeviceLabel()).toBe('chrome android pwa');
   });
 });
+
+describe('never throws into the caller (best-effort telemetry)', () => {
+  it('falls back when platform detection throws', () => {
+    // Simulates a partially-mocked capabilities seam (as in createNewFile.test)
+    // or a hostile runtime: a detection failure must not propagate.
+    vi.spyOn(capabilities, 'isNative').mockImplementation(() => {
+      throw new Error('capabilities unavailable');
+    });
+    expect(getPlatformLabel()).toBe('web');
+    expect(getDeviceLabel()).toBe('unknown');
+  });
+});
