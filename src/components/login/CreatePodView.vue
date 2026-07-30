@@ -16,6 +16,7 @@ import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isUserCancellation } from '@/services/google/googleAuth';
 import { slackNotify } from '@/utils/slackNotify';
+import { getPlatformLabel, getDeviceLabel } from '@/utils/platformLabel';
 import { reportError } from '@/utils/errorReporter';
 
 const { t } = useTranslation();
@@ -125,7 +126,8 @@ async function handleStep1Next() {
 
   if (result.success) {
     slackNotify(
-      `🫘 *New family pod started!*\n*Family:* ${familyName.value}\n*Owner:* ${name.value}`
+      `🫘 *New family pod started!*\n*Family:* ${familyName.value}\n*Owner:* ${name.value}` +
+        `\n*Platform:* ${getPlatformLabel()}\n*Device:* ${getDeviceLabel()}`
     );
     if (subscribeNewsletter.value) {
       try {

@@ -61,6 +61,7 @@ import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshA
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { slackNotify } from '@/utils/slackNotify';
+import { getPlatformLabel, getDeviceLabel } from '@/utils/platformLabel';
 import type { SaveFailureLevel } from '@/services/sync/syncService';
 import {
   searchBeanpodFilesGlobal,
@@ -1511,7 +1512,8 @@ export const useSyncStore = defineStore('sync', () => {
             : '(unknown)';
       slackNotify(
         `🎉 *Family pod created!*\n*Family:* ${familyName}\n*Owner:* ${ownerMember.name}\n*Storage:* ${storageLabel}` +
-          (heardVia ? `\n*Heard via:* ${heardVia}` : '')
+          (heardVia ? `\n*Heard via:* ${heardVia}` : '') +
+          `\n*Platform:* ${getPlatformLabel()}\n*Device:* ${getDeviceLabel()}`
       );
 
       return { ok: true };

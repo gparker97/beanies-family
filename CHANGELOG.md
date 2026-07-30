@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-07-31
+
+### Fixed
+
+- **New-joiner Slack alerts were silently missed from the native app.** The pod-creation notification is a fire-and-forget request that, on the Android/iOS app, was aborted when the app navigated onward right after signup — so app-based new families never pinged the team channel (browser and PWA sign-ups were unaffected). The request now uses `keepalive` so it survives the transition. At least two real families (The Leland Family, The Skog Family) were affected.
+
+### Added
+
+- **New-joiner Slack alerts now show platform and device.** Each "family pod started/created" ping now includes the surface (app / pwa / web) and a device label (e.g. `android app`, `iphone app`, `chrome desktop`, `chrome android pwa`) so it's clear at a glance where a new family signed up from.
+
 ## 2026-07-30
 
 ### Changed

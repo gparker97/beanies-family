@@ -30,6 +30,13 @@ export function slackPost(
   fetch(url, {
     method: 'POST',
     mode: 'no-cors',
+    // `keepalive` lets the request outlive the page/WebView teardown that
+    // immediately follows pod creation. Without it a fire-and-forget POST is
+    // aborted mid-flight on the native Capacitor WebView (the view navigates
+    // onward before the socket flushes) — which silently dropped new-joiner
+    // pings for app users while browser tabs, which keep the request alive
+    // longer, delivered fine. See the 2026-07-31 investigation.
+    keepalive: true,
     body: JSON.stringify(payload),
   }).catch((e) => {
     console.warn(`[${scope}] webhook POST failed`, e);
