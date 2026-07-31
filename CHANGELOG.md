@@ -18,6 +18,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **New-joiner Slack alerts now show platform and device.** Each "family pod started/created" ping now includes the surface (app / pwa / web) and a device label (e.g. `android app`, `iphone app`, `chrome desktop`, `chrome android pwa`) so it's clear at a glance where a new family signed up from.
 
+### Changed
+
+- **Android app updated to 0.9.8R3 (Play Store production).** The new build carries the new-joiner notification fix and is submitted to Google review for rollout to all Play Store users.
+
 ## 2026-07-30
 
 ### Changed
