@@ -21,7 +21,7 @@ To give an example of our schedule, on our second full day we boarded the train 
 
 The next day started with an early morning soufflé pancake breakfast in an attempt to beat the 40 person line which formed by 9am (those pancakes were so light they could have floated away), and then a trip to an Osaka-area amusement park with waterslides (which, by the way, due to me being, apparently by Japanese standards, a clinically obese 5'10" 81kg person - which could have been in part due to the pancakes - I was denied from boarding because of an 80kg safety limit, which I'm not bitter at all about, and I can assure you I did _not_ spend the next 20 minutes arguing with the slide attendant about whether 81 is a bigger number than 80).
 
-We then spent a few hours shopping in Osaka, visited the teamLab exhibit in Osaka (which, for my subscribers who remember, is [apparently different from the one in Kyoto](https://beanies.family/blog/japan-trip-with-my-son)), grabbed some amazing wagyu udon for dinner, and finished the night with some singing.
+We then spent a few hours shopping, visited the teamLab exhibit in Osaka (which, for my subscribers who remember, is [apparently different from the one in Kyoto](https://beanies.family/blog/japan-trip-with-my-son)), grabbed some amazing wagyu udon for dinner, and finished the night with some singing.
 
 In any case, I'm not here to talk about how I spent the week in Osaka with my (healthily) Japan-obsessed family, touring every corner of Southern Japan like mental patients from dawn to dusk, capping that off with midnight karaoke sessions, or how much I thoroughly enjoyed their company and the time I spent with my awesome sister and her amazingly beautiful and talented family.
 
