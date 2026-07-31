@@ -45,6 +45,7 @@ Properties (read the LIVE schema at runtime; select options drift):
   Publish Date  date
   Category      select       (see the category map below)
   URL           url          the live post URL, filled in after publishing
+  Sub           rich_text    the post subtitle → maps to frontmatter `subtitle`
   Substack      checkbox     ticked once cross-posted
   Notes         rich_text
 
@@ -78,7 +79,7 @@ which are real and in use. When they disagree, believe the schema.
 | `date`        | yes      | Notion `Publish Date`                           |
 | `category`    | yes      | Notion `Category`, mapped (below)               |
 | `excerpt`     | yes      | **not in Notion** — preserve, or propose one    |
-| `subtitle`    | no       | not in Notion — preserve                        |
+| `subtitle`    | no       | Notion `Sub` if set, else preserve existing     |
 | `coverEmoji`  | no       | not in Notion — preserve                        |
 | `coverImage`  | no       | `/blog/<file>.webp`                             |
 | `featured`    | no       | not in Notion — preserve (default `false`)      |
@@ -86,11 +87,13 @@ which are real and in use. When they disagree, believe the schema.
 | `updatedDate` | no       | set only when revising an already-published post|
 | `draft`       | no       | `false` unless greg says to keep the flag on    |
 
-Four required fields have no home in Notion (`excerpt` chiefly). So regeneration is
-**not** a blind overwrite: read the existing file first, carry those fields forward,
-and only propose new values when the file doesn't exist yet. Losing a hand-tuned
-`excerpt` — which is also the meta description and the RSS summary — would be a silent
-SEO regression.
+Some fields still have no home in Notion (`excerpt` chiefly, plus `coverEmoji` and
+`featured`). So regeneration is **not** a blind overwrite: read the existing file first,
+carry those fields forward, and only propose new values when the file doesn't exist yet.
+Losing a hand-tuned `excerpt` — which is also the meta description and the RSS summary —
+would be a silent SEO regression. (`subtitle` now maps from the Notion `Sub` property, so
+it survives regeneration; older posts written before `Sub` existed may only carry it in
+the file — preserve it there.)
 
 File path: `content/blog/YYYY-MM-DD-<slug>.md` (repo root, **not** `web/src/content/`).
 
