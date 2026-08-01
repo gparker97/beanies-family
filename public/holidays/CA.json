@@ -2,12 +2,12 @@
   "meta": {
     "country": "CA",
     "name": "Canada",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-08-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.32.0",
+    "source": "date-holidays@3.34.0",
     "primaryLanguage": "en",
     "types": [
       "public"
@@ -25,23 +25,8 @@
       "type": "public"
     },
     {
-      "date": "2025-04-20",
-      "name": "Easter Sunday",
-      "type": "public"
-    },
-    {
-      "date": "2025-05-19",
-      "name": "Victoria Day",
-      "type": "public"
-    },
-    {
       "date": "2025-07-01",
       "name": "Canada Day",
-      "type": "public"
-    },
-    {
-      "date": "2025-08-04",
-      "name": "Civic Holiday",
       "type": "public"
     },
     {
@@ -50,23 +35,8 @@
       "type": "public"
     },
     {
-      "date": "2025-10-13",
-      "name": "Thanksgiving",
-      "type": "public"
-    },
-    {
-      "date": "2025-11-11",
-      "name": "Remembrance Day",
-      "type": "public"
-    },
-    {
       "date": "2025-12-25",
       "name": "Christmas Day",
-      "type": "public"
-    },
-    {
-      "date": "2025-12-26",
-      "name": "Boxing Day",
       "type": "public"
     },
     {
@@ -80,23 +50,8 @@
       "type": "public"
     },
     {
-      "date": "2026-04-05",
-      "name": "Easter Sunday",
-      "type": "public"
-    },
-    {
-      "date": "2026-05-18",
-      "name": "Victoria Day",
-      "type": "public"
-    },
-    {
       "date": "2026-07-01",
       "name": "Canada Day",
-      "type": "public"
-    },
-    {
-      "date": "2026-08-03",
-      "name": "Civic Holiday",
       "type": "public"
     },
     {
@@ -105,23 +60,8 @@
       "type": "public"
     },
     {
-      "date": "2026-10-12",
-      "name": "Thanksgiving",
-      "type": "public"
-    },
-    {
-      "date": "2026-11-11",
-      "name": "Remembrance Day",
-      "type": "public"
-    },
-    {
       "date": "2026-12-25",
       "name": "Christmas Day",
-      "type": "public"
-    },
-    {
-      "date": "2026-12-26",
-      "name": "Boxing Day",
       "type": "public"
     },
     {
@@ -135,23 +75,8 @@
       "type": "public"
     },
     {
-      "date": "2027-03-28",
-      "name": "Easter Sunday",
-      "type": "public"
-    },
-    {
-      "date": "2027-05-24",
-      "name": "Victoria Day",
-      "type": "public"
-    },
-    {
       "date": "2027-07-01",
       "name": "Canada Day",
-      "type": "public"
-    },
-    {
-      "date": "2027-08-02",
-      "name": "Civic Holiday",
       "type": "public"
     },
     {
@@ -160,23 +85,8 @@
       "type": "public"
     },
     {
-      "date": "2027-10-11",
-      "name": "Thanksgiving",
-      "type": "public"
-    },
-    {
-      "date": "2027-11-11",
-      "name": "Remembrance Day",
-      "type": "public"
-    },
-    {
       "date": "2027-12-25",
       "name": "Christmas Day",
-      "type": "public"
-    },
-    {
-      "date": "2027-12-26",
-      "name": "Boxing Day",
       "type": "public"
     },
     {
@@ -190,23 +100,8 @@
       "type": "public"
     },
     {
-      "date": "2028-04-16",
-      "name": "Easter Sunday",
-      "type": "public"
-    },
-    {
-      "date": "2028-05-22",
-      "name": "Victoria Day",
-      "type": "public"
-    },
-    {
       "date": "2028-07-01",
       "name": "Canada Day",
-      "type": "public"
-    },
-    {
-      "date": "2028-08-07",
-      "name": "Civic Holiday",
       "type": "public"
     },
     {
@@ -215,23 +110,8 @@
       "type": "public"
     },
     {
-      "date": "2028-10-09",
-      "name": "Thanksgiving",
-      "type": "public"
-    },
-    {
-      "date": "2028-11-11",
-      "name": "Remembrance Day",
-      "type": "public"
-    },
-    {
       "date": "2028-12-25",
       "name": "Christmas Day",
-      "type": "public"
-    },
-    {
-      "date": "2028-12-26",
-      "name": "Boxing Day",
       "type": "public"
     },
     {
@@ -245,23 +125,8 @@
       "type": "public"
     },
     {
-      "date": "2029-04-01",
-      "name": "Easter Sunday",
-      "type": "public"
-    },
-    {
-      "date": "2029-05-21",
-      "name": "Victoria Day",
-      "type": "public"
-    },
-    {
       "date": "2029-07-01",
       "name": "Canada Day",
-      "type": "public"
-    },
-    {
-      "date": "2029-08-06",
-      "name": "Civic Holiday",
       "type": "public"
     },
     {
@@ -270,23 +135,8 @@
       "type": "public"
     },
     {
-      "date": "2029-10-08",
-      "name": "Thanksgiving",
-      "type": "public"
-    },
-    {
-      "date": "2029-11-11",
-      "name": "Remembrance Day",
-      "type": "public"
-    },
-    {
       "date": "2029-12-25",
       "name": "Christmas Day",
-      "type": "public"
-    },
-    {
-      "date": "2029-12-26",
-      "name": "Boxing Day",
       "type": "public"
     }
   ]
