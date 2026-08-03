@@ -72,21 +72,21 @@
     "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1095.0",
+    "@aws-sdk/client-dynamodb": "^3.1100.0",
     "@aws-sdk/util-dynamodb": "^3.996.7",
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.4.2",
     "@eslint/js": "^9.39.2",
     "@heroicons/vue": "^2.2.0",
     "@microsoft/eslint-plugin-sdl": "^1.1.0",
-    "@playwright/test": "^1.62.0",
-    "@remotion/cli": "^4.0.499",
-    "@remotion/google-fonts": "^4.0.499",
+    "@playwright/test": "^1.62.1",
+    "@remotion/cli": "^4.0.503",
+    "@remotion/google-fonts": "^4.0.503",
     "@tailwindcss/postcss": "^4.3.3",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.1.2",
     "@types/qrcode": "^1.5.6",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/test-utils": "^2.4.11",
     "@vue/tsconfig": "^0.9.1",
@@ -103,8 +103,8 @@
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.11.1",
     "husky": "^9.1.7",
-    "lint-staged": "^17.2.0",
-    "postcss": "^8.5.23",
+    "lint-staged": "^17.3.0",
+    "postcss": "^8.5.25",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "react": "^19.2.8",
@@ -123,7 +123,7 @@
     "vite-plugin-wasm": "^3.6.0",
     "vitest": "^4.1.10",
     "vue-eslint-parser": "^10.4.1",
-    "vue-tsc": "^3.3.8"
+    "vue-tsc": "^3.3.9"
   },
   "overrides": {
     "serialize-javascript": "^7.0.3"
