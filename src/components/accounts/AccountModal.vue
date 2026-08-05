@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue';
+import { ref, computed, reactive, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import AccountDetailsFields from '@/components/accounts/AccountDetailsFields.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
@@ -104,6 +104,11 @@ const loanPayFromAccountId = ref('');
 const details = reactive<AccountDetails>(emptyAccountDetails());
 const detailErrors = computed(() => validateAccountDetails(details, type.value));
 const detailsValid = computed(() => Object.keys(detailErrors.value).length === 0);
+// A detail-field error must never be hidden behind a collapsed section — Save is
+// disabled while invalid, so force "More Details" open so the user can see + fix it.
+watch(detailsValid, (valid) => {
+  if (!valid) showMoreDetails.value = true;
+});
 
 // MRU: find most recent institution/country from existing accounts
 function getMruDefaults() {
@@ -268,7 +273,7 @@ function handleDelete() {
     :icon="modalIcon"
     icon-bg="var(--tint-silk-20)"
     :save-label="saveLabel"
-    :save-disabled="!canSave"
+    :save-disabled="!canSave || !detailsValid"
     :is-submitting="isSubmitting"
     :show-delete="isEditing"
     @close="emit('close')"

@@ -71,10 +71,12 @@ describe('type predicates', () => {
 });
 
 describe('extractAccountDetails', () => {
-  it('maps savings interestRate → savingsInterestRate only for savings', () => {
+  it('reads the savings rate from its own field, never the loan interestRate', () => {
     expect(
-      extractAccountDetails(makeAccount({ type: 'savings', interestRate: 3.5 })).savingsInterestRate
+      extractAccountDetails(makeAccount({ type: 'savings', savingsInterestRate: 3.5 }))
+        .savingsInterestRate
     ).toBe(3.5);
+    // A loan's interestRate must NOT leak into the savings form-state field.
     expect(
       extractAccountDetails(makeAccount({ type: 'loan', interestRate: 3.5 })).savingsInterestRate
     ).toBeUndefined();
@@ -107,33 +109,58 @@ describe('sanitizeWallets', () => {
   });
 });
 
-describe('buildAccountDetailsPatch — type gating (Pass-4 correctness)', () => {
-  it('OMITS interestRate for a loan (never wipes the rate)', () => {
+describe('buildAccountDetailsPatch — type gating + purge', () => {
+  it('never writes the loan interestRate for a loan (loan block is its sole writer)', () => {
     const patch = buildAccountDetailsPatch(details(), 'loan');
     expect('interestRate' in patch).toBe(false);
   });
-  it('OMITS card fields for a bank account', () => {
-    const patch = buildAccountDetailsPatch(details({ cardLast4: '1234' }), 'checking');
-    expect('cardLast4' in patch).toBe(false);
-    expect('cardNetwork' in patch).toBe(false);
+  it('PURGES the loan interestRate on every non-loan type (undefined = deleted)', () => {
+    expect(buildAccountDetailsPatch(details(), 'checking').interestRate).toBeUndefined();
+    expect('interestRate' in buildAccountDetailsPatch(details(), 'checking')).toBe(true);
+    expect(buildAccountDetailsPatch(details(), 'savings').interestRate).toBeUndefined();
   });
-  it('OMITS account number for cash + crypto', () => {
+  it('PURGES off-type card fields (present as undefined so the repo deletes them)', () => {
+    const patch = buildAccountDetailsPatch(details({ cardLast4: '1234' }), 'checking');
+    expect(patch.cardLast4).toBeUndefined();
+    expect(patch.cardNetwork).toBeUndefined();
+    expect('cardLast4' in patch).toBe(true); // emitted (undefined), not omitted
+  });
+  it('PURGES off-type wallets on a bank account', () => {
+    const patch = buildAccountDetailsPatch(
+      details({ wallets: [{ id: '1', label: 'L', address: '0xabc' }] }),
+      'checking'
+    );
+    expect(patch.wallets).toBeUndefined();
+  });
+  it('clears account number for cash + crypto (undefined); keeps it for checking', () => {
     expect(
-      'accountNumber' in buildAccountDetailsPatch(details({ accountNumber: '123' }), 'cash')
-    ).toBe(false);
+      buildAccountDetailsPatch(details({ accountNumber: '123' }), 'cash').accountNumber
+    ).toBeUndefined();
     expect(
-      'accountNumber' in buildAccountDetailsPatch(details({ accountNumber: '123' }), 'crypto')
-    ).toBe(false);
+      buildAccountDetailsPatch(details({ accountNumber: '123' }), 'crypto').accountNumber
+    ).toBeUndefined();
     expect(
       buildAccountDetailsPatch(details({ accountNumber: '123' }), 'checking').accountNumber
     ).toBe('123');
   });
-  it('maps savingsInterestRate → interestRate for savings; 0/empty → undefined', () => {
+  it('savings rate persists to its OWN field; 0 → undefined; negatives allowed', () => {
     expect(
-      buildAccountDetailsPatch(details({ savingsInterestRate: 2.5 }), 'savings').interestRate
+      buildAccountDetailsPatch(details({ savingsInterestRate: 2.5 }), 'savings').savingsInterestRate
     ).toBe(2.5);
     expect(
-      buildAccountDetailsPatch(details({ savingsInterestRate: 0 }), 'savings').interestRate
+      buildAccountDetailsPatch(details({ savingsInterestRate: 0 }), 'savings').savingsInterestRate
+    ).toBeUndefined();
+    // Negative deposit rates are real and must persist (not dropped by the >0 guard).
+    expect(
+      buildAccountDetailsPatch(details({ savingsInterestRate: -0.5 }), 'savings')
+        .savingsInterestRate
+    ).toBe(-0.5);
+    // Never touches the loan interestRate.
+    expect(
+      'interestRate' in buildAccountDetailsPatch(details({ savingsInterestRate: 2.5 }), 'savings')
+    ).toBe(true);
+    expect(
+      buildAccountDetailsPatch(details({ savingsInterestRate: 2.5 }), 'savings').interestRate
     ).toBeUndefined();
   });
   it('in-type cleared string → undefined (so the repo deletes it)', () => {
@@ -205,18 +232,21 @@ describe('validation', () => {
 });
 
 describe('formatCardChip', () => {
-  it('formats with/without network; null when last-4 absent/invalid', () => {
+  it('renders network-only, last4-only, or both; null only when neither is present', () => {
     expect(formatCardChip('visa', '1234')).toBe('Visa ••1234');
     expect(formatCardChip('', '1234')).toBe('••1234');
-    expect(formatCardChip('visa', '')).toBeNull();
-    expect(formatCardChip('visa', '12')).toBeNull();
+    expect(formatCardChip('visa', '')).toBe('Visa'); // network only → still a chip (no empty section)
+    expect(formatCardChip('visa', '12')).toBe('Visa'); // invalid last-4 dropped, network kept
+    expect(formatCardChip('', '')).toBeNull();
+    expect(formatCardChip(undefined, undefined)).toBeNull();
   });
 });
 
 describe('hasAccountDetails + telemetry', () => {
-  it('hasAccountDetails ignores interestRate (shared with loans) but catches detail fields', () => {
+  it('hasAccountDetails ignores the loan interestRate but catches detail fields incl. savings rate', () => {
     expect(hasAccountDetails(makeAccount())).toBe(false);
-    expect(hasAccountDetails(makeAccount({ interestRate: 5 }))).toBe(false);
+    expect(hasAccountDetails(makeAccount({ interestRate: 5 }))).toBe(false); // loan rate is not a detail field
+    expect(hasAccountDetails(makeAccount({ savingsInterestRate: 3.5 }))).toBe(true);
     expect(hasAccountDetails(makeAccount({ accountNumber: '123' }))).toBe(true);
     expect(hasAccountDetails(makeAccount({ wallets: [] }))).toBe(false);
     expect(

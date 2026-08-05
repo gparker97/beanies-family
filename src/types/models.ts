@@ -199,9 +199,9 @@ export interface CryptoWallet {
 
 // Form-state shape for the account-details tier. Decouples the input layer
 // (strings, always-present keys) from the persisted layer (optional, coerced).
-// `savingsInterestRate` maps to `Account.interestRate` for savings accounts.
 // Bridged to/from `Account` by extractAccountDetails / buildAccountDetailsPatch
-// in `utils/accountDetails.ts`.
+// in `utils/accountDetails.ts`. `savingsInterestRate` persists to its OWN
+// `Account.savingsInterestRate` field (never the loan `interestRate`).
 export interface AccountDetails {
   accountNumber: string;
   onlineBankingUrl: string;
@@ -252,6 +252,7 @@ export interface Account {
   routingNumber?: string; // routing / sort code (checking/savings)
   iban?: string; // (checking/savings)
   swiftBic?: string; // (checking/savings)
+  savingsInterestRate?: number; // savings APY — SEPARATE from the loan `interestRate` field so the two can never collide on a type change (savings/loan both once wrote `interestRate`, corrupting a loan's rate)
   cardNetwork?: CardNetwork; // (credit_card)
   cardLast4?: string; // last 4 digits ONLY — never the full PAN (credit_card)
   cardExpiry?: string; // "MM/YY" (credit_card)
@@ -261,7 +262,7 @@ export interface Account {
   wallets?: CryptoWallet[]; // labelled public wallets (crypto)
 
   linkedAssetId?: UUID; // Links a loan account to its source asset
-  interestRate?: number; // Annual interest rate (loan accounts + savings)
+  interestRate?: number; // Annual interest rate (LOAN accounts only — savings use `savingsInterestRate`)
   monthlyPayment?: number; // Monthly payment amount (loan accounts only)
   loanTermMonths?: number; // Loan term in months (loan accounts only)
   loanStartDate?: ISODateString; // Loan start date (loan accounts only)
