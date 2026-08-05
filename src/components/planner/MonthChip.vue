@@ -62,13 +62,14 @@ const time = computed(() => {
 const title = computed(() => props.occurrence.activity.title);
 
 // External-calendar clash (#34) — resolved through the single `useClash` seam.
+// The clash is signalled solely by the OverlapMark glyph (see ClashIndicator in
+// the template), matching every other surface (drawer / week / day / agenda / list).
+// The chip deliberately wears NO orange ring: orange outlines are reserved for
+// date-state (today / selected day), and a ring here read as "today" at grid scale.
 const clash = useClash(
   () => props.occurrence.activity.id,
   () => props.occurrence.date
 );
-/** Active (unacknowledged) overlap → the month chip wears a soft Heritage-Orange
- *  ring (the loudest the tight month view gets; the dismiss lives in the drawer). */
-const isActiveClash = computed(() => !!clash.value && !clash.value.acknowledged);
 
 // Localized + beanie-aware (zh / beanie mode) — matches every other surface; the
 // raw constant name would announce English to screen-reader users in other locales.
@@ -107,7 +108,6 @@ function onClick(event: MouseEvent) {
   <button
     type="button"
     class="font-inter text-secondary-500 flex w-full min-w-0 items-center gap-1 overflow-hidden rounded-md border-l-[3px] py-0.5 pr-1.5 pl-1 text-left text-xs leading-tight transition-opacity hover:opacity-80 dark:text-gray-200"
-    :class="{ 'ring-primary-500 ring-1': isActiveClash }"
     :style="{ borderLeftColor: classification.color, backgroundColor: bgColor }"
     :aria-label="ariaLabel"
     data-testid="month-chip"
