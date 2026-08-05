@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-05
+
+### Changed
+
+- **Terraform deploys now run through a checked environment file (developer tooling — no user-facing change).** Infrastructure changes are applied by hand, and all five sensitive Terraform inputs have no defaults, so a correct apply relied on remembering to export each key against the right AWS account. There's now a template at `infrastructure/.beanies-tf.env.example` documenting where every key comes from, plus a preflight check that refuses to proceed if the shell is authenticated to the wrong AWS account or any key is missing. Nothing about the running app changed.
+
 ## 2026-07-31
 
 ### Fixed
