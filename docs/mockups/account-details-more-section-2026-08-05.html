@@ -1,0 +1,1266 @@
+<!doctype html>
+<!--
+  beanies.family — Account details ("More Details") — static design mockup
+  ---------------------------------------------------------------------------
+  One-file-per-concept mockup (docs/mockups convention). NOT wired to the app.
+  Reproduces the real AccountModal.vue "More Details" collapsible + a new set of
+  optional per-type account-detail fields, plus how they render read-only in the
+  AccountViewModal drawer. CIG-clamped: Heritage Orange accents, Deep Slate text,
+  Sky Silk focus rings, squircle radii, Outfit/Inter type scale, light + dark.
+
+  Fonts: the real app ships Outfit (headings/labels/values) + Inter (body/data).
+  This standalone mockup approximates them with a system-font stack (no CDN).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family — Account details (More Details) — mockup 2026-08-05</title>
+    <style>
+      /* ---- Approximation of the real faces (Outfit + Inter) via system stack ---- */
+      :root {
+        --font-outfit: 'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --font-inter: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+        /* Brand palette */
+        --orange: #f15d22;
+        --orange-hover: #d14d1a;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --silk: #aed6f1;
+        --cloud: #f8f9fa;
+        --success: #27ae60;
+
+        /* Light theme tokens */
+        --page-bg: #f8f9fa;
+        --card-bg: #ffffff;
+        --color-text: #2c3e50;
+        --color-text-muted: rgba(44, 62, 80, 0.6);
+        --field-bg: rgba(44, 62, 80, 0.05);
+        --input-bg: #ffffff;
+        --input-border: #d1d5db;
+        --divider: rgba(44, 62, 80, 0.08);
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-silk-20: rgba(174, 214, 241, 0.2);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+        --tint-success-10: rgba(39, 174, 96, 0.1);
+        --toggle-off: rgba(44, 62, 80, 0.2);
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --page-bg: #1a252f;
+          --card-bg: #243342;
+          --color-text: #ecf0f1;
+          --color-text-muted: #bdc3c7;
+          --field-bg: rgba(255, 255, 255, 0.05);
+          --input-bg: #2c3e50;
+          --input-border: #4a6274;
+          --divider: rgba(255, 255, 255, 0.08);
+          --tint-orange-8: rgba(241, 93, 34, 0.12);
+          --tint-orange-15: rgba(241, 93, 34, 0.2);
+          --tint-silk-20: rgba(174, 214, 241, 0.12);
+          --tint-slate-5: rgba(255, 255, 255, 0.05);
+          --tint-success-10: rgba(39, 174, 96, 0.15);
+          --toggle-off: rgba(255, 255, 255, 0.22);
+          --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+          --soft-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+        }
+      }
+
+      /* ---- Reset-ish ---- */
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: var(--font-inter);
+        background: var(--page-bg);
+        color: var(--color-text);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ---- Page chrome ---- */
+      .page-header {
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 1.75rem 1.25rem 0.5rem;
+      }
+      .page-header h1 {
+        font-family: var(--font-outfit);
+        font-weight: 800;
+        font-size: 1.5rem;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .page-header h1 .fam {
+        color: var(--orange);
+      }
+      .page-header .note {
+        font-size: 0.8125rem;
+        color: var(--color-text-muted);
+        margin: 0.35rem 0 0;
+      }
+      .badge-static {
+        display: inline-block;
+        font-family: var(--font-outfit);
+        font-size: 0.625rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--orange);
+        background: var(--tint-orange-15);
+        border-radius: 20px;
+        padding: 0.2rem 0.6rem;
+        vertical-align: middle;
+        margin-left: 0.5rem;
+      }
+
+      .panels {
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 1.25rem;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+      @media (min-width: 940px) {
+        .panels {
+          grid-template-columns: 1.15fr 0.85fr;
+          align-items: start;
+        }
+      }
+
+      .panel-label {
+        font-family: var(--font-outfit);
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+        margin: 0 0 0.6rem 0.25rem;
+      }
+
+      /* ---- Modal shell (mimics BeanieFormModal drawer) ---- */
+      .modal {
+        background: var(--card-bg);
+        border-radius: 24px;
+        box-shadow: var(--soft-shadow);
+        overflow: hidden;
+      }
+      .modal-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--divider);
+      }
+      .icon-box {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 1.25rem;
+        flex: none;
+      }
+      .icon-box.silk {
+        background: var(--tint-silk-20);
+      }
+      .icon-box.money {
+        background: var(--tint-orange-8);
+      }
+      .modal-title {
+        font-family: var(--font-outfit);
+        font-size: 1.125rem;
+        font-weight: 700;
+        margin: 0;
+      }
+      .modal-title small {
+        display: block;
+        font-family: var(--font-inter);
+        font-size: 0.75rem;
+        font-weight: 400;
+        color: var(--color-text-muted);
+      }
+      .modal-body {
+        background: var(--page-bg);
+        padding: 1.25rem;
+      }
+      .modal-footer {
+        display: flex;
+        gap: 0.75rem;
+        padding: 1rem 1.25rem;
+        border-top: 1px solid var(--divider);
+        background: var(--card-bg);
+      }
+
+      /* ---- Form field group (FormFieldGroup.vue) ---- */
+      .fg {
+        margin-bottom: 1.25rem;
+      }
+      .fg:last-child {
+        margin-bottom: 0;
+      }
+      .fg-label {
+        font-family: var(--font-outfit);
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--color-text);
+        opacity: 0.35;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-bottom: 0.5rem;
+      }
+      .fg-label .req {
+        color: var(--orange);
+        opacity: 1;
+        font-weight: 700;
+      }
+      .fg-hint {
+        font-size: 0.75rem;
+        color: var(--color-text-muted);
+        margin: 0.4rem 0 0;
+      }
+
+      /* ---- Inputs (BaseInput.vue) ---- */
+      .input,
+      .select,
+      textarea.input {
+        display: block;
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid var(--input-border);
+        background: var(--input-bg);
+        color: var(--color-text);
+        font-family: var(--font-inter);
+        font-size: 0.9375rem;
+        padding: 0.55rem 0.75rem;
+        transition:
+          border-color 150ms,
+          box-shadow 150ms;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      .input::placeholder,
+      textarea.input::placeholder {
+        color: var(--color-text-muted);
+        opacity: 0.6;
+      }
+      .input:focus,
+      .select:focus,
+      textarea.input:focus {
+        outline: none;
+        border-color: var(--orange);
+        /* Sky Silk focus ring */
+        box-shadow: 0 0 0 3px rgba(174, 214, 241, 0.55);
+      }
+      textarea.input {
+        resize: vertical;
+        min-height: 76px;
+        line-height: 1.45;
+      }
+      .select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23F15D22' d='M6 8 0 0h12z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.85rem center;
+        padding-right: 2rem;
+      }
+      .mono {
+        font-family: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+        font-size: 0.8125rem;
+        letter-spacing: -0.01em;
+      }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.85rem;
+      }
+      .grid-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 0.85rem;
+      }
+      @media (max-width: 520px) {
+        .grid-2,
+        .grid-3 {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ---- Account-type selector (pill/tab row) ---- */
+      .type-selector {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-bottom: 1.25rem;
+      }
+      .type-pill {
+        font-family: var(--font-outfit);
+        font-size: 0.75rem;
+        font-weight: 600;
+        border: 1px solid var(--input-border);
+        background: var(--card-bg);
+        color: var(--color-text);
+        border-radius: 20px;
+        padding: 0.4rem 0.85rem;
+        cursor: pointer;
+        transition: all 150ms;
+      }
+      .type-pill:hover {
+        border-color: var(--orange);
+      }
+      .type-pill.active {
+        background: var(--orange);
+        border-color: var(--orange);
+        color: #fff;
+        box-shadow: 0 2px 10px rgba(241, 93, 34, 0.35);
+      }
+
+      /* ---- More Details collapsible header ---- */
+      .more-toggle {
+        font-family: var(--font-outfit);
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--orange);
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+      .more-toggle:hover {
+        text-decoration: underline;
+      }
+      .more-toggle .chev {
+        display: inline-block;
+        transition: transform 200ms;
+      }
+      .more-toggle.open .chev {
+        transform: rotate(180deg);
+      }
+
+      .more-panel {
+        margin-top: 1rem;
+        padding: 1.1rem;
+        border-radius: 18px;
+        background: var(--card-bg);
+        border: 1px solid var(--divider);
+      }
+      .more-panel > .section-caption {
+        font-family: var(--font-inter);
+        font-size: 0.75rem;
+        color: var(--color-text-muted);
+        margin: 0 0 1rem;
+      }
+
+      /* Type-conditional field group wrapper */
+      .type-block {
+        border-radius: 16px;
+        background: var(--tint-orange-8);
+        padding: 1rem;
+        margin-bottom: 1.25rem;
+      }
+      .type-block-title {
+        font-family: var(--font-outfit);
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--color-text);
+        margin: 0 0 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+      .cvv-caption {
+        font-size: 0.75rem;
+        color: var(--color-text-muted);
+        margin: 0.75rem 0 0;
+        display: flex;
+        gap: 0.35rem;
+        align-items: flex-start;
+      }
+
+      /* ---- Last-4 preview chip ---- */
+      .card-preview-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-family: var(--font-outfit);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        background: var(--slate);
+        color: #fff;
+        border-radius: 20px;
+        padding: 0.35rem 0.7rem;
+        white-space: nowrap;
+      }
+      .card-preview-chip .net {
+        color: var(--silk);
+      }
+      .card-preview-chip .dots {
+        opacity: 0.7;
+        letter-spacing: 0.05em;
+      }
+      .last4-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      .last4-row .input {
+        max-width: 120px;
+      }
+
+      /* ---- Wallet list (crypto centerpiece) ---- */
+      .wallet-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+      }
+      .wallet-row {
+        position: relative;
+        border-radius: 16px;
+        background: var(--card-bg);
+        border: 1px solid var(--divider);
+        box-shadow: var(--card-shadow);
+        padding: 0.95rem 0.95rem 1rem;
+      }
+      .wallet-row-head {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.7rem;
+      }
+      .wallet-index {
+        width: 22px;
+        height: 22px;
+        border-radius: 8px;
+        background: var(--tint-orange-15);
+        color: var(--orange);
+        font-family: var(--font-outfit);
+        font-size: 0.6875rem;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+        flex: none;
+      }
+      .wallet-row-head .wl-label {
+        font-family: var(--font-outfit);
+        font-size: 0.6875rem;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--color-text);
+        opacity: 0.35;
+      }
+      .wallet-remove {
+        margin-left: auto;
+        width: 26px;
+        height: 26px;
+        border-radius: 9px;
+        border: none;
+        background: var(--tint-slate-5);
+        color: var(--color-text-muted);
+        font-size: 1rem;
+        line-height: 1;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        transition: all 150ms;
+      }
+      .wallet-remove:hover {
+        background: rgba(241, 93, 34, 0.12);
+        color: var(--orange);
+      }
+      .wallet-fields {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.6rem;
+      }
+      .wallet-addr-wrap {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.5rem;
+        align-items: stretch;
+      }
+      .wallet-addr-wrap .input {
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      .wallet-chain {
+        max-width: 100%;
+      }
+      @media (min-width: 480px) {
+        .wallet-fields {
+          grid-template-columns: 1.4fr 0.9fr;
+          grid-template-areas:
+            'addr chain'
+            'addr chain';
+        }
+        .wallet-addr-wrap {
+          grid-area: addr;
+        }
+        .wallet-chain {
+          grid-area: chain;
+        }
+      }
+      .mini-label {
+        font-family: var(--font-outfit);
+        font-size: 0.625rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text);
+        opacity: 0.35;
+        display: block;
+        margin-bottom: 0.3rem;
+      }
+      .add-wallet-btn {
+        margin-top: 0.9rem;
+        font-family: var(--font-outfit);
+        font-size: 0.8125rem;
+        font-weight: 700;
+        color: #fff;
+        background: var(--orange);
+        border: none;
+        border-radius: 14px;
+        padding: 0.6rem 1rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: background 150ms;
+        box-shadow: 0 2px 10px rgba(241, 93, 34, 0.3);
+      }
+      .add-wallet-btn:hover {
+        background: var(--orange-hover);
+      }
+
+      /* ---- Loan note ---- */
+      .loan-note {
+        border-radius: 16px;
+        background: var(--tint-orange-8);
+        padding: 1rem;
+        font-size: 0.8125rem;
+        color: var(--color-text);
+        display: flex;
+        gap: 0.55rem;
+        align-items: flex-start;
+        margin-bottom: 1.25rem;
+      }
+      .loan-note strong {
+        font-family: var(--font-outfit);
+      }
+
+      /* ---- Toggle rows (ToggleSwitch.vue) ---- */
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-radius: 14px;
+        background: var(--tint-slate-5);
+        padding: 0.8rem 1rem;
+      }
+      .toggle-row + .toggle-row {
+        margin-top: 0.75rem;
+      }
+      .toggle-row .tr-title {
+        font-family: var(--font-outfit);
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--color-text);
+      }
+      .toggle-row .tr-desc {
+        font-size: 0.75rem;
+        color: var(--color-text-muted);
+      }
+      .switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        flex: none;
+        cursor: pointer;
+      }
+      .switch input {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .switch .track {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: var(--toggle-off);
+        transition: background 180ms;
+      }
+      .switch .thumb {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+        transition: transform 180ms;
+      }
+      .switch input:checked + .track {
+        background: var(--orange);
+      }
+      .switch input:checked + .track + .thumb {
+        transform: translateX(20px);
+      }
+
+      /* ---- Footer buttons ---- */
+      .btn {
+        flex: 1;
+        border-radius: 16px;
+        padding: 0.85rem 1rem;
+        font-family: var(--font-outfit);
+        font-size: 0.875rem;
+        font-weight: 700;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: all 150ms;
+      }
+      .btn-save {
+        color: #fff;
+        border: none;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        box-shadow: 0 4px 16px rgba(241, 93, 34, 0.3);
+      }
+      .btn-ghost {
+        flex: none;
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        background: rgba(231, 76, 60, 0.08);
+        border: none;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        font-size: 1.1rem;
+      }
+
+      /* ---- Read-only display (Panel B — AccountViewModal) ---- */
+      .view-section-title {
+        font-family: var(--font-outfit);
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text);
+        opacity: 0.5;
+        margin: 0 0 0.75rem;
+      }
+      .detail-rows {
+        display: flex;
+        flex-direction: column;
+      }
+      .detail-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.7rem 0;
+        border-bottom: 1px solid var(--divider);
+      }
+      .detail-row:last-child {
+        border-bottom: none;
+      }
+      .detail-row .dr-label {
+        font-family: var(--font-inter);
+        font-size: 0.8125rem;
+        color: var(--color-text-muted);
+        flex: none;
+      }
+      .detail-row .dr-value {
+        font-family: var(--font-outfit);
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--color-text);
+        text-align: right;
+        word-break: break-word;
+      }
+      .detail-row .dr-value a {
+        color: var(--orange);
+        text-decoration: none;
+      }
+      .detail-row .dr-value a:hover {
+        text-decoration: underline;
+      }
+
+      .view-block {
+        margin-top: 1.5rem;
+      }
+      .view-block:first-child {
+        margin-top: 0;
+      }
+      .balance-head {
+        margin-bottom: 1.25rem;
+      }
+      .balance-head .inst {
+        font-family: var(--font-outfit);
+        font-size: 0.875rem;
+        color: var(--color-text-muted);
+        margin: 0 0 0.4rem;
+      }
+      .balance-head .bal-cap {
+        font-family: var(--font-outfit);
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text);
+        opacity: 0.5;
+        margin: 0 0 0.15rem;
+      }
+      .balance-head .bal {
+        font-family: var(--font-outfit);
+        font-size: 1.875rem;
+        font-weight: 800;
+      }
+
+      /* Read-only wallet rows */
+      .ro-wallet {
+        border-radius: 14px;
+        background: var(--tint-slate-5);
+        padding: 0.7rem 0.85rem;
+        margin-bottom: 0.6rem;
+      }
+      .ro-wallet:last-child {
+        margin-bottom: 0;
+      }
+      .ro-wallet .rw-top {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.3rem;
+      }
+      .ro-wallet .rw-label {
+        font-family: var(--font-outfit);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--color-text);
+      }
+      .ro-wallet .rw-chain {
+        font-family: var(--font-outfit);
+        font-size: 0.625rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--orange);
+        background: var(--tint-orange-15);
+        border-radius: 20px;
+        padding: 0.1rem 0.5rem;
+      }
+      .ro-wallet .rw-addr {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .ro-wallet .rw-addr code {
+        font-family: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+        font-size: 0.75rem;
+        color: var(--color-text-muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+        min-width: 0;
+      }
+      .copy-btn {
+        flex: none;
+        border: none;
+        background: var(--card-bg);
+        border-radius: 8px;
+        width: 26px;
+        height: 26px;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        color: var(--color-text-muted);
+        box-shadow: var(--card-shadow);
+      }
+      .copy-btn:hover {
+        color: var(--orange);
+      }
+
+      .cc-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-family: var(--font-outfit);
+        font-size: 0.8125rem;
+        font-weight: 600;
+      }
+
+      .footnote {
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 0 1.25rem 2.5rem;
+        font-size: 0.75rem;
+        color: var(--color-text-muted);
+      }
+      .eye-btn {
+        border: none;
+        background: none;
+        cursor: pointer;
+        color: var(--color-text-muted);
+        padding: 0.4rem;
+        display: grid;
+        place-items: center;
+      }
+      .input-with-eye {
+        position: relative;
+      }
+      .input-with-eye .eye-btn {
+        position: absolute;
+        right: 0.4rem;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+      .input-with-eye .input {
+        padding-right: 2.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page-header">
+      <h1>beanies.family — Account details<span class="fam"> (More Details)</span><span class="badge-static">mockup 2026-08-05</span></h1>
+      <p class="note">
+        Static design mockup for review — not wired to the app. Panel A is the edit form (the
+        AccountModal "More Details" section, expanded); Panel B is the read-only drawer view.
+      </p>
+    </header>
+
+    <main class="panels">
+      <!-- ============================= PANEL A — EDIT FORM ============================= -->
+      <section>
+        <p class="panel-label">Panel A · Edit form — "More Details" expanded</p>
+        <div class="modal">
+          <div class="modal-header">
+            <div class="icon-box silk">🏦</div>
+            <div>
+              <h2 class="modal-title">
+                Edit Account
+                <small>Chase Everyday Checking</small>
+              </h2>
+            </div>
+          </div>
+
+          <div class="modal-body">
+            <!-- The account-type selector: switches which type-specific fields show -->
+            <div class="fg">
+              <label class="fg-label">Account Type (mockup switcher)</label>
+              <div class="type-selector" id="typeSelector">
+                <button class="type-pill active" data-type="bank">Bank (checking/savings)</button>
+                <button class="type-pill" data-type="credit">Credit card</button>
+                <button class="type-pill" data-type="crypto">Crypto</button>
+                <button class="type-pill" data-type="loan">Loan</button>
+                <button class="type-pill" data-type="cash">Cash</button>
+              </div>
+            </div>
+
+            <!-- More Details collapsible -->
+            <button class="more-toggle open" id="moreToggle">
+              More Details <span class="chev">&#9662;</span>
+            </button>
+
+            <div class="more-panel" id="morePanel">
+              <p class="section-caption">
+                Optional account details. Everything here is safe to leave blank — beanies stores it
+                encrypted in your Family Data File, right beside your bean count.
+              </p>
+
+              <!-- COMMON — Account number (hidden for crypto + cash) -->
+              <div class="fg" data-field="account-number">
+                <label class="fg-label">Account Number</label>
+                <input class="input" type="text" placeholder="e.g. 000123456789" value="•••• •••• 4821" />
+              </div>
+
+              <!-- COMMON — Online banking URL -->
+              <div class="fg">
+                <label class="fg-label">Online Banking URL</label>
+                <input class="input" type="url" placeholder="https://…" value="https://secure.chase.com" />
+              </div>
+
+              <!-- COMMON — Online banking user ID -->
+              <div class="fg">
+                <label class="fg-label">Online Banking User ID</label>
+                <input class="input" type="text" placeholder="username" value="greg.parker" />
+              </div>
+
+              <!-- COMMON — Customer-service phone -->
+              <div class="fg">
+                <label class="fg-label">Customer-Service Phone</label>
+                <input class="input" type="tel" placeholder="+1 800 …" value="+1 800 935 9935" />
+              </div>
+
+              <!-- ===================== BANK-only ===================== -->
+              <div class="type-block" data-block="bank">
+                <p class="type-block-title">🏦 Bank details</p>
+                <div class="grid-3">
+                  <div class="fg" style="margin-bottom: 0">
+                    <label class="fg-label">Routing / Sort Code</label>
+                    <input class="input" type="text" placeholder="021000021" value="021000021" />
+                  </div>
+                  <div class="fg" style="margin-bottom: 0">
+                    <label class="fg-label">IBAN</label>
+                    <input class="input mono" type="text" placeholder="GB29 NWBK …" />
+                  </div>
+                  <div class="fg" style="margin-bottom: 0">
+                    <label class="fg-label">SWIFT / BIC</label>
+                    <input class="input" type="text" placeholder="CHASUS33" value="CHASUS33" />
+                  </div>
+                </div>
+                <div class="fg" style="margin: 0.85rem 0 0; max-width: 220px">
+                  <label class="fg-label">Interest Rate (savings)</label>
+                  <input class="input" type="number" step="0.01" min="0" placeholder="0.0" />
+                  <p class="fg-hint">Annual % — leave blank for checking.</p>
+                </div>
+              </div>
+
+              <!-- ===================== CREDIT-CARD-only ===================== -->
+              <div class="type-block" data-block="credit" hidden>
+                <p class="type-block-title">💳 Credit card details</p>
+                <div class="grid-2">
+                  <div class="fg" style="margin-bottom: 0">
+                    <label class="fg-label">Card Network</label>
+                    <select class="select" id="networkSelect">
+                      <option>Visa</option>
+                      <option>Mastercard</option>
+                      <option>Amex</option>
+                      <option>Discover</option>
+                      <option>UnionPay</option>
+                      <option>JCB</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <div class="fg" style="margin-bottom: 0">
+                    <label class="fg-label">Last 4 Digits</label>
+                    <div class="last4-row">
+                      <input class="input" id="last4Input" type="text" inputmode="numeric" maxlength="4" placeholder="1234" value="1234" />
+                      <span class="card-preview-chip" id="cardPreview">
+                        <span class="net">Visa</span>
+                        <span class="dots">••</span>1234
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="grid-3" style="margin-top: 0.85rem">
+                  <div class="fg" style="margin-bottom: 0">
+                    <label class="fg-label">Expiry (MM/YY)</label>
+                    <input class="input" type="text" maxlength="5" placeholder="MM/YY" value="08/27" />
+                  </div>
+                  <div class="fg" style="margin-bottom: 0">
+                    <label class="fg-label">Statement Day</label>
+                    <input class="input" type="number" min="1" max="31" placeholder="1–31" value="14" />
+                  </div>
+                  <div class="fg" style="margin-bottom: 0">
+                    <label class="fg-label">Payment-Due Day</label>
+                    <input class="input" type="number" min="1" max="31" placeholder="1–31" value="2" />
+                  </div>
+                </div>
+                <div class="fg" style="margin: 0.85rem 0 0; max-width: 240px">
+                  <label class="fg-label">Credit Limit</label>
+                  <input class="input" type="text" inputmode="decimal" placeholder="$0.00" value="$10,000.00" />
+                </div>
+                <p class="cvv-caption">
+                  <span aria-hidden="true">🔒</span>
+                  <span>Your CVV / security code is never stored — beanies keeps only what you need to recognise the card.</span>
+                </p>
+              </div>
+
+              <!-- ===================== CRYPTO-only (centerpiece) ===================== -->
+              <div class="type-block" data-block="crypto" hidden style="background: var(--tint-silk-20)">
+                <p class="type-block-title">🪙 Wallets</p>
+                <p class="section-caption" style="margin-top: -0.4rem">
+                  Track the wallets that hold this account's beans. Public addresses only — never a
+                  seed phrase or private key.
+                </p>
+                <div class="wallet-list" id="walletList">
+                  <!-- pre-populated example wallets injected by JS -->
+                </div>
+                <button class="add-wallet-btn" id="addWalletBtn">
+                  <span aria-hidden="true">＋</span> Add wallet
+                </button>
+              </div>
+
+              <!-- ===================== LOAN note ===================== -->
+              <div class="loan-note" data-block="loan" hidden>
+                <span aria-hidden="true">🏦</span>
+                <span>
+                  <strong>Loan fields live above.</strong> Interest rate, monthly payment, term, and
+                  start date are set in the Loan Details section higher up in this form — no extra
+                  loan fields here.
+                </span>
+              </div>
+
+              <!-- COMMON — Notes -->
+              <div class="fg">
+                <label class="fg-label">Notes</label>
+                <textarea class="input" placeholder="Anything worth remembering about this account…">Salary goes in here on the 25th. PIN reminder is in the family vault, not here.</textarea>
+              </div>
+
+              <!-- Existing toggle rows (new fields slot in ABOVE these) -->
+              <div class="toggle-row">
+                <div>
+                  <div class="tr-title">Include in Net Worth</div>
+                  <div class="tr-desc">Count this account toward your family's bean count.</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" checked />
+                  <span class="track"></span>
+                  <span class="thumb"></span>
+                </label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <div class="tr-title">Active</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" checked />
+                  <span class="track"></span>
+                  <span class="thumb"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button class="btn-ghost" title="Delete account" aria-label="Delete account">🗑️</button>
+            <button class="btn btn-save">Save Account</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================= PANEL B — READ-ONLY DISPLAY ============================= -->
+      <section>
+        <p class="panel-label">Panel B · Read-only drawer — how saved details display</p>
+        <div class="modal">
+          <div class="modal-header">
+            <div class="icon-box money">💰</div>
+            <div>
+              <h2 class="modal-title">Amex Platinum</h2>
+            </div>
+          </div>
+
+          <div class="modal-body">
+            <!-- Balance head (mirrors AccountViewModal) -->
+            <div class="balance-head">
+              <p class="inst">American Express</p>
+              <p class="bal-cap">Current Balance</p>
+              <div class="bal" style="color: var(--orange)">-$1,204.55</div>
+            </div>
+
+            <!-- Credit-card example -->
+            <div class="view-block">
+              <h3 class="view-section-title">Account details</h3>
+              <div class="detail-rows">
+                <div class="detail-row">
+                  <span class="dr-label">Card</span>
+                  <span class="dr-value">
+                    <span class="cc-badge"><span class="card-preview-chip"><span class="net">Visa</span><span class="dots">••</span>1234</span></span>
+                  </span>
+                </div>
+                <div class="detail-row">
+                  <span class="dr-label">Expiry</span>
+                  <span class="dr-value">08/27</span>
+                </div>
+                <div class="detail-row">
+                  <span class="dr-label">Credit limit</span>
+                  <span class="dr-value">$10,000.00</span>
+                </div>
+                <div class="detail-row">
+                  <span class="dr-label">Statement / due day</span>
+                  <span class="dr-value">14th / 2nd</span>
+                </div>
+                <div class="detail-row">
+                  <span class="dr-label">Online banking</span>
+                  <span class="dr-value"><a href="#" onclick="return false">secure.chase.com ↗</a></span>
+                </div>
+                <div class="detail-row">
+                  <span class="dr-label">User ID</span>
+                  <span class="dr-value">greg.parker</span>
+                </div>
+                <div class="detail-row">
+                  <span class="dr-label">Customer service</span>
+                  <span class="dr-value">+1 800 935 9935</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Crypto example — read-only labelled wallets with copy affordance -->
+            <div class="view-block">
+              <h3 class="view-section-title">Wallets</h3>
+              <div class="ro-wallet">
+                <div class="rw-top">
+                  <span class="rw-label">Cold storage — Ledger</span>
+                  <span class="rw-chain">Bitcoin</span>
+                </div>
+                <div class="rw-addr">
+                  <code>bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq</code>
+                  <button class="copy-btn" title="Copy address" aria-label="Copy address">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="ro-wallet">
+                <div class="rw-top">
+                  <span class="rw-label">Hot wallet — MetaMask</span>
+                  <span class="rw-chain">Ethereum</span>
+                </div>
+                <div class="rw-addr">
+                  <code>0x742d35Cc6634C0532925a3b844Bc454e4438f44e</code>
+                  <button class="copy-btn" title="Copy address" aria-label="Copy address">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="view-block">
+              <h3 class="view-section-title">Notes</h3>
+              <p style="font-size: 0.875rem; color: var(--color-text); margin: 0">
+                Salary goes in here on the 25th. PIN reminder is in the family vault, not here.
+              </p>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button class="btn btn-ghost" style="flex: 1; width: auto; height: auto; background: var(--field-bg); color: var(--color-text)">Close</button>
+            <button class="btn btn-save">Edit</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <p class="footnote">
+      Static HTML mockup · docs/mockups/account-details-more-section-2026-08-05.html · light + dark
+      themed via <code>prefers-color-scheme</code> · no app wiring.
+    </p>
+
+    <script>
+      // ---- Account-type switcher: show/hide type-specific blocks + hide account number ----
+      const typeSelector = document.getElementById('typeSelector');
+      const blocks = {
+        bank: document.querySelector('[data-block="bank"]'),
+        credit: document.querySelector('[data-block="credit"]'),
+        crypto: document.querySelector('[data-block="crypto"]'),
+        loan: document.querySelector('[data-block="loan"]'),
+      };
+      const acctNumberField = document.querySelector('[data-field="account-number"]');
+
+      typeSelector.addEventListener('click', (e) => {
+        const btn = e.target.closest('.type-pill');
+        if (!btn) return;
+        typeSelector.querySelectorAll('.type-pill').forEach((p) => p.classList.remove('active'));
+        btn.classList.add('active');
+        const type = btn.dataset.type;
+
+        Object.entries(blocks).forEach(([key, el]) => {
+          if (el) el.hidden = key !== type;
+        });
+
+        // Account number is meaningless for crypto + cash
+        acctNumberField.hidden = type === 'crypto' || type === 'cash';
+      });
+
+      // ---- More Details collapsible ----
+      const moreToggle = document.getElementById('moreToggle');
+      const morePanel = document.getElementById('morePanel');
+      moreToggle.addEventListener('click', () => {
+        const open = morePanel.hidden;
+        morePanel.hidden = !open;
+        moreToggle.classList.toggle('open', open);
+      });
+
+      // ---- Credit-card last-4 preview chip ----
+      const networkSelect = document.getElementById('networkSelect');
+      const last4Input = document.getElementById('last4Input');
+      const cardPreview = document.getElementById('cardPreview');
+      function renderCardChip() {
+        const net = networkSelect.value;
+        const last4 = (last4Input.value || '••••').padStart(0);
+        cardPreview.innerHTML =
+          '<span class="net">' + net + '</span><span class="dots">••</span>' + (last4Input.value || '0000');
+      }
+      networkSelect.addEventListener('change', renderCardChip);
+      last4Input.addEventListener('input', renderCardChip);
+
+      // ---- Repeatable wallet list ----
+      const walletList = document.getElementById('walletList');
+      const addWalletBtn = document.getElementById('addWalletBtn');
+      const CHAINS = ['Ethereum', 'Bitcoin', 'Solana', 'Polygon', 'Other'];
+      let walletSeq = 0;
+
+      function chainOptions(selected) {
+        return CHAINS.map(
+          (c) => '<option' + (c === selected ? ' selected' : '') + '>' + c + '</option>'
+        ).join('');
+      }
+
+      function makeWallet({ label = '', address = '', chain = 'Ethereum' } = {}) {
+        walletSeq += 1;
+        const idx = walletList.children.length + 1;
+        const row = document.createElement('div');
+        row.className = 'wallet-row';
+        row.innerHTML =
+          '<div class="wallet-row-head">' +
+          '<span class="wallet-index">' + idx + '</span>' +
+          '<span class="wl-label">Wallet</span>' +
+          '<button class="wallet-remove" title="Remove wallet" aria-label="Remove wallet">×</button>' +
+          '</div>' +
+          '<div class="fg" style="margin-bottom:0.6rem">' +
+          '<label class="mini-label">Label</label>' +
+          '<input class="input" type="text" placeholder="e.g. Cold storage — Ledger" value="' + label + '" />' +
+          '</div>' +
+          '<div class="wallet-fields">' +
+          '<div class="wallet-addr-wrap">' +
+          '<div style="min-width:0"><label class="mini-label">Public address</label>' +
+          '<input class="input mono" type="text" placeholder="0x… / bc1…" value="' + address + '" /></div>' +
+          '</div>' +
+          '<div class="wallet-chain"><label class="mini-label">Chain</label>' +
+          '<select class="select">' + chainOptions(chain) + '</select></div>' +
+          '</div>';
+        row.querySelector('.wallet-remove').addEventListener('click', () => {
+          row.remove();
+          reindexWallets();
+        });
+        walletList.appendChild(row);
+      }
+
+      function reindexWallets() {
+        [...walletList.children].forEach((row, i) => {
+          row.querySelector('.wallet-index').textContent = i + 1;
+        });
+      }
+
+      addWalletBtn.addEventListener('click', () => makeWallet());
+
+      // Pre-populate two example wallets so the repeat pattern is obvious
+      makeWallet({
+        label: 'Cold storage — Ledger',
+        address: 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq',
+        chain: 'Bitcoin',
+      });
+      makeWallet({
+        label: 'Hot wallet — MetaMask',
+        address: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+        chain: 'Ethereum',
+      });
+    </script>
+  </body>
+</html>
