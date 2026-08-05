@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-05",
-    "translationCount": 3889
+    "translationCount": 3887
   },
   "translations": {
     "app.name": {
@@ -19236,11 +19236,6 @@
       "hash": "2klv13",
       "lastUpdated": "2026-08-05"
     },
-    "accountDetails.field.customerServicePhone": {
-      "translation": "客户服务电话",
-      "hash": "a8sjv0",
-      "lastUpdated": "2026-08-05"
-    },
     "accountDetails.field.notes": {
       "translation": "注 意 事 项",
       "hash": "18xach",
@@ -19424,11 +19419,6 @@
     "accountDetails.view.userId": {
       "translation": "用户ID",
       "hash": "p3gepc",
-      "lastUpdated": "2026-08-05"
-    },
-    "accountDetails.view.customerService": {
-      "translation": "客户服务",
-      "hash": "rhgvbh",
       "lastUpdated": "2026-08-05"
     },
     "accountDetails.copyAddress": {

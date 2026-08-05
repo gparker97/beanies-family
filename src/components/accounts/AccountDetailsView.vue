@@ -193,17 +193,6 @@ async function copyAddress(address: string) {
           {{ account.onlineBankingUserId }}
         </dd>
       </div>
-      <div
-        v-if="account.customerServicePhone"
-        class="flex justify-between gap-4 border-b border-[var(--divider,rgba(44,62,80,0.08))] py-2.5 last:border-0"
-      >
-        <dt class="text-sm text-[var(--color-text-muted)]">
-          {{ t('accountDetails.view.customerService') }}
-        </dt>
-        <dd class="font-outfit text-right text-sm font-semibold">
-          {{ account.customerServicePhone }}
-        </dd>
-      </div>
     </dl>
 
     <!-- Wallets -->

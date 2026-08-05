@@ -15,9 +15,13 @@ import { ACCOUNT_DETAIL_KEYS, CARD_NETWORK_LABELS } from '@/constants/accountDet
 
 // ── Type-applicability predicates (the single source of truth) ──────────────
 
-/** Account number is meaningless for cash + crypto (crypto uses wallets). */
+/**
+ * Account number applies to institution-backed accounts. Hidden for cash and
+ * crypto (crypto uses wallets), and for credit cards (which keep only the
+ * last-4, never a full number).
+ */
 export function showsAccountNumber(type: AccountType | ''): boolean {
-  return type !== '' && type !== 'cash' && type !== 'crypto';
+  return type !== '' && type !== 'cash' && type !== 'crypto' && type !== 'credit_card';
 }
 
 export function bankFieldsApply(type: AccountType | ''): boolean {
@@ -39,7 +43,6 @@ export function emptyAccountDetails(): AccountDetails {
     accountNumber: '',
     onlineBankingUrl: '',
     onlineBankingUserId: '',
-    customerServicePhone: '',
     notes: '',
     routingNumber: '',
     iban: '',
@@ -65,7 +68,6 @@ export function extractAccountDetails(account: Account): AccountDetails {
     accountNumber: account.accountNumber ?? '',
     onlineBankingUrl: account.onlineBankingUrl ?? '',
     onlineBankingUserId: account.onlineBankingUserId ?? '',
-    customerServicePhone: account.customerServicePhone ?? '',
     notes: account.notes ?? '',
     routingNumber: account.routingNumber ?? '',
     iban: account.iban ?? '',
@@ -120,7 +122,6 @@ export function buildAccountDetailsPatch(
   // Common (all types) — always in-type, so empty → undefined (deletes on update).
   patch.onlineBankingUrl = str(details.onlineBankingUrl);
   patch.onlineBankingUserId = str(details.onlineBankingUserId);
-  patch.customerServicePhone = str(details.customerServicePhone);
   patch.notes = str(details.notes);
 
   // Account number — hidden for cash + crypto.

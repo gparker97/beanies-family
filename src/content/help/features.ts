@@ -1615,7 +1615,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Every account can carry an <strong>account number</strong> (except cash and crypto), an <strong>online-banking link and user ID</strong>, a <strong>customer-service phone</strong>, and free-form <strong>notes</strong>. Beyond those, the fields adapt to the account type:',
+          'Every account can carry an <strong>account number</strong> (except cash, crypto, and credit cards), an <strong>online-banking link and user ID</strong>, and free-form <strong>notes</strong>. Beyond those, the fields adapt to the account type:',
       },
       {
         type: 'list',

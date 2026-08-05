@@ -40,11 +40,13 @@ function details(overrides: Partial<AccountDetails> = {}): AccountDetails {
 }
 
 describe('type predicates', () => {
-  it('showsAccountNumber hides for cash + crypto + empty', () => {
+  it('showsAccountNumber hides for cash + crypto + credit_card + empty', () => {
     expect(showsAccountNumber('checking')).toBe(true);
     expect(showsAccountNumber('loan')).toBe(true);
+    expect(showsAccountNumber('education_529')).toBe(true);
     expect(showsAccountNumber('cash')).toBe(false);
     expect(showsAccountNumber('crypto')).toBe(false);
+    expect(showsAccountNumber('credit_card')).toBe(false);
     expect(showsAccountNumber('')).toBe(false);
   });
   it('group predicates', () => {
