@@ -60,7 +60,8 @@ type EditableField =
   | 'pickup'
   | 'instructorName'
   | 'instructorContact'
-  | 'notes';
+  | 'notes'
+  | 'link';
 
 const props = defineProps<{
   activity: FamilyActivity | null;
@@ -204,6 +205,7 @@ const draftPickupMemberId = ref('');
 const draftInstructorName = ref('');
 const draftInstructorContact = ref('');
 const draftNotes = ref('');
+const draftLink = ref('');
 
 // Reschedule state
 const showReschedule = ref(false);
@@ -216,6 +218,7 @@ const rescheduleEndTime = ref('');
 const titleInputRef = ref<HTMLInputElement | null>(null);
 const instructorNameRef = ref<HTMLInputElement | null>(null);
 const instructorContactRef = ref<HTMLInputElement | null>(null);
+const linkRef = ref<HTMLInputElement | null>(null);
 const notesRef = ref<HTMLTextAreaElement | null>(null);
 
 const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
@@ -256,12 +259,16 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         case 'notes':
           draftNotes.value = activity.value.notes ?? '';
           break;
+        case 'link':
+          draftLink.value = activity.value.link ?? '';
+          break;
       }
       nextTick(() => {
         if (field === 'title') titleInputRef.value?.focus();
         if (field === 'instructorName') instructorNameRef.value?.focus();
         if (field === 'instructorContact') instructorContactRef.value?.focus();
         if (field === 'notes') notesRef.value?.focus();
+        if (field === 'link') linkRef.value?.focus();
       });
     },
     async saveDraft(field) {
@@ -383,6 +390,14 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           const val = draftNotes.value.trim() || null;
           if (val !== (editing.notes ?? null)) {
             update.notes = val;
+            changed = true;
+          }
+          break;
+        }
+        case 'link': {
+          const val = draftLink.value.trim() || null;
+          if (val !== (editing.link ?? null)) {
+            update.link = val;
             changed = true;
           }
           break;
@@ -1502,6 +1517,60 @@ async function confirmReschedule() {
                     </svg>
                   </button>
                 </div>
+              </div>
+            </template>
+          </InlineEditField>
+        </FormFieldGroup>
+
+        <!-- Link — only shown when populated -->
+        <FormFieldGroup v-if="activity.link" :label="t('planner.field.link')">
+          <InlineEditField
+            :editing="editingField === 'link'"
+            tint-color="orange"
+            @start-edit="startEdit('link')"
+          >
+            <template #view>
+              <div class="flex min-w-0 items-center gap-1.5">
+                <a
+                  :href="
+                    activity.link.startsWith('http') ? activity.link : `https://${activity.link}`
+                  "
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="truncate text-sm text-[#00B4D8] hover:underline"
+                  @click.stop
+                >
+                  {{ activity.link.replace(/^https?:\/\//, '') }}
+                </a>
+                <span class="shrink-0 text-xs opacity-40" aria-hidden="true">🔗</span>
+              </div>
+            </template>
+            <template #edit>
+              <div class="flex items-center gap-2">
+                <div class="flex-1">
+                  <BaseInput
+                    ref="linkRef"
+                    v-model="draftLink"
+                    type="url"
+                    placeholder="https://..."
+                    class="rounded-[14px] ring-2 ring-orange-500/30"
+                    @keydown="handleInputKeydown('link')($event)"
+                  />
+                </div>
+                <button
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                  @click.stop="saveField('link')"
+                >
+                  <svg
+                    class="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
               </div>
             </template>
           </InlineEditField>

@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-07-25",
-    "translationCount": 3841
+    "lastUpdated": "2026-08-05",
+    "translationCount": 3842
   },
   "translations": {
     "app.name": {
@@ -19210,6 +19210,11 @@
       "translation": "{n}天前",
       "hash": "so228i",
       "lastUpdated": "2026-07-25"
+    },
+    "planner.field.link": {
+      "translation": "链接",
+      "hash": "1erkq",
+      "lastUpdated": "2026-08-05"
     }
   }
 }
