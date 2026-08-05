@@ -82,9 +82,26 @@ export function extractUrls(text: string): string[] {
 }
 
 /** Get display-friendly domain from a URL (e.g. "docs.google.com"). */
+/**
+ * Normalize a user-entered URL into a safe absolute href. Prepends `https://`
+ * unless the string ALREADY carries a scheme (`http://`, `https://`, `ftp://`,
+ * …). Detecting the scheme by a proper `scheme://` test — not `startsWith('http')`
+ * — so a bare domain that happens to begin with the letters "http"
+ * (e.g. `httpbin.org`, `http.mybank.com`) is still given a scheme rather than
+ * left as a relative path the browser resolves against the app origin.
+ * Empty/blank input is returned unchanged (callers guard on presence).
+ */
+export function ensureHttpUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 export function getUrlDomain(url: string): string {
   try {
-    const { hostname } = new URL(url);
+    // Normalize first so a scheme-less input (e.g. "secure.chase.com/login")
+    // parses and yields just the hostname instead of falling through to raw.
+    const { hostname } = new URL(ensureHttpUrl(url));
     return hostname.replace(/^www\./, '');
   } catch {
     return url;

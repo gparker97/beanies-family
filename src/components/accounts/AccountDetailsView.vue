@@ -8,7 +8,7 @@ import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useClipboard } from '@/composables/useClipboard';
 import { showToast } from '@/composables/useToast';
-import { getUrlDomain } from '@/utils/url';
+import { getUrlDomain, ensureHttpUrl } from '@/utils/url';
 import { getOrdinalSuffix } from '@/utils/format';
 import {
   showsAccountNumber,
@@ -41,10 +41,7 @@ const creditLimit = computed(() =>
     : ''
 );
 
-const bankUrl = computed(() => props.account.onlineBankingUrl ?? '');
-const bankHref = computed(() =>
-  bankUrl.value.startsWith('http') ? bankUrl.value : `https://${bankUrl.value}`
-);
+const bankHref = computed(() => ensureHttpUrl(props.account.onlineBankingUrl ?? ''));
 
 async function copyAddress(address: string) {
   const ok = await copy(address);
@@ -155,13 +152,15 @@ async function copyAddress(address: string) {
           <dd class="font-outfit text-right text-sm font-semibold">{{ account.swiftBic }}</dd>
         </div>
         <div
-          v-if="account.type === 'savings' && account.interestRate"
+          v-if="account.type === 'savings' && account.savingsInterestRate"
           class="flex justify-between gap-4 border-b border-[var(--divider,rgba(44,62,80,0.08))] py-2.5 last:border-0"
         >
           <dt class="text-sm text-[var(--color-text-muted)]">
             {{ t('accountDetails.field.interestRate') }}
           </dt>
-          <dd class="font-outfit text-right text-sm font-semibold">{{ account.interestRate }}%</dd>
+          <dd class="font-outfit text-right text-sm font-semibold">
+            {{ account.savingsInterestRate }}%
+          </dd>
         </div>
       </template>
 
