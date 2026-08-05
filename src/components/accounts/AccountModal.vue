@@ -83,6 +83,14 @@ const coOwnerMembers = computed(() =>
   familyStore.sortedHumans.filter((m) => m.id !== memberId.value)
 );
 
+// Collapse the joint-owner section back to the subtle link. Clears the
+// selection too — a hidden-but-populated list would still persist on save,
+// so "collapsed" must mean "no joint owners".
+function collapseCoOwners() {
+  showCoOwners.value = false;
+  coOwnerIds.value = [];
+}
+
 // Loan state (for loan-type accounts)
 const interestRate = ref<number | undefined>(undefined);
 const monthlyPayment = ref<number | undefined>(undefined);
@@ -284,6 +292,17 @@ function handleDelete() {
       + {{ t('accounts.jointOwnerAdd') }}
     </button>
     <FormFieldGroup v-else-if="showCoOwners" :label="t('accounts.jointOwners')">
+      <template #label-extra>
+        <button
+          type="button"
+          class="hover:text-primary-500 ml-1 text-sm leading-none text-[var(--color-text-muted)] transition-colors"
+          :aria-label="t('accounts.jointOwnerRemove')"
+          :title="t('accounts.jointOwnerRemove')"
+          @click="collapseCoOwners"
+        >
+          &times;
+        </button>
+      </template>
       <FamilyChipPicker v-model="coOwnerIds" mode="multi" :members="coOwnerMembers" />
     </FormFieldGroup>
 
