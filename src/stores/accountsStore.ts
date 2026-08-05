@@ -11,6 +11,8 @@ import { mutate } from '@/services/automerge/worker/docClient';
 import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
 import { toISODateString } from '@/utils/date';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
+import { accountDetailTelemetry } from '@/utils/accountDetails';
 import type { Account, CreateAccountInput, UpdateAccountInput, CurrencyCode } from '@/types/models';
 
 export const useAccountsStore = defineStore('accounts', () => {
@@ -155,6 +157,13 @@ export const useAccountsStore = defineStore('accounts', () => {
         const isFirst = accounts.value.length === 0;
         // Immutable update: assign a new array so downstream computeds re-evaluate
         accounts.value = [...accounts.value, account];
+        // Adoption/diagnostic signal — counts/booleans only, never field values.
+        logEvent({
+          level: 'info',
+          surface: 'account-details',
+          message: 'account created',
+          context: accountDetailTelemetry(account),
+        });
         if (isFirst) {
           celebrate('first-account');
         }
@@ -175,6 +184,13 @@ export const useAccountsStore = defineStore('accounts', () => {
         if (updated) {
           // Immutable update: assign a new array so downstream computeds re-evaluate
           accounts.value = accounts.value.map((a) => (a.id === id ? updated : a));
+          // Adoption/diagnostic signal — counts/booleans only, never field values.
+          logEvent({
+            level: 'info',
+            surface: 'account-details',
+            message: 'account updated',
+            context: accountDetailTelemetry(updated),
+          });
         }
         return updated;
       },

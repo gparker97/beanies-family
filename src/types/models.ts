@@ -179,6 +179,48 @@ export type AccountType =
   | 'loan'
   | 'other';
 
+// Card network for credit_card account details (proper nouns — rendered via
+// CARD_NETWORK_LABELS, never translated).
+export type CardNetwork =
+  'visa' | 'mastercard' | 'amex' | 'discover' | 'unionpay' | 'jcb' | 'other';
+
+// Blockchain network for a crypto wallet (proper nouns — rendered via
+// CRYPTO_CHAIN_LABELS, never translated).
+export type CryptoChain = 'ethereum' | 'bitcoin' | 'solana' | 'polygon' | 'other';
+
+// A single labelled PUBLIC crypto wallet on a crypto account. Reference info
+// only — NEVER a seed phrase or private key (those wait for the secrets module).
+export interface CryptoWallet {
+  id: UUID; // stable key for v-for + Automerge identity
+  label: string;
+  address: string;
+  chain?: CryptoChain;
+}
+
+// Form-state shape for the account-details tier. Decouples the input layer
+// (strings, always-present keys) from the persisted layer (optional, coerced).
+// `savingsInterestRate` maps to `Account.interestRate` for savings accounts.
+// Bridged to/from `Account` by extractAccountDetails / buildAccountDetailsPatch
+// in `utils/accountDetails.ts`.
+export interface AccountDetails {
+  accountNumber: string;
+  onlineBankingUrl: string;
+  onlineBankingUserId: string;
+  customerServicePhone: string;
+  notes: string;
+  routingNumber: string;
+  iban: string;
+  swiftBic: string;
+  savingsInterestRate?: number;
+  cardNetwork: CardNetwork | '';
+  cardLast4: string;
+  cardExpiry: string;
+  creditLimit?: number;
+  statementDay?: number;
+  paymentDueDay?: number;
+  wallets: CryptoWallet[];
+}
+
 export interface Account {
   id: UUID;
   memberId: UUID;
@@ -191,8 +233,30 @@ export interface Account {
   institutionCountry?: string;
   isActive: boolean;
   includeInNetWorth: boolean;
+
+  // Account details (optional reference info — see docs/plans/2026-08-05-account-details-more-section.md).
+  // The non-secret tier: identifying/reference info only. Access credentials
+  // (passwords, PIN, CVV, full PAN, seed phrases) are NOT stored here — they
+  // wait for a future secrets module with per-member private encryption.
+  // All flat (top-level) so the repo's delete-on-undefined update works.
+  accountNumber?: string; // full account number (bank); hidden for cash + crypto
+  onlineBankingUrl?: string;
+  onlineBankingUserId?: string;
+  customerServicePhone?: string;
+  notes?: string;
+  routingNumber?: string; // routing / sort code (checking/savings)
+  iban?: string; // (checking/savings)
+  swiftBic?: string; // (checking/savings)
+  cardNetwork?: CardNetwork; // (credit_card)
+  cardLast4?: string; // last 4 digits ONLY — never the full PAN (credit_card)
+  cardExpiry?: string; // "MM/YY" (credit_card)
+  creditLimit?: number; // account currency (credit_card)
+  statementDay?: number; // 1..31 (credit_card)
+  paymentDueDay?: number; // 1..31 (credit_card)
+  wallets?: CryptoWallet[]; // labelled public wallets (crypto)
+
   linkedAssetId?: UUID; // Links a loan account to its source asset
-  interestRate?: number; // Annual interest rate (loan accounts only)
+  interestRate?: number; // Annual interest rate (loan accounts + savings)
   monthlyPayment?: number; // Monthly payment amount (loan accounts only)
   loanTermMonths?: number; // Loan term in months (loan accounts only)
   loanStartDate?: ISODateString; // Loan start date (loan accounts only)

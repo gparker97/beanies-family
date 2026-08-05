@@ -211,6 +211,20 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'hint_op',
   'hint_reason', // why a candidate was not generated (no-dob | out-of-window | ...)
   'hint_count', // count carried by the per-reason "trigger skipped" debug event
+  // Account-details adoption/diagnostic counters (surface `account-details`).
+  // All PII-FREE by construction: an account-type enum plus booleans + counts
+  // summarizing WHICH detail categories were populated — NEVER the field values
+  // (account numbers, card digits, wallet addresses, URLs, phones, notes are
+  // sensitive financial data and must never enter the firehose). MIRROR every
+  // key here in the Lambda allowlist + its pinned test, AND in the store
+  // data-collection declarations (docs/runbooks/native-store-submission.md,
+  // PrivacyInfo.xcprivacy, Play Data Safety, web/src/pages/privacy.astro).
+  'account_type',
+  'has_account_number',
+  'has_online_banking',
+  'has_card_details',
+  'wallet_count',
+  'detail_field_count',
 ]);
 
 export const MAX_STRING_LEN = 200;

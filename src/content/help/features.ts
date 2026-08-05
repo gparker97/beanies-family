@@ -1576,4 +1576,70 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'account-details',
+    category: 'features',
+    title: 'Keep account details in one place',
+    excerpt:
+      'Store the reference details you always dig for — account number, online-banking link, card last-4, crypto wallets — right on the account.',
+    icon: '\u{1F3E6}',
+    readTime: 3,
+    updatedDate: '2026-08-05',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          "An account can hold more than a balance. Under <strong>More Details</strong> on any account you can jot down the reference details you always end up hunting for — the account number, where you log in, which card ends in what, or the public addresses of your crypto wallets. It's all optional, so add only what's useful to you.",
+      },
+      {
+        type: 'heading',
+        content: 'Add details to an account',
+        level: 2,
+        id: 'add-details',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open an account and tap <strong>Edit</strong> (or add a new one).',
+          'Tap <strong>More Details</strong> to expand the extra fields.',
+          'Fill in whatever you like and tap <strong>Save</strong>. Blank fields are simply skipped.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Which fields appear',
+        level: 2,
+        id: 'which-fields',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Every account can carry an <strong>account number</strong> (except cash and crypto), an <strong>online-banking link and user ID</strong>, a <strong>customer-service phone</strong>, and free-form <strong>notes</strong>. Beyond those, the fields adapt to the account type:',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Checking / savings</strong> — routing or sort code, IBAN, SWIFT/BIC (and an interest rate for savings).',
+          '<strong>Credit card</strong> — network, the last 4 digits, expiry, credit limit, and your statement and payment-due days.',
+          '<strong>Crypto</strong> — a list of labelled public wallet addresses, each with an optional chain.',
+        ],
+      },
+      {
+        type: 'callout',
+        title: 'Visible to your whole family',
+        icon: '\u{1F46A}',
+        content:
+          'Account details are stored <strong>encrypted</strong> in your Family Data File, but everyone in your family can see them — the same as your balances. Only add what you’re happy for your family to see.',
+      },
+      {
+        type: 'callout',
+        title: 'What beanies never stores',
+        icon: '\u{1F512}',
+        content:
+          'For your safety, beanies deliberately does <strong>not</strong> store your card’s CVV / security code, your PINs, your full card number, your online-banking password, or a crypto seed phrase or private key. Card details keep only the last 4 digits — just enough to recognise the card. A dedicated secure area for passwords is planned for a future update.',
+      },
+    ],
+  },
 ];
