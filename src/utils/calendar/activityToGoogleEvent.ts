@@ -183,6 +183,7 @@ export function computePushHash(
     feeCurrency: activity.feeCurrency,
     feeSchedule: activity.feeSchedule,
     notes: activity.notes,
+    link: activity.link,
     isActive: activity.isActive,
     // NOTE: `reminderMinutes` is deliberately EXCLUDED — it is not exported
     // (`buildReminders` always emits empty overrides), so a field that cannot
