@@ -206,7 +206,6 @@ export interface AccountDetails {
   accountNumber: string;
   onlineBankingUrl: string;
   onlineBankingUserId: string;
-  customerServicePhone: string;
   notes: string;
   routingNumber: string;
   iban: string;
@@ -239,10 +238,9 @@ export interface Account {
   // (passwords, PIN, CVV, full PAN, seed phrases) are NOT stored here — they
   // wait for a future secrets module with per-member private encryption.
   // All flat (top-level) so the repo's delete-on-undefined update works.
-  accountNumber?: string; // full account number (bank); hidden for cash + crypto
+  accountNumber?: string; // full account number (bank); hidden for cash + crypto + credit cards
   onlineBankingUrl?: string;
   onlineBankingUserId?: string;
-  customerServicePhone?: string;
   notes?: string;
   routingNumber?: string; // routing / sort code (checking/savings)
   iban?: string; // (checking/savings)

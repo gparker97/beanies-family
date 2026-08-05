@@ -49,7 +49,6 @@ export const ACCOUNT_DETAIL_KEYS: (keyof Account)[] = [
   'accountNumber',
   'onlineBankingUrl',
   'onlineBankingUserId',
-  'customerServicePhone',
   'notes',
   'routingNumber',
   'iban',
