@@ -55,6 +55,20 @@ const transactionsStore = useTransactionsStore();
 const recurringStore = useRecurringStore();
 const { getMemberName } = useMemberInfo();
 
+/** Comma-joined member names for the joint-owner / "for whom" display lines. */
+const coOwnerNames = computed(() =>
+  (props.account?.coOwnerIds ?? [])
+    .map((id) => getMemberName(id))
+    .filter(Boolean)
+    .join(', ')
+);
+const forNames = computed(() =>
+  (props.account?.forMemberIds ?? [])
+    .map((id) => getMemberName(id))
+    .filter(Boolean)
+    .join(', ')
+);
+
 const VISIBLE_CAP = 20;
 const activeFilter = ref<ActivityFilter>('all');
 
@@ -211,6 +225,12 @@ watch(
           class="font-outfit text-sm text-[#2C3E50]/70 dark:text-gray-300"
         >
           {{ account.institution }}
+        </p>
+        <p v-if="coOwnerNames" class="font-outfit text-sm text-[#2C3E50]/70 dark:text-gray-300">
+          {{ t('accounts.jointOwners') }}: {{ coOwnerNames }}
+        </p>
+        <p v-if="forNames" class="font-outfit text-sm text-[#2C3E50]/70 dark:text-gray-300">
+          {{ t('accounts.forWhom') }}: {{ forNames }}
         </p>
         <div>
           <p

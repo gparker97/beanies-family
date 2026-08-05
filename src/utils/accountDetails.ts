@@ -36,6 +36,27 @@ export function cryptoFieldsApply(type: AccountType | ''): boolean {
   return type === 'crypto';
 }
 
+// Account types where earmarking the account "for" one or more family members is
+// common (college funds, ISAs, kids' savings, retirement pots). Not limited to
+// kids — a spouse's education/retirement account qualifies too.
+const FOR_WHOM_TYPES = new Set<AccountType>([
+  'savings',
+  'investment',
+  'education_529',
+  'education_savings',
+  'retirement',
+  'retirement_401k',
+  'retirement_ira',
+  'retirement_roth_ira',
+  'retirement_bene_ira',
+  'retirement_kids_ira',
+]);
+
+/** Whether the optional "For" (who the account is for) selector applies. */
+export function showsForWhomField(type: AccountType | ''): boolean {
+  return type !== '' && FOR_WHOM_TYPES.has(type);
+}
+
 // ── Form-state factory + hydration ──────────────────────────────────────────
 
 export function emptyAccountDetails(): AccountDetails {

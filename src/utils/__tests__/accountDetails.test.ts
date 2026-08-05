@@ -4,6 +4,7 @@ import {
   bankFieldsApply,
   cardFieldsApply,
   cryptoFieldsApply,
+  showsForWhomField,
   emptyAccountDetails,
   extractAccountDetails,
   sanitizeWallets,
@@ -57,6 +58,15 @@ describe('type predicates', () => {
     expect(cardFieldsApply('checking')).toBe(false);
     expect(cryptoFieldsApply('crypto')).toBe(true);
     expect(cryptoFieldsApply('cash')).toBe(false);
+  });
+  it('showsForWhomField covers savings/investment/education/retirement, not checking/credit', () => {
+    expect(showsForWhomField('savings')).toBe(true);
+    expect(showsForWhomField('investment')).toBe(true);
+    expect(showsForWhomField('education_529')).toBe(true);
+    expect(showsForWhomField('retirement_kids_ira')).toBe(true);
+    expect(showsForWhomField('checking')).toBe(false);
+    expect(showsForWhomField('credit_card')).toBe(false);
+    expect(showsForWhomField('')).toBe(false);
   });
 });
 
