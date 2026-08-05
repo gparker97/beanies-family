@@ -52,6 +52,8 @@ infrastructure/**/.terraform/
 *.tfplan
 tfplan
 tfplan.out
+# A filled-in copy of the terraform env file — the .example template stays tracked.
+.beanies-tf.env
 infrastructure/*.plan
 
 # Promo-video recording artifacts (raw footage, traces) — never committed

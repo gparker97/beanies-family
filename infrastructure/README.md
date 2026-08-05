@@ -27,18 +27,41 @@ The cloud build (`app.beanies.family`) uses these same Lambdas via the Terraform
 
 ## Setup
 
+### 1. Environment file (one-time)
+
+Five Terraform variables are sensitive and have no defaults — an apply fails without all of them. They live in a private env file rather than a tfvars file, so they never risk being committed:
+
 ```bash
+cp infrastructure/.beanies-tf.env.example ~/.beanies-tf.env
+chmod 600 ~/.beanies-tf.env
+# edit ~/.beanies-tf.env and fill in the five keys
+```
+
+The template documents where each key comes from, and how to read it back out of the deployed Lambda if you lose it.
+
+**Account note:** beanies.family is in the **personal** AWS account `517040426968` (the `default` profile) — _not_ the grobrix account `785130009771` used by other projects. The env file pins the profile and region, and `beanies_tf_check` fails loudly if the shell is authenticated to the wrong account.
+
+### 2. Plan and apply
+
+```bash
+source ~/.beanies-tf.env
 cd infrastructure
+
+beanies_tf_check   # preflight: right account, right region, all five vars set
 
 # Initialize Terraform (downloads providers, connects to state backend)
 terraform init
 
-# Review planned changes
-terraform plan -var-file=environments/prod.tfvars
+# Review planned changes — terraform.auto.tfvars is auto-loaded, no -var-file needed
+terraform plan
 
 # Apply changes
-terraform apply -var-file=environments/prod.tfvars
+terraform apply
 ```
+
+> **Read every resource change in the plan**, not just the one you intended to touch. Manual console edits show up as drift that Terraform will silently revert.
+
+Three of the five keys (`registry_api_key`, `log_ingest_api_key`, `ai_extract_api_key`) ship inside the public client bundle and must match their GitHub Actions secrets exactly — rotating one means updating both sides and redeploying the client. See the template for the mapping.
 
 ## State Management
 
