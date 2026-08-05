@@ -20,4 +20,4 @@
  * `getFullVersionLabel`). Bump this constant as the first step of a prod release so
  * the shown version never goes stale the way the old hardcoded "v1.0.0 - MVP" did.
  */
-export const APP_VERSION = '0.9.8R3';
+export const APP_VERSION = '0.9.9';
