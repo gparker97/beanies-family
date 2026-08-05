@@ -222,7 +222,14 @@ export interface AccountDetails {
 
 export interface Account {
   id: UUID;
-  memberId: UUID;
+  memberId: UUID; // Primary owner — drives net-worth attribution, grouping, and member filtering.
+  // Additional (joint) owners — DESCRIPTIVE ONLY. Not wired into net-worth,
+  // grouping, or member filtering (the primary owner remains authoritative, so a
+  // joint balance is never double-counted). Empty/absent = solely owned.
+  coOwnerIds?: UUID[];
+  // Who this account is for (e.g. a child's college fund, a spouse's ISA).
+  // Descriptive only; shown on savings/investment/education/retirement types.
+  forMemberIds?: UUID[];
   name: string;
   icon?: string; // Emoji icon (e.g. "🏦")
   type: AccountType;

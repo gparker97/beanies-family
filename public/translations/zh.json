@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-05",
-    "translationCount": 3887
+    "translationCount": 3890
   },
   "translations": {
     "app.name": {
@@ -19439,6 +19439,21 @@
     "accountDetails.copyFailedMsg": {
       "translation": "手动复制地址。",
       "hash": "d1owbv",
+      "lastUpdated": "2026-08-05"
+    },
+    "accounts.jointOwnerAdd": {
+      "translation": "共有人",
+      "hash": "sodkse",
+      "lastUpdated": "2026-08-05"
+    },
+    "accounts.jointOwners": {
+      "translation": "共同所有者",
+      "hash": "5fnqyy",
+      "lastUpdated": "2026-08-05"
+    },
+    "accounts.forWhom": {
+      "translation": "对于",
+      "hash": "1ind",
       "lastUpdated": "2026-08-05"
     }
   }
