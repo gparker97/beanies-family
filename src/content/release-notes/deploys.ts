@@ -17,6 +17,61 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.08.05',
+    date: '2026-08-05',
+    month: '5 august 2026',
+    spotlight: true,
+    summary: {
+      en: 'Keep account details in one place, and add links to your activities.',
+      beanie: 'keep account details in one place, and add links to your activities.',
+    },
+    features: [
+      {
+        icon: '🏦',
+        title: {
+          en: 'Account details, all in one place',
+          beanie: 'account details, all in one place',
+        },
+        description: {
+          en: 'Accounts can now keep the reference bits you always hunt for - account number, online-banking link and login, card network and last 4, even crypto wallet addresses - tucked under More Details. For your safety we never store passwords, PINs, card security codes, or seed phrases.',
+          beanie:
+            'accounts can now keep the reference bits you always hunt for - account number, online-banking link and login, card network and last 4, even crypto wallet addresses - tucked under more details. for your safety we never store passwords, pins, card security codes, or seed phrases.',
+        },
+      },
+      {
+        icon: '👪',
+        title: { en: "Joint owners, and who it's for", beanie: "joint owners, and who it's for" },
+        description: {
+          en: "Add extra owners to a shared account, and mark who a savings, investment, or education account is for, like a child's college fund.",
+          beanie:
+            "add extra owners to a shared account, and mark who a savings, investment, or education account is for, like a child's college fund.",
+        },
+      },
+      {
+        icon: '🔗',
+        title: { en: 'Links on activities', beanie: 'links on activities' },
+        description: {
+          en: "Add a booking page, class info, or event link to any calendar activity, so it's one tap away when you need it.",
+          beanie:
+            "add a booking page, class info, or event link to any calendar activity, so it's one tap away when you need it.",
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.07.24',
     date: '2026-07-24',
     month: '24 july 2026',
