@@ -32,6 +32,7 @@ import { getActivityCategoryColor, getActivityFallbackEmoji } from '@/constants/
 import { addHourToTime, formatNookDate } from '@/utils/date';
 import { buildRecurrenceOptions } from '@/utils/format';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
+import { ensureHttpUrl } from '@/utils/url';
 import type {
   FamilyActivity,
   ActivityCategory,
@@ -1149,7 +1150,7 @@ function handleSave() {
               <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
               <a
                 v-if="link"
-                :href="link.startsWith('http') ? link : `https://${link}`"
+                :href="ensureHttpUrl(link)"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--tint-slate-5)] text-sm transition-colors hover:bg-[var(--tint-slate-10)] dark:bg-slate-700"

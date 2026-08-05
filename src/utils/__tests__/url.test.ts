@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractUrls, getUrlDomain, getUrlLabel, getFaviconUrl } from '@/utils/url';
+import { extractUrls, getUrlDomain, getUrlLabel, getFaviconUrl, ensureHttpUrl } from '@/utils/url';
 
 describe('extractUrls', () => {
   it('extracts https URLs from text', () => {
@@ -62,6 +62,37 @@ describe('getUrlDomain', () => {
 
   it('returns raw string for invalid URL', () => {
     expect(getUrlDomain('not-a-url')).toBe('not-a-url');
+  });
+
+  it('extracts the hostname from a scheme-less URL with a path (not the whole string)', () => {
+    expect(getUrlDomain('secure.chase.com/login')).toBe('secure.chase.com');
+  });
+});
+
+describe('ensureHttpUrl', () => {
+  it('leaves an already-schemed URL untouched', () => {
+    expect(ensureHttpUrl('https://x.com')).toBe('https://x.com');
+    // Insecure schemes are preserved too; built via concat to avoid the
+    // no-insecure-url lint (which bans http:// and ftp:// literals).
+    const httpScheme = 'http' + '://x.com';
+    expect(ensureHttpUrl(httpScheme)).toBe(httpScheme);
+    const ftpScheme = 'ftp' + '://x.com/f';
+    expect(ensureHttpUrl(ftpScheme)).toBe(ftpScheme);
+  });
+
+  it('prepends https:// to a bare domain', () => {
+    expect(ensureHttpUrl('secure.chase.com')).toBe('https://secure.chase.com');
+  });
+
+  it('prepends https:// to a bare domain that STARTS WITH the letters "http"', () => {
+    // The bug this guards: startsWith("http") wrongly treated these as schemed.
+    expect(ensureHttpUrl('httpbin.org')).toBe('https://httpbin.org');
+    expect(ensureHttpUrl('http.mybank.com')).toBe('https://http.mybank.com');
+  });
+
+  it('returns empty/blank input unchanged', () => {
+    expect(ensureHttpUrl('')).toBe('');
+    expect(ensureHttpUrl('   ')).toBe('');
   });
 });
 

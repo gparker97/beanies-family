@@ -93,7 +93,7 @@ export function extractAccountDetails(account: Account): AccountDetails {
     routingNumber: account.routingNumber ?? '',
     iban: account.iban ?? '',
     swiftBic: account.swiftBic ?? '',
-    savingsInterestRate: account.type === 'savings' ? account.interestRate : undefined,
+    savingsInterestRate: account.savingsInterestRate,
     cardNetwork: account.cardNetwork ?? '',
     cardLast4: account.cardLast4 ?? '',
     cardExpiry: account.cardExpiry ?? '',
@@ -119,17 +119,18 @@ export function sanitizeWallets(wallets: CryptoWallet[]): CryptoWallet[] {
 // ── Save-payload builder ────────────────────────────────────────────────────
 
 /**
- * Assemble the persisted patch by CONDITIONAL SPREAD.
+ * Assemble the persisted patch. EVERY detail key is always written: to its value
+ * when the field applies to this account type and is non-empty, or to `undefined`
+ * otherwise. Because the generic repo `update` deletes any key set to `undefined`,
+ * this means an in-type cleared field AND an off-type field are both removed — so
+ * changing an account's type purges the previous type's detail data instead of
+ * orphaning it in the encrypted file.
  *
- * A field appears in the patch ONLY when its type group applies. An
- * applicable-but-cleared field is emitted as `undefined` (so the repo deletes
- * the key and the clear round-trips). A non-applicable group is OMITTED
- * entirely — NEVER emitted as `undefined`. This is load-bearing: because the
- * generic repo `update` deletes any key whose value is `undefined`, a patch
- * that emitted `interestRate: undefined` while editing a LOAN would wipe the
- * loan's rate. `savingsInterestRate` therefore maps to `interestRate` only for
- * savings; for every other type the key is never mentioned (the loan block in
- * AccountModal remains its sole writer).
+ * This is SAFE (unlike an earlier version) because no detail key overlaps a
+ * loan-owned field: savings uses its own `savingsInterestRate`, never the loan
+ * `interestRate`. The only time this touches `interestRate` is to PURGE it from a
+ * non-loan account (legacy cleanup, see below); it is never written for a loan,
+ * so the AccountModal loan block remains a loan's sole rate writer.
  */
 export function buildAccountDetailsPatch(
   details: AccountDetails,
@@ -137,41 +138,49 @@ export function buildAccountDetailsPatch(
 ): Partial<Account> {
   const patch: Partial<Account> = {};
   const str = (s: string): string | undefined => s.trim() || undefined;
+  // Positive-only numbers (day-of-month, credit limit): 0/blank/negative → unset.
   const num = (n: number | undefined): number | undefined =>
     typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined;
+  // Interest rate may legitimately be negative (negative deposit rates); 0/blank
+  // is the "not entered" sentinel from the numeric input.
+  const rate = (n: number | undefined): number | undefined =>
+    typeof n === 'number' && Number.isFinite(n) && n !== 0 ? n : undefined;
 
-  // Common (all types) — always in-type, so empty → undefined (deletes on update).
+  // Common (shown for all types except where a predicate hides the field).
   patch.onlineBankingUrl = str(details.onlineBankingUrl);
   patch.onlineBankingUserId = str(details.onlineBankingUserId);
   patch.notes = str(details.notes);
+  patch.accountNumber = showsAccountNumber(type) ? str(details.accountNumber) : undefined;
 
-  // Account number — hidden for cash + crypto.
-  if (showsAccountNumber(type)) patch.accountNumber = str(details.accountNumber);
+  // Bank (checking / savings). Off-type → undefined (purged).
+  const bank = bankFieldsApply(type);
+  patch.routingNumber = bank ? str(details.routingNumber) : undefined;
+  patch.iban = bank ? str(details.iban) : undefined;
+  patch.swiftBic = bank ? str(details.swiftBic) : undefined;
+  // Savings rate → its OWN field, never the loan `interestRate`.
+  patch.savingsInterestRate = type === 'savings' ? rate(details.savingsInterestRate) : undefined;
+  // `interestRate` is loan-exclusive. Purge it from EVERY non-loan account so a
+  // legacy value (from before savings had its own field, incl. the brief prod
+  // window that reused it) can never survive a type change and be misread as a
+  // loan rate. For a loan, we don't mention it — the AccountModal loan block is
+  // its sole writer, so a loan's rate is never wiped.
+  if (type !== 'loan') patch.interestRate = undefined;
 
-  // Bank (checking / savings).
-  if (bankFieldsApply(type)) {
-    patch.routingNumber = str(details.routingNumber);
-    patch.iban = str(details.iban);
-    patch.swiftBic = str(details.swiftBic);
-  }
-  // Savings interest rate → Account.interestRate. ONLY savings — never mention
-  // `interestRate` for any other type (protects a loan's rate).
-  if (type === 'savings') patch.interestRate = num(details.savingsInterestRate);
+  // Card (credit_card). Off-type → undefined (purged).
+  const card = cardFieldsApply(type);
+  patch.cardNetwork = card ? details.cardNetwork || undefined : undefined;
+  patch.cardLast4 = card ? str(details.cardLast4) : undefined;
+  patch.cardExpiry = card ? str(details.cardExpiry) : undefined;
+  patch.creditLimit = card ? num(details.creditLimit) : undefined;
+  patch.statementDay = card ? num(details.statementDay) : undefined;
+  patch.paymentDueDay = card ? num(details.paymentDueDay) : undefined;
 
-  // Card (credit_card).
-  if (cardFieldsApply(type)) {
-    patch.cardNetwork = details.cardNetwork || undefined;
-    patch.cardLast4 = str(details.cardLast4);
-    patch.cardExpiry = str(details.cardExpiry);
-    patch.creditLimit = num(details.creditLimit);
-    patch.statementDay = num(details.statementDay);
-    patch.paymentDueDay = num(details.paymentDueDay);
-  }
-
-  // Crypto wallets.
+  // Crypto wallets. Off-type → undefined (purged).
   if (cryptoFieldsApply(type)) {
     const clean = sanitizeWallets(details.wallets);
     patch.wallets = clean.length ? clean : undefined;
+  } else {
+    patch.wallets = undefined;
   }
 
   return patch;
@@ -229,14 +238,19 @@ export function validateAccountDetails(
 
 // ── Display + telemetry formatters ──────────────────────────────────────────
 
-/** "Visa ••1234" (or "••1234" with no network). Null when last-4 is absent/invalid. */
+/**
+ * "Visa ••1234" (both), "Visa" (network only), or "••1234" (last-4 only).
+ * Null only when NEITHER a network nor a valid last-4 is present — so a
+ * card that carries just a network still renders a chip (no empty section).
+ */
 export function formatCardChip(
   network?: Account['cardNetwork'] | '',
   last4?: string
 ): string | null {
-  if (!last4 || !/^\d{4}$/.test(last4)) return null;
   const net = network ? CARD_NETWORK_LABELS[network] : '';
-  return net ? `${net} ••${last4}` : `••${last4}`;
+  const digits = last4 && /^\d{4}$/.test(last4) ? `••${last4}` : '';
+  if (!net && !digits) return null;
+  return [net, digits].filter(Boolean).join(' ');
 }
 
 function isSet(v: unknown): boolean {

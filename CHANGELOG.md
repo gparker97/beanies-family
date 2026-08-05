@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-05
 
+### Fixed
+
+- **Account-details review fixes.** A code review of the new account-details feature caught several issues, now fixed: a savings account converted to a loan could carry its old interest rate onto the loan (savings now uses its own rate field, fully separate from loans); switching an account's type now clears the previous type's detail fields instead of leaving them stored; the Save button no longer looks enabled while silently doing nothing when a detail field is invalid; a savings account whose only detail is its rate now shows it; account and activity links entered as a bare domain that starts with "http" now open correctly; and negative savings rates now save.
+
 ### Added
 
 - **Accounts can now note joint owners and who they're for.** An account can optionally record additional (joint) owners — a subtle "add joint owner" option that stays out of the way unless you use it — and, for savings, investment, education, and retirement accounts, who the account is for (e.g. a child's college fund or a spouse's retirement pot). Both are descriptive and shown on the account; the primary owner still drives balances and totals.

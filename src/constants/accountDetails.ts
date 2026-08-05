@@ -43,8 +43,9 @@ export const CRYPTO_CHAIN_LABELS: Record<CryptoChain, string> = {
 // The single canonical list of the flat account-detail fields on `Account`.
 // Drives `hasAccountDetails`, the `detail_field_count` telemetry counter, and
 // is the seam a future secrets module migrates from ("move these keys").
-// NOTE: `interestRate` is intentionally EXCLUDED — it is shared with loans, so
-// it is not a detail-only field and must not flip `hasAccountDetails` for a loan.
+// NOTE: the loan `interestRate` is intentionally EXCLUDED — it is loan-owned,
+// not a detail field, and must not flip `hasAccountDetails` for a loan. The
+// savings rate lives in its own `savingsInterestRate` detail field (included).
 export const ACCOUNT_DETAIL_KEYS: (keyof Account)[] = [
   'accountNumber',
   'onlineBankingUrl',
@@ -53,6 +54,7 @@ export const ACCOUNT_DETAIL_KEYS: (keyof Account)[] = [
   'routingNumber',
   'iban',
   'swiftBic',
+  'savingsInterestRate',
   'cardNetwork',
   'cardLast4',
   'cardExpiry',
