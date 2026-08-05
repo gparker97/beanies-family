@@ -136,6 +136,14 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'hint_op',
   'hint_reason',
   'hint_count',
+  // Account-details adoption/diagnostic counters (surface `account-details`).
+  // PII-free: account-type enum + booleans + counts; never field values.
+  'account_type',
+  'has_account_number',
+  'has_online_banking',
+  'has_card_details',
+  'wallet_count',
+  'detail_field_count',
 ]);
 
 function getHeaders(event) {

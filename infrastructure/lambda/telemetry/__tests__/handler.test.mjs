@@ -202,6 +202,7 @@ describe('Telemetry Lambda handler', () => {
     // `family_email` is intentionally absent — the firehose is PII-free.
     it('matches the expected key set exactly', () => {
       const expected = [
+        'account_type',
         'action',
         'breadcrumbs',
         'browser',
@@ -213,6 +214,7 @@ describe('Telemetry Lambda handler', () => {
         'context_build_error',
         'credential_source',
         'detail',
+        'detail_field_count',
         'drive_file_not_found',
         'error_code',
         'family_id',
@@ -220,6 +222,9 @@ describe('Telemetry Lambda handler', () => {
         'file_id_tail',
         'from_path',
         'had_config',
+        'has_account_number',
+        'has_card_details',
+        'has_online_banking',
         'has_prf_output',
         'has_session',
         'hint_count',
@@ -272,6 +277,7 @@ describe('Telemetry Lambda handler', () => {
         'unwrap_ok',
         'visibility_state',
         'vue_info',
+        'wallet_count',
         'web_storage',
       ];
       assert.deepEqual([...ALLOWED_CONTEXT_KEYS].sort(), expected);

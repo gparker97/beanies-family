@@ -1822,6 +1822,99 @@ const STRING_DEFS = {
   'loanAccount.loanTerm': { en: 'Loan Term (Months)', beanie: 'loan term (months)' },
   'loanAccount.startDate': { en: 'Loan Start Date', beanie: 'loan start date' },
 
+  // Account details (optional reference info under "More Details")
+  'accountDetails.section.caption': {
+    en: 'Optional. Everything here is safe to leave blank — beanies stores it encrypted in your Family Data File.',
+    beanie:
+      'optional. everything here is safe to leave blank — beanies stores it encrypted in your family data file.',
+  },
+  'accountDetails.field.accountNumber': { en: 'Account Number', beanie: 'account number' },
+  'accountDetails.field.onlineBankingUrl': {
+    en: 'Online Banking URL',
+    beanie: 'online banking url',
+  },
+  'accountDetails.field.onlineBankingUserId': {
+    en: 'Online Banking User ID',
+    beanie: 'online banking user id',
+  },
+  'accountDetails.field.customerServicePhone': {
+    en: 'Customer-Service Phone',
+    beanie: 'customer-service phone',
+  },
+  'accountDetails.field.notes': { en: 'Notes', beanie: 'notes' },
+  'accountDetails.field.notesPlaceholder': {
+    en: 'Anything worth remembering about this account…',
+    beanie: 'anything worth remembering about this account…',
+  },
+  'accountDetails.bank.title': { en: 'Bank Details', beanie: 'bank details' },
+  'accountDetails.field.routingNumber': {
+    en: 'Routing / Sort Code',
+    beanie: 'routing / sort code',
+  },
+  'accountDetails.field.iban': { en: 'IBAN', beanie: 'iban' },
+  'accountDetails.field.swiftBic': { en: 'SWIFT / BIC', beanie: 'swift / bic' },
+  'accountDetails.field.interestRate': { en: 'Interest Rate (%)', beanie: 'interest rate (%)' },
+  'accountDetails.field.interestRateHint': {
+    en: 'Annual % — savings accounts.',
+    beanie: 'annual % — savings accounts.',
+  },
+  'accountDetails.card.title': { en: 'Credit Card Details', beanie: 'credit card details' },
+  'accountDetails.field.cardNetwork': { en: 'Card Network', beanie: 'card network' },
+  'accountDetails.field.cardLast4': { en: 'Last 4 Digits', beanie: 'last 4 digits' },
+  'accountDetails.field.cardExpiry': { en: 'Expiry (MM/YY)', beanie: 'expiry (mm/yy)' },
+  'accountDetails.field.creditLimit': { en: 'Credit Limit', beanie: 'credit limit' },
+  'accountDetails.field.statementDay': { en: 'Statement Day', beanie: 'statement day' },
+  'accountDetails.field.paymentDueDay': { en: 'Payment-Due Day', beanie: 'payment-due day' },
+  'accountDetails.card.cvvNote': {
+    en: 'Your CVV / security code is never stored — beanies keeps only what you need to recognise the card.',
+    beanie:
+      'your cvv / security code is never stored — beanies keeps only what you need to recognise the card.',
+  },
+  'accountDetails.crypto.title': { en: 'Wallets', beanie: 'wallets' },
+  'accountDetails.crypto.publicOnly': {
+    en: 'Public addresses only — never a seed phrase or private key.',
+    beanie: 'public addresses only — never a seed phrase or private key.',
+  },
+  'accountDetails.wallets.walletLabel': { en: 'Wallet', beanie: 'wallet' },
+  'accountDetails.wallets.labelField': { en: 'Label', beanie: 'label' },
+  'accountDetails.wallets.labelPlaceholder': {
+    en: 'e.g. Cold storage — Ledger',
+    beanie: 'e.g. cold storage — ledger',
+  },
+  'accountDetails.wallets.address': { en: 'Public Address', beanie: 'public address' },
+  'accountDetails.wallets.addressPlaceholder': { en: '0x… / bc1…', beanie: '0x… / bc1…' },
+  'accountDetails.wallets.chain': { en: 'Chain', beanie: 'chain' },
+  'accountDetails.wallets.chainOptional': { en: 'Chain (optional)', beanie: 'chain (optional)' },
+  'accountDetails.wallets.add': { en: 'Add Wallet', beanie: 'add wallet' },
+  'accountDetails.wallets.remove': { en: 'Remove wallet', beanie: 'remove wallet' },
+  'accountDetails.err.last4': {
+    en: 'Enter the last 4 digits (numbers only).',
+    beanie: 'enter the last 4 digits (numbers only).',
+  },
+  'accountDetails.err.expiry': { en: 'Use MM/YY, e.g. 08/27.', beanie: 'use mm/yy, e.g. 08/27.' },
+  'accountDetails.err.day': {
+    en: 'Enter a day from 1 to 31.',
+    beanie: 'enter a day from 1 to 31.',
+  },
+  'accountDetails.err.walletIncomplete': {
+    en: 'Add both a label and an address, or remove this wallet.',
+    beanie: 'add both a label and an address, or remove this wallet.',
+  },
+  'accountDetails.view.title': { en: 'Account Details', beanie: 'account details' },
+  'accountDetails.view.card': { en: 'Card', beanie: 'card' },
+  'accountDetails.view.expiry': { en: 'Expiry', beanie: 'expiry' },
+  'accountDetails.view.statementDue': { en: 'Statement / Due Day', beanie: 'statement / due day' },
+  'accountDetails.view.onlineBanking': { en: 'Online Banking', beanie: 'online banking' },
+  'accountDetails.view.userId': { en: 'User ID', beanie: 'user id' },
+  'accountDetails.view.customerService': { en: 'Customer Service', beanie: 'customer service' },
+  'accountDetails.copyAddress': { en: 'Copy address', beanie: 'copy address' },
+  'accountDetails.copied': { en: 'Address copied', beanie: 'address copied' },
+  'accountDetails.copyFailedTitle': { en: "Couldn't copy", beanie: "couldn't copy" },
+  'accountDetails.copyFailedMsg': {
+    en: 'Copy the address manually.',
+    beanie: 'copy the address manually.',
+  },
+
   // Family
   'family.title': { en: 'Family', beanie: 'the pod' },
   'family.addMember': { en: 'Add Member', beanie: 'add a beanie' },

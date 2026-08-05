@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **Accounts can now store reference details.** Under "More Details" on any account you can keep the info you always dig for — account number, online-banking link + user ID, customer-service phone, and notes — plus type-specific fields: routing/sort code, IBAN and SWIFT/BIC for bank accounts; card network, last 4, expiry, credit limit and statement/due days for credit cards; and a list of labelled public wallet addresses for crypto. Everything is optional and shows in a clean read-only panel on the account. For safety, beanies never stores your CVV, PINs, full card number, online-banking password, or crypto seed phrase.
 - **Activities can now include a link.** Add a URL (a booking page, class info, event page, etc.) to any activity — it appears as a clickable link in the activity, and syncs into the description of the matching Google Calendar event when calendar sync is on.
 
 ### Changed
